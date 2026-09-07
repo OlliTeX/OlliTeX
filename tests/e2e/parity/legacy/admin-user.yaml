@@ -1,0 +1,109 @@
+# Functional matrix — legacy /admin/user  (parity scope page 11 of 13)
+#
+# Each feature declares, for BOTH sides, the spec file and the test it lives in
+# (test_id = the FIRST word of the test title, matched case-insensitively by
+# parity/check.mjs). The gate is GREEN only when a matching test exists in both
+# the legacy baseline file and the hub parity file for EVERY feature.
+#
+# Equivalence definition (owner): the /hub feature does what the legacy feature
+# did — same endpoints + payloads + resulting state, same role sensitivity —
+# proven by the tests, not by eyeballing.
+
+page: /admin/user
+id: admin-user
+roles:
+  admin: full
+  tpladmin: denied
+  user: denied
+
+files:
+  legacy: specs/parity/legacy-admin-user.test.e2e.ts
+  hub: specs/parity/hub-admin-users.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: user list renders for site admin (role gate)
+    behavior: { endpoint: POST /admin/users, visible: user table + New user }
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: template-admin and plain user are denied (403 / no list)
+    behavior: { visible: 403 or hidden }
+    legacy_test: denied
+    hub_test: deny
+
+  - id: list
+    kind: table
+    desc: sorted user list (name/email/signed-up/last-active)
+    behavior: { endpoint: POST /admin/users, payload: { sort: { by, asc } } }
+    legacy_test: list
+    hub_test: renders   # hub renders the same table in the leaf
+
+  - id: create
+    kind: button
+    where: "New user" modal
+    behavior:
+      endpoint: POST /admin/user/create
+      payload: { email, firstName?, lastName? }
+      visible: new row present
+    legacy_test: create
+    hub_test: create
+
+  - id: resend
+    kind: button
+    where: row menu "Send activation email"
+    behavior: { endpoint: POST /admin/user/:id/send-activation }
+    legacy_test: resend
+    hub_test: resend
+
+  - id: info
+    kind: button
+    where: row menu "User info" / legacy Info
+    modal: ["User info (L1)"]
+    behavior: { visible: read-only detail dialog (email, role, signed-up) }
+    legacy_test: info
+    hub_test: info
+
+  - id: update
+    kind: button
+    where: row menu "Update…" / legacy Update
+    modal: ["Update user (L1)"]
+    behavior:
+      endpoint: POST /admin/user/:id/update
+      payload: { firstName, lastName, email, isAdmin, canManageTemplates }
+      visible: dialog closes, list refreshes
+    legacy_test: update
+    hub_test: update
+
+  - id: suspend
+    kind: button
+    where: row menu "Suspend user" / "Resume user"
+    behavior: { endpoint: POST /admin/user/:id/update, payload: { suspended: true } }
+    legacy_test: suspend
+    hub_test: suspend
+
+  - id: delete
+    kind: button
+    where: row menu "Delete user" (soft)
+    modal: ["Confirm (L1)"]
+    behavior: { endpoint: POST /admin/user/:id/delete, payload: { sendEmail, toUserId } }
+    legacy_test: delete
+    hub_test: delete
+
+  - id: restore
+    kind: button
+    where: deleted view "Restore user"
+    behavior: { endpoint: POST /admin/user/:id/restore }
+    legacy_test: delete      # legacy covers restore in the delete+restore test
+    hub_test: delete         # hub delete+purge test drives the deleted view
+
+  - id: purge
+    kind: button
+    where: deleted view "Purge permanently" (hard)
+    modal: ["Purge user permanently? (L1)"]
+    behavior: { endpoint: DELETE /admin/user/:id }
+    legacy_test: purge
+    hub_test: delete         # hub exercises purge inside the delete+purge test
