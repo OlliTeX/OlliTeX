@@ -94,7 +94,7 @@ export default function HubLayout({
             <Icon name={railOpen ? 'menu_open' : 'menu'} size={22} />
           </button>
           <Group gap="xs" wrap="nowrap">
-            <Icon name="auto_storyboard" size={26} style={{ color: 'var(--mantine-color-ollitex-6)' }} />
+            <Icon name="auto_stories" size={26} style={{ color: 'var(--mantine-color-ollitex-6)' }} />
             <div>
               <Title order={4} style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
                 {brand}

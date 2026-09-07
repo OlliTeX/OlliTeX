@@ -1,5 +1,4 @@
 import React from 'react'
-import { Accordion, Group, Text } from '@mantine/core'
 import Icon from '../shared/icons'
 import { useOpenSet, accordionState } from './accordion-state'
 import type { HubNode } from './nav-tree'
@@ -12,34 +11,36 @@ interface RailProps {
 
 /**
  * Recursive hub rail (nav_structure.md §3):
- * - every folder folds independently → each folder renders its OWN
- *   Mantine Accordion instance (separate id space), so no shared
- *   Accordion context can collapse unrelated branches
- * - open state is centralized (accordion-state) with persistence
- * - leaf = Mantine-styled row; active leaf highlighted
+ * - every folder folds independently (accordion-state store, persisted)
+ * - plain custom buttons (no widget CSS surprises — owner review #7:
+ *   folder heads must behave exactly like leaf rows)
+ * - tone (nav-tree): admin branches render RED text (danger),
+ *   user-settings branches BLUE (owner review #24)
+ * - open chevron rotates; active leaf highlighted in brand green
  */
-export default function Rail({ nav, active, onSelect }: RailProps) {
-  const open = useOpenSet()
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {nav.map(n => {
-        if (n.children && n.children.length > 0) return <Folder key={n.id} node={n} active={active} onSelect={onSelect} open={open} />
-        return <Leaf key={n.id} node={n} active={active} onSelect={onSelect} />
-      })}
-    </div>
-  )
+const TONE_COLOR: Record<string, string> = {
+  admin: 'var(--mantine-color-red-6)',
+  user: 'var(--mantine-color-blue-6)',
+}
+
+function toneOf(node: HubNode, inherit?: string): string | null {
+  if (node.tone) return node.tone
+  return inherit
 }
 
 function Leaf({
   node,
   active,
   onSelect,
+  tone,
 }: {
   node: HubNode
   active: string | null
   onSelect: (id: string) => void
+  tone?: string | null
 }) {
   const isActive = active === node.id
+  const toneColor = TONE_COLOR[toneOf(node, tone) || '']
   return (
     <button
       type="button"
@@ -58,7 +59,7 @@ function Leaf({
         fontWeight: isActive ? 600 : 500,
         textAlign: 'left',
         background: isActive ? 'var(--mantine-color-ollitex-6)' : 'transparent',
-        color: isActive ? 'var(--mantine-color-white)' : 'var(--mantine-color-text)',
+        color: isActive ? 'var(--mantine-color-white)' : toneColor || 'var(--mantine-color-text)',
         transition: 'background 120ms ease',
       }}
       onMouseEnter={e => {
@@ -71,69 +72,122 @@ function Leaf({
       <Icon
         name={node.icon}
         size={18}
-        style={{ color: isActive ? 'var(--mantine-color-white)' : 'var(--mantine-color-dimmed)' }}
+        style={{
+          color: isActive ? 'var(--mantine-color-white)' : toneColor || 'var(--mantine-color-dimmed)',
+          flexShrink: 0,
+        }}
       />
       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.label}</span>
     </button>
   )
 }
 
-/** One accordion instance per folder (independent fold state). */
+/** A folder row: button head + collapsible body (own open state). */
 function Folder({
   node,
   active,
   onSelect,
   open,
+  tone,
 }: {
   node: HubNode
   active: string | null
   onSelect: (id: string) => void
   open: Set<string>
+  tone?: string | null
 }) {
   const isOpen = open.has(node.id)
   const containsActive = active !== null && (active === node.id || active.startsWith(node.id + '.'))
-  const controlBg = containsActive ? 'var(--mantine-color-ollitex-0)' : 'transparent'
+  const toneHere = toneOf(node, tone)
+  const toneColor = TONE_COLOR[toneHere || '']
   return (
-    <Accordion
-      id={`hnav-${node.id.replace(/\./g, '_')}`}
-      value={isOpen ? 'f' : null}
-      onChange={(v: string | null) => {
-        const next = v === 'f'
-        if (next === isOpen) return
-        if (next) accordionState.open(node.id)
-        else accordionState.close(node.id)
-      }}
-      variant="call-out"
-      chevronPosition="right"
-      styles={{
-        root: { background: 'transparent', borderColor: 'transparent' },
-        item: { background: 'transparent', borderColor: 'transparent' },
-        control: { background: controlBg, borderRadius: 8, padding: '8px 10px', fontSize: 13.5 },
-        chevron: { color: 'var(--mantine-color-dimmed)' },
-        panel: { paddingTop: 4, paddingBottom: 6, paddingLeft: 8, paddingRight: 4 },
-      }}
-    >
-      <Accordion.Item value="f">
-        <Accordion.Control>
-          <Group gap={10} wrap="nowrap">
-            <Icon name={node.icon} size={18} style={{ color: 'var(--mantine-color-dimmed)' }} />
-            <Text size="sm" fw={650} style={{ flex: 1 }} ta="left">
-              {node.label}
-            </Text>
-          </Group>
-        </Accordion.Control>
-        <Accordion.Panel>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {node.children!.map(c =>
-              c.children && c.children.length > 0 ? (
-                <Folder key={c.id} node={c} active={active} onSelect={onSelect} open={open} />
-              ) : (
-                <Leaf key={c.id} node={c} active={active} onSelect={onSelect} />
-              )
-            )}
-          </div>
-        </Accordion.Panel>
-      </Accordion.Item>
-    </Accordion>
+    <div>
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        onClick={() => {
+          if (isOpen) accordionState.close(node.id)
+          else accordionState.open(node.id)
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          width: '100%',
+          padding: '8px 10px',
+          borderRadius: 8,
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: 13.5,
+          fontWeight: 650,
+          textAlign: 'left',
+          background: containsActive ? 'var(--mantine-color-default-hover)' : 'transparent',
+          color: toneColor || 'var(--mantine-color-text)',
+          transition: 'background 120ms ease',
+        }}
+        onMouseEnter={e => {
+          if (!containsActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--mantine-color-default-hover)'
+        }}
+        onMouseLeave={e => {
+          if (!containsActive) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+        }}
+      >
+        <Icon
+          name={node.icon}
+          size={18}
+          style={{
+            color: toneColor || 'var(--mantine-color-dimmed)',
+            flexShrink: 0,
+          }}
+        />
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {node.label}
+        </span>
+        <span
+          aria-hidden="true"
+          style={{
+            display: 'inline-flex',
+            transition: 'transform 160ms ease',
+            transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+            color: toneColor || 'var(--mantine-color-dimmed)',
+          }}
+        >
+          <Icon name="chevron_right" size={18} />
+        </span>
+      </button>
+      {isOpen ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 0 4px 10px' }}>
+          {node.children!.map(c =>
+            c.children && c.children.length > 0 ? (
+              <Folder
+                key={c.id}
+                node={c}
+                active={active}
+                onSelect={onSelect}
+                open={open}
+                tone={toneHere || tone}
+              />
+            ) : (
+              <Leaf key={c.id} node={c} active={active} onSelect={onSelect} tone={toneHere || tone} />
+            )
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export default function Rail({ nav, active, onSelect }: RailProps) {
+  const open = useOpenSet()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {nav.map(n =>
+        n.children && n.children.length > 0 ? (
+          <Folder key={n.id} node={n} active={active} onSelect={onSelect} open={open} />
+        ) : (
+          <Leaf key={n.id} node={n} active={active} onSelect={onSelect} />
+        )
+      )}
+    </div>
   )
 }

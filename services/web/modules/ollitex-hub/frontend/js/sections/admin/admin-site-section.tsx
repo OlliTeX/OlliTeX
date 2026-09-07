@@ -45,7 +45,7 @@ type Sec = Record<string, any>
 const NAV: { id: string; label: string; icon: string; group: string }[] = [
   { id: 'misc', label: 'Miscellaneous', icon: 'tune', group: 'General' },
   { id: 'signup', label: 'Sign-up', icon: 'person_add', group: 'General' },
-  { id: 'templates', label: 'Template gallery', icon: 'draft', group: 'General' },
+  { id: 'templates', label: 'Template gallery', icon: 'tag', group: 'General' },
   { id: 'zotero', label: 'Zotero', icon: 'auto_stories', group: 'Integrations' },
   { id: 'externalUrl', label: 'External URLs', icon: 'link', group: 'Integrations' },
   { id: 'sso-saml', label: 'SSO · SAML', icon: 'verified_user', group: 'Integrations' },
@@ -56,7 +56,7 @@ const NAV: { id: string; label: string; icon: string; group: string }[] = [
   { id: 'branding', label: 'Branding', icon: 'palette', group: 'Services' },
   { id: 'languagetool', label: 'Grammar (LT)', icon: 'spellcheck', group: 'Services' },
   { id: 'sandboxed-compiles', label: 'Sandboxed compiles', icon: 'build', group: 'Compilation' },
-  { id: 'pandoc', label: 'Pandoc', icon: 'convert', group: 'Compilation' },
+  { id: 'pandoc', label: 'Pandoc', icon: 'swap_vert', group: 'Compilation' },
   { id: 'git-integration', label: 'Git integration', icon: 'commit', group: 'Compilation' },
   { id: 'github-sync', label: 'GitHub sync', icon: 'cloud_sync', group: 'Compilation' },
   { id: 'linked-file-types', label: 'Linked file types', icon: 'attachment', group: 'Compilation' },
@@ -95,7 +95,7 @@ function Classic({ children, note }: { children: React.ReactNode; note?: string 
       {note ? (
         <Group gap={8} mb="md" wrap="nowrap">
           <Text size="xs" c="dimmed">
-            Classic controls — will be restyled to the OlliTeX kit in a follow-up.
+            Classic controls — will be restyled to the LibreLeaf kit in a follow-up.
           </Text>
         </Group>
       ) : null}
@@ -107,7 +107,7 @@ function Classic({ children, note }: { children: React.ReactNode; note?: string 
 /* ─────────────── Mantine-native section forms ─────────────── */
 
 function MiscNative({ initial, onChange }: { initial: Sec; onChange: (patch: Sec) => void }) {
-  const [appName, setAppName] = useState(initial.appName || 'OlliTeX')
+  const [appName, setAppName] = useState(initial.appName || 'LibreLeaf')
   const [hidePoweredBy, setHidePoweredBy] = useState(initial.hidePoweredBy === true)
   const [noindex, setNoindex] = useState(initial.noindex === true)
   const [allowPublic, setAllowPublic] = useState(initial.allowPublic !== false)

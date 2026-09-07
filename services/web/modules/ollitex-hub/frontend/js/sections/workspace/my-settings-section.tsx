@@ -352,24 +352,34 @@ function EditorTab() {
   )
 }
 
-export default function MySettingsSection() {
+export default function MySettingsSection({
+  initialTab,
+}: {
+  /** Focused view (owner review #12-#15): render only this tab, no tab list,
+   * no "full settings page" link — the hub keeps everything in /hub. */
+  initialTab?: string
+}) {
+  const focused = Boolean(initialTab)
+  const tab = initialTab || 'account'
   return (
     <Stack gap="md">
-      <Tabs defaultValue="account" style={{ borderWidth: 0 }}>
-        <Tabs.List mb="md">
-          <Tabs.Tab value="account" leftSection={<Icon name="person" size={16} />}>
-            Account
-          </Tabs.Tab>
-          <Tabs.Tab value="password" leftSection={<Icon name="key" size={16} />}>
-            Password
-          </Tabs.Tab>
-          <Tabs.Tab value="appearance" leftSection={<Icon name="dark_mode" size={16} />}>
-            Appearance
-          </Tabs.Tab>
-          <Tabs.Tab value="editor" leftSection={<Icon name="code" size={16} />}>
-            Editor defaults
-          </Tabs.Tab>
-        </Tabs.List>
+      <Tabs defaultValue={tab} style={{ borderWidth: 0 }}>
+        {focused ? null : (
+          <Tabs.List mb="md">
+            <Tabs.Tab value="account" leftSection={<Icon name="person" size={16} />}>
+              Account
+            </Tabs.Tab>
+            <Tabs.Tab value="password" leftSection={<Icon name="key" size={16} />}>
+              Password
+            </Tabs.Tab>
+            <Tabs.Tab value="appearance" leftSection={<Icon name="dark_mode" size={16} />}>
+              Appearance
+            </Tabs.Tab>
+            <Tabs.Tab value="editor" leftSection={<Icon name="code" size={16} />}>
+              Editor defaults
+            </Tabs.Tab>
+          </Tabs.List>
+        )}
         <Tabs.Panel value="account">
           <AccountTab />
         </Tabs.Panel>
@@ -383,14 +393,6 @@ export default function MySettingsSection() {
           <EditorTab />
         </Tabs.Panel>
       </Tabs>
-      <Alert icon={null} variant="light" color="gray" withBorder radius="md">
-        <Text size="sm">
-          Need email management, sessions, keybindings, or Zotero/Mendeley/Papers links?
-          <Anchor href="/user/mysettings" target="_blank" size="sm" ml={6}>
-            Open the full settings page
-          </Anchor>
-        </Text>
-      </Alert>
     </Stack>
   )
 }

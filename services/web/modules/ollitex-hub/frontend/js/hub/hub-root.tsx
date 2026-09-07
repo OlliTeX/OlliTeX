@@ -9,6 +9,7 @@ import SectionBoundary from './section-boundary'
 import { renderLeaf } from './leaves'
 import { HUB_NAV, HubNode, indexNav, visibleNav } from './nav-tree'
 import { accordionState } from './accordion-state'
+import { onHubNavigate } from './navigate'
 import {
   buildThemePatch,
   cssVarsFor,
@@ -38,14 +39,11 @@ function isAdminUser(): boolean {
   }
 }
 
-/** Standalone classic pages for the header "Open full page" link. */
+/** Standalone classic pages for the header "Open full page" link (kept for
+ * templates only — projects/library links removed per owner review 2026-09-07). */
 const STANDALONE: Record<string, { href: string; label: string }> = {
-  'projects.all': { href: '/project', label: 'Full project list' },
-  'projects.owned': { href: '/project', label: 'Full project list' },
-  'projects.shared': { href: '/project', label: 'Full project list' },
-  'projects.archived': { href: '/project', label: 'Full project list' },
   'templates.all': { href: '/templates', label: 'Full template gallery' },
-  library: { href: '/library', label: 'Full library' },
+  'templates.*': { href: '/templates', label: 'Full template gallery' },
 }
 
 const TITLES: Record<string, { title: string; subtitle?: string }> = {
@@ -76,7 +74,7 @@ export default function HubRoot() {
           { id: 'templates.all', label: 'All templates', icon: 'layers', render: 'template-cat', category: 'none' },
         ]
         list
-          .filter((c: any) => c && typeof c.key === 'string')
+          .filter((c: any) => c && typeof c.key === 'string' && c.key !== 'all' && c.key !== 'none')
           .forEach((c: any) =>
             nodes.push({
               id: `templates.${c.key}`,
@@ -113,13 +111,30 @@ export default function HubRoot() {
 
   const select = useCallback(
     (id: string) => {
-      setPath(id)
+      // folder ids resolve to their first leaf, so deep links and cross-section
+      // navigation (Overview shortcuts) always land on renderable content
+      let leaf = id
+      if (!idx.allLeaves.has(id)) {
+        const start = idx.byId.get(id) || (idx.ancestors.get(id) ? null : null)
+        const findFirstLeaf = (n: HubNode | undefined | null): string | null => {
+          if (!n) return null
+          if (!n.children || n.children.length === 0) return n.id
+          for (const c of n.children) {
+            const f = findFirstLeaf(c)
+            if (f) return f
+          }
+          return null
+        }
+        const f = findFirstLeaf(start || idx.byId.get(id))
+        if (f) leaf = f
+      }
+      setPath(leaf)
       try {
-        window.history.replaceState(null, '', `#/${id}`)
+        window.history.replaceState(null, '', `#/${leaf}`)
       } catch {
         // tests without history
       }
-      const anc = idx.ancestors.get(id) || []
+      const anc = idx.ancestors.get(leaf) || []
       accordionState.openChain(anc)
     },
     [idx]
@@ -157,8 +172,39 @@ export default function HubRoot() {
   }, [initial])
 
   const node = idx.byId.get(path) || idx.allLeaves.get(path) || null
-  const title = TITLES[path]?.title || node?.label || 'OlliTeX hub'
+  const title = TITLES[path]?.title || node?.label || 'LibreLeaf hub'
   const subtitle = TITLES[path]?.subtitle
+
+  // cross-section navigation (Overview shortcuts, owner review #2): the
+  // shortcut ids are short aliases mapped to real hub leaves
+  const SHORTCUT_ALIASES: Record<string, string> = {
+    site: 'site.general.misc',
+    users: 'site.general.users.all',
+    projects: 'site.general.projects.all',
+    templates: 'site.general.managetpl',
+    llm: 'site.llm.features',
+  }
+  useEffect(() => onHubNavigate(id => select(SHORTCUT_ALIASES[id] || id)), [select])
+
+  // browser back/forward + in-page hash fragments (e.g. /hub → /hub#/x)
+  useEffect(() => {
+    const onHash = () => {
+      const h = parseHash()
+      if (h && (idx.allLeaves.has(h) || idx.byId.has(h))) select(h)
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [select, idx])
+
+  // app logo (owner #1): /logo_full.svg via navbar meta, with a safe default
+  const logoSrc = useMemo(() => {
+    try {
+      const nb = (getMeta as any)('ol-navbar')
+      return (nb && (nb.customLogo || nb.customLogoDark)) || '/logo_full.svg'
+    } catch {
+      return '/logo_full.svg'
+    }
+  }, [])
 
   // M2.5 Appearance: custom instance theme (hub-theme.ts) → provider patch
   // + per-scheme CSS variables on the hub wrapper (live on Apply).
@@ -199,7 +245,8 @@ export default function HubRoot() {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100vh',
+        height: '100vh',
+        overflow: 'hidden',
         background: 'var(--mantine-color-body)',
         color: 'var(--mantine-color-text)',
         ...(cssVars as React.CSSProperties),
@@ -221,17 +268,13 @@ export default function HubRoot() {
           zIndex: 100,
         }}
       >
-        <Group gap="sm" wrap="nowrap">
-          <Icon name="auto_storyboard" size={26} style={{ color: 'var(--mantine-color-ollitex-6)' }} />
-          <div>
-            <Title order={4} style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-              OlliTeX
-            </Title>
-            <Text size="xs" c="dimmed" style={{ lineHeight: 1.2 }}>
-              {admin ? 'Workspace & administration' : 'Workspace'}
-            </Text>
-          </div>
-        </Group>
+        <a href="/" style={{ display: 'inline-flex', alignItems: 'center' }}>
+          <img
+            src={logoSrc}
+            alt="LibreLeaf"
+            style={{ height: 36, width: 'auto', display: 'block' }}
+          />
+        </a>
         <Group gap="sm" wrap="nowrap">
           {standalone ? (
             <Anchor href={standalone.href} target="_blank" rel="noreferrer" size="sm" style={{ textDecoration: 'none' }}>
@@ -245,12 +288,14 @@ export default function HubRoot() {
         </Group>
       </header>
 
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flex: 1, height: '100%', minHeight: 0 }}>
         <nav
           aria-label="Primary"
+          className="ol-hub-scroll"
           style={{
             width: 260,
             flexShrink: 0,
+            height: '100%',
             overflowY: 'auto',
             overscrollBehavior: 'contain',
             background: 'var(--mantine-color-body)',
@@ -261,7 +306,7 @@ export default function HubRoot() {
           <Rail nav={nav} active={path} onSelect={select} />
         </nav>
 
-        <main style={{ flex: 1, minWidth: 0, overflowY: 'auto', background: 'var(--mantine-color-body)' }}>
+        <main className="ol-hub-scroll" style={{ flex: 1, minWidth: 0, overflowY: 'auto', height: '100%', background: 'var(--mantine-color-body)' }}>
           <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto', width: '100%' }}>
             <div style={{ marginBottom: 20 }}>
               <Title order={2} style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>

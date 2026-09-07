@@ -118,7 +118,7 @@ export function SidebarLowerSection({
         </ul>
       </nav>
       <div className="ds-nav-ds-name" translate="no">
-        <span>OlliTeX</span>
+        <span>LibreLeaf</span>
       </div>
       <UserProvider>{contactUsModal}</UserProvider>
     </>

@@ -26,6 +26,7 @@ type AdminProject = {
   owner?: { email?: string }
   lastUpdated?: string
   lastOpened?: string
+  lastActive?: string
   trashed?: boolean
   deleted?: boolean
   deletedAt?: string
@@ -54,13 +55,18 @@ function pdate(p: any, ...keys: string[]): string {
 
 const ownerEmails: Record<string, string> = {}
 
-export default function AdminProjectsSection() {
+export type AdminProjectsView = 'all' | 'inactive' | 'trashed' | 'deleted'
+
+export default function AdminProjectsSection({
+  view = 'all',
+}: {
+  view?: AdminProjectsView
+}) {
   const [users, setUsers] = useState<any[]>([])
   const [scope, setScope] = useState('all')
   const [projects, setProjects] = useState<AdminProject[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [includeTrash, setIncludeTrash] = useState(false)
   const [confirmPurge, setConfirmPurge] = useState<AdminProject | null>(null)
   const [purging, setPurging] = useState(false)
 
@@ -100,12 +106,30 @@ export default function AdminProjectsSection() {
   const filtered = useMemo(() => {
     if (!projects) return []
     const q = search.trim().toLowerCase()
+    const INACTIVE_MS = 15 * 24 * 3600 * 1000
+    const isInactive = (p: AdminProject) => {
+      const t0 = p.lastOpened || p.lastActive
+      if (!t0) return true
+      const t = new Date(t0).getTime()
+      if (Number.isNaN(t)) return true
+      return Date.now() - t > INACTIVE_MS
+    }
     return projects.filter(p => {
-      if (!includeTrash && (p.trashed || p.deleted)) return false
+      switch (view) {
+        case 'deleted':
+          return Boolean(p.deleted || p.deletedAt)
+        case 'trashed':
+          return Boolean(p.trashed) && !(p.deleted || p.deletedAt)
+        case 'inactive':
+          return !p.trashed && !(p.deleted || p.deletedAt) && isInactive(p)
+        default:
+          return !p.trashed && !(p.deleted || p.deletedAt)
+      }
+    }).filter(p => {
       if (!q) return true
       return (pname(p) || '').toLowerCase().includes(q)
     })
-  }, [projects, search, includeTrash])
+  }, [projects, search, view])
 
   const act = async (fn: () => Promise<unknown>, okMsg: string) => {
     try {
@@ -152,18 +176,6 @@ export default function AdminProjectsSection() {
             size="sm"
             style={{ width: 260 }}
           />
-        </Group>
-        <Group gap="sm">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={includeTrash}
-              onChange={e => setIncludeTrash(e.currentTarget.checked)}
-            />
-            <Text size="sm" c="dimmed">
-              Include trash / deleted
-            </Text>
-          </label>
         </Group>
       </Group>
 
@@ -256,7 +268,7 @@ export default function AdminProjectsSection() {
                       ) : null}
                       {p.trashed && !p.deleted ? (
                         <Menu.Item
-                          icon={<Icon name="restore" size={16} />}
+                          icon={<Icon name="restore_from_trash" size={16} />}
                           color="teal"
                           onClick={() =>
                             void act(
@@ -285,7 +297,7 @@ export default function AdminProjectsSection() {
                       {p.deleted ? (
                         <>
                           <Menu.Item
-                            icon={<Icon name="restore" size={16} />}
+                            icon={<Icon name="restore_from_trash" size={16} />}
                             color="teal"
                             onClick={() =>
                               void act(

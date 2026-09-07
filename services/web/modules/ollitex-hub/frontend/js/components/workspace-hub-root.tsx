@@ -84,7 +84,7 @@ export default function WorkspaceHubRoot() {
 
   return (
     <HubLayout
-      brand="OlliTeX"
+      brand="LibreLeaf"
       tagline="Workspace"
       nav={NAV}
       active={section}

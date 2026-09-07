@@ -1,6 +1,7 @@
 import React from 'react'
 import { Stack, Text, Title, Alert } from '@mantine/core'
 import type { HubNode } from './nav-tree'
+import { hubNavigate } from './navigate'
 import Icon from '../shared/icons'
 import ProjectsSection from '../sections/workspace/projects-section'
 import TemplatesSection from '../sections/workspace/templates-section'
@@ -33,7 +34,11 @@ export function renderLeaf(node: HubNode): React.ReactNode {
   if (kind === 'site-sec' && node.siteId) {
     return <AdminSiteSection key={node.id} fixedSection={node.siteId} hideNav />
   }
-  if (kind === 'overview') return <AdminInstanceSection key={node.id} />
+  if (kind === 'overview') {
+    // Overview "Instance management" shortcuts (owner review #2): navigate
+    // to the relevant section instead of dead links (no-op before).
+    return <AdminInstanceSection key={node.id} onNavigate={hubNavigate} />
+  }
   if (kind === 'library') return <LibrarySection key={node.id} />
 
   switch (node.id) {
@@ -55,16 +60,31 @@ export function renderLeaf(node: HubNode): React.ReactNode {
     case 'site.general.appearance':
       return <AppearanceSection key={node.id} />
     case 'site.general.projects.all':
+      return <AdminProjectsSection key={node.id} view="all" />
     case 'site.general.projects.inactive':
+      return <AdminProjectsSection key={node.id} view="inactive" />
     case 'site.general.projects.trashed':
+      return <AdminProjectsSection key={node.id} view="trashed" />
     case 'site.general.projects.deleted':
-      return <AdminProjectsSection key={node.id} />
+      return <AdminProjectsSection key={node.id} view="deleted" />
     case 'site.general.users.all':
+      return <AdminUsersSection key={node.id} view="all" />
     case 'site.general.users.admins':
+      return <AdminUsersSection key={node.id} view="admins" />
     case 'site.general.users.suspended':
+      return <AdminUsersSection key={node.id} view="suspended" />
     case 'site.general.users.inactive':
+      return <AdminUsersSection key={node.id} view="inactive" />
     case 'site.general.users.deleted':
-      return <AdminUsersSection key={node.id} />
+      return <AdminUsersSection key={node.id} view="deleted" />
+    case 'mysettings.account':
+      return <MySettingsSection key={node.id} initialTab="account" />
+    case 'mysettings.password':
+      return <MySettingsSection key={node.id} initialTab="password" />
+    case 'mysettings.appearance':
+      return <MySettingsSection key={node.id} initialTab="appearance" />
+    case 'mysettings.editordefaults':
+      return <MySettingsSection key={node.id} initialTab="editor" />
     case 'site.llm.features':
     case 'site.llm.connection':
     case 'site.llm.models':

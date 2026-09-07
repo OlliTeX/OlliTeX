@@ -46,11 +46,16 @@ function isTemplateAdmin(u: any): boolean {
   return !!(u?.canManageTemplates || u?.flags?.canManageTemplates)
 }
 
-export default function AdminUsersSection() {
+export type AdminUsersView = 'all' | 'admins' | 'suspended' | 'inactive' | 'deleted'
+
+export default function AdminUsersSection({
+  view = 'all',
+}: {
+  view?: AdminUsersView
+}) {
   const [users, setUsers] = useState<AdminUser[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [showInactive, setShowInactive] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [cEmail, setCEmail] = useState('')
   const [cFirst, setCFirst] = useState('')
@@ -84,16 +89,34 @@ export default function AdminUsersSection() {
   const filtered = useMemo(() => {
     if (!users) return []
     const q = search.trim().toLowerCase()
+    const INACTIVE_MS = 15 * 24 * 3600 * 1000 // legacy admin: no activity for 15 days
+    const isInactive = (u: AdminUser) => {
+      if (!u.lastActive) return true
+      const t = new Date(u.lastActive).getTime()
+      if (Number.isNaN(t)) return true
+      return Date.now() - t > INACTIVE_MS
+    }
     return users.filter(u => {
-      if (u.deletedAt) return false
-      if (!showInactive && u.suspended) return false
+      switch (view) {
+        case 'deleted':
+          return Boolean(u.deletedAt)
+        case 'suspended':
+          return !u.deletedAt && Boolean(u.suspended)
+        case 'inactive':
+          return !u.deletedAt && !u.suspended && isInactive(u)
+        case 'admins':
+          return !u.deletedAt && (Boolean(u.isAdmin) || isTemplateAdmin(u))
+        default:
+          return !u.deletedAt
+      }
+    }).filter(u => {
       if (!q) return true
       return (
         (u.email || '').toLowerCase().includes(q) ||
         `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase().includes(q)
       )
     })
-  }, [users, search, showInactive])
+  }, [users, search, view])
 
   const setUserFlag = async (u: AdminUser, patch: Record<string, unknown>) => {
     setBusyId(uid(u))
@@ -180,13 +203,6 @@ export default function AdminUsersSection() {
           style={{ maxWidth: 380, width: '100%' }}
         />
         <Group gap="sm" wrap="wrap">
-          <Switch
-            checked={showInactive}
-            onChange={setShowInactive}
-            label="Show inactive"
-            size="sm"
-            color="ollitex"
-          />
           <Button
             size="md"
             color="ollitex"
@@ -315,7 +331,7 @@ export default function AdminUsersSection() {
                       </Menu.Item>
                       {u.suspended ? (
                         <Menu.Item
-                          icon={<Icon name="restore" size={16} />}
+                          icon={<Icon name="restore_from_trash" size={16} />}
                           color="teal"
                           onClick={() =>
                             void (

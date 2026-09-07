@@ -4,6 +4,8 @@ import HubRoot from '../hub/hub-root'
 
 // Material Symbols icon font (icon glyphs in the hub chrome/sections).
 import '../../../../../frontend/fonts/material-symbols/material-symbols.css'
+// Thin scrollbar + hub chrome styles (Wave A #8).
+import '../hub/hub.css'
 // Side-effect import: initialise this bundle's i18next instance (shared
 // frontend i18n module) so useTranslation() in the hub sections — including
 // the wrapped legacy components — resolves real strings instead of raw keys.

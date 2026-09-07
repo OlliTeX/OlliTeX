@@ -73,7 +73,7 @@ function ThinFooter({
               <>
                 <li>
                   {/* year of initial release, static */}© 2026{' '}
-                  <a href="https://github.com/davrot/6.3.0_post">OlliTeX</a>{' '}
+                  <a href="https://github.com/davrot/6.3.0_post">LibreLeaf</a>{' '}
                   — a fork of{' '}
                   <a href="https://github.com/overleaf/overleaf">Overleaf Community Edition</a>{' '}
                   (open source, AGPLv3)
@@ -103,7 +103,7 @@ function ThinFooter({
           <OLRow>
             <OLCol lg={12}>
               <p className="copyright-notice">
-                OlliTeX is a fork of Overleaf Community Edition™, an
+                LibreLeaf is a fork of Overleaf Community Edition™, an
                 open-source project by Overleaf, distributed under the terms
                 of the AGPLv3 license. This deployment is not operated, supported
                 or endorsed by Overleaf® and is provided "AS IS" with all

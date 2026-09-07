@@ -220,32 +220,8 @@ export default function ProjectsSection({
 
   return (
     <Stack gap="md">
-      {/* Sub-categories (parity with the classic /project sidebar): view
-          filters + organize tags (create / select / clear). */}
-      <Group gap={6} wrap="wrap">
-        {(
-          [
-            ['all', 'Projects'],
-            ['owned', 'Your projects'],
-            ['shared', 'Shared with you'],
-            ['archived', 'Archived projects'],
-          ] as const
-        ).map(([key, label]) => (
-          <Button
-            key={key}
-            size="xs"
-            variant={filter === key && !tagId ? 'filled' : 'default'}
-            color="ollitex"
-            disabled={creating || creatingTag}
-            onClick={() => {
-              setTagId(null)
-              setFilter(key)
-            }}
-          >
-            {label}
-          </Button>
-        ))}
-      </Group>
+      {/* Organize tags (create / select / clear) — the view filters live in the
+          hub rail now (owner review #3: in-page tabs removed). */}
       <Group gap={6} wrap="wrap" align="center">
         <Text size="xs" fw={700} tt="uppercase" c="dimmed" style={{ letterSpacing: '0.08em' }}>
           Organize Tags

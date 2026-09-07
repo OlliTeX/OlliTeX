@@ -30,7 +30,7 @@ const NAV_GROUPS: HubNavGroup[] = [
     items: [
       { id: USERS, label: 'Users', icon: 'groups' },
       { id: PROJECTS, label: 'Projects', icon: 'folder' },
-      { id: TPL, label: 'Templates', icon: 'draft' },
+      { id: TPL, label: 'Templates', icon: 'tag' },
     ],
   },
   {
@@ -164,7 +164,7 @@ export default function AdminHubRoot() {
 
   return (
     <HubLayout
-      brand="OlliTeX"
+      brand="LibreLeaf"
       tagline="Instance administration"
       nav={NAV_GROUPS}
       active={section}

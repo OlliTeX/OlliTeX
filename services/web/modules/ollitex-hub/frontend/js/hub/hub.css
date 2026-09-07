@@ -1,0 +1,21 @@
+/* overleaf-lab (Wave A #8): unified /hub scrollbars — slim, theme-aware,
+ * same visual language as the editor scrollbars (.code-scroll etc.).
+ * Applied to the rail (.ol-hub-scroll) and the main content area (hub-root).
+ */
+.ol-hub-scroll {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--mantine-color-default-4) transparent;
+}
+.ol-hub-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.ol-hub-scroll::-webkit-scrollbar-track { background: transparent; }
+.ol-hub-scroll::-webkit-scrollbar-thumb {
+  background: var(--mantine-color-default-4);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.ol-hub-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-color-default-5);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}

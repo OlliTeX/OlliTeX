@@ -35,6 +35,7 @@ export const HUB_NAV: HubNode[] = [
     icon: 'insights',
     admin: true,
     render: 'overview',
+    tone: 'admin',
   },
   {
     id: 'projects',
@@ -43,14 +44,14 @@ export const HUB_NAV: HubNode[] = [
     children: [
       { id: 'projects.all', label: 'All projects', icon: 'apps', render: 'projects', pview: 'all' },
       { id: 'projects.owned', label: 'My projects', icon: 'folder', render: 'projects', pview: 'owned' },
-      { id: 'projects.shared', label: 'Shared with you', icon: 'people', render: 'projects', pview: 'shared' },
+      { id: 'projects.shared', label: 'Shared with you', icon: 'groups', render: 'projects', pview: 'shared' },
       { id: 'projects.archived', label: 'Archived projects', icon: 'archive', render: 'projects', pview: 'archived' },
       {
         id: 'projects.tags',
         label: 'Organize Tags',
-        icon: 'sell',
+        icon: 'tag',
         children: [
-          { id: 'projects.tags.tags', label: 'All tags', icon: 'sell' },
+          { id: 'projects.tags.tags', label: 'All tags', icon: 'tag' },
           { id: 'projects.tags.new', label: 'New tag', icon: 'add' },
         ],
       },
@@ -72,13 +73,14 @@ export const HUB_NAV: HubNode[] = [
     id: 'mysettings',
     label: 'My settings',
     icon: 'person',
+    tone: 'user',
     children: [
       { id: 'mysettings.account', label: 'Update account info', icon: 'badge' },
       { id: 'mysettings.password', label: 'Change password', icon: 'key' },
       { id: 'mysettings.keybindings', label: 'Keybindings', icon: 'keyboard' },
       { id: 'mysettings.sync', label: 'Project synchronisation', icon: 'cloud_sync' },
       { id: 'mysettings.references', label: 'Reference managers', icon: 'menu_book' },
-      { id: 'mysettings.sessions', label: 'Sessions', icon: 'laptop' },
+      { id: 'mysettings.sessions', label: 'Sessions', icon: 'computer' },
       { id: 'mysettings.appearance', label: 'Appearance', icon: 'palette' },
       { id: 'mysettings.editordefaults', label: 'Editor defaults', icon: 'tune' },
       { id: 'mysettings.email', label: 'Email preferences', icon: 'mail' },
@@ -100,6 +102,7 @@ export const HUB_NAV: HubNode[] = [
     label: 'Site settings',
     icon: 'tune',
     admin: true,
+    tone: 'admin',
     children: [
       {
         id: 'site.general',
@@ -109,7 +112,7 @@ export const HUB_NAV: HubNode[] = [
           { id: 'site.general.misc', label: 'Miscellaneous', icon: 'tune', render: 'site-sec', siteId: 'misc' },
           { id: 'site.general.appearance', label: 'Appearance', icon: 'palette' },
           { id: 'site.general.signup', label: 'Sign-up', icon: 'person_add', render: 'site-sec', siteId: 'signup' },
-          { id: 'site.general.managetpl', label: 'Manage templates', icon: 'draft' },
+          { id: 'site.general.managetpl', label: 'Manage templates', icon: 'tag' },
           {
             id: 'site.general.projects',
             label: 'Projects',
@@ -117,7 +120,7 @@ export const HUB_NAV: HubNode[] = [
             children: [
               { id: 'site.general.projects.all', label: 'All projects', icon: 'apps' },
               { id: 'site.general.projects.inactive', label: 'Inactive projects', icon: 'hourglass_empty' },
-              { id: 'site.general.projects.trashed', label: 'Trashed projects', icon: 'delete_outline' },
+              { id: 'site.general.projects.trashed', label: 'Trashed projects', icon: 'delete' },
               { id: 'site.general.projects.deleted', label: 'Deleted projects', icon: 'delete_forever' },
             ],
           },
@@ -133,8 +136,8 @@ export const HUB_NAV: HubNode[] = [
               { id: 'site.general.users.deleted', label: 'Deleted users', icon: 'delete_forever' },
             ],
           },
-          { id: 'site.general.activeprojects', label: 'Active projects', icon: 'activityzone' },
-          { id: 'site.general.enclose', label: 'Open/Close Editor', icon: 'laptop' },
+          { id: 'site.general.activeprojects', label: 'Active projects', icon: 'track_changes' },
+          { id: 'site.general.enclose', label: 'Open/Close Editor', icon: 'computer' },
           { id: 'site.general.messages', label: 'System messages', icon: 'campaign' },
           { id: 'site.general.stats', label: 'Instance statistics', icon: 'monitoring' },
         ],
@@ -168,7 +171,7 @@ export const HUB_NAV: HubNode[] = [
         icon: 'build',
         children: [
           { id: 'site.compilation.sandboxed', label: 'Sandboxed compiles', icon: 'build', render: 'site-sec', siteId: 'sandboxed-compiles' },
-          { id: 'site.compilation.pandoc', label: 'Pandoc', icon: 'convert', render: 'site-sec', siteId: 'pandoc' },
+          { id: 'site.compilation.pandoc', label: 'Pandoc', icon: 'swap_vert', render: 'site-sec', siteId: 'pandoc' },
           { id: 'site.compilation.git', label: 'Git integration', icon: 'commit', render: 'site-sec', siteId: 'git-integration' },
           { id: 'site.compilation.github', label: 'GitHub sync', icon: 'cloud_sync', render: 'site-sec', siteId: 'github-sync' },
           { id: 'site.compilation.linkedfiletypes', label: 'Linked file types', icon: 'attachment', render: 'site-sec', siteId: 'linked-file-types' },
