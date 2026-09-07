@@ -63,7 +63,7 @@ function Leaf({
         transition: 'background 120ms ease',
       }}
       onMouseEnter={e => {
-        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--mantine-color-default-hover)'
+        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--mantine-color-ollitex-6) 12%, transparent)'
       }}
       onMouseLeave={e => {
         if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
@@ -121,12 +121,12 @@ function Folder({
           fontSize: 13.5,
           fontWeight: 650,
           textAlign: 'left',
-          background: containsActive ? 'var(--mantine-color-default-hover)' : 'transparent',
+          background: containsActive ? 'color-mix(in srgb, var(--mantine-color-ollitex-6) 10%, transparent)' : 'transparent',
           color: toneColor || 'var(--mantine-color-text)',
           transition: 'background 120ms ease',
         }}
         onMouseEnter={e => {
-          if (!containsActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--mantine-color-default-hover)'
+          if (!containsActive) (e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--mantine-color-ollitex-6) 12%, transparent)'
         }}
         onMouseLeave={e => {
           if (!containsActive) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'

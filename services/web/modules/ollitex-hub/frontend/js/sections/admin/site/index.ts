@@ -16,6 +16,7 @@ import {
   PandocSection,
   ServicesSection,
   WebdavSection,
+  ZoteroSection,
 } from './simple-sections'
 import { SandboxedSection } from './sandboxed-section'
 
@@ -36,4 +37,5 @@ export const NATIVE_SITE_SECTIONS: Record<string, ComponentType> = {
   webdav: WebdavSection,
   dropbox: DropboxSection,
   mendeley: MendeleySection,
+  zotero: ZoteroSection,
 }

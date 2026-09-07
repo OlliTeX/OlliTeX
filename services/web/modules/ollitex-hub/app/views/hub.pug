@@ -18,7 +18,7 @@ block append meta
 	meta(name='ol-overallThemes' data-type='json' content=overallThemes)
 	meta(name='ol-hub-admin' data-type='boolean' content=hubAdmin)
 	meta(name='ol-hub-theme' data-type='json' content=(hubTheme ? JSON.stringify(hubTheme) : 'null'))
-	meta(name='ol-ExposedSettings' data-type='json' content=exposedSettingsJson)
+	//- ol-ExposedSettings: provided by layout-base (ExpressLocals.ExposedSettings); declaring it here too trips the in-image webpack meta-tag duplicate check.
 	meta(name='ol-gitBridgeEnabled' data-type='boolean' content=gitBridgeEnabled)
 
 block content

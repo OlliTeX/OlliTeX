@@ -62,7 +62,7 @@ export const HUB_NAV: HubNode[] = [
   {
     id: 'templates',
     label: 'Templates',
-    icon: 'extension',
+    icon: 'menu_book',
     // children are replaced at runtime with the live category list
     // (GET /api/template/categories) + 'All templates'
     dynamicChildren: 'templates',

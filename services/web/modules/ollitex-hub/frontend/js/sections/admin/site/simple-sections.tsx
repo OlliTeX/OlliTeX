@@ -412,3 +412,36 @@ export function MendeleySection() {
     </SectionShell>
   )
 }
+
+export function ZoteroSection() {
+  const { data, error, flash, save, load } = useSiteSettings('zotero')
+  const { v, up } = useSyncValues(data, d => ({
+    enabled: bool0((d as any).enabled),
+    clientKey: str0((d as any).clientKey),
+    clientSecret: '',
+  }))
+  const secretSet = Boolean((data as any)?.clientSecretSet)
+  if (!data && !error) return <PageLoading label="Loading Zotero settings…" />
+  if (error && !data) return <Group><Text size="sm" c="red">Zotero: {error}</Text><Anchor href="#" onClick={e => { e.preventDefault(); void load() }}>Retry</Anchor></Group>
+  return (
+    <SectionShell
+      title="Zotero"
+      badge="zotero"
+      enabled={Boolean(v.enabled)}
+      onEnabled={x => up({ enabled: x })}
+      description="Zotero reference connector — link the instance's Zotero API credentials so users can import references from their Zotero libraries (My settings → Reference managers)."
+      footerNote="Requires a Zotero API key (client key + secret). Saved to the instance database; the connector picks it up on the next request."
+      flash={flash}
+      onSave={() => void save({
+        enabled: Boolean(v.enabled),
+        clientKey: String(v.clientKey || ''),
+        clientSecret: String(v.clientSecret || ''),
+      })}
+    >
+      <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
+        <Field label="Client key" required value={String(v.clientKey || '')} onChange={x => up({ clientKey: x })} placeholder="zotero_xxx" />
+        <SecretField label="Client secret" set={Boolean(secretSet)} value={String(v.clientSecret || '')} onChange={x => up({ clientSecret: x })} hint="Leave empty to keep the stored secret." />
+      </Group>
+    </SectionShell>
+  )
+}

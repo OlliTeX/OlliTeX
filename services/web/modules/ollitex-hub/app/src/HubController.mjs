@@ -60,7 +60,6 @@ async function buildLocals(req, res) {
     hubAdmin,
     hubTheme,
     hubUserJson: user ? JSON.stringify(user) : 'null',
-    exposedSettingsJson: JSON.stringify(Settings.exposedSettings || {}),
     gitBridgeEnabled: Settings.gitBridgeEnabled === 'true',
     availableAuthMethods,
     userIsAdminUpdatedOnLogin,

@@ -57,6 +57,84 @@ function isTemplateAdmin(u: any): boolean {
   return !!(u?.canManageTemplates || u?.flags?.canManageTemplates)
 }
 
+/** Row action “User info” (legacy show-user-info parity, owner B25). */
+function UserInfoModal({ user, onClose }: { user: any; onClose: () => void }) {
+  if (!user) return null
+  const rows: Array<[string, string]> = [
+    ['ID', String(user._id || user.id || '—')],
+    ['Email', user.email || '—'],
+    ['First name', user.firstName || '—'],
+    ['Last name', user.lastName || '—'],
+    ['Role', [user.isAdmin ? 'Admin' : 'User', isTemplateAdmin(user) ? 'Template manager' : null, user.suspended ? 'Suspended' : null].filter(Boolean).join(' · ') || 'User'],
+    ['Signed up', fmtDate(user.signUpDate)],
+    ['Last active', fmtDate(user.lastActive)],
+  ]
+  return (
+    <Modal opened onClose={onClose} size="sm" title={<Text fw={700}>User info</Text>} withinPortal>
+      <Stack gap="sm">
+        {rows.map(([k, val]) => (
+          <Group key={k} justify="space-between" gap="md">
+            <Text size="sm" c="dimmed" style={{ minWidth: 90, flexShrink: 0 }}>{k}</Text>
+            <Text size="sm" style={{ textAlign: 'right', wordBreak: 'break-word' }}>{val}</Text>
+          </Group>
+        ))}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose}>Close</Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
+/** Row action “Update” (legacy update-user parity, owner B25): name, email,
+ * admin flag, template manager. Saves via POST /admin/user/:id/update. */
+function UserUpdateModal({ user, onClose, onSaved }: { user: any; onClose: () => void; onSaved: (u: any) => void }) {
+  const [first, setFirst] = useState(user?.firstName || '')
+  const [last, setLast] = useState(user?.lastName || '')
+  const [email, setEmail] = useState(user?.email || '')
+  const [admin, setAdmin] = useState(Boolean(user?.isAdmin))
+  const [tpls, setTpls] = useState(isTemplateAdmin(user))
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  if (!user) return null
+  const save = async () => {
+    setSaving(true)
+    setErr(null)
+    try {
+      await postJSON(`/admin/user/${user._id || user.id}/update`, {
+        body: { firstName: first, lastName: last, email, isAdmin: admin, canManageTemplates: tpls },
+      })
+      onSaved(user)
+      notifications.show({ message: 'User updated.', color: 'teal' })
+      onClose()
+    } catch (e: any) {
+      setErr((e?.data?.message as string) || 'Could not update the user.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <Modal opened onClose={onClose} size="sm" title={<Text fw={700}>Update user</Text>} withinPortal>
+      <Stack gap="md">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <TextInput label="First name" value={first} onChange={e => setFirst(e.currentTarget.value)} />
+          <TextInput label="Last name" value={last} onChange={e => setLast(e.currentTarget.value)} />
+        </div>
+        <TextInput label="Email" value={email} onChange={e => setEmail(e.currentTarget.value)} />
+        <Group gap="md">
+          <Switch label="Admin" checked={admin} onChange={x => setAdmin(x)} />
+          <Switch label="Template manager" checked={tpls} onChange={x => setTpls(x)} />
+        </Group>
+        {err ? <Text size="sm" c="red">{err}</Text> : null}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button color="ollitex" loading={saving} onClick={() => void save()}>Save changes</Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
 export type AdminUsersView = 'all' | 'admins' | 'suspended' | 'inactive' | 'deleted'
 
 export default function AdminUsersSection({
@@ -84,6 +162,8 @@ export default function AdminUsersSection({
   const [confirmBulkPurge, setConfirmBulkPurge] = useState(false)
   const [confirmPurge, setConfirmPurge] = useState<AdminUser | null>(null)
   const [purging, setPurging] = useState(false)
+  const [infoUser, setInfoUser] = useState<AdminUser | null>(null)
+  const [updateUser, setUpdateUser] = useState<AdminUser | null>(null)
 
   const PAGE_SIZE = 25
 
@@ -421,6 +501,12 @@ export default function AdminUsersSection({
                           >
                             Send activation email
                           </Menu.Item>
+                          <Menu.Item icon={<Icon name="info" size={16} />} onClick={() => setInfoUser(u)}>
+                            User info
+                          </Menu.Item>
+                          <Menu.Item icon={<Icon name="edit" size={16} />} onClick={() => setUpdateUser(u)}>
+                            Update…
+                          </Menu.Item>
                           <Menu.Item
                             icon={<Icon name={u.isAdmin ? 'admin_panel_settings' : 'shield_person'} size={16} />}
                             onClick={() => void setUserFlag(u, { isAdmin: !u.isAdmin })}
@@ -477,6 +563,12 @@ export default function AdminUsersSection({
           </Table.Tbody>
         </Table>
       ) : null}
+
+      {infoUser ? <UserInfoModal user={infoUser} onClose={() => setInfoUser(null)} /> : null}
+      {updateUser ? <UserUpdateModal user={updateUser} onClose={() => setUpdateUser(null)} onSaved={u => {
+        setUsers(list => (list || []).map(x => (uid(x) === uid(u) ? ({ ...x } as any) : x)))
+        void load(page)
+      }} /> : null}
 
       <Modal opened={createOpen} onClose={() => setCreateOpen(false)} size="sm" title="New user">
         <Stack gap="md">

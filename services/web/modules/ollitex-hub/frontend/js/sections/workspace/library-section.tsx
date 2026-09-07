@@ -1157,19 +1157,34 @@ export default function LibrarySection() {
           <Menu.Dropdown>
             <Menu.Item leftSection={<Icon name="edit" size={16} />} onClick={() => { setEditing(null); setManualOpen(true) }}>
               Enter manually
+              <Text size="xs" c="dimmed" mt={2} fw={400}>
+                Full entry form — fields adapt to the reference type
+              </Text>
             </Menu.Item>
             <Menu.Item leftSection={<Icon name="content_paste" size={16} />} onClick={() => setPasteOpen(true)}>
               Paste references (BibTeX, DOI)
+              <Text size="xs" c="dimmed" mt={2} fw={400}>
+                BibTeX blocks and bare DOIs
+              </Text>
             </Menu.Item>
             <Menu.Item leftSection={<Icon name="upload_file" size={16} />} onClick={() => setUploadOpen(true)}>
               Upload .bib file
+              <Text size="xs" c="dimmed" mt={2} fw={400}>
+                A single BibTeX (.bib) file
+              </Text>
             </Menu.Item>
             <Menu.Divider>Import</Menu.Divider>
             <Menu.Item leftSection={<Icon name="badge" size={16} />} onClick={() => setOrcidOpen(true)}>
               Import from ORCID.org
+              <Text size="xs" c="dimmed" mt={2} fw={400}>
+                Search by name or ORCID iD
+              </Text>
             </Menu.Item>
             <Menu.Item leftSection={<Icon name="import_contacts" size={16} />} onClick={() => setZoteroOpen(true)}>
               Import from Zotero
+              <Text size="xs" c="dimmed" mt={2} fw={400}>
+                Browse your Zotero libraries and collections
+              </Text>
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>

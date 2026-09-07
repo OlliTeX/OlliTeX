@@ -51,12 +51,18 @@ describe('<ProjectsSection />', () => {
     const dropdown = await screen.findByRole('menu')
     for (const item of [
       'Blank project',
-      'From template',
       'Existing project',
       'Word document',
       'Markdown file',
+      'Import from GitHub',
+      // owner review B4/10e: Templates section with "More templates"
+      'Example project',
+      'More templates',
     ]) {
-      expect(within(dropdown).queryByText(new RegExp(item, 'i')), `menu missing "${item}"`).toBeTruthy()
+      expect(
+        within(dropdown).getAllByText(new RegExp(item, 'i')).length,
+        `menu missing "${item}"`
+      ).toBeGreaterThan(0)
     }
   })
 
@@ -71,6 +77,35 @@ describe('<ProjectsSection />', () => {
     // modal with the name + template fields (legacy /project parity)
     expect(await screen.findByText(/Project name/i)).toBeTruthy()
     expect(screen.queryByText(/Start from/i)).toBeTruthy()
+  })
+
+  it('row menu has Download PDF (10b parity) and triggers a silent compile', async () => {
+    const { calls } = stubFetch([
+      { method: 'POST', match: '/api/project', body: { projects: PROJECTS } },
+      { match: '/tag', body: { tags: [] } },
+      { match: '/api/templates', body: { templates: [] } },
+      { method: 'POST', match: '/project/p1/compile', body: {} },
+    ])
+    window.open = (window.open || (() => undefined)) as any
+    const origOpen = window.open
+    const opens: string[] = []
+    window.open = ((url: string) => { opens.push(url) }) as any
+    renderHub(<ProjectsSection />)
+    await screen.findByText('Paper draft')
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0])
+    const pdfItem = await screen.findByText('Download PDF')
+    expect(pdfItem).toBeTruthy()
+    fireEvent.click(pdfItem)
+
+    await waitFor(() => {
+      const compileCall = calls.find(c => c.url.includes('/project/p1/compile') && c.method === 'POST')
+      expect(compileCall).toBeTruthy()
+      const body = JSON.parse(compileCall!.body!)
+      expect(body.check).toBe('silent')
+    })
+    expect(opens).toContain('/project/p1/pdf')
+    window.open = origOpen as any
   })
 
   it('opens the zip upload modal from the menu (owner #30 .zip import)', async () => {

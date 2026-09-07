@@ -42,8 +42,14 @@ describe('<LibrarySection />', () => {
       '.bib file',
       'ORCID',
       'Zotero',
+      // owner review B11: item descriptions present
+      'Search by name or ORCID iD',
+      'Browse your Zotero libraries',
     ]) {
-      expect(within(dropdown).queryByText(new RegExp(item, 'i')), `menu missing "${item}"`).toBeTruthy()
+      expect(
+        within(dropdown).getAllByText(new RegExp(item, 'i')).length,
+        `menu missing "${item}"`
+      ).toBeGreaterThan(0)
     }
   })
 

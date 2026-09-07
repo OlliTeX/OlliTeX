@@ -475,6 +475,34 @@ export default function ProjectsSection({
     window.open(`/project/download/zip?project_ids=${list.map(pid).join(',')}`, '_blank', 'noopener')
   }
 
+  // Download PDF = compile (server waits for the first compile), then open
+  // the PDF in a new tab — same flow as the legacy compile-and-download button.
+  const doDownloadPdf = async (p: Project) => {
+    const id = pid(p)
+    setBusy(`pdf:${id}`)
+    try {
+      await postJSON(`/project/${id}/compile`, {
+        body: { check: 'silent', draft: false, incrementalCompilesEnabled: true },
+      })
+      window.open(`/project/${id}/pdf`, '_blank', 'noopener')
+    } catch (err: any) {
+      notifications.show({ message: err?.body?.error || err?.message || 'Compile failed — PDF not available yet.', color: 'red' })
+    } finally {
+      setBusy('')
+    }
+  }
+
+  // B4/10e (owner review): "Example project" = a template matching example/sample,
+  // else the first available one.
+  const exampleTpl = templates.find(t => /example|sample/i.test(t.name)) || templates[0]
+
+  const openWithTemplate = (id?: string) => {
+    setNewName('')
+    setNewErr(null)
+    setTemplate(id || 'none')
+    setNewOpen(true)
+  }
+
   const doArchive = async (list: Project[], archive: boolean) => {
     await act(
       `archive:${archive}`,
@@ -623,18 +651,9 @@ export default function ProjectsSection({
             <Menu.Dropdown>
               <Menu.Item
                 leftSection={<Icon name="article" size={16} />}
-                onClick={() => { setNewName(''); setNewErr(null); setTemplate('none'); setNewOpen(true) }}
+                onClick={() => openWithTemplate('none')}
               >
                 Blank project
-              </Menu.Item>
-              <Menu.Item
-                leftSection={<Icon name="extension" size={16} />}
-                onClick={() => { setNewName(''); setNewErr(null); setNewOpen(true) }}
-              >
-                From template
-              </Menu.Item>
-              <Menu.Item leftSection={<Icon name="cloud" size={16} />} onClick={() => setGhOpen(true)}>
-                From GitHub
               </Menu.Item>
               <Menu.Divider>Import</Menu.Divider>
               <Menu.Item leftSection={<Icon name="folder_zip" size={16} />} onClick={() => setZipOpen(true)}>
@@ -646,6 +665,28 @@ export default function ProjectsSection({
               <Menu.Item leftSection={<Icon name="markdown" size={16} />} onClick={() => setMdOpen(true)}>
                 Markdown file (.md)
               </Menu.Item>
+              <Menu.Item leftSection={<Icon name="cloud" size={16} />} onClick={() => setGhOpen(true)}>
+                Import from GitHub
+              </Menu.Item>
+              <Menu.Divider>Templates</Menu.Divider>
+              {exampleTpl ? (
+                <Menu.Item leftSection={<Icon name="menu_book" size={16} />} onClick={() => openWithTemplate(exampleTpl.id)}>
+                  Example project
+                  <Text size="xs" c="dimmed" mt={2} fw={400}>
+                    {exampleTpl.name}
+                  </Text>
+                </Menu.Item>
+              ) : null}
+              <Menu.Label>More templates</Menu.Label>
+              {templates.length === 0 ? (
+                <Menu.Item disabled>No templates published yet</Menu.Item>
+              ) : (
+                templates.map(t => (
+                  <Menu.Item key={t.id} leftSection={<Icon name="auto_stories" size={16} />} onClick={() => openWithTemplate(t.id)}>
+                    {t.name}
+                  </Menu.Item>
+                ))
+              )}
             </Menu.Dropdown>
           </Menu>
         </Group>
@@ -835,6 +876,13 @@ export default function ProjectsSection({
                               </Menu.Item>
                               <Menu.Item leftSection={<Icon name="download" size={16} />} onClick={() => downloadOne(p)}>
                                 Download (.zip)
+                              </Menu.Item>
+                              <Menu.Item
+                                leftSection={<Icon name="picture_as_pdf" size={16} />}
+                                loading={busy === `pdf:${id}`}
+                                onClick={() => void doDownloadPdf(p)}
+                              >
+                                Download PDF
                               </Menu.Item>
                               <Menu.Item leftSection={<Icon name={p.archived ? 'unarchive' : 'archive'} size={16} />} onClick={() => void doArchive([p], !p.archived)}>
                                 {p.archived ? 'Un-archive' : 'Archive'}

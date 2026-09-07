@@ -13,6 +13,7 @@ import LlmSettingsSection from '../sections/workspace/llm-settings-section'
 import AppearanceSection from '../sections/appearance-section'
 import AdminInstanceSection from '../sections/admin/admin-instance-section'
 import AdminSiteSection from '../sections/admin/admin-site-section'
+import SiteSettingsIndexSection from '../sections/admin/site/index-section'
 import { NATIVE_SITE_SECTIONS } from '../sections/admin/site'
 import AdminLlmSection from '../sections/admin/admin-llm-section'
 import AdminUsersSection from '../sections/admin/admin-users-section'
@@ -109,10 +110,9 @@ export function renderLeaf(node: HubNode): React.ReactNode {
     case 'site.general.appearance':
       return <AppearanceSection key={node.id} />
     case 'site.general.enclose':
-      // Owner mapping 2026-09-07: this leaf carries the legacy /admin/panel
-      // content (the full classic site-settings panel, mirror of /admin/site)
-      // until the native Mantine rebuilds land.
-      return <AdminSiteSection key={node.id} />
+      // Owner review B16: native map of all Mantine site-settings sections
+      // (replaces the legacy /admin/panel embed).
+      return <SiteSettingsIndexSection key={node.id} />
     case 'site.general.projects.all':
       return <AdminProjectsSection key={node.id} view="all" />
     case 'site.general.projects.inactive':

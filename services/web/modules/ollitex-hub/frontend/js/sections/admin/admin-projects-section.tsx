@@ -93,6 +93,41 @@ export default function AdminProjectsSection({
   const [confirmDeleteBulk, setConfirmDeleteBulk] = useState(false)
   const [confirmDeleteOne, setConfirmDeleteOne] = useState<AdminProject | null>(null)
   const [transferOpen, setTransferOpen] = useState(false)
+  const [shareTarget, setShareTarget] = useState<any | null>(null)
+  const [shareEmail, setShareEmail] = useState('')
+  const [sharePriv, setSharePriv] = useState('editor')
+  const [shareErr, setShareErr] = useState<string | null>(null)
+  const [shareBusy, setShareBusy] = useState(false)
+
+  const openShare = (proj: any) => {
+    setShareTarget(proj)
+    setShareEmail('')
+    setSharePriv('editor')
+    setShareErr(null)
+  }
+
+  // Legacy admin share: POST /admin/project/:id/invite { email, privileges }
+  const inviteShare = async () => {
+    const target = shareTarget
+    if (!target) return
+    const email = shareEmail.trim()
+    if (!email || !/.+@.+.+/.test(email)) {
+      setShareErr('Enter a valid email address.')
+      return
+    }
+    setShareBusy(true)
+    setShareErr(null)
+    try {
+      await postJSON(`/admin/project/${pid(target)}/invite`, { body: { email, privileges: sharePriv } })
+      notifications.show({ message: 'Invitation sent.', color: 'teal' })
+      setShareTarget(null)
+    } catch (err: any) {
+      const raw = err?.body?.error || err?.data?.message || ''
+      setShareErr(raw === 'cannot_invite_self' ? 'You cannot invite yourself to a project.' : raw || 'Could not send the invitation.')
+    } finally {
+      setShareBusy(false)
+    }
+  }
   const [tNewOwner, setTNewOwner] = useState('')
   const [tSkipEmails, setTSkipEmails] = useState(false)
   const [transferring, setTransferring] = useState(false)
@@ -390,6 +425,14 @@ export default function AdminProjectsSection({
                       >
                         Change owner
                       </Menu.Item>
+                      {!p.deleted && !p.deletedAt ? (
+                        <Menu.Item
+                          icon={<Icon name="person_add" size={16} />}
+                          onClick={() => openShare(p)}
+                        >
+                          Share… (invite)
+                        </Menu.Item>
+                      ) : null}
                       {!p.trashed && !(p.deleted || p.deletedAt) ? (
                         <Menu.Item
                           icon={<Icon name="delete" size={16} />}
@@ -446,6 +489,28 @@ export default function AdminProjectsSection({
           </Table.Tbody>
         </Table>
       ) : null}
+
+      <Modal onClose={() => setShareTarget(null)} size="sm" title="Share project" withinPortal opened={Boolean(shareTarget)}>
+        <Stack gap="md">
+          {shareTarget ? <Text size="sm" c="dimmed">Invite someone to “{shareTarget.name}”. They will receive an email with the invite.</Text> : null}
+          <TextInput label="Email address" value={shareEmail} onChange={e => setShareEmail(e.currentTarget.value)} placeholder="colleague@uni-bremen.de" error={shareErr || undefined} />
+          <NativeSelect
+            label="Access level"
+            value={sharePriv}
+            onChange={e => setSharePriv(e.currentTarget.value)}
+            data={[
+              { value: 'admin', label: 'Admin — full control' },
+              { value: 'editor', label: 'Editor — can edit' },
+              { value: 'reader', label: 'Reader — read only' },
+              { value: 'reviewer', label: 'Reviewer — can comment' },
+            ]}
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setShareTarget(null)} disabled={shareBusy}>Cancel</Button>
+            <Button color="ollitex" loading={shareBusy} onClick={() => void inviteShare()}>Send invite</Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal opened={transferOpen} onClose={() => setTransferOpen(false)} size="sm" title="Change owner">
         <Stack gap="md">
