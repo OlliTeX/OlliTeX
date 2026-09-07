@@ -67,7 +67,8 @@
     "local:test": "yarn run local:test:unit && yarn run local:test:frontend && yarn run local:test:acceptance",
     "knip": "knip --config knip.ts",
     "local:test:acceptance:app": "yarn run local:test:acceptance:app:server-ce",
-    "local:test:acceptance:modules": "yarn run local:test:acceptance:modules:server-ce"
+    "local:test:acceptance:modules": "yarn run local:test:acceptance:modules:server-ce",
+    "i18n:lint": "node scripts/translations/i18n-lint.js"
   },
   "browserslist": [
     "defaults and supports woff2",

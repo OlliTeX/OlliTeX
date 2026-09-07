@@ -44,6 +44,10 @@ unit: ## Full frontend unit + integration suite (vitest, all projects)
 hub: ## /hub frontend integration suite only (vitest project HubFrontend)
 	cd $(SERVICES_WEB) && $(YARN) vitest run --project=HubFrontend
 
+.PHONY: i18n
+i18n: ## Translation linter: code -> locales/en.json -> extracted-translations (bundle chain)
+	cd $(SERVICES_WEB) && node scripts/translations/i18n-lint.js
+
 .PHONY: lint
 lint: ## ESLint (zero-warning policy)
 	$(YARN) lint
@@ -53,7 +57,7 @@ format: ## Prettier check
 	$(YARN) format
 
 .PHONY: ci
-ci: build ## Green gate: build + full unit + hub suite
+ci: build i18n ## Green gate: build + i18n lint + full unit + hub suite
 	$(MAKE) unit
 	$(MAKE) hub
 

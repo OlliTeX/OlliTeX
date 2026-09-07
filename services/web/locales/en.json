@@ -4641,5 +4641,20 @@
   "zotero_upgrade_prompt_title": "Cite from Zotero",
   "mendeley_not_configured": "This site has not set up the Mendeley connector yet. Once your administrator configures it you can link your Mendeley account here.",
   "mendeley_reference_loading_error_not_linked": "Refresh failed: the account used to import the file is no longer linked to Mendeley or has been removed.",
-  "imported_from_mendeley_at_date_by": "Imported from Mendeley at __formattedDate__ __relativeDate__ by __importedByName__"
+  "imported_from_mendeley_at_date_by": "Imported from Mendeley at __formattedDate__ __relativeDate__ by __importedByName__",
+  "Help": "Help",
+  "Learn": "Learn",
+  "Solutions": "Solutions",
+  "Title": "Title",
+  "Zotero": "Zotero",
+  "adminSite.ssoLdapBindCreds": "Bind password (encrypted at rest)",
+  "adminSite.ssoLdapBindDN": "Bind DN for directory search",
+  "adminSite.ssoOidcUserInfo": "OIDC userinfo endpoint",
+  "adminSite.ssoSamlEntryPoint": "SAML entry point (SSO login URL)",
+  "notification_preferences": "Notification preferences",
+  "websockets": "WebSockets",
+  "grammar_picky": "Picky grammar rules",
+  "grammar_picky_description": "When enabled, more grammar issues are flagged (stricter checking).",
+  "symbol_palette_confirm_remove_category": "Remove this symbol category? __count__ symbols in this category will no longer be available.",
+  "symbol_palette_symbols_in_category": "__count__ symbols in this category"
 }
