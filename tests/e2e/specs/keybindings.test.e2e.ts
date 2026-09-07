@@ -18,7 +18,7 @@ async function go(page: import('playwright').Page) {
 }
 
 async function openModal(page: import('playwright').Page) {
-  await page.goto('/user/mysettings')
+  await page.goto('/hub/#mysettings.keybindings')
   await page.waitForTimeout(1_500)
   await page.click('text=Customize key bindings…')
   await expect(page.locator(MODAL)).toBeVisible({ timeout: 15_000 })
@@ -82,7 +82,7 @@ test('a rebind survives Apply + page reload (persistence)', async ({ page }) => 
   await page.waitForTimeout(1_200) // persist
 
   // reload → the stored binding is visible again
-  await page.goto('/user/mysettings')
+  await page.goto('/hub/#mysettings.keybindings')
   await page.waitForTimeout(1_500)
   await page.click('text=Customize key bindings…')
   await expect(page.locator(MODAL)).toBeVisible({ timeout: 15_000 })
