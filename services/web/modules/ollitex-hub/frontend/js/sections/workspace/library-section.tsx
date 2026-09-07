@@ -14,7 +14,7 @@ import {
   TextInput,
   Tooltip,
 } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import Icon from '../../shared/icons'
 import { EmptyState, PageError, PageLoading } from '../../shared/page-state'
 import ConfirmModal from '../../shared/confirm-modal'
@@ -76,7 +76,6 @@ function AddReferenceModal({
   const [note, setNote] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const notifications = useNotifications()
 
   const reset = () => {
     setType('article')
@@ -211,7 +210,6 @@ function ReferencesTable({
 }) {
   const [confirm, setConfirm] = useState<{ entry: LibraryEntryApi; permanent: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
-  const notifications = useNotifications()
 
   const act = async () => {
     if (!confirm) return

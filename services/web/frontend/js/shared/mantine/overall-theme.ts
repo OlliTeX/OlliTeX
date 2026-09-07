@@ -90,7 +90,10 @@ function rememberTheme(value: OverallTheme) {
 export function setTheme(value: OverallTheme): Promise<unknown> {
   applyScheme(schemeForTheme(value))
   rememberTheme(value)
-  return postJSON('/user/settings', { overallTheme: value })
+  // fetch-json contract: the payload goes under `body` (overall-theme bug
+  // fix 2026-09-07 — the payload used to be passed as a bare option and was
+  // silently dropped, so the preference never persisted server-side).
+  return postJSON('/user/settings', { body: { overallTheme: value } })
 }
 
 export function onColorSchemeChange(fn: () => void): () => void {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { ActionIcon, Group, Tooltip } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import Icon from './icons'
 import { OverallTheme, setTheme, storedOverallTheme } from '../../../../../frontend/js/shared/mantine/overall-theme'
 
@@ -20,7 +20,6 @@ const OPTIONS: { value: OverallTheme; label: string; icon: string }[] = [
 export default function ThemeToggle() {
   const [active, setActive] = useState<OverallTheme>(() => storedOverallTheme())
   const [busy, setBusy] = useState(false)
-  const notifications = useNotifications()
 
   async function choose(value: OverallTheme) {
     if (busy || value === active) return
@@ -31,7 +30,7 @@ export default function ThemeToggle() {
     } catch (err) {
       setActive(storedOverallTheme())
       try {
-        notifications.showNotification({
+        notifications.show({
           color: 'red',
           title: 'Theme not saved',
           message: 'Could not save the theme preference. The change is applied for this page only.',

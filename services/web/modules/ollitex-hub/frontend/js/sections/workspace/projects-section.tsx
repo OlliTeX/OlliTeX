@@ -13,7 +13,7 @@ import {
   TextInput,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import { postJSON, getJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
@@ -55,7 +55,15 @@ function personName(u?: { email: string; firstName?: string; lastName?: string }
   return n || u.email
 }
 
-export default function ProjectsSection() {
+export default function ProjectsSection({
+  defaultFilter,
+  tagsFocus,
+  defaultNewTag,
+}: {
+  defaultFilter?: 'all' | 'owned' | 'shared' | 'archived'
+  tagsFocus?: boolean
+  defaultNewTag?: boolean
+} = {}) {
   const [projects, setProjects] = useState<Project[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -67,13 +75,12 @@ export default function ProjectsSection() {
   const [newErr, setNewErr] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<Project | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [filter, setFilter] = useState<'all' | 'owned' | 'shared' | 'archived'>('all')
+  const [filter, setFilter] = useState<'all' | 'owned' | 'shared' | 'archived'>(defaultFilter || 'all')
   const [tagId, setTagId] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ _id?: string; id?: string; name?: string }>>([])
-  const [tagInputOpen, setTagInputOpen] = useState(false)
+  const [tagInputOpen, setTagInputOpen] = useState(Boolean(defaultNewTag))
   const [newTagName, setNewTagName] = useState('')
   const [creatingTag, setCreatingTag] = useState(false)
-  const notifications = useNotifications()
 
   const buildFilters = (f: string, tag: string | null) => {
     const out: Record<string, unknown> = {}
@@ -144,7 +151,7 @@ export default function ProjectsSection() {
       const data: any = await getJSON('/tag')
       setTags(Array.isArray(data?.tags) ? data.tags : Array.isArray(data) ? data : [])
     } catch (err: any) {
-      notifications.showNotification({
+      notifications.show({
         color: 'red',
         title: 'Could not create tag',
         message: (err?.data?.message as string) || 'Please try again.',

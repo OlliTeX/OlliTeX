@@ -1,0 +1,22 @@
+extends ../../../../app/views/layout-react
+
+block entrypointVar
+	- entrypoint = 'modules/ollitex-hub/pages/hub'
+
+block vars
+	- const hideNavLogo = true
+	- const hideBrandTitle = true
+	- const suppressNavContentLinks = true
+	- const suppressNavbar = true
+	- const suppressFooter = true
+	- const suppressPugCookieBanner = true
+	- const showThinFooter = false
+
+block append meta
+	meta(name='ol-userSettings' data-type='json' content=userSettings)
+	meta(name='ol-overallThemes' data-type='json' content=overallThemes)
+	meta(name='ol-hub-admin' data-type='boolean' content=hubAdmin)
+	meta(name='ol-hub-theme' data-type='json' content=(hubTheme ? JSON.stringify(hubTheme) : 'null'))
+
+block content
+	.olkit-hub#hub-root

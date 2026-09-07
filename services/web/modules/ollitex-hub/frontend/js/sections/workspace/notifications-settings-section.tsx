@@ -9,7 +9,7 @@ import {
   Switch,
   Text,
 } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { PageLoading } from '../../shared/page-state'
 
@@ -18,7 +18,6 @@ export default function NotificationsSettingsSection() {
   const [delay, setDelay] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const notifications = useNotifications()
 
   const load = useCallback(async () => {
     try {

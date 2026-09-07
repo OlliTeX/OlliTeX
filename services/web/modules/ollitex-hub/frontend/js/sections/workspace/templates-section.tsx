@@ -11,7 +11,7 @@ import {
   Text,
   TextInput,
 } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import { EmptyState, PageError, PageLoading } from '../../shared/page-state'
@@ -39,7 +39,11 @@ function normalize(t: any): Template {
   }
 }
 
-export default function TemplatesSection() {
+export default function TemplatesSection({
+  initialCategory,
+}: {
+  initialCategory?: string
+} = {}) {
   const [templates, setTemplates] = useState<Template[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -50,8 +54,7 @@ export default function TemplatesSection() {
   const [creating, setCreating] = useState(false)
   const [createErr, setCreateErr] = useState<string | null>(null)
   const [categories, setCategories] = useState<Array<{ key: string; name: string }>>([])
-  const [activeCategory, setActiveCategory] = useState('none')
-  const notifications = useNotifications()
+  const [activeCategory, setActiveCategory] = useState(initialCategory || 'none')
 
   const load = useCallback(async (category = 'none') => {
     setError(null)

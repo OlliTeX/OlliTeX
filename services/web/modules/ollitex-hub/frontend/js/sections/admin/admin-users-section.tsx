@@ -13,7 +13,7 @@ import {
   Tooltip,
   TextInput,
 } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
@@ -62,7 +62,6 @@ export default function AdminUsersSection() {
   const [confirmDel, setConfirmDel] = useState<AdminUser | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const notifications = useNotifications()
 
   const load = useCallback(async () => {
     setError(null)

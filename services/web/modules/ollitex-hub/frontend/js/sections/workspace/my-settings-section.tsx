@@ -15,7 +15,7 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 
@@ -55,7 +55,6 @@ function AccountTab() {
   const [firstName, setFirstName] = useState(user?.first_name || settings?.first_name || '')
   const [lastName, setLastName] = useState(user?.last_name || settings?.last_name || '')
   const [busy, setBusy] = useState(false)
-  const notifications = useNotifications()
 
   const save = async () => {
     setBusy(true)
@@ -118,7 +117,6 @@ function PasswordTab() {
   const [next2, setNext2] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const notifications = useNotifications()
 
   const save = async () => {
     if (!current || !next1) {
@@ -191,7 +189,6 @@ function AppearanceTab() {
   const { settings, refresh } = useUserSettings()
   const [theme, setTheme] = useState<string>(settings?.overallTheme || 'system')
   const [busy, setBusy] = useState(false)
-  const notifications = useNotifications()
 
   useEffect(() => {
     setTheme(settings?.overallTheme || 'system')
@@ -243,7 +240,6 @@ function EditorTab() {
   const [mathPreview, setMathPreview] = useState<boolean>(settings?.mathPreview ?? true)
   const [family, setFamily] = useState<string>(settings?.fontFamily || 'lucida')
   const [busy, setBusy] = useState(false)
-  const notifications = useNotifications()
 
   useEffect(() => {
     setFontSize(settings?.fontSize ?? null)

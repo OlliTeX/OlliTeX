@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import '@mantine/core/styles.css'
@@ -36,10 +36,38 @@ const hubColorSchemeManager = {
   unsubscribe: () => {},
 }
 
-export default function OlliTProvider({ children }: { children: React.ReactNode }) {
+export default function OlliTProvider({
+  children,
+  themePatch,
+}: {
+  children: React.ReactNode
+  themePatch?: Record<string, unknown>
+}) {
+  // M2.5 Appearance: optional override patch (custom hub theme) merged over
+  // the default brand theme. Without a patch this is exactly the previous
+  // behaviour, so other bundles are unaffected.
+  const theme = useMemo(() => {
+    if (!themePatch || typeof themePatch !== 'object') return ollitexTheme
+    const colors = {
+      ...(ollitexTheme as any).colors,
+      ...(themePatch.colors as Record<string, unknown> | undefined),
+    }
+    const components = {
+      ...
+        ((ollitexTheme as any).components as Record<string, unknown> | undefined),
+      ...((themePatch.components as Record<string, unknown> | undefined) || {}),
+    }
+    return {
+      ...(ollitexTheme as any),
+      ...(themePatch as any),
+      colors,
+      components,
+    }
+  }, [themePatch])
+
   return (
     <MantineProvider
-      theme={ollitexTheme}
+      theme={theme as any}
       defaultColorScheme={currentColorScheme()}
       colorSchemeManager={hubColorSchemeManager}
     >

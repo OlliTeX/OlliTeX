@@ -15,7 +15,7 @@ import {
   Tooltip,
   ActionIcon,
 } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import { getJSON, postJSON, putJSON, deleteJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
@@ -51,7 +51,6 @@ export default function AdminTemplatesSection() {
   const [busy, setBusy] = useState(false)
   const [confirmDel, setConfirmDel] = useState<GalleryTemplate | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const notifications = useNotifications()
 
   const load = useCallback(async () => {
     setLoading(true)

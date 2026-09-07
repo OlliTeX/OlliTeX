@@ -14,7 +14,7 @@ import {
   UnstyledButton,
   Box,
 } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import { getJSON, putJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import { PageError, PageLoading } from '../../shared/page-state'
@@ -344,13 +344,18 @@ function NativeCard({
   )
 }
 
-export default function AdminSiteSection() {
+export default function AdminSiteSection({
+  fixedSection,
+  hideNav,
+}: {
+  fixedSection?: string
+  hideNav?: boolean
+} = {}) {
   const [settings, setSettings] = useState<Sec | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [active, setActive] = useState('misc')
+  const [active, setActive] = useState(fixedSection || 'misc')
   const [drafts, setDrafts] = useState<Record<string, Sec>>({})
   const [saving, setSaving] = useState(false)
-  const notifications = useNotifications()
 
   const load = useCallback(async () => {
     setError(null)
@@ -558,6 +563,7 @@ export default function AdminSiteSection() {
 
   return (
     <div style={{ display: 'flex', minHeight: 520, alignItems: 'stretch' }}>
+      {!hideNav ? (
       <nav
         aria-label="Site settings sections"
         style={{
@@ -612,6 +618,7 @@ export default function AdminSiteSection() {
           ))}
         </Stack>
       </nav>
+      ) : null}
       <main style={{ flex: 1, minWidth: 0, overflowY: 'auto', maxHeight: 'calc(100vh - 120px)', padding: 12, background: 'var(--mantine-color-body)' }}>
         <Stack gap="md" maw={920}>
           <Text fw={700} size="lg">

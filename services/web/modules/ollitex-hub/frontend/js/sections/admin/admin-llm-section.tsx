@@ -11,7 +11,7 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { PageError, PageLoading } from '../../shared/page-state'
 import Icon from '../../shared/icons'
@@ -42,7 +42,6 @@ export default function AdminLlmSection() {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null)
-  const notifications = useNotifications()
 
   const load = useCallback(async () => {
     setError(null)

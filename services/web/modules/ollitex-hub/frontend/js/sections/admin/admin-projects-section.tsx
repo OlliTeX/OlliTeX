@@ -11,7 +11,7 @@ import {
   Text,
   TextInput,
 } from '@mantine/core'
-import { useNotifications } from '@mantine/notifications'
+import { notifications } from '@mantine/notifications'
 import { deleteJSON, getJSON, postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
@@ -63,7 +63,6 @@ export default function AdminProjectsSection() {
   const [includeTrash, setIncludeTrash] = useState(false)
   const [confirmPurge, setConfirmPurge] = useState<AdminProject | null>(null)
   const [purging, setPurging] = useState(false)
-  const notifications = useNotifications()
 
   useEffect(() => {
     void (async () => {
