@@ -12,6 +12,7 @@ import LlmSettingsSection from '../sections/workspace/llm-settings-section'
 import AppearanceSection from '../sections/appearance-section'
 import AdminInstanceSection from '../sections/admin/admin-instance-section'
 import AdminSiteSection from '../sections/admin/admin-site-section'
+import { NATIVE_SITE_SECTIONS } from '../sections/admin/site'
 import AdminLlmSection from '../sections/admin/admin-llm-section'
 import AdminUsersSection from '../sections/admin/admin-users-section'
 import AdminProjectsSection from '../sections/admin/admin-projects-section'
@@ -39,6 +40,8 @@ export function renderLeaf(node: HubNode): React.ReactNode {
     return <TemplatesSection key={node.id} initialCategory={node.category || 'none'} />
   }
   if (kind === 'site-sec' && node.siteId) {
+    const Native = NATIVE_SITE_SECTIONS[node.siteId]
+    if (Native) return <Native key={node.id} />
     return <AdminSiteSection key={node.id} fixedSection={node.siteId} hideNav />
   }
   if (kind === 'overview') {
