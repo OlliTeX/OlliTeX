@@ -59,8 +59,13 @@ export default function TemplatesSection({
   const load = useCallback(async (category = 'none') => {
     setError(null)
     try {
+      // owner #3 (2026-09-07): 'none' means "ALL templates" (the legacy
+      // gallery's All tab queries WITHOUT a category filter — ?category=none
+      // used to select only the ungrouped ones).
+      const catParam =
+        category && category !== 'none' ? `&category=${encodeURIComponent(category)}` : ''
       const data = await getJSON(
-        `/api/templates?by=${encodeURIComponent(sort)}&order=${sortOrder}&category=${encodeURIComponent(category)}`
+        `/api/templates?by=${encodeURIComponent(sort)}&order=${sortOrder}${catParam}`
       )
       const list = Array.isArray(data?.templates) ? data.templates.map(normalize).filter(t => t.id) : []
       setTemplates(list)

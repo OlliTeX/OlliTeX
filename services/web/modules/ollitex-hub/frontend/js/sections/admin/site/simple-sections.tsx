@@ -45,10 +45,10 @@ export function BrandingSection() {
         <Field label="Navbar title" value={String(v.navTitle || '')} onChange={x => up({ navTitle: x })} placeholder="LibreLeaf" hint="Shown in the top navigation bar." />
       </Group>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
-        <Area label="Left footer" value={String(v.leftFooter || '')} onChange={x => up({ leftFooter: x })} placeholder='[{"text": "…", "url": "https://…"}]' hint='JSON array of {text,url} items, or plain text.' />
+        <Area label="Left footer" width="100%" value={String(v.leftFooter || '')} onChange={x => up({ leftFooter: x })} placeholder='[{"text": "…", "url": "https://…"}]' hint='JSON array of {text,url} items, or plain text.' />
       </Group>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
-        <Area label="Right footer" value={String(v.rightFooter || '')} onChange={x => up({ rightFooter: x })} rows={2} placeholder='[{"text": "Powered by LibreLeaf", "url": "…"}]' />
+        <Area label="Right footer" width="100%" value={String(v.rightFooter || '')} onChange={x => up({ rightFooter: x })} rows={2} placeholder='[{"text": "Powered by LibreLeaf", "url": "…"}]' />
       </Group>
     </SectionShell>
   )

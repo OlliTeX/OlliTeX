@@ -38,7 +38,17 @@ const availableIntegrationLinkingWidgets = allAvailableIntegrationLinkingWidgets
   }
 )
 
-function LinkingSection() {
+/**
+ * owner #6b (2026-09-07): the unified hub renders the two leaves
+ * mysettings.sync and mysettings.references from this ONE section — `only`
+ * restricts the rendered block(s) so each leaf shows its own content.
+ * Default (no prop) = legacy /user/mysettings behaviour, unchanged.
+ */
+function LinkingSection({
+  only,
+}: {
+  only?: 'projectSync' | 'references'
+} = {}) {
   useBroadcastUser()
   const { t } = useTranslation()
   const { subscriptions } = useSSOContext()
@@ -102,6 +112,12 @@ function LinkingSection() {
 
   const hasSSOLinkingSection = Object.keys(subscriptions).length > 0
 
+  // per-leaf visibility (owner #6b)
+  const showAi = only !== 'references'
+  const showSync = only !== 'references'
+  const showRefs = only === undefined || only === 'references'
+  const showSso = only === undefined
+
   if (
     !haslangFeedbackLinkingWidgets &&
     !hasIntegrationLinkingSection &&
@@ -110,10 +126,18 @@ function LinkingSection() {
   ) {
     return null
   }
+  if (only === 'references' && !hasReferencesLinkingSection) return null
+  if (
+    only === 'projectSync' &&
+    !hasIntegrationLinkingSection &&
+    !haslangFeedbackLinkingWidgets
+  ) {
+    return null
+  }
 
   return (
     <>
-      {haslangFeedbackLinkingWidgets ? (
+      {showAi && haslangFeedbackLinkingWidgets ? (
         <>
           <h3 id="language-feedback">{t('ai_features')}</h3>
           {langFeedbackLinkingWidgets.map(
@@ -127,7 +151,7 @@ function LinkingSection() {
           )}
         </>
       ) : null}
-      {hasIntegrationLinkingSection ? (
+      {showSync && hasIntegrationLinkingSection ? (
         <>
           <h3 id="project-sync">{t('project_synchronisation')}</h3>
           {projectSyncSuccessMessage ? (
@@ -156,7 +180,7 @@ function LinkingSection() {
           </div>
         </>
       ) : null}
-      {hasReferencesLinkingSection ? (
+      {showRefs && hasReferencesLinkingSection ? (
         <>
           <h3 id="references">{t('reference_managers')}</h3>
           {referenceLinkingErrorMessage ? (
@@ -180,7 +204,7 @@ function LinkingSection() {
           </div>
         </>
       ) : null}
-      {hasSSOLinkingSection ? (
+      {showSso && hasSSOLinkingSection ? (
         <>
           <h3 id="linked-accounts">{t('linked_accounts')}</h3>
           {ssoErrorMessage ? (

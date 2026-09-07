@@ -20,10 +20,18 @@ import AdminTemplatesSection from '../sections/admin/admin-templates-section'
 // Legacy user-settings sections (features/settings) — self-contained React
 // components reused so /hub keeps every parameter (owner parity #11).
 import KeyBindingsCard from '../../../../../frontend/js/features/settings/components/key-bindings-card'
-import LinkingSection from '../../../../../frontend/js/features/settings/components/linking-section'
 import SessionsLeaf from '../sections/workspace/sessions-section'
 import SystemMessagesSection from '../sections/admin/system-messages-section'
 import InstanceStatsSection from '../sections/admin/instance-stats-section'
+import GrammarSettingsSection from '../../../../languagetool/frontend/js/grammar-settings-section'
+import LLMComplianceSettings from '../../../../llm/frontend/js/components/llm-compliance-settings'
+import LLMUsageMeter from '../../../../llm/frontend/js/components/llm-usage-meter'
+import GitHubSyncWidget from '../../../../github-sync/frontend/js/components/github-sync-widget'
+import WebdavWidget from '../../../../webdav/frontend/js/components/webdav-widget'
+import DropboxWidget from '../../../../dropbox/frontend/js/components/dropbox-widget'
+import { ZoteroWidget } from '../../../../zotero/frontend/js/components/zotero-widget'
+import { MendeleyWidget } from '../../../../mendeley/frontend/js/components/mendeley-widget'
+
 
 /**
  * Leaf renderer for the unified /hub (nav_structure.md §4).
@@ -59,12 +67,43 @@ export function renderLeaf(node: HubNode): React.ReactNode {
     case 'mysettings.email':
       return <NotificationsSettingsSection key={node.id} />
     case 'mysettings.llm.general':
-    case 'mysettings.llm.grammar':
-    case 'mysettings.llm.compliance':
-    case 'mysettings.llm.usage':
-      // combined BYO-LLM page (four sections: General, Grammar Checking,
-      // Compliance Review, Usage) — split per item in a later milestone
+      // BYO providers (add / remove / test / model selection)
       return <LlmSettingsSection key={node.id} />
+    case 'mysettings.llm.grammar':
+      // owner #7 (2026-09-07): each leaf shows its OWN section (was: all
+      // four rendered the same combined page)
+      return (
+        <Card key={node.id} withBorder paddings="md" radius="lg" mb="xs">
+          <Text fw={700} mb="xs">Grammar Checking</Text>
+          <Text size="sm" c="dimmed" mb="md">
+            Shared LanguageTool settings for grammar feedback in your projects
+            (mode, language, blocked rules). The per-project strictness toggle
+            stays in the project settings.
+          </Text>
+          <GrammarSettingsSection />
+        </Card>
+      )
+    case 'mysettings.llm.compliance':
+      return (
+        <Card key={node.id} withBorder paddings="md" radius="lg" mb="xs">
+          <Text fw={700} mb="xs">Compliance Review</Text>
+          <Text size="sm" c="dimmed" mb="md">
+            Your review rubrics for the AI compliance review in the project
+            review panel.
+          </Text>
+          <LLMComplianceSettings />
+        </Card>
+      )
+    case 'mysettings.llm.usage':
+      return (
+        <Card key={node.id} withBorder paddings="md" radius="lg" mb="xs">
+          <Text fw={700} mb="xs">Usage</Text>
+          <Text size="sm" c="dimmed" mb="md">
+            Your LLM usage for the last 30 days.
+          </Text>
+          <LLMUsageMeter scope="user" />
+        </Card>
+      )
     case 'site.general.managetpl':
       return <AdminTemplatesSection key={node.id} />
     case 'site.general.appearance':
@@ -108,13 +147,72 @@ export function renderLeaf(node: HubNode): React.ReactNode {
         </Card>
       )
     case 'mysettings.sync':
-    case 'mysettings.references':
-      // legacy LinkingSection: project synchronisation (WebDAV / Dropbox /
-      // GitHub / Git) + reference managers (Zotero / Mendeley / …)
+      // owner #6b (2026-09-07): each leaf renders its OWN provider set
+      // (before: both leaves showed the same combined legacy page — and on
+      // /hub it was EMPTY, because importOverleafModules has no widgets in
+      // this entry). The provider widgets below are plain React components
+      // and render natively in the hub.
       return (
-        <Card key={node.id} withBorder paddings="md" radius="lg">
-          <LinkingSection />
-        </Card>
+        <Stack key={node.id} gap="md">
+          <Text size="sm" c="dimmed">
+            Keep your projects in sync with external storage and git remotes.
+          </Text>
+          <Card withBorder paddings="md" radius="lg">
+            <Text fw={700} mb={4}>GitHub</Text>
+            <Text size="sm" c="dimmed" mb="md">
+              Sync projects with GitHub repositories and git servers.
+            </Text>
+            <GitHubSyncWidget />
+          </Card>
+          <Card withBorder paddings="md" radius="lg">
+            <Text fw={700} mb={4}>WebDAV (Nextcloud)</Text>
+            <Text size="sm" c="dimmed" mb="md">
+              Mirror your project to a WebDAV / Nextcloud folder.
+            </Text>
+            <WebdavWidget />
+          </Card>
+          <Card withBorder paddings="md" radius="lg">
+            <Text fw={700} mb={4}>Dropbox</Text>
+            <Text size="sm" c="dimmed" mb="md">
+              Mirror your project to Dropbox.
+            </Text>
+            <DropboxWidget />
+          </Card>
+        </Stack>
+      )
+    case 'mysettings.references':
+      return (
+        <Stack key={node.id} gap="md">
+          <Text size="sm" c="dimmed">
+            Connect your reference managers and import literature into any project.
+          </Text>
+          <Card withBorder paddings="md" radius="lg">
+            <Text fw={700} mb={4}>Zotero</Text>
+            <Text size="sm" c="dimmed" mb="md">
+              Link your Zotero account with an API key
+              (zotero.org/settings/keys).
+            </Text>
+            <ZoteroWidget />
+          </Card>
+          <Card withBorder paddings="md" radius="lg">
+            <Text fw={700} mb={4}>Mendeley</Text>
+            <Text size="sm" c="dimmed" mb="md">
+              Sign in to Mendeley to link your reference library.
+            </Text>
+            <MendeleyWidget />
+          </Card>
+          <Card withBorder paddings="md" radius="lg">
+            <Text fw={700} mb={4}>ORCID &amp; manual imports</Text>
+            <Text size="sm" c="dimmed">
+              Import from ORCID, paste BibTeX/DOI, or enter references manually
+              in your{' '}
+              <a href="/hub#/library" style={{ color: 'var(--mantine-color-ollitex-6, #1e6b41)' }}>
+                reference library
+              </a>
+              .
+            </Text>
+          </Card>
+        </Stack>
       )
     case 'mysettings.sessions':
       return <SessionsLeaf key={node.id} />
@@ -128,7 +226,11 @@ export function renderLeaf(node: HubNode): React.ReactNode {
     case 'site.llm.prompt':
     case 'site.llm.prompts':
     case 'site.llm.usage':
-      return <AdminLlmSection key={node.id} />
+      // owner #1 (2026-09-07): every leaf now renders ONLY its own section
+      // (before all six showed the same combined page)
+      return (
+        <AdminLlmSection key={node.id} section={node.id.split('.').pop() as 'features' | 'connection' | 'models' | 'prompt' | 'prompts' | 'usage'} />
+      )
     default:
       break
   }

@@ -5,6 +5,16 @@ if (typeof window !== 'undefined' && !window.metaAttributesCache) {
   window.metaAttributesCache = new Map()
 }
 
+// The hub leaves embed legacy feature components (llm usage meter, compliance
+// settings, grammar settings, linking widgets) whose i18n bootstrap reads the
+// `ol-i18n` page meta at module scope. Seed it so those modules initialise
+// in the test environment (production pages render the same meta server-side).
+if (typeof window !== 'undefined' && window.metaAttributesCache) {
+  if (!window.metaAttributesCache.has('ol-i18n')) {
+    window.metaAttributesCache.set('ol-i18n', { currentLangCode: 'en', lang: 'en' })
+  }
+}
+
 // Standard jsdom shims the UI tree (Mantine color scheme, Uppy, virtualized
 // lists) expects at load time.
 if (typeof window !== 'undefined') {

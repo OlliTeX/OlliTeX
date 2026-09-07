@@ -52,11 +52,16 @@ async function buildLocals(req, res) {
   } catch {
     hubTheme = null
   }
+  // 2026-09-07 (owner #6b): the hub's sync + references leaves embed the
+  // real provider widgets, which read ol-ExposedSettings / ol-gitBridgeEnabled
+  // at render time — expose both as page meta.
   return {
     userSettings,
     hubAdmin,
     hubTheme,
     hubUserJson: user ? JSON.stringify(user) : 'null',
+    exposedSettingsJson: JSON.stringify(Settings.exposedSettings || {}),
+    gitBridgeEnabled: Settings.gitBridgeEnabled === 'true',
     availableAuthMethods,
     userIsAdminUpdatedOnLogin,
     userDetailsUpdatedOnLogin,
