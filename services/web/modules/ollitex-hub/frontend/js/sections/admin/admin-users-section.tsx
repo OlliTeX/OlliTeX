@@ -16,6 +16,7 @@ import {
   Group,
   Menu,
   Modal,
+  Pagination,
   Stack,
   Switch,
   Table,
@@ -66,6 +67,8 @@ export default function AdminUsersSection({
   const [users, setUsers] = useState<AdminUser[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState<number | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [cEmail, setCEmail] = useState('')
   const [cFirst, setCFirst] = useState('')
@@ -82,55 +85,57 @@ export default function AdminUsersSection({
   const [confirmPurge, setConfirmPurge] = useState<AdminUser | null>(null)
   const [purging, setPurging] = useState(false)
 
-  const load = useCallback(async () => {
+  const PAGE_SIZE = 25
+
+  const load = useCallback(async (p: number) => {
     setError(null)
+    const filters: Record<string, unknown> = {}
+    if (view === 'admins') filters.admin = true
+    else if (view === 'suspended') filters.suspended = true
+    else if (view === 'inactive') filters.inactive = true
+    else if (view === 'deleted') filters.deleted = true
+    else filters.all = true
+    const q = search.trim()
+    if (q) filters.search = q
     try {
       const data = await postJSON('/admin/users', {
-        body: { sort: { by: 'signUpDate', order: 'desc' } },
+        body: {
+          sort: { by: 'signUpDate', order: 'desc' },
+          page: { index: p, size: PAGE_SIZE },
+          filters,
+        },
       })
       const list = Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : []
       setUsers(list)
+      setTotal(typeof data?.totalSize === 'number' ? data.totalSize : null)
     } catch (err: any) {
       setUsers([])
+      setTotal(null)
       setError((err?.data?.message as string) || String(err?.message || err))
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, search])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    setPage(1)
+  }, [view, search])
 
+  useEffect(() => {
+    setUsers(null)
+    void load(page)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, page])
+
+  // Server-side filtering (POST /admin/users filters). This CE build returns
+  // the full filtered list (page param accepted but not sliced server-side),
+  // so page client-side: slice only when the list is larger than one page —
+  // stays correct if a future build pages server-side too.
   const filtered = useMemo(() => {
-    if (!users) return []
-    const q = search.trim().toLowerCase()
-    const INACTIVE_MS = 15 * 24 * 3600 * 1000 // legacy admin: no activity for 15 days
-    const isInactive = (u: AdminUser) => {
-      if (!u.lastActive) return true
-      const t = new Date(u.lastActive).getTime()
-      if (Number.isNaN(t)) return true
-      return Date.now() - t > INACTIVE_MS
-    }
-    return users.filter(u => {
-      switch (view) {
-        case 'deleted':
-          return Boolean(u.deletedAt)
-        case 'suspended':
-          return !u.deletedAt && Boolean(u.suspended)
-        case 'inactive':
-          return !u.deletedAt && !u.suspended && isInactive(u)
-        case 'admins':
-          return !u.deletedAt && (Boolean(u.isAdmin) || isTemplateAdmin(u))
-        default:
-          return !u.deletedAt
-      }
-    }).filter(u => {
-      if (!q) return true
-      return (
-        (u.email || '').toLowerCase().includes(q) ||
-        `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase().includes(q)
-      )
-    })
-  }, [users, search, view])
+    const list = users || []
+    if (list.length <= PAGE_SIZE) return list
+    const start = (page - 1) * PAGE_SIZE
+    return list.slice(start, start + PAGE_SIZE)
+  }, [users, page, PAGE_SIZE])
 
   const sel = useSelection(filtered.map(uid))
 
@@ -536,6 +541,14 @@ export default function AdminUsersSection({
         onCancel={() => setConfirmPurge(null)}
         onConfirm={() => void doPurgeOne()}
       />
+          {total != null && total > PAGE_SIZE ? (
+        <Group justify="space-between" wrap="wrap" gap="xs">
+          <Text size="sm" c="dimmed">
+            Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))} — {total} user{total === 1 ? '' : 's'}
+          </Text>
+          <Pagination order={page} total={Math.ceil(total / PAGE_SIZE)} onChange={setPage} size="sm" />
+        </Group>
+      ) : null}
     </Stack>
   )
 }

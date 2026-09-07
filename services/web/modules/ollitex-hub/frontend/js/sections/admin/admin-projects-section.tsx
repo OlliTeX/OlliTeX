@@ -20,6 +20,7 @@ import {
   Group,
   Menu,
   Modal,
+  Pagination,
   NativeSelect,
   Stack,
   Table,
@@ -84,6 +85,8 @@ export default function AdminProjectsSection({
   const [projects, setProjects] = useState<AdminProject[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState<number | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [confirmPurge, setConfirmPurge] = useState<AdminProject | null>(null)
   const [confirmPurgeBulk, setConfirmPurgeBulk] = useState(false)
@@ -110,54 +113,69 @@ export default function AdminProjectsSection({
     })()
   }, [])
 
-  const load = useCallback(async () => {
+  const PAGE_SIZE = 25
+
+  const load = useCallback(async (p: number) => {
     setError(null)
+    const userId = scope === 'all' ? 'null' : scope
+    const filters: Record<string, unknown> = {}
+    if (view === 'trashed') filters.trashed = true
+    else if (view === 'deleted') filters.deleted = true
+    else filters.owned = true
+    const q = search.trim()
+    if (q) filters.search = q
     try {
-      const userId = scope === 'all' ? 'null' : scope
       const data = await postJSON(`/admin/user/${encodeURIComponent(userId)}/projects`, {
-        body: { sort: { by: 'lastUpdated', order: 'desc' } },
+        body: {
+          sort: { by: 'lastUpdated', order: 'desc' },
+          page: { index: p, size: PAGE_SIZE },
+          filters,
+        },
       })
       const list = Array.isArray(data?.projects) ? data.projects : []
       setProjects(list)
+      setTotal(typeof data?.totalSize === 'number' ? data.totalSize : null)
     } catch (err: any) {
       setProjects([])
+      setTotal(null)
       setError((err?.data?.message as string) || String(err?.message || err))
     }
-  }, [scope])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, view, search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [scope, view, search])
 
   useEffect(() => {
     setProjects(null)
-    void load()
-  }, [load])
+    void load(page)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, page])
 
-  const filtered = useMemo(() => {
-    if (!projects) return []
-    const q = search.trim().toLowerCase()
+  // Server-side filtering (owner #2); the CE build returns the full filtered
+  // list, so page client-side (slice only when > one page — stays correct if a
+  // future build pages server-side). 'inactive' has no server filter.
+  const allList = useMemo(() => {
+    const list = projects || []
+    if (view !== 'inactive') return list
     const INACTIVE_MS = 15 * 24 * 3600 * 1000
-    const isInactive = (p: AdminProject) => {
-      if (typeof p.inactive === 'boolean') return p.inactive // server flag (legacy)
+    return list.filter(p => {
+      if (typeof p.inactive === 'boolean') return p.inactive
       const t0 = p.lastOpened || p.lastActive || p.lastUpdated
       if (!t0) return true
-      const t = new Date(t0).getTime()
+      const t = Date.parse(t0)
       if (Number.isNaN(t)) return true
       return Date.now() - t > INACTIVE_MS
-    }
-    return projects.filter(p => {
-      switch (view) {
-        case 'deleted':
-          return Boolean(p.deleted || p.deletedAt)
-        case 'trashed':
-          return Boolean(p.trashed) && !(p.deleted || p.deletedAt)
-        case 'inactive':
-          return !p.trashed && !(p.deleted || p.deletedAt) && isInactive(p)
-        default:
-          return !p.trashed && !(p.deleted || p.deletedAt)
-      }
-    }).filter(p => {
-      if (!q) return true
-      return (pname(p) || '').toLowerCase().includes(q)
     })
-  }, [projects, search, view])
+  }, [projects, view])
+
+  const filtered = useMemo(() => {
+    const list = allList
+    if (list.length <= PAGE_SIZE) return list
+    const start = (page - 1) * PAGE_SIZE
+    return list.slice(start, start + PAGE_SIZE)
+  }, [allList, page, PAGE_SIZE])
 
   const sel = useSelection(filtered.map(pid))
   const selectedProjects = useMemo(() => filtered.filter(p => sel.isSelected(pid(p))), [filtered, sel.selected])
@@ -493,6 +511,14 @@ export default function AdminProjectsSection({
         onCancel={() => setConfirmPurgeBulk(false)}
         onConfirm={() => void runBulkProject('purge-bulk', p => deleteJSON(`/admin/project/${pid(p)}/purge`), 'Projects purged.').then(() => setConfirmPurgeBulk(false))}
       />
+          {total != null && total > PAGE_SIZE ? (
+        <Group justify="space-between" wrap="wrap" gap="xs">
+          <Text size="sm" c="dimmed">
+            Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))} — {total} project{total === 1 ? '' : 's'}
+          </Text>
+          <Pagination order={page} total={Math.ceil(total / PAGE_SIZE)} onChange={setPage} size="sm" />
+        </Group>
+      ) : null}
     </Stack>
   )
 }
