@@ -1,5 +1,5 @@
 import React from 'react'
-import { Stack, Text, Title, Alert } from '@mantine/core'
+import { Stack, Text, Title, Alert, Card } from '@mantine/core'
 import type { HubNode } from './nav-tree'
 import { hubNavigate } from './navigate'
 import Icon from '../shared/icons'
@@ -16,6 +16,13 @@ import AdminLlmSection from '../sections/admin/admin-llm-section'
 import AdminUsersSection from '../sections/admin/admin-users-section'
 import AdminProjectsSection from '../sections/admin/admin-projects-section'
 import AdminTemplatesSection from '../sections/admin/admin-templates-section'
+// Legacy user-settings sections (features/settings) — self-contained React
+// components reused so /hub keeps every parameter (owner parity #11).
+import KeyBindingsCard from '../../../../../frontend/js/features/settings/components/key-bindings-card'
+import LinkingSection from '../../../../../frontend/js/features/settings/components/linking-section'
+import SessionsLeaf from '../sections/workspace/sessions-section'
+import SystemMessagesSection from '../sections/admin/system-messages-section'
+import InstanceStatsSection from '../sections/admin/instance-stats-section'
 
 /**
  * Leaf renderer for the unified /hub (nav_structure.md §4).
@@ -59,6 +66,11 @@ export function renderLeaf(node: HubNode): React.ReactNode {
       return <AdminTemplatesSection key={node.id} />
     case 'site.general.appearance':
       return <AppearanceSection key={node.id} />
+    case 'site.general.enclose':
+      // Owner mapping 2026-09-07: this leaf carries the legacy /admin/panel
+      // content (the full classic site-settings panel, mirror of /admin/site)
+      // until the native Mantine rebuilds land.
+      return <AdminSiteSection key={node.id} />
     case 'site.general.projects.all':
       return <AdminProjectsSection key={node.id} view="all" />
     case 'site.general.projects.inactive':
@@ -85,6 +97,28 @@ export function renderLeaf(node: HubNode): React.ReactNode {
       return <MySettingsSection key={node.id} initialTab="appearance" />
     case 'mysettings.editordefaults':
       return <MySettingsSection key={node.id} initialTab="editor" />
+    case 'mysettings.keybindings':
+      // legacy KeyBindingsCard (JSON import/export, reset defaults, Vim/Emacs)
+      return (
+        <Card key={node.id} withBorder paddings="md" radius="lg">
+          <KeyBindingsCard />
+        </Card>
+      )
+    case 'mysettings.sync':
+    case 'mysettings.references':
+      // legacy LinkingSection: project synchronisation (WebDAV / Dropbox /
+      // GitHub / Git) + reference managers (Zotero / Mendeley / …)
+      return (
+        <Card key={node.id} withBorder paddings="md" radius="lg">
+          <LinkingSection />
+        </Card>
+      )
+    case 'mysettings.sessions':
+      return <SessionsLeaf key={node.id} />
+    case 'site.general.messages':
+      return <SystemMessagesSection key={node.id} />
+    case 'site.general.stats':
+      return <InstanceStatsSection key={node.id} />
     case 'site.llm.features':
     case 'site.llm.connection':
     case 'site.llm.models':

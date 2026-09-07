@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Group,
+  Menu,
   Modal,
   NativeSelect,
   Stack,
@@ -15,6 +16,10 @@ import {
   Tooltip,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
+import BibImportModal from '@modules/bib-editor/frontend/js/components/bib-import-modal'
+import OrcidPickerModal from '@modules/orcid-picker/frontend/js/components/orcid-picker-modal'
+import ZoteroPickerModal from '@modules/zotero/frontend/js/components/zotero-picker-modal'
+import { normaliseOrcidEntryKeys, splitImportText } from '@modules/bib-editor/frontend/js/utils/bib-import'
 import Icon from '../../shared/icons'
 import { EmptyState, PageError, PageLoading } from '../../shared/page-state'
 import ConfirmModal from '../../shared/confirm-modal'
@@ -361,6 +366,10 @@ export default function LibrarySection() {
   const [trashCount, setTrashCount] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [bibUploadOpen, setBibUploadOpen] = useState(false)
+  const [orcidOpen, setOrcidOpen] = useState(false)
+  const [zoteroOpen, setZoteroOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const load = useCallback(async () => {
@@ -390,6 +399,37 @@ export default function LibrarySection() {
     void load()
   }, [load])
 
+  const importEntries = async (entries: { type: string; id: string; fields: Record<string, string> }[]) => {
+    try {
+      const mapped = entries.map(e => ({
+        key: e.id,
+        type: e.type,
+        fields: Object.entries(e.fields).map(([name, value]) => ({ name, value })),
+      }))
+      if (mapped.length === 0) {
+        notifications.show({ message: 'No references to import.', color: 'orange' })
+        return
+      }
+      await createEntries(mapped)
+      notifications.show({
+        message: `Imported ${mapped.length} reference${mapped.length > 1 ? 's' : ''}.`,
+        color: 'green',
+      })
+      void load()
+    } catch (e) {
+      notifications.show({ message: failureFromError(e).message || 'Import failed.', color: 'red' })
+    }
+  }
+
+  const importBibtex = async (bibtex: string) => {
+    const entries = normaliseOrcidEntryKeys(
+      splitImportText(bibtex)
+        .filter(i => i.kind === 'bibtex')
+        .map(i => (i as { entry: { type: string; id: string; fields: Record<string, string> } }).entry),
+    )
+    await importEntries(entries)
+  }
+
   if (libEntries === null && !error) return <PageLoading label="Loading your reference library…" />
 
   return (
@@ -398,14 +438,36 @@ export default function LibrarySection() {
         <Text size="sm" c="dimmed">
           Personal reference library — cite these from any project.
         </Text>
-        <Button
-          size="md"
-          color="ollitex"
-          leftSection={<Icon name="add" size={18} />}
-          onClick={() => setAddOpen(true)}
-        >
-          Add reference
-        </Button>
+        <Menu width={300} position="bottom-end" withinPortal>
+          <Menu.Target>
+            <Button
+              size="md"
+              color="ollitex"
+              leftSection={<Icon name="add" size={18} />}
+              rightSection={<Icon name="expand_more" size={16} />}
+            >
+              Add reference
+            </Button>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Item leftSection={<Icon name="edit" size={16} />} onClick={() => setAddOpen(true)}>
+              Enter manually
+            </Menu.Item>
+            <Menu.Item leftSection={<Icon name="content_paste" size={16} />} onClick={() => { setPasteOpen(true)}}>
+              Paste references (BibTeX, DOI)
+            </Menu.Item>
+            <Menu.Item leftSection={<Icon name="upload_file" size={16} />} onClick={() => setBibUploadOpen(true)}>
+              Upload .bib file
+            </Menu.Item>
+            <Menu.Divider>Import</Menu.Divider>
+            <Menu.Item leftSection={<Icon name="badge" size={16} />} onClick={() => setOrcidOpen(true)}>
+              Import from ORCID.org
+            </Menu.Item>
+            <Menu.Item leftSection={<Icon name="import_contacts" size={16} />} onClick={() => setZoteroOpen(true)}>
+              Import from Zotero
+            </Menu.Item>
+          </Menu.Dropdown>
+        </Menu>
       </Group>
 
       {error ? <PageError label="Couldn’t load the library" detail={error} onRetry={() => void load()} /> : null}
@@ -445,6 +507,23 @@ export default function LibrarySection() {
       </Tabs>
 
       <AddReferenceModal open={addOpen} onClose={() => setAddOpen(false)} onCreated={() => void load()} />
+
+      <BibImportModal
+        show={pasteOpen}
+        existingIds={[]}
+        expectedSource="library"
+        onImport={entries => void importEntries(entries)}
+        onHidden={() => setPasteOpen(false)}
+      />
+      <BibImportModal
+        show={bibUploadOpen}
+        existingIds={[]}
+        expectedSource="library"
+        onImport={entries => void importEntries(entries)}
+        onHidden={() => setBibUploadOpen(false)}
+      />
+      <OrcidPickerModal show={orcidOpen} handleHide={() => setOrcidOpen(false)} onInsert={text => void importBibtex(text)} />
+      <ZoteroPickerModal show={zoteroOpen} handleHide={() => setZoteroOpen(false)} onInsert={text => void importBibtex(text)} />
 
       {loading && libEntries !== null ? (
         <Text size="xs" c="dimmed">

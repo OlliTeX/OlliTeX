@@ -15,6 +15,9 @@ import {
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { postJSON, getJSON } from '@/infrastructure/fetch-json'
+import { SplitTestProvider } from '@/shared/context/split-test-context'
+import UploadProjectModal from '@/features/project-list/components/new-project-button/upload-project-modal'
+import ImportDocumentModal from '@/features/project-list/components/new-project-button/import-document-modal'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
 import { EmptyState, PageError, PageLoading } from '../../shared/page-state'
@@ -81,6 +84,9 @@ export default function ProjectsSection({
   const [tagInputOpen, setTagInputOpen] = useState(Boolean(defaultNewTag))
   const [newTagName, setNewTagName] = useState('')
   const [creatingTag, setCreatingTag] = useState(false)
+  const [zipOpen, setZipOpen] = useState(false)
+  const [docxOpen, setDocxOpen] = useState(false)
+  const [mdOpen, setMdOpen] = useState(false)
 
   const buildFilters = (f: string, tag: string | null) => {
     const out: Record<string, unknown> = {}
@@ -280,17 +286,43 @@ export default function ProjectsSection({
           style={{ maxWidth: 420, width: '100%' }}
         />
         <Group gap="xs">
-          <Button
-            size="md"
-            color="ollitex"
-            leftSection={<Icon name="add" size={18} />}
-            onClick={() => {
-              setNewOpen(true)
-              setNewErr(null)
-            }}
-          >
-            New project
-          </Button>
+          <Menu width={280} position="bottom-start" withinPortal>
+            <Menu.Target>
+              <Button
+                size="md"
+                color="ollitex"
+                leftSection={<Icon name="add" size={18} />}
+                rightSection={<Icon name="expand_more" size={16} />}
+              >
+                New project
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item
+                leftSection={<Icon name="article" size={16} />}
+                onClick={() => {
+                  setNewName('')
+                  setNewErr(null)
+                  setNewOpen(true)
+                }}
+              >
+                Blank project
+              </Menu.Item>
+              <Menu.Item leftSection={<Icon name="extension" size={16} />} onClick={() => window.location.assign('/template')}>
+                From template
+              </Menu.Item>
+              <Menu.Divider>Import</Menu.Divider>
+              <Menu.Item leftSection={<Icon name="folder_zip" size={16} />} onClick={() => setZipOpen(true)}>
+                Existing project (.zip)
+              </Menu.Item>
+              <Menu.Item leftSection={<Icon name="description" size={16} />} onClick={() => setDocxOpen(true)}>
+                Word document (.docx)
+              </Menu.Item>
+              <Menu.Item leftSection={<Icon name="markdown" size={16} />} onClick={() => setMdOpen(true)}>
+                Markdown file (.md)
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       </Group>
 
@@ -425,6 +457,29 @@ export default function ProjectsSection({
           </Group>
         </Stack>
       </Modal>
+
+      <SplitTestProvider>
+        {zipOpen ? (
+          <UploadProjectModal
+            onHide={() => setZipOpen(false)}
+            openProject={id => window.location.assign(`/project/${id}`)}
+          />
+        ) : null}
+        {docxOpen ? (
+          <ImportDocumentModal
+            type="docx"
+            onHide={() => setDocxOpen(false)}
+            openProject={id => window.location.assign(`/project/${id}`)}
+          />
+        ) : null}
+        {mdOpen ? (
+          <ImportDocumentModal
+            type="markdown"
+            onHide={() => setMdOpen(false)}
+            openProject={id => window.location.assign(`/project/${id}`)}
+          />
+        ) : null}
+      </SplitTestProvider>
 
       <ConfirmModal
         open={!!toDelete}

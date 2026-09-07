@@ -17,6 +17,8 @@ import {
   onAppliedHubThemeChange,
 } from './hub-theme'
 import OlliTProvider from '../../../../../frontend/js/shared/mantine/provider'
+import { UserSettingsProvider } from '../../../../../frontend/js/shared/context/user-settings-context'
+import { SplitTestProvider } from '../../../../../frontend/js/shared/context/split-test-context'
 import {
   currentColorScheme,
   onColorSchemeChange,
@@ -241,6 +243,8 @@ export default function HubRoot() {
 
   return (
     <OlliTProvider themePatch={themePatch}>
+      <SplitTestProvider>
+        <UserSettingsProvider>
     <div
       style={{
         display: 'flex',
@@ -329,6 +333,8 @@ export default function HubRoot() {
         </main>
       </div>
     </div>
+        </UserSettingsProvider>
+      </SplitTestProvider>
     </OlliTProvider>
   )
 }

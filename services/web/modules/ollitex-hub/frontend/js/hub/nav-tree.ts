@@ -137,7 +137,7 @@ export const HUB_NAV: HubNode[] = [
             ],
           },
           { id: 'site.general.activeprojects', label: 'Active projects', icon: 'track_changes' },
-          { id: 'site.general.enclose', label: 'Open/Close Editor', icon: 'computer' },
+          { id: 'site.general.enclose', label: 'Full site settings', icon: 'tune' },
           { id: 'site.general.messages', label: 'System messages', icon: 'campaign' },
           { id: 'site.general.stats', label: 'Instance statistics', icon: 'monitoring' },
         ],
