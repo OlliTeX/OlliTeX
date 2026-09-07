@@ -8,6 +8,7 @@ import { EmailSection } from './email-section'
 import {
   BrandingSection,
   DropboxSection,
+  MendeleySection,
   GrammarSection,
   GitSection,
   GithubSection,
@@ -34,4 +35,5 @@ export const NATIVE_SITE_SECTIONS: Record<string, ComponentType> = {
   'linked-file-types': LinkedFileTypesSection,
   webdav: WebdavSection,
   dropbox: DropboxSection,
+  mendeley: MendeleySection,
 }

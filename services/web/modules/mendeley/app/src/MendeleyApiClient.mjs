@@ -26,17 +26,21 @@ function withProxy(options) {
     : options
 }
 
-function _basicAuthHeader() {
-  const creds = `${Settings.mendeley?.clientID}:${Settings.mendeley?.clientSecret}`
+function _basicAuthHeader(m) {
+  const clientId = m?.clientId || Settings.mendeley?.clientID || ''
+  const clientSecret = m?.clientSecret || Settings.mendeley?.clientSecret || ''
+  const creds = `${clientId}:${clientSecret}`
   return `Basic ${Buffer.from(creds).toString('base64')}`
 }
 
 // ---- Service configured? --------------------------------------------------
+// Resolved settings (SiteSettings mendeley section OR env seed) are passed
+// as `m`; the no-arg fallback keeps existing sync callers working.
 
-function isServiceConfigured() {
-  return Boolean(
-    Settings.mendeley?.clientID && Settings.mendeley?.clientSecret
-  )
+function isServiceConfigured(m) {
+  const clientId = m?.clientId || Settings.mendeley?.clientID
+  const clientSecret = m?.clientSecret || ''
+  return Boolean(clientId && clientSecret)
 }
 
 class MendeleyNotConfiguredError extends Error {
@@ -46,8 +50,8 @@ class MendeleyNotConfiguredError extends Error {
   }
 }
 
-function _ensureConfigured() {
-  if (!isServiceConfigured()) {
+function _ensureConfigured(m) {
+  if (!isServiceConfigured(m)) {
     throw new MendeleyNotConfiguredError()
   }
 }
@@ -55,11 +59,11 @@ function _ensureConfigured() {
 // ---- OAuth 2.0 -----------------------------------------------------------
 
 /** Step 1: the URL the user is redirected to in order to authorize access. */
-function getOAuthAuthorizeUrl(state) {
-  _ensureConfigured()
+function getOAuthAuthorizeUrl(state, m) {
+  _ensureConfigured(m)
   const url = new URL(MENDELEY_OAUTH_AUTHORIZE_URL)
-  url.searchParams.set('client_id', Settings.mendeley.clientID)
-  url.searchParams.set('redirect_uri', Settings.mendeley.callbackURL)
+  url.searchParams.set('client_id', m?.clientId || Settings.mendeley?.clientID)
+  url.searchParams.set('redirect_uri', m?.callbackURL || Settings.mendeley?.callbackURL)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', MENDELEY_SCOPE)
   url.searchParams.set('state', state)
@@ -67,36 +71,39 @@ function getOAuthAuthorizeUrl(state) {
 }
 
 /** Step 2: exchange the authorization code for access + refresh tokens. */
-async function exchangeCodeForToken(code) {
-  _ensureConfigured()
+async function exchangeCodeForToken(code, m) {
+  _ensureConfigured(m)
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
-    redirect_uri: Settings.mendeley.callbackURL,
+    redirect_uri: m?.callbackURL || Settings.mendeley?.callbackURL,
   })
-  return _requestToken(body)
+  return _requestToken(body, m)
 }
 
-async function _refreshAccessToken(refreshToken) {
+async function _refreshAccessToken(refreshToken, m) {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
     // Mendeley's docs show redirect_uri in the refresh example, even though
     // RFC 6749 §6 does not ask for it and the endpoint accepts the request
     // without it. Sent to match the documented form.
-    redirect_uri: Settings.mendeley.callbackURL,
+    redirect_uri: m?.callbackURL || Settings.mendeley?.callbackURL,
   })
-  return _requestToken(body)
+  return _requestToken(body, m)
 }
 
-async function _requestToken(body) {
+async function _requestToken(body, m) {
+  if (!isServiceConfigured(m)) {
+    throw new MendeleyNotConfiguredError()
+  }
   try {
     const data = await fetchJson(
       MENDELEY_OAUTH_TOKEN_URL,
       withProxy({
         method: 'POST',
         headers: {
-          Authorization: _basicAuthHeader(),
+          Authorization: _basicAuthHeader(m),
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: body.toString(),
@@ -159,7 +166,13 @@ async function isLinked(userId) {
  * Return a valid access token for the user, transparently refreshing (and
  * re-storing) it when the current one has expired.
  */
-async function _getAccessToken(userId) {
+const DEFAULT_M = {
+  clientId: Settings.mendeley?.clientID || '',
+  clientSecret: Settings.mendeley?.clientSecret || '',
+  callbackURL: Settings.mendeley?.callbackURL,
+}
+
+async function _getAccessToken(userId, m = DEFAULT_M) {
   const credentials = await _getStoredCredentials(userId)
   if (!credentials) {
     throw new MendeleyAccountNotLinkedError()
@@ -172,7 +185,7 @@ async function _getAccessToken(userId) {
     throw new MendeleyExpiredError('Mendeley token expired')
   }
   try {
-    const refreshed = await _refreshAccessToken(credentials.refreshToken)
+    const refreshed = await _refreshAccessToken(credentials.refreshToken, m)
     // Mendeley may not return a new refresh token; keep the existing one.
     if (!refreshed.refreshToken) {
       refreshed.refreshToken = credentials.refreshToken
@@ -189,8 +202,8 @@ async function _getAccessToken(userId) {
 
 // ---- API calls -----------------------------------------------------------
 
-async function _authHeaders(userId, accept) {
-  const accessToken = await _getAccessToken(userId)
+async function _authHeaders(userId, accept, m = DEFAULT_M) {
+  const accessToken = await _getAccessToken(userId, m)
   return {
     Authorization: `Bearer ${accessToken}`,
     ...(accept ? { Accept: accept } : {}),
@@ -198,8 +211,8 @@ async function _authHeaders(userId, accept) {
 }
 
 /** Get the list of groups for a user (for the create-file modal). */
-async function getGroupsForUser(userId) {
-  const headers = await _authHeaders(userId, 'application/vnd.mendeley-group.1+json')
+async function getGroupsForUser(userId, m = DEFAULT_M) {
+  const headers = await _authHeaders(userId, 'application/vnd.mendeley-group.1+json', m)
   try {
     const groups = await fetchJson(
       `${MENDELEY_API_URL}/groups?type=all`,
@@ -219,15 +232,16 @@ async function getGroupsForUser(userId) {
 }
 
 /** Export the user's entire library as BibTeX. */
-async function getUserLibraryBibtex(userId) {
-  return _fetchBibtex(userId, `${MENDELEY_API_URL}/documents?view=bib&limit=100`)
+async function getUserLibraryBibtex(userId, m = DEFAULT_M) {
+  return _fetchBibtex(userId, `${MENDELEY_API_URL}/documents?view=bib&limit=100`, m)
 }
 
 /** Export a group library as BibTeX. */
-async function getGroupLibraryBibtex(userId, groupId) {
+async function getGroupLibraryBibtex(userId, groupId, m = DEFAULT_M) {
   return _fetchBibtex(
     userId,
-    `${MENDELEY_API_URL}/documents?view=bib&limit=100&group_id=${encodeURIComponent(groupId)}`
+    `${MENDELEY_API_URL}/documents?view=bib&limit=100&group_id=${encodeURIComponent(groupId)}`,
+    m
   )
 }
 
@@ -235,12 +249,12 @@ async function getGroupLibraryBibtex(userId, groupId) {
  * Fetch all documents from a Mendeley endpoint as BibTeX, following the
  * `Link: <…>; rel="next"` pagination headers Mendeley returns.
  */
-async function _fetchBibtex(userId, firstUrl) {
+async function _fetchBibtex(userId, firstUrl, m = DEFAULT_M) {
   let allBibtex = ''
   let url = firstUrl
 
   while (url) {
-    const headers = await _authHeaders(userId, 'application/x-bibtex')
+    const headers = await _authHeaders(userId, 'application/x-bibtex', m)
     try {
       const { body: bibtex, response } = await fetchStringWithResponse(
         url,

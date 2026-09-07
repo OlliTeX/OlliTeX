@@ -7,6 +7,7 @@ import {
   MendeleyExpiredError,
   MendeleyForbiddenError,
 } from './MendeleyApiClient.mjs'
+import { getMendeleySettings } from './MendeleySection.mjs'
 
 /**
  * The account-settings references surface on this fork (2026-09-07): the
@@ -23,7 +24,9 @@ const REFERENCES_PAGE = '/hub#mysettings.references'
  * render the right state WITHOUT a 5xx when the connector is unconfigured.
  */
 async function status(req, res) {
-  const configured = MendeleyApiClient.isServiceConfigured()
+  const m = await getMendeleySettings()
+  const configured = Boolean(m.enabled)
+    && MendeleyApiClient.isServiceConfigured(m)
   const userId = SessionManager.getLoggedInUserId(req.session)
   let connected = false
   if (configured && userId) {
@@ -41,7 +44,8 @@ async function status(req, res) {
  * Returns the user's Mendeley groups (for the create-file modal).
  */
 async function getGroups(req, res) {
-  if (!MendeleyApiClient.isServiceConfigured()) {
+  const m = await getMendeleySettings()
+  if (!MendeleyApiClient.isServiceConfigured(m)) {
     return res.status(403).json({
       error: 'not_configured',
       message: 'mendeley_groups_relink',
@@ -80,9 +84,10 @@ async function getGroups(req, res) {
 async function oauth(req, res) {
   const userId = SessionManager.getLoggedInUserId(req.session)
   try {
+    const m = await getMendeleySettings()
     const state = crypto.randomBytes(16).toString('hex')
     req.session.mendeleyOAuthState = state
-    res.redirect(MendeleyApiClient.getOAuthAuthorizeUrl(state).toString())
+    res.redirect(MendeleyApiClient.getOAuthAuthorizeUrl(state, m).toString())
   } catch (err) {
     logger.err({ err, userId }, 'error starting Mendeley OAuth flow')
     res.redirect(REFERENCES_PAGE)
@@ -105,7 +110,8 @@ async function oauthCallback(req, res) {
   }
 
   try {
-    const tokens = await MendeleyApiClient.exchangeCodeForToken(code)
+    const m = await getMendeleySettings()
+    const tokens = await MendeleyApiClient.exchangeCodeForToken(code, m)
     await MendeleyApiClient.storeCredentials(userId, tokens)
     res.redirect(REFERENCES_PAGE)
   } catch (err) {

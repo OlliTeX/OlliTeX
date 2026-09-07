@@ -56,9 +56,10 @@ export default {
    * templates: per-category template counts.
    */
   getSiteSettings: expressify(async (req, res) => {
-    const [templates, zotero, externalUrl, signup, ssoSaml, ssoOidc, ssoLdap, sandboxedCompiles, gitIntegration, githubSync, email, linkedFileTypes, pandoc, webdav, dropbox, misc, languagetool, llm, branding, services] = await Promise.all([
+    const [templates, zotero, mendeley, externalUrl, signup, ssoSaml, ssoOidc, ssoLdap, sandboxedCompiles, gitIntegration, githubSync, email, linkedFileTypes, pandoc, webdav, dropbox, misc, languagetool, llm, branding, services] = await Promise.all([
       getSection('templates', Settings),
       getSection('zotero', Settings),
+      getSection('mendeley', Settings),
       getSection('externalUrl', Settings),
       getSection('signup', Settings),
       getSection('sso-saml', Settings),
@@ -99,6 +100,7 @@ export default {
     res.json({
       templates: { ...maskSecrets('templates', templates), counts },
       zotero: maskSecrets('zotero', zotero),
+      mendeley: maskSecrets('mendeley', mendeley),
       externalUrl: maskSecrets('externalUrl', externalUrl),
       signup: maskSecrets('signup', signup),
       'sso-saml': maskSecrets('sso-saml', ssoSaml),

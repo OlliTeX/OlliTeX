@@ -88,6 +88,8 @@ async function getCollection() {
 /** In-section field names that hold encrypted values. */
 export const SECRET_FIELDS = {
   zotero: ['clientSecret'],
+  // Reference manager connectors (2026-09, owner #8): Mendeley OAuth app.
+  mendeley: ['clientSecret'],
   // SSO providers (SSO multi-provider, 2026-08-29): stored (encrypted)
   // wins over the OVERLEAF_* env seed under the same key.
   'sso-saml': ['idpCert', 'privateKey', 'decryptionPvk'],
@@ -146,6 +148,7 @@ function loadDoc() {
 export const SECTION_KNOWN_KEYS = {
   templates: ['enabled', 'categories', 'allUsersCanManageTemplates', 'nonAdminCanPublishTemplates'],
   zotero: ['enabled', 'clientKey', 'clientSecret'],
+  mendeley: ['enabled', 'clientId', 'clientSecret'],
   externalUrl: ['enabled', 'blockedNetworks', 'allowedResourcesRegex'],
   signup: ['enabled', 'allowedEmailDomains', 'disabledRedirectUrl'],
   'sso-saml': [
@@ -471,6 +474,16 @@ function envSeeds(env, coreSettings, stored) {
       clientKey: env.ZOTERO_CLIENT_KEY || '',
       hasEnvSecret: Boolean(env.ZOTERO_CLIENT_SECRET),
     },
+    // Reference manager connectors (2026-09, owner #8): Mendeley. Env seed
+    // from MENDELEY_CLIENT_ID / MENDELEY_CLIENT_SECRET (settings.js) — the
+    // admin can store a DB override here (clientSecret encrypted).
+    mendeley: {
+      enabled:
+        Boolean(env.MENDELEY_CLIENT_ID) ||
+        Boolean(coreSettings?.mendeley?.clientID),
+      clientId: env.MENDELEY_CLIENT_ID || '',
+      hasEnvSecret: Boolean(env.MENDELEY_CLIENT_SECRET),
+    },
     externalUrl: {
       enabled:
         boolFromEnv(env.OVERLEAF_EXTERNAL_URLS) ??
@@ -696,6 +709,26 @@ export async function getSection(name, coreSettings) {
     delete merged.hasEnvSecret
   }
 
+  if (name === 'mendeley') {
+    // Same shape as zotero: stored (encrypted) wins, env seed second.
+    let secret = ''
+    if (stored.clientSecret) {
+      try {
+        secret = await decryptText(stored.clientSecret)
+      } catch (err) {
+        logger.warn(
+          { err },
+          'SiteSettings: mendeley clientSecret decrypt failed; env value used if set'
+        )
+      }
+      if (!secret && seeds.hasEnvSecret) secret = env.MENDELEY_CLIENT_SECRET
+    } else if (seeds.hasEnvSecret) {
+      secret = env.MENDELEY_CLIENT_SECRET
+    }
+    merged.clientSecret = secret
+    delete merged.hasEnvSecret
+  }
+
   // SSO provider sections: stored (encrypted) secret wins, env seed
   // second. Mirrors the zotero resolution above, generalized over the
   // section's SECRET_FIELDS list.
@@ -843,6 +876,16 @@ export function validateTemplatesSection(value) {
         }
       }
     }
+  }
+  return errors
+}
+
+export function validateMendeleySection(value) {
+  const errors = []
+  if (typeof value !== 'object' || value === null) return ['body must be a JSON object']
+  if (typeof value.enabled !== 'boolean') errors.push('enabled must be a boolean')
+  if (value.clientId !== undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(value.clientId || '')) {
+    errors.push('clientId may only contain letters, digits, _ and -')
   }
   return errors
 }
@@ -1262,6 +1305,7 @@ export function validateServicesSection(value) {
 export const SECTION_VALIDATORS = {
   templates: validateTemplatesSection,
   zotero: validateZoteroSection,
+  mendeley: validateMendeleySection,
   externalUrl: validateExternalUrlSection,
   signup: validateSignupSection,
   'sso-saml': validateSsoSamlSection,

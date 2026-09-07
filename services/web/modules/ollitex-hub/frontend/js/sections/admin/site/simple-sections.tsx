@@ -375,3 +375,40 @@ export function DropboxSection() {
     </SectionShell>
   )
 }
+
+// Owner #8 (2026-09-07): Site settings → Integrations → Mendeley.
+// Same shape as Dropbox (CLIENT_ID/SECRET + toggle). The server
+// (SiteSettings mendeley section) stores the secret encrypted; the mendeley
+// connector resolves it per request (env seed → DB override).
+export function MendeleySection() {
+  const { data, error, flash, save, load } = useSiteSettings('mendeley')
+  const { v, up } = useSyncValues(data, d => ({
+    enabled: bool0((d as any).enabled),
+    clientId: str0((d as any).clientId),
+    clientSecret: '',
+  }))
+  const secretSet = Boolean((data as any)?.clientSecretSet)
+  if (!data && !error) return <PageLoading label="Loading Mendeley settings…" />
+  if (error && !data) return <Group><Text size="sm" c="red">Mendeley: {error}</Text><Anchor href="#" onClick={e => { e.preventDefault(); void load() }}>Retry</Anchor></Group>
+  return (
+    <SectionShell
+      title="Mendeley"
+      badge="mendeley"
+      enabled={Boolean(v.enabled)}
+      onEnabled={x => up({ enabled: x })}
+      description="Mendeley reference connector — link a Mendeley account and import its library into any project (My settings → Reference managers)."
+      footerNote="Requires a Mendeley OAuth app (Client ID + Client Secret). Saved to the instance database; the connector picks it up on the next request."
+      flash={flash}
+      onSave={() => void save({
+        enabled: Boolean(v.enabled),
+        clientId: String(v.clientId || ''),
+        clientSecret: String(v.clientSecret || ''),
+      })}
+    >
+      <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
+        <Field label="Client ID" required value={String(v.clientId || '')} onChange={x => up({ clientId: x })} placeholder="your Mendeley app client id" />
+        <SecretField label="Client secret" set={Boolean(secretSet)} value={String(v.clientSecret || '')} onChange={x => up({ clientSecret: x })} hint="Leave empty to keep the stored secret." />
+      </Group>
+    </SectionShell>
+  )
+}

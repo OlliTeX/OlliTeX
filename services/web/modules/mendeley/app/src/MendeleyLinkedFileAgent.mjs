@@ -6,6 +6,7 @@ import UserGetter from '../../../../app/src/Features/User/UserGetter.mjs'
 import LinkedFilesHandler from '../../../../app/src/Features/LinkedFiles/LinkedFilesHandler.mjs'
 import LinkedFilesErrors from '../../../../app/src/Features/LinkedFiles/LinkedFilesErrors.mjs'
 import MendeleyApiClient from './MendeleyApiClient.mjs'
+import { getMendeleySettings } from './MendeleySection.mjs'
 import {
   MendeleyForbiddenError,
   MendeleyExpiredError,
@@ -108,14 +109,16 @@ async function refreshLinkedFile(
 
 async function _getBibtex(linkedFileData) {
   const userId = linkedFileData.importedByUserId
+  const m = await getMendeleySettings()
   try {
     if (linkedFileData.mendeleyGroupId) {
       return await MendeleyApiClient.getGroupLibraryBibtex(
         userId,
-        linkedFileData.mendeleyGroupId
+        linkedFileData.mendeleyGroupId,
+        m
       )
     }
-    return await MendeleyApiClient.getUserLibraryBibtex(userId)
+    return await MendeleyApiClient.getUserLibraryBibtex(userId, m)
   } catch (err) {
     if (err instanceof MendeleyForbiddenError || err instanceof MendeleyExpiredError) {
       logger.debug({ linkedFileData, err }, 'Mendeley access denied')

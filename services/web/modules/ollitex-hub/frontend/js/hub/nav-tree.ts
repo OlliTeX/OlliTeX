@@ -148,6 +148,8 @@ export const HUB_NAV: HubNode[] = [
         icon: 'link',
         children: [
           { id: 'site.integrations.zotero', label: 'Zotero', icon: 'auto_stories', render: 'site-sec', siteId: 'zotero' },
+          // Owner #8 (2026-09-07): Mendeley connector credentials (CLIENT_ID/SECRET + toggle).
+          { id: 'site.integrations.mendeley', label: 'Mendeley', icon: 'menu_book', render: 'site-sec', siteId: 'mendeley' },
           { id: 'site.integrations.externalurl', label: 'External URLs', icon: 'link', render: 'site-sec', siteId: 'externalUrl' },
           { id: 'site.integrations.sso-saml', label: 'SSO · SAML', icon: 'verified_user', render: 'site-sec', siteId: 'sso-saml' },
           { id: 'site.integrations.sso-oidc', label: 'SSO · OIDC', icon: 'badge', render: 'site-sec', siteId: 'sso-oidc' },
