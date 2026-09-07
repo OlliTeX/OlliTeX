@@ -9,7 +9,7 @@ import SectionBoundary from './section-boundary'
 import { renderLeaf } from './leaves'
 import { HUB_NAV, HubNode, indexNav, visibleNav } from './nav-tree'
 import { accordionState } from './accordion-state'
-import { onHubNavigate } from './navigate'
+import { onHubNavigate, SHORTCUT_ALIASES } from './navigate'
 import {
   buildThemePatch,
   cssVarsFor,

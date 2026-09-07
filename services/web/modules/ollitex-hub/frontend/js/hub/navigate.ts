@@ -5,6 +5,16 @@
 // (used e.g. by the Overview "Instance management" shortcuts, #2).
 const HUB_NAVIGATE_EVENT = 'ol-hub-navigate'
 
+// Overview “Instance management” shortcuts → concrete leaf ids (#2, Wave A).
+// Exported so the hub test suite can assert the alias table.
+export const SHORTCUT_ALIASES: Record<string, string> = {
+  site: 'site.general.misc',
+  users: 'site.general.users.all',
+  projects: 'site.general.projects.all',
+  templates: 'site.general.managetpl',
+  llm: 'site.llm.features',
+}
+
 export function hubNavigate(id: string): void {
   if (typeof id !== 'string' || !id) return
   try {

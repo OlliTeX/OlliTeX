@@ -21,11 +21,31 @@ if (process.env.CI && process.env.JUNIT_ROOT_SUITE_NAME) {
 
 const path = require('node:path')
 
+// Babel macro stub for the vitest runner (esbuild does not run babel macros):
+// legacy components call importOverleafModules('x') at module scope; resolve
+// the macro module to an empty registration stub so the import graph loads.
+const MACRO_STUB = path.join(
+  __dirname,
+  'modules/ollitex-hub/test/frontend/stubs/import-overleaf-module.mjs'
+)
+const overleafMacroStub = {
+  name: 'ollitex-hub-macro-stub',
+  enforce: 'pre',
+  resolveId(source) {
+    if (/[\\/]macros\/import-overleaf-module\.macro(\.js)?$/.test(source)) {
+      return MACRO_STUB
+    }
+    return null
+  },
+}
+
 module.exports = defineConfig({
+  plugins: [overleafMacroStub],
   resolve: {
-    alias: {
-      '@': path.join(__dirname, 'frontend/js'),
-    },
+    alias: [
+      { find: '@modules', replacement: path.join(__dirname, 'modules') },
+      { find: '@', replacement: path.join(__dirname, 'frontend/js') },
+    ],
   },
   esbuild: {
     // Repo components rely on the automatic JSX runtime (babel preset-react
@@ -68,6 +88,26 @@ module.exports = defineConfig({
             'test/unit/src/**/*.sequential.test.mjs',
           ],
           fileParallelism: false,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'HubFrontend',
+          // /hub React integration test suite (owner mandate 2026-09-07):
+          // fast, browser-free component tests covering every hub surface
+          // (rail, leaves, menus, settings, admin sections, theme logic).
+          environment: 'jsdom',
+          environmentOptions: {
+            jsdom: {
+              url: 'https://www.test-overleaf.com/',
+              pretendToBeVisual: true,
+            },
+          },
+          setupFiles: ['modules/ollitex-hub/test/frontend/vitest.setup.ts'],
+          include: ['modules/ollitex-hub/test/frontend/**/*.test.{ts,tsx}'],
+          exclude: ['modules/ollitex-hub/test/frontend/helpers/**'],
+          fileParallelism: true,
         },
       },
     ],
