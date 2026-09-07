@@ -56,6 +56,7 @@ async function buildLocals(req, res) {
     userSettings,
     hubAdmin,
     hubTheme,
+    hubUserJson: user ? JSON.stringify(user) : 'null',
     availableAuthMethods,
     userIsAdminUpdatedOnLogin,
     userDetailsUpdatedOnLogin,

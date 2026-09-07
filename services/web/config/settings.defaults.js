@@ -1056,6 +1056,11 @@ function buildSettings() {
       __dirname,
       '../modules/zotero/frontend/js/components/zotero-create-file'
     ),
+    // Mendeley reference connector (2026-09-07): "New file > Mendeley" import
+    Path.resolve(
+      __dirname,
+      '../modules/mendeley/frontend/js/components/mendeley-create-file'
+    ),
       // [IVd] diagram module: "New file > Diagram (SVG)" entry
     Path.resolve(
       __dirname,
@@ -1226,6 +1231,10 @@ function buildSettings() {
       __dirname,
       '../modules/zotero/frontend/js/components/zotero-widget'
     ),
+    Path.resolve(
+      __dirname,
+      '../modules/mendeley/frontend/js/components/mendeley-widget'
+    ),
     ],
     importProjectFromGithubModalWrapper: [
     Path.resolve(
@@ -1367,6 +1376,10 @@ function buildSettings() {
       __dirname,
       '../modules/zotero/frontend/js/components/zotero-integration-card.tsx'
     ),
+    Path.resolve(
+      __dirname,
+      '../modules/mendeley/frontend/js/components/mendeley-integration-card'
+    ),
     // [III]: WebDAV (Nextcloud) + Dropbox integration cards in the Integrations panel
     Path.resolve(
       __dirname,
@@ -1436,6 +1449,7 @@ function buildSettings() {
     'webdav', // [III]: WebDAV/Nextcloud mirroring (must be before zotero per provider-module order)
     'dropbox', // [III]: Dropbox project mirror sync
     'zotero',
+    'mendeley', // Mendeley reference connector (2026-09-07)
     'orcid-picker', // Import-from-ORCID picker (P2, BIB_ORCID_TEMPLATES_PLAN.md)
     'bib-editor',
     'tex-autoformatter', // autoformat toolbar button (N-C port, 2026-08-31)

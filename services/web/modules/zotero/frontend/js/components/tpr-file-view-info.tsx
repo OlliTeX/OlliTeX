@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import getMeta from '@/utils/meta'
 import { formatTime, relativeDate } from '@/features/utils/format-date'
 import { LinkedFileIcon } from '@/features/file-view/components/file-view-icons'
-import { hasProvider } from '@/features/file-view/types/binary-file'
+import { getReferenceProvider } from '../reference-providers'
 import type { LinkedFile, LinkedFileData } from '@/features/file-view/types/binary-file'
 
 /**
@@ -19,7 +19,8 @@ type TPRFileViewInfoProps = {
 export function TPRFileViewInfo({ file }: TPRFileViewInfoProps) {
   const { t } = useTranslation()
 
-  if (!hasProvider(file, 'zotero')) return null
+  const provider = getReferenceProvider(file)
+  if (!provider) return null
 
   const importedAt = (file.linkedFileData as any)?.importedAt || file.created
   const formattedDate = formatTime(importedAt)
@@ -33,12 +34,12 @@ export function TPRFileViewInfo({ file }: TPRFileViewInfoProps) {
       <LinkedFileIcon />
       &nbsp;
       {(importedByUserId === getMeta('ol-user_id')) ? (
-        t('imported_from_zotero_at_date', {
+        t(provider.i18n.importedAtDate, {
           formattedDate,
           relativeDate: relative,
         })
       ) : (
-        t('imported_from_zotero_at_date_by', {
+        t(provider.i18n.importedAtDateBy, {
           formattedDate,
           relativeDate: relative,
           importedByName,

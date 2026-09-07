@@ -4638,5 +4638,8 @@
   "zotero_sync_success_plural": "Synced __count__ references from Zotero.",
   "zotero_sync_up_to_date": "Your Zotero references are already up to date.",
   "zotero_upgrade_prompt_content": "Link your Zotero account to search and add your references from Zotero directly in your project—they’ll automatically be added to your .bib file. Or import them as a file into your __appName__ projects.",
-  "zotero_upgrade_prompt_title": "Cite from Zotero"
+  "zotero_upgrade_prompt_title": "Cite from Zotero",
+  "mendeley_not_configured": "This site has not set up the Mendeley connector yet. Once your administrator configures it you can link your Mendeley account here.",
+  "mendeley_reference_loading_error_not_linked": "Refresh failed: the account used to import the file is no longer linked to Mendeley or has been removed.",
+  "imported_from_mendeley_at_date_by": "Imported from Mendeley at __formattedDate__ __relativeDate__ by __importedByName__"
 }

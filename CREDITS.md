@@ -81,6 +81,13 @@ stack, self-seeding fixture journeys, composable test infrastructure) was
 inspired by the testing practices of
 [Forgejo](https://codeberg.org/forgejo/forgejo).
 
+The Mendeley reference connector in
+[`services/web/modules/mendeley`](services/web/modules/mendeley) is ported
+from the Third-Party-References module (`tpr-webmodule`) of the `ayakaleaf`
+fork (owner's pro line, 2025/2026); the OAuth client, token storage and
+linked-file agent logic were carried over 1:1 and adapted to the 6.3.0
+linked-files API and this fork's house style.
+
 # Acknowledgments
 
 Thanks to the users of the project for valuable feedback, suggestions,

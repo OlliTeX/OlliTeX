@@ -6,6 +6,8 @@ import Icon from '../shared/icons'
 import ThemeToggle from '../shared/theme-toggle'
 import Rail from './rail'
 import SectionBoundary from './section-boundary'
+import { UserProvider } from '../../../../../frontend/js/shared/context/user-context'
+import { SSOProvider } from '../../../../../frontend/js/features/settings/context/sso-context'
 import { renderLeaf } from './leaves'
 import { HUB_NAV, HubNode, indexNav, visibleNav } from './nav-tree'
 import { accordionState } from './accordion-state'
@@ -316,7 +318,7 @@ export default function HubRoot() {
               ) : null}
             </div>
             {node ? (
-              <SectionBoundary label={node.label}>{renderLeaf(node)}</SectionBoundary>
+              <SectionBoundary label={node.label}><UserProvider><SSOProvider>{renderLeaf(node)}</SSOProvider></UserProvider></SectionBoundary>
             ) : (
               <Text size="sm" c="dimmed">
                 Unknown section “{path}”. Pick a page from the menu.

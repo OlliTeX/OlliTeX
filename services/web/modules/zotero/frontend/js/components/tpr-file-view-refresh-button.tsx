@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
 import type { LinkedFile, LinkedFileData } from '@/features/file-view/types/binary-file'
-import { hasProvider } from '@/features/file-view/types/binary-file'
+import { getReferenceProvider } from '../reference-providers'
 
 type TPRFileViewRefreshButtonProps = {
   file: LinkedFile<keyof LinkedFileData>
@@ -20,12 +20,12 @@ export function TPRFileViewRefreshButton({
   refreshing,
 }: TPRFileViewRefreshButtonProps) {
   const { t } = useTranslation()
-  const zoteroIsProvider = hasProvider(file, 'zotero')
+  const refProviderIsProvider = Boolean(getReferenceProvider(file))
 
   return (
     <OLButton
       variant="primary"
-      onClick={() => refreshFile(zoteroIsProvider)}
+      onClick={() => refreshFile(refProviderIsProvider)}
       isLoading={refreshing}
     >
       {t('refresh')}
