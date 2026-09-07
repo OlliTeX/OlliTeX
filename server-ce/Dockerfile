@@ -127,7 +127,7 @@ ENV OVERLEAF_CONFIG=/etc/overleaf/settings.js
 ENV WEB_API_USER="overleaf"
 ENV ADMIN_PRIVILEGE_AVAILABLE="true"
 
-ENV OVERLEAF_APP_NAME="OlliTeX"
+ENV OVERLEAF_APP_NAME="LibreLeaf"
 
 ENV OPTIMISE_PDF="true"
 # Official 6.3.0 default for @overleaf/request-validation

@@ -1,23 +1,33 @@
+// /hub → Workspace → My Settings leaf? No — Site settings → Users leaves.
+// Admin user management (legacy /admin/users parity, owner #21):
+// per-row actions + Select-all + view-gated bulk toolbar:
+//   all/admins/suspended/inactive → Suspend · Resume · Mail · Set admin ·
+//   Unset admin · Delete
+//   deleted → Restore · Purge
+// APIs: POST /admin/users, /admin/user/:id/update|delete|restore|send-activation,
+//       DELETE /admin/user/:id (purge), POST /admin/user/create
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActionIcon,
   Badge,
   Button,
-    Group,
+  Checkbox,
+  Group,
   Menu,
   Modal,
   Stack,
   Switch,
   Table,
   Text,
-  Tooltip,
   TextInput,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { getJSON, postJSON } from '@/infrastructure/fetch-json'
+import { deleteJSON, postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
 import { EmptyState, PageError, PageLoading } from '../../shared/page-state'
+import { BulkToolbar, HeaderCheckbox, RowCheckbox, useSelection, BulkAction } from '../../shared/bulk-select'
 
 type AdminUser = {
   _id: string
@@ -64,9 +74,13 @@ export default function AdminUsersSection({
   const [cTemplates, setCTemplates] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createErr, setCreateErr] = useState<string | null>(null)
-  const [confirmDel, setConfirmDel] = useState<AdminUser | null>(null)
-  const [deleting, setDeleting] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [bulkBusy, setBulkBusy] = useState<string | null>(null)
+  const [confirmBulkDel, setConfirmBulkDel] = useState(false)
+  const [bulkSendEmail, setBulkSendEmail] = useState(false)
+  const [confirmBulkPurge, setConfirmBulkPurge] = useState(false)
+  const [confirmPurge, setConfirmPurge] = useState<AdminUser | null>(null)
+  const [purging, setPurging] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
@@ -118,23 +132,166 @@ export default function AdminUsersSection({
     })
   }, [users, search, view])
 
+  const sel = useSelection(filtered.map(uid))
+
+  // --- single-user actions -------------------------------------------------
   const setUserFlag = async (u: AdminUser, patch: Record<string, unknown>) => {
     setBusyId(uid(u))
     try {
       await postJSON(`/admin/user/${uid(u)}/update`, { body: patch })
-      setUsers(list =>
-        (list || []).map(x => (uid(x) === uid(u) ? ({ ...x, ...patch } as any) : x))
-      )
+      setUsers(list => (list || []).map(x => (uid(x) === uid(u) ? ({ ...x, ...patch } as any) : x)))
       notifications.show({ message: 'User updated.', color: 'teal' })
     } catch (err: any) {
-      notifications.show({
-        message: (err?.data?.message as string) || 'Could not update the user.',
-        color: 'red',
-      })
+      notifications.show({ message: (err?.data?.message as string) || 'Could not update the user.', color: 'red' })
     } finally {
       setBusyId(null)
     }
   }
+
+  const sendActivation = async (u: AdminUser) => {
+    try {
+      await postJSON(`/admin/user/${uid(u)}/send-activation`, { body: {} })
+      notifications.show({ message: 'Activation email requested.', color: 'teal' })
+    } catch (e: any) {
+      notifications.show({ message: (e?.data?.message as string) || 'Could not send activation.', color: 'red' })
+    }
+  }
+
+  const doDeleteOne = async (u: AdminUser) => {
+    setBusyId(uid(u))
+    try {
+      await postJSON(`/admin/user/${uid(u)}/delete`, { body: { sendEmail: false, toUserId: null } })
+      notifications.show({ message: `Deleted ${u.email}.`, color: 'gray' })
+      sel.clear()
+      await load()
+    } catch (e: any) {
+      notifications.show({ message: (e?.data?.message as string) || 'Delete failed.', color: 'red' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const restoreDeleted = async (u: AdminUser) => {
+    setBusyId(uid(u))
+    try {
+      await postJSON(`/admin/user/${uid(u)}/restore`, { body: {} })
+      notifications.show({ message: 'User restored.', color: 'teal' })
+      await load()
+    } catch (e: any) {
+      notifications.show({ message: (e?.data?.message as string) || 'Could not restore.', color: 'red' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const doPurgeOne = async () => {
+    if (!confirmPurge) return
+    setPurging(true)
+    try {
+      await deleteJSON(`/admin/user/${uid(confirmPurge)}`)
+      notifications.show({ message: `Purged ${confirmPurge.email}.`, color: 'gray' })
+      setConfirmPurge(null)
+      await load()
+    } catch (e: any) {
+      notifications.show({ message: (e?.data?.message as string) || 'Purge failed.', color: 'red' })
+      setConfirmPurge(null)
+    } finally {
+      setPurging(false)
+    }
+  }
+
+  // --- bulk actions (owner #21) --------------------------------------------
+  const selectedUsers = useMemo(() => filtered.filter(u => sel.isSelected(uid(u))), [filtered, sel.selected])
+
+  const runBulk = async (key: string, fn: () => Promise<unknown>, okMsg: string) => {
+    setBulkBusy(key)
+    let fail = 0
+    try {
+      for (const u of [...selectedUsers]) {
+        try {
+          await fn(u)
+        } catch (e: any) {
+          fail += 1
+          notifications.show({ message: `${u.email}: ${e?.data?.message || 'failed'}`, color: 'red' })
+        }
+      }
+      if (fail === 0) notifications.show({ message: okMsg, color: 'teal' })
+      sel.clear()
+      await load()
+    } finally {
+      setBulkBusy(null)
+    }
+  }
+
+  const doBulkDelete = async () => {
+    setBulkBusy('delete')
+    let fail = 0
+    try {
+      for (const u of [...selectedUsers]) {
+        try {
+          await postJSON(`/admin/user/${uid(u)}/delete`, { body: { sendEmail: bulkSendEmail, toUserId: null } })
+        } catch (e: any) {
+          fail += 1
+          notifications.show({ message: `${u.email}: ${e?.data?.message || 'failed'}`, color: 'red' })
+        }
+      }
+      setConfirmBulkDel(false)
+      setBulkSendEmail(false)
+      if (fail === 0) notifications.show({ message: 'Users deleted.', color: 'teal' })
+      sel.clear()
+      await load()
+    } finally {
+      setBulkBusy(null)
+    }
+  }
+
+  const doBulkPurge = async () => {
+    setBulkBusy('purge')
+    try {
+      for (const u of [...selectedUsers]) {
+        await deleteJSON(`/admin/user/${uid(u)}`)
+      }
+      setConfirmBulkPurge(false)
+      notifications.show({ message: 'Users permanently purged.', color: 'gray' })
+      sel.clear()
+      await load()
+    } catch (e: any) {
+      notifications.show({ message: (e?.data?.message as string) || 'Purge failed.', color: 'red' })
+      setConfirmBulkPurge(false)
+    } finally {
+      setBulkBusy(null)
+    }
+  }
+
+  // Bulk toolbar per view (legacy user-tools parity + owner #21 list).
+  const bulkActions: BulkAction[] = useMemo(() => {
+    const L = bulkBusy
+    if (view === 'deleted') {
+      return [
+        { key: 'restore', label: 'Restore', icon: 'restore_from_trash', loading: L === 'restore', onClick: () => void runBulk('restore', u => postJSON(`/admin/user/${uid(u)}/restore`, { body: {} }), 'Users restored.') },
+        { key: 'purge', label: 'Purge', icon: 'delete_forever', tone: 'danger', onClick: () => setConfirmBulkPurge(true) },
+      ]
+    }
+    const a: BulkAction[] = []
+    if (view !== 'suspended') {
+      a.push({ key: 'suspend', label: 'Suspend', icon: 'pause', loading: L === 'suspend', onClick: () => void runBulk('suspend', u => postJSON(`/admin/user/${uid(u)}/update`, { body: { suspended: true } }), 'Users suspended.') })
+    }
+    a.push({ key: 'resume', label: 'Resume', icon: 'play_arrow', loading: L === 'resume', onClick: () => void runBulk('resume', u => postJSON(`/admin/user/${uid(u)}/update`, { body: { suspended: false } }), 'Users resumed.') })
+    if (view !== 'suspended') {
+      a.push({ key: 'mail', label: 'Mail', icon: 'mail', loading: L === 'mail', onClick: () => void runBulk('mail', u => postJSON(`/admin/user/${uid(u)}/send-activation`, { body: {} }), 'Activation emails queued.') })
+    }
+    if (view !== 'admins' && view !== 'suspended') {
+      a.push({ key: 'setadmin', label: 'Set admin', icon: 'shield_person', loading: L === 'setadmin', onClick: () => void runBulk('setadmin', u => postJSON(`/admin/user/${uid(u)}/update`, { body: { isAdmin: true } }), 'Admin role granted.') })
+    }
+    a.push({ key: 'unsetadmin', label: 'Unset admin', icon: 'admin_panel_settings', loading: L === 'unsetadmin', onClick: () => void runBulk('unsetadmin', u => postJSON(`/admin/user/${uid(u)}/update`, { body: { isAdmin: false } }), 'Admin role removed.') })
+    a.push({ key: 'delete', label: 'Delete', icon: 'delete', tone: 'danger', onClick: () => setConfirmBulkDel(true) })
+    return a
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selectedUsers.length, bulkBusy])
+
+  const isAllDeleted = view === 'deleted'
+  const allSelectedIds = filtered.map(uid)
+  const someSelected = sel.count > 0 && sel.count < allSelectedIds.length
 
   const createUser = async () => {
     if (!cEmail.trim()) {
@@ -169,27 +326,6 @@ export default function AdminUsersSection({
     }
   }
 
-  const doDelete = async () => {
-    if (!confirmDel) return
-    setDeleting(true)
-    try {
-      await postJSON(`/admin/user/${uid(confirmDel)}/delete`, {
-        body: { sendEmail: false, toUserId: null },
-      })
-      notifications.show({ message: `Deleted ${confirmDel.email}.`, color: 'gray' })
-      setConfirmDel(null)
-      await load()
-    } catch (err: any) {
-      notifications.show({
-        message: (err?.data?.message as string) || 'Delete failed.',
-        color: 'red',
-      })
-      setConfirmDel(null)
-    } finally {
-      setDeleting(false)
-    }
-  }
-
   if (!users && !error) return <PageLoading label="Loading users…" />
 
   return (
@@ -203,15 +339,7 @@ export default function AdminUsersSection({
           style={{ maxWidth: 380, width: '100%' }}
         />
         <Group gap="sm" wrap="wrap">
-          <Button
-            size="md"
-            color="ollitex"
-            leftSection={<Icon name="person_add" size={18} />}
-            onClick={() => {
-              setCreateOpen(true)
-              setCreateErr(null)
-            }}
-          >
+          <Button size="md" color="ollitex" leftSection={<Icon name="person_add" size={18} />} onClick={() => { setCreateOpen(true); setCreateErr(null) }}>
             New user
           </Button>
         </Group>
@@ -219,21 +347,24 @@ export default function AdminUsersSection({
 
       {error ? <PageError label="Couldn’t load users" detail={error} onRetry={() => void load()} /> : null}
 
+      {users && filtered.length > 0 ? (
+        <BulkToolbar count={sel.count} actions={bulkActions} onClear={sel.clear} />
+      ) : null}
+
       {users && filtered.length === 0 ? (
-        <EmptyState
-          icon="groups"
-          title="No users found"
-          hint={search ? `Nothing matched “${search}”.` : 'Create your first account.'}
-        />
+        <EmptyState icon="groups" title="No users found" hint={search ? `Nothing matched “${search}”.` : 'Create your first account.'} />
       ) : null}
 
       {users && filtered.length > 0 ? (
         <Table striped highlightOnHover withTableBorder style={{ borderRadius: 10, overflow: 'hidden' }}>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th style={{ width: 36 }}>
+                <HeaderCheckbox checked={sel.count > 0 && !someSelected} indeterminate={someSelected} onChange={sel.toggleAll} label="Select all users in this view" />
+              </Table.Th>
               <Table.Th>User</Table.Th>
               <Table.Th style={{ width: 150 }}>Role</Table.Th>
-              <Table.Th style={{ width: 110 }}>Status</Table.Th>
+              {!isAllDeleted ? <Table.Th style={{ width: 110 }}>Active</Table.Th> : null}
               <Table.Th style={{ width: 110 }}>Created</Table.Th>
               <Table.Th style={{ width: 120 }}>Last active</Table.Th>
               <Table.Th style={{ width: 60, textAlign: 'right' }}>Actions</Table.Th>
@@ -241,125 +372,98 @@ export default function AdminUsersSection({
           </Table.Thead>
           <Table.Tbody>
             {filtered.map(u => (
-              <Table.Tr key={uid(u)}>
+              <Table.Tr
+                key={uid(u)}
+                onClick={() => sel.toggle(uid(u))}
+                style={{ cursor: 'pointer', background: sel.isSelected(uid(u)) ? 'var(--mantine-color-teal-0)' : undefined }}
+              >
+                <Table.Td onClick={e => e.stopPropagation()}>
+                  <RowCheckbox id={uid(u)} label={u.email} selected={sel.isSelected(uid(u))} onToggle={sel.toggle} />
+                </Table.Td>
                 <Table.Td>
-                  <Text size="sm" fw={600} ellipsis>
-                    {u.email}
-                  </Text>
-                  <Text size="xs" c="dimmed" ellipsis>
-                    {[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}
-                  </Text>
+                  <Text size="sm" fw={600} ellipsis>{u.email}</Text>
+                  <Text size="xs" c="dimmed" ellipsis>{[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}</Text>
                 </Table.Td>
                 <Table.Td>
                   <Group gap={4} wrap="wrap">
-                    {u.isAdmin ? (
-                      <Badge size="xs" variant="light" color="red" radius="sm">
-                        Admin
-                      </Badge>
-                    ) : (
-                      <Badge size="xs" variant="subtle" radius="sm">
-                        User
-                      </Badge>
-                    )}
-                    {isTemplateAdmin(u) ? (
-                      <Badge size="xs" variant="subtle" color="blue" radius="sm">
-                        Templates
-                      </Badge>
-                    ) : null}
-                    {u.suspended ? (
-                      <Badge size="xs" variant="light" color="orange" radius="sm">
-                        Suspended
-                      </Badge>
-                    ) : null}
+                    {u.isAdmin ? <Badge size="xs" variant="light" color="red" radius="sm">Admin</Badge> : <Badge size="xs" variant="subtle" radius="sm">User</Badge>}
+                    {isTemplateAdmin(u) ? <Badge size="xs" variant="subtle" color="blue" radius="sm">Templates</Badge> : null}
+                    {u.suspended ? <Badge size="xs" variant="light" color="orange" radius="sm">Suspended</Badge> : null}
                   </Group>
                 </Table.Td>
-                <Table.Td>
-                  <Switch
-                    size="xs"
-                    checked={!u.suspended}
-                    color="teal"
-                    loading={busyId === uid(u)}
-                    onChange={() => void setUserFlag(u, { suspended: !u.suspended })}
-                  />
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" c="dimmed">
-                    {fmtDate(u.signUpDate)}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" c="dimmed">
-                    {fmtDate(u.lastActive)}
-                  </Text>
-                </Table.Td>
-                <Table.Td style={{ textAlign: 'right' }}>
-                  <Menu width={240} position="bottom-end">
+                {!isAllDeleted ? (
+                  <Table.Td onClick={e => e.stopPropagation()}>
+                    <Switch size="xs" checked={!u.suspended} color="teal" loading={busyId === uid(u)} onChange={() => void setUserFlag(u, { suspended: !u.suspended })} />
+                  </Table.Td>
+                ) : (
+                  <Table.Td><Text size="xs" c="red">Deleted</Text></Table.Td>
+                )}
+                <Table.Td><Text size="sm" c="dimmed">{fmtDate(u.signUpDate)}</Text></Table.Td>
+                <Table.Td><Text size="sm" c="dimmed">{fmtDate(u.lastActive)}</Text></Table.Td>
+                <Table.Td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                  <Menu width={250} position="bottom-end">
                     <Menu.Target>
                       <ActionIcon variant="subtle" aria-label="Actions" style={{ cursor: 'pointer' }}>
                         <Icon name="more_vert" size={18} />
                       </ActionIcon>
                     </Menu.Target>
                     <Menu.Dropdown>
-                      <Menu.Item
-                        icon={<Icon name="mail" size={16} />}
-                        onClick={() =>
-                          void (
-                            postJSON(`/admin/user/${uid(u)}/send-activation`, { body: {} })
-                              .then(() => notifications.show({ message: 'Activation email requested.', color: 'teal' }))
-                              .catch((e: any) =>
-                                notifications.show({
-                                  message: (e?.data?.message as string) || 'Could not send activation.',
-                                  color: 'red',
-                                })
-                              )
-                          )
-                        }
-                      >
-                        Send activation email
-                      </Menu.Item>
-                      <Menu.Item
-                        icon={<Icon name={u.isAdmin ? 'admin_panel_settings' : 'shield_person'} size={16} />}
-                        onClick={() => void setUserFlag(u, { isAdmin: !u.isAdmin })}
-                      >
-                        {u.isAdmin ? 'Remove admin role' : 'Make admin'}
-                      </Menu.Item>
-                      <Menu.Item
-                        icon={<Icon name="extension" size={16} />}
-                        onClick={() => void setUserFlag(u, { canManageTemplates: !isTemplateAdmin(u) })}
-                      >
-                        {isTemplateAdmin(u) ? 'Remove template manage' : 'Allow template managing'}
-                      </Menu.Item>
-                      {u.suspended ? (
-                        <Menu.Item
-                          icon={<Icon name="restore_from_trash" size={16} />}
-                          color="teal"
-                          onClick={() =>
-                            void (
-                              postJSON(`/admin/user/${uid(u)}/restore`, { body: {} })
-                                .then(() => {
-                                  notifications.show({ message: 'User restored.', color: 'teal' })
-                                  load()
-                                })
-                                .catch((e: any) =>
-                                  notifications.show({
-                                    message: (e?.data?.message as string) || 'Could not restore.',
-                                    color: 'red',
-                                  })
-                                )
-                            )
-                          }
-                        >
-                          Restore user
-                        </Menu.Item>
-                      ) : null}
-                      <Menu.Divider />
-                      <Menu.Item
-                        icon={<Icon name="delete" size={16} />}
-                        color="red"
-                        onClick={() => setConfirmDel(u)}
-                      >
-                        Delete user
-                      </Menu.Item>
+                      {!isAllDeleted ? (
+                        <>
+                          <Menu.Item
+                            icon={<Icon name="mail" size={16} />}
+                            onClick={() => void sendActivation(u)}
+                          >
+                            Send activation email
+                          </Menu.Item>
+                          <Menu.Item
+                            icon={<Icon name={u.isAdmin ? 'admin_panel_settings' : 'shield_person'} size={16} />}
+                            onClick={() => void setUserFlag(u, { isAdmin: !u.isAdmin })}
+                          >
+                            {u.isAdmin ? 'Remove admin role' : 'Make admin'}
+                          </Menu.Item>
+                          <Menu.Item
+                            icon={<Icon name="extension" size={16} />}
+                            onClick={() => void setUserFlag(u, { canManageTemplates: !isTemplateAdmin(u) })}
+                          >
+                            {isTemplateAdmin(u) ? 'Remove template manage' : 'Allow template managing'}
+                          </Menu.Item>
+                          <Menu.Item
+                            icon={<Icon name={u.suspended ? 'play_arrow' : 'pause'} size={16} />}
+                            onClick={() => void setUserFlag(u, { suspended: !u.suspended })}
+                          >
+                            {u.suspended ? 'Resume user' : 'Suspend user'}
+                          </Menu.Item>
+                          <Menu.Divider />
+                          <Menu.Item
+                            icon={<Icon name="delete" size={16} />}
+                            color="red"
+                            loading={busyId === uid(u)}
+                            onClick={() => void doDeleteOne(u)}
+                          >
+                            Delete user
+                          </Menu.Item>
+                        </>
+                      ) : (
+                        <>
+                          <Menu.Item
+                            icon={<Icon name="restore_from_trash" size={16} />}
+                            color="teal"
+                            loading={busyId === uid(u)}
+                            onClick={() => void restoreDeleted(u)}
+                          >
+                            Restore user
+                          </Menu.Item>
+                          <Menu.Divider />
+                          <Menu.Item
+                            icon={<Icon name="delete_forever" size={16} />}
+                            color="red"
+                            onClick={() => setConfirmPurge(u)}
+                          >
+                            Purge permanently
+                          </Menu.Item>
+                        </>
+                      )}
                     </Menu.Dropdown>
                   </Menu>
                 </Table.Td>
@@ -369,30 +473,19 @@ export default function AdminUsersSection({
         </Table>
       ) : null}
 
-      <Modal
-        opened={createOpen}
-        onClose={() => setCreateOpen(false)}
-        size="sm"
-        title="New user"
-      >
+      <Modal opened={createOpen} onClose={() => setCreateOpen(false)} size="sm" title="New user">
         <Stack gap="md">
           <div>
-            <Text size="sm" fw={600} mb={6}>
-              Email <span style={{ color: 'var(--mantine-color-red-6)' }}>*</span>
-            </Text>
+            <Text size="sm" fw={600} mb={6}>Email <span style={{ color: 'var(--mantine-color-red-6)' }}>*</span></Text>
             <TextInput value={cEmail} onChange={e => setCEmail(e.currentTarget.value)} placeholder="name@example.org" />
           </div>
           <Group gap="md" wrap="wrap">
             <div style={{ flex: 1, minWidth: 160 }}>
-              <Text size="sm" fw={600} mb={6}>
-                First name
-              </Text>
+              <Text size="sm" fw={600} mb={6}>First name</Text>
               <TextInput value={cFirst} onChange={e => setCFirst(e.currentTarget.value)} />
             </div>
             <div style={{ flex: 1, minWidth: 160 }}>
-              <Text size="sm" fw={600} mb={6}>
-                Last name
-              </Text>
+              <Text size="sm" fw={600} mb={6}>Last name</Text>
               <TextInput value={cLast} onChange={e => setCLast(e.currentTarget.value)} />
             </div>
           </Group>
@@ -400,34 +493,48 @@ export default function AdminUsersSection({
             <Switch checked={cAdmin} onChange={setCAdmin} label="Administrator" color="ollitex" />
             <Switch checked={cTemplates} onChange={setCTemplates} label="Can manage templates" color="ollitex" />
           </Group>
-          <Text size="xs" c="dimmed">
-            The user must confirm their account via the activation email.
-          </Text>
+          <Text size="xs" c="dimmed">The user must confirm their account via the activation email.</Text>
           {createErr ? <Text size="sm" c="red">{createErr}</Text> : null}
           <Group justify="flex-end" gap="xs" mt="sm">
-            <Button variant="default" onClick={() => setCreateOpen(false)} disabled={creating}>
-              Cancel
-            </Button>
-            <Button color="ollitex" loading={creating} onClick={() => void createUser()}>
-              Create user
-            </Button>
+            <Button variant="default" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</Button>
+            <Button color="ollitex" loading={creating} onClick={() => void createUser()}>Create user</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal opened={confirmBulkDel} onClose={() => setConfirmBulkDel(false)} size="sm" title={`Delete ${sel.count} user${sel.count === 1 ? '' : 's'}?`}>
+        <Stack gap="md">
+          <Text size="sm">
+            The selected {sel.count === 1 ? 'user' : 'users'} will be deleted. Projects they owned follow the instance deletion policy.
+          </Text>
+          <Checkbox label="Send notification email" checked={bulkSendEmail} onChange={e => setBulkSendEmail(e.currentTarget.checked)} color="ollitex" />
+          <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={() => setConfirmBulkDel(false)}>Cancel</Button>
+            <Button color="red" variant="filled" loading={bulkBusy === 'delete'} onClick={() => void doBulkDelete()}>Delete</Button>
           </Group>
         </Stack>
       </Modal>
 
       <ConfirmModal
-        open={!!confirmDel}
-        title="Delete user?"
-        body={
-          confirmDel
-            ? `“${confirmDel.email}” will be removed. Projects they owned will follow the instance deletion policy.`
-            : ''
-        }
-        confirmLabel="Delete user"
+        open={confirmBulkPurge}
+        title={`Purge ${sel.count} user${sel.count === 1 ? '' : 's'} permanently?`}
+        body="Deleted user data (profile, activity, projects) will be irreversibly removed."
+        confirmLabel="Purge"
         danger
-        loading={deleting}
-        onCancel={() => setConfirmDel(null)}
-        onConfirm={() => void doDelete()}
+        loading={bulkBusy === 'purge'}
+        onCancel={() => setConfirmBulkPurge(false)}
+        onConfirm={() => void doBulkPurge()}
+      />
+
+      <ConfirmModal
+        open={!!confirmPurge}
+        title="Purge user permanently?"
+        body={confirmPurge ? `“${confirmPurge.email}” and all related data will be irreversibly removed.` : ''}
+        confirmLabel="Purge"
+        danger
+        loading={purging}
+        onCancel={() => setConfirmPurge(null)}
+        onConfirm={() => void doPurgeOne()}
       />
     </Stack>
   )

@@ -179,13 +179,6 @@ export default function HubRoot() {
 
   // cross-section navigation (Overview shortcuts, owner review #2): the
   // shortcut ids are short aliases mapped to real hub leaves
-  const SHORTCUT_ALIASES: Record<string, string> = {
-    site: 'site.general.misc',
-    users: 'site.general.users.all',
-    projects: 'site.general.projects.all',
-    templates: 'site.general.managetpl',
-    llm: 'site.llm.features',
-  }
   useEffect(() => onHubNavigate(id => select(SHORTCUT_ALIASES[id] || id)), [select])
 
   // browser back/forward + in-page hash fragments (e.g. /hub → /hub#/x)
