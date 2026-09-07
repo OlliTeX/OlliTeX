@@ -22,7 +22,7 @@ export type HubNode = {
   /** template category key for render:'template-cat' */
   category?: string
   /** projects view for render:'projects' */
-  pview?: 'all' | 'owned' | 'shared' | 'archived'
+  pview?: 'all' | 'owned' | 'shared' | 'archived' | 'trashed'
   /** dynamic children marker (template categories from API) */
   dynamicChildren?: string
   children?: HubNode[]
@@ -46,6 +46,8 @@ export const HUB_NAV: HubNode[] = [
       { id: 'projects.owned', label: 'My projects', icon: 'folder', render: 'projects', pview: 'owned' },
       { id: 'projects.shared', label: 'Shared with you', icon: 'groups', render: 'projects', pview: 'shared' },
       { id: 'projects.archived', label: 'Archived projects', icon: 'archive', render: 'projects', pview: 'archived' },
+      // Owner #10d (2026-09-07): trashed view with restore.
+      { id: 'projects.trashed', label: 'Trashed projects', icon: 'delete', render: 'projects', pview: 'trashed' },
       {
         id: 'projects.tags',
         label: 'Organize Tags',

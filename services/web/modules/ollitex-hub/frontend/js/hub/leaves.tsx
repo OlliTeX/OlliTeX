@@ -8,6 +8,7 @@ import TemplatesSection from '../sections/workspace/templates-section'
 import LibrarySection from '../sections/workspace/library-section'
 import NotificationsSettingsSection from '../sections/workspace/notifications-settings-section'
 import MySettingsSection from '../sections/workspace/my-settings-section'
+import KeybindingsSection from '../sections/workspace/keybindings-section'
 import LlmSettingsSection from '../sections/workspace/llm-settings-section'
 import AppearanceSection from '../sections/appearance-section'
 import AdminInstanceSection from '../sections/admin/admin-instance-section'
@@ -19,7 +20,6 @@ import AdminProjectsSection from '../sections/admin/admin-projects-section'
 import AdminTemplatesSection from '../sections/admin/admin-templates-section'
 // Legacy user-settings sections (features/settings) — self-contained React
 // components reused so /hub keeps every parameter (owner parity #11).
-import KeyBindingsCard from '../../../../../frontend/js/features/settings/components/key-bindings-card'
 import SessionsLeaf from '../sections/workspace/sessions-section'
 import SystemMessagesSection from '../sections/admin/system-messages-section'
 import InstanceStatsSection from '../sections/admin/instance-stats-section'
@@ -140,12 +140,10 @@ export function renderLeaf(node: HubNode): React.ReactNode {
     case 'mysettings.editordefaults':
       return <MySettingsSection key={node.id} initialTab="editor" />
     case 'mysettings.keybindings':
-      // legacy KeyBindingsCard (JSON import/export, reset defaults, Vim/Emacs)
-      return (
-        <Card key={node.id} withBorder paddings="md" radius="lg">
-          <KeyBindingsCard />
-        </Card>
-      )
+      // Owner #5a/5b (2026-09-07): Mantine rework (legacy bootstrap card →
+      // Mantine Radio.Group + custom-bindings modal, same saveUserSettings
+      // store, same capture/import/export logic).
+      return <KeybindingsSection key={node.id} />
     case 'mysettings.sync':
       // owner #6b (2026-09-07): each leaf renders its OWN provider set
       // (before: both leaves showed the same combined legacy page — and on

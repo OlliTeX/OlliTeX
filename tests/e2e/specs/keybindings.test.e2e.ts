@@ -12,6 +12,10 @@ import { loginRobust } from '../helpers/auth'
 import { USER } from '../fixtures/credentials'
 
 const MODAL = '[data-testid="custom-keybindings-modal"]'
+// The Mantine modal portal ROOT is a zero-height static anchor (the panel is
+// position:fixed inside it), so visibility/size assertions must target the
+// rendered content section, not the root.
+const MODAL_CONTENT = '[data-testid="custom-keybindings-modal"] section.mantine-Modal-content'
 
 async function go(page: import('playwright').Page) {
   await loginRobust(page, USER.email, USER.password)
@@ -21,7 +25,7 @@ async function openModal(page: import('playwright').Page) {
   await page.goto('/hub/#mysettings.keybindings')
   await page.waitForTimeout(1_500)
   await page.click('text=Customize key bindings…')
-  await expect(page.locator(MODAL)).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator(MODAL_CONTENT)).toBeVisible({ timeout: 15_000 })
 }
 
 test('preset row is exactly Overleaf/Vim/Emacs + populated action table', async ({ page }) => {
@@ -71,9 +75,9 @@ test('a rebind survives Apply + page reload (persistence)', async ({ page }) => 
   }
   await row.getByRole('button', { name: 'Rebind' }).click()
   await page.waitForTimeout(300)
-  await page.keyboard.press('Shift+Meta+U')
+  await page.keyboard.press('Meta+Shift+P')
   await page.waitForTimeout(400)
-  expect(await row.locator('td').nth(2).innerText()).toMatch(/U/i)
+  expect(await row.locator('td').nth(2).innerText()).toMatch(/P/i)
 
   await page
     .locator(`${MODAL} button`, { hasText: 'Apply' })
@@ -85,9 +89,9 @@ test('a rebind survives Apply + page reload (persistence)', async ({ page }) => 
   await page.goto('/hub/#mysettings.keybindings')
   await page.waitForTimeout(1_500)
   await page.click('text=Customize key bindings…')
-  await expect(page.locator(MODAL)).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator(MODAL_CONTENT)).toBeVisible({ timeout: 15_000 })
   const row2 = page.locator(`${MODAL} tbody tr`, { hasText: 'Move line(s) up' }).first()
-  expect(await row2.locator('td').nth(2).innerText()).toMatch(/U/i)
+  expect(await row2.locator('td').nth(2).innerText()).toMatch(/P/i)
 
   // cleanup: reset to Overleaf defaults so the next journey starts clean
   await page.locator(`${MODAL} label:has-text("Overleaf")`).first().click()
@@ -104,7 +108,7 @@ test('"Reset now" applies preset, persists, shows feedback, KEEPS modal open', a
   await page.waitForTimeout(1_000)
 
   // owner spec: modal stays open + inline applied feedback
-  await expect(page.locator(MODAL)).toBeVisible()
+  await expect(page.locator(MODAL_CONTENT)).toBeVisible()
   const applied = await page
     .locator(`${MODAL} [class*=body], ${MODAL} .modal, ${MODAL} form`)
     .first()
