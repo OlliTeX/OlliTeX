@@ -1,0 +1,75 @@
+# Panes — file tree · review · history · chat · outline · references · logs.
+# Dual-route specs (specs/editor/panes.test.e2e.ts) assert identical behavior
+# and API round-trips on /editor and /Project.
+page: /editor/:ProjectId vs /Project/:Project_id
+id: panes
+files:
+  legacy: specs/editor/panes.test.e2e.ts
+  editor: specs/editor/panes.test.e2e.ts
+
+features:
+  - id: filetree-create
+    desc: file tree: create file/folder round-trip
+    due: P5
+    legacy_test: create
+    editor_test: create
+
+  - id: filetree-rename-move
+    desc: file tree: rename + move round-trips (API)
+    due: P5
+    legacy_test: rename
+    editor_test: rename
+
+  - id: filetree-delete
+    desc: file tree: delete (trash) round-trip + restore path
+    due: P5
+    legacy_test: delete
+    editor_test: delete
+
+  - id: filetree-search
+    desc: file tree: path/type search narrows results
+    due: P5
+    legacy_test: search
+    editor_test: search
+
+  - id: review-annotate
+    desc: review: add + resolve comments round-trips (API + decorations)
+    due: P5
+    legacy_test: review
+    editor_test: review
+
+  - id: history-revert
+    desc: history: list + diff + revert round-trip on the same commits
+    due: P5
+    legacy_test: history
+    editor_test: history
+
+  - id: chat
+    desc: chat: send + render + mentions (CE chat flag on)
+    due: P5
+    legacy_test: chat
+    editor_test: chat
+
+  - id: outline
+    desc: outline pane lists sections + click-to-jump
+    due: P5
+    legacy_test: outline
+    editor_test: outline
+
+  - id: references-pane
+    desc: references pane: citation list + export bib parity
+    due: P5
+    legacy_test: references
+    editor_test: references
+
+  - id: logs
+    desc: compile logs pane shows the last compile output
+    due: P5
+    legacy_test: logs
+    editor_test: logs
+
+  - id: notifications
+    desc: notification surfaces (project notifications) render + mute parity
+    due: P5
+    legacy_test: notification
+    editor_test: notification

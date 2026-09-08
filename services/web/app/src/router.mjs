@@ -600,6 +600,30 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       ProjectController.loadEditor
     )
   }
+
+  // overleaf-lab editor renovation P0 (2026-09-09, EDITOR_RENOVATION_PLAN.md):
+  // /editor/:Project_id — the renovation target URL for the editor.
+  // P0 renders EXACTLY the current shell through the SAME controller +
+  // middleware chain as /Project/:Project_id (behaviour 1:1), so the
+  // dual-run and the parity gate can be established before any visual
+  // change. The renovated (Mantine) surface is a client-side variant
+  // selected by URL prefix in later phases; /Project stays as-is forever
+  // as the fallback route.
+  for (const route of [
+    '/editor/:Project_id',
+    '/editor/:Project_id/:detachRole(detacher|detached)',
+  ]) {
+    webRouter.get(
+      route,
+      RateLimiterMiddleware.rateLimit(openProjectRateLimiter, {
+        params: ['Project_id'],
+      }),
+      AsyncLocalStorage.middleware,
+      PermissionsController.useCapabilities(),
+      AuthorizationMiddleware.ensureUserCanReadProject,
+      ProjectController.loadEditor
+    )
+  }
   webRouter.head(
     '/Project/:Project_id/file/:File_id',
     AuthorizationMiddleware.ensureUserCanReadProject,

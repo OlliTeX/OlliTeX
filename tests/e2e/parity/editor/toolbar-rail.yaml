@@ -1,0 +1,92 @@
+# Toolbar + rail (frame) — Phase 2. One dual-route spec covers every control:
+# each control's click-through behavior is asserted on /editor and /Project.
+page: /editor/:ProjectId vs /Project/:Project_id
+id: toolbar-rail
+files:
+  legacy: specs/editor/toolbar-rail.test.e2e.ts
+  editor: specs/editor/toolbar-rail.test.e2e.ts
+
+features:
+  - id: title-rename
+    desc: project title inline edit round-trips (PUT /project/:id + rename API)
+    due: P2
+    legacy_test: title
+    editor_test: title
+
+  - id: share-open
+    desc: share control opens the share flow on both urls
+    due: P2
+    legacy_test: share
+    editor_test: share
+
+  - id: compile-button
+    desc: compile button triggers the compile round-trip from the toolbar
+    due: P2
+    legacy_test: compile
+    editor_test: compile
+
+  - id: export-flow
+    desc: export (incl. conversion option where offered) opens + submits
+    due: P2
+    legacy_test: export
+    editor_test: export
+
+  - id: duplicate
+    desc: duplicate project action creates a copy (API round-trip)
+    due: P2
+    legacy_test: duplicate
+    editor_test: duplicate
+
+  - id: download
+    desc: download project zips via the standard API
+    due: P2
+    legacy_test: download
+    editor_test: download
+
+  - id: history-toggle
+    desc: history panel opens + shows commit list + revert path exists
+    due: P2
+    legacy_test: history
+    editor_test: history
+
+  - id: layout-switch
+    desc: change-layout options persist (editor + editor/pdf split)
+    due: P2
+    legacy_test: layout
+    editor_test: layout
+
+  - id: online-users
+    desc: online-users indicator reflects presence
+    due: P2
+    legacy_test: online
+    editor_test: online
+
+  - id: request-access
+    desc: request-access control (non-owner) opens the request flow
+    due: P2
+    legacy_test: request access
+    editor_test: request access
+
+  - id: rail-panels
+    desc: rail tabs/panels (file tree · references · outline · logs) open and close
+    due: P2
+    legacy_test: rail
+    editor_test: rail
+
+  - id: rail-account
+    desc: rail account menu (sign out · my settings · admin) behaves per role
+    due: P2
+    legacy_test: account
+    editor_test: account
+
+  - id: rail-shortcuts
+    desc: keyboard-shortcuts surface in the rail opens with bindings listed
+    due: P2
+    legacy_test: shortcuts
+    editor_test: shortcuts
+
+  - id: rail-help
+    desc: help/control surface reachable (contact-us / about items present)
+    due: P2
+    legacy_test: help
+    editor_test: help

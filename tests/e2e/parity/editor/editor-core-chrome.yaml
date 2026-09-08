@@ -1,0 +1,57 @@
+# Editor-core chrome (CM6-adjacent UI) — highest-risk area; every row ships with
+# a behavior test on BOTH urls before the Mantine variant is activated.
+# The CM6 core itself is invariant — what moves is the chrome around it.
+page: /editor/:ProjectId vs /Project/:Project_id
+id: editor-core-chrome
+files:
+  legacy: specs/editor/editor-core.test.e2e.ts
+  editor: specs/editor/editor-core.test.e2e.ts
+
+features:
+  - id: keybindings
+    desc: keybinding behavior (bind → action fires in the editor) parity
+    due: P6
+    legacy_test: keybindings
+    editor_test: keybindings
+
+  - id: search-replace
+    desc: in-editor search + replace round-trip
+    due: P6
+    legacy_test: search
+    editor_test: search
+
+  - id: math-preview
+    desc: math preview renders the hovered equation identically
+    due: P6
+    legacy_test: math
+    editor_test: math
+
+  - id: autocomplete
+    desc: autocompletion (commands/environments) inserts the same text
+    due: P6
+    legacy_test: autocomplete
+    editor_test: autocomplete
+
+  - id: floating-menu
+    desc: selection floating menu offers the same actions
+    due: P6
+    legacy_test: floating
+    editor_test: floating
+
+  - id: symbol-palette
+    desc: symbol palette inserts the selected symbol
+    due: P6
+    legacy_test: symbol
+    editor_test: symbol
+
+  - id: equation-ai
+    desc: equation-AI entry works (or is gracefully absent by config) equally
+    due: P6
+    legacy_test: equation
+    editor_test: equation
+
+  - id: llm-inline
+    desc: inline LLM actions (ask-AI / compile-fix) fire the same endpoints
+    due: P6
+    legacy_test: llm
+    editor_test: llm

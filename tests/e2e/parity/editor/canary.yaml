@@ -1,0 +1,16 @@
+# Console canary — the editor must load with ZERO client-side errors.
+# P1 duty: extend this spec so the canary journey runs on /editor too (then
+# both sides of this row point at the same spec — the gate is satisfied and
+# the e2e run is the proof).
+page: /editor/:ProjectId vs /Project/:Project_id
+id: console-canary
+files:
+  legacy: specs/editor-console-canary.test.e2e.ts
+  editor: specs/editor-console-canary.test.e2e.ts
+
+features:
+  - id: canary
+    desc: editor loads with zero client-side errors (both urls)
+    due: P1
+    legacy_test: client-side
+    editor_test: editor loads

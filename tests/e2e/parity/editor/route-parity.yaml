@@ -1,0 +1,26 @@
+# Route SEMANTICS parity — auth walls and role answers must be IDENTICAL on both urls.
+# One spec proves both sides (it asserts /editor answer == /Project answer per case).
+page: /editor/:ProjectId vs /Project/:Project_id
+id: route-parity
+files:
+  legacy: specs/editor/dual-run.test.e2e.ts
+  editor: specs/editor/dual-run.test.e2e.ts
+
+features:
+  - id: guest-wall
+    desc: guests get the identical login wall on both urls
+    due: P0
+    legacy_test: route parity
+    editor_test: route parity
+
+  - id: non-member-parity
+    desc: non-members get the identical answer (status/location) on both urls
+    due: P0
+    legacy_test: non-member
+    editor_test: non-member
+
+  - id: detached-variant
+    desc: /editor/:id/detached answers like the /Project/:id/detached twin
+    due: P0
+    legacy_test: detached
+    editor_test: detached

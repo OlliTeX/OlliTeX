@@ -1,0 +1,63 @@
+# Module UIs inside the editor — renovation = Mantine skin over UNCHANGED
+# module logic. Where a dedicated suite already exists (legacy side), it is
+# cited directly — its tokens live in the real titles today.
+page: /editor/:ProjectId vs /Project/:Project_id
+id: module-uis
+files:
+  legacy: specs/editor/module-uis.test.e2e.ts
+  editor: specs/editor/module-uis.test.e2e.ts
+
+features:
+  - id: python-runner
+    desc: python split view runs, prints, writes output for .py documents
+    due: P7
+    legacy_test: split view
+    editor_test: split view
+
+  - id: llm-byo
+    desc: BYO provider lifecycle (save/list/check/delete) from the editor UI
+    due: P7
+    legacy_test: provider lifecycle
+    editor_test: provider lifecycle
+
+  - id: grammar
+    desc: grammar settings read + save round-trip from the editor UI
+    due: P7
+    legacy_test: grammar
+    editor_test: grammar
+
+  - id: zotero
+    desc: zotero import card is graceful (credential-less) on both urls
+    due: P7
+    legacy_test: zotero
+    editor_test: zotero
+
+  - id: mendeley
+    desc: mendeley import card is graceful (credential-less) on both urls
+    due: P7
+    legacy_test: mendeley
+    editor_test: mendeley
+
+  - id: webdav-dropbox
+    desc: webdav + dropbox integration surfaces answer gracefully (no 5xx)
+    due: P7
+    legacy_test: webdav
+    editor_test: webdav
+
+  - id: github-sync
+    desc: github-sync entry point (connect UI) reachable equally on both urls
+    due: P7
+    legacy_test: github
+    editor_test: github
+
+  - id: linked-files
+    desc: linked-files (mendeley/zotero/webdav) file tree integrations parity
+    due: P7
+    legacy_test: linked
+    editor_test: linked
+
+  - id: diagram
+    desc: diagram visual-editor entry reachable equally (CE feature config)
+    due: P7
+    legacy_test: diagram
+    editor_test: diagram

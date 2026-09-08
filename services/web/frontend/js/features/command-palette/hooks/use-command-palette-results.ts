@@ -18,7 +18,11 @@ const useCommandPaletteResults = (query: string) => {
   return results
 }
 
-const getSourcesMatchingQuery = (
+// Exported for testability (no behavior change): the query→source matching
+// rules of the command palette (prefix matching, prefixRequired filtering,
+// no-query defaults). Frozen before the editor renovation touches this UI.
+// (editor renovation P0e — test-debt baseline, 2026-09-09)
+export const getSourcesMatchingQuery = (
   query: string,
   sources: CommandPaletteSource[]
 ): { query: string; source: CommandPaletteSource }[] => {

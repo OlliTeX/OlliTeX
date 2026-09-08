@@ -110,6 +110,25 @@ module.exports = defineConfig({
           fileParallelism: true,
         },
       },
+      {
+        extends: true,
+        test: {
+          name: 'EditorRenovation',
+          // editor renovation (EDITOR_RENOVATION_PLAN.md): baseline specs that
+          // freeze the current editor surfaces' behavior before renovation,
+          // and the renovated surfaces' conformance afterwards (P0e onward).
+          environment: 'jsdom',
+          environmentOptions: {
+            jsdom: {
+              url: 'https://www.test-overleaf.com/',
+              pretendToBeVisual: true,
+            },
+          },
+          setupFiles: ['test/frontend/editor-renovation/vitest.setup.ts'],
+          include: ['test/frontend/editor-renovation/**/*.test.{ts,tsx}'],
+          fileParallelism: true,
+        },
+      },
     ],
     ...reporterOptions,
     hookTimeout: process.env.CI ? 20_000 : 10_000,

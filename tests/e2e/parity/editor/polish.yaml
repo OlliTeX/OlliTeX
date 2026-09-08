@@ -1,0 +1,38 @@
+# P8 hardening rows — the quality gates that must hold when the renovation
+# is declared complete (and stay holding in CI from that point on).
+page: /editor/:ProjectId vs /Project/:Project_id
+id: polish
+files:
+  legacy: specs/editor/polish.test.e2e.ts
+  editor: specs/editor/polish.test.e2e.ts
+
+features:
+  - id: a11y
+    desc: zero critical/serious axe violations on the /editor surfaces (light+dark)
+    due: P8
+    legacy_test: axe
+    editor_test: axe
+
+  - id: i18n
+    desc: no raw translation keys leaked on screen (en + one other locale)
+    due: P8
+    legacy_test: translations
+    editor_test: translations
+
+  - id: keyboard
+    desc: full keyboard walkthrough (tab order / modals / focus return)
+    due: P8
+    legacy_test: keyboard
+    editor_test: keyboard
+
+  - id: dark-mode
+    desc: light+dark parity of the renovated surfaces (no color-scheme orphans)
+    due: P8
+    legacy_test: dark
+    editor_test: dark
+
+  - id: perf
+    desc: initial-load budget held (P0 baseline reference: tests/e2e/editor/perf-baseline.json)
+    due: P8
+    legacy_test: baseline
+    editor_test: baseline

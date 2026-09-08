@@ -1,0 +1,60 @@
+{
+  "capturedAt": "2026-09-08T19:13:14.949Z",
+  "url": "/Project/6aa05e417d80aefa5c469b51",
+  "base": {
+    "label": "editor base surface",
+    "critical": [
+      {
+        "id": "aria-required-children",
+        "nodes": 2
+      },
+      {
+        "id": "button-name",
+        "nodes": 1
+      }
+    ],
+    "serious": [
+      {
+        "id": "aria-prohibited-attr",
+        "nodes": 1
+      },
+      {
+        "id": "nested-interactive",
+        "nodes": 2
+      }
+    ],
+    "moderate": []
+  },
+  "modal": {
+    "label": "share modal open",
+    "critical": [
+      {
+        "id": "aria-required-children",
+        "nodes": 2
+      },
+      {
+        "id": "button-name",
+        "nodes": 1
+      },
+      {
+        "id": "label",
+        "nodes": 1
+      }
+    ],
+    "serious": [
+      {
+        "id": "aria-prohibited-attr",
+        "nodes": 1
+      },
+      {
+        "id": "link-name",
+        "nodes": 1
+      },
+      {
+        "id": "nested-interactive",
+        "nodes": 2
+      }
+    ],
+    "moderate": []
+  }
+}

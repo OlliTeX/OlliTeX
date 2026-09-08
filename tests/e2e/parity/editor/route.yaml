@@ -1,0 +1,28 @@
+# Functional contract — /Project/:Project_id (legacy route) ↔ /editor/:Project_id (renovation target)
+# Phase 0: the dual-run route itself. Every row here must be GREEN before any visual phase starts.
+# Legacy proof = the pre-existing suites (they drive the editor via the legacy url);
+# editor proof = specs/editor/dual-run.test.e2e.ts (the same journey re-run on /editor).
+page: /editor/:ProjectId vs /Project/:Project_id
+id: route-core
+files:
+  legacy: specs/smoke.test.e2e.ts
+  editor: specs/editor/dual-run.test.e2e.ts
+
+features:
+  - id: route-open
+    desc: the editor page renders on the NEW url (same shell bootstrap as legacy)
+    due: P0
+    legacy_test: project
+    editor_test: render
+
+  - id: ot-editing
+    desc: OT/CM6 live editing works on BOTH urls (typing lands in the shared doc)
+    due: P0
+    legacy_test: editor
+    editor_test: type
+
+  - id: compile-pdf
+    desc: compile + compiled PDF reachable on BOTH urls
+    due: P0
+    legacy_test: compile
+    editor_test: pdf

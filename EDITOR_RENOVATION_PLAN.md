@@ -5,9 +5,43 @@ in use — keep it) + Mantine, including all modals**, served under the **`/edit
 route. **No functionality may be lost.** **Everything gets test coverage while we
 renovate.**
 
-Status: **PLAN** — implementation starts at Phase 0 after owner sign-off.
-Method: the proven `/hub` playbook — parity matrix as contract, per-surface
-swap-with-gate, legacy route untouched until GREEN, owner checkpoint per phase.
+Status: **PLAN** — Phase 0 in flight (2026-09-09). Method: the proven `/hub`
+playbook — parity matrix as contract, per-surface swap-with-gate, legacy route
+untouched until GREEN, owner checkpoint per phase.
+
+---
+
+## P0 progress log (live facts, 2026-09-09)
+
+- **Route live**: `GET /editor/:Project_id` (+ detached variant) registered in
+  `app/src/router.mjs` with the identical middleware chain as
+  `/Project/:Project_id` (contract test:
+  `test/unit/src/Project/EditorRouteContract.test.mjs`). Dual-run e2e GREEN
+  (3/3): render → type (OT) → compile → PDF on the NEW url; guest +
+  non-member + detached answers identical to the legacy url.
+- **Gate live**: `tests/e2e/parity/editor/*.yaml` (9 docs, 68 rows, phase-dated
+  P0…P8) + `tests/e2e/editor/check.mjs` (phase ratchet via
+  `tests/e2e/editor/PHASE`, currently **P0**: 6/6 due rows covered, 62 pending)
+  + CI job `editor-gate` + spec driver `specs/editor/parity-gate.test.e2e.ts`
+  (GREEN).
+- **a11y baseline captured** (`tests/e2e/editor/a11y-baseline.json`): the LEGACY
+  editor already shows **2 critical + 2 serious** axe violations
+  (aria-required-children, button-name, aria-prohibited-attr, nested-interactive)
+  → the P8 target (zero) is a strict improvement path.
+- **Test-debt findings (corrected)**: the fork's live frontend runner is
+  **vitest** (projects in `vitest.config.js`); the old mocha `test:frontend`
+  suite is broken in this fork (mocha-11 `.tsx` load failures + Cypress `cy`
+  references) — specs counted there are NOT executing. Real debt therefore:
+  **command-palette: 0 live specs (fixed — 10 baseline tests)** and
+  **share-project: API contract now frozen in the live runner** (5 tests).
+  New vitest project: `EditorRenovation`
+  (`test/frontend/editor-renovation/**`, 15/15 green), added to CI.
+- **Exports touched by the baselines** (behavior-neutral):
+  `getSourcesMatchingQuery` exported from
+  `command-palette/hooks/use-command-palette-results.ts`.
+- **Not changed by P0**: any visual surface, the CM6 core, APIs, CSS. /editor
+  and /Project are pixel-identical today — exactly as the mandate requires
+  before renovation starts.
 
 ---
 

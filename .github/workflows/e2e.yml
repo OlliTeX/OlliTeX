@@ -38,9 +38,21 @@ jobs:
       - name: Install web deps
         working-directory: services/web
         run: yarn install --frozen-lockfile --network-timeout 600000
-      - name: Hub + instance-stats frontend unit tests
+      - name: Hub + instance-stats frontend unit tests + editor route/render baselines
         working-directory: services/web
-        run: yarn vitest run modules/ollitex-hub modules/instance-stats
+        run: yarn vitest run modules/ollitex-hub modules/instance-stats test/unit/src/Project/EditorRouteContract.test.mjs test/frontend/editor-renovation
+
+  # editor renovation gate (EDITOR_RENOVATION_PLAN.md) — phase-aware "no
+  # functionality lost" ratchet: every row due by the committed PHASE must be
+  # covered by live tests on BOTH /Project and /editor (docker-free).
+  editor-gate:
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Editor parity matrix gate (legacy AND /editor coverage, phase-aware)
+        working-directory: tests/e2e
+        run: node editor/check.mjs
 
   e2e:
     runs-on: [self-hosted, linux, x64]
