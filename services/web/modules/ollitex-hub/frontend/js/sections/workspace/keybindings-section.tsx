@@ -247,10 +247,12 @@ function CustomBindingsModal({ onClose }: { onClose: () => void }) {
       }
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 2500)
+// eslint-disable-next-line no-console
       console.info(`custom keybindings import: ${Object.keys(next).length} bound, ${invalid} skipped`)
     } catch (err) {
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 2500)
+// eslint-disable-next-line no-console
       console.warn('custom keybindings import failed', err)
     }
   }
@@ -273,6 +275,7 @@ function CustomBindingsModal({ onClose }: { onClose: () => void }) {
       setSaved(true)
       setTimeout(onClose, 500)
     } catch (err) {
+// eslint-disable-next-line no-console
       console.warn('saving custom key bindings failed', err)
     }
   }
@@ -291,6 +294,7 @@ function CustomBindingsModal({ onClose }: { onClose: () => void }) {
       setResetApplied(true)
       setSaved(false)
     } catch (err) {
+// eslint-disable-next-line no-console
       console.warn('reset to preset failed', err)
     }
   }

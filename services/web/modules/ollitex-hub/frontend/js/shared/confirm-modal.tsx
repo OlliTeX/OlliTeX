@@ -27,7 +27,6 @@ export default function ConfirmModal(props: ConfirmModalProps) {
         variant="filled"
         loading={loading}
         onClick={onConfirm}
-        autoFocus
       >
         {confirmLabel}
       </Button>

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Card, Group, Stack, Text } from '@mantine/core'
+import { Card, Stack, Text } from '@mantine/core'
 import Icon from '../../../shared/icons'
 import { HUB_NAV, visibleNav } from '../../../hub/nav-tree'
 import type { HubNode } from '../../../hub/nav-tree'

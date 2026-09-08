@@ -1,0 +1,67 @@
+# Functional matrix — legacy /admin/instance-stats ↔ hub Instance statistics leaf
+# Roles: SITE ADMIN only (ensureUserIsSiteAdmin everywhere); tpladmin/USER denied.
+# Contract (live-verified from InstanceStatsRouter + api.ts):
+#   GET  /admin/instance-stats                     (page; anchor-nav sections user/project/storage/system/settings)
+#   GET  /admin/instance-stats/api/series?metric=&window=   (windows: month|6m|year|all)
+#   GET  /admin/instance-stats/api/alert-config
+#   PUT  /admin/instance-stats/api/alert-config
+#   POST /admin/instance-stats/api/send-test-alert-email
+# Hub leaf: /hub#/site.general.stats (InstanceStatsSection — same fetchSeries API).
+page: /admin/instance-stats
+id: admin-instance-stats
+roles:
+  admin: full
+  tpladmin: denied
+  user: denied
+  guest: denied
+
+files:
+  legacy: specs/parity/legacy-instance-stats.test.e2e.ts
+  hub: specs/parity/hub-instance-stats.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: page/leaf renders the dashboard (sections + window control)
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: non-site-admins (tpladmin, user, guest) are denied
+    legacy_test: deny
+    hub_test: deny
+
+  - id: series
+    kind: api
+    where: charts over the selected window
+    desc: /api/series returns {metric, window, series[]} for a window
+    behavior:
+      - { endpoint: GET /admin/instance-stats/api/series?metric=user_count&window=month }
+    legacy_test: series
+    hub_test: series
+
+  - id: alert-config
+    kind: form
+    where: settings section
+    desc: GET returns alert thresholds; PUT persists them and reads back
+    behavior:
+      - { endpoint: GET /admin/instance-stats/api/alert-config }
+      - { endpoint: PUT /admin/instance-stats/api/alert-config }
+    legacy_test: alert-config
+    hub_test: alert-config
+
+  - id: test-email
+    kind: button
+    where: settings section "send test alert"
+    desc: POST send-test-alert-email responds (2xx) for the site admin
+    behavior: { endpoint: POST /admin/instance-stats/api/send-test-alert-email }
+    legacy_test: test-email
+    hub_test: test-email
+
+  - id: windows
+    kind: select
+    where: window selector (month / 6m / year / all)
+    desc: switching the window re-fetches series for that window
+    legacy_test: windows
+    hub_test: windows

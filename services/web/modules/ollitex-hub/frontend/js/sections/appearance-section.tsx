@@ -104,7 +104,7 @@ export default function AppearanceSection() {
   const [saving, setSaving] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [importText, setImportText] = useState('')
-  const [importErr, setImportErr] = useState<string | null>(null)
+  const [, setImportErr] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const setMode = (mode: 'light' | 'dark', key: string, value: unknown) =>

@@ -9,19 +9,16 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-  Anchor,
   Badge,
   Button,
   Card,
   Group,
-  Stack,
   Text,
   TextInput,
   Textarea,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { getJSON, putJSON, postJSON } from '@/infrastructure/fetch-json'
-import Icon from '../../../shared/icons'
+import { getJSON, putJSON } from '@/infrastructure/fetch-json'
 import { PageError, PageLoading } from '../../../shared/page-state'
 
 export type Flash = { saving: boolean; saved: boolean; error: string | null }

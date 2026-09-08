@@ -286,7 +286,7 @@ export default function AdminUsersSection({
   }
 
   // --- bulk actions (owner #21) --------------------------------------------
-  const selectedUsers = useMemo(() => filtered.filter(u => sel.isSelected(uid(u))), [filtered, sel.selected])
+  const selectedUsers = useMemo(() => filtered.filter(u => sel.isSelected(uid(u))), [filtered, sel])
 
   const runBulk = async (key: string, fn: () => Promise<unknown>, okMsg: string) => {
     setBulkBusy(key)

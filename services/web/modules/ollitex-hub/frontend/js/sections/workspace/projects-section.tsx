@@ -214,7 +214,7 @@ function GithubImportModal({
         setRepos(null)
         setError((err?.data?.message as string) || 'Could not list GitHub repositories.')
       })
-  }, [open, providerId])
+  }, [open, providerId, selected])
 
   const doImport = async (repo: GitRepo) => {
     if (!selected) return
@@ -316,9 +316,9 @@ export default function ProjectsSection({
   defaultFilter?: View
   defaultTagId?: string | null
 } = {}) {
-  const [view, setView] = useState<View>(defaultFilter)
+  const [view] = useState<View>(defaultFilter)
   const [projects, setProjects] = useState<Project[] | null>(null)
-  const [allProjects, setAllProjects] = useState<Project[]>([])
+  const [, setAllProjects] = useState<Project[]>([])
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [tagId, setTagId] = useState<string | null>(defaultTagId || null)
@@ -935,18 +935,20 @@ export default function ProjectsSection({
       {/* New project (blank / from template) */}
       <Modal opened={newOpen} onClose={() => setNewOpen(false)} size="sm" title={<Text fw={700}>New project</Text>} withinPortal>
         <Stack gap="md">
-          <label style={{ display: 'block' }}>
+          <label htmlFor="hub-new-project-name" style={{ display: 'block' }}>
             <Text size="sm" fw={600} mb={6}>Project name</Text>
             <TextInput
+              id="hub-new-project-name"
               value={newName}
               onChange={e => setNewName(e.currentTarget.value)}
               placeholder="e.g. Thesis chapter 1"
               error={newErr && !newName.trim() ? 'required' : undefined}
             />
           </label>
-          <label style={{ display: 'block' }}>
+          <label htmlFor="hub-new-project-template" style={{ display: 'block' }}>
             <Text size="sm" fw={600} mb={6}>Start from</Text>
             <NativeSelect
+              id="hub-new-project-template"
               value={template}
               onChange={e => setTemplate(e.currentTarget.value)}
               data={[

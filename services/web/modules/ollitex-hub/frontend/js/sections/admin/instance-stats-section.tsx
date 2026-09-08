@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Anchor, Button, Card, Group, NativeSelect, SimpleGrid, Stack, Text } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { Anchor, Card, Group, NativeSelect, SimpleGrid, Stack, Text } from '@mantine/core'
 import Icon from '../../shared/icons'
 import { fetchSeries } from '@modules/instance-stats/frontend/js/features/instance-stats/api'
 import { WINDOW_OPTIONS } from '@modules/instance-stats/frontend/js/features/instance-stats/config'

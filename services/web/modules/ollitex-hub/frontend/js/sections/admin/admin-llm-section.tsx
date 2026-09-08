@@ -14,7 +14,6 @@ import {
 import { notifications } from '@mantine/notifications'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { PageError, PageLoading } from '../../shared/page-state'
-import Icon from '../../shared/icons'
 // overleaf-lab: the shared usage meter (admin scope → /admin/llm/usage)
 import LLMUsageMeter from '../../../../../llm/frontend/js/components/llm-usage-meter'
 
@@ -63,7 +62,7 @@ function useAdminLlm() {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const s = (await getJSON('/admin/llm/settings')) || {}
+      const s = (await getJSON('/admin/llm/settings/json')) || {}
       setState({
         systemPrompt: s.systemPrompt || '',
         llmApiUrl: s.llmApiUrl || '',

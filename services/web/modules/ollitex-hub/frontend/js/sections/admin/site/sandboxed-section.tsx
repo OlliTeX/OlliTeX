@@ -10,7 +10,6 @@ import {
   PageLoading,
   SectionShell,
   SectionTitle,
-  SwitchRow,
   bool0,
   num0,
   str0,
@@ -134,14 +133,14 @@ export function SandboxedSection() {
 
 function AnchorRetry({ load }: { load: () => void }) {
   return (
-    <a
-      href="#"
+    <button
+      type="button"
       onClick={e => {
         e.preventDefault()
         void load()
       }}
     >
       Retry
-    </a>
+    </button>
   )
 }

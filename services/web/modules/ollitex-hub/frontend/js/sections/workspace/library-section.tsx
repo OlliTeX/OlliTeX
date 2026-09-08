@@ -73,12 +73,6 @@ function fmtDate(iso: string | null): string {
  */
 
 // ─────────────────────────────── shared import pipeline ──────────────────
-type ImportRowsState = {
-  rows: BibImportRow[]
-  checked: string[]
-  done: boolean
-}
-
 function useImportRows(existingIds: string[]) {
   const [text, setText] = useState('')
   const [rows, setRows] = useState<BibImportRow[]>([])

@@ -1,0 +1,73 @@
+# Functional matrix — legacy /admin/llm/settings ↔ hub site.llm.* leaves
+# Roles: SITE ADMIN (owner rule: "+ tpladmin if enabled" — the CE gate is
+# ensureUserIsSiteAdmin for this surface; tpladmin denied is the parity truth).
+# Contract (server-verified, LLMRouter + LLMAdminController):
+#   GET  /admin/llm/settings            (page)
+#   GET  /admin/llm/settings/json       (settings: systemPrompt, llmApiUrl, llmApiType,
+#                                         hasLlmApiKey, allowedModels, knownModels,
+#                                         completionModel, reviewModel, maxContextTokens,
+#                                         chatEnabled/completionEnabled/reviewEnabled, …)
+#   POST /admin/llm/settings            (save; llmSettingsSchema; 400 {ok,error,errors[]})
+#   POST /admin/llm/settings/check      (connection check vs the configured endpoint)
+#   POST /admin/llm/models              (model scan)
+#   GET  /admin/llm/usage               ({ok, days, calls, tokens, byDay[]})
+# Hub leaves: /hub#/site.llm.features (+ .connection / .models / .prompt).
+page: /admin/llm/settings
+id: admin-llm-settings
+roles:
+  admin: full
+  tpladmin: denied
+  user: denied
+  guest: denied
+
+files:
+  legacy: specs/parity/legacy-llm-admin.test.e2e.ts
+  hub: specs/parity/hub-llm-admin.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: admin settings page/leaf render for the site admin
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: non-site-admins (tpladmin/user/guest) are denied
+    legacy_test: deny
+    hub_test: deny
+
+  - id: settings-json
+    kind: api
+    desc: GET /admin/llm/settings/json returns the settings object
+    behavior: { endpoint: GET /admin/llm/settings/json }
+    legacy_test: settings-json
+    hub_test: settings-json
+
+  - id: save
+    kind: form
+    desc: POST /admin/llm/settings persists (round-trip read via /settings/json)
+    behavior: { endpoint: POST /admin/llm/settings }
+    legacy_test: save
+    hub_test: save
+
+  - id: check
+    kind: button
+    desc: POST /admin/llm/settings/check probes the endpoint (graceful failure)
+    behavior: { endpoint: POST /admin/llm/settings/check }
+    legacy_test: check
+    hub_test: check
+
+  - id: models
+    kind: button
+    desc: POST /admin/llm/models scans the provider model list
+    behavior: { endpoint: POST /admin/llm/models }
+    legacy_test: models
+    hub_test: models
+
+  - id: usage
+    kind: panel
+    desc: GET /admin/llm/usage returns {ok, calls, tokens, byDay[]}
+    behavior: { endpoint: GET /admin/llm/usage }
+    legacy_test: usage
+    hub_test: usage

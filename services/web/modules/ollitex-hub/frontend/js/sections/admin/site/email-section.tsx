@@ -4,10 +4,8 @@
 
 import React, { useState } from 'react'
 import { Button, Group, Text } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
 import { postJSON } from '@/infrastructure/fetch-json'
 import {
-  Area,
   Field,
   NativeSelectField,
   PageLoading,
@@ -48,7 +46,6 @@ export function EmailSection() {
   const [testTo, setTestTo] = useState('')
   const [testBusy, setTestBusy] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
-  const sm = Boolean((data as any)?.enabled) // legacy has no enable switch for email; keep store untouched
 
   if (!data && !error) return <PageLoading label="Loading e-mail settings…" />
   if (error && !data) {

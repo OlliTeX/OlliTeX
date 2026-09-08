@@ -1,0 +1,64 @@
+# Functional matrix — legacy /admin/panel (CE: 3 panes) ↔ hub leaves
+# Owner rule: /admin/panel = system-messages + active-projects + open/close editor panes.
+# Contracts (server-verified, admin-panel.pug + AdminController):
+#   system-messages:
+#     POST /admin/messages        { content } (strict)
+#     POST /admin/messages/clear
+#     GET  /system/messages       → Msg[] (shared read)
+#   active-projects:
+#     pane renders the admin-tools active projects list
+#   open/close editor:
+#     POST /admin/closeEditor     { isOpen:false } → Settings.editorIsOpen=false
+#     POST /admin/openEditor      → Settings.editorIsOpen=true
+#     POST /admin/disconnectAllUsers (socket broadcast)
+# Hub leaves: /hub#/site.general.messages (SystemMessages), /hub#/site.general.editor
+#             (AdminEditorSection — PG-PN-1 added), /hub#/site.general.activeprojects.
+page: /admin/panel
+id: admin-panel
+roles:
+  admin: full
+  tpladmin: denied
+  user: denied
+  guest: denied
+
+files:
+  legacy: specs/parity/legacy-admin-panel.test.e2e.ts
+  hub: specs/parity/hub-admin-panel.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: the panel renders its panes for the site admin
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: non-site-admins (tpladmin/user/guest) are denied
+    legacy_test: deny
+    hub_test: deny
+
+  - id: system-messages
+    kind: form
+    desc: post a system message, it renders; clear removes it (both surfaces)
+    behavior: { endpoints: [POST /admin/messages, POST /admin/messages/clear] }
+    legacy_test: system-messages
+    hub_test: system-messages
+
+  - id: active-projects
+    kind: panel
+    desc: the active-projects pane/leaf renders the projects listing
+    legacy_test: active-projects
+    hub_test: active-projects
+
+  - id: editor
+    kind: button
+    desc: close/open the editor; state flips back (disconnection broadcast fires)
+    legacy_test: editor
+    hub_test: editor
+
+  - id: disconnect
+    kind: button
+    desc: POST /admin/disconnectAllUsers answers for the site admin
+    legacy_test: disconnect
+    hub_test: disconnect

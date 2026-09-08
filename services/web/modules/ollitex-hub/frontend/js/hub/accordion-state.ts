@@ -8,6 +8,7 @@
  * every change (Object.is comparison requires a new reference).
  */
 import { useSyncExternalStore } from 'react'
+import customLocalStorage from '@/infrastructure/local-storage'
 
 type Listener = () => void
 
@@ -15,10 +16,8 @@ const KEY = 'ol-hub-open-folders'
 
 function readInitial(): Set<string> {
   try {
-    const raw = window.localStorage.getItem(KEY)
-    if (!raw) return new Set()
-    const arr = JSON.parse(raw)
-    return new Set(Array.isArray(arr) ? arr.filter(x => typeof x === 'string') : [])
+    const arr = customLocalStorage.getItem(KEY)
+    return new Set(Array.isArray(arr) ? arr.filter((x: unknown) => typeof x === 'string') : [])
   } catch {
     return new Set()
   }
@@ -30,7 +29,7 @@ const listeners = new Set<Listener>()
 
 function persist() {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify([...snapshot]))
+    customLocalStorage.setItem(KEY, [...snapshot])
   } catch {
     // storage may be unavailable (private mode) — state still works in-memory
   }

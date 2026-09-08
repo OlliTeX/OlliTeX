@@ -1,5 +1,5 @@
 import React from 'react'
-import { Stack, Text, Title, Alert, Card } from '@mantine/core'
+import { Stack, Text, Alert, Card } from '@mantine/core'
 import type { HubNode } from './nav-tree'
 import { hubNavigate } from './navigate'
 import Icon from '../shared/icons'
@@ -24,6 +24,8 @@ import AdminTemplatesSection from '../sections/admin/admin-templates-section'
 import SessionsLeaf from '../sections/workspace/sessions-section'
 import SystemMessagesSection from '../sections/admin/system-messages-section'
 import InstanceStatsSection from '../sections/admin/instance-stats-section'
+import AdminEditorSection from '../sections/admin/admin-editor-section'
+import ActiveProjectsSection from '../sections/admin/active-projects-section'
 import GrammarSettingsSection from '../../../../languagetool/frontend/js/grammar-settings-section'
 import LLMComplianceSettings from '../../../../llm/frontend/js/components/llm-compliance-settings'
 import LLMUsageMeter from '../../../../llm/frontend/js/components/llm-usage-meter'
@@ -218,6 +220,10 @@ export function renderLeaf(node: HubNode): React.ReactNode {
       return <SystemMessagesSection key={node.id} />
     case 'site.general.stats':
       return <InstanceStatsSection key={node.id} />
+    case 'site.general.editor':
+      return <AdminEditorSection key={node.id} />
+    case 'site.general.activeprojects':
+      return <ActiveProjectsSection key={node.id} />
     case 'site.llm.features':
     case 'site.llm.connection':
     case 'site.llm.models':

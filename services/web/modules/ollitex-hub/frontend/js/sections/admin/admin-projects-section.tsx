@@ -214,7 +214,7 @@ export default function AdminProjectsSection({
   }, [allList, page, PAGE_SIZE])
 
   const sel = useSelection(filtered.map(pid))
-  const selectedProjects = useMemo(() => filtered.filter(p => sel.isSelected(pid(p))), [filtered, sel.selected])
+  const selectedProjects = useMemo(() => filtered.filter(p => sel.isSelected(pid(p))), [filtered, sel])
 
   const act = async (fn: () => Promise<unknown>, okMsg: string, key?: string) => {
     if (key) setBusyKey(key)

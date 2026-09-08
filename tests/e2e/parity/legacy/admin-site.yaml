@@ -1,0 +1,79 @@
+# Functional matrix — legacy /admin/site (site settings) ↔ hub site section leaves
+# Roles: SITE ADMIN (tpladmin/user/guest denied).
+# Contracts (server-verified, AdminToolsRouter + probe):
+#   GET  /admin/site                        (page)
+#   GET  /admin/site-settings               → 22 sections: templates, zotero,
+#        mendeley, externalUrl, signup, sso-saml, sso-oidc, sso-ldap,
+#        sandboxed-compiles, git-integration, github-sync, email, linked-file-types,
+#        pandoc, webdav, dropbox, misc, languagetool, llm, branding, services
+#   PUT  /admin/site-settings/:section      (body = section object; secrets masked)
+#   POST /admin/site-settings/email/test    (SMTP test, graceful errors)
+#   GET  /admin/site/template-admins        → { users: [...] }
+# Hub leaves: /hub#/site.general.enclose (index map) + /hub#/site.general.misc,
+#   #/site.general.signup, #/site.integrations.*, #/site.services.*, #/site.compilation.*.
+page: /admin/site
+id: admin-site
+roles:
+  admin: full
+  tpladmin: denied
+  user: denied
+  guest: denied
+
+files:
+  legacy: specs/parity/legacy-admin-site.test.e2e.ts
+  hub: specs/parity/hub-admin-site.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: the site settings page/index renders for the site admin
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: non-site-admins (tpladmin/user/guest) are denied
+    legacy_test: deny
+    hub_test: deny
+
+  - id: settings-read
+    kind: api
+    desc: GET /admin/site-settings returns the full section set
+    behavior: { endpoint: GET /admin/site-settings, sections: [misc, signup, email, sso-saml, externalUrl] }
+    legacy_test: settings-read
+    hub_test: settings-read
+
+  - id: save-roundtrip
+    kind: form
+    desc: PUT /admin/site-settings/misc persists (appName) and reads back; restored
+    behavior: { endpoint: PUT /admin/site-settings/misc }
+    legacy_test: save-roundtrip
+    hub_test: save-roundtrip
+
+  - id: signup
+    kind: form
+    desc: PUT /admin/site-settings/signup round-trips (enabled + domain list)
+    behavior: { endpoint: PUT /admin/site-settings/signup }
+    legacy_test: signup
+    hub_test: signup
+
+  - id: sso
+    kind: form
+    desc: SSO SAML/OIDC/LDAP sections round-trip (enabled flag)
+    behavior: { endpoints: [PUT /admin/site-settings/sso-saml, PUT /admin/site-settings/sso-oidc, PUT /admin/site-settings/sso-ldap] }
+    legacy_test: sso
+    hub_test: sso
+
+  - id: email-test
+    kind: button
+    desc: POST /admin/site-settings/email/test responds gracefully
+    behavior: { endpoint: POST /admin/site-settings/email/test }
+    legacy_test: email-test
+    hub_test: email-test
+
+  - id: template-admins
+    kind: list
+    desc: GET /admin/site/template-admins lists template-flag holders
+    behavior: { endpoint: GET /admin/site/template-admins }
+    legacy_test: template-admins
+    hub_test: template-admins

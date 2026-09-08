@@ -12,11 +12,10 @@ import {
   Switch,
   Tabs,
   Text,
-  Textarea,
   TextInput,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { getJSON, postJSON } from '@/infrastructure/fetch-json'
+import { postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 
 function getMetaJson(name: string): any {
@@ -31,7 +30,7 @@ function getMetaJson(name: string): any {
 
 function useUserSettings() {
   const [settings, setSettings] = useState<any>(() => getMetaJson('ol-userSettings') || {})
-  const [user, setUser] = useState<any>(() => {
+  const [user] = useState<any>(() => {
     try {
       return JSON.parse(document.querySelector('meta[name=ol-user]')?.getAttribute('content') || '{}')
     } catch {
@@ -236,7 +235,7 @@ function EditorTab() {
   const [fontSize, setFontSize] = useState<number | null>(settings?.fontSize ?? null)
   const [autoPair, setAutoPair] = useState<boolean>(settings?.autoPairDelimiters ?? true)
   const [syntaxValidation, setSyntaxValidation] = useState<boolean>(settings?.syntaxValidation ?? true)
-  const [pdfViewer, setPdfViewer] = useState<boolean>(settings?.pdfViewer ?? 'latexWork')
+  const [, setPdfViewer] = useState<boolean>(settings?.pdfViewer ?? 'latexWork')
   const [mathPreview, setMathPreview] = useState<boolean>(settings?.mathPreview ?? true)
   const [family, setFamily] = useState<string>(settings?.fontFamily || 'lucida')
   const [busy, setBusy] = useState(false)

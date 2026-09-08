@@ -108,10 +108,10 @@ Assert for **both** legacy and /hub:
 |---|---|---|---|---|
 | `/admin/user` | ✅ 11 features | ✅ 9/9 | ✅ 8/8 | ✅ GREEN (both sides) |
 | `/admin/project` | ✅ 9 features | ✅ 9/9 | ✅ 8/8 | ✅ GREEN (both sides) |
-| `/admin/site` | ⚪ next | ⚪ | ⚪ | ⚪ |
-| `/admin/panel` | ⚪ next | ⚪ | ⚪ | ⚪ |
-| `/admin/llm/settings` | ⚪ next | ⚪ | ⚪ | ⚪ |
-| `/admin/instance-stats` | ⚪ next | ⚪ | ⚪ | ⚪ |
+| `/admin/site` | ✅ 8 features | ✅ 8/8 | ✅ 8/8 | ✅ GREEN (both sides) |
+| `/admin/panel` | ✅ 6 features | ✅ 6/6 | ✅ 6/6 | ✅ GREEN (both sides) |
+| `/admin/llm/settings` | ✅ 7 features | ✅ 7/7 | ✅ 7/7 | ✅ GREEN (both sides) |
+| `/admin/instance-stats` | ✅ 6 features | ✅ 6/6 | ✅ 6/6 | ✅ GREEN (both sides) |
 | `/project` | ✅ 8 features | ✅ 8/8 | ✅ 8/8 | ✅ GREEN (both sides) |
 | `/library` | ✅ 7 features | ✅ 8/8 | ✅ 6/6 | ✅ GREEN (both sides) |
 | `/templates` | ✅ 6 features | ✅ 6/6 | ✅ 6/6 | ✅ GREEN (both sides) |
@@ -120,10 +120,33 @@ Assert for **both** legacy and /hub:
 | `/user/llm-settings` | ✅ 8 features | ✅ 8/8 | ✅ 8/8 | ✅ GREEN (both sides) |
 | `/user/notification-preferences` | ✅ 6 features | ✅ 6/6 | ✅ 6/6 | ✅ GREEN (both sides) |
 
-**Wave total (2026-09-08 13:2x UTC): 9/9 page-pairs GREEN — 140/140 parity tests
-passing; `parity/check.mjs` = GATE GREEN (70/70 features covered BOTH sides).
-Remaining pages (4): /admin/site, /admin/panel (3 CE panes), /admin/llm/settings,
-/admin/instance-stats — matrices will extend the gate once written.
+**FINAL STATUS (2026-09-09): **13/13 page-pairs GREEN — 194/194 parity tests
+passing (serial, workers=1, retries=0); `parity/check.mjs` = **GATE GREEN — 13
+matrices, 97/97 features covered BOTH sides** (also asserted in-suite by
+`parity-check.test.e2e.ts`).
+
+Completion wave (2026-09-09) added pages 10–13:
+- `/admin/instance-stats` ↔ hub `#/site.general.stats` — series API + alert-config
+  round-trip + test-alert + windows (month/6m/year/all).
+- `/admin/llm/settings` ↔ hub `#/site.llm.*` — settings JSON, save round-trip,
+  check, models, usage. Bug fixed: PG-AL-1 (hub read `/admin/llm/settings` HTML
+  route instead of `/settings/json` → empty panel) now uses the JSON endpoint.
+- `/admin/panel` (3 CE panes) ↔ hub `#/site.general.messages|editor|activeprojects`
+  — system messages post/clear, active-projects real-time feed, editor
+  open/close + disconnect-all. Bugs fixed: PG-PN-1 (editor pane had no hub
+  surface → added `AdminEditorSection`), PG-AP-1 (hub "Active projects" leaf was
+  a build-plan placeholder → added `ActiveProjectsSection` on
+  `/admin/active-projects`), PG-TO-1 (hub toasts must use the module-level
+  `notifications` import, not a hook).
+- `/admin/site` ↔ hub `#/site.general.enclose` + section leaves — 22-section
+  settings read, misc/signup round-trips, SSO enable-without-credentials guard
+  (422 parity), email-test determinism, template-admins list.
+- ESLint across the hub module: **0 errors / 0 warnings** (fixed 28 pre-existing
+  violations from earlier waves: unused imports/vars, no-console, a11y
+  label/anchor rules, exhaustive-deps).
+- E2E determinism: hub hash-only navigations can race the shell state — UI-level
+  assertions for newly-created data use a fresh first-load context (documented
+  inline at the call sites).
 
 Wave fixes folded into hub source (all e2e-evidenced):
 - PG-HB-1 LLM modal crash: capture `e.currentTarget.value` BEFORE lazy `setState` updaters (6 sites, llm-settings-section).

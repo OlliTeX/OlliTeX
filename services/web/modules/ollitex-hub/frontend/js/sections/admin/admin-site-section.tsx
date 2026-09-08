@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Anchor,
-  AppShell,
   Button,
   Card,
   Group,
@@ -32,7 +31,6 @@ import {
   LanguagetoolTab,
   BrandingTab,
   ServicesTab,
-  MiscTab,
 } from '../../../../../admin-tools/frontend/js/site-settings/components/r9-settings-tabs'
 import {
   SamlSsoTab,
