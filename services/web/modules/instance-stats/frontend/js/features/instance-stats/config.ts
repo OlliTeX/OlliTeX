@@ -5,6 +5,8 @@ const bytesToMB = (bytes: number) => bytes / (1024 * 1024)
 const bytesToGB = (bytes: number) => bytes / (1024 * 1024 * 1024)
 
 export const WINDOW_OPTIONS: Array<{ value: WindowKey; label: string }> = [
+  { value: 'day', label: 'Last day' },
+  { value: 'week', label: 'Last week' },
   { value: 'month', label: 'Last 1 month' },
   { value: '6m', label: 'Last 6 months' },
   { value: 'year', label: 'Last 1 year' },

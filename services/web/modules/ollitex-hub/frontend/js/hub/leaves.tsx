@@ -26,9 +26,10 @@ import SystemMessagesSection from '../sections/admin/system-messages-section'
 import InstanceStatsSection from '../sections/admin/instance-stats-section'
 import AdminEditorSection from '../sections/admin/admin-editor-section'
 import ActiveProjectsSection from '../sections/admin/active-projects-section'
+import HubHealthSection from '../sections/admin/hub-health-section'
 import GrammarSettingsSection from '../../../../languagetool/frontend/js/grammar-settings-section'
 import LLMComplianceSettings from '../../../../llm/frontend/js/components/llm-compliance-settings'
-import LLMUsageMeter from '../../../../llm/frontend/js/components/llm-usage-meter'
+import LlmUsagePanel from '../shared/llm-usage-panel'
 import GitHubSyncWidget from '../../../../github-sync/frontend/js/components/github-sync-widget'
 import WebdavWidget from '../../../../webdav/frontend/js/components/webdav-widget'
 import DropboxWidget from '../../../../dropbox/frontend/js/components/dropbox-widget'
@@ -104,7 +105,7 @@ export function renderLeaf(node: HubNode): React.ReactNode {
           <Text size="sm" c="dimmed" mb="md">
             Your LLM usage for the last 30 days.
           </Text>
-          <LLMUsageMeter scope="user" />
+          <LlmUsagePanel scope="user" />
         </Card>
       )
     case 'site.general.managetpl':
@@ -224,6 +225,9 @@ export function renderLeaf(node: HubNode): React.ReactNode {
       return <AdminEditorSection key={node.id} />
     case 'site.general.activeprojects':
       return <ActiveProjectsSection key={node.id} />
+    case 'site.general.health':
+      // overleaf-lab #14 (2026-09-08): live diagnostics leaf
+      return <HubHealthSection key={node.id} />
     case 'site.llm.features':
     case 'site.llm.connection':
     case 'site.llm.models':

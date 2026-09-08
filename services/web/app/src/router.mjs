@@ -449,6 +449,12 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthenticationController.requireLogin(),
     UserPagesController.sessionsPage
   )
+  // 2026-09-08 (overleaf-lab, owner): JSON list for the /hub sessions leaf
+  webRouter.get(
+    '/user/sessions/list',
+    AuthenticationController.requireLogin(),
+    UserPagesController.sessionsList
+  )
   webRouter.post(
     '/user/sessions/clear',
     AuthenticationController.requireLogin(),
@@ -1121,6 +1127,17 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthorizationMiddleware.ensureUserIsSiteAdmin,
     AdminController.index
   )
+
+  // overleaf-lab #4 (2026-09-08): read-only state of the editor gate,
+  // consumed by the /hub Editor controls leaf (live "Open/Closed" chip).
+  // Same CE-only guard as the open/close actions below.
+  if (!Features.hasFeature('saas')) {
+    webRouter.get(
+      '/admin/editor-state',
+      AuthorizationMiddleware.ensureUserIsSiteAdmin,
+      AdminController.editorState
+    )
+  }
 
   if (!Features.hasFeature('saas')) {
     webRouter.post(

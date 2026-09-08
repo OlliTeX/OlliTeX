@@ -17,6 +17,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # overleaf-lab #12 (2026-09-08): the /hub ↔ legacy parity gate is an
+  # EXPLICIT, docker-free job — a PR that breaks the 13/13 parity matrix
+  # fails immediately here (seconds) instead of after the full e2e run.
+  parity-gate:
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parity matrix gate (legacy AND hub coverage)
+        working-directory: tests/e2e
+        run: node parity/check.mjs
+
+  # hub module unit tests (incl. the leaf-audit + icon guards) — docker-free.
+  hub-unit:
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install web deps
+        working-directory: services/web
+        run: yarn install --frozen-lockfile --network-timeout 600000
+      - name: Hub + instance-stats frontend unit tests
+        working-directory: services/web
+        run: yarn vitest run modules/ollitex-hub modules/instance-stats
+
   e2e:
     runs-on: [self-hosted, linux, x64]
     timeout-minutes: 120

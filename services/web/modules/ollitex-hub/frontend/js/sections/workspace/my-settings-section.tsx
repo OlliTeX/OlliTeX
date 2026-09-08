@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import {
   Alert,
-  Anchor,
   Button,
   Card,
   Group,
@@ -14,7 +13,7 @@ import {
   Text,
   TextInput,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import { postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 
@@ -59,10 +58,10 @@ function AccountTab() {
     setBusy(true)
     try {
       await saveUserSettings({ first_name: firstName, last_name: lastName })
-      notifications.show({ message: 'Profile saved.', color: 'teal' })
+      notify({ message: 'Profile saved.', color: 'teal' })
       refresh()
     } catch (e: any) {
-      notifications.show({ message: e.message, color: 'red' })
+      notify({ message: e.message, color: 'red' })
     } finally {
       setBusy(false)
     }
@@ -80,10 +79,8 @@ function AccountTab() {
           </Text>
           <Text size="sm">{user?.email || '—'}</Text>
           <Text size="xs" c="dimmed" mt={4}>
-            Changing the primary email lives in the full settings page (it involves confirmation emails).
-            <Anchor href="/user/mysettings" target="_blank" size="xs" ml={6}>
-              Open
-            </Anchor>
+            The primary email was set at sign-up; changing it requires a
+            confirmation email flow and is not offered in this build.
           </Text>
         </div>
         <Group gap="md" wrap="wrap">
@@ -91,13 +88,13 @@ function AccountTab() {
             <Text size="sm" fw={600} mb={6}>
               First name
             </Text>
-            <TextInput value={firstName} onChange={e => setFirstName(e.currentTarget.value)} />
+            <TextInput value={firstName} onChange={e => setFirstName(e.currentTarget.value)} aria-label="First name" />
           </div>
           <div style={{ minWidth: 200, flex: 1 }}>
             <Text size="sm" fw={600} mb={6}>
               Last name
             </Text>
-            <TextInput value={lastName} onChange={e => setLastName(e.currentTarget.value)} />
+            <TextInput value={lastName} onChange={e => setLastName(e.currentTarget.value)} aria-label="Last name" />
           </div>
         </Group>
         <Group>
@@ -135,7 +132,7 @@ function PasswordTab() {
       setCurrent('')
       setNext1('')
       setNext2('')
-      notifications.show({ message: 'Password changed.', color: 'teal' })
+      notify({ message: 'Password changed.', color: 'teal' })
     } catch (e: any) {
       setErr((e?.data?.message as string) || 'Password change failed.')
     } finally {
@@ -157,6 +154,7 @@ function PasswordTab() {
             value={current}
             onChange={e => setCurrent(e.currentTarget.value)}
             placeholder="Current password"
+            aria-label="Current password"
           />
         </div>
         <Group gap="md" wrap="wrap">
@@ -164,13 +162,13 @@ function PasswordTab() {
             <Text size="sm" fw={600} mb={6}>
               New password
             </Text>
-            <TextInput type="password" value={next1} onChange={e => setNext1(e.currentTarget.value)} placeholder="New password" />
+            <TextInput type="password" value={next1} onChange={e => setNext1(e.currentTarget.value)} placeholder="New password" aria-label="New password" />
           </div>
           <div style={{ minWidth: 200, flex: 1 }}>
             <Text size="sm" fw={600} mb={6}>
               Repeat new password
             </Text>
-            <TextInput type="password" value={next2} onChange={e => setNext2(e.currentTarget.value)} placeholder="Repeat new password" />
+            <TextInput type="password" value={next2} onChange={e => setNext2(e.currentTarget.value)} placeholder="Repeat new password" aria-label="Repeat new password" />
           </div>
         </Group>
         {err ? <Alert color="red" icon={null} variant="light">{err}</Alert> : null}
@@ -198,10 +196,10 @@ function AppearanceTab() {
     setBusy(true)
     try {
       await saveUserSettings({ overallTheme: value })
-      notifications.show({ message: 'Theme saved.', color: 'teal' })
+      notify({ message: 'Theme saved.', color: 'teal' })
       refresh()
     } catch (e: any) {
-      notifications.show({ message: e.message, color: 'red' })
+      notify({ message: e.message, color: 'red' })
     } finally {
       setBusy(false)
     }
@@ -253,10 +251,10 @@ function EditorTab() {
     setBusy(true)
     try {
       await saveUserSettings(patch)
-      notifications.show({ message: 'Editor defaults saved.', color: 'teal' })
+      notify({ message: 'Editor defaults saved.', color: 'teal' })
       refresh()
     } catch (e: any) {
-      notifications.show({ message: e.message, color: 'red' })
+      notify({ message: e.message, color: 'red' })
     } finally {
       setBusy(false)
     }

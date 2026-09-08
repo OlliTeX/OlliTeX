@@ -152,18 +152,15 @@ export default function AdminInstanceSection({ onNavigate }: { onNavigate?: (id:
       <Card withBorder paddings="md" radius="lg">
         <Stack gap="sm">
           <Text fw={700}>About this instance</Text>
-          <Group gap="md" wrap="wrap">
+          <Group gap="md" wrap="wrap" align="center">
             <Badge variant="light" color="blue" radius="sm" size="sm">
               LibreLeaf 6.3.0 (Community Edition base)
             </Badge>
-            <Text size="sm" c="dimmed">
-              Full instance stats (time series, alerts, retention) remain available on the
-              dedicated page.
+            <Text size="sm" c="dimmed" truncate>
+              Time series, charts and alert settings live in the Instance statistics section.
             </Text>
-          </Group>
-          <Group gap="xs">
-            <Anchor href="/admin/instance-stats" target="_blank" size="sm">
-              Open full instance stats
+            <Anchor href="#/site.general.stats" size="sm">
+              Open instance statistics
             </Anchor>
           </Group>
         </Stack>

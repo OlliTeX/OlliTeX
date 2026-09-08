@@ -11,6 +11,7 @@ import { SSOProvider } from '../../../../../frontend/js/features/settings/contex
 import { renderLeaf } from './leaves'
 import { HUB_NAV, HubNode, indexNav, visibleNav } from './nav-tree'
 import { accordionState } from './accordion-state'
+import { startErrorCollector } from '../shared/error-collector'
 import { onHubNavigate, SHORTCUT_ALIASES } from './navigate'
 import {
   buildThemePatch,
@@ -28,7 +29,10 @@ import {
 
 function parseHash(): string {
   try {
-    return window.location.hash.replace(/^#\/?/, '')
+    // #8: the hash may carry leaf-state params (`#/a?q=x`) — only the id
+    // before `?` is a navigational key; strip the query part here so every
+    // consumer (selection, reconciler, titles) sees the leaf id alone.
+    return (window.location.hash || '').replace(/^#\/?/, '').split('?', 2)[0]
   } catch {
     return ''
   }
@@ -60,11 +64,19 @@ const TITLES: Record<string, { title: string; subtitle?: string }> = {
   'templates.all': { title: 'Templates', subtitle: 'Start a new project from a shared template.' },
   library: { title: 'Reference library', subtitle: 'Your personal bibliography, citable from any project.' },
   overview: { title: 'Overview & activity', subtitle: 'Instance health, storage, and recent activity.' },
+  'site.general.health': { title: 'Hub health', subtitle: 'Live diagnostics: server core, endpoint probes, and captured client errors.' },
 }
 
 export default function HubRoot() {
   const admin = useMemo(() => isAdminUser(), [])
   const [cats, setCats] = useState<HubNode[] | null>(null)
+
+  // overleaf-lab #14 (2026-09-08): start the runtime error ring buffer once,
+  // at hub root, so the Hub health leaf can surface anything that escaped the
+  // sections (the PG-TO-1 class of crash included).
+  useEffect(() => {
+    startErrorCollector()
+  }, [])
   const [path, setPath] = useState<string>(() => parseHash())
 
   // live template categories (nav_structure.md §2: Templates accordion)
@@ -134,7 +146,12 @@ export default function HubRoot() {
       }
       setPath(leaf)
       try {
-        window.history.replaceState(null, '', `#/${leaf}`)
+        // #1: guarded pushState — rail clicks create a normal history entry
+        // (back/forward finally works), but we never re-push when we are
+        // already there (popstate / back-forward must not spam history).
+        if (parseHash() !== leaf) {
+          window.history.pushState(null, '', `#/${leaf}`)
+        }
       } catch {
         // tests without history
       }
@@ -189,9 +206,43 @@ export default function HubRoot() {
       const h = parseHash()
       if (h && (idx.allLeaves.has(h) || idx.byId.has(h))) select(h)
     }
+    const onPop = () => {
+      // #1: back/forward restore a hash entry without firing 'hashchange'
+      // — select is idempotent (guarded pushState, no loop).
+      const h = parseHash()
+      if (h && (idx.allLeaves.has(h) || idx.byId.has(h))) select(h)
+    }
     window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('hashchange', onHash)
+      window.removeEventListener('popstate', onPop)
+    }
   }, [select, idx])
+
+  // #1 (2026-09-08): deterministic reconciler — the hash is the source of
+  // truth. Same-document hash changes can race React state (rail click vs
+  // programmatic navigation, harness gotos, address-bar edits, template
+  // category swap-in). After every path change (and on focus), if the
+  // rendered leaf and the hash disagree, the hash wins. Bounded: each
+  // reconcile runs at most once per path change and only mutates state when
+  // the two actually disagree.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const timers: number[] = []
+    const reconcile = () => {
+      const h = parseHash()
+      if (!h || h === path) return
+      if (idx.allLeaves.has(h) || idx.byId.has(h)) select(h)
+    }
+    timers.push(window.setTimeout(reconcile, 0))
+    timers.push(window.setTimeout(reconcile, 400))
+    window.addEventListener('focus', reconcile)
+    return () => {
+      timers.forEach(t => window.clearTimeout(t))
+      window.removeEventListener('focus', reconcile)
+    }
+  }, [path, idx, select])
 
   // app logo (owner #1): /logo_full.svg via navbar meta, with a safe default
   const logoSrc = useMemo(() => {
@@ -308,7 +359,7 @@ export default function HubRoot() {
         <main className="ol-hub-scroll" style={{ flex: 1, minWidth: 0, overflowY: 'auto', height: '100%', background: 'var(--mantine-color-body)' }}>
           <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto', width: '100%' }}>
             <div style={{ marginBottom: 20 }}>
-              <Title order={2} style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
+              <Title order={2} style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--mantine-color-text)' }}>
                 {title}
               </Title>
               {subtitle ? (

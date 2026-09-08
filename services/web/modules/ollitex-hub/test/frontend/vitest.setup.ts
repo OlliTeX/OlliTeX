@@ -1,4 +1,6 @@
 import { afterEach } from 'vitest'
+import { clearSectionDataCache } from '../../frontend/js/shared/use-section-data'
+import { invalidateSiteSettingsCache } from '../../frontend/js/shared/settings-cache'
 
 // jsdom environment for the hub frontend integration suite.
 if (typeof window !== 'undefined' && !window.metaAttributesCache) {
@@ -96,6 +98,11 @@ if (typeof window !== 'undefined') {
 }
 
 afterEach(() => {
+  // overleaf-lab #9/#3 (2026-09-08): the shared in-memory caches (section-data
+  // TTL + site-settings payload) are module-scoped — reset between tests so a
+  // stubbed response from one test cannot leak into the next.
+  clearSectionDataCache()
+  invalidateSiteSettingsCache()
   if (typeof window !== 'undefined') {
     window.metaAttributesCache?.clear()
     window.localStorage?.clear()

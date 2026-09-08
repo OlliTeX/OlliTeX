@@ -9,13 +9,29 @@ describe('<SessionsLeaf /> (mysettings.sessions)', () => {
     setHubMeta({})
   })
 
-  it('renders the revoke action and the session-list link', async () => {
-    stubFetch([])
+  it('renders the session list inline (no link to the soon-removed classic page)', async () => {
+    stubFetch([
+      {
+        match: '/user/sessions/list',
+        body: {
+          currentSession: { ip_address: '10.0.0.5', session_created: '2026-09-01T10:00:00Z' },
+          sessions: [
+            { ip_address: '10.0.0.9', session_created: '2026-08-30T09:00:00Z' },
+            { ip_address: '10.0.1.4', session_created: '2026-08-29T08:00:00Z' },
+          ],
+        },
+      },
+    ])
     renderHub(<SessionsLeaf />)
 
     expect(await screen.findByRole('button', { name: /Revoke all other sessions/ })).toBeTruthy()
-    const link = screen.getByRole('link', { name: /View sessions list/i })
-    expect(link.getAttribute('href')).toBe('/user/sessions')
+    // the list that used to be the linked /user/sessions page is now inline
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('10.0.0.9')
+      expect(document.body.textContent).toContain('10.0.1.4')
+    })
+    // nothing links out to the classic page anymore
+    expect(document.querySelector('a[href="/user/sessions"]')).toBeNull()
   })
 
   it('revokes other sessions via POST /user/sessions/clear', async () => {

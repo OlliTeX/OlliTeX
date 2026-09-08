@@ -1,15 +1,23 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Button, Group, Stack, Text, TextInput } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
-import { getJSON, postJSON } from '@/infrastructure/fetch-json'
+import { notify, errorMessage } from '../../shared/notify'
+import { postJSON, getJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
+import { invalidate, useSectionData } from '../../shared/use-section-data'
 
 type Msg = { _id?: string; content: string }
+
+const LABEL = 'GET /system/messages'
 
 /**
  * Hub leaf: Site settings → General → System messages (legacy /admin
  * "System messages" pane, Mantine-native).
+ *
+ * overleaf-lab #6 (2026-09-08): the list now refreshes LIVE (30 s heartbeat
+ * + tab-activation refetch via useSectionData) — an admin changing the
+ * banner in another window/tab, or on the classic page, sees it appear here
+ * without a manual reload.
  *
  * API (same endpoints the classic admin uses):
  *   GET  /system/messages          → Msg[]
@@ -17,23 +25,26 @@ type Msg = { _id?: string; content: string }
  *   POST /admin/messages/clear     → drops all
  */
 export default function SystemMessagesSection() {
-  const [messages, setMessages] = useState<Msg[] | null>(null)
+  const {
+    data: messages,
+    lastUpdated,
+    refetch,
+  } = useSectionData<Msg[]>(
+    async () => {
+      const d: any = await getJSON('/system/messages')
+      return Array.isArray(d) ? (d as Msg[]) : []
+    },
+    { label: LABEL, live: true },
+  )
   const [content, setContent] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
 
-  const load = useCallback(async () => {
-    try {
-      const data = await getJSON('/system/messages')
-      setMessages(Array.isArray(data) ? data : [])
-    } catch {
-      setMessages([])
-    }
-  }, [])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  const refresh = async () => {
+    // mutations must never be answered by the shared TTL copy
+    invalidate(LABEL)
+    await refetch(true)
+  }
 
   const add = async () => {
     if (!content.trim()) return
@@ -41,13 +52,10 @@ export default function SystemMessagesSection() {
     try {
       await postJSON('/admin/messages', { body: { content: content.trim() } })
       setContent('')
-      notifications.show({ message: 'System message added.', color: 'green' })
-      void load()
-    } catch (err: any) {
-      notifications.show({
-        message: (err?.data?.message as string) || 'Could not add the message.',
-        color: 'red',
-      })
+      notify({ message: 'System message added.', color: 'green' })
+      await refresh()
+    } catch (err) {
+      notify({ message: errorMessage(err, 'Could not add the message.'), color: 'red' })
     } finally {
       setBusy(false)
     }
@@ -58,13 +66,10 @@ export default function SystemMessagesSection() {
     setConfirmClear(false)
     try {
       await postJSON('/admin/messages/clear', {})
-      notifications.show({ message: 'All system messages cleared.', color: 'green' })
-      void load()
-    } catch (err: any) {
-      notifications.show({
-        message: (err?.data?.message as string) || 'Could not clear the messages.',
-        color: 'red',
-      })
+      notify({ message: 'All system messages cleared.', color: 'green' })
+      await refresh()
+    } catch (err) {
+      notify({ message: errorMessage(err, 'Could not clear the messages.'), color: 'red' })
     } finally {
       setBusy(false)
     }
@@ -80,13 +85,17 @@ export default function SystemMessagesSection() {
           </Text>
           <Text size="sm" c="dimmed" mt={4}>
             Banner messages shown to every user on this instance (login page,
-            project list, editor). One line each.
+            project list, editor). One line each. · overleaf-lab #6: live —
+            {lastUpdated
+              ? ` last updated ${new Date(lastUpdated).toLocaleTimeString()}`
+              : ' auto-refreshes every 30 s while visible'}
           </Text>
         </div>
       </Group>
 
       <Group gap="sm" wrap="nowrap">
         <TextInput
+          aria-label="Message text"
           value={content}
           onChange={e => setContent(e.currentTarget.value)}
           placeholder="e.g. Maintenance window on Sunday 02:00–04:00 UTC"

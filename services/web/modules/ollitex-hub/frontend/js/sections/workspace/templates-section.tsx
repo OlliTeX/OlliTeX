@@ -11,7 +11,7 @@ import {
   Text,
   TextInput,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import { EmptyState, PageError, PageLoading } from '../../shared/page-state'
@@ -122,7 +122,7 @@ export default function TemplatesSection({
         window.location.assign(`/project/${id}`)
         return
       }
-      notifications.show({ message: 'Project created from template.', color: 'teal' })
+      notify({ message: 'Project created from template.', color: 'teal' })
     } catch (err: any) {
       setCreateErr((err?.data?.message as string) || 'Could not create the project.')
     } finally {
@@ -138,6 +138,7 @@ export default function TemplatesSection({
           nav removed — it was a duplicate of the rail accordion). */}
       <Group justify="space-between" wrap="wrap" gap="sm">
         <TextInput
+          aria-label="Search templates"
           withLeftSection
           leftSection={<Icon name="search" size={18} />}
           value={query}
@@ -263,6 +264,7 @@ export default function TemplatesSection({
               Project name
             </Text>
             <TextInput
+              aria-label="Project name"
               value={projectName}
               onChange={e => setProjectName(e.currentTarget.value)}
               placeholder="Untitled"

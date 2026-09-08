@@ -357,6 +357,24 @@ const UserPagesController = {
     )
   },
 
+  // 2026-09-08 (overleaf-lab, owner): JSON twin of the sessions page for the
+  // /hub sessions leaf — the hub must not link out to the classic page (the
+  // legacy pages are being removed once /hub parity is complete).
+  sessionsList(req, res, next) {
+    const user = SessionManager.getSessionUser(req.session)
+    const currentSession = {
+      ip_address: user.ip_address,
+      session_created: user.session_created,
+    }
+    UserSessionsManager.getAllUserSessions(user, [req.sessionID], (err, sessions) => {
+      if (err != null) {
+        OError.tag(err, 'error getting all user sessions', { userId: user._id })
+        return next(err)
+      }
+      res.json({ currentSession, sessions })
+    })
+  },
+
   emailPreferencesPage: expressify(emailPreferencesPage),
 
   async compromisedPasswordPage(req, res) {

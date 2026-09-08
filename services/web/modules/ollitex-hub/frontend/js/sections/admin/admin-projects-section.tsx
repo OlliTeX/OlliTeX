@@ -20,16 +20,16 @@ import {
   Group,
   Menu,
   Modal,
-  Pagination,
   NativeSelect,
   Stack,
   Table,
   Text,
   TextInput,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import { deleteJSON, postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
+import HubPagination from '../../shared/pagination'
 import ConfirmModal from '../../shared/confirm-modal'
 import { EmptyState, PageError, PageLoading } from '../../shared/page-state'
 import { BulkToolbar, HeaderCheckbox, RowCheckbox, useSelection, BulkAction } from '../../shared/bulk-select'
@@ -120,7 +120,7 @@ export default function AdminProjectsSection({
     setShareErr(null)
     try {
       await postJSON(`/admin/project/${pid(target)}/invite`, { body: { email, privileges: sharePriv } })
-      notifications.show({ message: 'Invitation sent.', color: 'teal' })
+      notify({ message: 'Invitation sent.', color: 'teal' })
       setShareTarget(null)
     } catch (err: any) {
       const raw = err?.body?.error || err?.data?.message || ''
@@ -220,10 +220,10 @@ export default function AdminProjectsSection({
     if (key) setBusyKey(key)
     try {
       await fn()
-      notifications.show({ message: okMsg, color: 'teal' })
+      notify({ message: okMsg, color: 'teal' })
       await load()
     } catch (err: any) {
-      notifications.show({ message: (err?.data?.message as string) || 'Action failed.', color: 'red' })
+      notify({ message: (err?.data?.message as string) || 'Action failed.', color: 'red' })
     } finally {
       if (key) setBusyKey(null)
     }
@@ -257,11 +257,11 @@ export default function AdminProjectsSection({
         await fn(p)
       } catch (e: any) {
         fail += 1
-        notifications.show({ message: `${pname(p)}: ${e?.data?.message || 'failed'}`, color: 'red' })
+        notify({ message: `${pname(p)}: ${e?.data?.message || 'failed'}`, color: 'red' })
       }
     }
     setBusyKey(null)
-    if (fail === 0) notifications.show({ message: okMsg, color: 'teal' })
+    if (fail === 0) notify({ message: okMsg, color: 'teal' })
     sel.clear()
     await load()
   }
@@ -279,13 +279,13 @@ export default function AdminProjectsSection({
         })
       } catch (e: any) {
         fail += 1
-        notifications.show({ message: `${pname(p)}: ${e?.data?.message || 'failed'}`, color: 'red' })
+        notify({ message: `${pname(p)}: ${e?.data?.message || 'failed'}`, color: 'red' })
       }
     }
     setTransferring(false)
     setTransferOpen(false)
     setTNewOwner('')
-    if (fail === 0) notifications.show({ message: 'Ownership transferred.', color: 'teal' })
+    if (fail === 0) notify({ message: 'Ownership transferred.', color: 'teal' })
     setTransferTarget(null)
     sel.clear()
     await load()
@@ -326,6 +326,7 @@ export default function AdminProjectsSection({
             <NativeSelect value={scope} onChange={e => setScope(e.currentTarget.value)} data={ownerOptions} size="sm" />
           </div>
           <TextInput
+            aria-label="Search projects (all)"
             leftSection={<Icon name="search" size={16} />}
             value={search}
             onChange={e => setSearch(e.currentTarget.value)}
@@ -585,7 +586,7 @@ export default function AdminProjectsSection({
           <Text size="sm" c="dimmed">
             Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))} — {total} project{total === 1 ? '' : 's'}
           </Text>
-          <Pagination order={page} total={Math.ceil(total / PAGE_SIZE)} onChange={setPage} size="sm" />
+          <HubPagination page={page} total={Math.ceil(total / PAGE_SIZE)} onChange={setPage} />
         </Group>
       ) : null}
     </Stack>

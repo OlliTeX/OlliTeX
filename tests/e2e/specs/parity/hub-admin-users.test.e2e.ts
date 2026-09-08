@@ -182,6 +182,11 @@ test.describe('hub admin users (parity vs /admin/user)', () => {
     const cap = captureApi(p as any, BASE)
     await openRowMenu(p, u.email)
     await p.getByRole('menuitem', { name: /delete user/i }).click()
+    // overleaf-lab #4: single-user delete is guarded by a confirmation dialog
+    // (destructive-action guard) — click through it.
+    const delDlg = p.locator('[role="dialog"]').filter({ hasText: /delete/i }).last()
+    await expect(delDlg).toBeVisible({ timeout: 5000 })
+    await delDlg.locator('button', { hasText: /^delete user$/i }).last().click()
     await waitForCall(cap, c => c.some(x => x.method === 'POST' && x.path === `/admin/user/${u.id}/delete`), 'POST delete')
     expect((cap.calls.find(x => x.path === `/admin/user/${u.id}/delete`) as any)?.status).toBe(200)
     const cap2 = captureApi(p as any, BASE)

@@ -1030,6 +1030,40 @@ export default defineConfig([
       '@overleaf/french-typography-in-locales': 'error',
     },
   },
+  {
+    // overleaf-lab — #5 (2026-09-08): /hub toasts go through one safe entry
+    // point (shared/notify.ts). Ban the raw Mantine import in the hub module
+    // so the non-existent-hook / inconsistent-color regressions (PG-TO-1)
+    // cannot reappear. The wrapper file itself is the sole importer.
+    files: [
+      'modules/ollitex-hub/frontend/js/sections/**/*.{ts,tsx}',
+      'modules/ollitex-hub/frontend/js/pages/**/*.{ts,tsx}',
+      'modules/ollitex-hub/frontend/js/hub/**/*.{ts,tsx}',
+      'modules/ollitex-hub/frontend/js/components/**/*.{ts,tsx}',
+      'modules/ollitex-hub/frontend/js/shared/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@mantine/notifications',
+              message:
+                'Import { notify, ok, fail } from the hub shared/notify instead — single toast API for /hub (PG-TO-1 guard).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // overleaf-lab — the one file allowed to import @mantine/notifications.
+    files: ['modules/ollitex-hub/frontend/js/shared/notify.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
   globalIgnores([
     '**/data/',
     'scripts/translations/.cache/',

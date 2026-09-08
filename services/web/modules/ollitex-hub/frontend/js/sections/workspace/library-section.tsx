@@ -15,7 +15,7 @@ import {
   TextInput,
   Tooltip,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import BibEntryForm from '@modules/bib-editor/frontend/js/components/bib-entry-form'
 import type { BibEntry } from '@modules/bib-editor/frontend/js/utils/bib-types'
 import {
@@ -247,12 +247,12 @@ function PasteImportModal({
           fields: Object.entries(e.fields || {}).map(([name, value]) => ({ name, value: String(value ?? '') })),
         }))
       )
-      notifications.show({ message: `Imported ${created.length} reference${created.length > 1 ? 's' : ''}.`, color: 'teal' })
+      notify({ message: `Imported ${created.length} reference${created.length > 1 ? 's' : ''}.`, color: 'teal' })
       imp.reset()
       onClose()
       onImported()
     } catch (e) {
-      notifications.show({ message: failureFromError(e).message, color: 'red' })
+      notify({ message: failureFromError(e).message, color: 'red' })
     } finally {
       setImporting(false)
     }
@@ -332,7 +332,7 @@ function BibUploadModal({
       const text = await f.text()
       await imp.preview(text)
     } catch (e) {
-      notifications.show({ message: `Could not read ${f.name}`, color: 'red' })
+      notify({ message: `Could not read ${f.name}`, color: 'red' })
     }
   }
 
@@ -347,13 +347,13 @@ function BibUploadModal({
           fields: Object.entries(e.fields || {}).map(([name, value]) => ({ name, value: String(value ?? '') })),
         }))
       )
-      notifications.show({ message: `Imported ${created.length} reference${created.length > 1 ? 's' : ''} from ${fileName}.`, color: 'teal' })
+      notify({ message: `Imported ${created.length} reference${created.length > 1 ? 's' : ''} from ${fileName}.`, color: 'teal' })
       imp.reset()
       setFileName('')
       onClose()
       onImported()
     } catch (e) {
-      notifications.show({ message: failureFromError(e).message, color: 'red' })
+      notify({ message: failureFromError(e).message, color: 'red' })
     } finally {
       setImporting(false)
     }
@@ -508,8 +508,8 @@ function OrcidImportModal({
           // keep importing the rest (partial import is the legacy behaviour)
         }
       }
-      if (imported > 0) notifications.show({ message: `Imported ${imported} reference${imported > 1 ? 's' : ''} from ORCID.`, color: 'teal' })
-      else notifications.show({ message: 'No references could be imported from that ORCID record.', color: 'orange' })
+      if (imported > 0) notify({ message: `Imported ${imported} reference${imported > 1 ? 's' : ''} from ORCID.`, color: 'teal' })
+      else notify({ message: 'No references could be imported from that ORCID record.', color: 'orange' })
       onClose()
       if (imported > 0) onImported()
     } catch (e) {
@@ -699,7 +699,7 @@ function ZoteroImportModal({
       const items = splitImportText(data?.bibtex || '').filter(i => i.kind === 'bibtex')
       const entries = items.map(i => (i as { entry: BibEntry }).entry)
       if (entries.length === 0) {
-        notifications.show({ message: 'No references to import.', color: 'orange' })
+        notify({ message: 'No references to import.', color: 'orange' })
         return
       }
       await createEntries(
@@ -709,7 +709,7 @@ function ZoteroImportModal({
           fields: Object.entries(e.fields || {}).map(([name, value]) => ({ name, value: String(value ?? '') })),
         }))
       )
-      notifications.show({ message: `Imported ${entries.length} reference${entries.length > 1 ? 's' : ''} from Zotero.`, color: 'teal' })
+      notify({ message: `Imported ${entries.length} reference${entries.length > 1 ? 's' : ''} from Zotero.`, color: 'teal' })
       onClose()
       onImported()
     } catch (e) {
@@ -864,15 +864,15 @@ function ManualEntryModal({
     try {
       if (kind === 'existing' && originalId) {
         await updateEntry(originalId, { key: e.id, type: e.type, fields: cleanFields })
-        notifications.show({ message: `Updated “${e.id}”.`, color: 'teal' })
+        notify({ message: `Updated “${e.id}”.`, color: 'teal' })
       } else {
         await createEntries([{ key: e.id, type: e.type, fields: cleanFields }])
-        notifications.show({ message: `Added “${e.id}” to your library.`, color: 'teal' })
+        notify({ message: `Added “${e.id}” to your library.`, color: 'teal' })
       }
       onClose()
       onSaved()
     } catch (err) {
-      notifications.show({ message: failureFromError(err).message, color: 'red' })
+      notify({ message: failureFromError(err).message, color: 'red' })
     }
   }
 
@@ -1059,7 +1059,7 @@ export default function LibrarySection() {
         setTotal(count)
       } catch (e) {
         if (mode === 'append') {
-          notifications.show({ message: failureFromError(e).message, color: 'red' })
+          notify({ message: failureFromError(e).message, color: 'red' })
         } else {
           setEntries([])
           setError(failureFromError(e).message)
@@ -1103,19 +1103,19 @@ export default function LibrarySection() {
     try {
       if (confirm.kind === 'trash') {
         const n = await deleteEntries(confirm.keys, false)
-        notifications.show({ message: `Moved ${n} reference${n === 1 ? '' : 's'} to trash.`, color: 'gray' })
+        notify({ message: `Moved ${n} reference${n === 1 ? '' : 's'} to trash.`, color: 'gray' })
       } else if (confirm.kind === 'restore') {
         const n = await restoreEntries(confirm.keys)
-        notifications.show({ message: `Restored ${n} reference${n === 1 ? '' : 's'}.`, color: 'teal' })
+        notify({ message: `Restored ${n} reference${n === 1 ? '' : 's'}.`, color: 'teal' })
       } else {
         const n = await deleteEntries(confirm.keys, true)
-        notifications.show({ message: `Permanently deleted ${n} reference${n === 1 ? '' : 's'}.`, color: 'gray' })
+        notify({ message: `Permanently deleted ${n} reference${n === 1 ? '' : 's'}.`, color: 'gray' })
       }
       setConfirm(null)
       setSelected([])
       await refresh()
     } catch (e) {
-      notifications.show({ message: failureFromError(e).message, color: 'red' })
+      notify({ message: failureFromError(e).message, color: 'red' })
       setConfirm(null)
     } finally {
       setConfirmBusy(false)
@@ -1135,6 +1135,7 @@ export default function LibrarySection() {
     <Stack gap="md">
       <Group justify="space-between" wrap="wrap" gap="sm">
         <TextInput
+          aria-label="Search in your library"
           leftSection={<Icon name="search" size={18} />}
           value={searchInput}
           onChange={e => onSearchInput(e.currentTarget.value)}

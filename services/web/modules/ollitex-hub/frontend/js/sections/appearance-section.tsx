@@ -18,7 +18,7 @@ import {
   Text,
   TextInput,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../shared/notify'
 import { putJSON, deleteJSON } from '@/infrastructure/fetch-json'
 import Icon from '../shared/icons'
 import ConfirmModal from '../shared/confirm-modal'
@@ -74,6 +74,7 @@ function Swatch({ value, onChange, label }: { value: string; onChange: (v: strin
         />
       </span>
       <TextInput
+        aria-label={label}
         value={value}
         onChange={e => onChange(e.currentTarget.value.trim())}
         style={{ flex: 1, minWidth: 110, maxWidth: 150 }}
@@ -120,9 +121,9 @@ export default function AppearanceSection() {
     try {
       const saved = await putJSON('/api/hub-theme', { body: theme })
       setAppliedHubTheme(saved && saved.light ? (saved as any) : theme)
-      notifications.show({ message: 'Hub appearance applied to everyone on this instance.', color: 'green' })
+      notify({ message: 'Hub appearance applied to everyone on this instance.', color: 'green' })
     } catch (e: any) {
-      notifications.show({ message: 'Could not save the hub theme: ' + ((e && e.message) || 'unknown error'), color: 'red' })
+      notify({ message: 'Could not save the hub theme: ' + ((e && e.message) || 'unknown error'), color: 'red' })
     } finally {
       setSaving(false)
     }
@@ -134,9 +135,9 @@ export default function AppearanceSection() {
       await deleteJSON('/api/hub-theme')
       setTheme({ version: 1, light: { ...DEFAULT_HUB_THEME.light }, dark: { ...DEFAULT_HUB_THEME.dark } })
       setAppliedHubTheme(null)
-      notifications.show({ message: 'Hub appearance reset to the LibreLeaf defaults.', color: 'green' })
+      notify({ message: 'Hub appearance reset to the LibreLeaf defaults.', color: 'green' })
     } catch (e: any) {
-      notifications.show({ message: 'Could not reset the hub theme: ' + ((e && e.message) || 'unknown error'), color: 'red' })
+      notify({ message: 'Could not reset the hub theme: ' + ((e && e.message) || 'unknown error'), color: 'red' })
     } finally {
       setSaving(false)
     }
@@ -153,9 +154,9 @@ export default function AppearanceSection() {
       a.click()
       a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 2000)
-      notifications.show({ message: 'Theme JSON exported.', color: 'green' })
+      notify({ message: 'Theme JSON exported.', color: 'green' })
     } catch (e: any) {
-      notifications.show({ message: 'Export failed: ' + ((e && e.message) || 'unknown error'), color: 'red' })
+      notify({ message: 'Export failed: ' + ((e && e.message) || 'unknown error'), color: 'red' })
     }
   }
 
@@ -166,7 +167,7 @@ export default function AppearanceSection() {
       setImportOpen(false)
       setImportText('')
       setImportErr(null)
-      notifications.show({ message: 'Imported — review, then press Apply.', color: 'teal' })
+      notify({ message: 'Imported — review, then press Apply.', color: 'teal' })
     } catch (e: any) {
       setImportErr((e && e.message) || 'Invalid theme JSON')
     }

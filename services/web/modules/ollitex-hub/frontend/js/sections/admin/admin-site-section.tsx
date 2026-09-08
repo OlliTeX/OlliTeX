@@ -13,7 +13,7 @@ import {
   UnstyledButton,
   Box,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import { getJSON, putJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import { PageError, PageLoading } from '../../shared/page-state'
@@ -387,9 +387,9 @@ export default function AdminSiteSection({
       await putJSON(`/admin/site-settings/${id}`, { body })
       if (settings) setSettings({ ...settings, [id]: body })
       setDrafts(d => ({ ...d, [id]: {} }))
-      notifications.show({ message: 'Saved.', color: 'teal' })
+      notify({ message: 'Saved.', color: 'teal' })
     } catch (err: any) {
-      notifications.show({
+      notify({
         message: (err?.data?.message as string) || 'Could not save the section.',
         color: 'red',
       })

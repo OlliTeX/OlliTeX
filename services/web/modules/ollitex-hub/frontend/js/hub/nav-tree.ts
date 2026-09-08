@@ -143,6 +143,9 @@ export const HUB_NAV: HubNode[] = [
           { id: 'site.general.messages', label: 'System messages', icon: 'campaign' },
           { id: 'site.general.stats', label: 'Instance statistics', icon: 'monitoring' },
           { id: 'site.general.editor', label: 'Editor controls', icon: 'build' },
+          // overleaf-lab #14 (2026-09-08): live diagnostics (server core +
+          // endpoint probes + captured client errors)
+          { id: 'site.general.health', label: 'Hub health', icon: 'health_and_safety' },
         ],
       },
       {

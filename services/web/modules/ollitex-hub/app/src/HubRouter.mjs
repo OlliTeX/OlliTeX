@@ -45,5 +45,15 @@ export default {
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
       HubController.clearTheme
     )
+
+    // overleaf-lab #14 (2026-09-08): /hub diagnostics (admin-only).
+    // Server core status (uptime / node / mongo link) for the "Hub health"
+    // leaf; endpoint-level probing happens client-side against the same
+    // admin API the hub consumes.
+    webRouter.get('/api/hub/health',
+      AuthenticationController.requireLogin(),
+      AuthorizationMiddleware.ensureUserIsSiteAdmin,
+      HubController.hubHealth
+    )
   },
 }

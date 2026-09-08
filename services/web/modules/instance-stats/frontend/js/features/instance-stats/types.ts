@@ -1,4 +1,4 @@
-export type WindowKey = 'month' | '6m' | 'year' | 'all'
+export type WindowKey = 'day' | 'week' | 'month' | '6m' | 'year' | 'all'
 
 export type TabId = 'user' | 'project' | 'storage' | 'system'
 

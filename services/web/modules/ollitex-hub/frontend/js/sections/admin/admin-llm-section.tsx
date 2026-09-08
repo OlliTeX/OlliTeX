@@ -11,11 +11,12 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
+
+import LlmUsagePanel from '../../shared/llm-usage-panel'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { PageError, PageLoading } from '../../shared/page-state'
 // overleaf-lab: the shared usage meter (admin scope → /admin/llm/usage)
-import LLMUsageMeter from '../../../../../llm/frontend/js/components/llm-usage-meter'
 
 type Section = 'features' | 'connection' | 'models' | 'prompt' | 'prompts' | 'usage'
 
@@ -137,10 +138,10 @@ function useAdminLlm() {
         ...extra,
       }
       await postJSON('/admin/llm/settings', { body })
-      notifications.show({ message: 'LLM instance settings saved.', color: 'teal' })
+      notify({ message: 'LLM instance settings saved.', color: 'teal' })
       await load()
     } catch (err: any) {
-      notifications.show({
+      notify({
         message: (err?.data?.message as string) || 'Could not save LLM settings.',
         color: 'red',
       })
@@ -370,6 +371,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
             <div style={{ flex: 1, minWidth: 240 }}>
               <Text size="sm" fw={600} mb={6}>API base URL</Text>
               <TextInput
+                aria-label="API base URL"
                 value={state.llmApiUrl || ''}
                 onChange={e => setState(s => (s ? { ...s, llmApiUrl: e.currentTarget.value } : s))}
                 placeholder="https://api.openai.com/v1"
@@ -387,6 +389,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               <div style={{ flex: 1, minWidth: 260 }}>
                 <TextInput
                   type="password"
+                  aria-label="API key"
                   value={apiKey}
                   onChange={e => {
                     setApiKey(e.currentTarget.value)
@@ -570,7 +573,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
       {/* ── Usage ───────────────────────────────────────────────────────── */}
       {show('usage') ? (
         <SectionCard title="Usage" help="LLM usage across the instance for the last 30 days.">
-          <LLMUsageMeter scope="admin" />
+          <LlmUsagePanel scope="admin" />
         </SectionCard>
       ) : null}
     </Stack>

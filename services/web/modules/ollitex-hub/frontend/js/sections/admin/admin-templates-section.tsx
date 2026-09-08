@@ -16,7 +16,7 @@ import {
   ActionIcon,
   Modal,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import { getJSON, postJSON, putJSON, deleteJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
@@ -89,9 +89,9 @@ export default function AdminTemplatesSection() {
     try {
       await putJSON('/admin/site-settings/templates', { body: next })
       setSectionCfg(next)
-      notifications.show({ message: 'Template gallery settings saved.', color: 'teal' })
+      notify({ message: 'Template gallery settings saved.', color: 'teal' })
     } catch (err: any) {
-      notifications.show({
+      notify({
         message: (err?.data?.message as string) || 'Could not save settings.',
         color: 'red',
       })
@@ -136,10 +136,10 @@ export default function AdminTemplatesSection() {
       } else {
         throw new Error('Choose a bundle file or a URL first.')
       }
-      notifications.show({ message: 'Template imported.', color: 'teal' })
+      notify({ message: 'Template imported.', color: 'teal' })
       await load()
     } catch (err: any) {
-      notifications.show({
+      notify({
         message: (err?.data?.message as string) || err?.message || 'Import failed.',
         color: 'red',
       })
@@ -159,12 +159,12 @@ export default function AdminTemplatesSection() {
       // which never sends the fields the user did not touch).
       const body = Object.fromEntries(Object.entries(editForm).filter(([, v]) => v !== ''))
       await postJSON(`/template/${tid(editTpl)}/edit`, { body: body })
-      notifications.show({ message: 'Template updated.', color: 'teal' })
+      notify({ message: 'Template updated.', color: 'teal' })
       setEditTpl(null)
       setEditForm({})
       await load()
     } catch (err: any) {
-      notifications.show({
+      notify({
         message: (err?.data?.message as string) || 'Could not update the template.',
         color: 'red',
       })
@@ -235,6 +235,7 @@ export default function AdminTemplatesSection() {
           <Group gap="sm" wrap="wrap">
             <div style={{ flex: 1, minWidth: 260 }}>
               <TextInput
+                aria-label="Template import URL"
                 value={importUrl}
                 onChange={e => setImportUrl(e.currentTarget.value)}
                 placeholder="…or a URL: https://…/template.zip"
@@ -259,13 +260,10 @@ export default function AdminTemplatesSection() {
 
       <Card withBorder paddings="lg" radius="lg">
         <Stack gap="md">
-          <Group justify="space-between" wrap="nowrap">
+          <Group justify="space-between" wrap="nowrap" align="center">
             <Text fw={700}>
               Templates {list ? `(${list.length})` : ''}
             </Text>
-            <Anchor href="/templates/manage" target="_blank" rel="noreferrer" size="sm">
-              Open legacy manage page
-            </Anchor>
           </Group>
           {!list || list.length === 0 ? (
             <Text size="sm" c="dimmed">
@@ -360,11 +358,11 @@ export default function AdminTemplatesSection() {
           void (async () => {
             try {
               await deleteJSON(`/template/${tid(confirmDel as GalleryTemplate)}/delete`)
-              notifications.show({ message: 'Template deleted.', color: 'gray' })
+              notify({ message: 'Template deleted.', color: 'gray' })
               setConfirmDel(null)
               await load()
             } catch (err: any) {
-              notifications.show({
+              notify({
                 message: (err?.data?.message as string) || 'Delete failed.',
                 color: 'red',
               })

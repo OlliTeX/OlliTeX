@@ -30,9 +30,18 @@ const tpl = async () => {
 test('renders: /templates gallery shows h1 + fixture template card', async () => {
   const r = await p.goto(BASE + '/templates', { waitUntil: 'domcontentloaded' })
   expect(r?.status()).toBe(200)
-  await expect(p.locator('h1', { hasText: /templates/i })).toBeVisible({ timeout: 15000 })
+  // the gallery heading renders as the H2 "All templates" in this build
+  await expect(p.locator('h1, h2', { hasText: /templates/i }).first()).toBeVisible({ timeout: 15000 })
   const t = await tpl()
-  await expect(p.locator(`a[href*="${t.id}"]`).first()).toBeVisible({ timeout: 10000 })
+  // default sort is "Last updated" + pagination, so the long-lived fixture
+  // can sit off page 1. The header sort control is a button; sort by title
+  // ("Parity Fixture Template" sorts ahead of the churned "Parity Hub Import" rows).
+  const titleBtn = p.getByRole('button', { name: /title/i }).first()
+  if (await titleBtn.count().catch(() => 0)) {
+    await titleBtn.click()
+    await p.waitForTimeout(600)
+  }
+  await expect(p.locator(`a[href*="${t.id}"]`).first()).toBeVisible({ timeout: 15000 })
 })
 
 test('gate: guests see a login prompt, not template content', async ({ browser }) => {

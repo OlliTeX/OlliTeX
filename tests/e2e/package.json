@@ -5,8 +5,9 @@
   "description": "Forgejo-style Playwright e2e suite for the ext 6.3.0 Overleaf fork. Runs ONLY against the disposable test stack (docker-compose.test.yml) — never the production box.",
   "type": "module",
   "devDependencies": {
-    "playwright": "1.62.1",
-    "@playwright/test": "1.62.1"
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.62.1",
+    "playwright": "1.62.1"
   },
   "scripts": {
     "setup": "npm install --no-audit --no-fund",

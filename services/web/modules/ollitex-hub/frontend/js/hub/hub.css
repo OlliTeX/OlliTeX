@@ -19,3 +19,30 @@
   border: 2px solid transparent;
   background-clip: content-box;
 }
+
+/* a11y (2026-09-08, axe `color-contrast`): the app-wide stylesheet applies
+ * `color: var(--bs-heading-color)` (= --content-primary, a fixed dark navy) to
+ * every h1–h6, which fails WCAG AA on the hub's dark surfaces. Headings in the
+ * hub must use the theme-aware text token instead. This scoped override wins on
+ * specificity over the element-level global rule and applies to every leaf. */
+.ol-hub-scroll h1,
+.ol-hub-scroll h2,
+.ol-hub-scroll h3,
+.ol-hub-scroll h4,
+.ol-hub-scroll h5,
+.ol-hub-scroll h6 {
+  color: var(--mantine-color-text);
+}
+
+/* a11y: in-text links inside the hub need AA contrast on the hub surfaces in
+ * BOTH schemes (the flat brand-green shade 4 was ~3:1 on the dark neutral-70
+ * cards and got flagged by axe). Branch on Mantine's scheme attribute:
+ * light → deeper green (ollitex-7), dark → light green (ollitex-2), both
+ * passing 4.5:1 on the actual hub card backgrounds. */
+.ol-hub-scroll a:not(.mantine-Button-root) {
+  color: var(--mantine-color-ollitex-7, #1e6b41);
+  text-decoration: underline;
+}
+html[data-mantine-color-scheme='dark'] .ol-hub-scroll a:not(.mantine-Button-root) {
+  color: var(--mantine-color-ollitex-2, #b8dbc8);
+}

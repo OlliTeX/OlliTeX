@@ -10,7 +10,7 @@ import {
   Text,
   TextInput,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { PageLoading } from '../../shared/page-state'
 
@@ -45,7 +45,7 @@ export default function NotificationsSettingsSection() {
           notificationDelayMinutes: nextDelay === '' ? null : Number(nextDelay),
         },
       })
-      notifications.show({ message: 'Notification preferences saved.', color: 'teal' })
+      notify({ message: 'Notification preferences saved.', color: 'teal' })
     } catch (e: any) {
       setErr((e?.data?.message as string) || 'Could not save preferences.')
     } finally {
@@ -98,6 +98,7 @@ export default function NotificationsSettingsSection() {
                 sanitizing TextInput has no typeahead state and behaves like
                 the legacy number input. */}
             <TextInput
+              aria-label="Notification delay (minutes)"
               value={delay}
               onChange={e => setDelay(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 5))}
               placeholder="Server default (minutes)"

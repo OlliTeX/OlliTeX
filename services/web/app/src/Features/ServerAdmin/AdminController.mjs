@@ -142,6 +142,15 @@ const AdminController = {
     res.redirect('/admin#open-close-editor')
   },
 
+  // overleaf-lab #4 (2026-09-08): live editor-gate state for the /hub leaf.
+  // `!== false` matches the settings default (open unless explicitly closed).
+  editorState(req, res) {
+    res.json({
+      editorIsOpen: Settings.editorIsOpen !== false,
+      siteIsOpen: Settings.siteIsOpen !== false,
+    })
+  },
+
   closeEditor(req, res) {
     logger.warn('closing editor')
     const { body } = parseReq(req, closeEditorSchema, { logOnly: true })

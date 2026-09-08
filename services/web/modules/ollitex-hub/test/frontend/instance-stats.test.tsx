@@ -9,36 +9,41 @@ describe('<InstanceStatsSection />', () => {
     setHubMeta({ 'ol-hub-admin': true })
   })
 
-  it('renders metric cards from the instance-stats series API', async () => {
+  it('renders the User / Projects / Storage / System sub-sections with inline charts', async () => {
     const { calls } = stubFetch([
       {
         match: '/admin/instance-stats/api/series',
-        body: { metric: 'user_count', window: 'month', points: [{ day: 1, values: [42] }] },
+        body: { metric: 'user_count', window: 'month', points: [{ day: Date.UTC(2026, 8, 1), values: [42] }] },
       },
     ])
     renderHub(<InstanceStatsSection />)
 
-    await waitFor(() => {
-      expect(document.body.textContent).toMatch(/Users/)
-    })
-    // the "Users" card shows the latest point (42)
-    expect(document.body.textContent).toMatch(/Users42/)
-    // the default window is "month"
+    // every legacy sub-section is present in /hub (owner request 2026-09-08)
+    for (const heading of ['User', 'Projects', 'Storage', 'System', 'Alert settings']) {
+      await waitFor(() => {
+        expect(document.body.textContent).toMatch(new RegExp(heading))
+      })
+    }
+    // the "Users" metric card shows its latest point (42)
+    expect(document.body.textContent).toMatch(/Users/)
+    expect(document.body.textContent).toMatch(/42/)
+    // the default window is "month" and every metric was fetched
     const series = calls.filter(c => c.url.includes('/admin/instance-stats/api/series'))
-    expect(series.length).toBeGreaterThan(0)
+    expect(series.length).toBeGreaterThanOrEqual(13)
     expect(series[0].url).toMatch(/window=month/)
-    expect(series[0].url).toMatch(/metric=user_count/)
+    // inline SVG charts render (the bar/line graphs live in the hub, not behind a link)
+    expect(document.querySelectorAll('svg[role="img"]').length).toBeGreaterThan(0)
   })
 
-  it('formats byte metrics in GB', async () => {
+  it('formats byte metrics in GB on the latest-value readout', async () => {
     stubFetch([
       {
         match: '/admin/instance-stats/api/series?metric=disk_usage',
-        body: { metric: 'disk_usage', window: 'month', points: [{ day: 1, values: [2.5 * 1024 ** 3] }] },
+        body: { metric: 'disk_usage', window: 'month', points: [{ day: Date.UTC(2026, 8, 1), values: [2.5 * 1024 ** 3, 100 * 1024 ** 3] }] },
       },
       {
         match: '/admin/instance-stats/api/series',
-        body: { metric: 'user_count', window: 'month', points: [{ day: 1, values: [7] }] },
+        body: { metric: 'user_count', window: 'month', points: [{ day: Date.UTC(2026, 8, 1), values: [7] }] },
       },
     ])
     renderHub(<InstanceStatsSection />)
@@ -48,18 +53,18 @@ describe('<InstanceStatsSection />', () => {
     })
   })
 
-  it('links to the full charts page and switches window on demand', async () => {
+  it('re-fetches every series when the window changes (no external charts page)', async () => {
     const { calls } = stubFetch([
       {
         match: '/admin/instance-stats/api/series',
-        body: { metric: 'user_count', window: 'month', points: [{ day: 1, values: [1] }] },
+        body: { metric: 'user_count', window: 'month', points: [{ day: Date.UTC(2026, 8, 1), values: [1] }] },
       },
     ])
     renderHub(<InstanceStatsSection />)
     await waitFor(() => expect(document.body.textContent).toMatch(/Users/))
 
-    const link = screen.getByRole('link', { name: /Full charts/i })
-    expect(link.getAttribute('href')).toBe('/admin/instance-stats')
+    // nothing links out to the soon-removed classic page anymore
+    expect(document.querySelector('a[href="/admin/instance-stats"]')).toBeNull()
 
     const select = screen.getByRole('combobox') as HTMLSelectElement
     fireEvent.change(select, { target: { value: '6m' } })

@@ -35,6 +35,8 @@ export const STAT_KEYS = [
 ]
 
 export const WINDOWS = {
+  day: 1,
+  week: 7,
   month: 30,
   '6m': 180,
   year: 365,

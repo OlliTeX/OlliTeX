@@ -59,7 +59,7 @@ function Leaf({
         fontWeight: isActive ? 600 : 500,
         textAlign: 'left',
         background: isActive ? 'var(--mantine-color-ollitex-6)' : 'transparent',
-        color: isActive ? 'var(--mantine-color-white)' : toneColor || 'var(--mantine-color-text)',
+        color: isActive ? 'var(--mantine-color-white)' : 'var(--mantine-color-text)',
         transition: 'background 120ms ease',
       }}
       onMouseEnter={e => {
@@ -69,11 +69,17 @@ function Leaf({
         if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
       }}
     >
+      {/* a11y 2026-09-08: tone color now decorative only (8px dot) — the label
+          text uses --mantine-color-text for a guaranteed 4.5:1 contrast */}
+      <span
+        aria-hidden="true"
+        style={{ width: 7, height: 7, borderRadius: 4, background: toneColor || 'transparent', flexShrink: 0, alignSelf: 'center', marginRight: 2 }}
+      />
       <Icon
         name={node.icon}
         size={18}
         style={{
-          color: isActive ? 'var(--mantine-color-white)' : toneColor || 'var(--mantine-color-dimmed)',
+          color: isActive ? 'var(--mantine-color-white)' : 'var(--mantine-color-text)',
           flexShrink: 0,
         }}
       />
@@ -99,7 +105,6 @@ function Folder({
   const isOpen = open.has(node.id)
   const containsActive = active !== null && (active === node.id || active.startsWith(node.id + '.'))
   const toneHere = toneOf(node, tone)
-  const toneColor = TONE_COLOR[toneHere || '']
   return (
     <div>
       <button
@@ -122,7 +127,7 @@ function Folder({
           fontWeight: 650,
           textAlign: 'left',
           background: containsActive ? 'color-mix(in srgb, var(--mantine-color-ollitex-6) 10%, transparent)' : 'transparent',
-          color: toneColor || 'var(--mantine-color-text)',
+          color: 'var(--mantine-color-text)',
           transition: 'background 120ms ease',
         }}
         onMouseEnter={e => {
@@ -136,7 +141,7 @@ function Folder({
           name={node.icon}
           size={18}
           style={{
-            color: toneColor || 'var(--mantine-color-dimmed)',
+            color: 'var(--mantine-color-text)',
             flexShrink: 0,
           }}
         />
@@ -149,7 +154,7 @@ function Folder({
             display: 'inline-flex',
             transition: 'transform 160ms ease',
             transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-            color: toneColor || 'var(--mantine-color-dimmed)',
+            color: 'var(--mantine-color-text)',
           }}
         >
           <Icon name="chevron_right" size={18} />

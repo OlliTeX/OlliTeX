@@ -16,16 +16,16 @@ import {
   Group,
   Menu,
   Modal,
-  Pagination,
   Stack,
   Switch,
   Table,
   Text,
   TextInput,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import { deleteJSON, postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
+import HubPagination from '../../shared/pagination'
 import ConfirmModal from '../../shared/confirm-modal'
 import { EmptyState, PageError, PageLoading } from '../../shared/page-state'
 import { BulkToolbar, HeaderCheckbox, RowCheckbox, useSelection, BulkAction } from '../../shared/bulk-select'
@@ -105,7 +105,7 @@ function UserUpdateModal({ user, onClose, onSaved }: { user: any; onClose: () =>
         body: { firstName: first, lastName: last, email, isAdmin: admin, canManageTemplates: tpls },
       })
       onSaved(user)
-      notifications.show({ message: 'User updated.', color: 'teal' })
+      notify({ message: 'User updated.', color: 'teal' })
       onClose()
     } catch (e: any) {
       setErr((e?.data?.message as string) || 'Could not update the user.')
@@ -161,6 +161,9 @@ export default function AdminUsersSection({
   const [bulkSendEmail, setBulkSendEmail] = useState(false)
   const [confirmBulkPurge, setConfirmBulkPurge] = useState(false)
   const [confirmPurge, setConfirmPurge] = useState<AdminUser | null>(null)
+  // overleaf-lab #4 (2026-09-08): single-user delete had NO confirm
+  // (bulk + purge did) — same guard now.
+  const [confirmDelete, setConfirmDelete] = useState<AdminUser | null>(null)
   const [purging, setPurging] = useState(false)
   const [infoUser, setInfoUser] = useState<AdminUser | null>(null)
   const [updateUser, setUpdateUser] = useState<AdminUser | null>(null)
@@ -225,9 +228,9 @@ export default function AdminUsersSection({
     try {
       await postJSON(`/admin/user/${uid(u)}/update`, { body: patch })
       setUsers(list => (list || []).map(x => (uid(x) === uid(u) ? ({ ...x, ...patch } as any) : x)))
-      notifications.show({ message: 'User updated.', color: 'teal' })
+      notify({ message: 'User updated.', color: 'teal' })
     } catch (err: any) {
-      notifications.show({ message: (err?.data?.message as string) || 'Could not update the user.', color: 'red' })
+      notify({ message: (err?.data?.message as string) || 'Could not update the user.', color: 'red' })
     } finally {
       setBusyId(null)
     }
@@ -236,9 +239,9 @@ export default function AdminUsersSection({
   const sendActivation = async (u: AdminUser) => {
     try {
       await postJSON(`/admin/user/${uid(u)}/send-activation`, { body: {} })
-      notifications.show({ message: 'Activation email requested.', color: 'teal' })
+      notify({ message: 'Activation email requested.', color: 'teal' })
     } catch (e: any) {
-      notifications.show({ message: (e?.data?.message as string) || 'Could not send activation.', color: 'red' })
+      notify({ message: (e?.data?.message as string) || 'Could not send activation.', color: 'red' })
     }
   }
 
@@ -246,11 +249,11 @@ export default function AdminUsersSection({
     setBusyId(uid(u))
     try {
       await postJSON(`/admin/user/${uid(u)}/delete`, { body: { sendEmail: false, toUserId: null } })
-      notifications.show({ message: `Deleted ${u.email}.`, color: 'gray' })
+      notify({ message: `Deleted ${u.email}.`, color: 'gray' })
       sel.clear()
       await load()
     } catch (e: any) {
-      notifications.show({ message: (e?.data?.message as string) || 'Delete failed.', color: 'red' })
+      notify({ message: (e?.data?.message as string) || 'Delete failed.', color: 'red' })
     } finally {
       setBusyId(null)
     }
@@ -260,10 +263,10 @@ export default function AdminUsersSection({
     setBusyId(uid(u))
     try {
       await postJSON(`/admin/user/${uid(u)}/restore`, { body: {} })
-      notifications.show({ message: 'User restored.', color: 'teal' })
+      notify({ message: 'User restored.', color: 'teal' })
       await load()
     } catch (e: any) {
-      notifications.show({ message: (e?.data?.message as string) || 'Could not restore.', color: 'red' })
+      notify({ message: (e?.data?.message as string) || 'Could not restore.', color: 'red' })
     } finally {
       setBusyId(null)
     }
@@ -274,11 +277,11 @@ export default function AdminUsersSection({
     setPurging(true)
     try {
       await deleteJSON(`/admin/user/${uid(confirmPurge)}`)
-      notifications.show({ message: `Purged ${confirmPurge.email}.`, color: 'gray' })
+      notify({ message: `Purged ${confirmPurge.email}.`, color: 'gray' })
       setConfirmPurge(null)
       await load()
     } catch (e: any) {
-      notifications.show({ message: (e?.data?.message as string) || 'Purge failed.', color: 'red' })
+      notify({ message: (e?.data?.message as string) || 'Purge failed.', color: 'red' })
       setConfirmPurge(null)
     } finally {
       setPurging(false)
@@ -297,10 +300,10 @@ export default function AdminUsersSection({
           await fn(u)
         } catch (e: any) {
           fail += 1
-          notifications.show({ message: `${u.email}: ${e?.data?.message || 'failed'}`, color: 'red' })
+          notify({ message: `${u.email}: ${e?.data?.message || 'failed'}`, color: 'red' })
         }
       }
-      if (fail === 0) notifications.show({ message: okMsg, color: 'teal' })
+      if (fail === 0) notify({ message: okMsg, color: 'teal' })
       sel.clear()
       await load()
     } finally {
@@ -317,12 +320,12 @@ export default function AdminUsersSection({
           await postJSON(`/admin/user/${uid(u)}/delete`, { body: { sendEmail: bulkSendEmail, toUserId: null } })
         } catch (e: any) {
           fail += 1
-          notifications.show({ message: `${u.email}: ${e?.data?.message || 'failed'}`, color: 'red' })
+          notify({ message: `${u.email}: ${e?.data?.message || 'failed'}`, color: 'red' })
         }
       }
       setConfirmBulkDel(false)
       setBulkSendEmail(false)
-      if (fail === 0) notifications.show({ message: 'Users deleted.', color: 'teal' })
+      if (fail === 0) notify({ message: 'Users deleted.', color: 'teal' })
       sel.clear()
       await load()
     } finally {
@@ -337,11 +340,11 @@ export default function AdminUsersSection({
         await deleteJSON(`/admin/user/${uid(u)}`)
       }
       setConfirmBulkPurge(false)
-      notifications.show({ message: 'Users permanently purged.', color: 'gray' })
+      notify({ message: 'Users permanently purged.', color: 'gray' })
       sel.clear()
       await load()
     } catch (e: any) {
-      notifications.show({ message: (e?.data?.message as string) || 'Purge failed.', color: 'red' })
+      notify({ message: (e?.data?.message as string) || 'Purge failed.', color: 'red' })
       setConfirmBulkPurge(false)
     } finally {
       setBulkBusy(null)
@@ -396,7 +399,7 @@ export default function AdminUsersSection({
           isExternal: false,
         },
       })
-      notifications.show({ message: `Created ${cEmail.trim()}.`, color: 'teal' })
+      notify({ message: `Created ${cEmail.trim()}.`, color: 'teal' })
       setCreateOpen(false)
       setCEmail('')
       setCFirst('')
@@ -421,6 +424,7 @@ export default function AdminUsersSection({
           value={search}
           onChange={e => setSearch(e.currentTarget.value)}
           placeholder="Search by name or email"
+          aria-label="Search users by name or email"
           style={{ maxWidth: 380, width: '100%' }}
         />
         <Group gap="sm" wrap="wrap">
@@ -478,7 +482,14 @@ export default function AdminUsersSection({
                 </Table.Td>
                 {!isAllDeleted ? (
                   <Table.Td onClick={e => e.stopPropagation()}>
-                    <Switch size="xs" checked={!u.suspended} color="teal" loading={busyId === uid(u)} onChange={() => void setUserFlag(u, { suspended: !u.suspended })} />
+                    <Switch
+                    size="xs"
+                    checked={!u.suspended}
+                    color="teal"
+                    loading={busyId === uid(u)}
+                    onChange={() => void setUserFlag(u, { suspended: !u.suspended })}
+                    aria-label={u.suspended ? `Activate (unsuspend) ${u.email}` : `Suspend ${u.email}`}
+                  />
                   </Table.Td>
                 ) : (
                   <Table.Td><Text size="xs" c="red">Deleted</Text></Table.Td>
@@ -529,8 +540,7 @@ export default function AdminUsersSection({
                           <Menu.Item
                             icon={<Icon name="delete" size={16} />}
                             color="red"
-                            loading={busyId === uid(u)}
-                            onClick={() => void doDeleteOne(u)}
+                            onClick={() => setConfirmDelete(u)}
                           >
                             Delete user
                           </Menu.Item>
@@ -574,16 +584,16 @@ export default function AdminUsersSection({
         <Stack gap="md">
           <div>
             <Text size="sm" fw={600} mb={6}>Email <span style={{ color: 'var(--mantine-color-red-6)' }}>*</span></Text>
-            <TextInput value={cEmail} onChange={e => setCEmail(e.currentTarget.value)} placeholder="name@example.org" />
+            <TextInput value={cEmail} onChange={e => setCEmail(e.currentTarget.value)} placeholder="name@example.org" aria-label="Email" />
           </div>
           <Group gap="md" wrap="wrap">
             <div style={{ flex: 1, minWidth: 160 }}>
               <Text size="sm" fw={600} mb={6}>First name</Text>
-              <TextInput value={cFirst} onChange={e => setCFirst(e.currentTarget.value)} />
+              <TextInput value={cFirst} onChange={e => setCFirst(e.currentTarget.value)} aria-label="First name" />
             </div>
             <div style={{ flex: 1, minWidth: 160 }}>
               <Text size="sm" fw={600} mb={6}>Last name</Text>
-              <TextInput value={cLast} onChange={e => setCLast(e.currentTarget.value)} />
+              <TextInput value={cLast} onChange={e => setCLast(e.currentTarget.value)} aria-label="Last name" />
             </div>
           </Group>
           <Group gap="lg" wrap="wrap">
@@ -633,12 +643,24 @@ export default function AdminUsersSection({
         onCancel={() => setConfirmPurge(null)}
         onConfirm={() => void doPurgeOne()}
       />
+
+      {/* overleaf-lab #4: confirm before the (soft) single-user delete */}
+      <ConfirmModal
+        open={!!confirmDelete}
+        title={`Delete “${confirmDelete?.email ?? ''}”?`}
+        body="The user and their projects move to the deleted view and can be restored until they are purged. This cannot be undone from the normal UI. Note: no email is sent to the user for this action."
+        confirmLabel="Delete user"
+        danger
+        loading={!!confirmDelete && busyId === uid(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => { const u = confirmDelete; setConfirmDelete(null); if (u) void doDeleteOne(u) }}
+      />
           {total != null && total > PAGE_SIZE ? (
         <Group justify="space-between" wrap="wrap" gap="xs">
           <Text size="sm" c="dimmed">
             Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))} — {total} user{total === 1 ? '' : 's'}
           </Text>
-          <Pagination order={page} total={Math.ceil(total / PAGE_SIZE)} onChange={setPage} size="sm" />
+          <HubPagination page={page} total={Math.ceil(total / PAGE_SIZE)} onChange={setPage} />
         </Group>
       ) : null}
     </Stack>

@@ -15,7 +15,7 @@ import {
   TextInput,
   Tooltip,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
@@ -204,7 +204,7 @@ export default function LlmSettingsSection() {
       } else {
         await postJSON(`/user/llm-providers/${draft.id}`, { body: payload })
       }
-      notifications.show({ message: 'LLM provider saved.', color: 'teal' })
+      notify({ message: 'LLM provider saved.', color: 'teal' })
       setDraft(null)
       await load()
     } catch (e: any) {
@@ -219,11 +219,11 @@ export default function LlmSettingsSection() {
     setDeleting(true)
     try {
       await postJSON(`/user/llm-providers/${toDelete.id}/delete`, { body: {} })
-      notifications.show({ message: `Deleted “${toDelete.name}”.`, color: 'gray' })
+      notify({ message: `Deleted “${toDelete.name}”.`, color: 'gray' })
       setToDelete(null)
       await load()
     } catch (e: any) {
-      notifications.show({ message: (e?.data?.message as string) || 'Delete failed.', color: 'red' })
+      notify({ message: (e?.data?.message as string) || 'Delete failed.', color: 'red' })
       setToDelete(null)
     } finally {
       setDeleting(false)
@@ -318,7 +318,7 @@ export default function LlmSettingsSection() {
                       try {
                         await postJSON(`/user/llm-providers/${row.id}`, { body: { enabled: v } })
                       } catch (e: any) {
-                        notifications.show({ message: (e?.data?.message as string) || 'Could not update.', color: 'red' })
+                        notify({ message: (e?.data?.message as string) || 'Could not update.', color: 'red' })
                       }
                     }}
                   />
@@ -362,6 +362,7 @@ export default function LlmSettingsSection() {
                 Name
               </Text>
               <TextInput
+                aria-label="LLM profile name"
                 value={draft?.name || ''}
                 onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, name: v } : d)) }}
                 placeholder="e.g. Internal LLM gateway"
@@ -388,6 +389,7 @@ export default function LlmSettingsSection() {
               Base URL {draft?.providerType === 'openaiCompatible' ? <span style={{ color: 'var(--mantine-color-red-6)' }}>*</span> : null}
             </Text>
             <TextInput
+              aria-label="API base URL"
               value={draft?.baseUrl || ''}
               onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, baseUrl: v } : d)) }}
               placeholder="https://…/v1"
@@ -399,6 +401,7 @@ export default function LlmSettingsSection() {
               API key {draft && !draft.isNew ? '(leave blank to keep the stored key)' : '(encrypted at rest)'}
             </Text>
             <TextInput type="password"
+              aria-label="API key"
               value={draft?.apiKey || ''}
               onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, apiKey: v, keepKey: !!v || d.keepKey } : d)) }}
               placeholder="sk-…"
@@ -411,6 +414,7 @@ export default function LlmSettingsSection() {
               <Text span size="xs" c="dimmed" fw={400}>(one per line)</Text>
             </Text>
             <Textarea
+              aria-label="Models (one per line)"
               value={draft?.models || ''}
               onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, models: v } : d)) }}
               minRows={3}

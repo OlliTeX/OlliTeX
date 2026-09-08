@@ -17,8 +17,9 @@ import {
   TextInput,
   Textarea,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
-import { getJSON, putJSON } from '@/infrastructure/fetch-json'
+import { notify } from '../../../shared/notify'
+import { putJSON } from '@/infrastructure/fetch-json'
+import { getSiteSettings, invalidateSiteSettingsCache } from '../../../shared/settings-cache'
 import { PageError, PageLoading } from '../../../shared/page-state'
 
 export type Flash = { saving: boolean; saved: boolean; error: string | null }
@@ -32,7 +33,9 @@ export function useSiteSettings(section: string) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const all = await getJSON('/admin/site-settings')
+      // overleaf-lab #9: shared 30 s cache — moving between sections no
+      // longer re-fetches the whole payload (and never serves failures)
+      const all = await getSiteSettings()
       setData((all as any)?.[section] || {})
     } catch (err: any) {
       setError((err?.data?.message as string) || String(err?.message || err))
@@ -50,9 +53,12 @@ export function useSiteSettings(section: string) {
       try {
         await putJSON(`/admin/site-settings/${section}`, { body })
         setFlash({ saving: false, saved: true, error: null })
-        const fresh = await getJSON('/admin/site-settings')
+        // overleaf-lab #9: a save must be visible in this editor immediately —
+        // invalidate, then read fresh (bypasses the shared TTL copy)
+        invalidateSiteSettingsCache()
+        const fresh = await getSiteSettings(true)
         setData((fresh as any)?.[section] || {})
-        notifications.show({ message: 'Saved.', color: 'teal' })
+        notify({ message: 'Saved.', color: 'teal' })
         return true
       } catch (err: any) {
         setFlash({

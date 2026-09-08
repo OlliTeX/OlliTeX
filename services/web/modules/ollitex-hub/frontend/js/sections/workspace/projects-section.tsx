@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Badge,
   Button,
@@ -20,11 +20,12 @@ import { Dashboard as UppyDashboard } from '@uppy/react'
 import '@uppy/core/dist/style.css'
 import '@uppy/dashboard/dist/style.css'
 import { useProjectUploader } from '@/features/project-list/hooks/use-project-uploader'
-import { notifications } from '@mantine/notifications'
+import { notify } from '../../shared/notify'
 import { postJSON, getJSON, deleteJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
 import { EmptyState, PageError, PageLoading } from '../../shared/page-state'
+import { intParam, readLeafHashParams, writeLeafHashParams } from '../../shared/hash-params'
 
 /**
  * Owner #10a–#10f (2026-09-07): the Projects leaf is the reworked project
@@ -126,7 +127,7 @@ function UppyUploadModal({
     onSuccess: (projectId: string) => onDone(projectId, convertedFrom),
     onError: (response: any) => {
       const message = response?.body?.error || 'Upload failed.'
-      notifications.show({ message, color: 'red' })
+      notify({ message, color: 'red' })
     },
   })
   if (!open) return null
@@ -320,12 +321,33 @@ export default function ProjectsSection({
   const [projects, setProjects] = useState<Project[] | null>(null)
   const [, setAllProjects] = useState<Project[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
-  const [tagId, setTagId] = useState<string | null>(defaultTagId || null)
+  // overleaf-lab #8 (2026-09-08): leaf state (search / tag / page) lives in the
+  // hash now — deep links like /hub#/projects.all?q=latex&page=2 restore the
+  // exact view, and the address bar always shows what you are looking at.
+  // `defaultTagId` (the tags leaves) still wins over the persisted tag.
+  const initialHash = useMemo(() => readLeafHashParams(), [])
+  const [query, setQuery] = useState(() => initialHash.q || '')
+  const [tagId, setTagId] = useState<string | null>(() => defaultTagId || initialHash.tag || null)
   const [tags, setTags] = useState<Array<{ _id?: string; id?: string; name?: string }>>([])
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => intParam(initialHash, 'page', 1))
   const [selected, setSelected] = useState<string[]>([])
   const [busy, setBusy] = useState<string | null>(null)
+
+  // persist leaf state (debounced so typing doesn't thrash the URL)
+  const hashTimer = useRef<number | null>(null)
+  useEffect(() => {
+    if (hashTimer.current) window.clearTimeout(hashTimer.current)
+    hashTimer.current = window.setTimeout(() => {
+      writeLeafHashParams({
+        q: query || '',
+        tag: tagId || '',
+        page: page && page > 1 ? String(page) : '',
+      })
+    }, 250)
+    return () => {
+      if (hashTimer.current) window.clearTimeout(hashTimer.current)
+    }
+  }, [query, tagId, page])
 
   // new-project modals
   const [newOpen, setNewOpen] = useState(false)
@@ -442,11 +464,11 @@ export default function ProjectsSection({
     setBusy(key)
     try {
       await fn()
-      if (okMsg) notifications.show({ message: okMsg, color: 'teal' })
+      if (okMsg) notify({ message: okMsg, color: 'teal' })
       setSelected([])
       await load(view, tagId)
     } catch (err: any) {
-      notifications.show({ message: (err?.data?.message as string) || `Action failed: ${key}`, color: 'red' })
+      notify({ message: (err?.data?.message as string) || `Action failed: ${key}`, color: 'red' })
     } finally {
       setBusy(null)
     }
@@ -486,7 +508,7 @@ export default function ProjectsSection({
       })
       window.open(`/project/${id}/pdf`, '_blank', 'noopener')
     } catch (err: any) {
-      notifications.show({ message: err?.body?.error || err?.message || 'Compile failed — PDF not available yet.', color: 'red' })
+      notify({ message: err?.body?.error || err?.message || 'Compile failed — PDF not available yet.', color: 'red' })
     } finally {
       setBusy('')
     }
@@ -629,6 +651,7 @@ export default function ProjectsSection({
         </Group>
         <Group gap="xs">
           <TextInput
+            aria-label="Search projects"
             leftSection={<Icon name="search" size={18} />}
             value={query}
             onChange={e => { setQuery(e.currentTarget.value); setPage(1) }}
