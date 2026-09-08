@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-  Alert,
+
   Anchor,
   Badge,
   Button,
@@ -14,6 +14,7 @@ import {
   TextInput,
   Tooltip,
   ActionIcon,
+  Modal,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { getJSON, postJSON, putJSON, deleteJSON } from '@/infrastructure/fetch-json'
@@ -51,6 +52,9 @@ export default function AdminTemplatesSection() {
   const [busy, setBusy] = useState(false)
   const [confirmDel, setConfirmDel] = useState<GalleryTemplate | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [editTpl, setEditTpl] = useState<GalleryTemplate | null>(null)
+  const [editForm, setEditForm] = useState<{ name?: string; descriptionMD?: string; authorMD?: string; license?: string }>({})
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -94,10 +98,20 @@ export default function AdminTemplatesSection() {
     }
   }
 
+  // Mantine 9.6 quirk (PG-TH-1): FileInput onChange can deliver the File,
+  // the change event, or even the input element depending on re-renders.
+  // Normalize to a real File (or null) before storing.
+  const onImportFile = (e: unknown) => {
+    const maybe = (e as any)?.target?.files?.[0] ?? e
+    const ok = maybe instanceof File || ((maybe as any)?.size !== undefined && typeof (maybe as any)?.name === 'string')
+    setImportFile(ok ? (maybe as File) : null)
+  }
+
   const doImport = async () => {
     setBusy(true)
     try {
-      if (importFile) {
+      // PG-TH-1: only a real File is importable (guards against event/element leakage)
+      if (importFile instanceof File) {
         const b64 = await new Promise<string>((resolve, reject) => {
           const fr = new FileReader()
           fr.onload = () => {
@@ -109,7 +123,7 @@ export default function AdminTemplatesSection() {
           fr.readAsDataURL(importFile)
         })
         await postJSON('/template/bundle/import', {
-          body: { data: b64, override },
+          body: { data: b64, override: override === true },
         })
         setImportFile(null)
         setOverride(false)
@@ -136,6 +150,30 @@ export default function AdminTemplatesSection() {
 
   if (loading) return <PageLoading label="Loading template management…" />
 
+  const doEdit = async () => {
+    if (!editTpl) return
+    setSavingEdit(true)
+    try {
+      // Partial update: the server schema requires non-empty license; omit blank
+      // fields so untouched values survive (mirrors the legacy edit dialog,
+      // which never sends the fields the user did not touch).
+      const body = Object.fromEntries(Object.entries(editForm).filter(([, v]) => v !== ''))
+      await postJSON(`/template/${tid(editTpl)}/edit`, { body: body })
+      notifications.show({ message: 'Template updated.', color: 'teal' })
+      setEditTpl(null)
+      setEditForm({})
+      await load()
+    } catch (err: any) {
+      notifications.show({
+        message: (err?.data?.message as string) || 'Could not update the template.',
+        color: 'red',
+      })
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+
   return (
     <Stack gap="md">
       {cfgError ? <PageError label="Couldn’t load gallery settings" detail={cfgError} onRetry={() => void load()} /> : null}
@@ -152,7 +190,7 @@ export default function AdminTemplatesSection() {
             </div>
             <Switch
               checked={sectionCfg?.enabled !== false}
-              onChange={v => void saveSection({ enabled: v })}
+              onChange={() => void saveSection({ enabled: sectionCfg?.enabled === false })}
               color="ollitex"
             />
           </Group>
@@ -169,10 +207,10 @@ export default function AdminTemplatesSection() {
                     size="xs"
                     checked={c.enabled !== false}
                     color="ollitex"
-                    onChange={v =>
+                    onChange={() =>
                       void saveSection({
                         categories: (sectionCfg?.categories || []).map(x =>
-                          x.key === c.key ? { ...x, enabled: v } : x
+                          x.key === c.key ? { ...x, enabled: x.enabled === false } : x
                         ),
                       })
                     }
@@ -189,7 +227,7 @@ export default function AdminTemplatesSection() {
           <Text fw={700}>Import a template bundle</Text>
           <FileInput
             value={importFile}
-            onChange={setImportFile}
+            onChange={onImportFile}
             accept="application/zip,.zip"
             placeholder="…/thesis-template.zip"
             leftSection={<Icon name="upload_file" size={18} />}
@@ -210,7 +248,7 @@ export default function AdminTemplatesSection() {
           <Group gap="sm">
             <Switch
               checked={override}
-              onChange={setOverride}
+              onChange={() => setOverride(override !== true)}
               label="Replace a template with the same name"
               size="xs"
               color="ollitex"
@@ -270,6 +308,24 @@ export default function AdminTemplatesSection() {
                             </ActionIcon>
                           </Anchor>
                         </Tooltip>
+                        <Tooltip label="Edit template">
+                          <ActionIcon
+                            variant="subtle"
+                            aria-label="Edit template"
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => {
+                              setEditTpl(t)
+                              setEditForm({
+                                name: tname(t),
+                                descriptionMD: (t as any).descriptionMD || (t as any).description || '',
+                                authorMD: (t as any).authorMD || (t as any).author || '',
+                                license: (t as any).license || '',
+                              })
+                            }}
+                          >
+                            <Icon name="edit" size={18} />
+                          </ActionIcon>
+                        </Tooltip>
                         <Tooltip label="Delete template">
                           <ActionIcon
                             variant="subtle"
@@ -319,6 +375,35 @@ export default function AdminTemplatesSection() {
           })()
         }}
       />
+      <Modal
+        opened={!!editTpl}
+        onClose={() => setEditTpl(null)}
+        title="Edit template?"
+        size="md"
+      >
+        <Stack gap="sm" mt="sm">
+          <TextInput
+            label="Template title"
+            value={editForm.name ?? ''}
+            onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, name: v })) }}
+          />
+          <TextInput
+            label="Author (markdown)"
+            value={editForm.authorMD ?? ''}
+            onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, authorMD: v })) }}
+          />
+          <TextInput
+            label="License (markdown)"
+            value={editForm.license ?? ''}
+            onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, license: v })) }}
+          />
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={() => setEditTpl(null)}>Cancel</Button>
+            <Button loading={savingEdit} onClick={() => void doEdit()}>Save changes</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
     </Stack>
   )
 }

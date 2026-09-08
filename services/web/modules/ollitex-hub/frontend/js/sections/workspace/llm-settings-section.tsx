@@ -349,6 +349,12 @@ export default function LlmSettingsSection() {
         onClose={() => setDraft(null)}
         size="md"
         title={<Text fw={700}>{draft?.isNew ? 'Add LLM provider' : `Edit “${draft?.name}”`}</Text>}
+        // PG-HF-1 (parity/e2e): Mantine's focus trap raced the controlled
+        // re-render — the second field fill would unmount the whole modal
+        // (observed in e2e: one fill OK, second fill → dialog gone).
+        // trapFocus=false keeps Esc/outside-click close semantics without the
+        // racing focus checks.
+        trapFocus={false}
       >
         <Stack gap="md">
           <Group gap="md" wrap="wrap">
@@ -358,7 +364,7 @@ export default function LlmSettingsSection() {
               </Text>
               <TextInput
                 value={draft?.name || ''}
-                onChange={e => setDraft(d => (d ? { ...d, name: e.currentTarget.value } : d))}
+                onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, name: v } : d)) }}
                 placeholder="e.g. Internal LLM gateway"
               />
             </div>
@@ -368,7 +374,7 @@ export default function LlmSettingsSection() {
               </Text>
               <NativeSelect
                 value={draft?.providerType || 'openaiCompatible'}
-                onChange={e => setDraft(d => (d ? { ...d, providerType: e.currentTarget.value } : d))}
+                onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, providerType: v } : d)) }}
                 data={[
                   { value: 'openaiCompatible', label: 'OpenAI-compatible' },
                   { value: 'openai', label: 'OpenAI' },
@@ -384,7 +390,7 @@ export default function LlmSettingsSection() {
             </Text>
             <TextInput
               value={draft?.baseUrl || ''}
-              onChange={e => setDraft(d => (d ? { ...d, baseUrl: e.currentTarget.value } : d))}
+              onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, baseUrl: v } : d)) }}
               placeholder="https://…/v1"
             />
           </div>
@@ -395,7 +401,7 @@ export default function LlmSettingsSection() {
             </Text>
             <TextInput type="password"
               value={draft?.apiKey || ''}
-              onChange={e => setDraft(d => (d ? { ...d, apiKey: e.currentTarget.value, keepKey: !!e.currentTarget.value || d.keepKey } : d))}
+              onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, apiKey: v, keepKey: !!v || d.keepKey } : d)) }}
               placeholder="sk-…"
             />
           </div>
@@ -407,7 +413,7 @@ export default function LlmSettingsSection() {
             </Text>
             <Textarea
               value={draft?.models || ''}
-              onChange={e => setDraft(d => (d ? { ...d, models: e.currentTarget.value } : d))}
+              onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, models: v } : d)) }}
               minRows={3}
               maxRows={8}
               placeholder={'gpt-4o-mini\nllama3.1-70b'}
@@ -420,7 +426,7 @@ export default function LlmSettingsSection() {
             </Text>
             <NativeSelect
               value={draft?.completionModel || ''}
-              onChange={e => setDraft(d => (d ? { ...d, completionModel: e.currentTarget.value } : d))}
+              onChange={e => { const v = e.currentTarget.value; setDraft(d => (d ? { ...d, completionModel: v } : d)) }}
               data={[
                 { value: '', label: 'None' },
                 ...(draft ? draft.models.split(/[\n,]/).map(s => s.trim()).filter(Boolean).map(m => ({ value: m, label: m })) : []),
@@ -432,7 +438,7 @@ export default function LlmSettingsSection() {
             <Group wrap="nowrap" gap="xs">
               <Switch
                 checked={draft?.enabled !== false}
-                onChange={v => setDraft(d => (d ? { ...d, enabled: v } : d))}
+                onChange={() => setDraft(d => (d ? { ...d, enabled: d.enabled === true } : d))}
                 label="Enabled for this instance"
                 color="ollitex"
               />

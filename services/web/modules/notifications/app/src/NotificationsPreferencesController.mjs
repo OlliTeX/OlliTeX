@@ -23,7 +23,7 @@ function _formatDelayLabel(ms) {
   return `${ms} ms`
 }
 
-const globalPreferencesSchema = z.object({
+const globalPreferencesShape = z.object({
   muteAllNotifications: z.boolean(),
   notificationDelayMinutes: z
     .number()
@@ -33,6 +33,12 @@ const globalPreferencesSchema = z.object({
     .nullable()
     .optional(),
 })
+// PG-NP-2 (parity): parseReq validates against the REQUEST object (req.body,
+// req.query, req.params are fields of req) — the original flat schema made
+// every JSON POST to /notifications/preferences 400 with
+// "expected boolean, received undefined". Wrap in { body } like the form
+// schema so req.body is validated.
+const globalPreferencesSchema = z.object({ body: globalPreferencesShape })
 
 const projectPreferencesSchema = z.looseObject({})
 

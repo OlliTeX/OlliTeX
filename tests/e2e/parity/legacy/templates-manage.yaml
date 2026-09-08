@@ -1,0 +1,80 @@
+# Functional matrix — legacy /templates/manage (parity scope page)
+# Roles: admin + template admin (canManageTemplates) = full; user = denied.
+# Template fixture: e2e import of a bundle (template.json+source.zip+output.pdf)
+# creates "Parity Fixture Template"; tests use throwaway imports + cleanup.
+page: /templates/manage
+id: templates-manage
+roles:
+  admin: full
+  tpladmin: full
+  user: denied
+
+files:
+  legacy: specs/parity/legacy-templates-manage.test.e2e.ts
+  hub: specs/parity/hub-templates-manage.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: manage page renders the template list for admin and template admin
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: plain user cannot open /templates/manage (403)
+    legacy_test: denied
+    hub_test: deny
+
+    kind: table
+    desc: admin template list (name/version/owner)
+    behavior: { endpoint: GET /api/templates/admin-list }
+    legacy_test: list
+    hub_test: renders
+
+  - id: import
+    kind: button
+    where: import bundle (file)
+    modal: ["Import template bundle (L1)"]
+    desc: import a bundle zip; 409 on name conflict with override
+    behavior:
+      endpoint: POST /template/bundle/import
+      payload: { data: base64(zip[template.json,source.zip,output.pdf]), override }
+    legacy_test: import
+    hub_test: import
+
+  - id: import-url
+    kind: button
+    where: import from URL
+    description: URL import with SSRF guard (internal URLs rejected)
+    behavior:
+      endpoint: POST /template/bundle/import-url
+      payload: { url, override }
+    legacy_test: import
+    hub_test: import
+
+  - id: edit
+    kind: button
+    where: template row "Edit"
+    modal: ["Edit template (L1)"]
+    behavior: { endpoint: POST /template/:id/edit, payload: { name?, description? } }
+    legacy_test: edit
+    hub_test: edit
+
+  - id: delete
+    kind: button
+    where: template row "Delete"
+    modal: ["Confirm (L1)"]
+    behavior: { endpoint: DELETE /template/:id/delete }
+    legacy_test: delete
+    hub_test: delete
+
+  - id: categories
+    kind: form
+    where: gallery section (enable + categories)
+    desc: enable template gallery + manage enabled categories
+    behavior:
+      - { endpoint: PUT /admin/site-settings/templates, payload: { enabled, categories } }
+      - { endpoint: GET /api/template/categories }
+    legacy_test: categories
+    hub_test: categories

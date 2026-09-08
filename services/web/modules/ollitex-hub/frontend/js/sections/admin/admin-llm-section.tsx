@@ -282,15 +282,15 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
             <Text size="sm" fw={600}>Master switch</Text>
             <Switch
               checked={!state.llmDisabledByAdmin}
-              onChange={v => setState(s => (s ? { ...s, llmDisabledByAdmin: !v } : s))}
+              onChange={() => setState(s => (s ? { ...s, llmDisabledByAdmin: state.llmDisabledByAdmin === true } : s))}
               color="ollitex"
               label={state.llmDisabledByAdmin ? 'AI disabled' : 'AI enabled'}
             />
           </Group>
           <Group gap="lg" wrap="wrap">
-            <Switch checked={state.chatEnabled} onChange={v => setState(s => (s ? { ...s, chatEnabled: v } : s))} label="Chat (Ask AI)" color="ollitex" />
-            <Switch checked={state.completionEnabled} onChange={v => setState(s => (s ? { ...s, completionEnabled: v } : s))} label="Inline completion" color="ollitex" />
-            <Switch checked={state.reviewEnabled} onChange={v => setState(s => (s ? { ...s, reviewEnabled: v } : s))} label="Review panel" color="ollitex" />
+            <Switch checked={state.chatEnabled} onChange={() => setState(s => (s ? { ...s, chatEnabled: state.chatEnabled === true } : s))} label="Chat (Ask AI)" color="ollitex" />
+            <Switch checked={state.completionEnabled} onChange={() => setState(s => (s ? { ...s, completionEnabled: state.completionEnabled === true } : s))} label="Inline completion" color="ollitex" />
+            <Switch checked={state.reviewEnabled} onChange={() => setState(s => (s ? { ...s, reviewEnabled: state.reviewEnabled === true } : s))} label="Review panel" color="ollitex" />
           </Group>
           <Group justify="space-between" wrap="nowrap" gap="sm">
             <Text size="sm" fw={600}>
@@ -299,7 +299,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
             </Text>
             <Switch
               checked={!state.languageToolDisabledByAdmin}
-              onChange={v => setState(s => (s ? { ...s, languageToolDisabledByAdmin: !v } : s))}
+              onChange={() => setState(s => (s ? { ...s, languageToolDisabledByAdmin: state.languageToolDisabledByAdmin === true } : s))}
               color="ollitex"
             />
           </Group>

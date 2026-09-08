@@ -149,22 +149,22 @@ function MiscNative({ initial, onChange }: { initial: Sec; onChange: (patch: Sec
           <TextInput value={appName} onChange={e => setAppName(e.currentTarget.value)} />
         </div>
         <Group gap="lg">
-          <Switch checked={hidePoweredBy} onChange={setHidePoweredBy} label="Hide attribution" color="ollitex" />
-          <Switch checked={noindex} onChange={setNoindex} label="Block indexing (noindex)" color="ollitex" />
+          <Switch checked={hidePoweredBy} onChange={() => setHidePoweredBy(!hidePoweredBy)} label="Hide attribution" color="ollitex" />
+          <Switch checked={noindex} onChange={() => setNoindex(!noindex)} label="Block indexing (noindex)" color="ollitex" />
         </Group>
       </Group>
 
       <Text fw={700}>Access</Text>
       <Group gap="lg" wrap="wrap">
-        <Switch checked={allowPublic} onChange={setAllowPublic} label="Allow public projects" color="ollitex" />
-        <Switch checked={anonRW} onChange={setAnonRW} label="Anonymous read/write links" color="ollitex" />
-        <Switch checked={disableLink} onChange={setDisableLink} label="Disable link sharing" color="ollitex" />
+        <Switch checked={allowPublic} onChange={() => setAllowPublic(!allowPublic)} label="Allow public projects" color="ollitex" />
+        <Switch checked={anonRW} onChange={() => setAnonRW(!anonRW)} label="Anonymous read/write links" color="ollitex" />
+        <Switch checked={disableLink} onChange={() => setDisableLink(!disableLink)} label="Disable link sharing" color="ollitex" />
       </Group>
 
       <Text fw={700}>Features</Text>
       <Group gap="lg" wrap="wrap">
-        <Switch checked={pythonRunner} onChange={setPythonRunner} label="Python split editor (browser)" color="ollitex" />
-        <Switch checked={historyRestore} onChange={setHistoryRestore} label="Restore history on open" color="ollitex" />
+        <Switch checked={pythonRunner} onChange={() => setPythonRunner(!pythonRunner)} label="Python split editor (browser)" color="ollitex" />
+        <Switch checked={historyRestore} onChange={() => setHistoryRestore(!historyRestore)} label="Restore history on open" color="ollitex" />
       </Group>
 
       <Text fw={700}>Limits & defaults</Text>
@@ -225,7 +225,7 @@ function SignupNative({ initial, onChange }: { initial: Sec; onChange: (patch: S
             Allow new accounts to be created on this instance.
           </Text>
         </div>
-        <Switch checked={enabled} onChange={setEnabled} color="ollitex" />
+        <Switch checked={enabled} onChange={() => setEnabled(!enabled)} color="ollitex" />
       </Group>
       <div>
         <Text size="sm" fw={600} mb={6}>
@@ -258,7 +258,7 @@ function ZoteroNative({ initial, onChange }: { initial: Sec; onChange: (patch: S
             Lets users import references from their Zotero library.
           </Text>
         </div>
-        <Switch checked={enabled} onChange={setEnabled} color="ollitex" />
+        <Switch checked={enabled} onChange={() => setEnabled(!enabled)} color="ollitex" />
       </Group>
       <Group gap="md" wrap="wrap">
         <div style={{ flex: 1, minWidth: 220 }}>
@@ -299,7 +299,7 @@ function ExternalUrlsNative({ initial, onChange }: { initial: Sec; onChange: (pa
             Allow importing content from arbitrary URLs into projects (SSRF-guarded).
           </Text>
         </div>
-        <Switch checked={enabled} onChange={setEnabled} color="ollitex" />
+        <Switch checked={enabled} onChange={() => setEnabled(!enabled)} color="ollitex" />
       </Group>
       <div>
         <Text size="sm" fw={600} mb={6}>

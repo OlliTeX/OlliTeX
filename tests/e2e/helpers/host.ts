@@ -26,7 +26,7 @@ function mongoEvalScript(script: string): string {
   if (!mongo) {
     throw new Error('mongo container not found (expected name matching *-e2e-mongo-1)')
   }
-  return dockerExec(mongo, ['mongosh', '--quiet', '--eval', script])
+  return dockerExec(mongo, ['mongosh', '--quiet', 'sharelatex', '--eval', script])
 }
 
 /**

@@ -93,6 +93,7 @@ export default function AdminProjectsSection({
   const [confirmDeleteBulk, setConfirmDeleteBulk] = useState(false)
   const [confirmDeleteOne, setConfirmDeleteOne] = useState<AdminProject | null>(null)
   const [transferOpen, setTransferOpen] = useState(false)
+  const [transferTarget, setTransferTarget] = useState<any | null>(null) // row-level transfer target (parity fix)
   const [shareTarget, setShareTarget] = useState<any | null>(null)
   const [shareEmail, setShareEmail] = useState('')
   const [sharePriv, setSharePriv] = useState('editor')
@@ -267,9 +268,11 @@ export default function AdminProjectsSection({
 
   const doBulkTransfer = async () => {
     if (!tNewOwner) return
+    const scope = transferTarget ? [transferTarget] : [...selectedProjects]
+    if (scope.length === 0) { setTransferOpen(false); return }
     setTransferring(true)
     let fail = 0
-    for (const p of [...selectedProjects]) {
+    for (const p of scope) {
       try {
         await postJSON(`/project/${pid(p)}/transfer-ownership`, {
           body: { user_id: tNewOwner, skipEmails: tSkipEmails },
@@ -283,6 +286,7 @@ export default function AdminProjectsSection({
     setTransferOpen(false)
     setTNewOwner('')
     if (fail === 0) notifications.show({ message: 'Ownership transferred.', color: 'teal' })
+    setTransferTarget(null)
     sel.clear()
     await load()
   }
@@ -297,7 +301,7 @@ export default function AdminProjectsSection({
     }
     const a: BulkAction[] = [
       { key: 'download', label: 'Download', icon: 'download', onClick: () => downloadZip(selectedProjects.map(pid)) },
-      { key: 'transfer', label: 'Change owner', icon: 'swap_horiz', onClick: () => setTransferOpen(true) },
+      { key: 'transfer', label: 'Change owner', icon: 'swap_horiz', onClick: () => { setTransferTarget(null); setTNewOwner(''); setTSkipEmails(false); setTransferOpen(true) } },
     ]
     if (view !== 'trashed') {
       a.push({ key: 'trash', label: 'Trash', icon: 'delete', loading: L === 'trash', onClick: () => void runBulkProject('trash', p => postJSON(`/admin/project/${pid(p)}/trash`, { body: { userId: powner(p) } }), 'Projects moved to trash.') })
@@ -311,7 +315,6 @@ export default function AdminProjectsSection({
 
   const allSelectedIds = filtered.map(pid)
   const someSelected = sel.count > 0 && sel.count < allSelectedIds.length
-  const isAllDeleted = view === 'deleted'
 
   if (!projects && !error) return <PageLoading label="Loading projects…" />
 
@@ -420,6 +423,7 @@ export default function AdminProjectsSection({
                         onClick={() => {
                           setTNewOwner('')
                           setTSkipEmails(false)
+                          setTransferTarget(p)
                           setTransferOpen(true)
                         }}
                       >
@@ -523,7 +527,7 @@ export default function AdminProjectsSection({
             data={newOwnerOptions}
             placeholder="Choose new owner…"
           />
-          <Checkbox label="Skip notification emails" checked={tSkipEmails} onChange={e => setTSkipEmails(e.currentTarget.checked)} color="ollitex" />
+          <Checkbox label="Skip notification emails" checked={tSkipEmails} onChange={checked => setTSkipEmails(checked === true)} color="ollitex" />
           <Group justify="flex-end" gap="xs">
             <Button variant="default" onClick={() => setTransferOpen(false)} disabled={transferring}>Cancel</Button>
             <Button color="ollitex" loading={transferring} disabled={!tNewOwner} onClick={() => void doBulkTransfer()}>

@@ -29,6 +29,22 @@ export const USER = {
   isAdmin: false,
 } as const
 
+/**
+ * TEMPLATE ADMIN (owner role, 2026-09-07): canManageTemplates=true, NOT a site
+ * admin. Grants /templates/manage without the rest of /admin. Created by the
+ * phase-0 fixture step (register+activate) then promoted via mongo — mirrors
+ * promoteAdmin's mongo path (tests/e2e/helpers/host.ts#promoteAdmin).
+ */
+export const TPLADMIN = {
+  email: 'e2e-tpladmin@e2e.test',
+  // same policy as the others: test-only dummy, must not contain e2e/admin/test
+  password: 'Ol-Fixture-7tW4',
+  first_name: 'E2e',
+  last_name: 'Tpladmin',
+  isAdmin: false,
+  canManageTemplates: true,
+} as const
+
 /** Seeded project (created by the seed step via the app API, so it goes
  *  through the real project-creation code path). */
 export const SEED_PROJECT = {

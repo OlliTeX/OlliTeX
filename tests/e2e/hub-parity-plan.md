@@ -106,19 +106,32 @@ Assert for **both** legacy and /hub:
 
 | Page (13) | Matrix | Legacy baseline | Hub parity | Gate |
 |---|---|---|---|---|
-| `/admin/user` | ✅ 11 features | ✅ 10/10 | ✅ 8/8 | ✅ GREEN (both sides) |
-| `/admin/project` | ▶ next | ⚪ | ⚪ | ⚪ |
-| `/admin/site` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/admin/panel` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/admin/llm/settings` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/admin/instance-stats` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/project` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/library` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/templates` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/templates/manage` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/user/mysettings` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/user/llm-settings` | ⚪ | ⚪ | ⚪ | ⚪ |
-| `/user/notification-preferences` | ⚪ | ⚪ | ⚪ | ⚪ |
+| `/admin/user` | ✅ 11 features | ✅ 9/9 | ✅ 8/8 | ✅ GREEN (both sides) |
+| `/admin/project` | ✅ 9 features | ✅ 9/9 | ✅ 8/8 | ✅ GREEN (both sides) |
+| `/admin/site` | ⚪ next | ⚪ | ⚪ | ⚪ |
+| `/admin/panel` | ⚪ next | ⚪ | ⚪ | ⚪ |
+| `/admin/llm/settings` | ⚪ next | ⚪ | ⚪ | ⚪ |
+| `/admin/instance-stats` | ⚪ next | ⚪ | ⚪ | ⚪ |
+| `/project` | ✅ 8 features | ✅ 8/8 | ✅ 8/8 | ✅ GREEN (both sides) |
+| `/library` | ✅ 7 features | ✅ 8/8 | ✅ 6/6 | ✅ GREEN (both sides) |
+| `/templates` | ✅ 6 features | ✅ 6/6 | ✅ 6/6 | ✅ GREEN (both sides) |
+| `/templates/manage` | ✅ 8 features | ✅ 8/8 | ✅ 7/7 | ✅ GREEN (both sides) |
+| `/user/mysettings` | ✅ 9 features | ✅ 9/9 | ✅ 9/9 | ✅ GREEN (both sides) |
+| `/user/llm-settings` | ✅ 8 features | ✅ 8/8 | ✅ 8/8 | ✅ GREEN (both sides) |
+| `/user/notification-preferences` | ✅ 6 features | ✅ 6/6 | ✅ 6/6 | ✅ GREEN (both sides) |
+
+**Wave total (2026-09-08 13:2x UTC): 9/9 page-pairs GREEN — 140/140 parity tests
+passing; `parity/check.mjs` = GATE GREEN (70/70 features covered BOTH sides).
+Remaining pages (4): /admin/site, /admin/panel (3 CE panes), /admin/llm/settings,
+/admin/instance-stats — matrices will extend the gate once written.
+
+Wave fixes folded into hub source (all e2e-evidenced):
+- PG-HB-1 LLM modal crash: capture `e.currentTarget.value` BEFORE lazy `setState` updaters (6 sites, llm-settings-section).
+- PG-TH-1/2 template-import FileInput: normalize to real `File|null` (no circular-JSON Event); PG-TH-3 Modal `opened=`; PG-TH-6 edit POST `{ body: editForm }`; PG-TE-2 partial-update body (license is schema-required → omit blank fields).
+- PG-LR-1 Mantine 9 Checkbox delivers `(checked, event)`: 4 sites normalized (library select-all ×2, admin-projects skip-emails, admin-users bulk-email).
+- PG-SW Switch normalization (computed-inversion) across llm/admin-* sections; PG-ND-1 NumberInput → plain input.
+- Harness: added PUT/PATCH branches to `api()` (was silently POSTing).
+- Gate matcher: test-title substring match (tokens may be multi-word); titles are the contract names.
 
 ## Proven pattern (per page)
 1. `parity/legacy/<page>.yaml` — feature list w/ legacy endpoints + `legacy_test`/`hub_test` tokens.

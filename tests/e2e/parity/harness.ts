@@ -1,4 +1,45 @@
 import { execFileSync } from 'node:child_process'
+import type { Page } from '@playwright/test'
+import { login as _login } from '../helpers/auth'
+import { mongoEval as _mongoEvalRaw } from '../helpers/host'
+
+export const login = _login
+
+const BASE = process.env.OL_BASE || 'http://127.0.0.1:7420'
+
+/** mongoEval with smart scalar coercion (ObjectId()/numbers/null → typed). */
+export function mongoEval(expr: string): any {
+  const raw = String(_mongoEvalRaw(expr)).trim()
+  const m = raw.match(/ObjectId\(["']([^"']+)["']\)/)
+  if (m) return m[1]
+  if (raw === 'null' || raw === 'undefined' || raw === '') return null
+  const num = Number(raw)
+  if (!Number.isNaN(num)) return num
+  try { return JSON.parse(raw) } catch { return raw }
+}
+
+/** CSRF-safe request helper bound to the page's session. */
+export async function api(p: Page, method: string, path: string, body?: unknown) {
+  const headers: Record<string, string> = {}
+  if (method !== 'GET') {
+    const tok = await p.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)
+    if (tok) headers['X-CSRF-TOKEN'] = tok
+    if (body !== undefined) headers['Content-Type'] = 'application/json'
+  }
+  const opts = { headers, data: body === undefined ? undefined : JSON.stringify(body) } as any
+  if (method === 'GET') return p.request.get(BASE + path, opts)
+  if (method === 'DELETE') return p.request.delete(BASE + path, opts)
+  if (method === 'PUT') return p.request.put(BASE + path, opts)
+  if (method === 'PATCH') return p.request.patch(BASE + path, opts)
+  return p.request.post(BASE + path, opts)
+}
+
+/** Assert a call was captured (throws with the captured list on failure). */
+export function expectCalled(cap: { calls: any[] }, fn: (c: any[]) => boolean, label: string) {
+  if (!fn(cap.calls)) {
+    throw new Error(`expected ${label}; saw: ` + cap.calls.map((c: any) => `${c.method} ${c.path} -> ${c.status}`).join(' | '))
+  }
+}
 
 /**
  * Parity harness — shared by the LEGACY baseline specs and the HUB parity specs.
@@ -61,4 +102,22 @@ export async function waitForCall(cap: { calls: ApiCall[] }, fn: (c: ApiCall[]) 
     }
     await new Promise(r => setTimeout(r, 120))
   }
+}
+
+/** Create a throwaway project via the standard CE endpoint (POST /project/create). */
+export async function mkProject(p: any, name: string) {
+  const r = await api(p, 'POST', '/project/new', { projectName: name })
+  const j = await r.json().catch(() => ({}))
+  const id = j.project_id ?? j.project?._id ?? j._id
+  if (!id) throw new Error('mkProject failed: ' + r.status() + ' ' + JSON.stringify(j).slice(0, 160))
+  return { _id: id } as { _id: string }
+}
+
+/** Soft-delete + hard-purge a throwaway project (admin rights required). */
+export async function killProject(p: any, pid: string) {
+  try {
+    await api(p, 'POST', `/admin/project/${pid}/trash`, { userId: 'null' })
+    await api(p, 'DELETE', `/admin/project/${pid}`)
+    await api(p, 'DELETE', `/admin/project/${pid}/purge`)
+  } catch { /* best effort cleanup */ }
 }

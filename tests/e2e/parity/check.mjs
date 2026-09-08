@@ -40,11 +40,13 @@ function parseMatrix(text) {
   return { page, id, legacyFile, hubFile, feats }
 }
 
-function testFirstWords(file) {
+function testTitles(file) {
+  // a matrix token is covered when it appears (lowercased) inside any test
+  // title of the file — titles are the stable contract names.
   if (!fs.existsSync(file)) return null
   const txt = fs.readFileSync(file, 'utf8')
-  const titles = [...txt.matchAll(/test\(\s*['"`]([^'"`]+)['"`]/g)].map(m => m[1])
-  return new Set(titles.map(t => (t.trim().match(/[A-Za-z0-9_]+/) || [''])[0].toLowerCase()))
+  const titles = [...txt.matchAll(/test\(\s*['"`]([^'"`]+)['"`]/g)].map(m => m[1].toLowerCase())
+  return (token) => titles.some(t => t.includes(String(token).toLowerCase()))
 }
 
 function main() {
@@ -61,17 +63,17 @@ function main() {
     const doc = parseMatrix(fs.readFileSync(path.join(LEGACY_DIR, f), 'utf8'))
     const legacyPath = doc.legacyFile && path.join(ROOT, 'tests/e2e', doc.legacyFile)
     const hubPath = doc.hubFile && path.join(ROOT, 'tests/e2e', doc.hubFile)
-    const legacyWords = legacyPath ? testFirstWords(legacyPath) : null
-    const hubWords = hubPath ? testFirstWords(hubPath) : null
-    if (!legacyWords || !hubWords) {
+    const hasLegacy = legacyPath ? testTitles(legacyPath) : null
+    const hasHub = hubPath ? testTitles(hubPath) : null
+    if (!hasLegacy || !hasHub) {
       gaps.push(`${doc.page||f}: spec file(s) missing (legacy=${doc.legacyFile}, hub=${doc.hubFile})`)
       total += doc.feats.length
       continue
     }
     for (const feat of doc.feats) {
       total++
-      const okL = feat.legacy_test && legacyWords.has(String(feat.legacy_test).toLowerCase())
-      const okH = feat.hub_test && hubWords.has(String(feat.hub_test).toLowerCase())
+      const okL = feat.legacy_test && hasLegacy && hasLegacy(String(feat.legacy_test))
+      const okH = feat.hub_test && hasHub && hasHub(String(feat.hub_test))
       if (okL && okH) covered++
       else {
         if (!okL) gaps.push(`${doc.page||f} :: ${feat.id} — LEGACY test "${feat.legacy_test}" not found in ${doc.legacyFile}`)

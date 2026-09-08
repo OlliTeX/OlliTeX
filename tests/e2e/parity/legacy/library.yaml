@@ -1,0 +1,83 @@
+# Functional matrix — legacy /library (personal reference library)
+# Roles: any logged-in user (personal library); guest = login wall.
+# Contract (server-verified):
+#   GET  /library                          (page)
+#   GET  /library/references               (list; entries {id,key,title,...})
+#   POST /library/references               (create entry; {key,title,author,year,...})
+#   GET  /library/references/count
+#   GET  /library/trashed                  (trash view)
+#   POST /library/references/delete        (move to trash / purge)
+#   POST /library/references/restore       (restore from trash)
+#   GET  /library/references/download      (bulk .bib export)
+#   GET  /library/references/citation-key-suggestions?base=
+# Hub leaf: /hub#/library (library-section, shares bib-editor library-api).
+page: /library
+id: library
+roles:
+  admin: full
+  tpladmin: full
+  user: full
+  guest: login-wall
+
+files:
+  legacy: specs/parity/legacy-library.test.e2e.ts
+  hub: specs/parity/hub-library.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: library page renders with the entry list + add control
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: guest gets the login wall
+    legacy_test: deny
+    hub_test: deny
+
+  - id: list
+    kind: table
+    desc: entries list (key/title) + count
+    behavior:
+      - { endpoint: GET /library/references }
+      - { endpoint: GET /library/references/count }
+    legacy_test: list
+    hub_test: list
+
+  - id: create
+    kind: button
+    where: "Add entry" / new-entry form
+    modal: ["Entry form (L1)"]
+    desc: creating an entry persists and appears in the list
+    behavior: { endpoint: POST /library/references }
+    legacy_test: create
+    hub_test: create
+
+  - id: trash-restore
+    kind: button
+    where: entry row actions
+    modal: ["Confirm (L1)"]
+    desc: delete moves to trash; restore brings it back
+    behavior:
+      - { endpoint: POST /library/references/delete }
+      - { endpoint: GET /library/trashed }
+      - { endpoint: POST /library/references/restore }
+    legacy_test: trash-restore
+    hub_test: trash-restore
+
+  - id: download
+    kind: button
+    where: "Download .bib" (row or bulk)
+    desc: bulk download returns a .bib body containing the entry key
+    behavior: { endpoint: GET /library/references/download }
+    legacy_test: download
+    hub_test: download
+
+  - id: citekey-suggestions
+    kind: input
+    where: citation-key field helper
+    desc: key suggestions for a base string (or graceful empty)
+    behavior: { endpoint: GET /library/references/citation-key-suggestions }
+    legacy_test: citekey
+    hub_test: citekey

@@ -107,7 +107,7 @@ export default function TemplatesSection({
     )
   }, [templates, query])
 
-  const useTemplate = async () => {
+  const startFromTemplate = async () => {
     if (!using) return
     setCreating(true)
     setCreateErr(null)
@@ -146,6 +146,19 @@ export default function TemplatesSection({
           style={{ maxWidth: 460, width: '100%' }}
         />
         <div style={{ width: 180 }}>
+          {/* PG-TG-1 (parity): the legacy gallery filters by category (DS-nav
+              categories / ?category=). The section had activeCategory state
+              but no control at all — add the category selector beside sort. */}
+          <NativeSelect
+            value={activeCategory}
+            onChange={e => setActiveCategory(e.currentTarget.value)}
+            data={[
+              { value: 'none', label: 'All templates' },
+              ...categories.map(c => ({ value: c.key, label: c.name || c.key })),
+            ]}
+            size="sm"
+            aria-label="Template category"
+          />
           <NativeSelect
             value={sort === 'name' && sortOrder === 'asc' ? 'name' : sort}
             onChange={e => {
@@ -163,6 +176,7 @@ export default function TemplatesSection({
               { value: 'lastUpdated', label: 'Sort: recently updated' },
             ]}
             size="sm"
+            aria-label="Template sort"
           />
         </div>
       </Group>
@@ -263,7 +277,7 @@ export default function TemplatesSection({
               color="ollitex"
               loading={creating}
               onClick={() => {
-                void useTemplate()
+                void startFromTemplate()
               }}
             >
               Create project

@@ -4,10 +4,11 @@ import {
   Button,
   Card,
   Group,
-  NumberInput,
+
   Stack,
   Switch,
   Text,
+  TextInput,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
@@ -66,9 +67,16 @@ export default function NotificationsSettingsSection() {
           </div>
           <Switch
             checked={enabled}
-            onChange={v => {
-              setEnabled(v)
-              void save(v, delay)
+            onChange={() => {
+              // PG-NM-1 (parity): toggle from the current UI state. Mantine
+              // hands us a value the controlled re-render had already fought
+              // (observed: click never turned the switch off and the POST was
+              // always muteAllNotifications:false). Deriving the target from
+              // `enabled` makes the control deterministic regardless of the
+              // onChange payload shape.
+              const next = !(enabled === true)
+              setEnabled(next)
+              void save(next, delay)
             }}
             color="ollitex"
             loading={busy}
@@ -84,12 +92,15 @@ export default function NotificationsSettingsSection() {
             default (2 minutes). Max 10080 (one week).
           </Text>
           <div style={{ maxWidth: 220 }}>
-            <NumberInput
-              value={delay === '' ? null : Number(delay)}
-              onChange={v => setDelay(v == null ? '' : String(v))}
-              min={1}
-              max={10080}
-              placeholder="Server default"
+            {/* PG-ND-1 (parity): Mantine NumberInput's typeahead left the React
+                state stuck at '' — typed values never reached save(), so the
+                delay silently did not persist (legacy form works). A plain
+                sanitizing TextInput has no typeahead state and behaves like
+                the legacy number input. */}
+            <TextInput
+              value={delay}
+              onChange={e => setDelay(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 5))}
+              placeholder="Server default (minutes)"
               rightSection="min"
             />
           </div>

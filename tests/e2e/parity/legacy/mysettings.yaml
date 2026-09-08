@@ -1,0 +1,82 @@
+# Functional matrix — legacy /user/mysettings (parity scope page)
+# Schema: parity/check.mjs (legacy_test / hub_test = first word of test title).
+page: /user/mysettings
+id: user-mysettings
+roles:
+  admin: full
+  tpladmin: full
+  user: full
+
+files:
+  legacy: specs/parity/legacy-mysettings.test.e2e.ts
+  hub: specs/parity/hub-mysettings.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: settings page renders for any logged-in user (role-gated to self)
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: anonymous is redirect to login (no settings for guests)
+    legacy_test: denied
+    hub_test: deny
+
+  - id: account
+    kind: form
+    desc: update account info (first/last name) persists
+    behavior: { endpoint: PUT /user/settings, payload: { first_name, last_name } }
+    legacy_test: account
+    hub_test: account
+
+  - id: password
+    kind: form
+    modal: ["Change password (L1)"]
+    desc: change password (current + new) — login works with the new one
+    behavior: { endpoint: POST /user/password/update, payload: { currentPassword, newPassword } }
+    legacy_test: password
+    hub_test: password
+
+  - id: sync
+    kind: form
+    desc: project synchronisation = WebDAV (server URL/username/password/root folder) connect + status + disconnect
+    behavior:
+      - { endpoint: POST /user/webdav/connect }
+      - { endpoint: GET /user/webdav/status }
+      - { endpoint: POST /user/webdav/disconnect }
+    legacy_test: sync
+    hub_test: sync
+
+  - id: keybindings
+    kind: form
+    desc: editor keybindings saved and reloaded from user settings
+    legacy_test: keybindings
+    hub_test: keybindings
+
+  - id: sessions
+    kind: list
+    modal: ["Clear all sessions (L1)"]
+    desc: list active sessions; clear all / revoke keeps behaviour of legacy page
+    behavior:
+      - { endpoint: GET /user/sessions }
+      - { endpoint: POST /user/sessions/clear }
+    legacy_test: sessions
+    hub_test: sessions
+
+# EXCLUDED (owner 2026-09-07): newsletter / email-preference endpoints
+# (/user/newsletter/*) are SaaS-only surface — the CE legacy settings page
+# renders NO newsletter UI, so there is no legacy function to be equivalent to.
+
+  - id: appearance
+    kind: toggle
+    desc: theme (light/dark/system) persists on the user doc
+    legacy_test: appearance
+    hub_test: appearance
+
+  - id: references
+    kind: list
+    desc: reference-manager integrations (zotero/mendeley/webdav visibility by site flag)
+    legacy_test: references
+    hub_test: references

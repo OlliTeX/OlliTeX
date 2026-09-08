@@ -179,7 +179,7 @@ function ImportPreviewTable({
           <Table.Th style={{ width: 40 }}>
             <Checkbox
               checked={importable.length > 0 && importable.every(r => checked.includes(r.rowId))}
-              onChange={e => onToggleAll(!!e.currentTarget.checked)}
+              onChange={checked => onToggleAll(checked === true)}
               aria-label="Select all importable"
             />
           </Table.Th>
@@ -941,7 +941,7 @@ function LibraryTable({
       <Table.Thead>
         <Table.Tr>
           <Table.Th style={{ width: 40 }}>
-            <Checkbox checked={allSelected} onChange={e => onToggleAll(!!e.currentTarget.checked)} aria-label="Select all" />
+            <Checkbox checked={allSelected} onChange={checked => onToggleAll(checked === true)} aria-label="Select all" />
           </Table.Th>
           <Table.Th style={{ width: 160 }}>Key</Table.Th>
           <Table.Th style={{ width: 120 }}>Type</Table.Th>

@@ -1,0 +1,81 @@
+# Functional matrix — legacy /user/llm-settings (owner: "llm-settings (BYO provider)")
+# Scope = BYO provider management (owner framing). EXCLUDED (documented):
+#   * user grammar/compliance/selected-model fine-tuning — served in the hub
+#     by the editor settings world (grammar proven in R8/owner round-8);
+#     the provider's own completionModel lives in the provider form on both sides.
+# Roles: all logged-in roles (personal settings); guest denied.
+# Contract (server-verified):
+#   GET  /user/llm-providers                     → { providers: [...] }
+#   POST /user/llm-providers                     → 201 { ok, provider } (apiKey masked, hasKey)
+#   POST /user/llm-providers/:id                 → update (incl. { enabled })
+#   POST /user/llm-providers/check               → graceful success/fail (never 5xx)
+#   POST /user/llm-providers/scan                → model discovery (graceful)
+#   POST /user/llm-providers/:id/delete          → removed from list
+#   SSRF: loopback base URL refused at save (blocked-url).
+page: /user/llm-settings
+id: llm-settings
+roles:
+  admin: full
+  tpladmin: full
+  user: full
+
+files:
+  legacy: specs/parity/legacy-llm-settings.test.e2e.ts
+  hub: specs/parity/hub-llm-settings.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: page lists providers + "Add provider"
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: guest cannot open the page
+    legacy_test: deny
+    hub_test: deny
+
+  - id: providers-save
+    kind: button
+    where: "Add provider" form
+    modal: ["Provider form (L1)"]
+    desc: save a new provider (201, apiKey masked, persists in list)
+    behavior:
+      - { endpoint: POST /user/llm-providers, payload: { name, providerType, baseUrl, apiKey, models, completionModel } }
+      - { endpoint: GET /user/llm-providers }
+    legacy_test: save
+    hub_test: save
+
+  - id: providers-check
+    kind: button
+    where: provider row / form "Check connection"
+    desc: connection check vs unreachable endpoint fails GRACEFULLY (no 5xx)
+    behavior: { endpoint: POST /user/llm-providers/check }
+    legacy_test: check
+    hub_test: check
+
+  - id: providers-scan
+    kind: button
+    where: provider form "Scan models"
+    desc: model discovery is graceful (unreachable → no 5xx, clear error)
+    behavior: { endpoint: POST /user/llm-providers/scan }
+    legacy_test: scan
+    hub_test: scan
+
+  - id: providers-toggle
+    kind: switch
+    where: provider row enable switch
+    desc: enabling/disabling persists
+    behavior: { endpoint: POST /user/llm-providers/:id, payload: { enabled } }
+    legacy_test: toggle
+    hub_test: toggle
+
+  - id: providers-delete
+    kind: button
+    where: provider row "Delete"
+    modal: ["Confirm (L1)"]
+    desc: delete removes the provider from the list
+    behavior: { endpoint: POST /user/llm-providers/:id/delete }
+    legacy_test: delete
+    hub_test: delete

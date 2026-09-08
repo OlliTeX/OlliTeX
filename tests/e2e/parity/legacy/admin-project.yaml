@@ -1,0 +1,95 @@
+# Functional matrix — legacy /admin/project (parity scope page)
+# Schema: parity/check.mjs (legacy_test / hub_test = first word of test title).
+page: /admin/project
+id: admin-project
+roles:
+  admin: full
+  tpladmin: denied
+  user: denied
+
+files:
+  legacy: specs/parity/legacy-admin-project.test.e2e.ts
+  hub: specs/parity/hub-admin-projects.test.e2e.ts
+
+fixtures:
+  - throwaway project created via POST /project/create and trashed/deleted per test
+
+features:
+  - id: renders
+    kind: page
+    desc: admin project list renders for site admin
+    behavior: { endpoint: POST /admin/user/null/projects, visible: project table }
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: template-admin and plain user are denied
+    legacy_test: denied
+    hub_test: deny
+
+  - id: list
+    kind: table
+    desc: filtered list (all / owned / trashed / deleted)
+    behavior: { endpoint: POST /admin/user/:idOrNull/projects }
+    legacy_test: list
+    hub_test: renders
+
+  - id: download
+    kind: button
+    where: row/bulk "Download"
+    behavior: { endpoint: GET /project/download/zip?project_ids=... }
+    legacy_test: download
+    hub_test: download
+
+  - id: trash
+    kind: button
+    where: row menu "Trash project"
+    behavior: { endpoint: POST /admin/project/:id/trash, payload: { userId } }
+    legacy_test: trash
+    hub_test: trash
+
+  - id: untrash
+    kind: button
+    where: trashed view "Restore"
+    behavior: { endpoint: POST /admin/project/:id/untrash, payload: { userId } }
+    legacy_test: trash   # covered inside the trash+untrash test
+    hub_test: trash
+
+  - id: delete
+    kind: button
+    where: trashed view "Delete" (soft) / deleted view present
+    behavior: { endpoint: DELETE /admin/project/:id }
+    legacy_test: delete
+    hub_test: delete
+
+  - id: undelete
+    kind: button
+    where: deleted view "Restore"
+    behavior: { endpoint: POST /admin/project/:id/undelete, payload: { userId } }
+    legacy_test: delete   # covered inside the delete+undelete test
+    hub_test: delete
+
+  - id: purge
+    kind: button
+    where: deleted view "Purge"
+    modal: ["Confirm purge (L1)"]
+    behavior: { endpoint: DELETE /admin/project/:id/purge }
+    legacy_test: purge
+    hub_test: purge
+
+  - id: transfer
+    kind: button
+    where: row/bulk "Change owner"
+    modal: ["Change owner (L1)"]
+    behavior: { endpoint: POST /project/:id/transfer-ownership, payload: { user_id, skipEmails } }
+    legacy_test: transfer
+    hub_test: transfer
+
+  - id: invite
+    kind: button
+    where: row menu "Share / invite"
+    modal: ["Share project (L1)"]
+    behavior: { endpoint: POST /admin/project/:id/invite, payload: { email, privileges } }
+    legacy_test: invite
+    hub_test: invite

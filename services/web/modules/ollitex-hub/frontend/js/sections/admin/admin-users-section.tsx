@@ -122,8 +122,8 @@ function UserUpdateModal({ user, onClose, onSaved }: { user: any; onClose: () =>
         </div>
         <TextInput label="Email" value={email} onChange={e => setEmail(e.currentTarget.value)} />
         <Group gap="md">
-          <Switch label="Admin" checked={admin} onChange={x => setAdmin(x)} />
-          <Switch label="Template manager" checked={tpls} onChange={x => setTpls(x)} />
+          <Switch label="Admin" checked={admin} onChange={() => setAdmin(!admin)} />
+          <Switch label="Template manager" checked={tpls} onChange={() => setTpls(!tpls)} />
         </Group>
         {err ? <Text size="sm" c="red">{err}</Text> : null}
         <Group justify="flex-end">
@@ -587,8 +587,8 @@ export default function AdminUsersSection({
             </div>
           </Group>
           <Group gap="lg" wrap="wrap">
-            <Switch checked={cAdmin} onChange={setCAdmin} label="Administrator" color="ollitex" />
-            <Switch checked={cTemplates} onChange={setCTemplates} label="Can manage templates" color="ollitex" />
+            <Switch checked={cAdmin} onChange={() => setCAdmin(!cAdmin)} label="Administrator" color="ollitex" />
+            <Switch checked={cTemplates} onChange={() => setCTemplates(!cTemplates)} label="Can manage templates" color="ollitex" />
           </Group>
           <Text size="xs" c="dimmed">The user must confirm their account via the activation email.</Text>
           {createErr ? <Text size="sm" c="red">{createErr}</Text> : null}
@@ -604,7 +604,7 @@ export default function AdminUsersSection({
           <Text size="sm">
             The selected {sel.count === 1 ? 'user' : 'users'} will be deleted. Projects they owned follow the instance deletion policy.
           </Text>
-          <Checkbox label="Send notification email" checked={bulkSendEmail} onChange={e => setBulkSendEmail(e.currentTarget.checked)} color="ollitex" />
+          <Checkbox label="Send notification email" checked={bulkSendEmail} onChange={checked => setBulkSendEmail(checked === true)} color="ollitex" />
           <Group justify="flex-end" gap="xs">
             <Button variant="default" onClick={() => setConfirmBulkDel(false)}>Cancel</Button>
             <Button color="red" variant="filled" loading={bulkBusy === 'delete'} onClick={() => void doBulkDelete()}>Delete</Button>

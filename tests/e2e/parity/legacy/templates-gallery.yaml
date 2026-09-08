@@ -1,0 +1,68 @@
+# Functional matrix — legacy /templates (gallery) — owner list "templates"
+# Roles: gallery requires login (CE default: guests see a login prompt);
+#   any logged-in user can browse + start projects from templates.
+# Contract (server-verified on e2e stack, with fixture template):
+#   GET  /api/templates[?by=&order=&category=]   → { templates: [{id,version,name,author,description,category,lastUpdated}] }
+#   GET  /api/template/categories                 → [{key,name}]
+#   GET  /template/:id                            → detail ("Open as Template", "View PDF")
+#   POST /project/new { projectName, template }   → project created from template
+# Fixture: "Parity Fixture Template" imported via /template/bundle/import
+# (see templates-manage specs).
+page: /templates
+id: templates
+roles:
+  admin: full
+  tpladmin: full
+  user: full
+  guest: login-prompt
+
+files:
+  legacy: specs/parity/legacy-templates-gallery.test.e2e.ts
+  hub: specs/parity/hub-templates-gallery.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: gallery renders h1 + template card for the fixture template
+    legacy_test: renders
+    hub_test: renders
+
+  - id: gate
+    kind: access
+    desc: guest sees a login prompt, not template content
+    legacy_test: gate
+    hub_test: deny
+
+  - id: list
+    kind: table
+    desc: JSON listing with id/version/name/author/category
+    behavior: { endpoint: GET /api/templates }
+    legacy_test: list
+    hub_test: list
+
+  - id: detail
+    kind: page
+    desc: template detail shows name + "Open as Template" + "View PDF"
+    behavior: { endpoint: GET /template/:id }
+    legacy_test: detail
+    hub_test: detail
+
+  - id: use
+    kind: button
+    where: detail / card "use" action
+    modal: ["Name the new project (L1)"]
+    desc: starting a project from the template creates it (POST /project/new {projectName, template})
+    behavior:
+      - { endpoint: POST /project/new, payload: { projectName, template } }
+      - { mongo: 'db.projects — new project exists with template origin' }
+    legacy_test: use
+    hub_test: use
+
+  - id: categories
+    kind: nav
+    desc: enabled categories listed; category filter narrows the gallery
+    behavior:
+      - { endpoint: GET /api/template/categories }
+      - { endpoint: GET /api/templates?category=<key> }
+    legacy_test: categories
+    hub_test: categories

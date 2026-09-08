@@ -1,0 +1,79 @@
+# Functional matrix — legacy /project (all-projects list) ↔ hub projects leaf
+# Roles: any logged-in user (own + shared projects); guest = login wall.
+# Contract (live-verified):
+#   POST /project/new            {projectName}            → {project_id}
+#   POST /project/:id/trash                → 200
+#   POST /project/:id/restore              → 200
+#   DELETE /project/:id                   → 200
+#   GET  /project/trashed                 (trash page, legacy)
+#   Hub listing: POST /api/project {filters, sort} (same data domain)
+#   Tags: per-project assign (POST /project/:id/tag), both surfaces
+# Legacy page: /project (h1 "All projects"; New project · search · Trash · tags).
+# Hub leaf: /hub#/projects (search, views all/owned/shared/archived/trashed, tags).
+# NOTE: SaaS-only surfaces (billing, etc.) are out of parity scope by owner rule.
+page: /project
+id: project-list
+roles:
+  admin: full
+  tpladmin: full
+  user: full
+  guest: login-wall
+
+files:
+  legacy: specs/parity/legacy-project.test.e2e.ts
+  hub: specs/parity/hub-project.test.e2e.ts
+
+features:
+  - id: renders
+    kind: page
+    desc: list page renders (h1 + New project control)
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: guest gets the login wall
+    legacy_test: deny
+    hub_test: deny
+
+  - id: list
+    kind: table
+    desc: the user's projects are listed (names visible)
+    behavior:
+      - { endpoint: POST /api/project }   # hub listing
+    legacy_test: list
+    hub_test: list
+
+  - id: create
+    kind: button
+    where: "New project"
+    modal: ["New project dialog (L1)", "From template picker (L2)"]
+    desc: creating a project persists it and shows it in the list
+    behavior: { endpoint: POST /project/new }
+    legacy_test: create
+    hub_test: create
+
+  - id: search
+    kind: input
+    where: search box ("Search in all projects…")
+    desc: filtering by name narrows the list
+    legacy_test: search
+    hub_test: search
+
+  - id: trash-restore
+    kind: button
+    where: row actions (delete/trash icon) + Trash view
+    modal: ["Trash project confirm (L1)"]
+    desc: move to trash → appears in trashed view → restore brings it back
+    behavior:
+      - { endpoint: POST /project/:id/trash }
+      - { endpoint: POST /project/:id/restore }
+    legacy_test: trash-restore
+    hub_test: trash-restore
+
+  - id: tags
+    kind: panel
+    where: "New tag" (legacy) / tag picker (hub)
+    desc: creating a tag and assigning it to a project persists the assignment
+    legacy_test: tags
+    hub_test: tags

@@ -1,0 +1,56 @@
+# Functional matrix — legacy /user/notification-preferences (owner list: "notification-prefs")
+# NOTE: the CE live URL is /user/notification-preferences (…/notification-prefs → 404).
+# Roles: any logged-in user (personal settings); guest denied.
+# Contract (server-verified): GET + POST /notifications/preferences
+#   global shape: { muteAllNotifications: bool, notificationDelayMinutes?: int 1..10080|null }
+# Legacy page = form-encoded POST (checkbox present/absent + number input).
+# Hub leaf = /hub#/mysettings.email (JSON POST).
+page: /user/notification-preferences
+id: notification-prefs
+roles:
+  admin: full
+  tpladmin: full
+  user: full
+
+files:
+  legacy: specs/parity/legacy-notification-prefs.test.e2e.ts
+  hub: specs/parity/hub-notification-prefs.test.e2e.ts
+
+features:
+  - id: renders
+    kind: form
+    desc: page renders "Email preferences" with mute-all checkbox + delay input
+    legacy_test: renders
+    hub_test: renders
+
+  - id: denied
+    kind: access
+    desc: guest cannot open the page (login redirect / 403 or no settings UI)
+    legacy_test: deny
+    hub_test: deny
+
+  - id: mute
+    kind: checkbox
+    where: "mute all email notifications"
+    desc: toggling mute persists via POST /notifications/preferences and reads back
+    behavior:
+      - { endpoint: POST /notifications/preferences }
+      - { endpoint: GET /notifications/preferences }
+    legacy_test: mute
+    hub_test: mute
+
+  - id: delay
+    kind: input
+    where: notification delay minutes
+    desc: setting a custom delay (int 1..10080) persists and reads back
+    behavior:
+      - { endpoint: POST /notifications/preferences, payload: { notificationDelayMinutes: int } }
+      - { endpoint: GET /notifications/preferences }
+    legacy_test: delay
+    hub_test: delay
+
+  - id: default-label
+    kind: text
+    desc: the "leave empty" hint shows the server default delay (parity of info)
+    legacy_test: default
+    hub_test: default
