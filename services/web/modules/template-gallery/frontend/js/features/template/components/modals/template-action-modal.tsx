@@ -5,7 +5,7 @@ import * as eventTracking from '@/infrastructure/event-tracking'
 import { isSmallDevice } from '@/infrastructure/event-tracking'
 import useIsMounted from '@/shared/hooks/use-is-mounted'
 import Notification from '@/shared/components/notification'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import {
   OLModal,
   OLModalBody,
@@ -46,6 +46,8 @@ function TemplateActionModal({
   onClearError,
 }: TemplateActionModalProps) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M5)
+
   const [error, setError] = useState<false | { name: string; error: unknown }>(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const isMounted = useIsMounted()
@@ -125,16 +127,16 @@ function TemplateActionModal({
             })
           ) : (
             <>
-              <OLButton variant="secondary" onClick={handleCloseModal}>
+              <Btn variant="secondary" onClick={handleCloseModal}>
                 {t('cancel')}
-              </OLButton>
-              <OLButton
+              </Btn>
+              <Btn
                 variant="danger"
                 onClick={() => handleActionForTemplate(template)}
                 disabled={isProcessing}
               >
                 {t('confirm')}
-              </OLButton>
+              </Btn>
             </>
           )}
         </OLModalFooter>

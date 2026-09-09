@@ -9,7 +9,6 @@ import withErrorBoundary from '@/infrastructure/error-boundary'
 import { GenericErrorBoundaryFallback } from '@/shared/components/generic-error-boundary-fallback'
 import getMeta from '@/utils/meta'
 import DefaultNavbar from '@/shared/components/navbar/default-navbar'
-import Footer from '@/shared/components/footer/footer'
 import CookieBanner from '@/shared/components/cookie-banner'
 import SystemMessages from '@/shared/components/system-messages'
 import { DsNavPageSwitcher } from '../../../../../../../modules/ce-ui/frontend/js/ds-nav-page-switcher'
@@ -50,7 +49,6 @@ function TemplateGalleryChrome() {
   const activeOverallTheme = useActiveOverallTheme()
   useThemedPage()
   const navbarProps = getMeta('ol-navbar')
-  const footerProps = getMeta('ol-footer')
 
   return (
     <div className="project-ds-nav-page website-redesign">

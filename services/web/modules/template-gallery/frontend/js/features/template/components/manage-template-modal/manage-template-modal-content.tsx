@@ -10,7 +10,7 @@ import {
   OLModalTitle,
 } from '@/shared/components/ol/ol-modal'
 import OLForm from '@/shared/components/ol/ol-form'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import { useDetachCompileContext } from '@/shared/context/detach-compile-context'
 import { useUserContext } from '@/shared/context/user-context'
 import { useFocusTrap } from '../../hooks/use-focus-trap'
@@ -36,6 +36,8 @@ export default function ManageTemplateModalContent({
   projectName,
 }: ManageTemplateModalContentProps) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M5)
+
   const { pdfFile } = useDetachCompileContext()
   const user = useUserContext()
 
@@ -153,10 +155,10 @@ export default function ManageTemplateModalContent({
       </OLModalBody>
 
       <OLModalFooter>
-        <OLButton variant="secondary" disabled={inFlight} onClick={handleHide}>
+        <Btn variant="secondary" disabled={inFlight} onClick={handleHide}>
           {t('cancel')}
-        </OLButton>
-        <OLButton
+        </Btn>
+        <Btn
           id="submit-publish-template"
           variant={override ? 'danger' : 'primary'}
           disabled={inFlight || !valid || disablePublish}
@@ -164,7 +166,7 @@ export default function ManageTemplateModalContent({
           type="submit"
         >
           {inFlight ? <>{t('publishing')}…</> : override ? t('overwrite') : t('publish')}
-        </OLButton>
+        </Btn>
       </OLModalFooter>
     </div>
   )

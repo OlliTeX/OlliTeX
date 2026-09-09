@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useIsMounted from '@/shared/hooks/use-is-mounted'
 import { useLocation } from '@/shared/hooks/use-location'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import DeleteTemplateModal from './modals/delete-template-modal'
 import { useTemplateContext } from '../context/template-context'
 import { deleteTemplate } from '../util/api'
@@ -10,6 +10,8 @@ import type { Template } from '../../../../../types/template'
 
 function DeleteTemplateButton() {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M5)
+
   const [showModal, setShowModal] = useState(false)
   const isMounted = useIsMounted()
   const { template } = useTemplateContext()
@@ -34,9 +36,9 @@ function DeleteTemplateButton() {
 
   return (
     <>
-      <OLButton variant="danger" onClick={handleOpenModal}>
+      <Btn variant="danger" onClick={handleOpenModal}>
         {t('delete')}
-      </OLButton>
+      </Btn>
       <DeleteTemplateModal
         template={template}
         actionHandler={handleDeleteTemplate}

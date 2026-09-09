@@ -1,7 +1,7 @@
 import React, { useReducer, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLForm from '@/shared/components/ol/ol-form'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import withErrorBoundary from '@/infrastructure/error-boundary'
 import TemplateActionModal from './template-action-modal'
 import { useTemplateContext } from '../../context/template-context'
@@ -44,6 +44,8 @@ function EditTemplateModal({
   actionHandler,
 }: EditTemplateModalProps) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M5)
+
   const { template } = useTemplateContext()
 
   const [editedTemplate, dispatch] = useReducer(templateFormReducer, template)
@@ -102,17 +104,17 @@ function EditTemplateModal({
       actionHandler={handleAction}
       renderFooterButtons={({ onConfirm, onCancel, isProcessing }) => (
         <>
-          <OLButton variant="secondary" onClick={onCancel}>
+          <Btn variant="secondary" onClick={onCancel}>
             {t('cancel')}
-          </OLButton>
-          <OLButton
+          </Btn>
+          <Btn
             id="submit-edit-template"
             onClick={onConfirm}
             variant="primary"
             disabled={submitButtonDisabled || isProcessing}
           >
             {t('save')}
-          </OLButton>
+          </Btn>
         </>
       )}
       onClearError={fn => {

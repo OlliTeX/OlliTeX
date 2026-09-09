@@ -17,7 +17,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import Notification from '@/shared/components/notification'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 
@@ -47,6 +47,8 @@ function issuesFrom(err: unknown): string[] | null {
 
 export default function TemplateBundles({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M5)
+
   const [templates, setTemplates] = useState<TemplateRow[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -183,10 +185,10 @@ export default function TemplateBundles({ compact = false }: { compact?: boolean
                 {/* R12-7 (2026-08-31): the in-place edit view is GET /template/:id —
                     /template/:id/edit is POST-only (hence the 404). Same target as
                     the upstream EditTemplateButton. */}
-                <OLButton variant="ghost" size="sm" as="a" href={`/template/${tp.id}`}>
+                <Btn variant="ghost" size="sm" href={`/template/${tp.id}`}>
                   {t('Edit')}
-                </OLButton>
-                <OLButton
+                </Btn>
+                <Btn
                   variant="ghost"
                   size="sm"
                   disabled={busy}
@@ -217,19 +219,19 @@ export default function TemplateBundles({ compact = false }: { compact?: boolean
                   }}
                 >
                   {t('Delete')}
-                </OLButton>
-                <OLButton variant="ghost" size="sm" as="a" href={`/template/${tp.id}/bundle`}>
+                </Btn>
+                <Btn variant="ghost" size="sm" href={`/template/${tp.id}/bundle`}>
                   {t('Download bundle')}
-                </OLButton>
+                </Btn>
               </td>
             </tr>
           ))}
           </tbody>
         </table>
         <div className="d-flex gap-2 align-items-center flex-wrap mt-2">
-        <OLButton variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
+        <Btn variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
           {t('Import bundle…')}
-        </OLButton>
+        </Btn>
         <input
           ref={fileRef}
           type="file"
@@ -238,14 +240,14 @@ export default function TemplateBundles({ compact = false }: { compact?: boolean
           onChange={onFile}
           data-testid="bundle-import-file"
         />
-        <OLButton
+        <Btn
           variant="secondary"
           disabled={busy || url.trim() === ''}
           onClick={() => doImportUrl(url.trim(), false)}
           data-testid="bundle-import-url"
         >
           {t('Import from URL…')}
-        </OLButton>
+        </Btn>
         <input
           type="url"
           className="form-control form-control-sm"

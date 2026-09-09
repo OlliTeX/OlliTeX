@@ -6,7 +6,6 @@ import useThemedPage from '@/shared/hooks/use-themed-page'
 import { SplitTestProvider } from '@/shared/context/split-test-context'
 import { UserSettingsProvider } from '@/shared/context/user-settings-context'
 import DefaultNavbar from '@/shared/components/navbar/default-navbar'
-import Footer from '@/shared/components/footer/footer'
 import CookieBanner from '@/shared/components/cookie-banner'
 import SystemMessages from '@/shared/components/system-messages'
 import { DsNavPageSwitcher } from '../../../../../modules/ce-ui/frontend/js/ds-nav-page-switcher'
@@ -22,7 +21,6 @@ function TemplateAdminChrome() {
   useThemedPage()
   const activeOverallTheme = useActiveOverallTheme()
   const navbarProps = getMeta('ol-navbar') || {}
-  const footerProps = getMeta('ol-footer') || {}
   return (
     <div className="project-ds-nav-page website-redesign">
       <SystemMessages />

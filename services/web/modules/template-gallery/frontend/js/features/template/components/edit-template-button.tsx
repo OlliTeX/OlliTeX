@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useIsMounted from '@/shared/hooks/use-is-mounted'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import EditTemplateModal from './modals/edit-template-modal'
 import { useTemplateContext } from '../context/template-context'
 import { updateTemplate } from '../util/api'
@@ -9,6 +9,8 @@ import type { Template } from '../../../../../types/template'
 
 export default function EditTemplateButton() {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M5)
+
   const [showModal, setShowModal] = useState(false)
   const isMounted = useIsMounted()
   const { template, setTemplate } = useTemplateContext()
@@ -32,9 +34,9 @@ export default function EditTemplateButton() {
 
   return (
     <>
-      <OLButton variant="secondary" onClick={handleOpenModal}>
+      <Btn variant="secondary" onClick={handleOpenModal}>
         {t('edit')}
-      </OLButton>
+      </Btn>
 
       <EditTemplateModal
         showModal={showModal}

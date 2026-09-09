@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import getMeta from '@/utils/meta'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLCol from '@/shared/components/ol/ol-col'
 import OLRow from '@/shared/components/ol/ol-row'
 import OLTooltip from '@/shared/components/ol/ol-tooltip'
@@ -13,6 +13,8 @@ import { licensesMap } from './settings/settings-license'
 
 function TemplateDetails() {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M5)
+
   const {template} = useTemplateContext()
   const lastUpdatedDate = fromNowDate(template.lastUpdated)
   const tooltipText = formatDate(template.lastUpdated)
@@ -100,13 +102,13 @@ function TemplateDetails() {
         <OLCol md={12} className="text-end">
           {/* 3b (2026-08-29): "save" a template = download its bundle
               (template.json + source.zip + output.pdf) for backup/restore. */}
-          <OLButton
-            as="a"
+          <Btn
+           
             href={`/template/${template.id}/bundle`}
             variant="secondary"
           >
             {t('Download bundle')}
-          </OLButton>
+          </Btn>
           <EditTemplateButton />
           <DeleteTemplateButton />
         </OLCol>

@@ -17,7 +17,7 @@ import {
   useEditorUiVariant,
 } from './variant'
 
-export type SurfaceBtnVariant = 'primary' | 'secondary' | 'danger' | 'danger-ghost' | 'link' | 'tertiary'
+export type SurfaceBtnVariant = 'primary' | 'secondary' | 'danger' | 'danger-ghost' | 'link' | 'tertiary' | 'ghost'
 
 export interface SurfaceBtnProps {
   children: ReactNode
@@ -38,6 +38,9 @@ export interface SurfaceBtnProps {
   // passthroughs (OLButton className/type; Mantine Button className)
   className?: string
   type?: string
+  // stable element identity + form association (legacy form= attribute)
+  id?: string
+  form?: string
 }
 
 export interface MantineSurface {
@@ -68,12 +71,16 @@ export function useMantineSurface(): MantineSurface {
     leftIcon,
     className,
     type,
+    id,
+    form,
   }: SurfaceBtnProps): ReactElement =>
     mantine && !href ? (
       <ctx.Provider>
         <Button
           size={size}
           className={className}
+          id={id}
+          form={form}
           disabled={disabled}
           onClick={onClick}
           loading={loading}
@@ -87,7 +94,7 @@ export function useMantineSurface(): MantineSurface {
               ? 'light'
               : variant === 'danger-ghost'
                 ? 'subtle'
-                : variant === 'link' || variant === 'tertiary'
+                : variant === 'link' || variant === 'tertiary' || variant === 'ghost'
                 ? 'subtle'
                 : 'fill'
           }
@@ -104,6 +111,8 @@ export function useMantineSurface(): MantineSurface {
         target={target}
         type={type}
         className={className}
+        id={id}
+        form={form}
         isLoading={loading}
         loadingLabel={loadingLabel}
         leadingIcon={leftIcon}
