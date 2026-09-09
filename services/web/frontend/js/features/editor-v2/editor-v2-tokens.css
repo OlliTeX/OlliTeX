@@ -48,3 +48,30 @@ html[data-mantine-color-scheme='dark'] .ol-editor-mantine {
   --border-divider-themed: var(--mantine-color-border);
   --toolbar-btn-color: var(--mantine-color-text);
 }
+
+/* P2 — renovated chrome (Mantine toolbar frame + rail icon bar) */
+.ol-editor-mantine .ol-v2-toolbar {
+  min-height: 44px;
+  font-family: var(--mantine-font-family);
+}
+
+.ol-editor-mantine .ol-v2-rail-nav {
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.ol-editor-mantine .ol-v2-rail-tab {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  position: relative;
+}
+
+/* rail-tab indicator dots (chat unread ...) — anchored on the icon */
+.ol-editor-mantine .ol-v2-rail-tab .has-indicator .badge-dot,
+.ol-editor-mantine .ol-v2-rail-tab .has-indicator .chat-indicator-dot,
+.ol-editor-mantine .ol-v2-rail-tab .has-indicator [class*='indicator'] {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}

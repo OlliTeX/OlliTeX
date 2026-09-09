@@ -1,6 +1,6 @@
 {
-  "capturedAt": "2026-09-08T22:49:04.216Z",
-  "url": "/Project/6aa090d64d69e94de4547cf7",
+  "capturedAt": "2026-09-09T05:01:04.337Z",
+  "url": "/Project/6aa0e804d65958494b9fd0b5",
   "base": {
     "label": "editor base surface",
     "critical": [
@@ -35,19 +35,11 @@
       {
         "id": "button-name",
         "nodes": 1
-      },
-      {
-        "id": "label",
-        "nodes": 1
       }
     ],
     "serious": [
       {
         "id": "aria-prohibited-attr",
-        "nodes": 1
-      },
-      {
-        "id": "link-name",
         "nodes": 1
       },
       {

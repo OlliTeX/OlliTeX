@@ -73,6 +73,8 @@ services:
       STAGING_PASSWORD: ${SHARED_SERVICE_TOKEN}
       V1_HISTORY_PASSWORD: ${SHARED_SERVICE_TOKEN}
       OT_JWT_AUTH_ALG: HS256
+      # P2 contract: the "Request edit access" toolbar flow (readOnly members)
+      SHARING_UPDATES_ENABLED: 'true'
       MONGO_CONNECTION_STRING: mongodb://mongo:27017/sharelatex?replicaSet=overleaf
       # ---- DB / infra ----
       OVERLEAF_MONGO_URL: mongodb://mongo:27017/sharelatex?replicaSet=overleaf

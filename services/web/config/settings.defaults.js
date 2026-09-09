@@ -1530,6 +1530,11 @@ function buildSettings() {
     // SplitTestHandler._getNonSaasAssignment); 'default' => hidden.
     'overleaf-code':
       process.env.ENABLE_PYTHON_RUNNER === 'true' ? 'enabled' : 'default',
+    // "Request edit access" toolbar flow (readOnly/review members asking the
+    // owner for editor access). Instance-level opt-in, same pattern as the
+    // flags above: enabled when SHARING_UPDATES_ENABLED=true, else default.
+    'sharing-updates':
+      process.env.SHARING_UPDATES_ENABLED === 'true' ? 'enabled' : 'default',
   },
 
   oauthProviders: {

@@ -2,8 +2,6 @@ import { Panel, PanelGroup } from 'react-resizable-panels'
 import classNames from 'classnames'
 import { HorizontalResizeHandle } from '@/features/ide-react/components/resize/horizontal-resize-handle'
 import PdfPreview from '@/features/pdf-preview/components/pdf-preview'
-import { RailLayout } from '../rail/rail'
-import { Toolbar } from '../toolbar/toolbar'
 import { HorizontalToggler } from '@/features/ide-react/components/resize/horizontal-toggler'
 import { EditingPausedBanner } from '../toolbar/editing-paused-banner'
 import { useTranslation } from 'react-i18next'
@@ -15,7 +13,8 @@ import { useRailContext } from '../../context/rail-context'
 import HistoryContainer from '@/features/ide-react/components/history-container'
 import { DefaultSynctexControl } from '@/features/pdf-preview/components/detach-synctex-control'
 import importOverleafModules from '../../../../../macros/import-overleaf-module.macro'
-
+import { ChromeToolbar } from '@/features/editor-v2/chrome/chrome-slot'
+import { RailLayout } from '../rail/rail'
 const mainEditorLayoutPanels: Array<{
   import: { default: ElementType }
   path: string
@@ -46,7 +45,7 @@ export default function MainLayout() {
 
   return (
     <div className="ide-redesign-main">
-      <Toolbar />
+      <ChromeToolbar />
       <EditingPausedBanner />
       <div className="ide-redesign-body">
         <PanelGroup

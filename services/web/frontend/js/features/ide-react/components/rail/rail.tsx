@@ -33,6 +33,12 @@ import RailOverflowDropdown from './rail-overflow-dropdown'
 import useRailOverflow from '@/features/ide-react/hooks/use-rail-overflow'
 import importOverleafModules from '../../../../../macros/import-overleaf-module.macro'
 import { shouldIncludeElement } from '@/features/ide-react/util/rail-utils'
+import MantineRailNavChrome from '@/features/editor-v2/chrome/mantine-rail'
+import {
+  canUseMantineSurface,
+  MantineSurfaceGate,
+  useEditorUiVariant,
+} from '@/features/editor-v2/variant'
 import { useEditorContext } from '@/shared/context/editor-context'
 import useEventListener from '@/shared/hooks/use-event-listener'
 
@@ -268,6 +274,14 @@ export const RailLayout = () => {
     }
   }, [t, isOpen, selectedTab, tabsInOverflow])
 
+  // P2 editor renovation: the /editor route renders the Mantine-framed
+  // icon list in place of the legacy one — inside this component's
+  // UNCHANGED TabContainer/Panel skeleton (the pane is a member of a
+  // react-resizable-panels group that assumes this DOM shape; re-wrapping
+  // it collapsed the pane). /project keeps the legacy byte-identical list.
+  const chromeCtx = useEditorUiVariant()
+  const railChrome = canUseMantineSurface(chromeCtx) ? 'mantine' : 'legacy'
+
   return (
     <TabContainer
       mountOnEnter // Only render when necessary (so that we can lazy load tab content)
@@ -280,6 +294,19 @@ export const RailLayout = () => {
       {/* The <Nav> element is a "div" and has a "role="tablist"".
           But it should be identified as a navigation landmark.
           Therefore, we nest them: the parent <nav> is the landmark, and its child gets the "role="tablist"". */}
+      {railChrome === 'mantine' ? (
+        <MantineSurfaceGate>
+          <MantineRailNavChrome
+            tabs={tabsInRail}
+            moreOptions={moreOptionsAction}
+            actions={railActions}
+            selectedTab={selectedTab}
+            isOpen={isOpen}
+            onTabKey={key => onTabSelect(key as never)}
+            tabWrapperRef={tabWrapperRef}
+          />
+        </MantineSurfaceGate>
+      ) : (
       <nav
         className={classNames('ide-rail', {
           hidden: isHistoryView || focusMode,
@@ -318,7 +345,7 @@ export const RailLayout = () => {
           </nav>
         </Nav>
       </nav>
-      {!focusMode &&
+      )}      {!focusMode &&
         moduleRailPopovers
           .filter(shouldIncludeElement)
           .map(({ key, Component, ref }) => <Component key={key} ref={ref} />)}
