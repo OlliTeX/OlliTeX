@@ -19,7 +19,6 @@
 import React from 'react'
 import CookieBanner from '@/shared/components/cookie-banner'
 import DefaultNavbar from '@/shared/components/navbar/default-navbar'
-import Footer from '@/shared/components/footer/footer'
 import { DsNavPageSwitcher } from '../../../../../modules/ce-ui/frontend/js/ds-nav-page-switcher'
 import { SidebarLowerSection } from '@/shared/components/sidebar/sidebar-lower-section'
 import SystemMessages from '@/shared/components/system-messages'
@@ -47,7 +46,6 @@ function LibraryChrome({ initialView }: { initialView: LibraryView }) {
   // of following the Dark/Light/System setting).
   useThemedPage()
   const navbarProps = getMeta('ol-navbar')
-  const footerProps = getMeta('ol-footer')
 
   return (
     <div className="project-ds-nav-page website-redesign library-enabled">

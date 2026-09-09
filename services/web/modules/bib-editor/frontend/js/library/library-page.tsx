@@ -34,7 +34,7 @@ import {
   OLDropdownMenu,
   OLDropdownToggle,
 } from '@/shared/components/ol/ol-dropdown-menu'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import {
   OLModal,
   OLModalBody,
@@ -59,6 +59,8 @@ type Report = {
 
 export default function LibraryPage() {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M6)
+
   const lib = useLibrary()
   const isTrash = lib.view === 'trash'
 
@@ -355,13 +357,13 @@ export default function LibraryPage() {
                     'References couldn’t be loaded. Refresh the page to try again.'
                   )}
                 </div>
-                <OLButton
+                <Btn
                   variant="primary"
                   size="sm"
                   onClick={() => void lib.refresh()}
                 >
                   {t('Retry')}
-                </OLButton>
+                </Btn>
               </div>
             </div>
           ) : totalRows === 0 && !isTrash ? (
@@ -563,18 +565,18 @@ export default function LibraryPage() {
           {t('This action cannot be undone.')}
         </OLModalBody>
         <OLModalFooter>
-          <OLButton
+          <Btn
             variant="secondary"
             onClick={() => setConfirmPermanent(null)}
           >
             {t('Cancel')}
-          </OLButton>
-          <OLButton
+          </Btn>
+          <Btn
             variant="danger"
             onClick={() => void handleConfirmPermanent()}
           >
             {t('Delete permanently')}
-          </OLButton>
+          </Btn>
         </OLModalFooter>
       </OLModal>
 

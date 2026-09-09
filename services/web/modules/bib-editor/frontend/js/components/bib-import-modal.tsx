@@ -29,7 +29,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { plural } from '../utils/plural'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import {
   OLModal,
@@ -73,6 +73,8 @@ export default function BibImportModal({
   initialText = '',
 }: Props) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M6)
+
   const [mode, setMode] = useState<'paste' | 'preview'>('paste')
   const [text, setText] = useState('')
   const [rows, setRows] = useState<BibImportRow[]>([])
@@ -177,14 +179,14 @@ export default function BibImportModal({
         {mode === 'preview' ? (
           <>
             {/* SaaS: labeled Back + visually-hidden "Preview" title */}
-            <OLButton
+            <Btn
               variant="ghost"
-              leadingIcon="arrow_back"
-              aria-label={t('back')}
+              leftIcon="arrow_back"
+              ariaLabel={t('back')}
               onClick={() => setMode('paste')}
             >
               {t('back')}
-            </OLButton>
+            </Btn>
             <OLModalTitle className="visually-hidden">{t('Preview')}</OLModalTitle>
           </>
         ) : (
@@ -213,17 +215,17 @@ export default function BibImportModal({
             </div>
           </OLModalBody>
           <OLModalFooter>
-            <OLButton variant="secondary" onClick={onHidden}>
+            <Btn variant="secondary" onClick={onHidden}>
               {t('cancel')}
-            </OLButton>
-            <OLButton
+            </Btn>
+            <Btn
               variant="primary"
               disabled={text.trim() === ''}
               onClick={() => void handlePreview()}
               type="button"
             >
               {t('Preview')}
-            </OLButton>
+            </Btn>
           </OLModalFooter>
         </>
       ) : (
@@ -289,16 +291,16 @@ export default function BibImportModal({
                   </div>
                 )}
                 <div className="bibtex-import-preview-footer-buttons">
-                  <OLButton variant="secondary" onClick={onHidden}>
+                  <Btn variant="secondary" onClick={onHidden}>
                     {t('cancel')}
-                  </OLButton>
-                  <OLButton
+                  </Btn>
+                  <Btn
                     variant="primary"
                     disabled={previewEmpty || !previewDone || checkedCount === 0}
                     onClick={handleImport}
                   >
                     {t('Save')}
-                  </OLButton>
+                  </Btn>
                 </div>
               </div>
             </div>

@@ -18,7 +18,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { degradeGrammarMode } from './utils/grammar-helpers'
 import getMeta from '@/utils/meta'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormText from '@/shared/components/ol/ol-form-text'
@@ -65,6 +65,7 @@ function announceChange(
 }
 
 export default function GrammarSettingsSection() {
+    const { Btn } = useMantineSurface() // module Mantine wave (M6)
     const metaAvailability: GrammarSettings =
         (getMeta('ol-grammarSettings') as GrammarSettings) || emptyAvailability
 
@@ -395,13 +396,13 @@ export default function GrammarSettingsSection() {
                                 }
                             }}
                         />
-                        <OLButton
+                        <Btn
                             variant="secondary"
                             type="button"
                             onClick={addBlockedRule}
                         >
                             Add
-                        </OLButton>
+                        </Btn>
                     </div>
                     {addRuleError && (
                         <OLFormText style={{ color: 'var(--danger, #d9534f)' }}>
@@ -442,15 +443,15 @@ export default function GrammarSettingsSection() {
                 </OLFormGroup>
 
                 <OLFormGroup>
-                    <OLButton
+                    <Btn
                         variant="primary"
                         type="submit"
                         disabled={saving}
-                        isLoading={saving}
+                        loading={saving}
                         loadingLabel="Saving…"
                     >
                         Save
-                    </OLButton>
+                    </Btn>
                 </OLFormGroup>
 
                 {saved && (

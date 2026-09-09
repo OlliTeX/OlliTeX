@@ -22,7 +22,7 @@
  */
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLIconButton from '@/shared/components/ol/ol-icon-button'
 import OLTooltip from '@/shared/components/ol/ol-tooltip'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
@@ -140,6 +140,8 @@ export default function BibEntryForm({
   submitText,
 }: Props) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M6)
+
   const [type, setType] = useState(entry.type || 'article')
   const [id, setId] = useState(entry.id || '')
   const [fields, setFields] = useState<Record<string, string>>({
@@ -478,14 +480,14 @@ export default function BibEntryForm({
                 }}
                 placeholder="10.1038/s41586-021-03819-2"
               />
-              <OLButton
+              <Btn
                 variant="secondary"
                 size="sm"
                 disabled={doiFetching || !doiInput.trim()}
                 onClick={() => void handleFetchDoi()}
               >
                 {doiFetching ? '…' : t('Fetch')}
-              </OLButton>
+              </Btn>
             </div>
             {doiFetchError && (
               <span className="bib-form-error">{doiFetchError}</span>
@@ -559,9 +561,9 @@ export default function BibEntryForm({
             description={t('Auto-generate from author/year')}
             overlayProps={{ placement: 'top', trigger: ['hover', 'focus'] }}
           >
-            <OLButton variant="secondary" size="sm" onClick={handleGenerateKey}>
+            <Btn variant="secondary" size="sm" onClick={handleGenerateKey}>
               {t('Generate')}
-            </OLButton>
+            </Btn>
           </OLTooltip>
         </div>
         <span className="bib-form-hint">
@@ -612,18 +614,18 @@ export default function BibEntryForm({
         <div className="bib-form-footer">
           <div className="bib-form-footer-left">
             {kind === 'existing' && onDelete && (
-              <OLButton variant="danger" size="sm" onClick={onDelete}>
+              <Btn variant="danger" size="sm" onClick={onDelete}>
                 {t('delete')}
-              </OLButton>
+              </Btn>
             )}
           </div>
           <div className="bib-form-footer-right">
-            <OLButton variant="secondary" size="sm" onClick={onBack}>
+            <Btn variant="secondary" size="sm" onClick={onBack}>
               {t('back')}
-            </OLButton>
-            <OLButton variant="primary" size="sm" onClick={handleCheck}>
+            </Btn>
+            <Btn variant="primary" size="sm" onClick={handleCheck}>
               {submitText ?? t('Check')}
-            </OLButton>
+            </Btn>
           </div>
         </div>
       )}
@@ -757,6 +759,8 @@ function BibAuthorField({
   error?: boolean
 }) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M6)
+
 
   const parseAuthors = useCallback(
     (v: string) => (v ? v.split(/\s+and\s+/i).map(a => a.trim()) : ['']),
@@ -843,9 +847,9 @@ function BibAuthorField({
           </div>
         </div>
       ))}
-      <OLButton variant="secondary" size="sm" className="bib-author-add" onClick={addAuthor}>
+      <Btn variant="secondary" size="sm" className="bib-author-add" onClick={addAuthor}>
         {t('Add author')}
-      </OLButton>
+      </Btn>
     </div>
   )
 }

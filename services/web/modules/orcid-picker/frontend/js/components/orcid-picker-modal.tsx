@@ -23,7 +23,7 @@ import {
   OLModalBody,
   OLModalFooter,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
@@ -75,6 +75,8 @@ export default function OrcidPickerModal({
   onInsert,
 }: OrcidPickerModalProps) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M6)
+
 
   // -- step state --
   const [step, setStep] = useState<Step>('search')
@@ -327,15 +329,15 @@ export default function OrcidPickerModal({
           <>
             {/* Toggle between search-by-name and direct ORCID */}
             <div style={{ marginBottom: '12px' }} data-testid="orcid-mode-toggle">
-              <OLButton
+              <Btn
                 variant={searchMode === 'name' ? 'primary' : 'secondary'}
                 size="sm"
                 onClick={() => setSearchMode('name')}
                 style={{ marginRight: '8px' }}
               >
                 {t('Search by name')}
-              </OLButton>
-              <OLButton
+              </Btn>
+              <Btn
                 variant={searchMode === 'orcid' ? 'primary' : 'secondary'}
                 size="sm"
                 onClick={() => {
@@ -344,7 +346,7 @@ export default function OrcidPickerModal({
                 }}
               >
                 {t('Enter ORCID iD')}
-              </OLButton>
+              </Btn>
             </div>
 
             {searchError && (
@@ -374,14 +376,14 @@ export default function OrcidPickerModal({
                       onKeyDown={handleNameKeyDown}
                       disabled={searchLoading}
                     />
-                    <OLButton
+                    <Btn
                       variant="primary"
                       onClick={() => void handleSearchByName()}
                       disabled={searchLoading || !nameQuery.trim()}
                       isLoading={searchLoading}
                     >
                       {t('Search')}
-                    </OLButton>
+                    </Btn>
                   </div>
                 </OLFormGroup>
 
@@ -450,7 +452,7 @@ export default function OrcidPickerModal({
                                 {a.institutionNames?.join(', ') || '—'}
                               </td>
                               <td style={{ padding: '6px 10px' }}>
-                                <OLButton
+                                <Btn
                                   variant="ghost"
                                   size="sm"
                                   onClick={e => {
@@ -462,7 +464,7 @@ export default function OrcidPickerModal({
                                   }}
                                 >
                                   {t('Select')}
-                                </OLButton>
+                                </Btn>
                               </td>
                             </tr>
                           )
@@ -489,14 +491,14 @@ export default function OrcidPickerModal({
                     onKeyDown={handleOrcidKeyDown}
                     disabled={worksLoading}
                   />
-                  <OLButton
+                  <Btn
                     variant="primary"
                     onClick={() => void handleGoToWorksByOrcid()}
                     disabled={worksLoading || !orcidInput.trim()}
                     isLoading={worksLoading}
                   >
                     {t('Load works')}
-                  </OLButton>
+                  </Btn>
                 </div>
               </OLFormGroup>
             )}
@@ -505,7 +507,7 @@ export default function OrcidPickerModal({
 
         {step === 'works' && (
           <>
-            <OLButton
+            <Btn
               variant="ghost"
               size="sm"
               onClick={() => {
@@ -517,7 +519,7 @@ export default function OrcidPickerModal({
               data-testid="orcid-back"
             >
               {t('Back to search')}
-            </OLButton>
+            </Btn>
 
             {worksLoading && <p>{t('Loading works…')}</p>}
 
@@ -622,10 +624,10 @@ export default function OrcidPickerModal({
 
       {step === 'works' && works.length > 0 && (
         <OLModalFooter>
-          <OLButton variant="secondary" onClick={handleClose}>
+          <Btn variant="secondary" onClick={handleClose}>
             {t('Cancel')}
-          </OLButton>
-          <OLButton
+          </Btn>
+          <Btn
             variant="primary"
             onClick={() => void handleImport()}
             disabled={selectedPutCodes.size === 0 || importing}
@@ -639,7 +641,7 @@ export default function OrcidPickerModal({
               : t('Import selected (__count__)', {
                   count: selectedPutCodes.size,
                 })}
-          </OLButton>
+          </Btn>
         </OLModalFooter>
       )}
     </OLModal>

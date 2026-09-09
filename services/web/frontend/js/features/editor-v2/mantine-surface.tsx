@@ -41,6 +41,8 @@ export interface SurfaceBtnProps {
   // stable element identity + form association (legacy form= attribute)
   id?: string
   form?: string
+  // a11y passthrough (OLButton aria-label ↔ Mantine Button aria-label)
+  ariaLabel?: string
 }
 
 export interface MantineSurface {
@@ -73,6 +75,7 @@ export function useMantineSurface(): MantineSurface {
     type,
     id,
     form,
+    ariaLabel,
   }: SurfaceBtnProps): ReactElement =>
     mantine && !href ? (
       <ctx.Provider>
@@ -81,6 +84,7 @@ export function useMantineSurface(): MantineSurface {
           className={className}
           id={id}
           form={form}
+          aria-label={ariaLabel}
           disabled={disabled}
           onClick={onClick}
           loading={loading}
@@ -113,6 +117,7 @@ export function useMantineSurface(): MantineSurface {
         className={className}
         id={id}
         form={form}
+        aria-label={ariaLabel}
         isLoading={loading}
         loadingLabel={loadingLabel}
         leadingIcon={leftIcon}

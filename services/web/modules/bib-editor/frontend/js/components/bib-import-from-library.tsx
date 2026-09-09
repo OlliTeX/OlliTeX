@@ -18,7 +18,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { plural } from '../utils/plural'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import {
   OLModal,
   OLModalBody,
@@ -71,6 +71,8 @@ export default function BibImportFromLibrary({
   onHidden,
 }: Props) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M6)
+
   const [rows, setRows] = useState<LibraryRow[]>([])
   const [loading, setLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
@@ -294,10 +296,10 @@ export default function BibImportFromLibrary({
               </div>
             )}
             <div className="bibtex-import-preview-footer-buttons">
-              <OLButton variant="secondary" onClick={onHidden}>
+              <Btn variant="secondary" onClick={onHidden}>
                 {t('cancel')}
-              </OLButton>
-              <OLButton
+              </Btn>
+              <Btn
                 variant="primary"
                 disabled={
                   loading || listError !== null || checkedCount === 0 || done
@@ -305,7 +307,7 @@ export default function BibImportFromLibrary({
                 onClick={handleImport}
               >
                 {t('Import')}
-              </OLButton>
+              </Btn>
             </div>
           </div>
         </div>
