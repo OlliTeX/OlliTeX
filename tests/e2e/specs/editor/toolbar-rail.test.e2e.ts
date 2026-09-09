@@ -164,10 +164,8 @@ for (const route of ['/project', '/editor'] as const) {
     test('duplicate: make-a-copy opens the clone flow', async () => {
       await openEditor(adminPage, route, pid)
       await clickMenuItem(adminPage, 'File', /make a copy/i)
-      const dup = adminPage
-        .locator('[role=dialog], .modal, [class*=clone-project]')
-        .first()
-      await expect(dup).toBeVisible({ timeout: 10_000 })
+      // the clone form opens (identical content on both frames): title visible
+      await adminPage.getByText('Copy project', { exact: true }).first().waitFor({ state: 'visible', timeout: 10_000 })
       await adminPage.keyboard.press('Escape')
     })
 

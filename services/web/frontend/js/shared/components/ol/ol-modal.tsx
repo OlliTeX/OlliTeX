@@ -8,8 +8,14 @@ import {
 } from 'react-bootstrap'
 import { ModalBodyProps } from 'react-bootstrap/ModalBody'
 import type { Options as FocusTrapOptions } from 'focus-trap'
+import { Modal as MantineModal } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
+import {
+  canUseMantineSurface,
+  MantineSurfaceGate,
+  useEditorUiVariant,
+} from '@/features/editor-v2/variant'
 
 type OLModalProps = ModalProps & {
   size?: 'sm' | 'lg'
@@ -40,8 +46,34 @@ export function OLModal({
   themed = false,
   className,
   backdropClassName,
+  size,
   ...props
 }: OLModalProps) {
+  // P3 editor renovation: on the /editor route (once the P1 shell gate is
+  // ready) the modal surface is the Mantine Modal frame — same API surface
+  // (show/onHide/size), same children, Mantine's built-in focus trap and
+  // ESC/outside-click close. /project renders the legacy react-bootstrap
+  // modal with its focus-trap wiring verbatim. This component's identity is
+  // stable — only the framed output swaps, per-surface (the IDE tree is
+  // never remounted).
+  const ctx = useEditorUiVariant()
+  if (canUseMantineSurface(ctx)) {
+    return (
+      <MantineSurfaceGate>
+        <MantineModal
+          opened={show}
+          onClose={onHide}
+          size={size === 'sm' ? 'sm' : 'lg'}
+          withinPortal
+          trapFocus
+          position="center"
+          className={classNames('ol-mant-modal', { 'modal-themed': themed }, className)}
+        >
+          {children}
+        </MantineModal>
+      </MantineSurfaceGate>
+    )
+  }
   return (
     <Modal
       show={show}
