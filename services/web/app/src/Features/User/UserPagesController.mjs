@@ -285,6 +285,24 @@ const UserPagesController = {
         login_support_title: Settings.nav?.login_support_title,
         login_support_text: Settings.nav?.login_support_text,
         metadata,
+        // OLiT Mantine auth surface: the React login page reads its config
+        // (SSO buttons, LDAP field, support text) from ol-auth-config.
+        authConfigJson: JSON.stringify({
+          sso: [
+            res.locals.samlEnable
+              ? { label: res.locals.samlName, href: '/saml/login' }
+              : null,
+            res.locals.oidcEnable
+              ? { label: res.locals.oidcName, href: '/oidc/login' }
+              : null,
+          ].filter(Boolean),
+          ldapEnabled: !!res.locals.ldapEnable,
+          ldapPlaceholder: res.locals.ldapEnable
+            ? res.locals.ldapPlaceholder
+            : undefined,
+          supportTitle: Settings.nav?.login_support_title,
+          supportText: Settings.nav?.login_support_text,
+        }),
       })
     }
     return Promise.all([
@@ -309,6 +327,12 @@ const UserPagesController = {
           placeholder: ldap.placeholder || 'Username',
         },
       }
+      res.locals.samlEnable = saml.enabled === true
+      res.locals.samlName = saml.identityServiceName || 'Log in with SAML IdP'
+      res.locals.oidcEnable = oidc.enabled === true
+      res.locals.oidcName = oidc.identityServiceName || 'Log in with SSO (OIDC)'
+      res.locals.ldapEnable = ldap.enabled === true
+      res.locals.ldapPlaceholder = ldap.placeholder || 'Username'
       renderLogin()
     }).catch((err) => {
       // SSO resolution must never break the login page.

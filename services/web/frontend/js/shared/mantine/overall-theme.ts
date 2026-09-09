@@ -70,6 +70,8 @@ function applyScheme(scheme: ColorScheme) {
   })
 }
 
+export { applyScheme }
+
 /** Keep the meta tag (the in-page source of truth) in sync with the UI. */
 function rememberTheme(value: OverallTheme) {
   try {

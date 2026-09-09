@@ -482,6 +482,8 @@ function hydrateAsyncForm(el: HTMLFormElement) {
   formAutoSubmitHelper(el)
 }
 
+export { hydrateAsyncForm }
+
 function hydrateRegularForm(el: HTMLFormElement) {
   inflightHelper(el)
   formValidationHelper(el)

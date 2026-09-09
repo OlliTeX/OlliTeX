@@ -1,82 +1,25 @@
-extends ../layout-website-redesign
+extends ../layout-react
+
+block entrypointVar
+	- entrypoint = 'pages/auth/login'
 
 block vars
-	- isWebsiteRedesign = true
-	// R9 item 8 (2026-08-29, davrot/overleaf-cep@6a0aaaba login.pug): suppress
-	// the right-side navbar block on the login page (no account/admin tabs
-	// are meaningful signed-out — keeps the navbar clean).
-	// 2026-09-01 (user decision): brand-only header in EVERY session state —
-	// /login and /register are not visited by logged-in users anyway.
+	// OLiT Mantine surface (owner scope): /login renders through the React
+	// entry (pages/auth/login) with the shared ollitex Mantine provider.
+	// Brand-only chrome, as before (2026-09-01 owner decision).
+	- suppressNavbar = true
 	- suppressNavbarRight = true
+	- suppressFooter = true
+	- suppressPugCookieBanner = true
+	- showThinFooter = false
+	- hideNavLogo = true
+	- hideBrandTitle = true
+
+block append meta
+	// SSO buttons + LDAP field behaviour + support text — built by the
+	// controller (UserPagesController.loginPage already resolves the SSO
+	// sections request-locally).
+	meta(name='ol-auth-config' data-type='json' content=authConfigJson)
 
 block content
-	main#main-content.content
-		.container
-			.row
-				.col-lg-6.offset-lg-3.col-xl-4.offset-xl-4
-					.page-header
-						if login_support_title
-							h1 !{login_support_title}
-						else
-							h1 #{translate("log_in")} 
-					form(name='loginForm' data-ol-async-form action='/login' method='POST')
-						input(name='_csrf' type='hidden' value=csrfToken)
-						+formMessagesNewStyle
-						+customFormMessageNewStyle('invalid-password-retry-or-reset', 'danger')
-							| !{translate('email_or_password_wrong_try_again_or_reset', {}, [{ name: 'a', attrs: { href: '/user/password/reset', 'aria-describedby': 'resetPasswordDescription' } }])}
-							span.visually-hidden(id='resetPasswordDescription')
-								| #{translate('reset_password_link')}
-						+customFormMessageNewStyle('password-compromised')
-							| !{translate('password_compromised_try_again_or_use_known_device_or_reset', {}, [{name: 'a', attrs: {href: 'https://haveibeenpwned.com/passwords', rel: 'noopener noreferrer', target: '_blank'}}, {name: 'a', attrs: {href: '/user/password/reset', target: '_blank'}}])}.
-						.form-group
-							label(for='email') #{translate("email")}
-							input#email.form-control(
-								name='email'
-								type=(settings.ldap && settings.ldap.enable) ? 'text' : 'email'
-								required
-								placeholder=(settings.ldap && settings.ldap.enable) ? settings.ldap.placeholder : 'email@example.com'
-								autofocus='true'
-								autocomplete='username'
-							)
-						.form-group
-							label(for='password') #{translate("password")}
-							input#password.form-control(
-								name='password'
-								type='password'
-								autocomplete='current-password'
-								required
-							)
-						.actions
-							button.btn-primary.btn(type='submit' data-ol-disabled-inflight)
-								span(data-ol-inflight='idle') #{translate("login")}
-								span(hidden data-ol-inflight='pending') #{translate("logging_in")}…
-							a.float-end(href='/user/password/reset') #{translate("forgot_your_password")}?
-						if login_support_text
-							hr
-							p.text-center !{login_support_text}
-					if settings.saml && settings.saml.enable
-						.actions(style='margin-top: 30px;')
-							a.button.btn-secondary.btn(
-							href='/saml/login',
-								style="width: 100%;"
-								data-ol-disabled-inflight
-							)
-								span(data-ol-inflight="idle") #{settings.saml.identityServiceName}
-								span(hidden data-ol-inflight="pending") #{translate("logging_in")}…
-					if settings.oidc && settings.oidc.enable
-						.actions(style='margin-top: 30px;')
-							a.button.btn-secondary.btn(
-								href='/oidc/login',
-								style="width: 100%;"
-								data-ol-disabled-inflight
-							)
-								span(data-ol-inflight="idle") #{settings.oidc.identityServiceName}
-								span(hidden data-ol-inflight="pending") #{translate("logging_in")}…
-					// SSO multi-provider (2026-08-30): LDAP logins go through
-					// the SAME /login form (LDAPRouter.post /login runs
-					// LDAPAuthenticationController.passportLogin first); the
-					// input type/placeholder above already adapts to
-					// settings.ldap.enable.
-					if settings.ldap && settings.ldap.enable
-						.actions(style='margin-top: 10px;')
-							p.form-text.text-center(style='margin: 0;') #{translate("ldap_login_hint")}
+	#auth-root

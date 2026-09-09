@@ -42,6 +42,21 @@ async function registrationPage(req, res, next) {
     title: 'register',
     sharedProjectData,
     newTemplateData,
+    // OLiT Mantine auth surface: the React register page reads its config
+    // (domain restrictions, invitation/template context) from
+    // ol-auth-config.
+    authConfigJson: JSON.stringify({
+      domains: [...displayDomains.values()],
+      context: sharedProjectData.user_first_name !== undefined
+        ? {
+            kind: 'invite',
+            userFirstName: sharedProjectData.user_first_name,
+            projectName: sharedProjectData.project_name,
+          }
+        : newTemplateData.templateName !== undefined
+          ? { kind: 'template', templateName: newTemplateData.templateName }
+          : null,
+    }),
     displayDomains: [...displayDomains.values()],
     csrfToken: req.csrfToken(),
   })

@@ -1,91 +1,51 @@
-.auth-aux-logo {
-  position: absolute;
-  top: var(--spacing-06);
-  left: var(--spacing-06);
-
-  img {
-    height: 40px;
+// OLiT auth pages (/login + /register on the shared Mantine surface).
+// The form is a native HTML form taken over by the hydrate-form engine,
+// rendered by Mantine components; this file styles the engine-injected
+// message notifications to match the Mantine surface (the legacy
+// .notification styles live in the website-redesign scope) and pins the
+// link colour to the app's themed link token (the brand green does not
+// reach 4.5:1 on the dark card — a11y gate, 2026-09-10).
+.ol-auth-root {
+  code {
+    color: inherit;
   }
-}
 
-.auth-aux-container {
-  padding: calc($header-height + $spacing-11) var(--spacing-04) 0;
-  max-width: 400px;
-  min-height: 100vh;
-  margin-left: auto;
-  margin-right: auto;
+  .mantine-Anchor-root {
+    color: var(--link-ui-themed);
 
-  .recaptcha-branding {
-    @include body-xs;
-
-    padding: 0;
-    text-align: left;
+    &:hover {
+      color: var(--link-ui-hover-themed);
+    }
   }
-}
+  .ol-auth-form-messages {
+    display: contents;
 
-.auth-aux-new-password ~ .notification {
-  margin-top: var(--spacing-04);
-}
+    .notification {
+      margin-top: 4px;
+      padding: 10px 12px;
+      border-radius: var(--border-radius-base, 8px);
+      font-size: var(--font-size-04, 14px);
+      line-height: 1.4;
+      background-color: rgb(255 255 255 / 8%);
+      border: 1px solid rgb(255 255 255 / 15%);
+      color: inherit;
 
-.login-register-container {
-  max-width: 400px;
-  margin: 0 auto;
-  padding-bottom: 125px;
-}
+      &.notification-type-error {
+        background-color: color-mix(in srgb, var(--content-danger-themed) 12%, transparent);
+        border-color: color-mix(in srgb, var(--content-danger-themed) 40%, transparent);
+        color: var(--content-danger-themed);
+      }
 
-.login-register-error-container {
-  padding-bottom: var(--spacing-05);
-  text-align: left;
-}
+      &.notification-type-success {
+        background-color: color-mix(in srgb, var(--content-positive-themed) 10%, transparent);
+        border-color: color-mix(in srgb, var(--content-positive-themed) 35%, transparent);
+        color: var(--content-positive-themed);
+      }
 
-.login-register-card {
-  padding-top: 0;
-  padding-bottom: 0;
-  text-align: center;
-}
-
-.login-register-header {
-  padding-bottom: var(--spacing-07);
-  border-bottom: solid 1px var(--border-divider);
-}
-
-.login-register-header-heading {
-  margin: 0;
-  color: var(--content-secondary);
-}
-
-.login-register-hr-text-container {
-  line-height: 1;
-  position: relative;
-  padding: var(--spacing-08) 0;
-  font-size: var(--font-size-02);
-
-  &::before {
-    content: '';
-    position: absolute;
-    height: 1px;
-    background-color: var(--neutral-20);
-    top: 50%;
-    left: 0;
-    right: 0;
-  }
-}
-
-.login-register-hr-text {
-  position: relative;
-  background-color: #fff;
-  padding: 0 var(--spacing-05);
-}
-
-.login-register-text,
-.login-register-hr-text-container {
-  margin: 0;
-}
-
-.login-register-text {
-  padding-bottom: var(--spacing-08);
-
-  &:last-child {
-    padding-bottom: 0;
+      a {
+        color: inherit;
+        text-decoration: underline;
+      }
+    }
   }
 }
