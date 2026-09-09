@@ -313,7 +313,15 @@ export const RailLayout = () => {
         })}
         aria-label={t('sidebar')}
       >
-        <Nav activeKey={selectedTab} className="ide-rail-tabs-nav">
+        <Nav
+          activeKey={selectedTab}
+          className="ide-rail-tabs-nav"
+          // a11y (P8): this "tablist" contains non-tab children (the tab
+          // wrapper, the lower action nav, the more-options action), which
+          // violates aria-required-children. Its tabs still carry
+          // role=tab individually; a bare named region is the honest role.
+          role="region"
+        >
           <div className="ide-rail-tabs-wrapper" ref={tabWrapperRef}>
             {tabsInRail
               .filter(shouldIncludeElement)

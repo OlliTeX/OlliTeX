@@ -65,6 +65,7 @@ export const ToolbarItems: FC<{
           {showGroup('group-section') && (
             <div
               className="ol-cm-toolbar-button-group"
+              role="group"
               data-overflow="group-section"
               aria-label={t('toolbar_text_formatting')}
             >
@@ -74,6 +75,7 @@ export const ToolbarItems: FC<{
           {showGroup('group-format') && (
             <div
               className="ol-cm-toolbar-button-group"
+              role="group"
               aria-label={t('toolbar_text_style')}
             >
               <ToolbarButton
@@ -97,6 +99,7 @@ export const ToolbarItems: FC<{
           {showGroup('group-math') && (
             <div
               className="ol-cm-toolbar-button-group"
+              role="group"
               data-overflow="group-math"
               aria-label={t('toolbar_insert_math_and_symbols')}
             >
@@ -116,6 +119,7 @@ export const ToolbarItems: FC<{
           )}
           <div
             className="ol-cm-toolbar-button-group"
+              role="group"
             data-overflow="group-misc"
             aria-label={t('toolbar_insert_misc')}
           >
@@ -180,6 +184,7 @@ export const ToolbarItems: FC<{
           {showGroup('group-list') && (
             <div
               className="ol-cm-toolbar-button-group"
+              role="group"
               data-overflow="group-list"
               aria-label={t('toolbar_list_indentation')}
             >

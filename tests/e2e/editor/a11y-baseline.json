@@ -1,52 +1,26 @@
 {
-  "capturedAt": "2026-09-09T09:03:42.185Z",
-  "url": "/Project/6aa120e5db76799da01bb7fe",
+  "capturedAt": "2026-09-09T15:43:14.313Z",
+  "url": "/Project/6aa17e896827dafb3ab161ad",
   "base": {
     "label": "editor base surface",
     "critical": [
-      {
-        "id": "aria-required-children",
-        "nodes": 2
-      },
       {
         "id": "button-name",
         "nodes": 1
       }
     ],
-    "serious": [
-      {
-        "id": "aria-prohibited-attr",
-        "nodes": 1
-      },
-      {
-        "id": "nested-interactive",
-        "nodes": 2
-      }
-    ],
+    "serious": [],
     "moderate": []
   },
   "modal": {
     "label": "share modal open",
     "critical": [
       {
-        "id": "aria-required-children",
-        "nodes": 2
-      },
-      {
         "id": "button-name",
         "nodes": 1
       }
     ],
-    "serious": [
-      {
-        "id": "aria-prohibited-attr",
-        "nodes": 1
-      },
-      {
-        "id": "nested-interactive",
-        "nodes": 2
-      }
-    ],
+    "serious": [],
     "moderate": []
   }
 }
