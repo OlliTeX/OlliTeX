@@ -113,18 +113,53 @@
   .modal-subtitle {
     color: inherit;
   }
+
+  // A Mantine modal whose body carries the LEGACY header (title + close
+  // button, e.g. the share modal before its body conversion) would render
+  // an empty, theme-mixed Mantine header bar on top of the legacy header —
+  // the user sees a duplicated/empty title bar ("title not in the header",
+  // dark bar over light body). Detect the legacy header inside the Mantine
+  // body and suppress the Mantine header bar; the legacy header keeps the
+  // title and its own close button.
+  &:has(.mantine-Modal-body > .modal-header)
+    .mantine-Modal-content
+    > .mantine-Modal-header {
+    display: none;
+  }
 }
 
 html[data-mantine-color-scheme='light'] .ol-mant-modal {
   @include light-themed-variables;
 
   --bs-heading-color: var(--content-primary);
+
+  .mantine-Modal-header {
+    background-color: var(--bg-light-primary);
+    color: var(--content-primary);
+    border-color: var(--border-divider);
+
+    button,
+    .mantine-Modal-title {
+      color: var(--content-primary);
+    }
+  }
 }
 
 html[data-mantine-color-scheme='dark'] .ol-mant-modal {
   @include light-themed-variables;
 
   --bs-heading-color: var(--content-primary);
+
+  .mantine-Modal-header {
+    background-color: var(--bg-light-primary);
+    color: var(--content-primary);
+    border-color: var(--border-divider);
+
+    button,
+    .mantine-Modal-title {
+      color: var(--content-primary);
+    }
+  }
 
   .mantine-Modal-content {
     background-color: var(--bg-light-primary);
