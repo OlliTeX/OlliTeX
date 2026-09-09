@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import useAsync from '@/shared/hooks/use-async' // 6.3.0: default-export hook whose result object carries runAsync(promise)
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormText from '@/shared/components/ol/ol-form-text'
@@ -30,6 +30,8 @@ interface ComplianceRubric {
 
 export default function LLMComplianceSettings() {
     const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M4)
+
     const { isReady } = useWaitForI18n()
     const { runAsync } = useAsync<unknown>()
     const [rubrics, setRubrics] = useState<ComplianceRubric[]>([])
@@ -157,15 +159,15 @@ export default function LLMComplianceSettings() {
             {rubrics.map(rubric => (
                 <div key={rubric.id} className="ol-llm-admin-settings__rubric-card">
                     <div className="ol-llm-admin-settings__row-end">
-                        <OLButton
+                        <Btn
                             variant="link"
                             size="sm"
-                            type="button"
+                           
                             onClick={() => removeRubric(rubric.id)}
                         >
                             <MaterialIcon type="delete" className="me-1 ol-llm-admin-settings__icon-base" />
                             {t('remove_rubric', 'Remove rubric')}
-                        </OLButton>
+                        </Btn>
                     </div>
                     <OLFormGroup controlId={`llm-user-rubric-name-${rubric.id}`}>
                         <OLFormLabel>{t('rubric_name', 'Rubric name')}</OLFormLabel>
@@ -213,19 +215,19 @@ export default function LLMComplianceSettings() {
             ))}
 
             <div className="ol-llm-admin-settings__row-end ol-llm-admin-settings__mt-lg">
-                <OLButton size="sm" variant="tertiary" type="button" onClick={addRubric}>
+                <Btn size="sm" variant="tertiary" onClick={addRubric}>
                     <MaterialIcon type="add" className="me-1 ol-llm-admin-settings__icon-base" />
                     {t('add_rubric', 'Add rubric')}
-                </OLButton>
+                </Btn>
                 <span className="ol-llm-admin-settings__spacer-sm" />
-                <OLButton size="sm" variant="tertiary" type="button" onClick={resetToInherited}>
+                <Btn size="sm" variant="tertiary" onClick={resetToInherited}>
                     <MaterialIcon type="restart_alt" className="me-1 ol-llm-admin-settings__icon-base" />
                     {t('reset_to_defaults', 'Reset to deployment defaults')}
-                </OLButton>
-                <OLButton size="sm" variant="secondary" type="button" onClick={save} disabled={saving} isLoading={saving}>
+                </Btn>
+                <Btn size="sm" variant="secondary" onClick={save} disabled={saving} loading={saving}>
                     <MaterialIcon type="save" className="me-1 ol-llm-admin-settings__icon-base" />
                     {t('save_settings', 'Save my rubrics')}
-                </OLButton>
+                </Btn>
             </div>
 
             {saved && (

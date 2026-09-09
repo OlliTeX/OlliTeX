@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
@@ -91,6 +91,8 @@ export default function LLMSettingsSection({ compact = false }: { compact?: bool
     // header is skipped there.
 
     const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M4)
+
     const [providers, setProviders] = useState<ProviderRow[]>([])
     const [maxProviders, setMaxProviders] = useState(10)
     const [loading, setLoading] = useState(true)
@@ -417,21 +419,21 @@ export default function LLMSettingsSection({ compact = false }: { compact?: bool
                                             : t('llm_byo_disabled', 'Disabled')}
                                     </td>
                                     <td className="llm-buo-actions">
-                                        <OLButton
+                                        <Btn
                                             variant="tertiary"
                                             size="xs"
                                             onClick={() => openEdit(row)}
                                         >
                                             {t('llm_byo_edit', 'Edit')}
-                                        </OLButton>{' '}
-                                        <OLButton
+                                        </Btn>{' '}
+                                        <Btn
                                             variant="tertiary"
                                             size="xs"
                                             disabled={busy !== null}
                                             onClick={() => removeProvider(row)}
                                         >
                                             {t('llm_byo_delete', 'Delete')}
-                                        </OLButton>
+                                        </Btn>
                                     </td>
                                 </tr>
                             ))}
@@ -450,9 +452,9 @@ export default function LLMSettingsSection({ compact = false }: { compact?: bool
             )}
 
             {!loading && canAdd && !draft && (
-                <OLButton variant="secondary" onClick={openAdd}>
+                <Btn variant="secondary" onClick={openAdd}>
                     {t('llm_byo_add', 'Add provider')}
-                </OLButton>
+                </Btn>
             )}
 
             {/* Add / edit panel */}
@@ -576,10 +578,10 @@ export default function LLMSettingsSection({ compact = false }: { compact?: bool
                                     }
                                 }}
                             />
-                            <OLButton variant="tertiary" onClick={addModel}>
+                            <Btn variant="tertiary" onClick={addModel}>
                                 {t('llm_byo_model_add', 'Add')}
-                            </OLButton>
-                            <OLButton
+                            </Btn>
+                            <Btn
                                 variant="tertiary"
                                 disabled={busy !== null}
                                 onClick={scanModels}
@@ -587,7 +589,7 @@ export default function LLMSettingsSection({ compact = false }: { compact?: bool
                                 {busy === 'scan'
                                     ? t('llm_byo_scanning', 'Scanning...')
                                     : t('llm_byo_scan', 'Scan backend for models')}
-                            </OLButton>
+                            </Btn>
                         </div>
                         {draft.models.length > 0 && (
                             <div className="llm-buo-model-chips">
@@ -652,7 +654,7 @@ export default function LLMSettingsSection({ compact = false }: { compact?: bool
                     )}
 
                     <div className="llm-buo-editor-actions">
-                        <OLButton
+                        <Btn
                             variant="primary"
                             disabled={busy !== null}
                             onClick={save}
@@ -660,8 +662,8 @@ export default function LLMSettingsSection({ compact = false }: { compact?: bool
                             {busy === 'save'
                                 ? t('llm_byo_saving', 'Saving...')
                                 : t('llm_byo_save', 'Save provider')}
-                        </OLButton>{' '}
-                        <OLButton
+                        </Btn>{' '}
+                        <Btn
                             variant="tertiary"
                             disabled={busy !== null}
                             onClick={testDraft}
@@ -669,10 +671,10 @@ export default function LLMSettingsSection({ compact = false }: { compact?: bool
                             {busy === 'test'
                                 ? t('llm_byo_testing', 'Testing...')
                                 : t('llm_byo_test', 'Test connection')}
-                        </OLButton>{' '}
-                        <OLButton variant="tertiary" onClick={closeDraft}>
+                        </Btn>{' '}
+                        <Btn variant="tertiary" onClick={closeDraft}>
                             {t('llm_byo_cancel', 'Cancel')}
-                        </OLButton>
+                        </Btn>
                     </div>
                 </div>
             )}

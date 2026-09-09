@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { OLModal } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import MaterialIcon from '@/shared/components/material-icon'
 import { useLLMModelSelection } from '../hooks/use-llm-model-selection'
 import '../../stylesheets/llm-ui.scss'
@@ -19,6 +19,8 @@ const LLMModelSelectModal = React.memo(function LLMModelSelectModal({
     onHide,
 }: LLMModelSelectModalProps) {
     const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M4)
+
     // overleaf-lab (owner request 2026-08-26): the "Deployment default" pseudo
     // option is gone — only concrete models (site + BYO rows) are selectable.
     const { options, loaded, selected, apply } = useLLMModelSelection()
@@ -95,12 +97,12 @@ const LLMModelSelectModal = React.memo(function LLMModelSelectModal({
                 </div>
             </div>
             <div className="modal-footer">
-                <OLButton variant="tertiary" onClick={onHide}>
+                <Btn variant="tertiary" onClick={onHide}>
                     {t('cancel', 'Cancel')}
-                </OLButton>
-                <OLButton variant="primary" onClick={save} disabled={!loaded}>
+                </Btn>
+                <Btn variant="primary" onClick={save} disabled={!loaded}>
                     {t('llm_apply_model', 'Use this model')}
-                </OLButton>
+                </Btn>
             </div>
         </OLModal>
     )

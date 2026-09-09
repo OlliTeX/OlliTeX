@@ -3,7 +3,10 @@ import { useTranslation } from 'react-i18next'
 import getMeta from '@/utils/meta'
 import { postJSON } from '@/infrastructure/fetch-json'
 import useAsync from '@/shared/hooks/use-async'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
+import { Switch } from '@mantine/core'
 import OLButton from '@/shared/components/ol/ol-button'
+import { canUseMantineSurface, useEditorUiVariant } from '@/features/editor-v2/variant'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormText from '@/shared/components/ol/ol-form-text'
@@ -83,6 +86,21 @@ function ToggleSwitch({
     onChange: (v: boolean) => void
     label?: string
 }) {
+    const ctx = useEditorUiVariant()
+    const mantine = canUseMantineSurface(ctx)
+    if (mantine) {
+        return (
+            <ctx.Provider>
+                <Switch
+                    checked={checked}
+                    onChange={() => onChange(!checked)}
+                    label={label}
+                    aria-label={label}
+                    size="md"
+                />
+            </ctx.Provider>
+        )
+    }
     return (
         <OLButton
             role="switch"
@@ -100,6 +118,7 @@ function ToggleSwitch({
 
 export default function LLMAdminSettingsPage() {
     const { t } = useTranslation()
+    const { Btn } = useMantineSurface() // module Mantine wave (M4)
     const hasStoredKey = getMeta('ol-hasLlmApiKey') === 'true'
     // overleaf-lab: true when the shown URL is inherited from the LLM_API_URL env
     // var rather than saved in the admin settings file.
@@ -535,7 +554,7 @@ export default function LLMAdminSettingsPage() {
                           {t('llm_api_key_optional_local', 'Leave blank for a local server with no auth (e.g. a llama.cpp server).')}
                       </OLFormText>
                       {hasStoredKey && (
-                          <OLButton
+                          <Btn
                               variant="link"
                               onClick={() => {
                                   setLlmApiKey('')
@@ -543,22 +562,22 @@ export default function LLMAdminSettingsPage() {
                               }}
                           >
                               {t('llm_api_key_remove', 'Remove stored key')}
-                          </OLButton>
+                          </Btn>
                       )}
                   </OLFormGroup>
 
                   <div className="ol-llm-admin-settings__row-inline">
-                      <OLButton
+                      <Btn
                           variant="secondary"
                           size="sm"
-                          type="button"
+                         
                           onClick={testConnection}
                           disabled={!canConnect}
-                          isLoading={testStatus === 'testing'}
+                          loading={testStatus === 'testing'}
                       >
                           <MaterialIcon type="cable" className="me-1 ol-llm-admin-settings__icon-base"  />
                           {t('test_connection', 'Test Connection')}
-                      </OLButton>
+                      </Btn>
                       {testStatus === 'success' && (
                           <span className="llm-settings-section-status llm-settings-section-status-success">
                               <MaterialIcon type="check_circle" className="llm-settings-section-status-icon" />
@@ -595,17 +614,17 @@ export default function LLMAdminSettingsPage() {
                   <div
                       className={`ol-llm-admin-settings__row-inline${allModels.length > 0 ? ' ol-llm-admin-settings__mt-lg' : ''}`}
                   >
-                      <OLButton
+                      <Btn
                           variant="secondary"
                           size="sm"
-                          type="button"
+                         
                           onClick={scanModels}
                           disabled={!canConnect}
-                          isLoading={scanStatus === 'scanning'}
+                          loading={scanStatus === 'scanning'}
                       >
                           <MaterialIcon type="radar" className="me-1 ol-llm-admin-settings__icon-base"  />
                           {t('scan_for_models', 'Scan for Models')}
-                      </OLButton>
+                      </Btn>
                       {scanStatus === 'success' && (
                           <span className="llm-settings-section-status llm-settings-section-status-success">
                               <MaterialIcon type="check_circle" className="llm-settings-section-status-icon" />
@@ -673,25 +692,25 @@ export default function LLMAdminSettingsPage() {
                               </table>
                           </div>
                           <div className="ol-llm-admin-settings__models-actions">
-                              <OLButton
+                              <Btn
                                   variant="link"
                                   size="sm"
-                                  type="button"
+                                 
                                   onClick={() => setAllowedModels([...allModels])}
                                   className="ol-llm-admin-settings__link-btn"
                               >
                                   {t('select_all', 'Select all')}
-                              </OLButton>
+                              </Btn>
                               <span className="ol-llm-admin-settings__muted">|</span>
-                              <OLButton
+                              <Btn
                                   variant="link"
                                   size="sm"
-                                  type="button"
+                                 
                                   onClick={() => setAllowedModels([])}
                                   className="ol-llm-admin-settings__link-btn"
                               >
                                   {t('unselect_all', 'Unselect all')}
-                              </OLButton>
+                              </Btn>
                           </div>
                       </>
                   )}
@@ -736,16 +755,16 @@ export default function LLMAdminSettingsPage() {
                       <OLFormText className="ol-llm-admin-settings__no-margin">
                           {systemPrompt.length}/4000 {t('characters', 'characters')}
                       </OLFormText>
-                      <OLButton
+                      <Btn
                           variant="link"
                           size="sm"
-                          type="button"
+                         
                           onClick={() => setSystemPrompt(DEFAULT_SYSTEM_PROMPT)}
                           className="ol-llm-admin-settings__link-btn"
                       >
                           <MaterialIcon type="restart_alt" className="me-1 ol-llm-admin-settings__icon-base"  />
                           {t('reset_to_default', 'Reset to default')}
-                      </OLButton>
+                      </Btn>
                   </div>
               </div>
 
@@ -868,32 +887,32 @@ export default function LLMAdminSettingsPage() {
                               <OLFormText className="ol-llm-admin-settings__no-margin">
                                   {field.help}
                               </OLFormText>
-                              <OLButton
+                              <Btn
                                   variant="link"
                                   size="sm"
-                                  type="button"
+                                 
                                   onClick={() => field.set(field.def || '')}
                                   className="ol-llm-admin-settings__link-btn"
                               >
                                   <MaterialIcon type="restart_alt" className="me-1 ol-llm-admin-settings__icon-base"  />
                                   {t('reset_to_default', 'Reset to default')}
-                              </OLButton>
+                              </Btn>
                           </div>
                       </div>
                   ))}
 
                   {/* overleaf-lab: (b) collapsible Ask AI action templates, one textarea per action */}
                   <div className="ol-llm-admin-settings__mt-sm">
-                      <OLButton
+                      <Btn
                           variant="link"
                           size="sm"
-                          type="button"
+                         
                           onClick={() => setShowActions(v => !v)}
                           className="ol-llm-admin-settings__small-md"
                       >
                           <MaterialIcon type={showActions ? 'expand_less' : 'expand_more'} className="me-1 ol-llm-admin-settings__icon-lg"  />
                           {t('ask_ai_action_templates', 'Ask AI action templates')}
-                      </OLButton>
+                      </Btn>
 
                       {showActions && (
                           <div className="ol-llm-admin-settings__mt-md">
@@ -924,10 +943,10 @@ export default function LLMAdminSettingsPage() {
                                           />
                                       </OLFormGroup>
                                       <div className="ol-llm-admin-settings__row-end">
-                                          <OLButton
+                                          <Btn
                                               variant="link"
                                               size="sm"
-                                              type="button"
+                                             
                                               onClick={() => {
                                                   const def = promptDefaults.askAiActionPrompts?.[key] || ''
                                                   setAskAiActionPrompts(prev => ({ ...prev, [key]: def }))
@@ -936,7 +955,7 @@ export default function LLMAdminSettingsPage() {
                                           >
                                               <MaterialIcon type="restart_alt" className="me-1 ol-llm-admin-settings__icon-base"  />
                                               {t('reset_to_default', 'Reset to default')}
-                                          </OLButton>
+                                          </Btn>
                                       </div>
                                   </div>
                               ))}
@@ -1013,16 +1032,16 @@ export default function LLMAdminSettingsPage() {
                       </div>
 
                       <div className="ol-llm-admin-settings__row-between">
-                          <OLButton
+                          <Btn
                               variant="secondary"
                               size="sm"
-                              type="button"
+                             
                               onClick={() => testLanguageToolConnection()}
                               disabled={ltCheckStatus === 'checking'}
                               isLoading={ltCheckStatus === 'checking'}
                           >
                               {t('language_tool_check', 'Check LanguageTool connection')}
-                          </OLButton>
+                          </Btn>
                           {ltCheckStatus !== 'idle' && (
                               <Notification
                                   type={ltCheckStatus === 'success' ? 'success' : 'error'}
@@ -1058,17 +1077,17 @@ export default function LLMAdminSettingsPage() {
               {saveErrors.length > 0 && (
                   <Notification type="error" content={saveErrors.join(' · ')} />
               )}
-              <OLButton
+              <Btn
                   variant="primary"
                   type="submit"
                   disabled={isSaving}
-                  isLoading={isSaving}
+                  loading={isSaving}
                   loadingLabel={t('saving') + '…'}
                   className="ol-llm-admin-settings__save-btn"
               >
                   <MaterialIcon type="save" className="me-1 ol-llm-admin-settings__icon-lg"  />
                   {t('save_settings', 'Save Settings')}
-              </OLButton>
+              </Btn>
           {/* Section 7: Usage (usage meter). Inside the form so it renders in the content column with the other tabs. */}
           <div className="card page-content-card llm-settings-section" data-sec="usage">
               <div className="llm-settings-section-header">

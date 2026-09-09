@@ -17,7 +17,7 @@ import {
   useEditorUiVariant,
 } from './variant'
 
-export type SurfaceBtnVariant = 'primary' | 'secondary' | 'danger' | 'danger-ghost'
+export type SurfaceBtnVariant = 'primary' | 'secondary' | 'danger' | 'danger-ghost' | 'link' | 'tertiary'
 
 export interface SurfaceBtnProps {
   children: ReactNode
@@ -30,6 +30,14 @@ export interface SurfaceBtnProps {
   // converted action surface is for real actions only.
   href?: string
   target?: string
+  // loading state (OLButton isLoading/loadingLabel ↔ Mantine loading)
+  loading?: boolean
+  loadingLabel?: string
+  // leading icon (OLButton leadingIcon ↔ Mantine leftSection)
+  leftIcon?: ReactNode
+  // passthroughs (OLButton className/type; Mantine Button className)
+  className?: string
+  type?: string
 }
 
 export interface MantineSurface {
@@ -58,11 +66,14 @@ export function useMantineSurface(): MantineSurface {
     loading,
     loadingLabel,
     leftIcon,
+    className,
+    type,
   }: SurfaceBtnProps): ReactElement =>
     mantine && !href ? (
       <ctx.Provider>
         <Button
           size={size}
+          className={className}
           disabled={disabled}
           onClick={onClick}
           loading={loading}
@@ -75,6 +86,8 @@ export function useMantineSurface(): MantineSurface {
             variant === 'secondary'
               ? 'light'
               : variant === 'danger-ghost'
+                ? 'subtle'
+                : variant === 'link' || variant === 'tertiary'
                 ? 'subtle'
                 : 'fill'
           }
@@ -89,6 +102,8 @@ export function useMantineSurface(): MantineSurface {
         disabled={disabled}
         href={href}
         target={target}
+        type={type}
+        className={className}
         isLoading={loading}
         loadingLabel={loadingLabel}
         leadingIcon={leftIcon}

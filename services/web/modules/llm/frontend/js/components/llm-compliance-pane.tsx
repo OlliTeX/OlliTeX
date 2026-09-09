@@ -1,7 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import MaterialIcon from '@/shared/components/material-icon'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import { useLLMCompliance } from '../hooks/use-llm-compliance'
 import { useLLMModelSelection } from '../hooks/use-llm-model-selection'
 import type {
@@ -75,6 +75,8 @@ function ComplianceReportItem({ item }: { item: ComplianceItem }) {
 
 function LLMCompliancePane() {
     const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M4)
+
     // overleaf-lab (owner request 2026-08-26): the per-pane model picker is
     // gone — the Review run still uses the ONE shared (user-scoped) selection,
     // made via File → "Select LLM Model".
@@ -247,14 +249,14 @@ function LLMCompliancePane() {
                         marginBottom: 8,
                     }}
                 >
-                    <OLButton
+                    <Btn
                         variant="secondary"
-                        type="button"
+                       
                         onClick={downloadReport}
                     >
                         <MaterialIcon type="download" />{' '}
                         {t('download_report', 'Download report')}
-                    </OLButton>
+                    </Btn>
                 </div>
 
                 {/* overleaf-lab: nudge users to keep the report; a new review is a
@@ -369,15 +371,15 @@ function LLMCompliancePane() {
                     ))}
                 </select>
                 {showRunButton && (
-                    <OLButton
+                    <Btn
                         variant="primary"
-                        type="button"
+                       
                         onClick={() => runReview(selectedModel || undefined)}
                         disabled={!selectedRubricId}
                     >
                         <MaterialIcon type="fact_check" />{' '}
                         {t('run_review', 'Run review')}
-                    </OLButton>
+                    </Btn>
                 )}
             </div>
 
@@ -395,13 +397,13 @@ function LLMCompliancePane() {
                         </div>
                     )}
                     <div style={{ marginTop: 8 }}>
-                        <OLButton
+                        <Btn
                             variant="secondary"
-                            type="button"
+                           
                             onClick={cancelReview}
                         >
                             <MaterialIcon type="close" /> {t('cancel', 'Cancel')}
-                        </OLButton>
+                        </Btn>
                     </div>
                 </div>
             )}
@@ -506,13 +508,13 @@ function LLMCompliancePane() {
                     )}
 
                     <div style={{ marginTop: 8 }}>
-                        <OLButton
+                        <Btn
                             variant="secondary"
-                            type="button"
+                           
                             onClick={cancelReview}
                         >
                             <MaterialIcon type="close" /> {t('cancel', 'Cancel')}
-                        </OLButton>
+                        </Btn>
                     </div>
                 </div>
             )}
