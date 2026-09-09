@@ -1,6 +1,8 @@
 # Modals (core IDE modals P3 + the big three P4) — renovated to Mantine modals.
 # Each row's proof = a dual-route test (same journey on /editor and /Project)
 # asserting the SAME API calls and the same visible result.
+# The big-modals rows (due P4) live in modals-p4.yaml (one matrix doc per
+# spec file, like the rest of the editor matrices).
 page: /editor/:ProjectId vs /Project/:Project_id
 id: modals
 files:
@@ -37,57 +39,3 @@ features:
     due: P3
     legacy_test: diff
     editor_test: diff
-
-  - id: share-invite
-    desc: share modal: invite by email + role change persists (API round-trip)
-    due: P4
-    legacy_test: invite
-    editor_test: invite
-
-  - id: share-remove
-    desc: share modal: remove collaborator updates membership (API round-trip)
-    due: P4
-    legacy_test: remove
-    editor_test: remove
-
-  - id: share-request
-    desc: non-owner sees request-access entry in the share surface
-    due: P4
-    legacy_test: request access
-    editor_test: request access
-
-  - id: clone
-    desc: clone-project flow copies the project (API round-trip + new id)
-    due: P4
-    legacy_test: clone
-    editor_test: clone
-
-  - id: settings-compile
-    desc: project settings: compile form (root / format) saves via POST settings
-    due: P4
-    legacy_test: compile
-    editor_test: compile
-
-  - id: settings-references
-    desc: project settings: references tab (import/export bib) round-trips
-    due: P4
-    legacy_test: references
-    editor_test: references
-
-  - id: settings-tags
-    desc: project settings/tags: assign + remove round-trip (API)
-    due: P4
-    legacy_test: tags
-    editor_test: tags
-
-  - id: word-count
-    desc: word-count modal shows counts for the focused doc
-    due: P4
-    legacy_test: word
-    editor_test: word
-
-  - id: hotkeys
-    desc: hotkeys/surface modal lists the same bindings as the rail surface
-    due: P4
-    legacy_test: hotkeys
-    editor_test: hotkeys
