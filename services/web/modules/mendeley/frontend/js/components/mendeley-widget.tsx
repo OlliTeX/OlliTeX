@@ -4,7 +4,7 @@ import getMeta from '@/utils/meta'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import useAsync from '@/shared/hooks/use-async'
 import { debugConsole } from '@/utils/debugging'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import {
   OLModal,
   OLModalBody,
@@ -24,6 +24,8 @@ import MendeleyLogo from '@/shared/svgs/mendeley-logo'
  */
 export const MendeleyWidget = function MendeleyWidget() {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M2)
+
   const { appName } = getMeta('ol-ExposedSettings')
 
   const {
@@ -41,7 +43,6 @@ export const MendeleyWidget = function MendeleyWidget() {
 
   const [showUnlinkModal, setShowUnlinkModal] = useState(false)
 
-  const configured = Boolean(status?.configured)
   const isConnected = Boolean(status?.connected)
 
   const handleConnCheck = useCallback(() => {
@@ -119,27 +120,27 @@ export const MendeleyWidget = function MendeleyWidget() {
 
         <div>
           {isConnected ? (
-            <OLButton
+            <Btn
               variant="danger-ghost"
               onClick={() => setShowUnlinkModal(true)}
               disabled={isUnlinking}
             >
               {isUnlinking ? t('unlinking') : t('unlink')}
-            </OLButton>
+            </Btn>
           ) : isErrorConnCheck ? (
-            <OLButton
+            <Btn
               variant="secondary"
               onClick={handleConnCheck}
             >
               {t('reconnect')}
-            </OLButton>
+            </Btn>
           ) : (
-            <OLButton
+            <Btn
               variant="secondary"
               href="/user/mendeley/oauth?popup=0"
             >
               {t('link')}
-            </OLButton>
+            </Btn>
           )}
         </div>
       </div>
@@ -167,20 +168,20 @@ export const MendeleyWidget = function MendeleyWidget() {
         </OLModalBody>
 
         <OLModalFooter>
-          <OLButton
+          <Btn
             variant="secondary"
             onClick={() => setShowUnlinkModal(false)}
           >
             {t('cancel')}
-          </OLButton>
+          </Btn>
 
-          <OLButton
+          <Btn
             variant="danger-ghost"
             onClick={handleUnlink}
             disabled={isUnlinking}
           >
             {isUnlinking ? t('unlinking') : t('unlink')}
-          </OLButton>
+          </Btn>
         </OLModalFooter>
       </OLModal>
     </>

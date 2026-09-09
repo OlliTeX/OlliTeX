@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import type { ReactElement, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import getMeta from '@/utils/meta'
 import {
@@ -9,13 +8,7 @@ import {
     OLModalHeader,
     OLModalTitle,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLNotification from '@/shared/components/notification' // 6.3.0 legacy Notification provides the OLNotification surface
-import { Alert, Button } from '@mantine/core'
-import {
-    canUseMantineSurface,
-    useEditorUiVariant,
-} from '@/features/editor-v2/variant'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { debugConsole } from '@/utils/debugging'
 
@@ -51,12 +44,6 @@ function WebdavSyncModal({ show, handleHide, projectId, initialProjectName }: {
     initialProjectName?: string
 }) {
     const { t } = useTranslation()
-    // M1 module Mantine wave (hooks before any early return): on the /editor
-    // variant this modal's buttons/notifications render as Mantine inside
-    // the editor's OlliT provider (the OLModal frame is already Mantine
-    // there); /Project keeps the legacy OLButton surface verbatim.
-    const uiCtx = useEditorUiVariant()
-    const mantine = canUseMantineSurface(uiCtx)
     const [modalStatus, setModalStatus] = useState<'loading' | 'disconnected' | 'notLinkedProject' | 'connected'>('loading')
     const [status, setStatus] = useState<ProjectWebdavStatus>()
     const [projectName, setProjectName] = useState<string>()
@@ -247,52 +234,9 @@ function WebdavSyncModal({ show, handleHide, projectId, initialProjectName }: {
         setStatus(undefined)
     }
 
-    type BtnVariant = 'primary' | 'secondary' | 'danger-ghost'
-    const Btn = ({
-        children,
-        variant = 'secondary',
-        onClick,
-        disabled,
-    }: {
-        children: ReactNode
-        variant?: BtnVariant
-        onClick: () => void
-        disabled?: boolean
-    }): ReactElement =>
-        mantine ? (
-            <uiCtx.Provider>
-                <Button
-                    size="xs"
-                    disabled={disabled}
-                    onClick={onClick}
-                    color={variant === 'danger-ghost' ? 'red' : undefined}
-                    variant={
-                        variant === 'secondary'
-                            ? 'light'
-                            : variant === 'danger-ghost'
-                                ? 'subtle'
-                                : 'fill'
-                    }
-                >
-                    {children}
-                </Button>
-            </uiCtx.Provider>
-        ) : (
-            <OLButton variant={variant} onClick={onClick} disabled={disabled}>
-                {children}
-            </OLButton>
-        )
-
-    const Warn = ({ children }: { children: ReactNode }): ReactElement =>
-        mantine ? (
-            <uiCtx.Provider>
-                <Alert color="yellow" variant="light">
-                    {children}
-                </Alert>
-            </uiCtx.Provider>
-        ) : (
-            <OLNotification type="warning" content={children as string} />
-        )
+    // M1 module Mantine wave: shared surface helper (hooks before
+    // any early return) — Mantine on /editor, legacy on /Project.
+    const { Btn, Warn } = useMantineSurface()
 
     if (modalStatus === 'loading') {
         return (

@@ -2,7 +2,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import useAsync from '@/shared/hooks/use-async'
 import { deleteJSON } from '@/infrastructure/fetch-json'
 import { debugConsole } from '@/utils/debugging'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   OLModal,
   OLModalHeader,
@@ -10,10 +10,8 @@ import {
   OLModalBody,
   OLModalFooter,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLNotification from '@/shared/components/notification'
-
-import { ProjectSyncState, GitSyncModalStatus } from '../../types/git-sync-types'
 
 type ZoteroLinkInfoModalModalProps = {
   show: boolean
@@ -21,13 +19,14 @@ type ZoteroLinkInfoModalModalProps = {
   handleHide: () => void
 }
 
-const ZoteroLinkInfoModal = ({ show, isError, handleHide }: ZoteroLinkInfoModalProps) => {
+const ZoteroLinkInfoModal = ({ show, isError, handleHide }: ZoteroLinkInfoModalModalProps) => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M2)
+
   const [showUnlinkInfo, setShowUnlinkInfo] = useState(false)
 
   const {
     isLoading: isUnlinking,
-    isError: isErrorUnlink,
     runAsync: runAsyncUnlink,
   } = useAsync<void>()
 
@@ -69,7 +68,7 @@ const ZoteroLinkInfoModal = ({ show, isError, handleHide }: ZoteroLinkInfoModalP
               <Trans
                 i18nKey="you_currently_have_x_linked_with_your_overleaf_account"
                 values={{ managers: t('zotero') }}
-                components={[<b />]}
+                components={[<b key="b" />]}
               />
             }
           />
@@ -78,28 +77,28 @@ const ZoteroLinkInfoModal = ({ show, isError, handleHide }: ZoteroLinkInfoModalP
 
       <OLModalFooter>
         {showUnlinkInfo ? (
-          <OLButton
+          <Btn
             variant="danger"
             disabled={isUnlinking}
             onClick={handleUnlink}
           >
             {t('confirm')}
-          </OLButton>
+          </Btn>
         ) : (
-          <OLButton
+          <Btn
             variant="danger-ghost"
             disabled={isUnlinking}
             onClick={() => setShowUnlinkInfo(true)}
           >
             {t('unlink')}
-          </OLButton>
+          </Btn>
         )}
-        <OLButton
+        <Btn
           variant="secondary"
           onClick={handleHide}
         >
           {t('close')}
-        </OLButton>
+        </Btn>
       </OLModalFooter>
       </OLModal>
     </>

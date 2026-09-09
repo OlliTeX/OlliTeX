@@ -21,7 +21,7 @@ import {
   OLModalBody,
   OLModalFooter,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
@@ -67,6 +67,8 @@ export default function ZoteroPickerModal({
   onInsert,
 }: ZoteroPickerModalProps) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M2)
+
 
   const [step, setStep] = useState<Step>('library')
   const [notLinked, setNotLinked] = useState(false)
@@ -296,16 +298,16 @@ export default function ZoteroPickerModal({
                 t(' (library access + read access to all groups).')}
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <OLButton
+              <Btn
                 variant="primary"
                 href="/user/zotero/oauth?popup=0"
                 target="_blank"
               >
                 {t('Link Zotero')}
-              </OLButton>
-              <OLButton variant="secondary" onClick={handleClose}>
+              </Btn>
+              <Btn variant="secondary" onClick={handleClose}>
                 {t('Cancel')}
-              </OLButton>
+              </Btn>
             </div>
           </>
         ) : (
@@ -359,12 +361,12 @@ export default function ZoteroPickerModal({
                         ))}
                       </OLFormSelect>
                     </OLFormGroup>
-                    <OLButton
+                    <Btn
                       variant="primary"
                       onClick={browse}
                     >
                       {t('Browse items')}
-                    </OLButton>
+                    </Btn>
                   </>
                 )}
               </>
@@ -372,7 +374,7 @@ export default function ZoteroPickerModal({
 
             {step === 'items' && (
               <>
-                <OLButton
+                <Btn
                   variant="ghost"
                   size="sm"
                   onClick={() => {
@@ -384,7 +386,7 @@ export default function ZoteroPickerModal({
                   data-testid="zot-back"
                 >
                   {t('Back to libraries')}
-                </OLButton>
+                </Btn>
 
                 {itemsLoading && <p>{t('Loading items…')}</p>}
 
@@ -498,17 +500,17 @@ export default function ZoteroPickerModal({
 
       {step === 'items' && !notLinked && !itemsLoading && items.length > 0 && (
         <OLModalFooter>
-          <OLButton variant="secondary" onClick={handleClose}>
+          <Btn variant="secondary" onClick={handleClose}>
             {t('Cancel')}
-          </OLButton>
-          <OLButton
+          </Btn>
+          <Btn
             variant="primary"
             onClick={() => void handleImport()}
             disabled={selectedKeys.size === 0 || importing}
             isLoading={importing}
           >
             {t('Import selected (__count__)', { count: selectedKeys.size })}
-          </OLButton>
+          </Btn>
         </OLModalFooter>
       )}
     </OLModal>

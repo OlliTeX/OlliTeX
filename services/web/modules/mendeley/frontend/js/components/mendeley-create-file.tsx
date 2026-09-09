@@ -1,10 +1,9 @@
 import { useTranslation } from 'react-i18next'
-import { useEffect, useCallback, useState } from 'react'
-import * as eventTracking from '@/infrastructure/event-tracking'
+import { useEffect, useCallback } from 'react'
 import { getJSON } from '@/infrastructure/fetch-json'
 import useAsync from '@/shared/hooks/use-async'
 import { debugConsole } from '@/utils/debugging'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLNotification from '@/shared/components/notification'
 import { useFileTreeActionable } from '@/features/file-tree/contexts/file-tree-actionable'
 import FileTreeModalCreateFileMode from '@/features/file-tree/components/file-tree-create/file-tree-modal-create-file-mode'
@@ -31,6 +30,8 @@ export function CreateFileMode() {
 export function CreateFilePane() {
   const { newFileCreateMode } = useFileTreeActionable()
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M2)
+
   const isMendeleyMode = newFileCreateMode === 'mendeley'
 
   const {
@@ -84,7 +85,7 @@ export function CreateFilePane() {
       <div className="referencesImportModal">
         <p>{t('mendeley_sync_description')}</p>
         <p>
-          <OLButton
+          <Btn
             variant="primary"
             onClick={() => {
               window.open(
@@ -95,7 +96,7 @@ export function CreateFilePane() {
             }}
           >
             {t('link_to_mendeley')}
-          </OLButton>
+          </Btn>
         </p>
       </div>
     )
