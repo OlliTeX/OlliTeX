@@ -4,7 +4,7 @@ import {
   OLModalBody,
   OLModalFooter,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import GitServersList, { GitServer } from '../git-servers-list'
 import GitProviderModal from '../git-provider-modal'
 
@@ -20,6 +20,8 @@ type GitSyncNeedAuthModalProps = {
  */
 const GitSyncNeedAuthModal = ({ handleHide, selectServer }: GitSyncNeedAuthModalProps) => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
   const [showProviderModal, setShowProviderModal] = useState(false)
   const [linkedServer, setLinkedServer] = useState<GitServer | null>(null)
   const [listKey, setListKey] = useState(0)
@@ -44,9 +46,9 @@ const GitSyncNeedAuthModal = ({ handleHide, selectServer }: GitSyncNeedAuthModal
         <GitServersList key={listKey} showTest={false} showDelete={false} showLink onLink={handleLink} />
 
         <div style={{ marginTop: '1rem' }}>
-          <OLButton variant="secondary" onClick={() => setShowProviderModal(true)}>
+          <Btn variant="secondary" onClick={() => setShowProviderModal(true)}>
             {t('new_provider')}
-          </OLButton>
+          </Btn>
         </div>
 
         {linkedServer && (
@@ -55,9 +57,9 @@ const GitSyncNeedAuthModal = ({ handleHide, selectServer }: GitSyncNeedAuthModal
       </OLModalBody>
 
       <OLModalFooter>
-        <OLButton variant="secondary" onClick={handleHide}>
+        <Btn variant="secondary" onClick={handleHide}>
           {t('cancel')}
-        </OLButton>
+        </Btn>
       </OLModalFooter>
 
       {showProviderModal && (

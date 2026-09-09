@@ -7,7 +7,7 @@ import {
   OLModalBody,
   OLModalFooter,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLNotification from '@/shared/components/notification'
 import { GitSyncModalStatus, ProjectSyncState } from '../../types/git-sync-types'
 
@@ -34,6 +34,8 @@ const GitSyncMergeModal = ({
 }: GitSyncMergeModalProps) => {
 
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
   const { error, isError, isLoading, setError, runAsync } = useAsync<ProjectSyncState>()
   const { indexAllReferences } = useReferencesContext()
 
@@ -120,12 +122,12 @@ const GitSyncMergeModal = ({
       )}
 
       <OLModalFooter>
-        <OLButton
+        <Btn
           variant="secondary"
           onClick={handleHide}
         >
           {t('close')}
-        </OLButton>
+        </Btn>
       </OLModalFooter>
     </>
   )

@@ -2,7 +2,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import useAsync from '@/shared/hooks/use-async'
 import { deleteJSON } from '@/infrastructure/fetch-json'
 import { OLModalBody, OLModalFooter } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLNotification from '@/shared/components/notification'
 import { debugConsole } from '@/utils/debugging'
 import { ProjectSyncState, GitSyncModalStatus } from '../../types/git-sync-types'
@@ -21,6 +21,8 @@ const GitSyncUnlinkModal = ({
   projectId,
 }: GitSyncUnlinkModalProps) => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
 
   const {
     error,
@@ -82,20 +84,20 @@ const GitSyncUnlinkModal = ({
 
       <OLModalFooter>
         <div className="d-flex gap-2">
-          <OLButton
+          <Btn
             variant="danger"
             onClick={handleUnlink}
             disabled={isLoading || !!error}
           >
             {t('confirm')}
-          </OLButton>
+          </Btn>
 
-          <OLButton
+          <Btn
             variant="secondary"
             onClick={handleHide}
           >
             {t('cancel')}
-          </OLButton>
+          </Btn>
         </div>
       </OLModalFooter>
     </>

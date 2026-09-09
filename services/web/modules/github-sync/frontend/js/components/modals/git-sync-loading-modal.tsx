@@ -3,7 +3,7 @@ import {
   OLModalBody,
   OLModalFooter,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLNotification from '@/shared/components/notification'
 import { GitSyncModalStatus } from '../../types/git-sync-types'
 
@@ -14,6 +14,8 @@ type GitSyncLoadingModalProps = {
 }
 const GitSyncLoadingModal = ({ handleHide, setModalStatus, errorMessage }: GitSyncLoadingModalProps) => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
 
   return (
     <>
@@ -33,19 +35,19 @@ const GitSyncLoadingModal = ({ handleHide, setModalStatus, errorMessage }: GitSy
 
       <OLModalFooter>
         {errorMessage && (
-          <OLButton
+          <Btn
             variant="danger-ghost"
             onClick={() => setModalStatus('confirm-unlink')}
           >
             {t('unlink')}
-          </OLButton>
+          </Btn>
         )}
-        <OLButton
+        <Btn
           variant="secondary"
           onClick={handleHide}
         >
           {t('cancel')}
-        </OLButton>
+        </Btn>
       </OLModalFooter>
     </>
   )

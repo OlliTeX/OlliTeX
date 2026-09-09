@@ -5,6 +5,7 @@
   "main": "index.mjs",
   "type": "module",
   "dependencies": {
+    "@mantine/core": "*",
     "@overleaf/logger": "*",
     "@overleaf/mongoose-wrapper": "*",
     "@overleaf/o-error": "*",

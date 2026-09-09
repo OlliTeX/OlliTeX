@@ -8,7 +8,7 @@ import {
   OLModalHeader,
   OLModalTitle,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { debugConsole } from '@/utils/debugging'
 
@@ -46,6 +46,8 @@ function DropboxSyncModal({
   initialProjectName?: string
 }) {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
   const [modalStatus, setModalStatus] =
     useState<'loading' | 'disconnected' | 'notLinkedProject' | 'connected'>('loading')
   const [status, setStatus] = useState<ProjectDropboxStatus>()
@@ -301,13 +303,13 @@ function DropboxSyncModal({
               <strong>{t('project_name_label')} </strong> {projectName}
             </div>
           )}
-          <OLButton
+          <Btn
             variant="secondary"
             onClick={() => handleLinkProject()}
             disabled={working}
           >
             {working ? t('loading') : t('dropbox_link_project_button')}
-          </OLButton>
+          </Btn>
         </OLModalBody>
       </OLModal>
     )
@@ -347,25 +349,25 @@ function DropboxSyncModal({
               )}
 
               <div className="d-flex gap-2 mt-3 mb-3">
-                <OLButton variant="secondary" onClick={handlePull} disabled={working}>
+                <Btn variant="secondary" onClick={handlePull} disabled={working}>
                   {working ? t('loading') : t('dropbox_import_from_dropbox')}
-                </OLButton>
-                <OLButton variant="primary" onClick={handlePush} disabled={working}>
+                </Btn>
+                <Btn variant="primary" onClick={handlePush} disabled={working}>
                   {working ? t('loading') : t('dropbox_export_to_dropbox')}
-                </OLButton>
+                </Btn>
               </div>
 
               <p className="small text-muted">{t('dropbox_import_note')}</p>
               <p className="small text-muted mb-2">{t('dropbox_export_note')}</p>
 
               {/* Unlink button */}
-              <OLButton
+              <Btn
                 variant="danger-ghost"
                 onClick={handleUnlinkProject}
                 disabled={working}
               >
                 {t('dropbox_unlink_button')}
-              </OLButton>
+              </Btn>
               <p className="small text-muted">
                 {t('dropbox_unlink_note')}
               </p>
@@ -374,9 +376,9 @@ function DropboxSyncModal({
         </OLModalBody>
 
         <OLModalFooter>
-          <OLButton variant="secondary" onClick={handleClose}>
+          <Btn variant="secondary" onClick={handleClose}>
             {t('close')}
-          </OLButton>
+          </Btn>
         </OLModalFooter>
       </OLModal>
     )

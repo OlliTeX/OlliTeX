@@ -4,7 +4,7 @@ import {
   OLModalBody,
   OLModalFooter,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLNotification from '@/shared/components/notification'
 
 import { ProjectSyncState, GitSyncModalStatus } from '../../types/git-sync-types'
@@ -17,6 +17,8 @@ type GitSyncConflictModalProps = {
 
 const GitSyncConflictModal = ({ projectSyncState, handleHide, setModalStatus }: GitSyncConflictModalProps) => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
   const { appName } = getMeta('ol-ExposedSettings')
 
   return (
@@ -37,20 +39,20 @@ const GitSyncConflictModal = ({ projectSyncState, handleHide, setModalStatus }: 
         </p>
       </OLModalBody>
       <OLModalFooter>
-        <OLButton
+        <Btn
           variant="secondary"
           onClick={handleHide}
         >
           {t('close')}
-        </OLButton>
-        <OLButton
+        </Btn>
+        <Btn
           variant="primary"
           onClick={
             () => setModalStatus('run-merge-resolved')
           }
         >
           {t('continue_github_merge')}
-        </OLButton>
+        </Btn>
       </OLModalFooter>
     </>
   )

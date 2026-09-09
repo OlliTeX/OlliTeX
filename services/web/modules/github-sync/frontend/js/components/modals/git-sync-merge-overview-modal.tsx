@@ -8,7 +8,7 @@ import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLRow from '@/shared/components/ol/ol-row'
 import OLCol from '@/shared/components/ol/ol-col'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLIconButton from '@/shared/components/ol/ol-icon-button'
 import OLNotification from '@/shared/components/notification'
 import { debugConsole } from '@/utils/debugging'
@@ -49,6 +49,8 @@ const GitSyncMergeOverviewModal = ({
   setCommitMessage
 }: GitSyncMergeOverviewModalProps) => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
   const appName = 'Overleaf'
 
   const {
@@ -202,31 +204,31 @@ const GitSyncMergeOverviewModal = ({
         <div className="d-flex justify-content-between w-100">
 
           <div className="d-flex gap-2">
-            <OLButton
+            <Btn
               variant="danger-ghost"
               onClick={() => setModalStatus('confirm-unlink')}
               disabled={!isSuccess && error?.info?.statusCode !== 404}
             >
               {t('unlink')}
-            </OLButton>
+            </Btn>
           </div>
 
           <div className="d-flex gap-2">
-            <OLButton
+            <Btn
               variant="primary"
-              leadingIcon="sync"
+              leftIcon="sync"
               onClick={() => setModalStatus('run-merge')}
               disabled={!isSuccess}
             >
               {t('sync')}
-            </OLButton>
+            </Btn>
 
-            <OLButton
+            <Btn
               variant="secondary"
               onClick={handleHide}
             >
               {t('close')}
-            </OLButton>
+            </Btn>
           </div>
 
         </div>

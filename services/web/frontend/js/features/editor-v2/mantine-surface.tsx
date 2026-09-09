@@ -55,6 +55,9 @@ export function useMantineSurface(): MantineSurface {
     size = 'xs',
     href,
     target,
+    loading,
+    loadingLabel,
+    leftIcon,
   }: SurfaceBtnProps): ReactElement =>
     mantine && !href ? (
       <ctx.Provider>
@@ -62,6 +65,9 @@ export function useMantineSurface(): MantineSurface {
           size={size}
           disabled={disabled}
           onClick={onClick}
+          loading={loading}
+          loaderProps={loadingLabel ? { label: loadingLabel } : undefined}
+          leftSection={leftIcon}
           color={
             variant === 'danger' || variant === 'danger-ghost' ? 'red' : undefined
           }
@@ -83,6 +89,9 @@ export function useMantineSurface(): MantineSurface {
         disabled={disabled}
         href={href}
         target={target}
+        isLoading={loading}
+        loadingLabel={loadingLabel}
+        leadingIcon={leftIcon}
       >
         {children}
       </OLButton>

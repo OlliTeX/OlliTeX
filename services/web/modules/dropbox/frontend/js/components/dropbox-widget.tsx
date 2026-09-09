@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { debugConsole } from '@/utils/debugging'
 
 const DropboxWidget = () => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
   const [connected, setConnected] = useState(false)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
@@ -52,15 +54,15 @@ const DropboxWidget = () => {
         {connected ? (
           <>
             <p className="small">Connected to Dropbox.</p>
-            <OLButton variant="danger-ghost" onClick={disconnect} disabled={working}>
+            <Btn variant="danger-ghost" onClick={disconnect} disabled={working}>
               Disconnect
-            </OLButton>
+            </Btn>
           </>
         ) : (
           <>
-            <OLButton variant="secondary" onClick={connect} disabled={working}>
+            <Btn variant="secondary" onClick={connect} disabled={working}>
               Connect Dropbox
-            </OLButton>
+            </Btn>
           </>
         )}
       </div>

@@ -2,7 +2,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import useAsync from '@/shared/hooks/use-async'
 import { deleteJSON } from '@/infrastructure/fetch-json'
 import { OLModalBody, OLModalFooter } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLNotification from '@/shared/components/notification'
 import { debugConsole } from '@/utils/debugging'
 import { GitSyncModalStatus } from '../../types/git-sync-types'
@@ -19,6 +19,8 @@ const GitSyncUnlinkUnavailableModal = ({
   projectId,
 }: GitSyncUnlinkUnavailableModalProps) => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
 
   const {
     error,
@@ -66,20 +68,20 @@ const GitSyncUnlinkUnavailableModal = ({
 
       <OLModalFooter>
         <div className="d-flex gap-2">
-          <OLButton
+          <Btn
             variant="primary"
             onClick={handleUnlink}
             disabled={isLoading}
           >
             {t('unlink_github_repository')}
-          </OLButton>
+          </Btn>
 
-          <OLButton
+          <Btn
             variant="secondary"
             onClick={handleHide}
           >
             {t('cancel')}
-          </OLButton>
+          </Btn>
         </div>
       </OLModalFooter>
     </>

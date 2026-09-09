@@ -11,7 +11,7 @@ import {
   OLModalFooter,
 } from '@/shared/components/ol/ol-modal'
 import OLNotification from '@/shared/components/notification'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import OLForm from '@/shared/components/ol/ol-form'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
@@ -39,6 +39,8 @@ const GitSyncExportModal = ({
   server
 }: GitSyncExportModalProps) => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
 
   const [servers, setServers] = useState<GitServer[]>([])
   const [providerId, setProviderId] = useState('')
@@ -216,22 +218,22 @@ const GitSyncExportModal = ({
       </OLModalBody>
 
       <OLModalFooter>
-        <OLButton
+        <Btn
           variant="secondary"
           onClick={handleHide}
         >
           {t('cancel')}
-        </OLButton>
+        </Btn>
 
-        <OLButton
+        <Btn
           variant="primary"
           onClick={createRepo}
           disabled={!repoName.trim() || isLoading}
-          isLoading={isLoading}
+          loading={isLoading}
           loadingLabel={t('creating')}
         >
           {t('create_project_in_github')}
-        </OLButton>
+        </Btn>
       </OLModalFooter>
     </>
   )

@@ -4,7 +4,7 @@ import {
   OLModalBody,
   OLModalFooter,
 } from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+import { useMantineSurface } from '@/features/editor-v2/mantine-surface'
 import { ProjectSyncState } from '../../types/git-sync-types'
 
 type GitSyncNeedPermissionModalProps = {
@@ -14,6 +14,8 @@ type GitSyncNeedPermissionModalProps = {
 
 const GitSyncNeedPermissionModal = ({ projectSyncState, handleHide }: GitSyncNeedPermissionModalProps) => {
   const { t } = useTranslation()
+  const { Btn } = useMantineSurface() // module Mantine wave (M3)
+
   return (
     <>
       <OLModalBody>
@@ -48,12 +50,12 @@ const GitSyncNeedPermissionModal = ({ projectSyncState, handleHide }: GitSyncNee
         />
       </OLModalBody>
       <OLModalFooter>
-        <OLButton
+        <Btn
           variant="secondary"
           onClick={handleHide}
         >
           {t('close')}
-        </OLButton>
+        </Btn>
       </OLModalFooter>
     </>
   )
