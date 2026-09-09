@@ -1,0 +1,50 @@
+/*
+ * editor-v2 token bridge (EDITOR_RENOVATION_PLAN.md P1).
+ *
+ * Loaded ONLY in the /editor Mantine shell chunk — the /Project bundle never
+ * imports it. Under `.ol-editor-mantine` we re-anchor the legacy design-token
+ * variables onto the Mantine palette so the two chrome generations share one
+ * visual system inside the renovated editor:
+ *
+ *   legacy var            Mantine origin
+ *   --green-50/70         ollitex-6/8   (brand green, same values)
+ *   --neutral-70          gray-6
+ *   --content-primary     --mantine-color-text (scheme-correct)
+ *   --bg-primary/secondary Mantine body surfaces
+ *   --border-divider-themed  --mantine-color-border
+ *   --border-radius-base    8px (the app kit radius, = Mantine theme)
+ *
+ * All values keep the EXACT same hex pairs the app already uses (OL_NEUTRAL /
+ * OLL_GREEN live inside the Mantine theme), so light/dark parity holds and
+ * there is no new color anywhere.
+ */
+
+.ol-editor-mantine {
+  --green-50: var(--mantine-color-ollitex-6);
+  --green-70: var(--mantine-color-ollitex-8);
+  --neutral-70: var(--mantine-color-gray-6);
+  --border-radius-base: 8px;
+}
+
+html[data-mantine-color-scheme='light'] .ol-editor-mantine {
+  --content-primary: var(--mantine-color-text);
+  --content-primary-themed: var(--mantine-color-text);
+  --content-secondary: var(--mantine-color-gray-7);
+  --content-secondary-themed: var(--mantine-color-gray-7);
+  --bg-primary-themed: var(--mantine-color-white);
+  --bg-secondary-themed: var(--mantine-color-gray-0);
+  --border-divider-themed: var(--mantine-color-border);
+  --toolbar-btn-color: var(--mantine-color-text);
+}
+
+html[data-mantine-color-scheme='dark'] .ol-editor-mantine {
+  --content-primary: var(--mantine-color-text);
+  --content-primary-themed: var(--mantine-color-text);
+  --content-secondary: var(--mantine-color-gray-4);
+  --content-secondary-themed: var(--mantine-color-gray-4);
+  --content-primary-dark: var(--mantine-color-text);
+  --bg-primary-themed: var(--mantine-color-dark-9);
+  --bg-secondary-themed: var(--mantine-color-dark-8);
+  --border-divider-themed: var(--mantine-color-border);
+  --toolbar-btn-color: var(--mantine-color-text);
+}

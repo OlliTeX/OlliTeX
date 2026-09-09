@@ -1,0 +1,20 @@
+# editor-v2 P1 — the renovated Mantine shell (EDITOR_RENOVATION_PLAN.md).
+#
+# Contract: /editor runs the Mantine shell (marker + dataset + shell CSS
+# loaded, IDE boots); /Project stays legacy (marker absent, shell CSS never
+# loaded). One spec covers both sides, so both file slots point at it —
+# the gate is satisfied only while the spec passes live.
+page: /editor/:ProjectId (renovated shell) vs /Project/:Project_id (dormant)
+id: shell
+files:
+  legacy: specs/editor/shell-probe.test.e2e.ts
+  editor: specs/editor/shell-probe.test.e2e.ts
+
+features:
+  - id: shell-active
+    desc: >-
+      /editor carries .ol-editor-mantine + data-ol-editor-variant="mantine",
+      the shell chunk CSS is loaded, and the IDE boots with no regression
+    due: P1
+    legacy_test: shell
+    editor_test: shell

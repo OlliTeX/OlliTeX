@@ -80,21 +80,34 @@ async function setFixturePassword(page: any, email: string, password: string): P
   if (!token) {
     throw new Error(`[seed] ${email}: no one-time password token after registration`)
   }
-  await gotoRobust(page, `${BASE}/user/activate?token=${encodeURIComponent(token)}`)
+  // This fork (6.3.0-post / LibreLeaf) moved the post-registration password
+  // step from CE's /user/activate to /user/password/set (PasswordResetRouter).
+  // The form requires both the email AND the token as query params and has a
+  // single password field (#passwordField) — verified against the live form.
+  await gotoRobust(
+    page,
+    `${BASE}/user/password/set?email=${encodeURIComponent(email)}&passwordResetToken=${encodeURIComponent(token)}`
+  )
   await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
-  const emailField = page.locator('#emailField')
-  // the activate form's email input is DISABLED + prefilled from the token
-  // (filling it hangs) — only the password is entered here.
-  void emailField
   await page.locator('#passwordField').fill(password)
-  const confirm = page.locator('input[type=password]:not(#passwordField)').first()
-  if ((await confirm.count()) > 0) await confirm.fill(password)
-  await page.click('button[type=submit]')
+  const setArr = await Promise.all([
+    page.waitForResponse(
+      r => r.url().includes('/user/password/set') && r.request().method() === 'POST',
+      { timeout: 20_000 }
+    ).catch(() => null),
+    page.click('button[type=submit]'),
+  ])
+  const setResp = setArr[0]
+  if (setResp) {
+    const st = setResp.status()
+    const rb = await setResp.text().catch(() => '')
+    console.log(`[seed-diag] POST /user/password/set -> ${st} ${rb.slice(0, 300)}`)
+  }
   await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
-  // success indicator: CE redirects to the login page after password set
+  // success indicator: the app redirects to login (or shows a confirmation)
   const url = page.url()
   const body = (await page.locator('body').innerText().catch(() => '')) || ''
-  if (!/\/login/.test(url) && !/password.*set|success/i.test(body)) {
+  if (!/\/login/.test(url) && !/password.*set|success|signed/i.test(body)) {
     throw new Error(
       `[seed] ${email}: password set did not confirm (url=${url}, page: "${body
         .replace(/\s+/g, ' ')

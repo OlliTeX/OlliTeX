@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { loginRobust } from '../../helpers/auth'
-import { api, killProject } from '../../parity/harness'
+import { api, killProject, ensureFixtureTemplate } from '../../parity/harness'
 import { USER } from '../../fixtures/credentials'
 
 // Parity baseline (legacy /templates gallery) — browse templates + start a
@@ -13,6 +13,7 @@ test.beforeAll(async ({ browser }) => {
   const c = await browser.newContext({ viewport: { width: 1400, height: 900 } })
   p = await c.newPage()
   await loginRobust(p, USER.email, USER.password)
+  await ensureFixtureTemplate(browser)
 })
 test.afterAll(async () => {
   if (p) await p.context().close().catch(() => {})

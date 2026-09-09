@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import type { Page } from '@playwright/test'
-import { login as _login } from '../helpers/auth'
+import { login as _login, loginRobust } from '../helpers/auth'
 import { mongoEval as _mongoEvalRaw } from '../helpers/host'
 
 export const login = _login
@@ -120,4 +120,59 @@ export async function killProject(p: any, pid: string) {
     await api(p, 'DELETE', `/admin/project/${pid}`)
     await api(p, 'DELETE', `/admin/project/${pid}/purge`)
   } catch { /* best effort cleanup */ }
+}
+
+/**
+ * Ensure the persistent fixture template "Parity Fixture Template" exists
+ * (idempotent). Fresh stacks wipe mongo and the two gallery parity specs
+ * depend on this long-lived fixture. Logs in as ADMIN in its own context so
+ * it works no matter which role the calling spec runs as. A 409 means a
+ * parallel worker created it in the meantime — fine.
+ */
+export async function ensureFixtureTemplate(browser: import('@playwright/test').Browser): Promise<void> {
+  const { ADMIN } = (await import('../fixtures/credentials')) as any
+  const c = await browser.newContext()
+  const q = await c.newPage()
+  try {
+    await loginRobust(q, ADMIN.email, ADMIN.password)
+    // CSRF token comes from a rendered page's meta tag (this fork's POST
+    // guard: X-CSRF-TOKEN is required, like the manage-spec's api() helper).
+    await q.goto(BASE + '/project', { waitUntil: 'domcontentloaded' }).catch(() => {})
+    const csrf = await q.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)
+    const j = await (async () => {
+      const r = await q.request.get(BASE + '/api/templates', csrf ? { headers: { 'X-CSRF-TOKEN': csrf } } : {})
+      return r.json().catch(() => ({}))
+    })()
+    const arr: any[] = j.templates ?? (Array.isArray(j) ? j : [])
+    if (arr.some(x => (x.name || '') === 'Parity Fixture Template')) return
+    const fs = await import('node:fs')
+    const src = '/tmp/tplfix'
+    if (!fs.existsSync(src + '/source.zip') || !fs.existsSync(src + '/output.pdf')) {
+      // first stack: build the bundle assets once
+      if (!fs.existsSync(src)) fs.mkdirSync(src, { recursive: true })
+      const doc = '\\documentclass{article}\\begin{document}Parity Fixture Body\\end{document}\n'
+      fs.mkdirSync(src + '/srcdir', { recursive: true })
+      fs.writeFileSync(src + '/srcdir/main.tex', doc)
+      execFileSync('zip', ['-q', 'source.zip', 'main.tex'], { cwd: src + '/srcdir' })
+      // /tmp/tplfix/source.zip was created inside srcdir — move it up
+      fs.renameSync(src + '/srcdir/source.zip', src + '/source.zip')
+      fs.writeFileSync(src + '/output.pdf', '%PDF-1.5 fake fixture pdf\n%%EOF\n')
+    }
+    const dir = '/tmp/tplfix_seed' + Date.now()
+    fs.mkdirSync(dir, { recursive: true })
+    fs.copyFileSync(src + '/source.zip', dir + '/source.zip')
+    fs.copyFileSync(src + '/output.pdf', dir + '/output.pdf')
+    fs.writeFileSync(dir + '/template.json', JSON.stringify({ name: 'Parity Fixture Template', version: '1.0.0', category: 'academic-journal', author: 'e2e-fixture', description: 'persistent fixture template for gallery parity specs' }))
+    execFileSync('zip', ['-q', dir + '/bundle.zip', 'template.json', 'source.zip', 'output.pdf'], { cwd: dir })
+    const data = fs.readFileSync(dir + '/bundle.zip').toString('base64')
+    const r = await q.request.post(BASE + '/template/bundle/import', {
+      headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}) },
+      data: JSON.stringify({ data, override: false }),
+    })
+    if (![200, 201, 409].includes(r.status())) {
+      throw new Error(`ensureFixtureTemplate: import failed (${r.status()})`)
+    }
+  } finally {
+    await c.close().catch(() => {})
+  }
 }
