@@ -82,7 +82,6 @@ const LayoutDropdownItem = ({
   return (
     <OLDropdownItem
       active={active}
-      aria-current={active}
       disabled={disabled}
       onClick={onClick}
       leadingIcon={leadingIcon}

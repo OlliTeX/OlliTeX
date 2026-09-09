@@ -22,6 +22,7 @@ export const SettingsModalBody = ({
     >
       <div className="d-flex flex-row">
         <Nav
+          role="region"
           activeKey={activeTab ?? undefined}
           className="d-flex flex-column ide-settings-tab-nav"
         >

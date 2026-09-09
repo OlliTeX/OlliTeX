@@ -49,6 +49,7 @@ export function OLModal({
   size,
   ...props
 }: OLModalProps) {
+  const { t } = useTranslation()
   // P3 editor renovation: on the /editor route (once the P1 shell gate is
   // ready) the modal surface is the Mantine Modal frame — same API surface
   // (show/onHide/size), same children, Mantine's built-in focus trap and
@@ -67,6 +68,7 @@ export function OLModal({
           withinPortal
           trapFocus
           position="center"
+          closeButtonProps={{ 'aria-label': t('close_dialog') }}
           className={classNames('ol-mant-modal', { 'modal-themed': themed }, className)}
         >
           {children}

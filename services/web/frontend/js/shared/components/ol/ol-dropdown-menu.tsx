@@ -110,8 +110,7 @@ function OLDropdownItem(
 
   return (
     <DropdownItem
-      active={active}
-      className={className}
+      className={classnames({ active }, className)}
       role="menuitem"
       {...props}
       ref={ref}
@@ -198,5 +197,7 @@ export function OLDropdownHeader({
   as = 'li',
   ...props
 }: OLDropdownHeaderProps) {
-  return <DropdownHeader as={as} {...props} />
+  return (
+    <DropdownHeader as={as} role="group" {...props} />
+  )
 }

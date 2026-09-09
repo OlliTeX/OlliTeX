@@ -73,9 +73,23 @@ function ThinFooter({
               <>
                 <li>
                   {/* year of initial release, static */}© 2026{' '}
-                  <a href="https://github.com/davrot/6.3.0_post">LibreLeaf</a>{' '}
+                  <a
+                    className="site-footer-attribution-link"
+                    href="https://github.com/davrot/6.3.0_post"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    LibreLeaf
+                  </a>{' '}
                   — a fork of{' '}
-                  <a href="https://github.com/overleaf/overleaf">Overleaf Community Edition</a>{' '}
+                  <a
+                    className="site-footer-attribution-link"
+                    href="https://github.com/overleaf/overleaf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Overleaf Community Edition
+                  </a>{' '}
                   (open source, AGPLv3)
                 </li>
                 {showLanguagePicker || hasCustomLeftNav ? <Separator /> : null}

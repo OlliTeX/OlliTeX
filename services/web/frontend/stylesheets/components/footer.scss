@@ -156,6 +156,18 @@ footer.site-footer {
       margin: 0 var(--spacing-04);
     }
 
+    // attribution links must stay visually distinct from the sentence text
+    a.site-footer-attribution-link {
+      color: var(--link-web-themed);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+
+      &:hover,
+      &:focus-visible {
+        color: var(--link-web-hover-themed);
+      }
+    }
+
     i {
       font-size: var(--font-size-05);
     }

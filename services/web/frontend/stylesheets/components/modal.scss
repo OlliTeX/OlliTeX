@@ -102,6 +102,45 @@
   }
 }
 
+// OLiT Mantine surface (the /editor OLModal branch): the modal is portaled
+// outside the app's theme scope. The documented contract in this file is
+// that modal interiors stay on the light theme ("until we add a dark
+// modal version") — so in the dark scheme we force the whole Mantine
+// surface (shell included) to the light palette, which keeps every raw OL
+// token (headings, labels, links, inputs) at correct contrast.
+.ol-mant-modal {
+  .modal-title,
+  .modal-subtitle {
+    color: inherit;
+  }
+}
+
+html[data-mantine-color-scheme='light'] .ol-mant-modal {
+  @include light-themed-variables;
+
+  --bs-heading-color: var(--content-primary);
+}
+
+html[data-mantine-color-scheme='dark'] .ol-mant-modal {
+  @include light-themed-variables;
+
+  --bs-heading-color: var(--content-primary);
+
+  .mantine-Modal-content {
+    background-color: var(--bg-light-primary);
+    color: var(--content-primary);
+  }
+
+  .mantine-Modal-close {
+    color: var(--content-primary);
+
+    &:hover,
+    &:focus-visible {
+      background-color: var(--bg-light-secondary);
+    }
+  }
+}
+
 // Git bridge modal
 .git-bridge-copy {
   background: var(--bg-light-secondary);

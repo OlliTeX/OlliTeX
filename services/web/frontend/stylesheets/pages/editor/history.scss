@@ -97,8 +97,12 @@ history-root {
   .toggle-switch-label {
     flex: 1;
 
+    // guaranteed-readable label in both light and dark (secondary tokens
+    // can fall below 4.5:1 on mid dark surfaces)
     span {
       display: block;
+
+      color: var(--content-primary-themed);
     }
   }
 
@@ -254,6 +258,20 @@ history-root {
   .history-version-origin,
   .history-version-saved-by {
     color: var(--content-secondary-themed);
+  }
+
+  // dark scheme: the secondary token sits below 4.5:1 on the mid-dark
+  // history surfaces — bump the meta text to the readable primary token
+  // (editor route only; the legacy route has no Mantine scheme attribute)
+  html[data-mantine-color-scheme='dark'] & {
+    .history-version-day,
+    .history-version-change-action,
+    .history-version-metadata-users,
+    .history-version-origin,
+    .history-version-saved-by,
+    .history-version-user-badge-text {
+      color: var(--content-primary-themed);
+    }
   }
 
   .history-version-change-action {

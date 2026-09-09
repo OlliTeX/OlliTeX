@@ -22,11 +22,14 @@ import { useTranslation } from 'react-i18next'
 import { inlineBackground } from '../../../source-editor/extensions/inline-background'
 import OLButton from '@/shared/components/ol/ol-button'
 
-function extensions(themeOptions: Options): Extension[] {
+function extensions(themeOptions: Options & { ariaLabel?: string }): Extension[] {
   return [
     EditorView.editable.of(false),
     EditorState.readOnly.of(true),
-    EditorView.contentAttributes.of({ tabindex: '0' }),
+    EditorView.contentAttributes.of({
+      tabindex: '0',
+      'aria-label': themeOptions.ariaLabel || 'Read-only version diff',
+    }),
     lineNumbers(),
     EditorView.lineWrapping,
     indentUnit.of('    '), // TODO: Vary this by file type
@@ -57,6 +60,7 @@ function DocumentDiffViewer({
         fontSize,
         fontFamily,
         lineHeight,
+        ariaLabel: t('history_diff_readonly'),
       }),
     })
   })

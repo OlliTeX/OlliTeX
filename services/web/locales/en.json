@@ -1862,6 +1862,7 @@
   "history_compare_from_this_version": "Compare from this version",
   "history_compare_up_to_this_version": "Compare up to this version",
   "history_delete_label": "Delete label",
+  "history_diff_readonly": "Read-only version diff",
   "history_download_this_version": "Download this version",
   "history_entry_origin_dropbox": "via Dropbox",
   "history_entry_origin_git": "via Git",

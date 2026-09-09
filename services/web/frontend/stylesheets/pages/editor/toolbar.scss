@@ -364,8 +364,9 @@
     background-position: -100% 0;
   }
 
+  // accent-02 (green-60) keeps white text at >=4.5:1 (accent-01 is 4.17)
   color: var(--white);
-  background-color: var(--bg-accent-01);
+  background-color: var(--bg-accent-02);
   border-radius: var(--border-radius-full);
   box-shadow: 0 2px 4px rgb(30 37 48 / 16%);
 }
