@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import getMeta from '@/utils/meta'
 import {
@@ -10,6 +11,11 @@ import {
 } from '@/shared/components/ol/ol-modal'
 import OLButton from '@/shared/components/ol/ol-button'
 import OLNotification from '@/shared/components/notification' // 6.3.0 legacy Notification provides the OLNotification surface
+import { Alert, Button } from '@mantine/core'
+import {
+    canUseMantineSurface,
+    useEditorUiVariant,
+} from '@/features/editor-v2/variant'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { debugConsole } from '@/utils/debugging'
 
@@ -45,6 +51,12 @@ function WebdavSyncModal({ show, handleHide, projectId, initialProjectName }: {
     initialProjectName?: string
 }) {
     const { t } = useTranslation()
+    // M1 module Mantine wave (hooks before any early return): on the /editor
+    // variant this modal's buttons/notifications render as Mantine inside
+    // the editor's OlliT provider (the OLModal frame is already Mantine
+    // there); /Project keeps the legacy OLButton surface verbatim.
+    const uiCtx = useEditorUiVariant()
+    const mantine = canUseMantineSurface(uiCtx)
     const [modalStatus, setModalStatus] = useState<'loading' | 'disconnected' | 'notLinkedProject' | 'connected'>('loading')
     const [status, setStatus] = useState<ProjectWebdavStatus>()
     const [projectName, setProjectName] = useState<string>()
@@ -235,6 +247,53 @@ function WebdavSyncModal({ show, handleHide, projectId, initialProjectName }: {
         setStatus(undefined)
     }
 
+    type BtnVariant = 'primary' | 'secondary' | 'danger-ghost'
+    const Btn = ({
+        children,
+        variant = 'secondary',
+        onClick,
+        disabled,
+    }: {
+        children: ReactNode
+        variant?: BtnVariant
+        onClick: () => void
+        disabled?: boolean
+    }): ReactElement =>
+        mantine ? (
+            <uiCtx.Provider>
+                <Button
+                    size="xs"
+                    disabled={disabled}
+                    onClick={onClick}
+                    color={variant === 'danger-ghost' ? 'red' : undefined}
+                    variant={
+                        variant === 'secondary'
+                            ? 'light'
+                            : variant === 'danger-ghost'
+                                ? 'subtle'
+                                : 'fill'
+                    }
+                >
+                    {children}
+                </Button>
+            </uiCtx.Provider>
+        ) : (
+            <OLButton variant={variant} onClick={onClick} disabled={disabled}>
+                {children}
+            </OLButton>
+        )
+
+    const Warn = ({ children }: { children: ReactNode }): ReactElement =>
+        mantine ? (
+            <uiCtx.Provider>
+                <Alert color="yellow" variant="light">
+                    {children}
+                </Alert>
+            </uiCtx.Provider>
+        ) : (
+            <OLNotification type="warning" content={children as string} />
+        )
+
     if (modalStatus === 'loading') {
         return (
             <OLModal show={show} onHide={handleClose}>
@@ -294,9 +353,9 @@ function WebdavSyncModal({ show, handleHide, projectId, initialProjectName }: {
                             <strong>{t('project_name_label')} </strong> {projectName}
                         </div>
                     )}
-                    <OLButton variant="secondary" onClick={() => handleLinkProject()} disabled={working}>
+                    <Btn variant="secondary" disabled={working} onClick={() => handleLinkProject()}>
                         {working ? t('loading') : t('webdav_link_project_button')}
-                    </OLButton>
+                    </Btn>
                 </OLModalBody>
             </OLModal>
         )
@@ -336,7 +395,7 @@ function WebdavSyncModal({ show, handleHide, projectId, initialProjectName }: {
                             {/* D.4: conflict view — both sides changed since last sync */}
                             {connectedStatus.mergeStatus === 'conflict' && (
                                 <div className="mb-3">
-                                    <OLNotification type="warning" content={t('webdav_conflict_title')} />
+                                    <Warn>{t('webdav_conflict_title')}</Warn>
                                     <p className="small">{t('webdav_conflict_detail')}</p>
                                     {connectedStatus.lastConflict?.path && (
                                         <p className="small">
@@ -345,32 +404,32 @@ function WebdavSyncModal({ show, handleHide, projectId, initialProjectName }: {
                                     )}
                                     {connectedStatus.lastConflict?.path && (
                                         <div className="d-flex gap-2">
-                                            <OLButton
+                                            <Btn
                                                 variant="secondary"
                                                 onClick={() => handleResolveConflict('local')}
                                                 disabled={working}
                                             >
                                                 {t('webdav_conflict_keep_local_button')}
-                                            </OLButton>
-                                            <OLButton
+                                            </Btn>
+                                            <Btn
                                                 variant="primary"
                                                 onClick={() => handleResolveConflict('remote')}
                                                 disabled={working}
                                             >
                                                 {t('webdav_conflict_keep_remote_button')}
-                                            </OLButton>
+                                            </Btn>
                                         </div>
                                     )}
                                 </div>
                             )}
 
                             <div className="d-flex gap-2 mt-3 mb-3">
-                                <OLButton variant="secondary" onClick={handlePoll} disabled={working}>
+                                <Btn variant="secondary" onClick={() => handlePoll()} disabled={working}>
                                     {working ? t('loading') : t('webdav_import_from_webdav')}
-                                </OLButton>
-                                <OLButton variant="primary" onClick={handlePush} disabled={working}>
+                                </Btn>
+                                <Btn variant="primary" onClick={() => handlePush()} disabled={working}>
                                     {working ? t('loading') : t('webdav_export_to_webdav')}
-                                </OLButton>
+                                </Btn>
                             </div>
                             <p className="small text-muted">
                                 {t('webdav_import_note')}
@@ -380,13 +439,13 @@ function WebdavSyncModal({ show, handleHide, projectId, initialProjectName }: {
                             </p>
 
                             {/* Unlink button */}
-                            <OLButton
+                            <Btn
                                 variant="danger-ghost"
-                                onClick={handleUnlinkProject}
+                                onClick={() => handleUnlinkProject()}
                                 disabled={working}
                             >
                                 {t('webdav_unlink_button')}
-                            </OLButton>
+                            </Btn>
                             <p className="small text-muted">
                                 {t('webdav_unlink_note')}
                             </p>
@@ -395,9 +454,9 @@ function WebdavSyncModal({ show, handleHide, projectId, initialProjectName }: {
                 </OLModalBody>
 
                 <OLModalFooter>
-                    <OLButton variant="secondary" onClick={handleClose}>
+                    <Btn variant="secondary" onClick={handleClose}>
                         {t('close')}
-                    </OLButton>
+                    </Btn>
                 </OLModalFooter>
             </OLModal>
         )
