@@ -71,7 +71,24 @@ export function OLModal({
           closeButtonProps={{ 'aria-label': t('close_dialog') }}
           className={classNames('ol-mant-modal', { 'modal-themed': themed }, className)}
         >
-          {children}
+          <div
+            className="ol-mant-modal-close-scope"
+            onClickCapture={e => {
+              // Legacy headers (rb Modal.Header closeButton markup) render a
+              // .btn-close whose handler normally comes from the react-bootstrap
+              // Modal context — absent here under the Mantine frame. Delegate
+              // any .btn-close inside the modal to this modal's onHide so the
+              // close button works no matter which header style is in use.
+              const el = e.target as HTMLElement
+              if (el && el.closest && el.closest('.btn-close')) {
+                e.preventDefault()
+                e.stopPropagation()
+                onHide()
+              }
+            }}
+          >
+            {children}
+          </div>
         </MantineModal>
       </MantineSurfaceGate>
     )

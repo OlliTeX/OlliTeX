@@ -102,29 +102,39 @@
   }
 }
 
-// OLiT Mantine surface (the /editor OLModal branch): the modal is portaled
-// outside the app's theme scope. The documented contract in this file is
-// that modal interiors stay on the light theme ("until we add a dark
-// modal version") — so in the dark scheme we force the whole Mantine
-// surface (shell included) to the light palette, which keeps every raw OL
-// token (headings, labels, links, inputs) at correct contrast.
+// OLiT Mantine surface (the /editor OLModal branch): the modal is
+// portaled outside the app's theme scope, so the active scheme's token set
+// is mirrored here — legacy body AND Mantine chrome follow the app's
+// light/dark theme (owner contract: "the modal theme follows the app").
 .ol-mant-modal {
+  // Consistent modal chrome (both schemes, owner report: title font and
+  // padding varied between modals): one header rhythm, one title metric.
+  .modal-header {
+    padding: var(--spacing-06);
+    gap: var(--spacing-04);
+  }
+
   .modal-title,
   .modal-subtitle {
     color: inherit;
+    font-size: var(--font-size-05);
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0;
   }
 
   // A Mantine modal whose body carries the LEGACY header (title + close
   // button, e.g. the share modal before its body conversion) would render
-  // an empty, theme-mixed Mantine header bar on top of the legacy header —
-  // the user sees a duplicated/empty title bar ("title not in the header",
-  // dark bar over light body). Detect the legacy header inside the Mantine
-  // body and suppress the Mantine header bar; the legacy header keeps the
-  // title and its own close button.
-  &:has(.mantine-Modal-body > .modal-header)
-    .mantine-Modal-content
-    > .mantine-Modal-header {
-    display: none;
+  // an empty, theme-different Mantine header bar on top of the legacy
+  // header — a duplicated title bar. Detect the legacy header inside the
+  // Mantine body and suppress the Mantine header bar; the legacy header
+  // keeps the title and its close (wired via OLModal's delegated
+  // .btn-close handler — see ol-modal.tsx).
+  &:has(.mantine-Modal-body > .modal-header),
+  &:has(.mantine-Modal-body > .ol-mant-modal-close-scope > .modal-header) {
+    .mantine-Modal-content > .mantine-Modal-header {
+      display: none;
+    }
   }
 }
 
@@ -132,48 +142,12 @@ html[data-mantine-color-scheme='light'] .ol-mant-modal {
   @include light-themed-variables;
 
   --bs-heading-color: var(--content-primary);
-
-  .mantine-Modal-header {
-    background-color: var(--bg-light-primary);
-    color: var(--content-primary);
-    border-color: var(--border-divider);
-
-    button,
-    .mantine-Modal-title {
-      color: var(--content-primary);
-    }
-  }
 }
 
 html[data-mantine-color-scheme='dark'] .ol-mant-modal {
-  @include light-themed-variables;
+  @include dark-themed-variables;
 
   --bs-heading-color: var(--content-primary);
-
-  .mantine-Modal-header {
-    background-color: var(--bg-light-primary);
-    color: var(--content-primary);
-    border-color: var(--border-divider);
-
-    button,
-    .mantine-Modal-title {
-      color: var(--content-primary);
-    }
-  }
-
-  .mantine-Modal-content {
-    background-color: var(--bg-light-primary);
-    color: var(--content-primary);
-  }
-
-  .mantine-Modal-close {
-    color: var(--content-primary);
-
-    &:hover,
-    &:focus-visible {
-      background-color: var(--bg-light-secondary);
-    }
-  }
 }
 
 // Git bridge modal
