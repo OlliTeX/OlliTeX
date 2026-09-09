@@ -43,7 +43,12 @@ test.describe('hub a11y (axe-core)', () => {
       const page = await ctx.newPage()
       await loginRobust(page, c.creds.email, c.creds.password)
       await page.goto(BASE + c.leaf, { waitUntil: 'domcontentloaded' })
-      await page.waitForTimeout(1200) // let the leaf settle (data + rails)
+      // let the leaf settle (data + rails). admin data sections fetch after
+      // first paint — axe sampling mid-hydration produced intermittent false
+      // color-contrast reads (badge-on-default-bg), so wait for networkidle
+      // before analyzing.
+      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {})
+      await page.waitForTimeout(2000)
 
       const res = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
