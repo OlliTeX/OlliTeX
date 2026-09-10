@@ -332,3 +332,35 @@ none a prerequisite for T1–T4:
 - [ ] v1.5 parity items (§6 T2.5) tracked as separate gated tasks; none gates v1.
 - [ ] Docs: `clsi_typst/README.md` + runbook section (envs, image, how to add another
       compiler later) + README "Typst support" note.
+
+---
+
+## ✅ Close-out (2026-09-13) — T1 done, T2 live matrix green, deployed
+
+| Gate | Result |
+|---|---|
+| `yarn install` (root + clsi_typst + web) | GREEN |
+| eslint (changed set) | 0 errors |
+| clsi_typst unit (`yarn vitest run`) | 46/46 (stable-mock fixtures; gate in dedicated file) |
+| web core vitest (Compile, Clsi+Compile 112, TypstT1 56, i18n, i18n-lint, site-settings, templates) | GREEN (residual full-parallel flakes are pre-existing — baseline HEAD shows the same class, members differ) |
+| webpack production | GREEN (typstyle wasm warning noted) |
+| **T2 live matrix (e2e stack, fixture user)** | **3/3**: menu flag ON → basic compile→PDF (%PDF- verified) → article `#bibliography`+`~@key` (0.15.1) compiles |
+| Regression battery | smoke + equation-editor + editor-core: 19 passed (+1 flaky timing, passed on retry) |
+
+### Commits (branch ext-6.3.0-port, pushed)
+- `1cf1f62f53` Typst T1 port (127 files)
+- `9ca70cb94f` T1b — flag ON default, typst schema, 501 UX, DOCKER_RUNNER scoping, sandbox dirs
+- `64b87cb066` digest re-pin to the daemon manifest (0.15.1 re-verified on it)
+- `22b871a542` TYPST_COMPILES_DIR honored over deployment-compelled compilesDir
+- `7571f71e93` T2 live matrix (3/3 green)
+
+### Deployment
+- Production image `98caf51b4047` (= tree at `22b871a542`); `sharelatex/sharelatex:ext-6.3.0-port`;
+  overleafserver cycled healthy; `typstEnabled:true` in exposed settings; clsi_typst-overleaf running.
+- Production compose adds the sandbox same-path binds (`./data/typst/{compiles,output}`) + TYPST_* env.
+- Rollback (owner path): `COMPILE_TYPEST_ENABLED: 'false'` in both web + clsi_typst env → menu hidden,
+  compiler setting hidden, compiles 501 → clean unavailable state (unit tested).
+
+### Open (owner-gated / future)
+- e2e spec committed as a standalone `specs/typst-t2.test.e2e.ts` (not yet in the PHASE gate).
+- Parity gaps (plan §T2.5): tinymist WASM click-to-source + hover math preview (next wave).
