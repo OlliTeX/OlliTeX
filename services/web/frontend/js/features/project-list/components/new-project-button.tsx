@@ -172,6 +172,14 @@ function NewProjectButton({
     onClick: (e: React.MouseEvent) => void
   }> = importProjectFromGithubMenu?.import.default
 
+  // Typst: registered unconditionally at build time; the runtime
+  // visibility gate (COMPILE_TYPEST_ENABLED) is applied on the menu item
+  // below and on the modal render path.
+  const [typstNewProjectMenuModule] = importOverleafModules('typstNewProjectMenu')
+  const TypstNewProjectMenu: JSXElementConstructor<{
+    onClick: (e: React.MouseEvent) => void
+  }> = typstNewProjectMenuModule?.import.default
+
   return (
     <>
       <OLDropdown
@@ -219,6 +227,21 @@ function NewProjectButton({
                 {t('existing_project_zip')}
               </OLDropdownItem>
             </li>
+            {/* Typst: entry into the Typst project modal; only shown when
+                the flag is on (ExposedSettings.typstEnabled). */}
+            {getMeta('ol-ExposedSettings').typstEnabled === true &&
+              (TypstNewProjectMenu ? (
+                <li role="none">
+                  <TypstNewProjectMenu
+                    onClick={e =>
+                      handleModalMenuClick(e, {
+                        modalVariant: 'blank_typst_project',
+                        dropdownMenuEvent: 'blank-typst-project',
+                      })
+                    }
+                  />
+                </li>
+              ) : null)}
             {docxImportEnabled && (
               <li role="none">
                 <OLDropdownItem

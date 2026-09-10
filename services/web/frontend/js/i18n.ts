@@ -65,7 +65,21 @@ i18n.use(initReactI18next).init({
 const localesPromise = import(
   /* webpackChunkName: "[request]" */ `../../locales/${LANG}.json`
 ).then(lang => {
-  i18n.addResourceBundle(LANG, 'translation', lang)
+  // `import()` resolves to a MODULE NAMESPACE in both webpack and vite/SSR.
+  // Namespace enumeration only exposes keys that are valid JS identifiers,
+  // so reserving-word-ish keys ("import", "default", ...) were silently
+  // missing from every i18next bundle — the New-project dropdown rendered
+  // the raw key "import" instead of "Import" (and similar for any other
+  // non-identifier key). The full object is always at namespace `default`
+  // (a CJS-style JSON module), so unwrap it when present. A plain object
+  // (no bundler) passes through unchanged; a legitimate `"default"`
+  // translation entry survives because the unwrapped object carries it.
+  const raw = lang && typeof lang === 'object' ? lang : {}
+  const bundle =
+    raw.default && typeof raw.default === 'object'
+      ? (raw.default as Record<string, string>)
+      : (raw as Record<string, string>)
+  i18n.addResourceBundle(LANG, 'translation', bundle)
   i18n.addResourceBundle(
     LANG,
     'writefull',

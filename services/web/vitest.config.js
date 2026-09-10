@@ -43,6 +43,19 @@ module.exports = defineConfig({
   plugins: [overleafMacroStub],
   resolve: {
     alias: [
+      {
+        // 'abort-controller'@3 ships `main: dist/abort-controller` (no
+        // extension), which the PnP ESM loader cannot infer. Alias to the
+        // concrete file (CJS-style resolution target) so vitest's SSR
+        // chain resolves it.
+        find: /^abort-controller$/,
+        replacement: path.join(
+          __dirname,
+          '..', '.yarn/cache',
+          'abort-controller-npm-3.0.0-2f3a9a2bcb-90ccc50f01.zip',
+          'node_modules', 'abort-controller', 'dist', 'abort-controller.js'
+        ),
+      },
       { find: '@modules', replacement: path.join(__dirname, 'modules') },
       { find: '@', replacement: path.join(__dirname, 'frontend/js') },
     ],
@@ -126,6 +139,51 @@ module.exports = defineConfig({
           },
           setupFiles: ['test/frontend/editor-renovation/vitest.setup.ts'],
           include: ['test/frontend/editor-renovation/**/*.test.{ts,tsx}'],
+          fileParallelism: true,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'TypstT1',
+          // Typst T1 (TYPST_INTEGRATION_PLAN.md §6): log parser (0.15.1
+          // miette format), compiler-setting + new-project-modal flag gating,
+          // toolbar wrap commands, and the module's typst language support —
+          // ported from the `typst_addon` branch (ext-6.3.0-typst). The repo's
+          // mocha test:frontend harness cannot load .tsx spec files under
+          // Node 22 + yarn PnP, so these run here under the same vitest+jsdom
+          // setup as EditorRenovation.
+          //
+          // globals: true — these specs are written in the mocha idiom
+          // (bare describe/it/beforeEach, chai expect), which vitest's global
+          // suite API is source-compatible with.
+          globals: true,
+          server: {
+            deps: {
+              // Resolve via vite (where the abort-controller file alias below
+              // applies) instead of the PnP ESM loader, which cannot resolve
+              // this package's extensionless `main`.
+              inline: [/abort-controller/],
+            },
+          },
+          environment: 'jsdom',
+          environmentOptions: {
+            jsdom: {
+              url: 'https://www.test-overleaf.com/',
+              pretendToBeVisual: true,
+            },
+          },
+          setupFiles: [
+            'test/frontend/editor-renovation/vitest.setup.ts',
+            'test/frontend/typst/codemirror-shim.ts',
+          ],
+          include: [
+            'test/frontend/ide/log-parser/typst-log-parser.test.ts',
+            'test/frontend/features/ide-settings/settings/compiler-setting.test.tsx',
+            'test/frontend/features/project-list/components/new-project-button.test.tsx',
+            'test/frontend/features/source-editor/extensions/toolbar/typst-wrap-commands.test.ts',
+            'modules/typst/test/frontend/languages/*.test.ts',
+          ],
           fileParallelism: true,
         },
       },

@@ -579,6 +579,10 @@ const _CompileController = {
       outputFiles,
       outputFilesArchive,
       compileGroup: limits?.compileGroup,
+      // echo the project's compiler so the client can pick the typst log
+      // parser (clsi_typst output.log = raw typst diagnostics) vs LaTeX
+      // HumanReadableLogs.
+      compiler: limits?.compiler,
       clsiServerId,
       clsiCacheShard,
       validationProblems,

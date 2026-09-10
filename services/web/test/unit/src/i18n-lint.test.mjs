@@ -32,7 +32,9 @@ describe('i18n chain (Forgejo-style linter)', () => {
         )
       } catch (e) {
         const combined = `${e.stdout || ''}${e.stderr || ''}`
-        fail(`i18n-lint reported findings:\n${combined.slice(-4000)}`)
+        // `fail` is a mocha global and is not available to this vitest project;
+        // rethrow with the linter output so the failure surfaces with context.
+        throw new Error(`i18n-lint reported findings:\n${combined.slice(-4000)}`)
       }
       expect(out).toContain('0 error(s)')
     },

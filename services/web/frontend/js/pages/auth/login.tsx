@@ -79,7 +79,7 @@ function LoginPage() {
       footer={
         <div>
           <Anchor href="/register" size="sm">
-            {t('dont_have_an_account')}
+            {t('dont_have_account')}
           </Anchor>
           {cfg.supportText ? (
             <div style={{ marginTop: 8, fontSize: 'var(--font-size-03)', color: 'var(--content-secondary-themed)' }}>

@@ -88,6 +88,39 @@ describe('<NewProjectButton />', function () {
     })
   })
 
+  describe('Typst project entry (gated by ExposedSettings.typstEnabled)', function () {
+    it('is hidden when the flag is off', function () {
+      Object.assign(getMeta('ol-ExposedSettings'), { typstEnabled: false })
+      renderWithProjectListContext(<NewProjectButton id="test" />)
+      const newProjectButton = screen.getByRole('button', {
+        name: 'New project',
+      })
+      fireEvent.click(newProjectButton)
+      expect(
+        screen.queryByRole('menuitem', { name: 'Blank Typst project' })
+      ).to.be.null
+    })
+
+    it('opens the Typst project modal when the flag is on', async function () {
+      Object.assign(getMeta('ol-ExposedSettings'), { typstEnabled: true })
+      renderWithProjectListContext(<NewProjectButton id="test" />)
+      const newProjectButton = screen.getByRole('button', {
+        name: 'New project',
+      })
+      fireEvent.click(newProjectButton)
+      fireEvent.click(
+        screen.getByRole('menuitem', { name: 'Blank Typst project' })
+      )
+      // The project modals are React.lazy chunks: under vitest the dynamic
+      // import settles a tick later than under the mocha/webpack harness,
+      // so await the label.
+      await screen.findByLabelText(/Project name/i)
+    })
+    afterEach(function () {
+      Object.assign(getMeta('ol-ExposedSettings'), { typstEnabled: undefined })
+    })
+  })
+
   describe('for affiliated user with custom templates', function () {
     beforeEach(function () {
       Object.assign(getMeta('ol-ExposedSettings'), {

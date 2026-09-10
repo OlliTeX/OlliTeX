@@ -1,0 +1,6 @@
+error: file not found (searched at /compile/does-not-exist.typ)
+  ┌─ main.typ:3:8
+  │
+3 │ #import "does-not-exist.typ" : non-existing
+  │         ^^^^^^^^^^^^^^^^^^^^
+

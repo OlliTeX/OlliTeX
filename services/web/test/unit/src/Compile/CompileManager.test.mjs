@@ -210,6 +210,10 @@ describe('CompileManager', function () {
             rootDoc_id: 'mock-root-doc-id-123',
             compileBackendClass: 'free',
             ownerAnalyticsId: 'abc',
+            // clsi dispatch per-compiler (clsi vs clsi_typst): the limits now
+            // carry the project compiler, which ClsiManager uses to select
+            // the target service URL.
+            compiler: 'latex',
           }
         )
       })
@@ -317,7 +321,12 @@ describe('CompileManager', function () {
 
     it('should look up the owner of the project', function (ctx) {
       ctx.ProjectGetter.promises.getProject
-        .calledWith(ctx.project_id, { owner_ref: 1, fromV1TemplateId: 1 })
+        .calledWith(ctx.project_id, {
+          owner_ref: 1,
+          fromV1TemplateId: 1,
+          // clsi dispatch per-compiler (clsi vs clsi_typst)
+          compiler: 1,
+        })
         .should.equal(true)
     })
 
@@ -340,6 +349,9 @@ describe('CompileManager', function () {
           compileGroup: ctx.group,
           compileBackendClass: 'premium',
           ownerAnalyticsId: 'abc',
+          // the fixture project has no compiler set; the limits carry it
+          // through as undefined (tex dispatch default)
+          compiler: undefined,
         })
         .should.equal(true)
     })

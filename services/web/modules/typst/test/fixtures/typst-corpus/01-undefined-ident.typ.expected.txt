@@ -1,0 +1,6 @@
+error: unknown variable: x
+  ┌─ main.typ:7:14
+  │
+7 │ The value of #x should trigger an error.
+  │               ^
+

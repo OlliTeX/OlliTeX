@@ -8,6 +8,7 @@ import {
 } from '../../../helpers/editor-providers'
 import CompilerSetting from '@/features/ide-settings/components/compiler-settings/compiler-setting'
 import userEvent from '@testing-library/user-event'
+import getMeta from '@/utils/meta'
 
 const OPTIONS = [
   {
@@ -28,9 +29,12 @@ const OPTIONS = [
   },
 ]
 
+const exposedSettings = () => getMeta('ol-ExposedSettings')
+
 describe('<CompilerSetting />', function () {
   afterEach(function () {
     fetchMock.removeRoutes().clearHistory()
+    exposedSettings().typstEnabled = undefined
   })
 
   it('each option is shown and can be selected', async function () {
@@ -67,5 +71,49 @@ describe('<CompilerSetting />', function () {
         )
       ).to.be.true
     }
+  })
+
+  describe('Typst option (gated by ExposedSettings.typstEnabled)', function () {
+    it('hides the Typst option when the flag is off (default behaviour)', function () {
+      exposedSettings().typstEnabled = false
+      const testRender = render(
+        <EditorProviders>
+          <SettingsModalProvider>
+            <CompilerSetting />
+          </SettingsModalProvider>
+        </EditorProviders>
+      )
+
+      const select = screen.getByLabelText('Compiler')
+      const values = within(select)
+        .queryAllByRole('option')
+        .map((el) => el.getAttribute('value'))
+      expect(values).to.deep.equal(['pdflatex', 'latex', 'xelatex', 'lualatex'])
+      testRender.unmount()
+    })
+
+    it('shows the Typst option when the flag is on', function () {
+      exposedSettings().typstEnabled = true
+      const testRender = render(
+        <EditorProviders>
+          <SettingsModalProvider>
+            <CompilerSetting />
+          </SettingsModalProvider>
+        </EditorProviders>
+      )
+
+      const select = screen.getByLabelText('Compiler')
+      const values = within(select)
+        .queryAllByRole('option')
+        .map((el) => el.getAttribute('value'))
+      expect(values).to.deep.equal([
+        'pdflatex',
+        'latex',
+        'xelatex',
+        'lualatex',
+        'typst',
+      ])
+      testRender.unmount()
+    })
   })
 })

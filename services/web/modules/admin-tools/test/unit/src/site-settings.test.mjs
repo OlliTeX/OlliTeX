@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { afterAll, beforeAll, afterEach, beforeEach, describe, it } from 'vitest'
+import { describe, it } from 'vitest'
 
 // Hermetic unit tests (added 2026-08-28): point the manager at a dedicated
 // database so the LIVE site_settings document (stored-wins semantics)
@@ -177,6 +177,7 @@ describe('SiteSettings', () => {
         'languagetool',
         'linked-file-types',
         'llm',
+        'mendeley',
         'misc',
         'pandoc',
         'sandboxed-compiles',

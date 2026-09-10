@@ -179,6 +179,11 @@ describe('ClsiManager', function () {
         },
         clsi: {
           url: `http://${CLSI_HOST}`,
+          // clsi_typst is a dedicated service (plan §3.9); ClsiManager
+          // dispatches typst compiles to this URL (F2.2).
+          typst: {
+            url: 'http://clsi-typst.example.com:3014',
+          },
           submissionCompileBackendClass: 'free',
           standardCompileBackendClass: 'free',
           priorityCompileBackendClass: 'premium',
@@ -196,7 +201,7 @@ describe('ClsiManager', function () {
       },
       enablePdfCaching: true,
       clsiCookie: { key: 'clsiserver' },
-      safeCompilers: ['pdflatex', 'latex', 'xelatex', 'lualatex'],
+      safeCompilers: ['pdflatex', 'latex', 'xelatex', 'lualatex', 'typst'],
       defaultLatexCompiler: 'pdflatex',
       allowedImageNames: [
         { imageName: 'mock-image-name', hasCheckpointing: true },
@@ -453,6 +458,105 @@ describe('ClsiManager', function () {
           'free',
           `${ctx.newClsiServerId}1`
         )
+      })
+    })
+
+    describe('with a typst project (F2.11 image override)', function () {
+      const buildId = '18fbe9e7564-30dcb2f71250c690'
+
+      beforeEach(async function (ctx) {
+        ctx.docs = {
+          '/main.typ': {
+            name: 'main.typ',
+            _id: 'mock-doc-id-1',
+            lines: ['Hello', 'world'],
+          },
+        }
+        ctx.project.compiler = 'typst'
+        // a texlive image (e.g. imported or default-set project) must NOT be
+        // forwarded to clsi_typst (its allowedImages + docker image are
+        // typst only); expect the TYPST_DOCKER_IMAGE default instead.
+        ctx.project.imageName = 'texlive-full:2026'
+        ctx.outputFiles = [
+          {
+            url: `/project/${ctx.project_id}/user/${ctx.user_id}/build/${buildId}/output/output.pdf`,
+            path: 'output.pdf',
+            type: 'pdf',
+            build: buildId,
+          },
+          {
+            url: `/project/${ctx.project_id}/user/${ctx.user_id}/build/${buildId}/output/output.log`,
+            path: 'output.log',
+            type: 'log',
+            build: buildId,
+          },
+        ]
+        ctx.responseBody.compile.outputFiles = ctx.outputFiles.map(
+          outputFile => ({
+            ...outputFile,
+            url: `http://${CLSI_HOST}${outputFile.url}`,
+          })
+        )
+        ctx.responseBody.compile.buildId = buildId
+        ctx.timeout = 100
+        ctx.result = await ctx.ClsiManager.promises.sendRequest(
+          null,
+          ctx.project._id,
+          ctx.user_id,
+          {
+            compileBackendClass: 'free',
+            compileGroup: 'standard',
+            compiler: 'typst', // CompileManager threads limits.compiler (F2.2)
+            timeout: ctx.timeout,
+          }
+        )
+      })
+
+      it('should forward the typst compile image, not the project texlive image', function (ctx) {
+        const call = ctx.FetchUtils.fetchStringWithResponse.firstCall
+        // clsi_typst only (F2.2 dispatch), so the URL host must be the
+        // typst service's
+        expect(call.args[0].href).to.equal(
+          'http://clsi-typst.example.com:3014/project/project-id/user/user-id/compile?compileBackendClass=free&compileGroup=standard'
+        )
+        const options = call.args[1].json.compile.options
+        // Owner decision (2026-09-10): typst 0.15.1, digest-pinned image
+        // (TYPST_INTEGRATION_PLAN.md §7 re-pin gate: a digest bump is a gated
+        // task — template + error corpus re-verified). NOT the 0.14-era
+        // `pandoc/typst:3-alpine` the test was originally written against.
+        const expectedImage =
+          process.env.TYPST_DOCKER_IMAGE ||
+          'pandoc/typst:latest-alpine@sha256:92cacfbca16676429c57d3cc9b80dd1d4c037c6e4b2e2b283170fb9252cb6221'
+        // clsi_typst's allowedImages are typst-only: the project's texlive
+        // image must NOT be forwarded (F2.11 / F3.4)
+        expect(options.imageName).to.equal(expectedImage)
+        expect(options.imageName).to.not.equal('texlive-full:2026')
+      })
+
+      it('throws the 501 misroute guard when the clsi_typst URL is unconfigured (flag-off safety net)', async function (ctx) {
+        // Flag-off path (owner: default ON, rollback = env false): a typst
+        // compile must fail LOUDLY (OError) instead of silently compiling on
+        // the TeX service.
+        const Original = ctx.Settings.apis.clsi.typst
+        ctx.Settings.apis.clsi.typst = undefined
+        try {
+          await ctx.ClsiManager.promises.sendRequest(
+            null,
+            ctx.project._id,
+            ctx.user_id,
+            {
+              compileBackendClass: 'free',
+              compileGroup: 'standard',
+              compiler: 'typst',
+              timeout: 100,
+            }
+          )
+          expect.fail('expected sendRequest to throw')
+        } catch (e) {
+          expect(e.message).to.contain('clsi_typst URL is not configured')
+        } finally {
+          ctx.Settings.apis.clsi.typst = Original
+        }
       })
     })
 

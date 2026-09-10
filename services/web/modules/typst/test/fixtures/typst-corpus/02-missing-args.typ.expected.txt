@@ -1,0 +1,6 @@
+error: missing argument: b
+  ┌─ main.typ:4:1
+  │
+4 │ #add(1)
+  │  ^^^^^^
+

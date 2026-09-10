@@ -520,6 +520,10 @@ export default async function (webRouter, privateApiRouter, publicApiRouter) {
       llmAllowUserSettings: Settings.llm?.allowUserSettings ?? false,
       // [III]: overall LLM module on/off (admin UI + feature gates)
       llmEnabled: Settings.llm?.enabled ?? false,
+      // Typst: runtime visibility switch for the "Typst project" entry in the
+      // New-Project dropdown; mirrors Settings.typst.enabled (default ON —
+      // owner 2026-09-10; COMPILE_TYPEST_ENABLED=false disables).
+      typstEnabled: !!(Settings.typst && Settings.typst.enabled),
       llmAdminEnabled: res.locals.grammarSettings
         ? res.locals.grammarSettings.llmAdminEnabled
         : true,

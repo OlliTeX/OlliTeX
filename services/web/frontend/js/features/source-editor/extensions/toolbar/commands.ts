@@ -26,6 +26,11 @@ import { sendSearchEvent } from '@/features/event-tracking/search-events'
 export const toggleBold = toggleRanges('\\textbf')
 export const toggleItalic = toggleRanges('\\textit')
 
+// Typst-style bold/italic: the lezer grammar marks '*…*' as Strong and
+// '_…_' as Emph when they wrap typst content.
+export const typstToggleBold = wrapRanges('*', '*')
+export const typstToggleItalic = wrapRanges('_', '_')
+
 // TODO: apply as a snippet?
 // TODO: read URL from clipboard?
 export const wrapInHref = wrapRanges('\\href{}{', '}', false, (range, view) =>

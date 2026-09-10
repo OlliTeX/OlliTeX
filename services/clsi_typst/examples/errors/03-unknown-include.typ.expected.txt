@@ -1,0 +1,6 @@
+error: file not found (searched at /compile/nonexistent-library.typ)
+  ┌─ main.typ:3:8
+  │
+3 │ #import "nonexistent-library.typ": something
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+

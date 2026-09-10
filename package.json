@@ -209,6 +209,7 @@
     "services/analytics",
     "services/chat",
     "services/clsi",
+    "services/clsi_typst",
     "services/clsi-cache",
     "services/clsi-lb",
     "services/clsi-perf",

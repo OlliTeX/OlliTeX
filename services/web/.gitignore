@@ -38,3 +38,4 @@ frontend/js/features/source-editor/lezer-bibtex/bibtex.terms.mjs
 debug-storybook.log
 
 .cache
+public/*.module.wasm

@@ -89,7 +89,9 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
 }) => {
   const { t } = useTranslation()
   const { isOverleaf } = getMeta('ol-ExposedSettings')
-  const { overallTheme, floatingMenu } = useProjectSettingsContext()
+  const { overallTheme, floatingMenu, compiler } = useProjectSettingsContext()
+  // Typst projects: hide TeX Live-only compile settings (fork parity F2.11)
+  const isTypst = compiler === 'typst'
   const [settingToFocus, setSettingToFocus] = useState<string | undefined>(
     undefined
   )
@@ -222,14 +224,17 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
               {
                 key: 'imageName',
                 component: <ImageNameSetting />,
+                hidden: isTypst,
               },
               {
                 key: 'draft',
                 component: <DraftSetting />,
+                hidden: isTypst,
               },
               {
                 key: 'stopOnFirstError',
                 component: <StopOnFirstErrorSetting />,
+                hidden: isTypst,
               },
               {
                 key: 'autoCompile',
@@ -238,6 +243,7 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
               {
                 key: 'optimizeCompiles',
                 component: <OptimizeCompileSetting />,
+                hidden: isTypst,
               },
             ],
           },
@@ -343,6 +349,7 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
       spellcheckExtraSections,
       hasToolbarMigration,
       floatingMenu,
+      isTypst,
     ]
   )
 

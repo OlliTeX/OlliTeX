@@ -1,0 +1,24 @@
+#!/bin/bash
+
+NODE_PARAMS=""
+if [ "$DEBUG_NODE" == "true" ]; then
+    echo "running debug - clsi_typst"
+    NODE_PARAMS="--inspect=0.0.0.0:30131"
+fi
+
+# Set permissions on docker.sock if present,
+# To enable sibling-containers (see entrypoint.sh in clsi project)
+if [ -e '/var/run/docker.sock' ]; then
+  echo ">> Setting permissions on docker socket"
+  DOCKER_GROUP=$(stat -c '%g' /var/run/docker.sock)
+  groupadd --non-unique --gid "${DOCKER_GROUP}" dockeronhost
+  usermod -aG dockeronhost www-data
+fi
+
+source /etc/overleaf/env.sh
+export LISTEN_ADDRESS=127.0.0.1
+
+# typst compile service (plan §4/§5: runit sibling of clsi-overleaf,
+# digest-pinned pandoc/typst image runs as host docker child process,
+# uid 33, network-disabled sandbox)
+exec /sbin/setuser www-data /usr/bin/node $NODE_PARAMS /overleaf/services/clsi_typst/app.js >> /var/log/overleaf/clsi_typst.log 2>&1

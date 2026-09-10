@@ -1,0 +1,12 @@
+error: unclosed delimiter
+  ┌─ main.typ:3:9
+  │
+3 │ #let x = (1 + 2
+  │          ^
+
+error: the character `#` is not valid in code
+  ┌─ main.typ:4:0
+  │
+4 │ #x
+  │ ^
+

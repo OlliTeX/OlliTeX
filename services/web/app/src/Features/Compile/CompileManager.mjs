@@ -140,6 +140,8 @@ async function getProjectCompileLimits(projectId) {
   const project = await ProjectGetter.promises.getProject(projectId, {
     owner_ref: 1,
     fromV1TemplateId: 1,
+    // clsi dispatch per-compiler (clsi vs clsi_typst)
+    compiler: 1,
   })
   return _getProjectCompileLimits(project)
 }
@@ -149,6 +151,8 @@ async function _getProjectCompileLimits(project) {
     throw new Error('project not found')
   }
   const limits = await _getUserCompileLimits(project.owner_ref)
+  // which clsi (clsi vs clsi_typst) the project compiles on
+  limits.compiler = project.compiler
   if (project.fromV1TemplateId === Settings.overrideCompileTimeForTemplate) {
     limits.timeout = Math.max(limits.timeout, 20)
   }
@@ -231,7 +235,10 @@ async function stopCompile(projectId, userId) {
   const limits =
     await CompileManager.promises.getProjectCompileLimits(projectId)
 
-  return await ClsiManager.promises.stopCompile(projectId, userId, limits)
+  return await ClsiManager.promises.stopCompile(projectId, userId, {
+    ...limits,
+    compiler: limits.compiler,
+  })
 }
 
 async function deleteAuxFiles(projectId, userId, clsiserverid) {

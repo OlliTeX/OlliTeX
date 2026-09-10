@@ -1,0 +1,64 @@
+/*
+ * Typst autocomplete — completion-row chips for the typst module's custom
+ * option `type`s (improve_typst.md item 15).
+ *
+ * The engine (`modules/typst/.../reference-completion.ts`) tags every option
+ * with `type`: `ref` (in-doc label), `bib` (.bib citation key) and `file`
+ * (`#include` / `#import` paths). The autocomplete fork we ship renders each
+ * option's icon cell as `.cm-completionIcon` + `.cm-completionIcon-<type>`,
+ * and the glue layer
+ * (`frontend/js/features/source-editor/extensions/auto-complete.ts`)
+ * adds `ol-cm-completion-<type>` to the row itself.
+ *
+ * Base CodeMirror leaves that cell EMPTY for unrecognised types (only the
+ * default icon set gets a glyph). Item 15 fills it: a small rounded square
+ * carrying the type's first letter, colour-coded per kind.
+ */
+
+/* stylelint-disable selector-class-pattern -- CodeMirror completion classes */
+.cm-tooltip-autocomplete > ul > li[role='option'] {
+  .cm-completionIcon.cm-completionIcon-ref,
+  .cm-completionIcon.cm-completionIcon-bib,
+  .cm-completionIcon.cm-completionIcon-file {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 12px;
+    height: 12px;
+    margin-left: auto;
+    border-radius: var(--border-radius-base);
+    color: var(--white);
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 700;
+  }
+
+  &.ol-cm-completion-ref {
+    .cm-completionIcon {
+      background: #2e6f40; /* green — a structural marker in this document */
+      &::after {
+        content: 'R';
+      }
+    }
+  }
+
+  &.ol-cm-completion-bib {
+    .cm-completionIcon {
+      background: #4656a7; /* blue — a bibliography reference */
+      &::after {
+        content: 'B';
+      }
+    }
+  }
+
+  &.ol-cm-completion-file {
+    .cm-completionIcon {
+      background: #9a6a00; /* amber — a filesystem path */
+      &::after {
+        content: 'F';
+      }
+    }
+  }
+}
+/* stylelint-enable selector-class-pattern */

@@ -211,13 +211,14 @@ async function stopCompile(projectId, userId, options) {
   if (options == null) {
     options = {}
   }
-  const { compileBackendClass, compileGroup } = options
+  const { compileBackendClass, compileGroup, compiler } = options
   const url = _getCompilerUrl(
     compileBackendClass,
     compileGroup,
     projectId,
     userId,
-    'compile/stop'
+    'compile/stop',
+    compiler
   )
   const opts = { method: 'POST' }
   await _makeRequest(
@@ -244,12 +245,14 @@ async function deleteAuxFiles(projectId, userId, options, clsiserverid) {
   if (options == null) {
     options = {}
   }
-  const { compileBackendClass, compileGroup } = options
+  const { compileBackendClass, compileGroup, compiler } = options
   const url = _getCompilerUrl(
     compileBackendClass,
     compileGroup,
     projectId,
-    userId
+    userId,
+    undefined,
+    compiler
   )
   const [
     clsiResult,
@@ -312,7 +315,8 @@ async function _sendBuiltRequest(projectId, userId, req, options) {
     userId,
     req,
     options.compileBackendClass,
-    options.compileGroup
+    options.compileGroup,
+    options.compiler
   )
 
   const outputFiles = _parseOutputFiles(
@@ -627,9 +631,19 @@ function _getCompilerUrl(
   compileGroup,
   projectId,
   userId,
-  action
+  action,
+  compiler
 ) {
-  const u = new URL(Settings.apis.clsi.url)
+  const clsiUrl =
+    compiler === 'typst'
+      ? Settings.apis.clsi.typst && Settings.apis.clsi.typst.url
+      : Settings.apis.clsi.url
+  if (compiler === 'typst' && clsiUrl == null) {
+    throw new OError('clsi_typst URL is not configured for this instance', {
+      projectId,
+    })
+  }
+  const u = new URL(clsiUrl)
   u.pathname = `/project/${projectId}`
   if (userId != null) {
     u.pathname += `/user/${userId}`
@@ -647,14 +661,16 @@ async function _postToClsi(
   userId,
   req,
   compileBackendClass,
-  compileGroup
+  compileGroup,
+  compiler
 ) {
   const url = _getCompilerUrl(
     compileBackendClass,
     compileGroup,
     projectId,
     userId,
-    'compile'
+    'compile',
+    compiler
   )
   const opts = {
     json: req,
@@ -1152,7 +1168,10 @@ function _finaliseRequest(projectId, options, project, docs, files) {
     rootResourcePath = rootResourcePathOverride
   }
   if (rootResourcePath == null) {
-    if (hasMainFile) {
+    // typst projects root at main.typ; every other compiler uses main.tex
+    if (project.compiler === 'typst') {
+      rootResourcePath = 'main.typ'
+    } else if (hasMainFile) {
       rootResourcePath = 'main.tex'
     } else if (numberOfDocsInProject === 1) {
       // only one file, must be the main document
@@ -1190,6 +1209,15 @@ function _finaliseRequest(projectId, options, project, docs, files) {
   const hasPremiumCompiles = ['alpha', 'priority'].includes(
     options.compileGroup
   )
+  // typst projects compile in the dedicated clsi_typst service; its docker
+  // image is typst-only, so the project's TeX Live imageName is never
+  // forwarded. OWNER DECISION 2026-09-10: current stable typst 0.15.1 via
+  // the digest-pinned pandoc/typst tag (see TYPST_INTEGRATION_PLAN §5.3).
+  const compileImageName =
+    project.compiler === 'typst'
+      ? process.env.TYPST_DOCKER_IMAGE ||
+        'pandoc/typst:latest-alpine@sha256:92cacfbca16676429c57d3cc9b80dd1d4c037c6e4b2e2b283170fb9252cb6221'
+      : project.imageName
   return {
     compile: {
       options: {
@@ -1198,7 +1226,7 @@ function _finaliseRequest(projectId, options, project, docs, files) {
         editorId: options.editorId,
         compiler: project.compiler,
         timeout: options.timeout,
-        imageName: project.imageName,
+        imageName: compileImageName,
         draft: Boolean(options.draft),
         // enable for premium compiles only
         png2pdf: Boolean(options.png2pdf) && hasPremiumCompiles,
@@ -1206,7 +1234,7 @@ function _finaliseRequest(projectId, options, project, docs, files) {
         enableCheckpoint:
           Boolean(options.checkpointing) &&
           hasPremiumCompiles &&
-          _imageHasCheckpointing(project.imageName),
+          _imageHasCheckpointing(compileImageName),
         stopOnFirstError: Boolean(options.stopOnFirstError),
         check: options.check,
         syncType: options.syncType,
@@ -1291,7 +1319,8 @@ async function wordCount(
     compileGroup,
     projectId,
     userId,
-    'wordcount'
+    'wordcount',
+    limits.compiler
   )
   url.searchParams.set('file', filename)
   url.searchParams.set('image', req.compile.options.imageName)

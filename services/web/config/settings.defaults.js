@@ -79,7 +79,7 @@ const httpPermissionsPolicy = {
   },
 }
 
-const safeCompilers = ['xelatex', 'pdflatex', 'latex', 'lualatex']
+const safeCompilers = ['xelatex', 'pdflatex', 'latex', 'lualatex', 'typst']
 
 // 2026-09-09 (owner R11 #9, live root-cause): the object below reads
 // process.env at BUILD time, and web boot order does not guarantee who
@@ -247,6 +247,14 @@ function buildSettings() {
     },
     clsi: {
       url: `http://${process.env.CLSI_HOST || '127.0.0.1'}:3013`,
+      // typst compiles go to a dedicated clsi_typst service; ClsiManager
+      // picks this URL per-compiler. COMPILE_TYPEST_ENABLED defaults ON
+      // (owner 2026-09-10); set it to 'false' to disable.
+      typst: {
+        url:
+          process.env.CLSI_TYPEST_URL ||
+          `http://${process.env.CLSI_TYPEST_HOST || '127.0.0.1'}:3014`,
+      },
       downloadHost:
         process.env.CLSI_LB_IP || process.env.CLSI_LB_HOST
           ? `http://${process.env.CLSI_LB_IP || process.env.CLSI_LB_HOST}:80`
@@ -922,6 +930,9 @@ function buildSettings() {
     // [IVd] diagram/image editor plugins: SVG diagrams are editable text-ish
     // files for the diagram (maxGraph) visual editor.
     'svg',
+    // Typst: .typ documents are editable (created/uploaded files are docs,
+    // not binaries).
+    'typ',
     'drawio',
     parseTextExtensions(process.env.ADDITIONAL_TEXT_EXTENSIONS)
   ),
@@ -933,7 +944,7 @@ function buildSettings() {
     process.env.FILE_IGNORE_PATTERN ||
     '**/{{__MACOSX,.git,.texpadtmp,.R,.venv,venv}{,/**},.!(latexmkrc),*.{dvi,aux,log,toc,out,pdfsync,synctex,synctex(busy),fdb_latexmk,fls,nlo,ind,glo,gls,glg,bbl,blg,doc,docx,gz,swp}}',
 
-  validRootDocExtensions: ['tex', 'Rtex', 'ltx', 'Rnw'],
+  validRootDocExtensions: ['tex', 'Rtex', 'ltx', 'Rnw', 'typ'],
 
   emailConfirmationDisabled:
     process.env.EMAIL_CONFIRMATION_DISABLED === 'true' || false,
@@ -1167,7 +1178,16 @@ function buildSettings() {
         '../modules/llm/frontend/js/extensions/llm-editor-toolbar-ask-ai'
       ),
     ],
-    sourceEditorToolbarButtonGroups: [],
+    sourceEditorToolbarButtonGroups: [
+      // typst module: bold/italic/format group for `.typ` documents (the
+      // component self-gates on the active language + the typst feature
+      // flag); registered unconditionally so one release image serves both
+      // flag states.
+      Path.resolve(
+        __dirname,
+        '../modules/typst/frontend/js/components/typst-toolbar-buttons'
+      ),
+    ],
     sourceEditorToolbarComponents: [],
     sourceEditorToolbarEndButtons: [
       // tex-autoformatter module (ported 2026-08-31 from CE+ autoformat,
@@ -1247,6 +1267,20 @@ function buildSettings() {
       __dirname,
       '../modules/github-sync/frontend/js/components/import-from-github-menu.tsx'
     ),
+    ],
+    // Typst: "Typst project" new-project entry + modal. Runtime visibility
+    // is ExposedSettings.typst.enabled (COMPILE_TYPEST_ENABLED).
+    typstNewProjectMenu: [
+      Path.resolve(
+        __dirname,
+        '../modules/typst/frontend/js/components/typst-new-project-menu.tsx'
+      ),
+    ],
+    typstNewProjectModalWrapper: [
+      Path.resolve(
+        __dirname,
+        '../modules/typst/frontend/js/components/typst-new-project-modal-wrapper.tsx'
+      ),
     ],
     // [III]: import-project-from-Nextcloud/WebDAV modal + navbar menu entry
     importProjectFromWebdavModalWrapper: [
@@ -1462,6 +1496,7 @@ function buildSettings() {
     'languagetool',
     'latex-editor', // [IVc]: MathLive-based LaTeX equation editor module
     'ollitex-hub', // Option B (owner 2026-09-06): /hub/admin + /hub/workspace unified pages
+    'typst', // typst: create-from-UI + compiler dispatch; gated by Settings.typst.enabled
   ],
   viewIncludes: {},
 
@@ -1487,6 +1522,17 @@ function buildSettings() {
 
   managedUsers: {
     enabled: false,
+  },
+
+  // Feature gate for the typst module. Top-level section, NOT
+  // Settings.features.typst (Settings.features is a plan->features map;
+  // an `{enabled}` key there would corrupt plan matching). WHEN OFF:
+  // modules/typst router is not mounted (no "Typst project" creation) and
+  // clsi_typst (separate service, same env) answers 501 on any compile.
+  // OWNER DECISION 2026-09-10: default ON; set COMPILE_TYPEST_ENABLED=false
+  // in env to disable (rollback path).
+  typst: {
+    enabled: process.env.COMPILE_TYPEST_ENABLED !== 'false',
   },
 
   // N-D (2026-09-01): admin instance-statistics dashboards
