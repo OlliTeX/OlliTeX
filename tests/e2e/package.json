@@ -16,6 +16,8 @@
     "stack:logs": "docker compose -f docker-compose.test.yml --project-name ol-e2e logs --tail 50 overleaf",
     "test": "npm run stack:up && npx playwright test",
     "test:tail": "npx playwright test",
+    "wiki:shots": "node scripts/wiki-screenshots.mjs",
+    "wiki:check": "node scripts/wiki-screenshots.mjs --check",
     "report": "npx playwright show-report playwright-report"
   }
 }

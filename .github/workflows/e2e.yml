@@ -8,9 +8,9 @@ name: e2e
 on:
   workflow_dispatch:
   pull_request:
-    branches: [ext-6.3.0-port, '6.3.0_port']
+    branches: [main, ext-6.3.0-port, '6.3.0_port']
   push:
-    branches: [ext-6.3.0-port]
+    branches: [main, ext-6.3.0-port]
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -28,6 +28,18 @@ jobs:
       - name: Parity matrix gate (legacy AND hub coverage)
         working-directory: tests/e2e
         run: node parity/check.mjs
+
+  # wiki docs gate (W5/W6): link integrity + data-safety scan over
+  # docs/wiki — docker-free, seconds. Fails a PR if a page links to a
+  # missing asset or a secret pattern / real e-mail domain slipped in.
+  wiki-gate:
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wiki link + data-safety gate
+        working-directory: tests/e2e
+        run: node scripts/wiki-screenshots.mjs --check
 
   # hub module unit tests (incl. the leaf-audit + icon guards) — docker-free.
   hub-unit:

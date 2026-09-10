@@ -8,6 +8,8 @@
 #   make help          list targets
 #   make ci            build + full unit + hub frontend suite (green gate)
 #   make e2e           stack up + playwright suite
+#   make wiki-shots    regenerate docs/wiki screenshots (needs the e2e stack)
+#   make wiki-check    wiki docs gate (links + data-safety scan) for CI
 #   make image         rebuild the server-ce docker image
 #
 # Notes:
@@ -100,6 +102,14 @@ image: ## Rebuild the server-ce docker image (make all)
 .PHONY: clean
 clean: ## Remove local caches (prettier/eslint)
 	rm -rf ./.cache
+
+.PHONY: wiki-shots
+wiki-shots: ## Regenerate the wiki screenshots + data-safety gate (needs the e2e stack up)
+	cd $(E2E_DIR) && npm run wiki:shots
+
+.PHONY: wiki-check
+wiki-check: ## Wiki docs gate only (links + data-safety scan; for CI)
+	cd $(E2E_DIR) && npm run wiki:check
 
 .PHONY: all
 all: ## Alias for ci

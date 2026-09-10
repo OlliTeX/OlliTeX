@@ -144,6 +144,23 @@ A ready-to-run local deployment (nginx + overleaf + mongo + redis) lives in
 - The suite's structure was inspired by the testing practices of
   [Forgejo](https://codeberg.org/forgejo/forgejo).
 
+## Documentation
+
+- **Wiki** — [`docs/wiki`](docs/wiki/README.md): user guide, admin guide,
+  and installation docs, with auto-generated screenshots. A data-safety
+  gate (link integrity + secret/private-e-mail-domain scan + PNG metadata
+  scan) fails any run where something it should not be in the wiki is in
+  the wiki; the audit receipt is at [`docs/wiki/AUDIT.md`](docs/wiki/AUDIT.md).
+  - Regenerate screenshots (needs the e2e stack running):
+    `make wiki-shots`.
+  - Docs-only gate (CI):
+    `make wiki-check`.
+- Backlog: [`IMPROVEMENTS_2026-09-16.md`](IMPROVEMENTS_2026-09-16.md)
+  (P0 first: admin API authorization pass, then SMTP unblock).
+- Plans (untracked local docs): `BRANDING.md`, `ext_explain.md`,
+  `TYPST_INTEGRATION_PLAN.md`, `docs/WIKI_PLAN.md`, and the round plans in
+  the repo root (see `.gitignore` for the list).
+
 ## Contributing
 
 OlliTeX is a community fork; contributions are welcome. Please read

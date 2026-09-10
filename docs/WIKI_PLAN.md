@@ -140,7 +140,7 @@ A final `verify` step inside the same script:
   prose is the literal dummy `sk-ollitex-dummy-do-not-use`.
 - **Network hygiene**: during the run, Playwright `route('**')` denies every
   request not matching the E2E origin or the unreachable
-  `http://127.0.0.2:9` BYO endpoint — nothing can phone home.
+  `http://ollitex-wiki-demo.invalid` BYO endpoint — nothing can phone home.
 - Output: `docs/wiki/AUDIT.md` (auto-overwritten per run): shot list, SHAs of
   images, verification timestamp, stack version. This file is the data-safety
   receipt.
