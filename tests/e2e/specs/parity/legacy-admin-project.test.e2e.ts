@@ -31,22 +31,21 @@ const projTrashed = (pid: string) =>
 const collabCount = (pid: string) =>
   Number(mongoEval(`(db.projects.findOne({ _id: ObjectId("${pid}") }).collaberator_refs || []).length`))
 
-test('renders: GET /admin/project shows the admin project list for site admin', async () => {
+test('redirects: /admin/project 301 → /hub#/site.general.projects.all (page removed 2026-09-10)', async () => {
   const p = admin()
-  await p.goto(BASE + '/admin/project', { waitUntil: 'domcontentloaded' })
-  await p.waitForTimeout(1500)
-  await expect(p).toHaveTitle(/Projects/i)
-  await expect(p.locator('h1').first()).toContainText(/projects/i)
+  const res = await p.request.get(BASE + '/admin/project', { maxRedirects: 0 })
+  expect(res.status(), '301 expected').toBe(301)
+  expect(res.headers()['location']).toBe('/hub#/site.general.projects.all')
 })
 
-test('denied: tpladmin + user cannot open /admin/project', async ({ browser }) => {
+test('denied: tpladmin + user are denied the admin project surface (gate enforced on the hub)', async ({ browser }) => {
   for (const a of [TPLADMIN, USER]) {
     const ctx = await browser.newContext(); const p2 = await ctx.newPage()
     await loginRobust(p2, a.email, a.password)
-    const resp = await p2.goto(BASE + '/admin/project', { waitUntil: 'domcontentloaded' }).catch(() => null)
+    await p2.goto(BASE + '/admin/project', { waitUntil: 'domcontentloaded' })
+    await p2.waitForTimeout(1200)
     const body = (await p2.locator('body').innerText().catch(() => '')) || ''
-    const denied = (resp?.status() === 403) || !/Change owner|Trash project|All projects/i.test(body)
-    expect(denied, `${a.email} must not manage projects`).toBeTruthy()
+    expect(/Change owner|Trash project/i.test(body), `${a.email} must not manage projects`).toBeFalsy()
     await ctx.close()
   }
 })

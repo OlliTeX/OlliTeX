@@ -4,24 +4,9 @@ import logger from '@overleaf/logger'
 import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import EmailHandler from '../../../../app/src/Features/Email/EmailHandler.mjs'
 import UserGetter from '../../../../app/src/Features/User/UserGetter.mjs'
-import { User } from '../../../../app/src/models/User.mjs'
-import UserSettingsHelper from '../../../../app/src/Features/Project/UserSettingsHelper.mjs'
-import Errors from '../../../../app/src/Features/Errors/Errors.js'
-import * as Path from 'node:path'
 import { parseReq, z } from '../../../../app/src/infrastructure/Validation.mjs'
 import NotificationsPreferencesHandler from './NotificationsPreferencesHandler.mjs'
-import { normalizeGlobalDelayMinutes } from './PreferenceNormalizer.mjs'
 
-// Server default grace delay (same env var as the enqueue script), used to
-// show users what "leave empty" means on the preferences page.
-const DEFAULT_DELAY_MS =
-  Number(process.env.PROJECT_CHANGE_NOTIFICATION_MIN_DELAY_MS) || 120000
-
-function _formatDelayLabel(ms) {
-  if (ms % 60000 === 0) return `${ms / 60000} minutes`
-  if (ms % 1000 === 0) return `${ms / 1000} seconds`
-  return `${ms} ms`
-}
 
 const globalPreferencesShape = z.object({
   muteAllNotifications: z.boolean(),
@@ -41,47 +26,6 @@ const globalPreferencesShape = z.object({
 const globalPreferencesSchema = z.object({ body: globalPreferencesShape })
 
 const projectPreferencesSchema = z.looseObject({})
-
-// Form submission from /user/notification-preferences (form-encoded, not
-// JSON): checkbox value present when checked, absent when unchecked.
-const updateGlobalPreferencesFormSchema = z.object({
-  body: z.looseObject({
-    muteAllNotifications: z.string().optional(),
-    notificationDelayMinutes: z.string().optional().nullable(),
-  }),
-})
-
-async function globalPreferencesPage(req, res, next) {
-  try {
-    const userId = SessionManager.getLoggedInUserId(req.session)
-    const preferences = await NotificationsPreferencesHandler.promises.getGlobalPreferences(
-      userId
-    )
-    // 2026-09 (S+P, owner): shared down-left account menu (ThemeToggle) reads
-    // its theme from ol-userSettings — provide the local like the golden pages.
-    let userSettings = {}
-    if (req?.user) {
-      const user = (await User.findById(req.user._id, 'ace')) ?? req.user
-      userSettings = await UserSettingsHelper.buildUserSettings(req, res, user)
-    }
-    res.render(
-      Path.resolve(import.meta.dirname, '../views/user/notification-preferences'),
-      {
-        title: 'email_preferences',
-        userSettings,
-        // The checkbox is an opt-IN ("Notifications on project activity")
-        // while the stored flag is an opt-OUT (muteAllNotifications), so the
-        // page renders the negated value.
-        muteAllNotifications: preferences.muteAllNotifications,
-        notificationsEnabled: !preferences.muteAllNotifications,
-        notificationDelayMinutes: preferences.notificationDelayMinutes ?? null,
-        defaultDelayLabel: _formatDelayLabel(DEFAULT_DELAY_MS),
-      }
-    )
-  } catch (err) {
-    next(err)
-  }
-}
 
 async function getGlobalPreferences(req, res, next) {
   try {
@@ -111,44 +55,9 @@ async function updateGlobalPreferences(req, res, next) {
   }
 }
 
-async function updateGlobalPreferencesFromForm(req, res, next) {
-  try {
-    const { body } = parseReq(req, updateGlobalPreferencesFormSchema)
-    const userId = SessionManager.getLoggedInUserId(req.session)
-
-    // Empty field = "use server default" (null); otherwise a whole number
-    // of minutes in 1..10080, else reject the whole save.
-    let notificationDelayMinutes = null
-    if (
-      body.notificationDelayMinutes !== undefined &&
-      body.notificationDelayMinutes !== ''
-    ) {
-      notificationDelayMinutes = normalizeGlobalDelayMinutes(
-        body.notificationDelayMinutes
-      )
-      if (notificationDelayMinutes === null) {
-        throw new Errors.InvalidError(
-          'Notification delay must be a whole number of minutes between 1 and 10080'
-        )
-      }
-    }
-
-    const preferences = {
-      // Opt-IN checkbox vs opt-OUT flag: checked => notifications on.
-      muteAllNotifications: !body.muteAllNotifications,
-      notificationDelayMinutes,
-    }
-
-    await NotificationsPreferencesHandler.promises.saveGlobalPreferences(
-      userId,
-      preferences
-    )
-
-    res.json(preferences)
-  } catch (err) {
-    next(err)
-  }
-}
+// 2026-09-10 (owner queue 3): the legacy /user/notification-preferences
+// form handler is gone with the page (the hub saves via the JSON
+// /notifications/preferences endpoint).
 
 async function getProjectPreferences(req, res, next) {
   try {
@@ -199,10 +108,8 @@ async function sendTestEmail(req, res, next) {
 }
 
 export default {
-  globalPreferencesPage,
   getGlobalPreferences,
   updateGlobalPreferences,
-  updateGlobalPreferencesFromForm,
   getProjectPreferences,
   saveProjectPreferences,
   sendTestEmail,

@@ -17,10 +17,10 @@ files:
   hub: specs/parity/hub-notification-prefs.test.e2e.ts
 
 features:
-  - id: renders
+  - id: renders   # 2026-09-10: legacy page removed; legacy side now asserts the 301 redirect to the hub
     kind: form
     desc: page renders "Email preferences" with mute-all checkbox + delay input
-    legacy_test: renders
+    legacy_test: redirects
     hub_test: renders
 
   - id: denied

@@ -116,7 +116,7 @@ function TokenAccessRoot() {
     <div className="token-access-container">
       {!isSharingUpdatesEnabled && (
         <div className="token-access-action-header">
-          <a href="/project" className="token-access-home-link">
+          <a href="/hub#/projects.all" className="token-access-home-link">
             <MaterialIcon
               type="arrow_left_alt"
               style={{ fontSize: 'inherit' }}

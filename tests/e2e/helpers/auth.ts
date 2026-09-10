@@ -125,40 +125,33 @@ export async function createBlankProject(
     )
     .first()
 
-  // Verified flow (welcome-message-create-new-project-dropdown.tsx →
-  // blank-project-modal.tsx → modal-content-new-project-form.tsx):
-  //   1. trigger button opens the dropdown
-  //   2. "Blank project" item sets the active modal (it does NOT create)
-  //   3. the #blank-project-modal form's Create button POSTs /project/new
-  // Both page states (welcome / project list) route into the same modal.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    await expect(trigger).toBeVisible({ timeout: 15_000 })
-    await trigger.click({ timeout: 15_000 })
-    const item = page.locator('text=Blank project').first()
-    await expect(item).toBeVisible({ timeout: 15_000 })
-    await item.click({ timeout: 15_000 })
-    const modal = page.locator('#blank-project-modal, .project-list-modal').last()
-    await expect(modal).toBeVisible({ timeout: 15_000 })
-    // the Create button stays DISABLED until a project name is typed
-    // (disabled={projectName === '' || isLoading || redirecting})
-    const nameField = modal.locator('input[type="text"]').first()
-    await expect(nameField).toBeVisible({ timeout: 10_000 })
-    await nameField.fill('e2e-smoke-project')
-    // EXACT name — :has-text("Create") also matches the "Create a new
-    // project" dropdown toggle (substring trap, verified live)
-    const createBtn = modal.getByRole('button', { name: 'Create', exact: true }).first()
-    await expect(createBtn).toBeEnabled({ timeout: 10_000 })
-    await createBtn.click({ force: true, timeout: 15_000 })
-    const navigated = await page
-      .waitForURL(/\/project\/[0-9a-f]{24}/, { timeout: 15_000 })
-      .then(() => true)
-      .catch(() => false)
-    if (navigated) {
-      return new URL(page.url()).pathname.split('/')[2]
-    }
-    await page.keyboard.press('Escape').catch(() => {})
-    await page.waitForTimeout(800)
+  // 2026-09-10 (legacy /project dashboard removed): the new-project surface
+  // is now the hub (the legacy URL 301s to it). Hub flow:
+  //   1. "New project" button opens the hub menu
+  //   2. "Blank project" item opens the hub modal (it does NOT create)
+  //   3. the hub modal's Create button POSTs /project/new and lands on
+  //      /project/<id> (the editor route)
+  await expect(trigger).toBeVisible({ timeout: 20_000 })
+  await trigger.click({ timeout: 15_000 })
+  const item = page.locator('text=Blank project').first()
+  await expect(item).toBeVisible({ timeout: 15_000 })
+  await item.click({ timeout: 15_000 })
+  const nameField = page.locator('label:has-text("Project name") input, #hub-new-project-name').first()
+  await expect(nameField).toBeVisible({ timeout: 20_000 })
+  await nameField.fill('e2e-smoke-project')
+  const createBtn = page
+    .locator('[role="dialog"] button:has-text("Create"), .mantine-Modal-root button:has-text("Create")')
+    .first()
+  await createBtn.click({ force: true, timeout: 15_000 })
+  const navigated = await page
+    .waitForURL(/\/project\/[0-9a-f]{24}/, { timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false)
+  if (navigated) {
+    return new URL(page.url()).pathname.split('/')[2]
   }
+  await page.keyboard.press('Escape').catch(() => {})
+  await page.waitForTimeout(800)
 
   // deterministic fallback: create via the JSON API and open the editor
   const context = page.context()

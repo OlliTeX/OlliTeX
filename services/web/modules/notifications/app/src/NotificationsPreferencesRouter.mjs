@@ -34,19 +34,24 @@ function apply(webRouter, privateApiRouter, publicApiRouter) {
     NotificationsPreferencesController.saveProjectPreferences
   )
 
-  // Settings page (linked from live upstream: /user/settings "Email
-  // preferences" and the project settings modal "Manage notifications
-  // across all your projects")
+  // 2026-09-10 (owner queue 3): the legacy page is removed — email
+  // preferences live in the hub (#/mysettings.email). Redirect (pattern:
+  // /admin/instance-stats). The JSON preference API above is the hub's
+  // live contract and stays. (The legacy form POST goes with the page.)
   webRouter.get(
     '/user/notification-preferences',
     auth,
-    NotificationsPreferencesController.globalPreferencesPage
+    function (req, res) {
+      res.redirect(301, '/hub#/mysettings.email')
+    }
   )
 
   webRouter.post(
     '/user/notification-preferences',
     auth,
-    NotificationsPreferencesController.updateGlobalPreferencesFromForm
+    function (req, res) {
+      res.redirect(301, '/hub#/mysettings.email')
+    }
   )
 
   webRouter.post(

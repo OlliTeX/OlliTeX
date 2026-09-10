@@ -132,7 +132,7 @@ export function AccountMenuItems({
         {sessionUser.email}
       </OLDropdownItem>
       <NavDropdownDivider />
-      <NavDropdownLinkItem href="/project">{t('projects')}</NavDropdownLinkItem>
+      <NavDropdownLinkItem href="/hub#/projects.all">{t('projects')}</NavDropdownLinkItem>
       {navExtraItems.map((item, index) => (
         <NavDropdownLinkItem key={index} href={item.url}>
           {item.translatedText || item.text}

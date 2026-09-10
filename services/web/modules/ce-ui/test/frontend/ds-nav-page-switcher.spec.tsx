@@ -88,11 +88,11 @@ describe('<DsNavPageSwitcher />', function () {
       )
     })
 
-    it('Projects link points to /project', function () {
+    it('Projects link points to the hub (legacy /project removed 2026-09-10)', function () {
       cy.findByRole('link', { name: /projects/i }).should(
         'have.attr',
         'href',
-        '/project'
+        '/hub#/projects.all'
       )
     })
   })

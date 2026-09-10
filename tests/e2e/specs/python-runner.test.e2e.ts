@@ -122,7 +122,8 @@ test('admin/site: python-runner toggle persists (misc.pythonRunner round-trip)',
   context,
 }) => {
   await loginRobust(page, ADMIN.email, ADMIN.password)
-  await page.goto('/project', { waitUntil: 'domcontentloaded' })
+  // 2026-09-10: legacy /project dashboard removed → hub surface (any logged-in page gives the CSRF meta)
+  await page.goto('/hub#/projects.all', { waitUntil: 'domcontentloaded' })
   await adminPythonToggle(context, page)
 })
 

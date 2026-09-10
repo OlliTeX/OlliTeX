@@ -3,8 +3,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { getUsageSummary } from './LLMUsage.mjs'; // overleaf-lab (usage meter)
 import { z } from 'zod'
-import { User } from '../../../../app/src/models/User.mjs'
-import UserSettingsHelper from '../../../../app/src/Features/Project/UserSettingsHelper.mjs'
 import { expressify } from '@overleaf/promise-utils'
 import { encryptSecret, decryptSecret } from './LLMCrypto.mjs' // overleaf-lab: at-rest encryption of admin API key
 import { listModels, detectProviderType } from './LLMClient.mjs' // overleaf-lab: AI-SDK provider seam
@@ -135,23 +133,6 @@ async function buildDisplaySettings() {
       askAiActionPrompts: DEFAULT_ASK_AI_ACTION_PROMPTS,
     },
   }
-}
-
-async function adminSettingsPage(req, res) {
-  const pugPath = new URL('../../app/views/llm-admin-settings.pug', import.meta.url).pathname
-  // 2026-09 (P, owner): the shared down-left account menu (ThemeToggle) reads
-  // its theme from ol-userSettings — provide the local like the golden pages.
-  let userSettings = {}
-  if (req?.user) {
-    const user = (await User.findById(req.user._id, 'ace')) ?? req.user
-    userSettings = await UserSettingsHelper.buildUserSettings(req, res, user)
-  }
-  // 2026-09: proper page <title> (consistency with the gold admin pages).
-  res.render(pugPath, {
-    ...(await buildDisplaySettings()),
-    title: 'LLM Configuration',
-    userSettings,
-  })
 }
 
 async function getAdminSettings(req, res) {
@@ -596,7 +577,6 @@ async function usageSummary(req, res) {
   }
 }
 export default {
-  adminSettingsPage: expressify(adminSettingsPage),
   getAdminSettings: expressify(getAdminSettings),
   saveAdminSettings: expressify(saveAdminSettings),
   checkAdminLLMConnection: expressify(checkAdminLLMConnection),

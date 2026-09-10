@@ -30,7 +30,7 @@ function InviteNotValid({ email }: InviteNotValidProps) {
                 <OLButton
                   variant="primary"
                   size="lg"
-                  href="/project"
+                  href="/hub#/projects.all"
                   className="mb-4"
                 >
                   {t('back_to_my_projects')}

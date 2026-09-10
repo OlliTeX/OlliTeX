@@ -56,7 +56,7 @@ export default function AdminMenu({
         </NavDropdownLinkItem>
       ) : null}
       {(getMeta('ol-ExposedSettings') as any)?.llmEnabled ? (
-        <NavDropdownLinkItem href="/admin/llm/settings">
+        <NavDropdownLinkItem href="/hub#/site.llm.instance">
           LLM Settings
         </NavDropdownLinkItem>
       ) : null}

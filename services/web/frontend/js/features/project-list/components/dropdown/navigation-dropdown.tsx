@@ -260,7 +260,7 @@ function NavigationDropdown({
             </li>
             <li role="none">
               <OLDropdownItem
-                href="/project/trashed"
+                href="/hub#/projects.trashed"
                 active={projectsTrashActive}
                 trailingIcon={projectsTrashActive ? 'check' : undefined}
                 leadingIcon={<Folder size={20} />}

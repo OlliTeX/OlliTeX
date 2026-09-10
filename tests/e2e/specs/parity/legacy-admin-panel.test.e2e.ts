@@ -5,6 +5,11 @@ import { ADMIN, USER, TPLADMIN } from '../../fixtures/credentials'
 
 // Parity baseline (legacy /admin/panel, CE build = 3 panes) — system messages,
 // active projects, open/close editor.
+// 2026-09-10 (owner queue 4): the legacy PAGE is REMOVED — /admin/panel 301s to
+// /hub#/overview; the admin surfaces (system messages / active projects / open-
+// close editor) live on the hub (site.general.*). The API contract tests
+// (POST /admin/messages, /admin/closeEditor, /admin/openEditor,
+// /admin/disconnectAllUsers) are unchanged; page tests now assert the redirect.
 const BASE = 'http://127.0.0.1:7420'
 const PAGE = BASE + '/admin/panel'
 let p: any = null
@@ -29,48 +34,45 @@ const postRedirect = async (path: string, body?: unknown) => {
   return res.status() < 400
 }
 
-test('renders: /admin/panel shows its panes (messages, projects, editor)', async () => {
-  await p.goto(PAGE, { waitUntil: 'domcontentloaded' })
-  expect(p.url(), 'on the panel').toContain('/admin/panel')
-  for (const pane of ['#system-messages', '#active-projects', '#open-close-editor']) {
-    await expect(p.locator(pane).first()).toBeAttached({ timeout: 15000 })
-  }
-  await expect(p.getByRole('button', { name: /post message/i }).first()).toBeVisible({ timeout: 10000 })
-  await expect(p.getByRole('button', { name: /close editor/i }).first()).toBeVisible({ timeout: 10000 })
+test('redirects: /admin/panel 301 → /hub#/overview (page removed 2026-09-10)', async () => {
+  const res = await p.request.get(PAGE, { maxRedirects: 0 })
+  expect(res.status(), '301 expected').toBe(301)
+  expect(res.headers()['location']).toBe('/hub#/overview')
 })
 
-test('deny: non-site-admins are denied the admin panel', async ({ browser }) => {
+test('deny: non-site-admins are denied the admin panel (gate enforced on the hub)', async ({ browser }) => {
   for (const who of [TPLADMIN, USER]) {
     const ctx = await browser.newContext(); const q = await ctx.newPage()
-    await q.goto(PAGE, { waitUntil: 'domcontentloaded' }).catch(() => {})
-    const ok = /login|signin|denied|forbidden/i.test(q.url()) || !/post message/i.test((await q.locator('body').innerText().catch(() => '')) || '')
-    expect(ok, who.email + ' denied').toBeTruthy()
+    await loginRobust(q, who.email, who.password)
+    await q.goto(PAGE, { waitUntil: 'domcontentloaded' })
+    await q.waitForTimeout(1200)
+    const body = (await q.locator('body').innerText().catch(() => '')) || ''
+    expect(/post message/i.test(body), who.email + ' must NOT see the panel controls').toBeFalsy()
     await ctx.close()
   }
 })
 
-test('system-messages: post a message, it renders on the panel; clear removes it', async () => {
+test('system-messages: post a message, it is readable via GET /system/messages; clear removes it', async () => {
   const msg = unique('parity-msg')
   try {
     const r = await a('POST', '/admin/messages', { content: msg })
-    expect(r.status(), 'post status ' + r.status).toBeTruthy()
-    expect(r.status()).toBeLessThan(400)
-    await p.goto(PAGE, { waitUntil: 'domcontentloaded' })
-    await expect(p.locator('body', { hasText: msg }).first()).toBeVisible({ timeout: 15000 })
+    expect(r.status(), 'post status ' + r.status).toBeLessThan(400)
+    const list = await (await a('GET', '/system/messages')).json().catch(() => [])
+    const items = Array.isArray(list) ? list : (list.messages ?? [])
+    expect(items.some((m: any) => (m.content ?? m.text ?? '').includes(msg)), 'message readable').toBeTruthy()
   } finally {
     await a('POST', '/admin/messages/clear', {}).catch(() => {})
-    await p.goto(PAGE, { waitUntil: 'domcontentloaded' }).catch(() => {})
-    const bodyText = (await p.locator('body').innerText().catch(() => '')) || ''
-    expect(bodyText.includes(msg), 'message cleared').toBeFalsy()
+    const list = await (await a('GET', '/system/messages')).json().catch(() => [])
+    const items = Array.isArray(list) ? list : (list.messages ?? [])
+    expect(items.some((m: any) => (m.content ?? m.text ?? '').includes(msg)), 'message cleared').toBeFalsy()
   }
 })
 
-test('active-projects: the pane renders the projects listing surface', async () => {
-  await p.goto(PAGE, { waitUntil: 'domcontentloaded' })
-  const pane = p.locator('#active-projects').first()
-  await expect(pane).toBeAttached({ timeout: 15000 })
-  const paneText = ((await pane.innerText().catch(() => '')) || '').toLowerCase()
-  expect(/active projects|no projects/i.test(paneText), 'pane shows the listing (' + paneText.slice(0, 60) + ')').toBeTruthy()
+test('active-projects: the hub active-projects leaf renders the listing surface', async () => {
+  await p.goto(BASE + '/hub#/site.general.activeprojects', { waitUntil: 'domcontentloaded' })
+  await p.waitForTimeout(1500)
+  const bodyText = ((await p.locator('body').innerText().catch(() => '')) || '').toLowerCase()
+  expect(/active projects|no projects/i.test(bodyText), 'surface shows the listing (' + bodyText.slice(0, 80) + ')').toBeTruthy()
 })
 
 test('editor: closeEditor blocks then openEditor restores (state round-trip)', async () => {

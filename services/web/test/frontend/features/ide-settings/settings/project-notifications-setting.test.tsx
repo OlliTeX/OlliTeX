@@ -235,7 +235,7 @@ describe('<ProjectNotificationsSetting />', function () {
     )
     expect(
       screen.getByRole('link', { name: 'Change settings' }).getAttribute('href')
-    ).to.equal('/user/notification-preferences')
+    ).to.equal('/hub#/mysettings.email') // 2026-09-10: legacy page removed; link targets the hub
     expect(screen.queryByLabelText('All project activity', { exact: false })).to
       .not.exist
     expect(

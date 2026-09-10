@@ -27,7 +27,7 @@ export default function LoggedInItems({
 
   return (
     <>
-      <NavLinkItem href="/project" className="nav-item-projects">
+      <NavLinkItem href="/hub#/projects.all" className="nav-item-projects">
         {t('projects')}
       </NavLinkItem>
       {/* Templates lives in the left sidebar page switcher

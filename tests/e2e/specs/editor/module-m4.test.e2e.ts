@@ -46,15 +46,17 @@ test.describe('M4 llm surfaces', () => {
     expect(pageErrors, 'no pageerrors: ' + pageErrors.join(' | ')).toEqual([])
   })
 
-  test('admin llm settings page: legacy surface + works', async () => {
+  test('admin llm settings page: legacy URL redirects to the hub (page removed 2026-09-10)', async () => {
+    const res = await page.request.get(B + '/admin/llm/settings', { maxRedirects: 0 }).catch(() => null)
+    expect(res, 'response available').toBeTruthy()
+    expect(res!.status(), '301 expected').toBe(301)
+    expect(res!.headers()['location']).toBe('/hub#/site.llm.instance')
+    // follow the redirect: the hub admin instance surface must render (llm text, no page errors)
     await page.goto(B + '/admin/llm/settings', { waitUntil: 'load' }).catch(() => {})
     await page.waitForTimeout(3500)
-    // the admin llm page title must be reachable; the exact path may be the
-    // admin hub section — assert one of the two known surfaces rendered
     const body = await page.locator('body').innerText()
-    expect(body.toLowerCase()).toMatch(/llm|api|model|provider/i)
-    const mantineBtnsInLegacy = await page.locator('.modal .mantine-Button-root, form .mantine-Button-root').count()
-    expect(mantineBtnsInLegacy, 'no Mantine Buttons inside the admin llm forms').toBe(0)
+    expect(body.toLowerCase()).toMatch(/llm|instance/i)
+    expect(pageErrors, 'no pageerrors: ' + pageErrors.join(' | ')).toEqual([])
   })
 
   test('editor: llm in-editor surfaces stable (no pageerrors)', async () => {

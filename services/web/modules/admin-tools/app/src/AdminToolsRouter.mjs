@@ -18,9 +18,14 @@ export default {
     webRouter.get('/user/activate', UserListController.activateAccountPage)
     AuthenticationController.addEndpointToLoginWhitelist('/user/activate')
 
+    // 2026-09-10 (owner queue 5): legacy admin user page removed — hub
+    // #/site.general.users.* is the surface; the user CRUD APIs below are
+    // the hub's live contract and stay.
     webRouter.get('/admin/user',
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
-      UserListController.manageUsersPage
+      function (req, res) {
+        res.redirect(301, '/hub#/site.general.users.all')
+      }
     )
     webRouter.post(
       '/admin/user/create',
@@ -60,9 +65,14 @@ export default {
       ProjectListController.getProjectsJson
     )
 
+    // 2026-09-10 (owner queue 6): legacy admin project page removed — hub
+    // #/site.general.projects.* is the surface; the project CRUD APIs are
+    // the hub's live contract and stay.
     webRouter.get('/admin/project',
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
-      ProjectListController.manageProjectsPage
+      function (req, res) {
+        res.redirect(301, '/hub#/site.general.projects.all')
+      }
     )
     webRouter.post('/admin/project/:project_id/trash',
       AuthorizationMiddleware.ensureUserIsSiteAdmin,

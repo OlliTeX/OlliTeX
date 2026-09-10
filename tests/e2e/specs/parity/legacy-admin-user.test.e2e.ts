@@ -77,23 +77,23 @@ async function findUser(p: Page, mail: string) {
 async function purge(p: Page, id: string | null) { if (id) await api(p, 'DELETE', `/admin/user/${id}`).catch(() => {}) }
 
 test.describe('legacy /admin/user (baseline)', () => {
-  test('renders for site admin (200, no 403, user list present)', async ({ browser }) => {
+  test('redirects: /admin/user 301 → /hub#/site.general.users.all (page removed 2026-09-10)', async ({ browser }) => {
     const p = await admin(browser)
-    const resp = await p.goto(BASE + '/admin/user', { waitUntil: 'domcontentloaded' })
-    expect(resp!.status()).toBe(200)
-    const body = (await p.locator('body').innerText().catch(() => '')) || ''
-    expect(/All users/.test(body), 'expected the "All users" heading').toBeTruthy()
+    const res = await p.request.get(BASE + '/admin/user', { maxRedirects: 0 })
+    expect(res.status(), '301 expected').toBe(301)
+    expect(res.headers()['location']).toBe('/hub#/site.general.users.all')
   })
 
-  test('denied: tpladmin + user cannot open /admin/user', async ({ browser }) => {
+  test('denied: tpladmin + user are denied the admin user surface (gate enforced on the hub)', async ({ browser }) => {
     for (const a of [TPLADMIN, USER]) {
       const ctx = await browser.newContext(); const p = await ctx.newPage()
       await p.goto(BASE + '/login', { waitUntil: 'domcontentloaded' })
       await loginRobust(p as any, a.email, a.password)
-      const resp = await p.goto(BASE + '/admin/user', { waitUntil: 'domcontentloaded' }).catch(() => null)
+      await p.goto(BASE + '/admin/user', { waitUntil: 'domcontentloaded' })
+      await p.waitForTimeout(1200)
       const body = (await p.locator('body').innerText().catch(() => '')) || ''
-      const denied = (resp && resp.status() === 403) || !/All users/.test(body)
-      expect(denied, `${a.email} must not access /admin/user`).toBeTruthy()
+      const sees = /all users|create user|suspend/i.test(body)
+      expect(sees, `${a.email} must not see the admin user surface`).toBe(false)
       await ctx.close()
     }
   })

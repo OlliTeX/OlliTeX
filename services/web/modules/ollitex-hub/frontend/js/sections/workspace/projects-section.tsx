@@ -724,6 +724,14 @@ export default function ProjectsSection({
                   Typst article (bibliography)
                 </Menu.Item>
               ) : null}
+              {typstEnabled ? (
+                <Menu.Item
+                  leftSection={<Icon name="photo" size={16} />}
+                  onClick={() => openWithTemplate('typst:example')}
+                >
+                  Typst example project
+                </Menu.Item>
+              ) : null}
               <Menu.Divider>Import</Menu.Divider>
               <Menu.Item leftSection={<Icon name="folder_zip" size={16} />} onClick={() => setZipOpen(true)}>
                 Existing project (.zip)
@@ -1027,6 +1035,7 @@ export default function ProjectsSection({
                   ? [
                       { value: 'typst:basic', label: 'Blank Typst project' },
                       { value: 'typst:article', label: 'Typst article (bibliography)' },
+                      { value: 'typst:example', label: 'Typst example project' },
                     ]
                   : []),
                 ...(templates.length > 0

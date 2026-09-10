@@ -1,9 +1,7 @@
 import Path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import _ from 'lodash'
 import crypto from 'node:crypto'
 import Settings from '@overleaf/settings'
-import Metrics from '@overleaf/metrics'
 import logger from '@overleaf/logger'
 import { User } from '../../../../app/src/models/User.mjs'
 import { DeletedUser } from '../../../../app/src/models/DeletedUser.mjs'
@@ -16,7 +14,6 @@ import OneTimeTokenHandler from '../../../../app/src/Features/Security/OneTimeTo
 import UserGetter from '../../../../app/src/Features/User/UserGetter.mjs'
 import UserUpdater from '../../../../app/src/Features/User/UserUpdater.mjs'
 import UserDeleter from '../../../../app/src/Features/User/UserDeleter.mjs'
-import UserSettingsHelper from '../../../../app/src/Features/Project/UserSettingsHelper.mjs'
 import ProjectDeleter from '../../../../app/src/Features/Project/ProjectDeleter.mjs'
 import OwnershipTransferHandler from '../../../../app/src/Features/Collaborators/OwnershipTransferHandler.mjs'
 import HttpErrorHandler from '../../../../app/src/Features/Errors/HttpErrorHandler.mjs'
@@ -24,7 +21,6 @@ import ErrorController from '../../../../app/src/Features/Errors/ErrorController
 import Errors, { OError } from '../../../../app/src/Features/Errors/Errors.js'
 import { db } from '../../../../app/src/infrastructure/mongodb.mjs'
 
-const __dirname = Path.dirname(fileURLToPath(import.meta.url))
 
 const externalAuth = process.env.EXTERNAL_AUTH ?
                      process.env.EXTERNAL_AUTH.split(/\s+/).filter(m => m && m !== 'none') : []
@@ -60,46 +56,6 @@ async function _sendActivationEmail(idString) {
       throw new OError('Failed to send activation email', { error: error.message, email: user.email })
     })
   return
-}
-
-function cleanupSession(req) {
-  // cleanup redirects at the end of the redirect chain
-  delete req.session.postCheckoutRedirect
-  delete req.session.postLoginRedirect
-  delete req.session.postOnboardingRedirect
-}
-
-async function manageUsersPage(req, res, next) {
-  cleanupSession(req)
-
-  const usersBlobPending = _getUsers().catch(err => {
-    logger.err({ err }, 'users listing in background failed')
-    return undefined
-  })
-
-  const prefetchedUsersBlob = await usersBlobPending
-
-  Metrics.inc('user-list-prefetch-users', 1, {
-    status: prefetchedUsersBlob ? 'success' : 'error',
-  })
-
-  const userId = SessionManager.getLoggedInUserId(req.session)
-  const user = await User.findById(userId, 'ace')
-
-  const userSettings = await UserSettingsHelper.buildUserSettings(
-    req,
-    res,
-    user
-  )
-
-  res.render(Path.resolve(__dirname, '../views/manage-users-react'), {
-    title: 'Manage Users',
-    userSettings,
-    prefetchedUsersBlob,
-    availableAuthMethods,
-    userDetailsUpdatedOnLogin,
-    userIsAdminUpdatedOnLogin,
-  })
 }
 
 async function registerNewUser(req, res, next) {
@@ -691,7 +647,6 @@ async function getAdditionalUserInfo(req, res, next) {
 }
 
 export default {
-  manageUsersPage: expressify(manageUsersPage),
   getUsersJson: expressify(getUsersJson),
   getAdditionalUserInfo: expressify(getAdditionalUserInfo),
   registerNewUser: expressify(registerNewUser),

@@ -152,10 +152,6 @@ const rateLimiters = {
       duration: 60,
     }
   ),
-  openDashboard: new RateLimiter('open-dashboard', {
-    points: 30,
-    duration: 60,
-  }),
   readAndWriteToken: new RateLimiter('read-and-write-token', {
     points: 15,
     duration: 60,
@@ -546,28 +542,28 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     ProjectController.projectEntitiesJson
   )
 
-  // All project dashboard navigation states render the same page. The active
-  // navigation item is derived from the URL on the frontend.
-  const domainCaptureTestSessionMiddleware = await Modules.middleware(
-    'domainCaptureTestSession'
-  )
-  for (const projectDashboardRoute of [
-    '/project',
-    '/project/owned',
-    '/project/shared',
-    '/project/archived',
-    '/project/trashed',
-    '/project/untagged',
-    '/project/tags/:tag',
-  ]) {
+  // 2026-09-10 (owner queue 7): the legacy project-list pages are removed —
+  // every dashboard state renders in the hub (/hub#/projects.*). The
+  // routes redirect (pattern: /admin/instance-stats, hub #23) so bookmarks
+  // and SSO deep links land in the hub. Project APIs (POST /project/new*,
+  // POST /api/project, /user/projects, /project/:id/entities) are untouched;
+  // editor deep links (/editor/:id, legacy /Project/:id) stay.
+  const projectDashboardRedirects = {
+    '/project': '/hub#/projects.all',
+    '/project/owned': '/hub#/projects.owned',
+    '/project/shared': '/hub#/projects.shared',
+    '/project/archived': '/hub#/projects.archived',
+    '/project/trashed': '/hub#/projects.trashed',
+    '/project/untagged': '/hub#/projects.all',
+    '/project/tags/:tag': '/hub#/projects.tags.tags',
+  }
+  for (const [projectDashboardRoute, hubTarget] of Object.entries(projectDashboardRedirects)) {
     webRouter.get(
       projectDashboardRoute,
       AuthenticationController.requireLogin(),
-      RateLimiterMiddleware.rateLimit(rateLimiters.openDashboard),
-      AsyncLocalStorage.middleware,
-      domainCaptureTestSessionMiddleware,
-      PermissionsController.useCapabilities(),
-      ProjectListController.projectListPage
+      function (req, res) {
+        res.redirect(301, hubTarget)
+      }
     )
   }
   webRouter.post(

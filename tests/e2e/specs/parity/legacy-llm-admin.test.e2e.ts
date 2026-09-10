@@ -5,6 +5,10 @@ import { ADMIN, USER, TPLADMIN } from '../../fixtures/credentials'
 
 // Parity baseline (legacy /admin/llm/settings) — site-admin LLM settings:
 // settings JSON, save (round-trip), connection check, model scan, usage.
+// 2026-09-10 (owner queue 5): the legacy PAGE is REMOVED — /admin/llm/settings
+// now 301s to the hub surface (Site → LLM → Instance), which manages the same
+// endpoints. The API contract tests below are unchanged; the page tests now
+// assert the redirect instead of the removed UI.
 const BASE = 'http://127.0.0.1:7420'
 const PAGE = BASE + '/admin/llm/settings'
 let p: any = null
@@ -18,20 +22,20 @@ test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const settings = async () => (await a('GET', '/admin/llm/settings/json')).json().catch(() => null)
 
-test('renders: /admin/llm/settings loads for the site admin', async () => {
-  await p.goto(PAGE, { waitUntil: 'domcontentloaded' })
-  expect(p.url(), 'on the page').toContain('/admin/llm/settings')
-  const body = (await p.locator('body').innerText()) || ''
-  await expect(p.locator('input:visible, select:visible, button:visible').first()).toBeVisible({ timeout: 15000 })
-  expect(/llm|system prompt|api|model/i.test(body), 'llm settings surface').toBeTruthy()
+test('redirects: /admin/llm/settings 301 → /hub#/site.llm.instance (page removed 2026-09-10)', async () => {
+  const res = await p.request.get(PAGE, { maxRedirects: 0 })
+  expect(res.status(), '301 expected').toBe(301)
+  expect(res.headers()['location']).toBe('/hub#/site.llm.instance')
 })
 
-test('deny: non-site-admins are denied the admin LLM settings', async ({ browser }) => {
+test('deny: non-site-admins are denied the admin LLM settings (gate enforced on the hub)', async ({ browser }) => {
   for (const who of [TPLADMIN, USER]) {
     const ctx = await browser.newContext(); const q = await ctx.newPage()
-    await q.goto(PAGE, { waitUntil: 'domcontentloaded' }).catch(() => {})
-    const ok = /login|signin|denied|forbidden/i.test(q.url()) || !/system prompt/i.test((await q.locator('body').innerText().catch(() => '')) || '')
-    expect(ok, who.email + ' denied').toBeTruthy()
+    await loginRobust(q, who.email, who.password)
+    await q.goto(PAGE, { waitUntil: 'domcontentloaded' })
+    await q.waitForTimeout(1200)
+    const body = (await q.locator('body').innerText().catch(() => '')) || ''
+    expect(/system prompt|allowed models/i.test(body), who.email + ' must NOT see the admin LLM form').toBeFalsy()
     await ctx.close()
   }
 })
@@ -68,7 +72,7 @@ test('check: POST /admin/llm/settings/check responds gracefully (no endpoint con
 
 test('models: POST /admin/llm/models responds (scan is graceful without a key)', async () => {
   const r = await a('POST', '/admin/llm/models', {})
-  expect(r.status(), 'models status ' + r.status()).toBeLessThan(500)
+  expect(r.status(), 'models status ' + r.status).toBeLessThan(500)
 })
 
 test('usage: GET /admin/llm/usage returns {ok, calls, tokens, byDay[]}', async () => {

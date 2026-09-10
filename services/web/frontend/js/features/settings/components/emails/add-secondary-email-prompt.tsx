@@ -103,7 +103,7 @@ export function AddSecondaryEmailPrompt() {
           <OLButton disabled={isSubmitting} variant="primary" type="submit">
             {isSubmitting ? <>{t('adding')}&hellip;</> : t('add_email_address')}
           </OLButton>
-          <OLButton disabled={isSubmitting} variant="secondary" href="/project">
+          <OLButton disabled={isSubmitting} variant="secondary" href="/hub#/projects.all">
             {t('not_now')}
           </OLButton>
           <p className="add-secondary-email-learn-more">

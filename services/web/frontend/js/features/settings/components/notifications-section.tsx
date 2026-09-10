@@ -6,7 +6,7 @@ function NotificationsSection() {
   return (
     <>
       <h3>{t('email_preferences')}</h3>
-      <a href="/user/notification-preferences">
+      <a href="/hub#/mysettings.email">
         {t('manage_email_preferences')}
       </a>
     </>

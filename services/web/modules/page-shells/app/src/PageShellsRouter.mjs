@@ -1,5 +1,4 @@
 import logger from '@overleaf/logger'
-import AdminPanelShellController from './AdminPanelShellController.mjs'
 import MySettingsShellController from './MySettingsShellController.mjs'
 import AuthorizationMiddleware from '../../../../app/src/Features/Authorization/AuthorizationMiddleware.mjs'
 import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.mjs'
@@ -28,10 +27,15 @@ const PageShellsRouter = {
       MySettingsShellController.mySettingsPage
     )
 
+    // 2026-09-10 (owner queue 4): the legacy admin panel page is removed —
+    // the admin hub is the single admin surface. Redirect (pattern:
+    // /admin/instance-stats); the hub #/overview leaf is the equivalent.
     webRouter.get(
       '/admin/panel',
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
-      AdminPanelShellController.adminPanelPage
+      function (req, res) {
+        res.redirect(301, '/hub#/overview')
+      }
     )
   },
 }

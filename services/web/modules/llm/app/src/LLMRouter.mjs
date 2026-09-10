@@ -251,10 +251,16 @@ export default {
         logger.info({}, '[LLM] All routes registered successfully')
 
         // Admin routes
+        // 2026-09-10 (owner queue 2): legacy admin LLM page removed — the hub
+        // holds the surface (site.llm.* incl. site.llm.instance). Redirect
+        // (pattern: /admin/instance-stats); the JSON endpoints below are the
+        // hub's live API and stay.
         webRouter.get(
             '/admin/llm/settings',
             AuthorizationMiddleware.ensureUserIsSiteAdmin,
-            LLMAdminController.adminSettingsPage
+            function (req, res) {
+                res.redirect(301, '/hub#/site.llm.instance')
+            }
         )
         logger.debug({}, '[LLM] Route registered: GET /admin/llm/settings')
 

@@ -15,11 +15,11 @@ fixtures:
   - throwaway project created via POST /project/create and trashed/deleted per test
 
 features:
-  - id: renders
+  - id: renders   # 2026-09-10: legacy page removed; legacy side now asserts the 301 redirect to the hub
     kind: page
     desc: admin project list renders for site admin
     behavior: { endpoint: POST /admin/user/null/projects, visible: project table }
-    legacy_test: renders
+    legacy_test: redirects
     hub_test: renders
 
   - id: denied

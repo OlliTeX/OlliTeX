@@ -96,7 +96,7 @@ export function DsNavPageSwitcher({
         </li>
         <li>
           <a
-            href="/project"
+            href="/hub#/projects.all"
             className={`ds-nav-page-switcher-item${activePage === 'projects' ? ' active' : ''}`}
             aria-current={activePage === 'projects' ? 'page' : undefined}
             onClick={

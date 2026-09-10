@@ -1,7 +1,7 @@
 /**
  * PSH — page-shells unit tests (UI-R10 W8).
  *
- * 1) The two NEW views mirror their upstream counterparts on every
+ * 1) The NEW views mirror their upstream counterparts on every
  *    functional surface (pug includes, entrypoints, meta tags, tab ids,
  *    form actions) while living only inside modules/page-shells.
  * 2) Upstream files remain untouched by this feature (byte stability).
@@ -20,42 +20,17 @@ const moduleDir = resolve(web, 'modules/page-shells')
 const read = p => readFileSync(p, 'utf8')
 
 describe('PSH view mirrors', () => {
-  it('admin-panel.pug mirrors upstream admin/index.pug on all functional surfaces', () => {
-    const upstream = read(resolve(repoApp, 'views/admin/index.pug'))
-    const shell = read(resolve(moduleDir, 'app/views/admin-panel.pug'))
-
-    // Same tab set. R12-9 (2026-08-31, user-requested) intentionally
-    // removed the four empty husk tabs (open-sockets, privileges-matrix,
-    // tpds, debug-projects) from the fork's /admin/panel shell, so the
-    // parity check covers the remaining functional tabs only — the
-    // upstream admin/index.pug still contains all seven.
-    for (const id of ['system-messages', 'active-projects', 'open-close-editor']) {
-      expect(shell).toContain(`'${id}'`)
-      expect(upstream).toContain(`'${id}'`)
-    }
-    // Same upstream endpoints (the two TPDS/Dropbox endpoints are only
-    // asserted on the upstream side — the removed husk tabs don't exist in
-    // the fork shell by design).
-    for (const action of ['/admin/messages', '/admin/messages/clear', '/admin/closeEditor', '/admin/disconnectAllUsers', '/admin/openEditor']) {
-      expect(shell).toContain(`action='${action}'`)
-      expect(upstream).toContain(`action='${action}'`)
-    }
-    expect(upstream).toContain(`action='/admin/flushProjectToTpds'`)
-    expect(upstream).toContain(`action='/admin/pollDropboxForUser'`)
-    // Reuses the upstream pieces
-    expect(shell).toContain('bookmarkable_tabset')
-    expect(shell).toContain('active-projects.pug')
-    expect(shell).toContain('layout-react')
-    // N-2 structural rebuild (2026-09-01): the DS-nav chrome mounts must
-    // exist so the shared React navbar/account menu can mount INSIDE the
-    // page div (golden /admin/site parity).
-    expect(shell).toContain('#admin-panel-navbar-root')
-    expect(shell).toContain('#admin-panel-account-root')
-    expect(shell).toContain('user-list-sidebar-wrapper-react')
-    // Theme parity with /admin (meta + script present in upstream)
-    const themeScriptUpstream = /meta\(name='ol-adminOverallTheme'/
-    expect(upstream).toMatch(themeScriptUpstream)
-    expect(shell).toMatch(themeScriptUpstream)
+  // 2026-09-10 (owner queue 4): the legacy /admin/panel page is REMOVED —
+  // the admin hub is the single admin surface. Assert the redirect + that
+  // the panel artifacts are gone (the my-settings shell still ships).
+  it('/admin/panel is a 301 redirect to the hub and its artifacts are removed', () => {
+    const router = read(resolve(moduleDir, 'app/src/PageShellsRouter.mjs'))
+    expect(router).toContain("'/admin/panel'")
+    expect(router).toContain('res.redirect(301, \'/hub#/overview\')')
+    expect(router).not.toContain('AdminPanelShellController')
+    expect(existsSync(resolve(moduleDir, 'app/views/admin-panel.pug'))).toBe(false)
+    expect(existsSync(resolve(moduleDir, 'app/src/AdminPanelShellController.mjs'))).toBe(false)
+    expect(existsSync(resolve(moduleDir, 'frontend/js/pages/panel-shell.js'))).toBe(false)
   })
 
   it('user-my-settings.pug mirrors upstream user/settings.pug on all meta tags + entrypoint', () => {
@@ -75,7 +50,7 @@ describe('PSH view mirrors', () => {
 
   it('module files exist and the module is registered', () => {
     expect(existsSync(resolve(moduleDir, 'index.mjs'))).toBe(true)
-    for (const f of ['PageShellsRouter.mjs', 'captureRender.mjs', 'AdminPanelShellController.mjs', 'MySettingsShellController.mjs']) {
+    for (const f of ['PageShellsRouter.mjs', 'captureRender.mjs', 'MySettingsShellController.mjs']) {
       expect(existsSync(resolve(moduleDir, 'app/src', f)), f).toBe(true)
     }
     const defaults = read(resolve(web, 'config/settings.defaults.js'))
@@ -129,9 +104,7 @@ describe('PSH upstream stability (hard constraint: no upstream edits)', () => {
       const full = resolve(repoApp, f.replace(/^app\//, ''))
       expect(existsSync(full), f).toBe(true)
     }
-    // The shell controllers IMPORT the upstream handlers (policy check).
-    const panelCtl = read(resolve(moduleDir, 'app/src/AdminPanelShellController.mjs'))
-    expect(panelCtl).toContain('ServerAdmin/AdminController.mjs')
+    // The settings shell controller IMPORTS the upstream handler (policy check).
     const settingsCtl = read(resolve(moduleDir, 'app/src/MySettingsShellController.mjs'))
     expect(settingsCtl).toContain('User/UserPagesController.mjs')
   })

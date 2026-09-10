@@ -41,30 +41,29 @@ async function newTypstProject(
     .first()
   await trigger.click()
 
-  // (1) flag-ON entry exists
+  // (1) flag-ON entry exists. 2026-09-10: legacy /project dashboard removed —
+  // "New project" now serves from the hub surface (the redirect target), whose
+  // new-project menu exposes the typst entries directly.
   const item = page.locator('text=Blank Typst project').first()
   await expect(item).toBeVisible({ timeout: 10_000 })
-  await item.click()
 
-  const modal = page.locator('#typst-new-project-modal')
-  await expect(modal).toBeVisible({ timeout: 10_000 })
-
-  await modal.locator('input[type="text"]').fill(opts.name)
+  // pick the entry for the requested template, then the shared hub modal
+  // (name + Create) handles the creation (POST /project/new/typst)
   if (opts.article) {
-    // (1b) Article template radio
-    const articleRadio = modal.locator('#typst-template-article')
-    await expect(articleRadio).toBeVisible({ timeout: 10_000 })
-    await articleRadio.check({ force: true })
-  }
-  if (opts.example) {
-    // (1c) Example template radio (owner 2026-09-13: TeX example translation)
-    const exampleRadio = modal.locator('#typst-template-example')
-    await expect(exampleRadio).toBeVisible({ timeout: 10_000 })
-    await exampleRadio.check({ force: true })
+    await page.locator('text=Typst article (bibliography)').first().click()
+  } else if (opts.example) {
+    // (1c) Example template (owner 2026-09-13: TeX example translation)
+    await page.locator('text=Typst example project').first().click()
+  } else {
+    await item.click()
   }
 
-  await modal.locator('button:has-text("Create")').click()
-  // created → editor (Overleaf lands on /project/<id>, the standard editor
+  const nameInput = page.locator('label:has-text("Project name") input, #hub-new-project-name')
+  await expect(nameInput.first()).toBeVisible({ timeout: 30_000 })
+  await nameInput.first().fill(opts.name)
+
+  await page.locator('[role="dialog"] button:has-text("Create"), .mantine-Modal-root button:has-text("Create")').first().click()
+  // created → editor (hub lands on /project/<id>, the standard editor
   // route; /Project/<id> and /editor/<id> are the legacy + renovated twins)
   await page.waitForURL(/\/(editor|Project|project)\/[a-f0-9]{24}/, { timeout: 30_000 })
 }

@@ -24,10 +24,10 @@ files:
   hub: specs/parity/hub-project.test.e2e.ts
 
 features:
-  - id: renders
+  - id: renders   # 2026-09-10: legacy page removed; legacy side now asserts the 301 redirect to the hub
     kind: page
     desc: list page renders (h1 + New project control)
-    legacy_test: renders
+    legacy_test: redirects
     hub_test: renders
 
   - id: denied
