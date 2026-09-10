@@ -36,7 +36,13 @@ const userDetailsUpdatedOnLogin = Object.fromEntries(
  */
 async function buildLocals(req, res) {
   const userId = SessionManager.getLoggedInUserId(req.session)
-  const user = userId ? await User.findById(userId, 'ace') : null
+  // 2026-09-16 (owner hub #6): the account tab reads email/first_name/
+  // last_name from this meta — the legacy 'ace'-only projection left them
+  // undefined, so the stored DB values never showed. Project the full set
+  // the hub UI consumes (buildUserSettings still reads user.ace.*).
+  const user = userId
+    ? await User.findById(userId, 'ace email first_name last_name')
+    : null
   const userSettings = user
     ? await UserSettingsHelper.buildUserSettings(req, res, user)
     : {}
