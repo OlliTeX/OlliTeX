@@ -9,8 +9,8 @@ import {
   useCodeMirrorViewContext,
 } from '@/features/source-editor/components/codemirror-context'
 import {
-  useEditorManagerContext,
-} from '@/features/ide-react/context/editor-manager-context'
+  useEditorOpenDocContext,
+} from '@/features/ide-react/context/editor-open-doc-context'
 import {
   mathAncestorNode,
   parseMathContainer,
@@ -43,8 +43,13 @@ const LatexEditorToolbarButton: FC = () => {
   const view = useCodeMirrorViewContext()
   // 2026-09 (owner Y): the Equation Editor only makes sense on .tex files —
   // on .bib (etc.) the button was confusing. Gate on the active document.
-  const { openDoc } = useEditorManagerContext()
-  const activeFileIsTex = !!openDoc && /\.tex$/i.test(openDoc.name || '')
+  // FIX 2026-09-10: the gate previously read `openDoc.name` — but in this
+  // codebase `openDoc` is the OPEN ACTION (a function), whose `.name` is
+  // always the string "openDoc" — so the button (and its 'latex-editor:open'
+  // listener) never mounted and the owner lost the whole equation editor.
+  // Correct source: the exposed open-document name state.
+  const { openDocName } = useEditorOpenDocContext()
+  const activeFileIsTex = !!openDocName && /\.tex$/i.test(openDocName)
 
   const [open, setOpen] = useState(false)
   const [initialLatex, setInitialLatex] = useState<string | undefined>(
