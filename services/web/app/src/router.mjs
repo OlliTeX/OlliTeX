@@ -1206,6 +1206,12 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthorizationMiddleware.ensureUserIsSiteAdmin,
     AdminController.deleteMessage
   )
+  // Owner #17b (2026-09-13): per-message placement selector.
+  webRouter.patch(
+    '/admin/messages/:message_id',
+    AuthorizationMiddleware.ensureUserIsSiteAdmin,
+    AdminController.updateMessage
+  )
 
   privateApiRouter.get('/perfTest', (req, res) => {
     plainTextResponse(res, 'hello')

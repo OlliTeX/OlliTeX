@@ -56,7 +56,23 @@ const pollDropboxForUserSchema = z.object({
 const createMessageSchema = z.object({
   body: z.strictObject({
     content: z.string(),
+    // Owner #17b (2026-09-13): per-message placement; [] = all pages.
+    placements: z
+      .array(z.enum(['editor', 'hub', 'auth']))
+      .max(4)
+      .optional(),
   }),
+})
+
+const updateMessageSchema = z.object({
+  params: z.object({ message_id: z.string().min(1) }),
+  body: z.strictObject({
+    placements: z.array(z.enum(['editor', 'hub', 'auth'])).max(4),
+  }),
+})
+
+const deleteMessageSchema = z.object({
+  params: z.object({ message_id: z.string().min(1) }),
 })
 
 const AdminController = {
@@ -179,12 +195,34 @@ const AdminController = {
 
   createMessage(req, res, next) {
     const { body } = parseReq(req, createMessageSchema, { logOnly: true })
-    SystemMessageManager.createMessage(body.content, function (error) {
-      if (error) {
-        return next(error)
+    SystemMessageManager.createMessage(
+      body.content,
+      body.placements || [],
+      function (error) {
+        if (error) {
+          return next(error)
+        }
+        res.redirect('/admin#system-messages')
       }
-      res.redirect('/admin#system-messages')
-    })
+    )
+  },
+
+  // Owner #17b (2026-09-13): change WHERE a message is shown.
+  updateMessage(req, res, next) {
+    const { params, body } = parseReq(req, updateMessageSchema, { logOnly: true })
+    SystemMessageManager.updateMessage(
+      params.message_id,
+      { placements: body.placements },
+      function (error) {
+        if (error) {
+          return next(error)
+        }
+        if (req.xhr || req.headers.accept?.includes('application/json')) {
+          return res.json({ success: true })
+        }
+        res.redirect('/admin#system-messages')
+      }
+    )
   },
 
   clearMessages(req, res, next) {
@@ -199,7 +237,8 @@ const AdminController = {
   // Owner #17c (2026-09-13): delete a single system message (the legacy admin
   // page only offered “clear all”).
   deleteMessage(req, res, next) {
-    const messageId = req.params.message_id
+    const { params } = parseReq(req, deleteMessageSchema, { logOnly: true })
+    const messageId = params.message_id
     SystemMessageManager.deleteMessage(String(messageId), function (error) {
       if (error) {
         return next(error)

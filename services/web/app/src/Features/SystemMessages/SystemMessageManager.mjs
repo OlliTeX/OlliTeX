@@ -25,11 +25,31 @@ const SystemMessageManager = {
     await this.refreshCache()
   },
 
-  async createMessage(content) {
-    const message = new SystemMessage({ content })
+  // placements: '#17b' surface list ('editor'|'hub'|'auth'); []/missing = all pages.
+  async createMessage(content, placements) {
+    const message = new SystemMessage({
+      content,
+      placements: Array.isArray(placements) ? placements : [],
+    })
     await message.save()
     await SystemMessageManager.notifyOtherPods()
     await this.refreshCache()
+    return message
+  },
+
+  // Owner #17b (2026-09-13): update per-message placement.
+  async updateMessage(messageId, updates) {
+    const updated = await SystemMessage.findByIdAndUpdate(
+      messageId,
+      { $set: updates },
+      { new: true }
+    ).exec()
+    if (!updated) {
+      throw new Error('System message not found')
+    }
+    await SystemMessageManager.notifyOtherPods()
+    await this.refreshCache()
+    return updated
   },
 
   // single-message delete (owner #17c, 2026-09-13: only “clear all” existed)

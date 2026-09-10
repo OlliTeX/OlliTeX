@@ -25,7 +25,7 @@ describe('<SystemMessagesSection />', () => {
     expect((screen.getByRole('button', { name: /Clear all/ }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('adds a message with the strict POST /admin/messages body { content }', async () => {
+  it('adds a message with the strict POST /admin/messages body { content, placements }', async () => {
     const { calls } = stubFetch([
       { match: '/system/messages', body: [] },
       { method: 'POST', match: '/admin/messages', body: {} },
@@ -33,6 +33,7 @@ describe('<SystemMessagesSection />', () => {
     renderHub(<SystemMessagesSection />)
     await screen.findByText(/No system messages/i)
 
+    // default placement is 'All pages' → placements []
     const input = screen.getByPlaceholderText(/Maintenance/i)
     fireEvent.change(input, { target: { value: 'HUB TEST MESSAGE' } })
     fireEvent.click(screen.getByRole('button', { name: /Add message/ }))
@@ -40,8 +41,67 @@ describe('<SystemMessagesSection />', () => {
     await waitFor(() => {
       const post = calls.find(c => c.method === 'POST' && c.url.includes('/admin/messages'))
       expect(post).toBeTruthy()
-      expect(JSON.parse(post!.body!)).toEqual({ content: 'HUB TEST MESSAGE' })
+      expect(JSON.parse(post!.body!)).toEqual({ content: 'HUB TEST MESSAGE', placements: [] })
     })
+  })
+
+  it('#17b: adds a message scoped to selected surfaces (All is exclusive)', async () => {
+    const { calls } = stubFetch([
+      { match: '/system/messages', body: [] },
+      { method: 'POST', match: '/admin/messages', body: {} },
+    ])
+    renderHub(<SystemMessagesSection />)
+    await screen.findByText(/No system messages/i)
+
+    // switch off 'All pages' → Editor + Hub
+    fireEvent.click(screen.getByRole('checkbox', { name: /All pages/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Editor/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Hub/i }))
+
+    const input = screen.getByPlaceholderText(/Maintenance/i)
+    fireEvent.change(input, { target: { value: 'EDITOR+HUB ONLY' } })
+    fireEvent.click(screen.getByRole('button', { name: /Add message/ }))
+
+    await waitFor(() => {
+      const post = calls.find(c => c.method === 'POST' && c.url.includes('/admin/messages'))
+      expect(post).toBeTruthy()
+      const body = JSON.parse(post!.body!)
+      expect(body.content).toBe('EDITOR+HUB ONLY')
+      expect(body.placements).toEqual(['editor', 'hub'])
+    })
+  })
+
+  it('#17b: per-row placement toggle PATCHes { placements } (legacy all → editor)', async () => {
+    const { calls } = stubFetch([
+      { match: '/system/messages', body: [{ _id: 'm1', content: 'Legacy message' }] },
+      { method: 'PATCH', match: '/admin/messages/m1', body: { success: true } },
+    ])
+    renderHub(<SystemMessagesSection />)
+    const row = await screen.findByTestId('msg-row-m1')
+
+    // legacy message has no placements → 'All pages' chip is checked
+    expect(within(row).getByRole('checkbox', { name: /All pages/i })).toBeTruthy()
+    expect((within(row).getByRole('checkbox', { name: /All pages/i }) as HTMLInputElement).checked).toBe(true)
+
+    fireEvent.click(within(row).getByRole('checkbox', { name: /Editor/i }))
+
+    await waitFor(() => {
+      const patch = calls.find(c => c.method === 'PATCH' && c.url.includes('/admin/messages/m1'))
+      expect(patch).toBeTruthy()
+      expect(JSON.parse(patch!.body!)).toEqual({ placements: ['editor'] })
+    })
+  })
+
+  it('#17b: row placement chips reflect a saved placements list', async () => {
+    stubFetch([
+      { match: '/system/messages', body: [{ _id: 'm2', content: 'Hub-only message', placements: ['hub'] }] },
+    ])
+    renderHub(<SystemMessagesSection />)
+    const row = await screen.findByTestId('msg-row-m2')
+
+    expect((within(row).getByRole('checkbox', { name: /Hub/i }) as HTMLInputElement).checked).toBe(true)
+    expect((within(row).getByRole('checkbox', { name: /Editor/i }) as HTMLInputElement).checked).toBe(false)
+    expect((within(row).getByRole('checkbox', { name: /All pages/i }) as HTMLInputElement).checked).toBe(false)
   })
 
   it('clears all messages via POST /admin/messages/clear (with confirm)', async () => {
