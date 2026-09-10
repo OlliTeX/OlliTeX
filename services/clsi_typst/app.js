@@ -27,6 +27,18 @@ import os from 'node:os'
 logger.initialize('clsi_typst')
 logger.logger.serializers.clsiRequest = loggerSerializers.clsiRequest
 
+// Sandbox-dir contract (plan §4.2 / DockerRunner same-path bind): when the
+// deployment runs clsi_typst with DOCKER_RUNNER=true, the shared deployment
+// settings.js has already forced path.compilesDir to the container's tex
+// data dir (deep merge wins over this service's defaults) — but the
+// DockerRunner volume-binds the sandbox host dir, so the service must write
+// its sources there too. The deployment passes TYPST_COMPILES_DIR (scoped
+// to this runit service — the tex clsi is untouched); honor it over the
+// merged-in override.
+if (process.env.TYPST_COMPILES_DIR) {
+  Settings.path.compilesDir = process.env.TYPST_COMPILES_DIR
+}
+
 Metrics.open_sockets.monitor(true)
 Metrics.memory.monitor(logger)
 Metrics.leaked_sockets.monitor(logger)
