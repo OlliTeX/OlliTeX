@@ -1,0 +1,32 @@
+---
+services:
+
+    # Mongo — improvements integrated from the compose_cep production stack
+    # (2026-09-13): replica-set auto-initiation IN the healthcheck, so
+    # `up` never needs a separate rs.initiate step; glibc SHSTK workaround
+    # for hosts whose kernel enables CET shadow-stack (avoids the
+    # "Illegal instruction" mongo crash seen on newer x86-64 kernels).
+    mongo:
+        restart: always
+        image: "${MONGO_DOCKER_IMAGE}"
+        command: "${MONGO_ARGS}"
+        container_name: overleafmongo
+        hostname: overleafmongo
+        environment:
+            GLIBC_TUNABLES: glibc.cpu.hwcaps=-SHSTK
+        volumes:
+            - "${MONGO_DATA_PATH}:/data/db"
+        expose:
+            - 27017
+        healthcheck:
+            test: "${MONGOSH} --quiet --eval \"rs.hello().setName ? rs.hello().setName : rs.initiate({_id: \\\"overleaf\\\",members:[{_id: 0, host:\\\"overleafmongo:27017\\\"}]})\""
+            interval: 10s
+            timeout: 10s
+            retries: 5
+
+    ollitex:
+      depends_on:
+        mongo:
+          condition: service_healthy
+      links:
+        - mongo

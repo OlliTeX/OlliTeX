@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# OlliTeX Toolkit — TUI (owner ask 2026-09-13, item g)
+# -----------------------------------------------------
+# One-screen operator console. The TUI is a THIN LAYER over the same
+# bin/ scripts (start|stop|logs|images|doctor|backup|n-grams) — it does
+# not replace the CLI; it makes day-to-day ops easier without losing
+# functionality. Needs python3 with the curses module (standard on
+# Debian/Ubuntu/RHEL).
+#
+#   Keys: arrows/jk navigate · enter run · q quit
+#         s start · o stop · r restart · l logs · i images
+#         p pull images · b backup · d doctor · n n-gram info
+#
+# Long jobs (pull, doctor, backup, logs -f) run detached and write to
+# data/toolkit-tui/<job>.log, so the TUI stays responsive.
+
+import curses
+import os
+import shutil
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+TOOLKIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BIN = os.path.join(TOOLKIT_ROOT, "bin")
+JOURNAL = os.path.join(TOOLKIT_ROOT, "data", "toolkit-tui")
+
+
+def sh(args, timeout=20):
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    except Exception as e:  # noqa: BLE001
+        return type("R", (), {"returncode": -1, "stdout": "", "stderr": str(e)})()
+
+
+def status_rows():
+    r = sh(["docker", "ps", "-a", "--filter", "name=overleaf", "--filter",
+            "name=ollitex", "--filter", "name=languagetool",
+            "--format", "{{.Names}}\t{{.Status}}"])
+    rows = []
+    for line in (r.stdout or "").splitlines():
+        parts = line.split("\t", 1)
+        if len(parts) == 2:
+            rows.append((parts[0], parts[1].split(",")[0]))
+    if not rows:
+        rows.append(("-", "no containers (run start)"))
+    return rows
+
+
+def ngrams_info():
+    rc = os.path.join(TOOLKIT_ROOT, "config", "overleaf.rc")
+    langs = "en,de,es,fr,de (default)"
+    if os.path.exists(rc):
+        for line in open(rc, encoding="utf-8", errors="ignore"):
+            if line.startswith("LANGUAGE_TOOL_NGRAM_LANGUAGES="):
+                langs = line.split("=", 1)[1].strip().strip('"')
+                break
+    return ("LanguageTool n-gram languages: " + langs +
+            "\nDownload (several GB per language) in a terminal:"
+            "\n    bin/languagetool-ngrams --languages en,de"
+            "\nThen LANGUAGE_TOOL_ENABLED=true + bin/up."
+            "\nAdmin toggle: /hub -> Admin -> Site -> Grammar.")
+
+
+MENU = [
+    ("s", "Start the OlliTeX stack", ["start"]),
+    ("o", "Stop the stack (data safe)", ["stop"]),
+    ("r", "Restart the stack", ["restart"]),
+    ("l", "Logs — follow in journal", ["logs", "-f"]),
+    ("i", "Show configured images", ["images"]),
+    ("p", "Pull configured images", ["images", "--pull"]),
+    ("b", "Backup config (zip)", ["backup-config", "-m", "zip"]),
+    ("d", "Doctor", ["doctor"]),
+    ("n", "LanguageTool n-gram info", None),
+    ("q", "Quit", None),
+]
+
+QUICKKEY = {m[0]: i for i, m in enumerate(MENU)}
+
+
+def run_menu_entry(args):
+    if args is None:
+        return ngrams_info()
+    os.makedirs(JOURNAL, exist_ok=True)
+    log = os.path.join(JOURNAL, "{}-{}.log".format(
+        args[0], datetime.now().strftime("%Y%m%d-%H%M%S")))
+    with open(log, "ab") as fh:
+        subprocess.Popen(
+            [os.path.join(BIN, args[0])] + args[1:],
+            stdout=fh, stderr=subprocess.STDOUT, cwd=TOOLKIT_ROOT,
+            start_new_session=True)
+    return "started detached -> " + log
+
+
+def main(win):
+    curses.curs_set(0)
+    if curses.has_colors():
+        curses.start_color()
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_CYAN, -1)
+        curses.init_pair(2, curses.COLOR_GREEN, -1)
+        curses.init_pair(3, curses.COLOR_RED, -1)
+        curses.init_pair(4, curses.COLOR_YELLOW, -1)
+    sel = 0
+    status = []
+    last_refresh = 0.0
+    message = " ready — arrows to select, ENTER to run, q to quit "
+    msg_err = False
+
+    while True:
+        height, width = win.getmaxyx()
+        win.erase()
+        if time.time() - last_refresh > 3.0 or not status:
+            status = status_rows()
+            last_refresh = time.time()
+        try:
+            win.addnstr(0, 0, " OlliTeX Toolkit — operator console ".center(max(width, 24))[:max(width, 24)], width - 1, curses.A_REVERSE | (curses.color_pair(1) if curses.has_colors() else 0))
+        except curses.error:
+            pass
+        try:
+            win.addnstr(1, 2, " STACK ", width - 1, curses.A_BOLD)
+        except curses.error:
+            pass
+        for i, (name, state) in enumerate(status[:max(height - 8, 1)]):
+            ok = "healthy" in state or state in ("Up", "up (healthy)")
+            down = "Exit" in state or state.startswith("dead")
+            col = 0
+            if curses.has_colors():
+                col = curses.color_pair(2) if ok else (curses.color_pair(3) if down else curses.color_pair(4))
+            label = " {:<20} {}".format(name[:20], state)
+            label = label[:max(width - 5, 1)]
+            try:
+                win.addnstr(2 + i, 2, label, width - 5, col | curses.A_BOLD)
+            except curses.error:
+                break
+        mx = max(30, width // 2)
+        try:
+            win.addnstr(1, mx, " ACTIONS ", width - 1, curses.A_BOLD)
+        except curses.error:
+            pass
+        for i, (key, label, _args) in enumerate(MENU):
+            y = 2 + i
+            if y > height - 3:
+                break
+            attr = curses.A_REVERSE if i == sel else 0
+            item = " [{}] {}".format(key, label)[:max(width - mx, 1)]
+            try:
+                win.addnstr(y, mx, item, max(width - mx, 1) - 1, attr)
+            except curses.error:
+                break
+        mcol = 0
+        if curses.has_colors():
+            mcol = curses.color_pair(3) if msg_err else curses.color_pair(2)
+        try:
+            win.addnstr(height - 2, 1, message[:max(width - 3, 1)].ljust(max(width - 3, 1)), width - 2, mcol)
+        except curses.error:
+            pass
+        try:
+            win.addnstr(height - 1, 1, " arrows/jk move · ENTER run · key shortcut · q quit ".ljust(max(width - 3, 1)), width - 2)
+        except curses.error:
+            pass
+        win.refresh()
+
+        try:
+            ch = win.getch()
+        except curses.error:
+            time.sleep(0.1)
+            continue
+
+        if ch in (ord("q"), 27):
+            return
+        if ch in (curses.KEY_UP, ord("k")):
+            sel = (sel - 1) % len(MENU)
+            message, msg_err = " ", False
+        elif ch in (curses.KEY_DOWN, ord("j")):
+            sel = (sel + 1) % len(MENU)
+            message, msg_err = " ", False
+        elif ch in [ord(k) for k in QUICKKEY]:
+            sel = QUICKKEY[chr(ch)]
+        elif ch in (curses.KEY_ENTER, 10, 13):
+            if 0 <= sel < len(MENU):
+                try:
+                    out = run_menu_entry(MENU[sel][2])
+                    message, msg_err = str(out)[:200], False
+                except Exception as e:  # noqa: BLE001
+                    message, msg_err = "error: " + str(e), True
+            status = []
+
+
+if __name__ == "__main__":
+    if not shutil.which("docker"):
+        print("ERROR: docker not found on PATH")
+        sys.exit(1)
+    try:
+        curses.wrapper(main)
+    except KeyboardInterrupt:
+        pass

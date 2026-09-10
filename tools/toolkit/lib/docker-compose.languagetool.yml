@@ -1,0 +1,33 @@
+---
+# LanguageTool — optional grammar-checking service (owner ask 2026-09-13).
+#
+# Enable in config/overleaf.rc:  LANGUAGE_TOOL_ENABLED=true
+# Language models (n-grams):      bin/languagetool-ngrams
+#   (downloads the zips for the languages listed in
+#   LANGUAGE_TOOL_NGRAM_LANGUAGES, default: en,de,es,fr,de)
+#
+# Admin surface: /hub → Site settings → Grammar
+#   - the endpoint URL (defaults to http://languagetool:8010, override with
+#     LANGUAGETOOL_URL in config/variables.env)
+#   - enable/disable + per-user preference live in the hub (no re-deploy)
+services:
+
+    languagetool:
+        image: "${LANGUAGE_TOOL_IMAGE}"
+        container_name: languagetool
+        hostname: languagetool
+        restart: unless-stopped
+        environment:
+            Java_Xms: 512m
+            Java_Xmx: 2g
+            langtool_languageModel: /ngrams
+        healthcheck:
+            test: ["CMD-SHELL", "wget --quiet --spider --timeout=5 http://localhost:8010/v2/languages 2>&1 || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 60s
+        ports:
+            - "${LANGUAGE_TOOL_PORT:-8010}:8010"
+        volumes:
+            - "${LANGUAGE_TOOL_DATA_PATH}/ngrams:/ngrams:ro"

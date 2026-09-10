@@ -1,0 +1,7 @@
+---
+services:
+
+  sharelatex:
+    environment:
+      SHARELATEX_MONGO_URL: "${MONGO_URL}"
+      SHARELATEX_REDIS_HOST: "${REDIS_HOST}"

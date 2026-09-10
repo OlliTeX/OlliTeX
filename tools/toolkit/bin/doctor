@@ -1,0 +1,478 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+#### Detect Toolkit Project Root ####
+# if realpath is not available, create a semi-equivalent function
+command -v realpath >/dev/null 2>&1 || realpath() {
+  [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+TOOLKIT_ROOT="$(realpath "$SCRIPT_DIR/..")"
+if [[ ! -d "$TOOLKIT_ROOT/bin" ]] || [[ ! -d "$TOOLKIT_ROOT/config" ]]; then
+  echo "ERROR: could not find root of the OlliTeX toolkit project (inferred project root as '$TOOLKIT_ROOT')"
+  exit 1
+fi
+
+source "$TOOLKIT_ROOT/lib/shared-functions.sh"
+
+SPACES_PER_INDENT=4
+
+WARNINGS_FILE="$(mktemp)"
+
+function add_warning() {
+  echo "$@" >> "$WARNINGS_FILE"
+}
+
+function indent_to_level() {
+  local levels="$1"
+  local number_of_spaces=$(( levels * SPACES_PER_INDENT ))
+  local spaces
+  spaces="$(printf %${number_of_spaces}s)"
+  echo -n "${spaces}"
+}
+
+function print_section_separator() {
+  echo "====== $* ======"
+}
+
+function print_point() {
+  local indent_level="0"
+  if [[ "${1:-null}" =~ [0-9]{1} ]]; then
+    indent_level="$1"
+    shift
+  fi
+  # shellcheck disable=SC2086
+  echo "$(indent_to_level $indent_level)- $*"
+}
+
+function check_host_information() {
+  print_point 0 "Host Information"
+
+  # Linux or not?
+  if [[ $(uname -a) =~ .*Linux.* ]]; then
+    print_point 1 "Linux"
+  else
+    print_point 1 "Not Linux !"
+    add_warning "This system seems to not be Linux"
+  fi
+
+  # LSB Information (particular distribution of Linux, and version)
+  if [[ -n $(command -v lsb_release) ]]; then
+    print_point 1 "Output of 'lsb_release -a':"
+    lsb_release -a 2>&1 | while read -r _line; do
+      echo "$(indent_to_level 3)$_line"
+    done
+  else
+    print_point 1 "lsb_release not found !"
+  fi
+}
+
+
+function check_dependencies() {
+
+  function get_version() {
+    local binary_name="$1"
+    if [[ "bash" == "$binary_name" ]]; then
+      bash -c 'echo $BASH_VERSION'
+    elif [[ "perl" == "$binary_name" ]]; then
+      perl -e 'print $];'
+    elif [[ "openssl" == "$binary_name" ]]; then
+      openssl version
+    elif [[ "awk" == "$binary_name" ]]; then
+      if awk -Wversion > /dev/null 2>&1; then
+        awk -Wversion 2>&1 | head -n 1
+      else
+        awk --version | head -n 1
+      fi
+    else
+      $binary_name --version | head -n 1
+    fi
+  }
+
+  function check_for_binary() {
+    local binary_name="$1"
+    print_point 1 "$binary_name"
+    if [[ -n $(command -v "$binary_name") ]]; then
+      print_point 2 "status: present"
+      local version
+      version=$(get_version "$binary_name")
+      print_point 2 "version info: $version"
+      if [[ "$binary_name" == "realpath" ]] \
+          && [[ "$(command -V "$binary_name")" =~ .*function.* ]]; then
+        local message="Could not find 'realpath' binary, falling back to custom function"
+        print_point 2 "WARNING: $message"
+        add_warning "$message"
+      fi
+    else
+      print_point 2 "status: MISSING !"
+      add_warning "$binary_name not found"
+    fi
+  }
+
+  print_point 0 "Dependencies"
+  declare -a binaries=(
+    bash
+    docker
+    realpath
+    perl
+    awk
+    openssl
+  )
+
+  for binary in "${binaries[@]}"; do
+    check_for_binary "$binary"
+  done
+
+  if docker compose version > /dev/null 2>&1; then
+    print_point 1 "docker compose"
+    print_point 2 "status: present"
+    print_point 2 "version info: $(docker compose version)"
+  elif command -v docker-compose > /dev/null; then
+    add_warning "docker-compose v1 has reached its End Of Life in July 2023 (https://docs.docker.com/compose/migrate/). We recommend upgrading to Docker Compose v2."
+    check_for_binary docker-compose
+  else
+    add_warning "Docker Compose not found"
+  fi
+}
+
+function check_docker_daemon() {
+  print_point 0 "Docker Daemon"
+  if docker ps &>/dev/null;  then
+    print_point 1 "status: up"
+
+    local docker_server_version=$(docker version -f '{{.Server.Version}}')
+    print_point 1 "server version: $docker_server_version"
+    if [[ "$docker_server_version" =~ ^([0-9]+)\.([0-9]+) ]]; then
+      local major="${BASH_REMATCH[1]}"
+      local minor="${BASH_REMATCH[2]}"
+      if [[ "$major" -lt 23 ]]; then
+        add_warning "Docker v$major.$minor has reached its End Of Life. We recommend upgrading to a supported version."
+      fi
+    else
+      add_warning "Docker server version unknown ($docker_server_version)"
+    fi
+
+    if docker info | grep -q -e '/var/snap/docker/common/var-lib-docker'; then
+      add_warning "Installing Docker via snap is not supported. The sandboxed compiles feature may not be available. Please follow the steps for installing Docker CE on https://docs.docker.com/engine/install/."
+    fi
+  else
+    print_point 1 "status: DOWN !"
+    add_warning "Docker daemon is not running"
+  fi
+}
+
+function print_warnings() {
+  print_section_separator "Warnings"
+  if [[ -n $(head -n 1 "$WARNINGS_FILE") ]]; then
+    while read -r _line; do
+      echo "! $_line"
+    done < "$WARNINGS_FILE"
+  else
+    echo "- None, all good"
+  fi
+}
+
+function check_config_files() {
+  print_section_separator "Configuration"
+
+  local config_files=(
+    "config/version"
+    "config/overleaf.rc"
+    "config/variables.env"
+  )
+  for config_file in "${config_files[@]}"
+  do
+
+    print_point 0 "$config_file"
+
+    if [[ ! -f "$TOOLKIT_ROOT/$config_file" ]]; then
+      print_point 1 "status: MISSING !"
+      add_warning "configuration file $config_file not found"
+    else
+
+      print_point 1 "status: present"
+
+      if [[ "$config_file" == "config/version" ]]; then
+        print_point 1 "version: $(head -n 1 "$TOOLKIT_ROOT/$config_file")"
+      elif [[ "$config_file" == "config/overleaf.rc" ]]; then
+        print_point 1 "values"
+
+        # Load vars from the rc file
+        # shellcheck disable=SC1090
+        source "$TOOLKIT_ROOT/$config_file"
+
+        # Check some vars from the RC file
+        if [[ "${OVERLEAF_DATA_PATH:-null}" != "null" ]]; then
+          print_point 2 "OVERLEAF_DATA_PATH: $OVERLEAF_DATA_PATH"
+        else
+          print_point 2 "OVERLEAF_DATA_PATH: MISSING !"
+          add_warning "rc file, OVERLEAF_DATA_PATH not set"
+        fi
+        if [[ "${OVERLEAF_LOG_PATH:-null}" != "null" ]]; then
+          print_point 2 "OVERLEAF_LOG_PATH: $OVERLEAF_LOG_PATH"
+        else
+          print_point 2 "OVERLEAF_LOG_PATH: not set, keeping logs in container"
+        fi
+
+        print_point 2 "OLLITEX_IMAGE: ${OLLITEX_IMAGE:-${IMAGE:-unset}}"
+        print_point 2 "SIBLING_CONTAINERS_ENABLED: ${SIBLING_CONTAINERS_ENABLED:-false}"
+        if [[ "${SIBLING_CONTAINERS_ENABLED:-null}" != "true" ]]; then
+          add_warning "SIBLING_CONTAINERS_ENABLED=false: compiles run inside the OlliTeX container — users have full read/write access to its resources. Use SIBLING_CONTAINERS_ENABLED=true (sandboxed compiles) when users must be isolated."
+        fi
+        if [[ "${OVERLEAF_LISTEN_IP:-null}" != "null" ]]; then
+          print_point 2 "OVERLEAF_LISTEN_IP: ${OVERLEAF_LISTEN_IP}"
+        fi
+        if [[ "${OVERLEAF_PORT:-null}" != "null" ]]; then
+          print_point 2 "OVERLEAF_PORT: ${OVERLEAF_PORT}"
+        fi
+
+        print_point 2 "MONGO_ENABLED: $MONGO_ENABLED"
+        if [[ "${MONGO_URL:-null}" != "null" ]]; then
+          print_point 2 "MONGO_URL: [set here]"
+        fi
+        if [[ "${MONGO_IMAGE:-null}" != "null" ]]; then
+          print_point 2 "MONGO_IMAGE: $MONGO_IMAGE"
+        fi
+        if [[ "${MONGO_VERSION:-null}" != "null" ]]; then
+          print_point 2 "MONGO_VERSION: $MONGO_VERSION"
+        fi
+        if [[ "${MONGO_DATA_PATH:-null}" != "null" ]]; then
+          print_point 2 "MONGO_DATA_PATH: $MONGO_DATA_PATH"
+        fi
+
+        print_point 2 "REDIS_ENABLED: $REDIS_ENABLED"
+        if [[ "${REDIS_HOST:-null}" != "null" ]]; then
+          print_point 2 "REDIS_HOST: [set here]"
+        fi
+        if [[ "${REDIS_PORT:-null}" != "null" ]]; then
+          print_point 2 "REDIS_PORT: [set here]"
+        fi
+        if [[ "${REDIS_IMAGE:-null}" != "null" ]]; then
+          print_point 2 "REDIS_IMAGE: $REDIS_IMAGE"
+        fi
+        if [[ "${REDIS_AOF_PERSISTENCE:-null}" != "null" ]]; then
+          print_point 2 "REDIS_AOF_PERSISTENCE: $REDIS_AOF_PERSISTENCE"
+        fi
+        if [[ "${REDIS_DATA_PATH:-null}" != "null" ]]; then
+          print_point 2 "REDIS_DATA_PATH: $REDIS_DATA_PATH"
+        fi
+
+        print_point 2 "NGINX_ENABLED: ${NGINX_ENABLED:-null}"
+        if [[ "${NGINX_CONFIG_PATH:-null}" != "null" ]]; then
+          print_point 2 "NGINX_CONFIG_PATH: $NGINX_CONFIG_PATH"
+        fi
+        if [[ "${TLS_PRIVATE_KEY_PATH:-null}" != "null" ]]; then
+          print_point 2 "TLS_PRIVATE_KEY_PATH: $TLS_PRIVATE_KEY_PATH"
+        fi
+        if [[ "${TLS_CERTIFICATE_PATH:-null}" != "null" ]]; then
+          print_point 2 "TLS_CERTIFICATE_PATH: $TLS_CERTIFICATE_PATH"
+        fi
+        if [[ "${NGINX_HTTP_LISTEN_IP:-null}" != "null" ]]; then
+          print_point 2 "NGINX_HTTP_LISTEN_IP: $NGINX_HTTP_LISTEN_IP"
+        fi
+        if [[ "${NGINX_HTTP_PORT:-null}" != "null" ]]; then
+          print_point 2 "NGINX_HTTP_PORT: $NGINX_HTTP_PORT"
+        fi
+        if [[ "${NGINX_TLS_LISTEN_IP:-null}" != "null" ]]; then
+          print_point 2 "NGINX_TLS_LISTEN_IP: $NGINX_TLS_LISTEN_IP"
+        fi
+        if [[ "${TLS_PORT:-null}" != "null" ]]; then
+          print_point 2 "TLS_PORT: $TLS_PORT"
+        fi
+
+        print_point 2 "LANGUAGE_TOOL_ENABLED: ${LANGUAGE_TOOL_ENABLED:-false}"
+
+      elif [[ "$config_file" == "config/variables.env" ]]; then
+        print_point 1 "values"
+
+        # Load vars from the rc file
+        # shellcheck disable=SC1090
+        source "$TOOLKIT_ROOT/$config_file"
+
+        if [[ "${OVERLEAF_FILESTORE_BACKEND:-fs}" == "s3" ]]; then
+          print_point 2 "OVERLEAF_FILESTORE_BACKEND: s3"
+          if [[ "${OVERLEAF_FILESTORE_USER_FILES_BUCKET_NAME:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_USER_FILES_BUCKET_NAME: $OVERLEAF_FILESTORE_USER_FILES_BUCKET_NAME"
+          else
+            add_warning "OVERLEAF_FILESTORE_USER_FILES_BUCKET_NAME is unset"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME: $OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME"
+          else
+            add_warning "OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME is unset"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_ENDPOINT:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_ENDPOINT: [set here]"
+          else
+            print_point 2 "OVERLEAF_FILESTORE_S3_ENDPOINT: Using AWS S3"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_PATH_STYLE:-null}" == "true" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_PATH_STYLE: true"
+          else
+            print_point 2 "OVERLEAF_FILESTORE_S3_PATH_STYLE: false"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_REGION:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_REGION: $OVERLEAF_FILESTORE_S3_REGION"
+          else
+            print_point 2 "OVERLEAF_FILESTORE_S3_REGION: <unset>"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID: [set here]"
+          else
+            add_warning "OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID is missing"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY: [set here]"
+          else
+            add_warning "OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY is missing"
+          fi
+        else
+          print_point 2 "OVERLEAF_FILESTORE_BACKEND: fs"
+        fi
+        if [[ "${OVERLEAF_HISTORY_BACKEND:-fs}" == "s3" ]]; then
+          print_point 2 "OVERLEAF_HISTORY_BACKEND: s3"
+          if [[ "${OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET: $OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET"
+          else
+            add_warning "OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET is unset"
+          fi
+          if [[ "${OVERLEAF_HISTORY_CHUNKS_BUCKET:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_CHUNKS_BUCKET: $OVERLEAF_HISTORY_CHUNKS_BUCKET"
+          else
+            add_warning "OVERLEAF_HISTORY_CHUNKS_BUCKET is unset"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_ENDPOINT:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_ENDPOINT: [set here]"
+          else
+            print_point 2 "OVERLEAF_HISTORY_S3_ENDPOINT: Using AWS S3"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_PATH_STYLE:-null}" == "true" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_PATH_STYLE: true"
+          else
+            print_point 2 "OVERLEAF_HISTORY_S3_PATH_STYLE: false"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_REGION:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_REGION: $OVERLEAF_HISTORY_S3_REGION"
+          else
+            print_point 2 "OVERLEAF_HISTORY_S3_REGION: <unset>"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_ACCESS_KEY_ID:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_ACCESS_KEY_ID: [set here]"
+          else
+            add_warning "OVERLEAF_HISTORY_S3_ACCESS_KEY_ID is missing"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_SECRET_ACCESS_KEY:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_SECRET_ACCESS_KEY: [set here]"
+          else
+            add_warning "OVERLEAF_HISTORY_S3_SECRET_ACCESS_KEY is missing"
+          fi
+        else
+          print_point 2 "OVERLEAF_HISTORY_BACKEND: fs"
+        fi
+
+        if [[ "${OVERLEAF_FILESTORE_BACKEND:-fs}" == "s3" ]]; then
+          print_point 2 "OVERLEAF_FILESTORE_BACKEND: s3"
+          if [[ "${OVERLEAF_FILESTORE_USER_FILES_BUCKET_NAME:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_USER_FILES_BUCKET_NAME: $OVERLEAF_FILESTORE_USER_FILES_BUCKET_NAME"
+          else
+            add_warning "OVERLEAF_FILESTORE_USER_FILES_BUCKET_NAME is unset"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME: $OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME"
+          else
+            add_warning "OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME is unset"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_ENDPOINT:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_ENDPOINT: [set here]"
+          else
+            print_point 2 "OVERLEAF_FILESTORE_S3_ENDPOINT: Using AWS S3"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_PATH_STYLE:-null}" == "true" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_PATH_STYLE: true"
+          else
+            print_point 2 "OVERLEAF_FILESTORE_S3_PATH_STYLE: false"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_REGION:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_REGION: $OVERLEAF_FILESTORE_S3_REGION"
+          else
+            print_point 2 "OVERLEAF_FILESTORE_S3_REGION: <unset>"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID: [set here]"
+          else
+            add_warning "OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID is missing"
+          fi
+          if [[ "${OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY: [set here]"
+          else
+            add_warning "OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY is missing"
+          fi
+        else
+          print_point 2 "OVERLEAF_FILESTORE_BACKEND: fs"
+        fi
+        if [[ "${OVERLEAF_HISTORY_BACKEND:-fs}" == "s3" ]]; then
+          print_point 2 "OVERLEAF_HISTORY_BACKEND: s3"
+          if [[ "${OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET: $OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET"
+          else
+            add_warning "OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET is unset"
+          fi
+          if [[ "${OVERLEAF_HISTORY_CHUNKS_BUCKET:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_CHUNKS_BUCKET: $OVERLEAF_HISTORY_CHUNKS_BUCKET"
+          else
+            add_warning "OVERLEAF_HISTORY_CHUNKS_BUCKET is unset"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_ENDPOINT:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_ENDPOINT: [set here]"
+          else
+            print_point 2 "OVERLEAF_HISTORY_S3_ENDPOINT: Using AWS S3"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_PATH_STYLE:-null}" == "true" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_PATH_STYLE: true"
+          else
+            print_point 2 "OVERLEAF_HISTORY_S3_PATH_STYLE: false"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_REGION:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_REGION: $OVERLEAF_HISTORY_S3_REGION"
+          else
+            print_point 2 "OVERLEAF_HISTORY_S3_REGION: <unset>"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_ACCESS_KEY_ID:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_ACCESS_KEY_ID: [set here]"
+          else
+            add_warning "OVERLEAF_HISTORY_S3_ACCESS_KEY_ID is missing"
+          fi
+          if [[ "${OVERLEAF_HISTORY_S3_SECRET_ACCESS_KEY:-null}" != "null" ]]; then
+            print_point 2 "OVERLEAF_HISTORY_S3_SECRET_ACCESS_KEY: [set here]"
+          else
+            add_warning "OVERLEAF_HISTORY_S3_SECRET_ACCESS_KEY is missing"
+          fi
+        else
+          print_point 2 "OVERLEAF_HISTORY_BACKEND: fs"
+        fi
+      fi
+    fi
+  done
+}
+
+function cleanup() {
+  rm "$WARNINGS_FILE"
+}
+
+function __main__() {
+  read_image_version
+  print_section_separator "Overleaf Doctor"
+  check_retracted_version
+  check_sharelatex_env_vars
+  check_host_information
+  check_dependencies
+  check_docker_daemon
+  check_config_files
+  print_warnings
+  print_section_separator "End"
+  cleanup
+}
+
+__main__ "$@"

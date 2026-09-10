@@ -1,0 +1,225 @@
+#! /usr/bin/env bash
+# shellcheck source-path=..
+
+set -euo pipefail
+
+#### Detect Toolkit Project Root ####
+# if realpath is not available, create a semi-equivalent function
+command -v realpath >/dev/null 2>&1 || realpath() {
+  [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+TOOLKIT_ROOT="$(realpath "$SCRIPT_DIR/..")"
+if [[ ! -d "$TOOLKIT_ROOT/bin" ]] || [[ ! -d "$TOOLKIT_ROOT/config" ]]; then
+  echo "ERROR: could not find root of the OlliTeX toolkit project (inferred project root as '$TOOLKIT_ROOT')"
+  exit 1
+fi
+
+source "$TOOLKIT_ROOT/lib/shared-functions.sh"
+
+function build_environment() {
+  canonicalize_data_paths
+  set_base_vars
+
+  if [[ $REDIS_ENABLED == "true" ]]; then
+    set_redis_vars
+  fi
+  if [[ $MONGO_ENABLED == "true" ]]; then
+    set_mongo_vars
+  fi
+  if [[ "${SIBLING_CONTAINERS_ENABLED:-false}" == "true" ]]; then
+    set_sibling_containers_vars
+  fi
+  if [[ "${OVERLEAF_LOG_PATH:-null}" != "null" ]]; then
+    set_logging_vars
+  fi
+  if [[ "${NGINX_ENABLED:-false}" == "true" ]]; then
+    set_nginx_vars
+  fi
+  if [[ "${LANGUAGE_TOOL_ENABLED:-false}" == "true" ]]; then
+    set_languagetool_vars
+  fi
+
+  # Include docker-compose.override.yml if it is present
+  if [[ -f "$TOOLKIT_ROOT/config/docker-compose.override.yml" ]]; then
+    DOCKER_COMPOSE_FLAGS+=(-f "$TOOLKIT_ROOT/config/docker-compose.override.yml")
+  fi
+}
+
+function canonicalize_data_paths() {
+  OVERLEAF_DATA_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$OVERLEAF_DATA_PATH")
+  if [[ "${OVERLEAF_LOG_PATH:-null}" != "null" ]]; then
+    OVERLEAF_LOG_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$OVERLEAF_LOG_PATH")
+  fi
+  if [[ "${MONGO_ENABLED:-false}" == "true" && -n "${MONGO_DATA_PATH:-}" ]]; then
+    MONGO_DATA_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$MONGO_DATA_PATH")
+  fi
+  if [[ "${REDIS_ENABLED:-false}" == "true" && -n "${REDIS_DATA_PATH:-}" ]]; then
+    REDIS_DATA_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$REDIS_DATA_PATH")
+  fi
+  if [[ "${LANGUAGE_TOOL_ENABLED:-false}" == "true" && -n "${LANGUAGE_TOOL_DATA_PATH:-}" ]]; then
+    LANGUAGE_TOOL_DATA_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$LANGUAGE_TOOL_DATA_PATH")
+  fi
+}
+
+# Set environment variables for docker-compose.base.yml
+function set_base_vars() {
+  DOCKER_COMPOSE_FLAGS=(-f "$TOOLKIT_ROOT/lib/docker-compose.base.yml")
+
+  if [[ ${OVERLEAF_LISTEN_IP:-null} == "null" ]];
+  then
+    if [[ ${SKIP_WARNINGS:-null} != "true" ]]; then
+      echo "WARNING: OVERLEAF_LISTEN_IP is not set in config/overleaf.rc. It should be the IP address other machines may reach your instance at. Defaulting to 0.0.0.0" >&2
+    fi
+    OVERLEAF_LISTEN_IP="0.0.0.0"
+  fi
+  export OVERLEAF_LISTEN_IP
+
+  OVERLEAF_IN_CONTAINER_DATA_PATH=/var/lib/overleaf
+  export OVERLEAF_IN_CONTAINER_DATA_PATH
+
+  export MONGO_URL
+  export REDIS_HOST
+  export REDIS_PORT
+  export OVERLEAF_DATA_PATH
+  export OVERLEAF_PORT
+  export IMAGE
+}
+
+# Set environment variables for docker-compose.redis.yml
+function set_redis_vars() {
+  DOCKER_COMPOSE_FLAGS+=(-f "$TOOLKIT_ROOT/lib/docker-compose.redis.yml")
+  export REDIS_IMAGE
+  export REDIS_DATA_PATH
+
+  if [[ "${REDIS_AOF_PERSISTENCE:-true}" == "true" ]]; then
+    REDIS_COMMAND="redis-server --appendonly yes --save 60 1 --loglevel warning"
+  else
+    REDIS_COMMAND="redis-server"
+  fi
+  export REDIS_COMMAND
+}
+
+# Set environment variables for docker-compose.mongo.yml
+function set_mongo_vars() {
+  DOCKER_COMPOSE_FLAGS+=(-f "$TOOLKIT_ROOT/lib/docker-compose.mongo.yml")
+
+  if [[ $MONGO_ENABLED == "true" && $IMAGE_VERSION_MAJOR -ge 4 ]]; then
+    MONGO_ARGS="--replSet overleaf"
+  else
+    MONGO_ARGS=""
+  fi
+  export MONGO_ARGS
+
+  export MONGO_DATA_PATH
+  export MONGO_DOCKER_IMAGE
+  export MONGOSH
+}
+
+# Set environment variables for docker-compose.sibling-containers.yml
+# (sandboxed compiles — a first-class OlliTeX build feature)
+function set_sibling_containers_vars() {
+  DOCKER_COMPOSE_FLAGS+=(-f "$TOOLKIT_ROOT/lib/docker-compose.sibling-containers.yml")
+  export DOCKER_SOCKET_PATH
+  export OVERLEAF_DATA_PATH
+}
+
+# Set environment variables for docker-compose.logging.yml
+function set_logging_vars() {
+  DOCKER_COMPOSE_FLAGS+=(-f "$TOOLKIT_ROOT/lib/docker-compose.logging.yml")
+
+  if [[ $IMAGE_VERSION_MAJOR -ge 5 ]]; then
+    OVERLEAF_IN_CONTAINER_LOG_PATH="/var/log/overleaf"
+  else
+    OVERLEAF_IN_CONTAINER_LOG_PATH="/var/log/sharelatex"
+  fi
+  export OVERLEAF_IN_CONTAINER_LOG_PATH
+  export OVERLEAF_LOG_PATH
+}
+
+# Set environment variables for docker-compose.nginx.yml
+function set_nginx_vars() {
+  DOCKER_COMPOSE_FLAGS+=(-f "$TOOLKIT_ROOT/lib/docker-compose.nginx.yml")
+
+  if [[ -n ${TLS_PRIVATE_KEY_PATH-} ]]; then
+    TLS_PRIVATE_KEY_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$TLS_PRIVATE_KEY_PATH")
+  fi
+  if [[ -n ${TLS_CERTIFICATE_PATH-} ]]; then
+    TLS_CERTIFICATE_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$TLS_CERTIFICATE_PATH")
+  fi
+  if [[ -n ${NGINX_CONFIG_PATH-} ]]; then
+    NGINX_CONFIG_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$NGINX_CONFIG_PATH")
+  fi
+  OVERLEAF_TRUSTED_PROXY_IPS=$(read_variable OVERLEAF_TRUSTED_PROXY_IPS || echo "")
+  if [[ "${OVERLEAF_TRUSTED_PROXY_IPS:-null}" == "null" ]]; then
+    # https://en.wikipedia.org/wiki/Private_network
+    # Docker allocates subnets from 172.16.0.0/12 by default.
+    OVERLEAF_TRUSTED_PROXY_IPS="loopback,172.16.0.0/12"
+  fi
+
+  export NGINX_CONFIG_PATH
+  export NGINX_IMAGE
+  export NGINX_HTTP_PORT
+  export NGINX_HTTP_LISTEN_IP
+  export NGINX_TLS_LISTEN_IP
+  export TLS_CERTIFICATE_PATH
+  export TLS_PORT
+  export TLS_PRIVATE_KEY_PATH
+  export OVERLEAF_TRUSTED_PROXY_IPS
+}
+
+# Set environment variables for docker-compose.languagetool.yml
+function set_languagetool_vars() {
+  DOCKER_COMPOSE_FLAGS+=(-f "$TOOLKIT_ROOT/lib/docker-compose.languagetool.yml")
+
+  # Default the admin-facing URL (visible in /hub → Site → Grammar) to the
+  # compose service name; admin can still override it at run time in the
+  # hub (site settings languagetool section wins at boot via EnvHydrator).
+  if [[ -z "$(read_variable LANGUAGETOOL_URL || echo '')" ]]; then
+    export LANGUAGETOOL_URL="http://languagetool:${LANGUAGE_TOOL_PORT:-8010}"
+  fi
+  export LANGUAGE_TOOL_IMAGE
+  export LANGUAGE_TOOL_DATA_PATH
+  export LANGUAGE_TOOL_PORT
+}
+
+function print_debug_info() {
+  if [[ ${RC_DEBUG:-null} != "null" ]]; then
+    echo ">>>>>>VARS>>>>>>"
+    echo "$(set -o posix; set)" # print all vars
+    echo "IMAGE_VERSION=$IMAGE_VERSION"
+    echo "<<<<<<<<<<<<<<<<"
+    echo ">>>>COMPOSE-ARGS>>>>"
+    echo "-p $PROJECT_NAME"
+    echo "${DOCKER_COMPOSE_FLAGS[@]}"
+    echo "$@"
+    echo "<<<<<<<<<<<<<<<<<<<<"
+  fi
+}
+
+function docker_compose() {
+  local flags=(-p "$PROJECT_NAME" "${DOCKER_COMPOSE_FLAGS[@]}" "$@")
+  if docker compose version >/dev/null 2>&1; then
+    # Docker compose v2 is available
+    exec docker compose "${flags[@]}"
+  elif command -v docker-compose >/dev/null; then
+    # Fall back to docker-compose v1
+    if [[ ${SKIP_WARNINGS:-null} != "true" ]]; then
+      echo "WARNING: docker-compose v1 has reached its End Of Life in July 2023 (https://docs.docker.com/compose/migrate/). We recommend upgrading to Docker Compose v2." >&2
+    fi
+    exec docker-compose "${flags[@]}"
+  else
+    echo "ERROR: Could not find Docker Compose." >&2
+    exit 1
+  fi
+}
+
+read_image_version
+source_image_versions
+read_config
+read_mongo_version
+check_retracted_version
+build_environment
+print_debug_info "$@"
+docker_compose "$@"

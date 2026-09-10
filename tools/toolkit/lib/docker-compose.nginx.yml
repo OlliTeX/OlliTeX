@@ -1,0 +1,28 @@
+---
+services:
+  ollitex:
+    environment:
+      OVERLEAF_SECURE_COOKIE: 'true'
+      OVERLEAF_TRUSTED_PROXY_IPS: "${OVERLEAF_TRUSTED_PROXY_IPS}"
+      OVERLEAF_BEHIND_PROXY: 'true'
+
+    depends_on:
+      - nginx
+
+  nginx:
+    image: "${NGINX_IMAGE}"
+    ports:
+      - "${NGINX_TLS_LISTEN_IP:-0.0.0.0}:${TLS_PORT:-443}:443"
+      - "${NGINX_HTTP_LISTEN_IP:-127.0.1.1}:${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - "${TLS_PRIVATE_KEY_PATH}:/certs/nginx_key.pem:ro"
+      - "${TLS_CERTIFICATE_PATH}:/certs/nginx_certificate.pem:ro"
+      - "${NGINX_CONFIG_PATH}:/etc/nginx/nginx.conf:ro"
+    restart: always
+    container_name: ollitex-nginx
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider --timeout=5 http://127.0.0.1:80/healthz 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

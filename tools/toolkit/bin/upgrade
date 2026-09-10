@@ -1,0 +1,281 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+#### Detect Toolkit Project Root ####
+# if realpath is not available, create a semi-equivalent function
+command -v realpath >/dev/null 2>&1 || realpath() {
+  [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+TOOLKIT_ROOT="$(realpath "$SCRIPT_DIR/..")"
+if [[ ! -d "$TOOLKIT_ROOT/bin" ]] || [[ ! -d "$TOOLKIT_ROOT/config" ]]; then
+  echo "ERROR: could not find root of the OlliTeX toolkit project (inferred project root as '$TOOLKIT_ROOT')"
+  exit 1
+fi
+
+source "$TOOLKIT_ROOT/lib/shared-functions.sh"
+
+function usage() {
+  echo "Usage: bin/upgrade"
+  echo ""
+  echo "This script will check for updates to the toolkit code (via git),"
+  echo "and offer to pull the new changes. It will then check the latest"
+  echo "available version of the docker image, and offer to update the"
+  echo "locally configured image (in config/image) if applicable"
+  echo ""
+  echo "This script will prompt the user for confirmation at"
+  echo "each step along the way."
+}
+
+function services_up() {
+  local top_output
+  top_output="$("$TOOLKIT_ROOT/bin/docker-compose" top)"
+  if [[ -z "$top_output" ]]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+function git_pull_available() {
+  local branch="$1"
+  local fetch_output
+  fetch_output="$(git -C "$TOOLKIT_ROOT" fetch --dry-run origin "$branch" 2>&1)"
+  local filtered_fetch_output
+  filtered_fetch_output="$(echo "$fetch_output" | grep '\-> origin/'"$branch")"
+  if [[ -z "$filtered_fetch_output" ]]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+function git_diff() {
+  git -C "$TOOLKIT_ROOT" diff "$@"
+}
+
+function is_up_to_date_with_remote() {
+  local branch="$1"
+  git_diff --quiet HEAD "origin/$branch"
+}
+
+function show_changes() {
+  local branch="$1"
+
+  if git_diff --quiet HEAD "origin/$branch" -- CHANGELOG.md; then
+    echo "No changelog available"
+    return 0
+  fi
+
+  # show CHANGELOG.md changes
+  # git diff --unified=0  hide diff context
+  # tail -n+6             hide the patch header
+
+  # Example output
+  #
+  # Changelog:
+  # ----------
+  # +## 2020-11-19
+  # +### Added
+  # +- Updated ...
+  # ----------
+
+  echo "Changelog:"
+  echo "----------"
+  git_diff --color --unified=0 HEAD "origin/$branch" -- CHANGELOG.md \
+  | tail -n+6
+  echo "----------"
+}
+
+function read_seed_image_version() {
+  SEED_IMAGE_VERSION="$(head -n 1 "$TOOLKIT_ROOT/lib/config-seed/version")"
+  if [[ ! "$SEED_IMAGE_VERSION" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+(-RC[0-9]*)?(-with-texlive-full)?$ ]]; then
+    echo "ERROR: invalid config-seed/version '${SEED_IMAGE_VERSION}'"
+    exit 1
+  fi
+  SEED_IMAGE_VERSION_MAJOR=${BASH_REMATCH[1]}
+  SEED_IMAGE_VERSION_MINOR=${BASH_REMATCH[2]}
+}
+
+function handle_image_upgrade() {
+  if [[ ! "$SEED_IMAGE_VERSION" > "$IMAGE_VERSION" ]]; then
+    echo "No change to docker image version"
+    return 0
+  fi
+
+  echo "New docker image version available ($SEED_IMAGE_VERSION)"
+  echo "Current image version is '$IMAGE_VERSION' (from config/version)"
+
+  local user_image_major_version="$(echo "$IMAGE_VERSION" | awk -F. '{print $1}')"
+  local seed_image_major_version="$(echo "$SEED_IMAGE_VERSION" | awk -F. '{print $1}')"
+  if [[ "$seed_image_major_version" > "$user_image_major_version" ]]; then
+    echo "WARNING: this is a major version update, please check the Release Notes for breaking changes before proceeding:"
+    echo "* https://github.com/overleaf/overleaf/wiki#release-notes"
+  fi
+
+  local should_upgrade="n"
+  read -r -p "Upgrade image? [y/n] " should_upgrade
+
+  if [[ ! "$should_upgrade" =~ [Yy] ]]; then
+    echo "Keeping image version '$IMAGE_VERSION'"
+    check_retracted_version
+    return 0
+  fi
+
+  echo "Upgrading config/version from $IMAGE_VERSION to $SEED_IMAGE_VERSION"
+
+  local docker_compose_override_path="$TOOLKIT_ROOT/config/docker-compose.override.yml"
+  if [ -f "$docker_compose_override_path" ]; then
+     if grep -q -E '^\s*image: sharelatex/sharelatex.*' "$docker_compose_override_path"; then
+        echo "WARNING: you are using a customized docker image, the server may not run on the latest version post upgrade."
+        echo "* If you have followed the guide 'Upgrading TexLive', please remove and recreate the modified image."
+        echo "* Remove the image: 'docker rm sharelatex/sharelatex:with-texlive-full'"
+        echo "* Remove the override file: 'rm config/docker-compose.override.yml'"
+        echo "* Recreate the image by following: https://github.com/overleaf/toolkit/blob/master/doc/ce-upgrading-texlive.md"
+     fi
+  fi
+
+
+  # Skip retraction check in sub-shells
+  export OVERLEAF_SKIP_RETRACTION_CHECK="$IMAGE_VERSION"
+  local version="$IMAGE_VERSION_MAJOR.$IMAGE_VERSION_MINOR.$IMAGE_VERSION_PATCH"
+  if [[ "$version" == "5.0.1" ]]; then
+    echo "-------------------------------------------------------"
+    echo "---------------------  WARNING  -----------------------"
+    echo "-------------------------------------------------------"
+    echo "  You are currently using a retracted version, $version."
+    echo ""
+    echo "  We have identified a critical bug in a database migration that causes data loss in the history system."
+    echo "  Please follow the steps of the recovery process in the following wiki page:"
+    echo "  https://github.com/overleaf/overleaf/wiki/Doc-version-recovery"
+    echo "-------------------------------------------------------"
+    echo "---------------------  WARNING  -----------------------"
+    echo "-------------------------------------------------------"
+    prompt "Are you following the recovery process?"
+  fi
+
+  if [[ "${PULL_BEFORE_UPGRADE:-true}" == "true" ]]; then
+    echo "Pulling new images (lib/images.env)"
+    source_image_versions
+    : "${OLLITEX_IMAGE:=sharelatex/sharelatex:$SEED_IMAGE_VERSION}"
+    docker pull "$OLLITEX_IMAGE"
+    typst_image=$(grep -E '^TYPST_IMAGE=' "$TOOLKIT_ROOT/lib/images.env" 2>/dev/null | head -n1 | cut -d= -f2-)
+    if [[ -n "$typst_image" ]]; then
+      docker pull "$typst_image"
+    fi
+  fi
+
+  ## Offer to stop docker services
+  local services_stopped="false"
+  if services_up; then
+    echo "docker services are up, stop them first?"
+    local should_stop="n"
+    read -r -p "Stop docker services? [y/n] " should_stop
+    if [[ ! "$should_stop" =~ [Yy] ]]; then
+      echo "exiting without stopping services"
+      exit 1
+    fi
+    services_stopped="true"
+    echo "Stopping docker services"
+    "$TOOLKIT_ROOT/bin/docker-compose" stop
+  fi
+
+  ## Advise the user to take a backup
+  ## (NOTE: we can't do this automatically because it will likely require
+  ##  sudo privileges. We leave it to the user to sort out for now)
+  echo "At this point, we recommend backing up your data before proceeding"
+  echo "!! WARNING: Only do this while the docker services are stopped!!"
+  local should_proceed="n"
+  read -r -p "Proceed with the upgrade? [y/n] " should_proceed
+  if [[ ! "$should_proceed" =~ [Yy] ]]; then
+    echo "Not proceeding with upgrade"
+    return 1
+  fi
+
+  ## Set the new image version
+  echo "Backing up old version file to config/__old-version"
+  cp "$TOOLKIT_ROOT/config/version" "$TOOLKIT_ROOT/config/__old-version"
+  echo "Over-writing config/version with $SEED_IMAGE_VERSION"
+  cp "$TOOLKIT_ROOT/lib/config-seed/version" "$TOOLKIT_ROOT/config/version"
+
+  # Legacy installs: make sure old SHARELATEX_-prefixed vars are flagged.
+  check_sharelatex_env_vars
+
+  ## Maybe offer to start services again
+  if [[ "${services_stopped:-null}" == "true" ]]; then
+    local should_start="n"
+    read -r -p "Start docker services again? [y/n] " should_start
+    if [[ "$should_start" =~ [Yy] ]]; then
+      echo "Starting docker services"
+      "$TOOLKIT_ROOT/bin/docker-compose" up -d
+    fi
+  fi
+}
+
+function handle_git_update() {
+  local current_branch
+  current_branch="$(git -C "$TOOLKIT_ROOT" rev-parse --abbrev-ref HEAD)"
+  local current_commit
+  current_commit="$(git -C "$TOOLKIT_ROOT" rev-parse --short HEAD)"
+
+  if [[ ! "$current_branch" == "master" ]]; then
+    echo "Warning: current branch is not master, '$current_branch' instead"
+  fi
+
+  echo "Checking for code update..."
+
+  if ! git_pull_available "$current_branch"; then
+    echo "No code update available for download"
+  else
+    echo "Code update available for download!"
+    git -C "$TOOLKIT_ROOT" fetch origin "$current_branch"
+  fi
+
+  if ! is_up_to_date_with_remote "$current_branch"; then
+    show_changes "$current_branch"
+
+    local should_pull="n"
+    read -r -p "Perform code update? [y/n] " should_pull
+
+    if [[ ! "$should_pull" =~ [Yy] ]]; then
+      echo "Continuing without updating code"
+    else
+      echo "Current commit is $current_commit"
+      echo "Updating code..."
+      git -C "$TOOLKIT_ROOT" pull origin "$current_branch"
+      echo "Relaunching bin/upgrade after code update"
+      exec $0 --skip-git-update
+    fi
+  fi
+}
+
+function handle_rc_rebranding() {
+  ## Rename variables in overleaf.rc SHARELATEX_ -> OVERLEAF_
+  rebrand_sharelatex_env_variables 'overleaf.rc' silent_if_no_match
+}
+
+function __main__() {
+  if [[ "${1:-null}" == "help" ]] \
+    || [[ "${1:-null}" == "--help" ]] ; then
+    usage && exit
+  fi
+
+  if [[ "${1:-null}" == "--skip-git-update" ]]; then
+    echo "Skipping git update"
+  else
+    handle_git_update
+  fi
+
+  read_seed_image_version
+  read_image_version
+  read_config
+  handle_rc_rebranding
+  handle_image_upgrade
+
+  echo "Done"
+  exit 0
+}
+
+__main__ "$@"

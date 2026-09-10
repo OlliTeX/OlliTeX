@@ -1,0 +1,120 @@
+#! /usr/bin/env bash
+#
+# OlliTeX Toolkit — LanguageTool n-gram language models
+# ---------------------------------------------------------------------------
+# Downloads the OFFICIAL LanguageTool n-gram data sets (per language,
+# https://languagetool.org/download/ngram-data/) into the LanguageTool
+# data directory (LANGUAGE_TOOL_DATA_PATH, default data/languagetool), in the
+# exact layout the erikvl87/languagetool image + /hub grammar settings expect:
+#
+#   <data>/ngrams/en/           # extracted language directory
+#   <data>/ngrams/ngrams-en.zip # stable-named archive (kept for reference)
+#
+# Languages: the ones listed in LANGUAGE_TOOL_NGRAM_LANGUAGES
+# (config/overleaf.rc — default "en,de,es,fr,de") or --languages en,de here.
+#
+# Sizes: en ≈ 9 GB, de ≈ 1.7 GB, es ≈ 1 GB, fr ≈ 1 GB, nl ≈ 1.2 GB (zip).
+# Requires unzip + several spare GB per language.
+#
+# After downloading: bin/up (when LANGUAGE_TOOL_ENABLED=true) starts the
+# languagetool container; admin toggle/URL: /hub → Admin → Site → Grammar.
+
+set -euo pipefail
+
+command -v realpath >/dev/null 2>&1 || realpath() {
+  [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
+TOOLKIT_ROOT="$(realpath "$(dirname "$SCRIPT_PATH")/..")"
+if [[ ! -d "$TOOLKIT_ROOT/bin" ]]; then
+  echo "ERROR: could not find root of the OlliTeX toolkit project"
+  exit 1
+fi
+source "$TOOLKIT_ROOT/lib/shared-functions.sh" 2>/dev/null || true
+
+BASE_URL="https://languagetool.org/download/ngram-data"
+
+# Official dated archives (2026-09-13): language -> archive name
+declare -A NG=(
+  [en]="ngrams-en-20150817.zip"
+  [de]="ngrams-de-20150819.zip"
+  [es]="ngrams-es-20150915.zip"
+  [fr]="ngrams-fr-20150913.zip"
+  [nl]="ngrams-nl-20181229.zip"
+)
+
+DATA_PATH="${TOOLKIT_ROOT}/data/languagetool"
+# Honour config when present (default.rc may already source images.env)
+if [[ -f "$TOOLKIT_ROOT/config/overleaf.rc" ]]; then
+  local_lt=$(sed -nE 's/^LANGUAGE_TOOL_DATA_PATH=//p' "$TOOLKIT_ROOT/config/overleaf.rc" 2>/dev/null | head -n1 | tr -d '"')
+  [[ -n "$local_lt" ]] && DATA_PATH="$TOOLKIT_ROOT/$local_lt"
+fi
+
+LANGS=""
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  echo "Usage: bin/languagetool-ngrams [--languages en,de,...]"
+  echo ""
+  echo "Official supported languages: en de es fr nl"
+  exit 0
+fi
+args=("$@")
+i=0
+while [[ $i -lt ${#args[@]} ]]; do
+  if [[ "${args[$i]}" == "--languages" && $((i+1)) -lt ${#args[@]} ]]; then
+    LANGS="${args[$((i+1))]}"
+  fi
+  i=$((i+1))
+done
+
+# Fallback: overleaf.rc list (strip duplicates, keep order)
+if [[ -z "$LANGS" ]]; then
+  if [[ -f "$TOOLKIT_ROOT/config/overleaf.rc" ]]; then
+    LANGS=$(sed -nE 's/^LANGUAGE_TOOL_NGRAM_LANGUAGES=//p' "$TOOLKIT_ROOT/config/overleaf.rc" 2>/dev/null | head -n1 | tr -d '"')
+  fi
+fi
+[[ -z "$LANGS" ]] && LANGS="en,de,es,fr,de"
+
+NL_DIR="$DATA_PATH/ngrams"
+mkdir -p "$NL_DIR"
+
+command -v unzip >/dev/null 2>&1 || { echo "ERROR: 'unzip' is required" ; exit 1; }
+
+echo "OlliTeX LanguageTool n-grams"
+echo "  target dir : $NL_DIR"
+echo "  languages  : $LANGS"
+echo
+
+seen=" "
+for lang in $(echo "$LANGS" | tr ',' ' '); do
+  # trim whitespace
+  lang="${lang// /}"
+  [[ "$lang" == "" ]] && continue
+  [[ "$seen" == *" $lang "* ]] && continue
+  seen="$seen$lang "
+
+  if [[ -z "${NG[$lang]:-}" ]]; then
+    echo "  - $lang : SKIPPED (not in the official n-gram set: en de es fr nl)"
+    continue
+  fi
+  archive="${NG[$lang]}"
+  stable="ngrams-${lang}.zip"
+
+  if [[ -d "$NL_DIR/$lang" && -f "$NL_DIR/$stable" ]]; then
+    echo "  - $lang : already present (data/languagetool/ngrams/$lang) — skipping"
+    continue
+  fi
+  echo "  - $lang : downloading $archive (can be several GB) ..."
+  curl -fL --retry 3 -o "$NL_DIR/$stable" "$BASE_URL/$archive"
+  echo "  - $lang : extracting to $NL_DIR/$lang/ ..."
+  ( cd "$NL_DIR" && rm -rf "$lang" && unzip -q -o "$stable" -d "$lang" )
+  echo "  - $lang : done ($(du -sh "$NL_DIR/$lang" 2>/dev/null | cut -f1))"
+done
+
+echo
+echo "All requested language models are in place:"
+ls -1 "$NL_DIR" | sed 's/^/  /'
+echo
+echo "Next steps:"
+echo "  1. LANGUAGE_TOOL_ENABLED=true   (config/overleaf.rc)"
+echo "  2. bin/up"
+echo "  3. /hub → Admin → Site → Grammar — verify + enable"

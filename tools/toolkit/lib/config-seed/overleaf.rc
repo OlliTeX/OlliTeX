@@ -1,0 +1,55 @@
+#### OlliTeX RC ####
+# Instance-level configuration. Per-user and most admin settings live in the
+# web UI: /hub (workspace) and /hub → Admin (site) — see doc/configuration.md.
+
+PROJECT_NAME=ollitex
+
+# OlliTeX server container
+# Image version: edit lib/images.env (OLLITEX_IMAGE) instead of here.
+# Use a user-defined image (optional):
+# OVERLEAF_IMAGE_NAME=docker.io/myregistry/ollitex
+OVERLEAF_DATA_PATH=data/ollitex
+OVERLEAF_LISTEN_IP=127.0.0.1
+OVERLEAF_PORT=80
+
+# Sibling containers (sandboxed compiles in dedicated containers —
+# mounts /var/run/docker.sock into the OlliTeX container)
+SIBLING_CONTAINERS_ENABLED=false
+DOCKER_SOCKET_PATH=/var/run/docker.sock
+# SIBLING_CONTAINERS_PULL=true
+
+# Mongo configuration
+MONGO_ENABLED=true
+MONGO_DATA_PATH=data/mongo
+MONGO_URL=mongodb://mongo/sharelatex
+
+# Redis configuration
+REDIS_ENABLED=true
+REDIS_DATA_PATH=data/redis
+REDIS_IMAGE=redis:8.6-alpine
+REDIS_AOF_PERSISTENCE=true
+
+# LanguageTool (optional grammar checking; see doc/language-toolkit.md)
+# After enabling: bin/languagetool-ngrams (downloads language models), then
+# bin/up. Admin toggle + URL: /hub → Admin → Site → Grammar.
+LANGUAGE_TOOL_ENABLED=false
+LANGUAGE_TOOL_PORT=8010
+LANGUAGE_TOOL_DATA_PATH=data/languagetool
+# Languages whose n-gram models get downloaded (comma separated):
+LANGUAGE_TOOL_NGRAM_LANGUAGES=en,de,es,fr,de
+
+# TLS proxy configuration (optional)
+# See documentation in doc/tls-proxy.md
+NGINX_ENABLED=false
+NGINX_CONFIG_PATH=config/nginx/nginx.conf
+NGINX_HTTP_PORT=80
+# Replace these IP addresses with the external IP address of your host
+NGINX_HTTP_LISTEN_IP=127.0.1.1
+NGINX_TLS_LISTEN_IP=127.0.1.1
+TLS_PRIVATE_KEY_PATH=config/nginx/certs/overleaf_key.pem
+TLS_CERTIFICATE_PATH=config/nginx/certs/overleaf_certificate.pem
+TLS_PORT=443
+
+# In Air-gapped setups, skip pulling images
+# PULL_BEFORE_UPGRADE=false
+# SIBLING_CONTAINERS_PULL=false

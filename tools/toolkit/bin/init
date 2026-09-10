@@ -1,0 +1,108 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+#### Detect Toolkit Project Root ####
+# if realpath is not available, create a semi-equivalent function
+command -v realpath >/dev/null 2>&1 || realpath() {
+  [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+TOOLKIT_ROOT="$(realpath "$SCRIPT_DIR/..")"
+if [[ ! -d "$TOOLKIT_ROOT/bin" ]] || [[ ! -d "$TOOLKIT_ROOT/config" ]]; then
+  echo "ERROR: could not find root of overleaf-toolkit project (inferred project root as '$TOOLKIT_ROOT')"
+  exit 1
+fi
+
+function usage() {
+  echo "Usage: bin/init [OPTION]"
+  echo ""
+  echo "Initialises local configuration files in the 'config/' directory"
+  echo ""
+  echo "--help          display this help and exit"
+  echo "--tls           Initialises local configuration with NGINX config, or"
+  echo "                adds NGINX config to an existing local configuration"
+}
+
+function config_exists() {
+  [ -f "$TOOLKIT_ROOT/config/overleaf.rc" ] \
+    || [ -f "$TOOLKIT_ROOT/config/variables.env" ] \
+    || [ -f "$TOOLKIT_ROOT/config/version" ]
+}
+
+function tls_config_exists() {
+  [ -f "$TOOLKIT_ROOT/config/nginx/nginx.conf" ] \
+    || [ -f "$TOOLKIT_ROOT/config/nginx/certs/overleaf_certificate.pem" ] \
+    || [ -f "$TOOLKIT_ROOT/config/nginx/certs/overleaf_key.pem" ]
+}
+
+function set_up_config_files() {
+  echo "Copying config files to 'config/'"
+  cp "$TOOLKIT_ROOT/lib/config-seed/overleaf.rc" "$TOOLKIT_ROOT/config/"
+  cp "$TOOLKIT_ROOT/lib/config-seed/variables.env" "$TOOLKIT_ROOT/config/"
+  cp "$TOOLKIT_ROOT/lib/config-seed/version" "$TOOLKIT_ROOT/config/"
+  local invite_token_secret
+  invite_token_secret="$(openssl rand -base64 32)"
+  sed -i'' "s|OVERLEAF_INVITE_TOKEN_SECRET=|OVERLEAF_INVITE_TOKEN_SECRET=${invite_token_secret}|" \
+    "$TOOLKIT_ROOT/config/variables.env"
+}
+
+function set_up_tls_proxy() {
+  PRIVATE_KEY="$TOOLKIT_ROOT/config/nginx/certs/overleaf_key.pem"
+  CERT_SIGN_REQ="$TOOLKIT_ROOT/config/nginx/certs/overleaf_csr.pem"
+  CERT="$TOOLKIT_ROOT/config/nginx/certs/overleaf_certificate.pem"
+  echo "Generate example self-signed TLS cert"
+  mkdir -p config/nginx/certs
+  cp "$TOOLKIT_ROOT/lib/config-seed/nginx.conf" "$TOOLKIT_ROOT/config/nginx/"
+  openssl req -new -nodes -keyout "$PRIVATE_KEY" -out "$CERT_SIGN_REQ" -subj "/CN=example.com" -batch
+  chmod 600 "$PRIVATE_KEY"
+  openssl x509 -req -days 365 -in "$CERT_SIGN_REQ"  -signkey "$PRIVATE_KEY" -out "$CERT"
+}
+
+HELP=false
+TLS=false
+
+function __main__() {
+  while [[ $# -gt 0 ]] ; do
+    case "$1" in
+      help | --help )
+        HELP=true
+        shift
+        ;;
+      --tls )
+        TLS=true
+        shift
+        ;;
+      *)
+        echo "Unrecognised option $1"
+        exit
+        ;;
+    esac
+  done
+  if [[ "$HELP" == "true" ]]; then
+    usage
+    exit
+  fi
+  if [[ "$TLS" == "true" ]]; then
+    if tls_config_exists; then
+      echo "ERROR: TLS config files already exist, exiting"
+      exit 1
+    else
+      set_up_tls_proxy
+    fi
+  fi
+  if config_exists; then
+    if [[ "$TLS" == "true" ]]; then
+      echo "Config files already exist, exiting"
+      exit 0
+    else
+      echo "ERROR: Config files already exist, exiting"
+      exit 1
+    fi
+  else
+    set_up_config_files
+  fi
+}
+
+__main__ "$@"

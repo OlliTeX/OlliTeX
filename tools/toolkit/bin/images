@@ -1,0 +1,80 @@
+#! /usr/bin/env bash
+
+set -uo pipefail
+
+#### Detect Toolkit Project Root ####
+# if realpath is not available, create a semi-equivalent function
+command -v realpath >/dev/null 2>&1 || realpath() {
+  [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+TOOLKIT_ROOT="$(realpath "$SCRIPT_DIR/..")"
+if [[ ! -d "$TOOLKIT_ROOT/bin" ]] || [[ ! -d "$TOOLKIT_ROOT/config" ]]; then
+  echo "ERROR: could not find root of the OlliTeX toolkit project (inferred project root as '$TOOLKIT_ROOT')"
+  exit 1
+fi
+
+PULL=false
+for arg in "$@"; do
+  case "$arg" in
+    --pull) PULL=true ;;
+  esac
+done
+
+function usage() {
+    echo "Usage: bin/images [--pull]"
+    echo ""
+    echo "Lists the OlliTeX container images configured in lib/images.env"
+    echo "and the copies present on this Docker daemon."
+    echo ""
+    echo "--pull    pull every configured image (use before upgrades)"
+}
+
+function get_env_image() {
+  local name=$1
+  grep -E "^${name}=" "$TOOLKIT_ROOT/lib/images.env" 2>/dev/null | head -n1 | cut -d= -f2-
+}
+
+function show() {
+  local name=$1 image=$2
+  echo "---- $name ----"
+  if [[ -n "$image" ]]; then
+    echo "configured: $image"
+    docker images "$image" 2>/dev/null | head -n3
+  else
+    echo "(not configured)"
+  fi
+  echo
+}
+
+function __main__() {
+    if [[ "${1:-null}" == "help" ]] || [[ "${1:-null}" == "--help" ]]; then
+        usage && exit
+    fi
+
+    echo "====================================================================="
+    echo " OlliTeX Toolkit — image versions (single source: lib/images.env)"
+    echo "====================================================================="
+    echo
+    show "OlliTeX server"       "$(get_env_image OLLITEX_IMAGE)"
+    show "Mongo"                "$(get_env_image MONGO_IMAGE)"
+    show "Redis"                "$(get_env_image REDIS_IMAGE)"
+    show "Typst (pinned)"       "$(get_env_image TYPST_IMAGE)"
+    show "TeX Live (optional)"  "$(get_env_image TEXLIVE_IMAGE)"
+    show "LanguageTool (optional)" "$(get_env_image LANGUAGE_TOOL_IMAGE)"
+    show "Nginx (TLS proxy)"    "$(get_env_image NGINX_IMAGE)"
+
+    if [[ "$PULL" == "true" ]]; then
+      for name in OLLITEX_IMAGE MONGO_IMAGE REDIS_IMAGE TYPST_IMAGE TEXLIVE_IMAGE LANGUAGE_TOOL_IMAGE NGINX_IMAGE; do
+        image=$(get_env_image "$name")
+        if [[ -n "$image" ]]; then
+          echo "Pulling $image ..."
+          docker pull "$image" \
+            || echo "  (failed to pull $image — check network / registry)"
+        fi
+      done
+    fi
+}
+
+__main__ "$@"
