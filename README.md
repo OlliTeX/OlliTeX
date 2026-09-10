@@ -1,8 +1,8 @@
 <h1 align="center">
   <br>
-  <img src="tools/logo/logo.svg" alt="OlliTeX" width="190">
+  <img src="doc/logo.svg" alt="OlliTeX" width="190">
   <br><br>
-  <img src="tools/logo/logo-horizontal.png" alt="OlliTeX — real-time collaborative authoring" width="340">
+  <img src="doc/logo-horizontal.png" alt="OlliTeX — real-time collaborative authoring" width="340">
 </h1>
 
 <p align="center">
@@ -11,11 +11,6 @@
   <a href="#getting-started">Getting started</a> •
   <a href="#contributing">Contributing</a> •
   <a href="#license">License</a>
-</p>
-
-<img src="doc/screenshot.png" alt="A project being edited in OlliTeX" width="100%">
-<p align="center">
-  Figure 1: A project being edited in OlliTeX.
 </p>
 
 ## OlliTeX
