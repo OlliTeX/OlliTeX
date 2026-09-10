@@ -16,6 +16,7 @@ import AdminSiteSection from '../sections/admin/admin-site-section'
 import SiteSettingsIndexSection from '../sections/admin/site/index-section'
 import { NATIVE_SITE_SECTIONS } from '../sections/admin/site'
 import AdminLlmSection from '../sections/admin/admin-llm-section'
+import AdminLlmInstanceSection from '../sections/admin/admin-llm-instance-section'
 import AdminUsersSection from '../sections/admin/admin-users-section'
 import AdminProjectsSection from '../sections/admin/admin-projects-section'
 import AdminTemplatesSection from '../sections/admin/admin-templates-section'
@@ -228,6 +229,10 @@ export function renderLeaf(node: HubNode): React.ReactNode {
     case 'site.general.health':
       // overleaf-lab #14 (2026-09-08): live diagnostics leaf
       return <HubHealthSection key={node.id} />
+      // 2026-09-16 (owner queue 1): instance-wide LLM flags (master
+      // switch, BYO, rate limits) — the card ported from /user/llm-settings.
+      case 'site.llm.instance':
+      return <AdminLlmInstanceSection key={node.id} />
     case 'site.llm.features':
     case 'site.llm.connection':
     case 'site.llm.models':

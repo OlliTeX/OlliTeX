@@ -192,6 +192,9 @@ export const HUB_NAV: HubNode[] = [
         label: 'LLM Settings',
         icon: 'psychology',
         children: [
+          // 2026-09-16 (owner queue 1): the instance-wide flags card
+          // (master switch + BYO + rates) ported from /user/llm-settings.
+          { id: 'site.llm.instance', label: 'Instance (admin)', icon: 'tune' },
           { id: 'site.llm.features', label: 'Features', icon: 'bolt' },
           { id: 'site.llm.connection', label: 'API Connection', icon: 'link' },
           { id: 'site.llm.models', label: 'Model Selection', icon: 'memory' },
