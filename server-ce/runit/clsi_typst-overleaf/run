@@ -18,6 +18,28 @@ fi
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 
+# clsi_typst MUST compile through the sandboxed DockerRunner: typst exists
+# only in the digest-pinned pandoc/typst image (it is NOT installed inside
+# the overleaf container, so the local runner would fail — verified live
+# 2026-09-10). DOCKER_RUNNER=true is scoped to this service (the tex clsi
+# keeps its local-runner CE mode); settings.defaults.cjs then applies the
+# typst docker image + allowedImages gate (clsi docker.sock permissions
+# are set above).
+export DOCKER_RUNNER=true
+
+# Sandbox compile dirs — DockerRunner's SAME-PATH contract: the host path
+# (for the docker daemon's bind) and the service's view must be the same
+# absolute string, so deployments bind each TYPST_*_DIR at the identical
+# container path (compose_cep + e2e compose do this). Defaults follow the
+# overleaf data root; a deployment WITHOUT the matching bind must set
+# TYPST_COMPILES_DIR/TYPST_OUTPUT_DIR (or leave the flag off, where the
+# service answers 501 and the menu is hidden by the web gate).
+export COMPILES_DIR="${TYPST_COMPILES_DIR:-/var/lib/overleaf/typst/compiles}"
+export SANDBOXED_COMPILES_HOST_DIR_COMPILES="$COMPILES_DIR"
+export TYPST_OUTPUT_DIR="${TYPST_OUTPUT_DIR:-/var/lib/overleaf/typst/output}"
+export SANDBOXED_COMPILES_HOST_DIR_OUTPUT="$TYPST_OUTPUT_DIR"
+mkdir -p "$COMPILES_DIR" "$TYPST_OUTPUT_DIR" 2>/dev/null || true
+
 # typst compile service (plan §4/§5: runit sibling of clsi-overleaf,
 # digest-pinned pandoc/typst image runs as host docker child process,
 # uid 33, network-disabled sandbox)

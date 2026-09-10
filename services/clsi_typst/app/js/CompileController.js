@@ -27,9 +27,26 @@ const projectOrUserParamsSchema = z.strictObject({
   user_id: zz.objectId().optional(),
 })
 
+// clsi_typst accepts 'typst' as the compiler. The shared tex schema stays
+// tex-only BY DESIGN (the tex service must never be fed typst, and clsi_typst
+// must never accept a latex dialect — its RequestParser is typst-only), so
+// the widening happens HERE, in a derived schema: only options.compiler
+// gains one member; every other field keeps the shared, strictObject-
+// enforced contract.
+const TYPST_VALID_COMPILERS = ['pdflatex', 'latex', 'xelatex', 'lualatex', 'typst']
+const typstCompileRequestBodySchema = compileRequestBodySchema.extend({
+  compile: compileRequestBodySchema.shape.compile.extend({
+    options: (compileRequestBodySchema.shape.compile.shape.options.unwrap
+      ? compileRequestBodySchema.shape.compile.shape.options.unwrap()
+      : compileRequestBodySchema.shape.compile.shape.options).extend({
+        compiler: z.enum(TYPST_VALID_COMPILERS).optional(),
+      }),
+  }),
+})
+
 const compileSchema = z.object({
   params: projectOrUserParamsSchema,
-  body: compileRequestBodySchema,
+  body: typstCompileRequestBodySchema,
 })
 
 function compile(req, res, next) {

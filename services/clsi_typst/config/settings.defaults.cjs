@@ -8,11 +8,13 @@ const LISTEN_HOST = process.env.LISTEN_ADDRESS || '127.0.0.1'
 const LISTEN_PORT = parseInt(process.env.CLSI_TYPST_PORT, 10) || 3014
 
 module.exports = {
-  // Feature gate (TYPST_INTEGRATION_PLAN §0): clsi_typst starts DISABLED by
-  // default. Every route returns 501 while off; enable per deployment with
-  // COMPILE_TYPEST_ENABLED=true (P4 web wiring ships the per-project routing.
-  // until then only direct POSTs to the service are expected).
-  compile_typst_enabled: process.env.COMPILE_TYPEST_ENABLED === 'true',
+  // Feature gate (TYPST_INTEGRATION_PLAN §0): clsi_typst is ENABLED by
+  // default (OWNER DECISION 2026-09-10: flag ON day one, parity with the
+  // web default `COMPILE_TYPEST_ENABLED !== 'false'`). Set
+  // COMPILE_TYPEST_ENABLED=false in env for the rollback path: every route
+  // then returns 501 ('typst compilation not enabled'), which web surfaces
+  // as a clean compile-unavailable state.
+  compile_typst_enabled: process.env.COMPILE_TYPEST_ENABLED !== 'false',
 
   compileSizeLimit: process.env.COMPILE_SIZE_LIMIT || '7mb',
 

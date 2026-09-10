@@ -705,6 +705,22 @@ async function _postToClsi(
         enableCompileFromCacheUntil =
           Date.now() + ENABLE_COMPILE_FROM_CACHE_ON_503_MS
         return { response: { compile: { status: 'unavailable' } } }
+      } else if (err.response.status === 501) {
+        // service-level feature gate (e.g. clsi_typst with
+        // COMPILE_TYPEST_ENABLED=false — owner rollback path): surface a
+        // clean unavailable state instead of a generic 500
+        let gateMessage = 'Compile service unavailable for this compiler'
+        try {
+          const parsed = JSON.parse(err.body)
+          if (parsed && parsed.error) gateMessage = parsed.error
+        } catch {}
+        logger.warn(
+          { projectId, gateMessage },
+          'CLSI returned a 501 feature gate'
+        )
+        return {
+          response: { compile: { status: 'unavailable' }, message: gateMessage },
+        }
       } else if (err.response.status === 504) {
         return { response: { compile: { status: 'timedout' } } }
       } else {

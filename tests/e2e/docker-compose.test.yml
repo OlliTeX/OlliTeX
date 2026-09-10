@@ -58,6 +58,10 @@ services:
       CRYPTO_RANDOM: ${CRYPTO_RANDOM}
       WEB_API_PASSWORD: ${WEB_API_PASSWORD}
       SHARED_SERVICE_TOKEN: ${SHARED_SERVICE_TOKEN}
+      # clsi_typst sandbox dirs (scoping: only the clsi_typst runit service
+      # reads these; the tex clsi is untouched)
+      TYPST_COMPILES_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
+      TYPST_OUTPUT_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
       # python-runner module: test stack exercises it (CE flag via
       # splitTestOverrides; see settings.defaults.js 'overleaf-code')
       ENABLE_PYTHON_RUNNER: 'true'
@@ -106,6 +110,12 @@ services:
     volumes:
       - ol-data:/var/lib/overleaf
       - /var/run/docker.sock:/var/run/docker.sock
+      # typst sandbox compile dirs (clsi_typst DockerRunner SAME-PATH
+      # contract): host dir bind-mounted at the identical container path so
+      # the pinned pandoc/typst image (uid 33) and the overleaf service see
+      # the same files (see server-ce/runit/clsi_typst-overleaf/run)
+      - ./local-data/typst/compiles:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
+      - ./local-data/typst/output:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     healthcheck:
