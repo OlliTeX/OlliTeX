@@ -155,7 +155,7 @@ export function EmailSection() {
         <div style={{ width: 320, maxWidth: '100%' }}>
           <Field label="Recipient" value={testTo} onChange={setTestTo} placeholder="admin@example.com" hint="Sent through the stored configuration (after saving)." />
         </div>
-        <Button color="ol" loading={testBusy} disabled={!testTo.trim()} onClick={() => void runTest()}>
+        <Button color="ollitex" loading={testBusy} disabled={!testTo.trim()} onClick={() => void runTest()}>
           Send test
         </Button>
       </Group>

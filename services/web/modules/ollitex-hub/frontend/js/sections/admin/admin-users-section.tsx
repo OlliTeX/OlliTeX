@@ -114,7 +114,7 @@ function UserUpdateModal({ user, onClose, onSaved }: { user: any; onClose: () =>
     }
   }
   return (
-    <Modal opened onClose={onClose} size="sm" title={<Text fw={700}>Update user</Text>} withinPortal>
+    <Modal opened onClose={onClose} size="sm" title={<Text fw={700}>Edit user</Text>} withinPortal>
       <Stack gap="md">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <TextInput label="First name" value={first} onChange={e => setFirst(e.currentTarget.value)} />
@@ -464,7 +464,7 @@ export default function AdminUsersSection({
               <Table.Tr
                 key={uid(u)}
                 onClick={() => sel.toggle(uid(u))}
-                style={{ cursor: 'pointer', background: sel.isSelected(uid(u)) ? 'var(--mantine-color-teal-0)' : undefined }}
+                style={{ cursor: 'pointer', background: sel.isSelected(uid(u)) ? 'var(--mantine-color-teal-light)' : undefined }}
               >
                 <Table.Td onClick={e => e.stopPropagation()}>
                   <RowCheckbox id={uid(u)} label={u.email} selected={sel.isSelected(uid(u))} onToggle={sel.toggle} />
@@ -516,7 +516,7 @@ export default function AdminUsersSection({
                             User info
                           </Menu.Item>
                           <Menu.Item icon={<Icon name="edit" size={16} />} onClick={() => setUpdateUser(u)}>
-                            Update…
+                            Edit…
                           </Menu.Item>
                           <Menu.Item
                             icon={<Icon name={u.isAdmin ? 'admin_panel_settings' : 'shield_person'} size={16} />}

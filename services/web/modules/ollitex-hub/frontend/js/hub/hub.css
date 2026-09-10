@@ -34,6 +34,30 @@
   color: var(--mantine-color-text);
 }
 
+/* Owner #11 (2026-09-13): the same fixed-navy heading rule leaks into the
+ * hub's PORTAL modals — they mount on <body>, outside .ol-hub-scroll, so the
+ * “New project” / confirm / edit-user titles rendered dark-navy-on-dark in
+ * the dark scheme. Neutralise it for hub Mantine modals (module modals keep
+ * their own .ol-mant-modal theming, excluded by :not()). The :root scheme
+ * mirror (OlliTProvider) keeps --mantine-color-text scheme-correct inside
+ * portals. Specificity note: the winning legacy rule is a selector LIST whose
+ * max arm is (0,3,1) (e.g. ".sidebar-blog .card-body .h2"), so this override
+ * must be (0,3,2)+ to beat it regardless of sheet order. */
+html[data-mantine-color-scheme] .mantine-Modal-root:not(.ol-mant-modal) h1,
+html[data-mantine-color-scheme] .mantine-Modal-root:not(.ol-mant-modal) h2,
+html[data-mantine-color-scheme] .mantine-Modal-root:not(.ol-mant-modal) h3,
+html[data-mantine-color-scheme] .mantine-Modal-root:not(.ol-mant-modal) h4,
+html[data-mantine-color-scheme] .mantine-Modal-root:not(.ol-mant-modal) h5,
+html[data-mantine-color-scheme] .mantine-Modal-root:not(.ol-mant-modal) h6,
+html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h1,
+html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h2,
+html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h3,
+html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h4,
+html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h5,
+html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h6 {
+  color: var(--mantine-color-text);
+}
+
 /* a11y: in-text links inside the hub need AA contrast on the hub surfaces in
  * BOTH schemes (the flat brand-green shade 4 was ~3:1 on the dark neutral-70
  * cards and got flagged by axe). Branch on Mantine's scheme attribute:

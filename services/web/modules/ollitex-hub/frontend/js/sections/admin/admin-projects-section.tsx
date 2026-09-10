@@ -367,7 +367,7 @@ export default function AdminProjectsSection({
               <Table.Tr
                 key={pid(p)}
                 onClick={() => sel.toggle(pid(p))}
-                style={{ cursor: 'pointer', background: sel.isSelected(pid(p)) ? 'var(--mantine-color-teal-0)' : undefined }}
+                style={{ cursor: 'pointer', background: sel.isSelected(pid(p)) ? 'var(--mantine-color-teal-light)' : undefined }}
               >
                 <Table.Td onClick={e => e.stopPropagation()}>
                   <RowCheckbox id={pid(p)} label={pname(p)} selected={sel.isSelected(pid(p))} onToggle={sel.toggle} />

@@ -165,7 +165,7 @@ export default function HubHealthSection() {
   async function copyReport() {
     try {
       const lines = [
-        `LibreLeaf hub health report — ${new Date().toISOString()}`,
+        `OlliTeX hub health report — ${new Date().toISOString()}`,
         core ? `server: uptime ${core.uptimeSec ?? '—'}s, node ${core.platform?.node}, mongo ${core.mongo?.state ?? '—'}` : 'server core: unavailable',
         '',
         'probes:',
@@ -244,7 +244,7 @@ export default function HubHealthSection() {
                     {core.mongo?.pingMs != null ? ` · ping ${core.mongo.pingMs}ms` : ''}
                   </Text>
                   <Text size="sm">
-                    app&nbsp;<b>{core.instance?.appName ?? 'LibreLeaf'}</b> ({core.instance?.env ?? '?'})
+                    app&nbsp;<b>{core.instance?.appName ?? 'OlliTeX'}</b> ({core.instance?.env ?? '?'})
                   </Text>
                 </Group>
                 {core.featureGates ? (

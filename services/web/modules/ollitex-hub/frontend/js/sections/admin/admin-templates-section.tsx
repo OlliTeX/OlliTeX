@@ -1,20 +1,22 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
 
+  ActionIcon,
   Anchor,
   Badge,
   Button,
   Card,
   FileInput,
   Group,
+  Modal,
+  NativeSelect,
   Stack,
   Switch,
   Table,
   Text,
+  Textarea,
   TextInput,
   Tooltip,
-  ActionIcon,
-  Modal,
 } from '@mantine/core'
 import { notify } from '../../shared/notify'
 import { getJSON, postJSON, putJSON, deleteJSON } from '@/infrastructure/fetch-json'
@@ -53,8 +55,30 @@ export default function AdminTemplatesSection() {
   const [confirmDel, setConfirmDel] = useState<GalleryTemplate | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editTpl, setEditTpl] = useState<GalleryTemplate | null>(null)
-  const [editForm, setEditForm] = useState<{ name?: string; descriptionMD?: string; authorMD?: string; license?: string }>({})
+  const [editForm, setEditForm] = useState<{ name?: string; descriptionMD?: string; authorMD?: string; license?: string; category?: string; language?: string }>({})
+  const [editCategories, setEditCategories] = useState<Array<{ key: string; name: string; url: string }>>([])
   const [savingEdit, setSavingEdit] = useState(false)
+
+  useEffect(() => {
+    if (!editTpl) return
+    let alive = true
+    getJSON<any>('/api/template/categories')
+      .then(data => {
+        if (!alive) return
+        const list = Array.isArray(data?.categories) ? data.categories : Array.isArray(data) ? data : []
+        setEditCategories(
+          list
+            .map((c: any) => ({ key: c?.key || c?.url || '', name: c?.name || c?.key || '', url: c?.url || '' }))
+            .filter((c: any) => c.key)
+        )
+      })
+      .catch(() => {
+        if (alive) setEditCategories([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [editTpl])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -318,6 +342,8 @@ export default function AdminTemplatesSection() {
                                 descriptionMD: (t as any).descriptionMD || (t as any).description || '',
                                 authorMD: (t as any).authorMD || (t as any).author || '',
                                 license: (t as any).license || '',
+                                category: (t as any).category || '',
+                                language: (t as any).language || '',
                               })
                             }}
                           >
@@ -376,30 +402,79 @@ export default function AdminTemplatesSection() {
       <Modal
         opened={!!editTpl}
         onClose={() => setEditTpl(null)}
-        title="Edit template?"
-        size="md"
+        title={<Text fw={700}>Edit template</Text>}
+        size="lg"
       >
-        <Stack gap="sm" mt="sm">
-          <TextInput
-            label="Template title"
-            value={editForm.name ?? ''}
-            onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, name: v })) }}
-          />
-          <TextInput
-            label="Author (markdown)"
-            value={editForm.authorMD ?? ''}
-            onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, authorMD: v })) }}
-          />
-          <TextInput
-            label="License (markdown)"
-            value={editForm.license ?? ''}
-            onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, license: v })) }}
-          />
-          <Group justify="flex-end" mt="xs">
-            <Button variant="default" onClick={() => setEditTpl(null)}>Cancel</Button>
-            <Button loading={savingEdit} onClick={() => void doEdit()}>Save changes</Button>
-          </Group>
-        </Stack>
+        <Group gap="md" mt="sm" wrap="wrap" align="flex-start">
+          <div style={{ width: '55%', minWidth: 260 }}>
+            <TextInput
+              label="Title"
+              value={editForm.name ?? ''}
+              onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, name: v })) }}
+            />
+            <TextInput
+              mt="sm"
+              label="Author (markdown)"
+              value={editForm.authorMD ?? ''}
+              onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, authorMD: v })) }}
+            />
+            <Group gap="sm" wrap="wrap" mt="sm">
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <NativeSelect
+                  label="Category"
+                  value={editForm.category ?? (editTpl?.category || '')}
+                  onChange={e => setEditForm(f => ({ ...f, category: e.currentTarget.value }))}
+                  data={[
+                    { value: '', label: '— no category —' },
+                    ...(editCategories.map(c => ({ value: c.url || c.key, label: c.name }))),
+                  ]}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <NativeSelect
+                  label="Language"
+                  value={editForm.language ?? ''}
+                  onChange={e => setEditForm(f => ({ ...f, language: e.currentTarget.value }))}
+                  data={[
+                    { value: '', label: 'Off' },
+                    { value: 'en_US', label: 'English (American)' },
+                    { value: 'en_GB', label: 'English (British)' },
+                    { value: 'de_DE', label: 'German' },
+                    { value: 'fr_FR', label: 'French' },
+                    { value: 'es_ES', label: 'Spanish' },
+                    { value: 'it_IT', label: 'Italian' },
+                    { value: 'pt_PT', label: 'Portuguese' },
+                  ]}
+                />
+              </div>
+            </Group>
+            <Textarea
+              mt="sm"
+              label="Description (markdown)"
+              minRows={4}
+              maxRows={10}
+              value={editForm.descriptionMD ?? ''}
+              onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, descriptionMD: v })) }}
+            />
+            <TextInput mt="sm" label="License (markdown)" value={editForm.license ?? ''} onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, license: v })) }} />
+          </div>
+          <div style={{ width: '45%', minWidth: 220 }}>
+            <Text size="xs" fw={600} mb={4}>Preview</Text>
+            <img
+              src={`/template/${tid(editTpl)}/preview?version=${encodeURIComponent(String((editTpl as any)?.version || 'latest'))}&style=preview`}
+              alt={`Preview of ${tname(editTpl)}`}
+              style={{ width: '100%', borderRadius: 10, border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-white)' }}
+            />
+            <Group gap="xs" mt="sm">
+              <Anchor href={`/project/new/template/${tid(editTpl)}?version=${encodeURIComponent(String((editTpl as any)?.version || 'latest'))}&name=${encodeURIComponent(tname(editTpl))}`} target="_blank" rel="noreferrer" size="sm">Open as template</Anchor>
+              <Anchor href={`/template/${tid(editTpl)}/preview?version=${encodeURIComponent(String((editTpl as any)?.version || 'latest'))}`} target="_blank" rel="noreferrer" size="sm">View PDF</Anchor>
+            </Group>
+          </div>
+        </Group>
+        <Group justify="flex-end" mt="md">
+          <Button variant="default" onClick={() => setEditTpl(null)}>Cancel</Button>
+          <Button color="ollitex" loading={savingEdit} onClick={() => void doEdit()}>Save</Button>
+        </Group>
       </Modal>
 
     </Stack>

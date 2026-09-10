@@ -353,9 +353,26 @@ export default function ProjectsSection({
   const [newOpen, setNewOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([])
-  const [template, setTemplate] = useState('none')
+  // 'start' encodes the creation path (owner 2026-09-13 issues #3b/#3c/#35:
+  // blank, example, typst basic/article, and the FULL gallery template list):
+  //   ''            → blank (POST /project/new, no template)
+  //   'example'     → example project (POST /project/new, template 'example')
+  //   'typst:basic' → POST /project/new/typst {template:'basic'}
+  //   'typst:article' → POST /project/new/typst {template:'article'}
+  //   `<templateId>`→ POST /project/new {template:<id>}
+  const [start, setStart] = useState('')
   const [newName, setNewName] = useState('')
   const [newErr, setNewErr] = useState<string | null>(null)
+  const typstEnabled =
+    ((): boolean => {
+      try {
+        const el = document.querySelector('meta[name=ol-ExposedSettings]')
+        const c = el?.getAttribute('content')
+        return c ? (JSON.parse(c)?.typstEnabled === true) : false
+      } catch {
+        return false
+      }
+    })()
   const [zipOpen, setZipOpen] = useState(false)
   const [docxOpen, setDocxOpen] = useState(false)
   const [mdOpen, setMdOpen] = useState(false)
@@ -426,7 +443,9 @@ export default function ProjectsSection({
 
   useEffect(() => {
     let alive = true
-    getJSON('/api/templates?by=name&order=asc&category=none')
+    // category=all: the FULL gallery list (owner issue #3c: gallery templates
+    // were missing — the old call only listed the no-category group)
+    getJSON('/api/templates?by=name&order=asc&category=all')
       .then((data: any) => {
         if (!alive) return
         const list = Array.isArray(data?.templates) ? data.templates : []
@@ -521,7 +540,7 @@ export default function ProjectsSection({
   const openWithTemplate = (id?: string) => {
     setNewName('')
     setNewErr(null)
-    setTemplate(id || 'none')
+    setStart(id || '') // '' = blank; or a gallery template id
     setNewOpen(true)
   }
 
@@ -588,12 +607,23 @@ export default function ProjectsSection({
     setCreating(true)
     setNewErr(null)
     try {
-      const data = await postJSON<{ project_id: string }>('/project/new', {
-        body: {
-          projectName: newName.trim(),
-          template: template === 'none' ? '' : template,
-        },
-      })
+      let data: { project_id?: string }
+      if (start.startsWith('typst:')) {
+        // Typst path: its own router (POST /project/new/typst)
+        data = await postJSON<{ project_id: string }>('/project/new/typst', {
+          body: {
+            projectName: newName.trim(),
+            template: start.slice('typst:'.length), // 'basic' | 'article'
+          },
+        })
+      } else {
+        data = await postJSON<{ project_id: string }>('/project/new', {
+          body: {
+            projectName: newName.trim(),
+            template: start || '', // '' = blank; 'example'; or a template id
+          },
+        })
+      }
       setNewOpen(false)
       setNewName('')
       if (data?.project_id) {
@@ -649,7 +679,7 @@ export default function ProjectsSection({
             </Group>
           ) : null}
         </Group>
-        <Group gap="xs">
+        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 1, minWidth: 0 }}>
           <TextInput
             aria-label="Search projects"
             leftSection={<Icon name="search" size={18} />}
@@ -657,7 +687,7 @@ export default function ProjectsSection({
             onChange={e => { setQuery(e.currentTarget.value); setPage(1) }}
             placeholder="Search projects"
             size="md"
-            style={{ maxWidth: 320, width: '100%' }}
+            style={{ minWidth: 140, maxWidth: 320, flex: 1 }}
           />
           <Menu width={320} position="bottom-end" withinPortal>
             <Menu.Target>
@@ -674,10 +704,26 @@ export default function ProjectsSection({
             <Menu.Dropdown>
               <Menu.Item
                 leftSection={<Icon name="article" size={16} />}
-                onClick={() => openWithTemplate('none')}
+                onClick={() => openWithTemplate(undefined)}
               >
                 Blank project
               </Menu.Item>
+              {typstEnabled ? (
+                <Menu.Item
+                  leftSection={<Icon name="functions" size={16} />}
+                  onClick={() => openWithTemplate('typst:basic')}
+                >
+                  Blank Typst project
+                </Menu.Item>
+              ) : null}
+              {typstEnabled ? (
+                <Menu.Item
+                  leftSection={<Icon name="menu_book" size={16} />}
+                  onClick={() => openWithTemplate('typst:article')}
+                >
+                  Typst article (bibliography)
+                </Menu.Item>
+              ) : null}
               <Menu.Divider>Import</Menu.Divider>
               <Menu.Item leftSection={<Icon name="folder_zip" size={16} />} onClick={() => setZipOpen(true)}>
                 Existing project (.zip)
@@ -955,7 +1001,7 @@ export default function ProjectsSection({
         </Group>
       ) : null}
 
-      {/* New project (blank / from template) */}
+      {/* New project (blank / example / typst / gallery templates) */}
       <Modal opened={newOpen} onClose={() => setNewOpen(false)} size="sm" title={<Text fw={700}>New project</Text>} withinPortal>
         <Stack gap="md">
           <label htmlFor="hub-new-project-name" style={{ display: 'block' }}>
@@ -972,11 +1018,23 @@ export default function ProjectsSection({
             <Text size="sm" fw={600} mb={6}>Start from</Text>
             <NativeSelect
               id="hub-new-project-template"
-              value={template}
-              onChange={e => setTemplate(e.currentTarget.value)}
+              value={start}
+              onChange={e => setStart(e.currentTarget.value)}
               data={[
-                { value: 'none', label: 'Blank project' },
-                ...templates.map(t => ({ value: t.id, label: t.name })),
+                { value: '', label: 'Blank project' },
+                { value: 'example', label: 'Example project' },
+                ...(typstEnabled
+                  ? [
+                      { value: 'typst:basic', label: 'Blank Typst project' },
+                      { value: 'typst:article', label: 'Typst article (bibliography)' },
+                    ]
+                  : []),
+                ...(templates.length > 0
+                  ? [
+                      { value: '__sep', label: 'From a template…', disabled: true },
+                      ...templates.map(t => ({ value: t.id, label: t.name })),
+                    ]
+                  : []),
               ]}
             />
           </label>

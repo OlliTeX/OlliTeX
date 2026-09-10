@@ -121,7 +121,7 @@ export function SandboxedSection() {
       <Button
         size="xs"
         variant="light"
-        color="ol"
+        color="ollitex"
         leftSection={<Icon name="add" size={15} />}
         onClick={() => up({ images: [...images, { image: '', name: '' }] })}
       >

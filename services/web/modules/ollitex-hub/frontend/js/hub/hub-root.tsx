@@ -7,6 +7,7 @@ import ThemeToggle from '../shared/theme-toggle'
 import Rail from './rail'
 import SectionBoundary from './section-boundary'
 import { UserProvider } from '../../../../../frontend/js/shared/context/user-context'
+import SystemMessages from '../../../../../frontend/js/shared/components/system-messages'
 import { SSOProvider } from '../../../../../frontend/js/features/settings/context/sso-context'
 import { renderLeaf } from './leaves'
 import { HUB_NAV, HubNode, indexNav, visibleNav } from './nav-tree'
@@ -193,7 +194,7 @@ export default function HubRoot() {
   }, [initial])
 
   const node = idx.byId.get(path) || idx.allLeaves.get(path) || null
-  const title = TITLES[path]?.title || node?.label || 'LibreLeaf hub'
+  const title = TITLES[path]?.title || node?.label || 'OlliTeX hub'
   const subtitle = TITLES[path]?.subtitle
 
   // cross-section navigation (Overview shortcuts, owner review #2): the
@@ -321,7 +322,7 @@ export default function HubRoot() {
         <a href="/" style={{ display: 'inline-flex', alignItems: 'center' }}>
           <img
             src={logoSrc}
-            alt="LibreLeaf"
+            alt="OlliTeX"
             style={{ height: 36, width: 'auto', display: 'block' }}
           />
         </a>
@@ -357,6 +358,8 @@ export default function HubRoot() {
         </nav>
 
         <main className="ol-hub-scroll" style={{ flex: 1, minWidth: 0, overflowY: 'auto', height: '100%', background: 'var(--mantine-color-body)' }}>
+          {/* Owner #17a (2026-09-13): system messages must appear on /hub, not only /editor. */}
+          <SystemMessages />
           <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto', width: '100%' }}>
             <div style={{ marginBottom: 20 }}>
               <Title order={2} style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--mantine-color-text)' }}>

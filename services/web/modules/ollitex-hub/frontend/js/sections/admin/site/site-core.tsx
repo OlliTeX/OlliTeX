@@ -144,7 +144,7 @@ export function SectionShell({
           <Text size="sm" c="teal">Saved.</Text>
         ) : null}
         {footerNote ? <Text size="xs" c="dimmed">{footerNote}</Text> : null}
-        <Button color="ol" loading={flash.saving} onClick={onSave}>
+        <Button color="ollitex" loading={flash.saving} onClick={onSave}>
           Save
         </Button>
       </Group>
@@ -221,11 +221,11 @@ export function Area({
   required?: boolean
 }) {
   return (
-    <div>
+    <div style={{ width: '100%' }}>
       <Text size="xs" fw={600} mb={4}>
         {label} {required ? <span style={{ color: 'var(--mantine-color-red-6)' }}>*</span> : null}
       </Text>
-      <Textarea autosize minRows={rows} value={value} onChange={e => onChange(e.currentTarget.value)} placeholder={placeholder} />
+      <Textarea w="100%" autosize minRows={rows} value={value} onChange={e => onChange(e.currentTarget.value)} placeholder={placeholder} />
       {hint ? <Text size="xs" c="dimmed" mt={4}>{hint}</Text> : null}
     </div>
   )

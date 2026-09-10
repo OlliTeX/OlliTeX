@@ -106,6 +106,10 @@ export const HUB_NAV: HubNode[] = [
     admin: true,
     tone: 'admin',
     children: [
+      // Owner #16/#19 (2026-09-13): “Full site settings” + “Hub health” belong
+      // directly under the Site settings header, not buried inside General.
+      { id: 'site.general.enclose', label: 'Full site settings', icon: 'tune' },
+      { id: 'site.general.health', label: 'Hub health', icon: 'health_and_safety' },
       {
         id: 'site.general',
         label: 'General',
@@ -139,13 +143,9 @@ export const HUB_NAV: HubNode[] = [
             ],
           },
           { id: 'site.general.activeprojects', label: 'Active projects', icon: 'track_changes' },
-          { id: 'site.general.enclose', label: 'Full site settings', icon: 'tune' },
           { id: 'site.general.messages', label: 'System messages', icon: 'campaign' },
           { id: 'site.general.stats', label: 'Instance statistics', icon: 'monitoring' },
           { id: 'site.general.editor', label: 'Editor controls', icon: 'build' },
-          // overleaf-lab #14 (2026-09-08): live diagnostics (server core +
-          // endpoint probes + captured client errors)
-          { id: 'site.general.health', label: 'Hub health', icon: 'health_and_safety' },
         ],
       },
       {

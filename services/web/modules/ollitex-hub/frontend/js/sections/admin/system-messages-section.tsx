@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { Button, Group, Stack, Text, TextInput } from '@mantine/core'
+import { Button, Group, Stack, Text, TextInput, ActionIcon, Tooltip } from '@mantine/core'
 import { notify, errorMessage } from '../../shared/notify'
-import { postJSON, getJSON } from '@/infrastructure/fetch-json'
+import { postJSON, getJSON, deleteJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
 import { invalidate, useSectionData } from '../../shared/use-section-data'
@@ -138,6 +138,30 @@ export default function SystemMessagesSection() {
               <Text size="sm" style={{ flex: 1 }}>
                 {m.content}
               </Text>
+              {/* Owner #17c (2026-09-13): delete a single message, not only all. */}
+              <Tooltip label="Delete this message">
+                <ActionIcon
+                  variant="subtle"
+                  color="red"
+                  aria-label={
+                    `Delete message: ${String(m.content || 'message').slice(0, 40)}`
+                  }
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        await deleteJSON(`/admin/messages/${encodeURIComponent(m._id)}`)
+                        notify({ message: 'Message deleted.', color: 'teal' })
+                        await refresh()
+                      } catch (err) {
+                        notify({ message: errorMessage(err, 'Could not delete the message.'), color: 'red' })
+                      }
+                    })()
+                  }}
+                >
+                  <Icon name="delete" size={16} />
+                </ActionIcon>
+              </Tooltip>
             </div>
           ))}
         </Stack>

@@ -154,7 +154,7 @@ export default function AdminInstanceSection({ onNavigate }: { onNavigate?: (id:
           <Text fw={700}>About this instance</Text>
           <Group gap="md" wrap="wrap" align="center">
             <Badge variant="light" color="blue" radius="sm" size="sm">
-              LibreLeaf 6.3.0 (Community Edition base)
+              OlliTeX 6.3.0 (Community Edition base)
             </Badge>
             <Text size="sm" c="dimmed" truncate>
               Time series, charts and alert settings live in the Instance statistics section.

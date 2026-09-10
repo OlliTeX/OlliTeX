@@ -135,7 +135,7 @@ export default function AppearanceSection() {
       await deleteJSON('/api/hub-theme')
       setTheme({ version: 1, light: { ...DEFAULT_HUB_THEME.light }, dark: { ...DEFAULT_HUB_THEME.dark } })
       setAppliedHubTheme(null)
-      notify({ message: 'Hub appearance reset to the LibreLeaf defaults.', color: 'green' })
+      notify({ message: 'Hub appearance reset to the OlliTeX defaults.', color: 'green' })
     } catch (e: any) {
       notify({ message: 'Could not reset the hub theme: ' + ((e && e.message) || 'unknown error'), color: 'red' })
     } finally {
@@ -319,11 +319,11 @@ export default function AppearanceSection() {
       {isCustom ? (
         <Text size="xs" c="dimmed" mt={10}>
           The hub is currently showing a custom theme. Use <b>Reset to defaults</b> to return to the standard
-          LibreLeaf look.
+          OlliTeX look.
         </Text>
       ) : (
         <Text size="xs" c="dimmed" mt={10}>
-          The hub is currently showing the standard LibreLeaf theme.
+          The hub is currently showing the standard OlliTeX theme.
         </Text>
       )}
     </div>

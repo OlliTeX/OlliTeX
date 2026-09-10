@@ -93,7 +93,7 @@ function Classic({ children, note }: { children: React.ReactNode; note?: string 
       {note ? (
         <Group gap={8} mb="md" wrap="nowrap">
           <Text size="xs" c="dimmed">
-            Classic controls — will be restyled to the LibreLeaf kit in a follow-up.
+            Classic controls — will be restyled to the OlliTeX kit in a follow-up.
           </Text>
         </Group>
       ) : null}
@@ -105,14 +105,23 @@ function Classic({ children, note }: { children: React.ReactNode; note?: string 
 /* ─────────────── Mantine-native section forms ─────────────── */
 
 function MiscNative({ initial, onChange }: { initial: Sec; onChange: (patch: Sec) => void }) {
-  const [appName, setAppName] = useState(initial.appName || 'LibreLeaf')
-  const [hidePoweredBy, setHidePoweredBy] = useState(initial.hidePoweredBy === true)
-  const [noindex, setNoindex] = useState(initial.noindex === true)
-  const [allowPublic, setAllowPublic] = useState(initial.allowPublic !== false)
-  const [anonRW, setAnonRW] = useState(initial.anonRW === true)
+  // Owner #12 (2026-09-13): full parity with the legacy admin
+  // “Miscellaneous” page, and — critically — the CANONICAL key names that
+  // SiteSettings EnvHydrator reads (navHidePoweredBy / robotsNoindex /
+  // allowPublicAccess / …; the previous hub keys like `hidePoweredBy`
+  // silently never hydrated to the environment).
+  const [appName, setAppName] = useState(initial.appName || 'OlliTeX')
+  const [hidePoweredBy, setHidePoweredBy] = useState(initial.navHidePoweredBy === true)
+  const [noindex, setNoindex] = useState(initial.robotsNoindex === true)
+  const [allowPublic, setAllowPublic] = useState(initial.allowPublicAccess === true)
+  const [anonRW, setAnonRW] = useState(initial.allowAnonymousReadWriteSharing === true)
   const [disableLink, setDisableLink] = useState(initial.disableLinkSharing === true)
-  const [pythonRunner, setPythonRunner] = useState(initial.pythonRunner === true)
+  const [disableChat, setDisableChat] = useState(initial.disableChat === true)
+  const [projDelay, setProjDelay] = useState(String(initial.projectHardDeletionDelayDays ?? 90))
+  const [userDelay, setUserDelay] = useState(String(initial.userHardDeletionDelayDays ?? 90))
   const [historyRestore, setHistoryRestore] = useState(initial.historyRestore === true)
+  const [pdfCaching, setPdfCaching] = useState(initial.enablePdfCaching !== false)
+  const [pythonRunner, setPythonRunner] = useState(initial.pythonRunner === true)
   const [maxUpload, setMaxUpload] = useState(String(initial.maxUploadSizeMiB ?? 50))
   const [maxEntities, setMaxEntities] = useState(String(initial.maxEntitiesPerProject ?? 2000))
   const [compiler, setCompiler] = useState(initial.defaultLatexCompiler || 'pdflatex')
@@ -121,20 +130,24 @@ function MiscNative({ initial, onChange }: { initial: Sec; onChange: (patch: Sec
   useEffect(() => {
     onChange({
       appName,
-      hidePoweredBy,
-      noindex,
-      allowPublic,
-      anonRW,
+      navHidePoweredBy: hidePoweredBy,
+      robotsNoindex: noindex,
+      allowPublicAccess: allowPublic,
+      allowAnonymousReadWriteSharing: anonRW,
       disableLinkSharing: disableLink,
-      pythonRunner,
+      disableChat,
+      projectHardDeletionDelayDays: parseInt(projDelay, 10) || 0,
+      userHardDeletionDelayDays: parseInt(userDelay, 10) || 0,
       historyRestore,
-      maxUploadSizeMiB: parseInt(maxUpload, 10),
-      maxEntitiesPerProject: parseInt(maxEntities, 10),
+      enablePdfCaching: pdfCaching,
+      pythonRunner,
+      maxUploadSizeMiB: parseInt(maxUpload, 10) || 0,
+      maxEntitiesPerProject: parseInt(maxEntities, 10) || 0,
       defaultLatexCompiler: compiler,
       projectChangeNotificationDelayMs: parseInt(notifDelay, 10) || 0,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appName, hidePoweredBy, noindex, allowPublic, anonRW, disableLink, pythonRunner, historyRestore, maxUpload, maxEntities, compiler, notifDelay])
+  }, [appName, hidePoweredBy, noindex, allowPublic, anonRW, disableLink, disableChat, projDelay, userDelay, historyRestore, pdfCaching, pythonRunner, maxUpload, maxEntities, compiler, notifDelay])
 
   return (
     <Stack gap="md">
@@ -142,7 +155,7 @@ function MiscNative({ initial, onChange }: { initial: Sec; onChange: (patch: Sec
       <Group gap="md" wrap="wrap">
         <div style={{ flex: 1, minWidth: 260 }}>
           <Text size="sm" fw={600} mb={6}>
-            Product name
+            Site / app name
           </Text>
           <TextInput value={appName} onChange={e => setAppName(e.currentTarget.value)} />
         </div>
@@ -152,17 +165,37 @@ function MiscNative({ initial, onChange }: { initial: Sec; onChange: (patch: Sec
         </Group>
       </Group>
 
-      <Text fw={700}>Access</Text>
+      <Text fw={700}>Access &amp; sharing</Text>
       <Group gap="lg" wrap="wrap">
         <Switch checked={allowPublic} onChange={() => setAllowPublic(!allowPublic)} label="Allow public projects" color="ollitex" />
-        <Switch checked={anonRW} onChange={() => setAnonRW(!anonRW)} label="Anonymous read/write links" color="ollitex" />
+        <Switch checked={anonRW} onChange={() => setAnonRW(!anonRW)} label="Allow anonymous read/write sharing" color="ollitex" />
         <Switch checked={disableLink} onChange={() => setDisableLink(!disableLink)} label="Disable link sharing" color="ollitex" />
+        <Switch checked={disableChat} onChange={() => setDisableChat(!disableChat)} label="Disable project chat" color="ollitex" />
+      </Group>
+
+      <Text fw={700}>Lifecycle &amp; retention</Text>
+      <Group gap="md" wrap="wrap">
+        <div style={{ minWidth: 200 }}>
+          <Text size="sm" fw={600} mb={6}>
+            Project hard-deletion delay (days)
+          </Text>
+          <TextInput value={projDelay} onChange={e => setProjDelay(e.currentTarget.value)} />
+          <Text size="xs" c="dimmed" mt={2}>Days before irreversible hard deletion</Text>
+        </div>
+        <div style={{ minWidth: 200 }}>
+          <Text size="sm" fw={600} mb={6}>
+            User hard-deletion delay (days)
+          </Text>
+          <TextInput value={userDelay} onChange={e => setUserDelay(e.currentTarget.value)} />
+          <Text size="xs" c="dimmed" mt={2}>Days before irreversible hard deletion</Text>
+        </div>
       </Group>
 
       <Text fw={700}>Features</Text>
       <Group gap="lg" wrap="wrap">
         <Switch checked={pythonRunner} onChange={() => setPythonRunner(!pythonRunner)} label="Python split editor (browser)" color="ollitex" />
-        <Switch checked={historyRestore} onChange={() => setHistoryRestore(!historyRestore)} label="Restore history on open" color="ollitex" />
+        <Switch checked={historyRestore} onChange={() => setHistoryRestore(!historyRestore)} label="Allow project history restore" color="ollitex" />
+        <Switch checked={pdfCaching} onChange={() => setPdfCaching(!pdfCaching)} label="Enable PDF caching" color="ollitex" />
       </Group>
 
       <Text fw={700}>Limits & defaults</Text>
@@ -203,6 +236,7 @@ function MiscNative({ initial, onChange }: { initial: Sec; onChange: (patch: Sec
 function SignupNative({ initial, onChange }: { initial: Sec; onChange: (patch: Sec) => void }) {
   const [enabled, setEnabled] = useState(initial.enabled !== false)
   const [domains, setDomains] = useState((initial.allowedDomains || []).join('\n'))
+  const [disabledRedirect, setDisabledRedirect] = useState(initial.disabledRedirectUrl || '')
   useEffect(() => {
     onChange({
       enabled,
@@ -210,10 +244,11 @@ function SignupNative({ initial, onChange }: { initial: Sec; onChange: (patch: S
         .split(/[\n,]/)
         .map(s => s.trim())
         .filter(Boolean),
+      disabledRedirectUrl: disabledRedirect.trim(),
       requireEmailConfirmation: initial.requireEmailConfirmation !== false,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, domains])
+  }, [enabled, domains, disabledRedirect])
   return (
     <Stack gap="md">
       <Group justify="space-between" wrap="nowrap">
@@ -234,6 +269,23 @@ function SignupNative({ initial, onChange }: { initial: Sec; onChange: (patch: S
           </Text>
         </Text>
         <Textarea value={domains} onChange={e => setDomains(e.currentTarget.value)} minRows={3} maxRows={8} placeholder={'uni-bremen.de\nexample.org'} />
+      </div>
+      <div>
+        <Text size="sm" fw={600} mb={6}>
+          Redirect URL when sign-up is disabled
+          <Text span size="xs" c="dimmed" fw={400}>
+            {' '}
+            (leave empty for /login)
+          </Text>
+        </Text>
+        <TextInput
+          value={disabledRedirect}
+          onChange={e => setDisabledRedirect(e.currentTarget.value)}
+          placeholder="/login, https://example.org/join …"
+        />
+        <Text size="xs" c="dimmed" mt={2}>
+          Where to send visitors of /register when the sign-up page is off.
+        </Text>
       </div>
     </Stack>
   )

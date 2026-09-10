@@ -1,0 +1,233 @@
+/* Hub legacy-widget bridge (owner issues 2026-09-13: #8, #9).
+ *
+ * Several hub sections (Git sync, WebDAV, Dropbox, ORCID import, LLM
+ * availability, …) embed OVERLEAF-LEGACY Bootstrap markup
+ * (.settings-widget-container, .form-control, .btn, .small, .table …) inside
+ * Mantine cards. Legacy Bootstrap chrome is not scheme-aware in this bundle,
+ * so on a dark hub it rendered white inputs / unreadable dimmed text and the
+ * buttons ignored the theme. Re-anchor the core chrome to Mantine's
+ * scheme-aware tokens; the [data-mantine-color-scheme] hook is mirrored onto
+ * <html> by the shared Mantine provider so this works for portaled content
+ * (modals) as well as the in-page cards.
+ */
+
+#hub-root .settings-widget-container,
+[data-modal-content="true"] .settings-widget-container {
+  color: var(--mantine-color-text);
+}
+
+/* Text levels */
+#hub-root .settings-widget-container .form-label,
+[data-modal-content="true"] .settings-widget-container .form-label,
+#hub-root .settings-widget-container h4,
+#hub-root .settings-widget-container h1,
+[data-modal-content="true"] .settings-widget-container h4 {
+  color: var(--mantine-color-text);
+}
+
+#hub-root .settings-widget-container .small,
+[data-modal-content="true"] .settings-widget-container .small,
+#hub-root .settings-widget-container .form-text,
+#hub-root .settings-widget-container .text-muted,
+[data-modal-content="true"] .settings-widget-container .text-muted {
+  color: var(--mantine-color-text-dimmed);
+}
+
+#hub-root .settings-widget-container .text-success,
+[data-modal-content="true"] .settings-widget-container .text-success {
+  color: var(--mantine-color-green-8);
+}
+
+#hub-root .settings-widget-container .text-danger,
+[data-modal-content="true"] .settings-widget-container .text-danger {
+  color: var(--mantine-color-red-6);
+}
+
+/* Inputs */
+#hub-root .settings-widget-container .form-control,
+[data-modal-content="true"] .settings-widget-container .form-control {
+  width: 100%;
+  background: var(--mantine-color-white);
+  color: var(--mantine-color-text);
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+#hub-root .settings-widget-container .form-control:focus,
+[data-modal-content="true"] .settings-widget-container .form-control:focus {
+  outline: none;
+  border-color: var(--mantine-color-ollitex-filled);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mantine-color-ollitex-filled) 25%, transparent);
+}
+
+#hub-root .settings-widget-container .form-control::placeholder,
+[data-modal-content="true"] .settings-widget-container .form-control::placeholder {
+  color: var(--mantine-color-text-dimmed);
+  opacity: 0.7;
+}
+
+/* Buttons — unified hub policy (owner #27/#28):
+ *   primary = filled ollitex · neutral = outlined · destructive = red ghost */
+#hub-root .settings-widget-container .btn,
+[data-modal-content="true"] .settings-widget-container .btn {
+  border-radius: 8px;
+}
+
+#hub-root .settings-widget-container .btn-secondary,
+[data-modal-content="true"] .settings-widget-container .btn-secondary {
+  background: transparent;
+  border: 1px solid var(--mantine-color-gray-3);
+  color: var(--mantine-color-text);
+}
+
+#hub-root .settings-widget-container .btn-secondary:hover,
+[data-modal-content="true"] .settings-widget-container .btn-secondary:hover {
+  background: var(--mantine-color-gray-1);
+  border-color: var(--mantine-color-gray-4);
+}
+
+#hub-root .settings-widget-container .btn-primary,
+[data-modal-content="true"] .settings-widget-container .btn-primary {
+  background: var(--mantine-color-ollitex-filled);
+  border-color: var(--mantine-color-ollitex-filled);
+  color: #fff;
+}
+
+#hub-root .settings-widget-container .btn-primary:hover,
+[data-modal-content="true"] .settings-widget-container .btn-primary:hover {
+  background: var(--mantine-color-ollitex-filled-hover);
+}
+
+#hub-root .settings-widget-container .btn-danger,
+[data-modal-content="true"] .settings-widget-container .btn-danger {
+  background: var(--mantine-color-red-6);
+  border-color: var(--mantine-color-red-6);
+  color: #fff;
+}
+
+#hub-root .settings-widget-container .btn-danger-ghost,
+[data-modal-content="true"] .settings-widget-container .btn-danger-ghost {
+  background: transparent;
+  border: none;
+  color: var(--mantine-color-red-6);
+}
+
+#hub-root .settings-widget-container .btn-danger-ghost:hover,
+[data-modal-content="true"] .settings-widget-container .btn-danger-ghost:hover {
+  background: var(--mantine-color-red-light);
+}
+
+/* Tables inside legacy widgets */
+#hub-root .settings-widget-container table,
+[data-modal-content="true"] .settings-widget-container table {
+  color: var(--mantine-color-text);
+}
+
+#hub-root .settings-widget-container .table td,
+[data-modal-content="true"] .settings-widget-container .table td {
+  color: var(--mantine-color-text-dimmed);
+  border-color: var(--mantine-color-gray-2);
+}
+
+#hub-root .settings-widget-container .table th,
+[data-modal-content="true"] .settings-widget-container .table th {
+  color: var(--mantine-color-text);
+  border-color: var(--mantine-color-gray-2);
+}
+
+/* Breakable long URLs stay readable */
+#hub-root .settings-widget-container .breakable-url,
+[data-modal-content="true"] .settings-widget-container .breakable-url {
+  word-break: break-all;
+}
+
+/* ===== Dark scheme overrides (attribute mirrored onto <html> by OlliTProvider) ===== */
+:root[data-mantine-color-scheme="dark"] .settings-widget-container {
+  color: var(--mantine-color-text);
+}
+
+:root[data-mantine-color-scheme="dark"] .settings-widget-container .form-control {
+  background: var(--mantine-color-dark-6);
+  border-color: var(--mantine-color-dark-4);
+  color: var(--mantine-color-text);
+}
+
+:root[data-mantine-color-scheme="dark"] .settings-widget-container .form-control:focus {
+  border-color: var(--mantine-color-ollitex-filled);
+}
+
+:root[data-mantine-color-scheme="dark"] .settings-widget-container .btn-secondary {
+  border-color: var(--mantine-color-dark-4);
+  color: var(--mantine-color-text);
+}
+
+:root[data-mantine-color-scheme="dark"] .settings-widget-container .btn-secondary:hover {
+  background: var(--mantine-color-dark-5);
+}
+
+:root[data-mantine-color-scheme="dark"] .settings-widget-container .table td,
+:root[data-mantine-color-scheme="dark"] .settings-widget-container .table th {
+  border-color: var(--mantine-color-dark-4);
+}
+
+:root[data-mantine-color-scheme="dark"] .settings-widget-container .text-success {
+  color: var(--mantine-color-green-4);
+}
+
+/* ===== bib-editor legacy form inside hub modals (owner #5c–#5g) ===== */
+[data-modal-content="true"] .bib-form-input,
+#hub-root .bib-form-input {
+  width: 100%;
+  background: var(--mantine-color-white);
+  color: var(--mantine-color-text);
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.875rem;
+}
+
+:root[data-mantine-color-scheme="dark"] [data-modal-content="true"] .bib-form-input,
+:root[data-mantine-color-scheme="dark"] #hub-root .bib-form-input {
+  background: var(--mantine-color-dark-6);
+  border-color: var(--mantine-color-dark-4);
+  color: var(--mantine-color-text);
+}
+
+[data-modal-content="true"] .bib-form-label,
+[data-modal-content="true"] .form-label {
+  color: var(--mantine-color-text);
+}
+
+[data-modal-content="true"] .bib-form-hint,
+[data-modal-content="true"] .form-text {
+  color: var(--mantine-color-text-dimmed);
+}
+
+/* Optional-field combobox (owner #5d): give the dropdown body a themed surface */
+[data-modal-content="true"] .bib-add-field-listbox,
+[data-modal-content="true"] [class*="bib-add-field-listbox"] {
+  background: var(--mantine-color-body, var(--mantine-color-white));
+  border: 1px solid var(--mantine-color-gray-3);
+  color: var(--mantine-color-text);
+}
+
+/* Footer button spacing (owner #5g) */
+[data-modal-content="true"] .bib-form-footer-right {
+  gap: 8px;
+}
+
+[data-modal-content="true"] .bib-doi-row,
+[data-modal-content="true"] .bib-form-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-modal-content="true"] .bib-doi-row .bib-form-input,
+[data-modal-content="true"] .bib-form-key-row .bib-form-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}

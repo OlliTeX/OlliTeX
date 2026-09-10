@@ -3,7 +3,7 @@
 // admin users/projects lists (legacy admin-tools parity).
 
 import React, { useCallback, useMemo, useState } from 'react'
-import { ActionIcon, Badge, Button, Checkbox, Group, Text } from '@mantine/core'
+import { ActionIcon, Badge, Button, Checkbox, Group, Paper, Text } from '@mantine/core'
 import Icon from './icons'
 
 export function useSelection(ids: string[]) {
@@ -120,39 +120,41 @@ export function BulkToolbar({
 }) {
   if (count === 0) return null
   return (
-    <Group gap="xs" wrap="wrap" pt={4} pr={8} pl={8} pb={4} pos="relative" style={{ background: 'var(--mantine-color-gray-0)', borderRadius: 10, border: '1px solid var(--mantine-color-gray-3)' }}>
-      <Badge size="sm" variant="light" color="teal">
-        {count} selected
-      </Badge>
-      <Group gap={6} wrap="wrap">
-        {actions.map(a => (
-          <Button
-            key={a.key}
-            size="xs"
-            variant="light"
-            color={a.tone === 'danger' ? 'red' : 'teal'}
-            leftSection={<Icon name={a.icon} size={15} />}
-            onClick={a.onClick}
-            disabled={a.disabled}
-            loading={a.loading}
-            aria-label={`Bulk ${a.label}`}
-          >
-            {a.label}
-          </Button>
-        ))}
+    <Paper withBorder shadow={0} radius={10} pos="relative">
+      <Group gap="xs" wrap="wrap" pt={4} pr={8} pl={8} pb={4}>
+        <Badge size="sm" variant="light" color="teal">
+          {count} selected
+        </Badge>
+        <Group gap={6} wrap="wrap">
+          {actions.map(a => (
+            <Button
+              key={a.key}
+              size="xs"
+              variant="light"
+              color={a.tone === 'danger' ? 'red' : 'teal'}
+              leftSection={<Icon name={a.icon} size={15} />}
+              onClick={a.onClick}
+              disabled={a.disabled}
+              loading={a.loading}
+              aria-label={`Bulk ${a.label}`}
+            >
+              {a.label}
+            </Button>
+          ))}
+        </Group>
+        <Text size="xs" c="dimmed">
+          Bulk action applies to the checked rows in this view only.
+        </Text>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          onClick={onClear}
+          aria-label="Clear selection"
+          title="Clear selection"
+        >
+          <Icon name="close" size={15} />
+        </ActionIcon>
       </Group>
-      <Text size="xs" c="dimmed">
-        Bulk action applies to the checked rows in this view only.
-      </Text>
-      <ActionIcon
-        variant="subtle"
-        color="gray"
-        onClick={onClear}
-        aria-label="Clear selection"
-        title="Clear selection"
-      >
-        <Icon name="close" size={15} />
-      </ActionIcon>
-    </Group>
+    </Paper>
   )
 }

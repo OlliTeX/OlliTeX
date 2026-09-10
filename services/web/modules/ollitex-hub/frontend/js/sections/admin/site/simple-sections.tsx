@@ -42,13 +42,13 @@ export function BrandingSection() {
       })}
     >
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
-        <Field label="Navbar title" value={String(v.navTitle || '')} onChange={x => up({ navTitle: x })} placeholder="LibreLeaf" hint="Shown in the top navigation bar." />
+        <Field label="Navbar title" value={String(v.navTitle || '')} onChange={x => up({ navTitle: x })} placeholder="OlliTeX" hint="Shown in the top navigation bar." />
       </Group>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
         <Area label="Left footer" width="100%" value={String(v.leftFooter || '')} onChange={x => up({ leftFooter: x })} placeholder='[{"text": "…", "url": "https://…"}]' hint='JSON array of {text,url} items, or plain text.' />
       </Group>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
-        <Area label="Right footer" width="100%" value={String(v.rightFooter || '')} onChange={x => up({ rightFooter: x })} rows={2} placeholder='[{"text": "Powered by LibreLeaf", "url": "…"}]' />
+        <Area label="Right footer" width="100%" value={String(v.rightFooter || '')} onChange={x => up({ rightFooter: x })} rows={2} placeholder='[{"text": "Powered by OlliTeX", "url": "…"}]' />
       </Group>
     </SectionShell>
   )
@@ -280,7 +280,7 @@ export function LinkedFileTypesSection() {
                 : cur.filter(k => k !== row.key)
               up({ enabledTypes: next })
             }}
-            color="ol"
+            color="ollitex"
           />
         ))}
       </Group>

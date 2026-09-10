@@ -43,6 +43,23 @@ export default function OlliTProvider({
   children: React.ReactNode
   themePatch?: Record<string, unknown>
 }) {
+  // Portals (modals, dropdowns) mount on <body>, OUTSIDE the MantineProvider
+  // wrapper element. Mantine 9 scopes most default/dark variable swaps with
+  // [data-mantine-color-scheme] selectors, so portaled surfaces kept the
+  // light defaults on a dark page (unreadable headers/inputs — owner #11).
+  // Mirror the resolved scheme onto <html> so every descendant portal picks
+  // up the same scheme. (Idempotent; the provider attribute stays canonical.)
+  React.useEffect(() => {
+    const apply = () => {
+      const s = hubColorSchemeManager.get('light')
+      if (s === 'light' || s === 'dark') {
+        document.documentElement.dataset.mantineColorScheme = s
+      }
+    }
+    apply()
+    return onColorSchemeChange(apply)
+  }, [])
+
   // M2.5 Appearance: optional override patch (custom hub theme) merged over
   // the default brand theme. Without a patch this is exactly the previous
   // behaviour, so other bundles are unaffected.

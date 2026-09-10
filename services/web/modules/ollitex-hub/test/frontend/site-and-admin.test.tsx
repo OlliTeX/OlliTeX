@@ -71,11 +71,11 @@ describe('<AdminUsersSection /> (owner B25: row Info + Update)', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0])
     expect(await screen.findByText('User info')).toBeTruthy()
-    expect(screen.getByText('Update…')).toBeTruthy()
+    expect(screen.getByText('Edit…')).toBeTruthy()
 
-    // Update flow: change email → save
-    fireEvent.click(screen.getByText('Update…'))
-    const modal = await screen.findByText('Update user')
+    // Update flow: change email → save (menu label “Edit…”, modal title “Update user”)
+    fireEvent.click(screen.getByText('Edit…'))
+    const modal = await screen.findByText('Edit user')
     expect(modal).toBeTruthy()
     const emailInput = (screen.getAllByLabelText('Email').find(el => (el as HTMLInputElement).tagName === 'INPUT')) as HTMLInputElement
     expect(emailInput).toBeTruthy()

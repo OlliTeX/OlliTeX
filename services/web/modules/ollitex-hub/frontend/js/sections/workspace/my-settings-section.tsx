@@ -15,6 +15,7 @@ import {
 } from '@mantine/core'
 import { notify } from '../../shared/notify'
 import { postJSON } from '@/infrastructure/fetch-json'
+import { setTheme } from '@/shared/mantine/overall-theme'
 import Icon from '../../shared/icons'
 
 function getMetaJson(name: string): any {
@@ -184,18 +185,29 @@ function PasswordTab() {
 
 function AppearanceTab() {
   const { settings, refresh } = useUserSettings()
-  const [theme, setTheme] = useState<string>(settings?.overallTheme || 'system')
+  // The store contract (shared/mantine/overall-theme.ts) is the LEGACY value
+  // space '' (dark) | 'light-' | 'system'; the Radio values are the friendly
+  // 'dark' | 'light' | 'system'. Mapping both ways (owner issue #10: the old
+  // code passed the radio value straight to the store, so "Light" resolved
+  // to dark and the live theme never matched the saved preference).
+  const radioForStored = (v: unknown) =>
+    v === 'light-' ? 'light' : v === '' || v == null ? 'dark' : 'system'
+  const storedForRadio = (v: string) =>
+    v === 'light' ? 'light-' : v === 'dark' ? '' : 'system'
+  const [radio, setRadio] = useState<string>(() => radioForStored(settings?.overallTheme))
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    setTheme(settings?.overallTheme || 'system')
+    setRadio(radioForStored(settings?.overallTheme))
   }, [settings?.overallTheme])
 
   const save = async (value: string) => {
-    setTheme(value)
+    setRadio(value)
     setBusy(true)
     try {
-      await saveUserSettings({ overallTheme: value })
+      // setTheme (shared store) applies locally + writes the meta tag + POSTs
+      // the valid stored value ('' | 'light-' | 'system') to /user/settings.
+      await setTheme(storedForRadio(value))
       notify({ message: 'Theme saved.', color: 'teal' })
       refresh()
     } catch (e: any) {
@@ -212,7 +224,7 @@ function AppearanceTab() {
           Applies to the whole workspace (this area, the project list, and the editor chrome).
         </Text>
         <RadioGroup
-          value={theme}
+          value={radio}
           onChange={v => void save(String(v))}
           label={<Text size="sm" fw={600}>Appearance</Text>}
         >

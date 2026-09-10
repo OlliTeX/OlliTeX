@@ -3,10 +3,12 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Group,
   NativeSelect,
   Stack,
   Switch,
+  Table,
   Text,
   Textarea,
   TextInput,
@@ -175,7 +177,21 @@ function useAdminLlm() {
     }
   }
 
-  return { state, setState, error, saving, load, save, checkConnection, checkLanguageTool }
+  // Owner #29 (2026-09-13): provider model scan (same endpoint as the legacy
+  // admin page — POST /admin/llm/models {apiUrl, apiType}).
+  const scanModels = async (apiUrl: string, apiType: string) => {
+    try {
+      const res: any = await postJSON('/admin/llm/models', {
+        body: { apiUrl: apiUrl || '', apiType: apiType || 'openai' },
+      })
+      if (res?.success && Array.isArray(res.models)) return { ok: true, models: res.models as string[] }
+      return { ok: false, models: [] as string[] }
+    } catch (e: any) {
+      return { ok: false, models: [] as string[], message: (e?.data?.message as string) || 'Model scan failed.' }
+    }
+  }
+
+  return { state, setState, error, saving, load, save, checkConnection, checkLanguageTool, scanModels }
 }
 
 function SectionCard({
@@ -221,6 +237,9 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
   const [ltBusy, setLtBusy] = useState(false)
   const [ltResult, setLtResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [actionKeys, setActionKeys] = useState<string[]>([])
+  const [scanned, setScanned] = useState<string[]>([])
+  const [scanBusy, setScanBusy] = useState(false)
+  const [scanMsg, setScanMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (state) setActionKeys(Object.keys(state.askAiActionPrompts || {}))
@@ -232,8 +251,6 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
   if (!state) return null
 
   const show = (s: Section) => section === 'all' || section === s
-
-  const modelsText = (state.allowedModels || []).join('\n')
 
   const doConnectionTest = async () => {
     setChecking(true)
@@ -259,23 +276,50 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
       {show('features') ? (
         <SectionCard
           title="Enable AI features instance-wide"
-          help="Turning the master switch off force-disables chat, completion, and review for every user."
+          help="Per-feature availability for every user (the force-off switches live under Services below)."
           actions={
-            <>
-              <Button color="ollitex" loading={saving} size="sm"
-                onClick={() => {
-                  void api.save({
-                    llmDisabledByAdmin: state!.llmDisabledByAdmin,
-                    chatEnabled: state!.chatEnabled,
-                    completionEnabled: state!.completionEnabled,
-                    reviewEnabled: state!.reviewEnabled,
-                    languageToolDisabledByAdmin: state!.languageToolDisabledByAdmin,
-                    languageToolUrl: state!.languageToolUrl,
-                  }).catch(() => undefined)
-                }}>
-                Save features
+            <Button color="ollitex" loading={saving} size="sm" onClick={() => {
+              void api.save({
+                chatEnabled: state!.chatEnabled,
+                completionEnabled: state!.completionEnabled,
+                reviewEnabled: state!.reviewEnabled,
+              }).catch(() => undefined)
+            }}>
+              Save
+            </Button>
+          }
+        >
+          <Group gap="lg" wrap="wrap">
+            <Switch checked={state.chatEnabled} onChange={() => setState(s => (s ? { ...s, chatEnabled: state.chatEnabled === true } : s))} label="Chat (Ask AI)" color="ollitex" />
+            <Switch checked={state.completionEnabled} onChange={() => setState(s => (s ? { ...s, completionEnabled: state.completionEnabled === true } : s))} label="Inline completion" color="ollitex" />
+            <Switch checked={state.reviewEnabled} onChange={() => setState(s => (s ? { ...s, reviewEnabled: state.reviewEnabled === true } : s))} label="Review panel" color="ollitex" />
+          </Group>
+        </SectionCard>
+      ) : null}
+
+      {/* ── Services (availability) — owner #32: LanguageTool gets its own card ── */}
+      {show('features') ? (
+        <SectionCard
+          title="Services (availability)"
+          help="Force the AI or LanguageTool grammar checking off for every user, even configured / BYO."
+          actions={
+            <Group gap="xs" align="flex-end">
+              <Button variant="default" size="sm" h={34} loading={ltBusy} onClick={() => {
+                setLtBusy(true); setLtResult(null)
+                api.checkLanguageTool(state!.languageToolUrl).then(r => { setLtResult(r); setLtBusy(false) })
+              }}>
+                Check LanguageTool connection
               </Button>
-            </>
+              <Button color="ollitex" loading={saving} size="sm" h={34} onClick={() => {
+                void api.save({
+                  llmDisabledByAdmin: state!.llmDisabledByAdmin,
+                  languageToolDisabledByAdmin: state!.languageToolDisabledByAdmin,
+                  languageToolUrl: state!.languageToolUrl,
+                }).catch(() => undefined)
+              }}>
+                Save
+              </Button>
+            </Group>
           }
         >
           <Group justify="space-between" wrap="nowrap" gap="sm">
@@ -287,15 +331,9 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               label={state.llmDisabledByAdmin ? 'AI disabled' : 'AI enabled'}
             />
           </Group>
-          <Group gap="lg" wrap="wrap">
-            <Switch checked={state.chatEnabled} onChange={() => setState(s => (s ? { ...s, chatEnabled: state.chatEnabled === true } : s))} label="Chat (Ask AI)" color="ollitex" />
-            <Switch checked={state.completionEnabled} onChange={() => setState(s => (s ? { ...s, completionEnabled: state.completionEnabled === true } : s))} label="Inline completion" color="ollitex" />
-            <Switch checked={state.reviewEnabled} onChange={() => setState(s => (s ? { ...s, reviewEnabled: state.reviewEnabled === true } : s))} label="Review panel" color="ollitex" />
-          </Group>
           <Group justify="space-between" wrap="nowrap" gap="sm">
             <Text size="sm" fw={600}>
-              LanguageTool (grammar checking)
-              <Text span size="xs" c="dimmed" fw={400}> force-off for the whole instance</Text>
+              Disable LanguageTool for all users (force off)
             </Text>
             <Switch
               checked={!state.languageToolDisabledByAdmin}
@@ -303,21 +341,16 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               color="ollitex"
             />
           </Group>
-          <Group gap="xs" wrap="wrap">
+          <Group gap="xs" align="flex-end">
             <div style={{ flex: 1, minWidth: 260 }}>
               <TextInput
-                label="LanguageTool instance URL (optional)"
-                placeholder="https://languagetool.example.org"
+                label="LanguageTool server URL"
+                placeholder="http://languagetool:8010"
                 value={state.languageToolUrl || ''}
                 onChange={e => setState(s => (s ? { ...s, languageToolUrl: e.currentTarget.value } : s))}
               />
             </div>
-            <Button variant="default" size="sm" loading={ltBusy} onClick={() => {
-              setLtBusy(true); setLtResult(null)
-              api.checkLanguageTool(state!.languageToolUrl).then(r => { setLtResult(r); setLtBusy(false) })
-            }}>
-              Check LT
-            </Button>
+            <Text size="xs" c="dimmed" pr={2}>Blank = env fallbacks only</Text>
           </Group>
           {ltResult ? (
             <Alert icon={null} variant="light" color={ltResult.ok ? 'teal' : 'red'}>
@@ -418,58 +451,123 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
         </SectionCard>
       ) : null}
 
-      {/* ── Model Selection ─────────────────────────────────────────────── */}
+      {/* ── Model Selection (owner #29: scan fills a table, checkbox enables) ── */}
       {show('models') ? (
         <SectionCard
           title="Model Selection"
-          help="Users can only pick from the models listed here (one per line). Keep this list current for the configured API type."
+          help="Scan the API for available models, then choose which ones users can access."
           actions={
-            <Button color="ollitex" loading={saving} size="sm"
-              onClick={() => {
+            <Group gap="xs" align="flex-end">
+              <Button variant="default" size="sm" loading={scanBusy} onClick={() => {
+                setScanBusy(true); setScanMsg(null)
+                api.scanModels(state!.llmApiUrl, state!.llmApiType).then(r => {
+                  if (r.ok) {
+                    setScanned(prev => Array.from(new Set([...prev, ...r.models])))
+                    setScanMsg(`Scanned — ${r.models.length} model(s) found.`)
+                  } else {
+                    setScanMsg((r as any).message || 'Scan failed — check the API URL/type under API Connection.')
+                  }
+                  setScanBusy(false)
+                })
+              }}>
+                Scan for Models
+              </Button>
+              <Button color="ollitex" loading={saving} size="sm" onClick={() => {
                 void api.save({
-                  allowedModels: modelsText.split(/[\n,]/).map(s => s.trim()).filter(Boolean),
+                  allowedModels: (state!.allowedModels || []),
                 }).catch(() => undefined)
               }}>
-              Save models
-            </Button>
+                Save
+              </Button>
+            </Group>
           }
         >
-          <Textarea
-            label="Allowed models (one per line)"
-            value={modelsText}
-            onChange={e => setState(s => (s ? { ...s, allowedModels: e.currentTarget.value.split(/[\n,]/).map(x => x.trim()).filter(Boolean) } : s))}
-            minRows={3}
-            maxRows={8}
-            placeholder={'gpt-4o-mini\ngemini-2.0-flash'}
-          />
-          {state.knownModels?.length ? (
-            <Text size="xs" c="dimmed">
-              Known models from the provider: {state.knownModels.join(', ')}
-            </Text>
+          {scanMsg ? (
+            <Alert icon={null} variant="light" withBorder color={/found/.test(scanMsg) ? 'teal' : 'red'} style={{ minHeight: 0 }}>
+              <Text size="sm">{scanMsg}</Text>
+            </Alert>
           ) : null}
+          {(() => {
+            const allowed = new Set(state.allowedModels || [])
+            const known = Array.from(new Set([...(state.knownModels || []), ...scanned, ...(state.allowedModels || [])]))
+            if (known.length === 0) {
+              return (
+                <Text size="sm" c="dimmed">
+                  No models known yet — run the scan, or save models manually via the provider docs.
+                </Text>
+              )
+            }
+            const toggle = (m: string) =>
+              setState(s => (s ? { ...s, allowedModels: allowed.has(m) ? s.allowedModels.filter(x => x !== m) : [...(s.allowedModels || []), m] } : s))
+            return (
+              <div>
+                <Table striped withTableBorder style={{ borderRadius: 10, overflow: 'hidden' }}>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Model</Table.Th>
+                      <Table.Th style={{ width: 100, textAlign: 'right' }}>Enabled</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {known.map(m => (
+                      <Table.Tr key={m}>
+                        <Table.Td><Text size="sm" c="text" style={{ fontFamily: 'var(--mantine-font-family-mono)', whiteSpace: 'pre' }}>{m}</Text></Table.Td>
+                        <Table.Td style={{ textAlign: 'right' }}>
+                          <Checkbox
+                            label={null}
+                            aria-label={`Enable ${m}`}
+                            checked={allowed.has(m)}
+                            onChange={() => toggle(m)}
+                            color="ollitex"
+                          />
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+                <Group gap="sm" mt="xs">
+                  <Button variant="subtle" size="xs" onClick={() => setState(s => (s ? { ...s, allowedModels: known } : s))}>
+                    Select all
+                  </Button>
+                  <Button variant="subtle" size="xs" onClick={() => setState(s => (s ? { ...s, allowedModels: [] } : s))}>
+                    Unselect all
+                  </Button>
+                  <Text size="xs" c="dimmed">{(state.allowedModels || []).length}/{known.length} enabled</Text>
+                </Group>
+              </div>
+            )
+          })()}
         </SectionCard>
       ) : null}
 
-      {/* ── System Prompt ───────────────────────────────────────────────── */}
+      {/* ── System Prompt (owner #30: counter + Reset + taller) ────────── */}
       {show('prompt') ? (
         <SectionCard
           title="Editor System Prompt"
           help="The base system prompt for in-editor AI (Ask AI / completion). Leave empty for the built-in default."
           actions={
-            <Button color="ollitex" loading={saving} size="sm"
-              onClick={() => { void api.save({ systemPrompt: state!.systemPrompt }).catch(() => undefined) }}>
-              Save prompt
-            </Button>
+            <Group gap="xs" align="flex-end">
+              <Button variant="subtle" size="sm" onClick={() => setState(s => (s ? { ...s, systemPrompt: '' } : s))}>
+                Reset to default
+              </Button>
+              <Button color="ollitex" loading={saving} size="sm"
+                onClick={() => { void api.save({ systemPrompt: state!.systemPrompt }).catch(() => undefined) }}>
+                Save
+              </Button>
+            </Group>
           }
         >
           <Textarea
             label="System prompt (optional)"
             value={state.systemPrompt || ''}
             onChange={e => setState(s => (s ? { ...s, systemPrompt: e.currentTarget.value } : s))}
-            minRows={3}
-            maxRows={8}
+            minRows={8}
+            maxRows={16}
             placeholder="You are a helpful LaTeX assistant…"
           />
+          <Text size="xs" c="dimmed" ta="right">
+            {(state.systemPrompt || '').length}/4000 characters
+          </Text>
         </SectionCard>
       ) : null}
 
@@ -490,7 +588,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
                   reviewMaxTokens: state!.reviewMaxTokens ?? undefined,
                 }).catch(() => undefined)
               }}>
-              Save prompts
+              Save
             </Button>
           }
         >
@@ -502,15 +600,24 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               label="Ask AI system prompt"
               value={state.askAiSystemPrompt || ''}
               onChange={e => setState(s => (s ? { ...s, askAiSystemPrompt: e.currentTarget.value } : s))}
-              minRows={2}
-              maxRows={5}
+              minRows={6}
+              maxRows={14}
               placeholder="…(empty = built-in default)"
             />
+            <Group justify="flex-end">
+              <Button variant="subtle" size="xs" onClick={() => setState(s => (s ? { ...s, askAiSystemPrompt: '' } : s))}>
+                Reset to default
+              </Button>
+            </Group>
           </div>
           {actionKeys.length > 0 ? (
             <Stack gap="sm">
-              <Text size="sm" fw={600}>Ask AI action prompts</Text>
-              {actionKeys.map(k => (
+              <Group justify="space-between" wrap="nowrap">
+                <Text size="sm" fw={600}>Ask AI action prompts</Text>
+                <Button variant="subtle" size="xs" onClick={() => setState(s => (s ? { ...s, askAiActionPrompts: {} } : s))}>
+                  Reset to default
+                </Button>
+              </Group>  {actionKeys.map(k => (
                 <Textarea
                   key={k}
                   label={k.replace(/_/g, ' ')}
@@ -522,8 +629,8 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
                         : s
                     )
                   }
-                  minRows={1}
-                  maxRows={3}
+                  minRows={3}
+                  maxRows={8}
                 />
               ))}
             </Stack>
@@ -536,18 +643,28 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               label="Error / compile-fix prompt"
               value={state.errorPrompt || ''}
               onChange={e => setState(s => (s ? { ...s, errorPrompt: e.currentTarget.value } : s))}
-              minRows={2}
-              maxRows={5}
+              minRows={6}
+              maxRows={14}
               placeholder="…(empty = built-in default)"
             />
+            <Group justify="flex-end">
+              <Button variant="subtle" size="xs" onClick={() => setState(s => (s ? { ...s, errorPrompt: '' } : s))}>
+                Reset to default
+              </Button>
+            </Group>
             <Textarea
               mt="sm"
               label="Compliance review prompt"
               value={state.reviewSystemPrompt || ''}
               onChange={e => setState(s => (s ? { ...s, reviewSystemPrompt: e.currentTarget.value } : s))}
-              minRows={2}
-              maxRows={5}
+              minRows={6}
+              maxRows={14}
             />
+            <Group justify="flex-end">
+              <Button variant="subtle" size="xs" onClick={() => setState(s => (s ? { ...s, reviewSystemPrompt: '' } : s))}>
+                Reset to default
+              </Button>
+            </Group>
           </div>
           <Group gap="md" wrap="wrap">
             <div style={{ width: 200 }}>

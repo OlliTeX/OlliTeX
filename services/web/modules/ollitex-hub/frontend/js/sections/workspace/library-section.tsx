@@ -424,7 +424,7 @@ function OrcidImportModal({
 }) {
   const [mode, setMode] = useState<'search' | 'works'>('search')
   const [nameQuery, setNameQuery] = useState('')
-  const [results, setResults] = useState<Array<{ orcid: string; name?: string; lastStatus?: string }>>([])
+  const [results, setResults] = useState<Array<{ orcid: string; givenNames?: string; familyNames?: string; institutionNames?: string[]; name?: string }>>([])
   const [searching, setSearching] = useState(false)
   const [orcid, setOrcid] = useState('')
   const [works, setWorks] = useState<OrcidWork[]>([])
@@ -449,7 +449,7 @@ function OrcidImportModal({
     setSearching(true)
     setError(null)
     try {
-      const data = await getJSON<{ results: Array<{ orcid: string; name?: string; lastStatus?: string }> }>(
+      const data = await getJSON<{ results: Array<{ orcid: string; givenNames?: string; familyNames?: string; institutionNames?: string[]; name?: string }> }>(
         `/orcid-picker/search?q=${encodeURIComponent(nameQuery.trim())}`
       )
       setResults(data?.results || [])
@@ -542,8 +542,13 @@ function OrcidImportModal({
                 {results.map(r => (
                   <Group key={r.orcid} justify="space-between" wrap="nowrap" gap="xs" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8, padding: '10px 12px' }}>
                     <div style={{ minWidth: 0 }}>
-                      <Text size="sm" fw={600} ellipsis>{r.name || r.orcid}</Text>
-                      <Text size="xs" c="dimmed">{r.orcid}{r.lastStatus ? ` · ${r.lastStatus}` : ''}</Text>
+                      <Text size="sm" fw={600} ellipsis>
+                        {[r.name, r.givenNames, r.familyNames].filter(Boolean).join(' ') || r.orcid}
+                      </Text>
+                      <Text size="xs" c="dimmed" ellipsis>
+                        {r.orcid}
+                        {Array.isArray(r.institutionNames) && r.institutionNames.length ? ` · ${r.institutionNames.join(', ').slice(0, 90)}` : ''}
+                      </Text>
                     </div>
                     <Button size="xs" variant="light" color="ollitex" onClick={() => void pickOrcid(r.orcid)}>
                       Browse works
@@ -929,7 +934,7 @@ function LibraryTable({
   onRestore: (keys: string[]) => void
   onPurge: (keys: string[]) => void
 }) {
-  const allSelected = entries.length > 0 && entries.every(e => selected.includes(e._id))
+  const allSelected = entries.length > 0 && entries.every(e => selected.includes(e._id || e.key))
   return (
     <Table striped highlightOnHover withTableBorder style={{ borderRadius: 10, overflow: 'hidden' }}>
       <Table.Thead>
@@ -947,11 +952,11 @@ function LibraryTable({
       </Table.Thead>
       <Table.Tbody>
         {entries.map(entry => (
-          <Table.Tr key={entry._id || entry.key} style={{ background: selected.includes(entry._id) ? 'var(--mantine-color-ollitex-0, rgba(30,107,65,0.06))' : undefined }}>
+          <Table.Tr key={entry._id || entry.key} style={{ background: selected.includes(entry._id || entry.key) ? 'var(--mantine-color-ollitex-light)' : undefined }}>
             <Table.Td>
               <Checkbox
-                checked={selected.includes(entry._id)}
-                onChange={() => onToggle(entry._id)}
+                checked={selected.includes(entry._id || entry.key)}
+                onChange={() => onToggle(entry._id || entry.key)}
                 aria-label={`Select ${entry.key}`}
               />
             </Table.Td>
@@ -1089,7 +1094,7 @@ export default function LibrarySection() {
   }
 
   const toggle = (key: string) => setSelected(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
-  const toggleAll = (v: boolean) => setSelected(v ? (entries || []).map(e => e._id) : [])
+  const toggleAll = (v: boolean) => setSelected(v ? (entries || []).map(e => e._id || e.key) : [])
 
   const doDownload = (ids: string[]) => {
     if (ids.length === 0) return

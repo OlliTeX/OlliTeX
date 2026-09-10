@@ -84,7 +84,7 @@ describe('<HubRoot /> shell', () => {
     })
     renderHub(<HubRoot />)
 
-    const logo = await screen.findByRole('img', { name: 'LibreLeaf' })
+    const logo = await screen.findByRole('img', { name: 'OlliTeX' })
     expect(logo.getAttribute('src')).toBe('/img/custom-logo.png')
     expect(logo.closest('a')?.getAttribute('href')).toBe('/')
   })
