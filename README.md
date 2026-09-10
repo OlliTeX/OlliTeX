@@ -90,7 +90,7 @@ administrator tools) **plus** the OlliTeX-specific stack:
 - **Operations toolkit** — environment-driven configuration
   (`server-ce/config/env.sh` + `tools/toolkit` seed), a central
   [Makefile](Makefile) entry point, an AGPL-compliant rebrand with provenance
-  kept visible ([BRANDING.md](BRANDING.md)).
+  kept visible (see the local `BRANDING.md` handoff notes).
 
 > [!CAUTION]
 > Community Edition is intended for use in environments where **all** users
@@ -128,11 +128,10 @@ A ready-to-run local deployment (nginx + overleaf + mongo + redis) lives in
   — this is the canonical gate; `yarn webpack` starts the *dev server*.
 - In-repo unit/integration suites: `cd services/web && yarn test:unit`
   (Vitest, all projects) or the root `make unit`.
-- [`ext_explain.md`](ext_explain.md) documents the extension surface
-  (features, settings, module wiring) of the fork.
-- [`BRANDING.md`](BRANDING.md) documents the OlliTeX rebrand and how to swap
-  the logo set (final art belongs in `tools/logo/` and the referenced app
-  paths).
+- `ext_explain.md` documents the extension surface (features, settings,
+  module wiring) of the fork.
+- `BRANDING.md` documents the OlliTeX rebrand and how to swap the logo
+  set (final art belongs in `tools/logo/` and the referenced app paths).
 
 ### Testing
 
