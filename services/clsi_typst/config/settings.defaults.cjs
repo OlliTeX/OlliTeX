@@ -148,7 +148,7 @@ if ((process.env.DOCKER_RUNNER || process.env.SANDBOXED_COMPILES) === 'true') {
           process.env.ALL_TYPST_DOCKER_IMAGES ||
           // OWNER DECISION 2026-09-10: current stable typst 0.15.1, digest
           // pinned (see TYPST_INTEGRATION_PLAN.md §5.3 / §8).
-          'pandoc/typst:latest-alpine@sha256:92cacfbca16676429c57d3cc9b80dd1d4c037c6e4b2e2b283170fb9252cb6221'
+          'pandoc/typst:latest-alpine@sha256:ae9dfa3c58cae72d363484442993b761ff4bc30202ec12823bc1e59fa952c892'
         ).split(',')[0].trim(),
       env: {
         HOME: '/tmp',

@@ -526,7 +526,7 @@ describe('ClsiManager', function () {
         // `pandoc/typst:3-alpine` the test was originally written against.
         const expectedImage =
           process.env.TYPST_DOCKER_IMAGE ||
-          'pandoc/typst:latest-alpine@sha256:92cacfbca16676429c57d3cc9b80dd1d4c037c6e4b2e2b283170fb9252cb6221'
+          'pandoc/typst:latest-alpine@sha256:ae9dfa3c58cae72d363484442993b761ff4bc30202ec12823bc1e59fa952c892'
         // clsi_typst's allowedImages are typst-only: the project's texlive
         // image must NOT be forwarded (F2.11 / F3.4)
         expect(options.imageName).to.equal(expectedImage)

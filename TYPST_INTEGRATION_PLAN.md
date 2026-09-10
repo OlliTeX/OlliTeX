@@ -190,11 +190,18 @@ the image** (clsi already works this way). So:
    rollout decision 2026-09-10; set `false` only to disable/rollback),
    `CLSI_TYPEST_URL=http://127.0.0.1:3014` (loopback — web and clsi_typst are in the
    same container), `TYPST_DOCKER_IMAGE` pinned to the **digest** of
-   `pandoc/typst:latest-alpine@sha256:92cacfbca16676429c57d3cc9b80dd1d4c037c6e4b2e2b283170fb9252cb6221`
+   `pandoc/typst:latest-alpine@sha256:ae9dfa3c58cae72d363484442993b761ff4bc30202ec12823bc1e59fa952c892`
    (amd64 image containing typst 0.15.1; `latest-alpine` kept as the human label;
    re-pin the digest on each typst bump — a bump is a gated task: template/fixture +
    error corpus + wordometer re-verify), `TYPST_ENABLE_DOCKER=true`. Document in our
    runbook.
+
+   > **Re-pin record 2026-09-13 (T2 live matrix):** the initially recorded digest
+   > (`92cacfbca1…`) no longer matched the daemon's stored manifest of the same
+   > tag — `docker run … typst --version` on the live image re-verified
+   > `typst 0.15.1 (9dfd3a08)` and the deploy digest now records the daemon's
+   > RepoDigest `ae9dfa3c58cae…`. Same typst build, different manifest pull.
+   > Re-verification performed (plan §7 gate): version + hello/citation compile.
 4. **Image pull**: `docker pull pandoc/typst:3-alpine` on the build host and the e2e
    host (stock image, no build).
 5. **nginx**: no change (loopback; their §6.2 decision "no extra nginx needed for v1"
@@ -291,7 +298,7 @@ none a prerequisite for T1–T4:
    default"). The 501 hard-fail stays as the mis-route safety net; env flip to
    `false` is the rollback path.
 2. **Typst image = current stable (0.15.1)** at
-   `pandoc/typst:latest-alpine@sha256:92cacfbca16676429c57d3cc9b80dd1d4c037c6e4b2e2b283170fb9252cb6221`
+   `pandoc/typst:latest-alpine@sha256:ae9dfa3c58cae72d363484442993b761ff4bc30202ec12823bc1e59fa952c892`
    (owner: "I prefer the current stable version"). Verified live 2026-09-10:
    compile-as-uid33 → real PDFs; modern `#bibliography`/`#cite` citations work (the
    0.14 breakage the addon worked around is gone); miette error shape compatible
