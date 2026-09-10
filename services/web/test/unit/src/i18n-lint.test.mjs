@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// i18n chain guard (owner 2026-09-07, "Forgejo-style i18n linter for LibreLeaf").
+// i18n chain guard (owner 2026-09-07, "Forgejo-style i18n linter for OlliTeX").
 // Runs the linter and requires a clean result: no key may be (a) used in code
 // but missing from locales/en.json (raw key visible in UI), (b) used in code
 // + present in en.json but absent from frontend/extracted-translations.json

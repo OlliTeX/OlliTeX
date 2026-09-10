@@ -7,6 +7,7 @@ import {
   PasswordInput,
   Alert,
 } from '@mantine/core'
+import SystemMessages from '@/shared/components/system-messages'
 
 /**
  * OLiT auth pages (owner scope: /login + /register on the shared Mantine
@@ -79,6 +80,8 @@ export function AuthCard({
     >
       <Card withBorder radius="md" p="xl" style={{ width: '100%', maxWidth: 440 }}>
         <Stack gap="md">
+          {/* Owner #17a (2026-09-13): system messages on the auth pages too. */}
+          <SystemMessages />
           <Text ta="center" style={{ fontSize: 'var(--font-size-06)', fontWeight: 700 }} fw={700}>
             {title}
           </Text>

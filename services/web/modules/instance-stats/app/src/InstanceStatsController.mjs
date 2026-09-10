@@ -25,6 +25,16 @@ function validateWindow(window) {
 }
 
 async function page(req, res, next) {
+  // Owner #23 (2026-09-13): the standalone /admin/instance-stats page is
+  // retired — instance statistics live in the hub (Site settings → Instance
+  // statistics). Keep the API routes (used by the section) but 301 the page.
+  void req
+  void next
+  res.redirect(301, '/hub#/site.general.stats')
+  return
+}
+
+async function pageDeprecated(req, res, next) { // eslint-disable-line no-unused-vars
   try {
     // N-2 round 3 (2026-09-01): the page now extends the golden
     // layout-react skeleton; the shared chrome reads its theme from the

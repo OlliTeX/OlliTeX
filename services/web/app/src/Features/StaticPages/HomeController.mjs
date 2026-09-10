@@ -16,7 +16,9 @@ const homepageExists = fs.existsSync(
 
 async function index(req, res) {
   if (SessionManager.isUserLoggedIn(req.session)) {
-    res.redirect('/project')
+    // owner 2026-09-13 (hub issues #34): '/' lands the logged-in user on the
+    // hub, not the legacy /project list
+    res.redirect('/hub')
   } else {
     await home(req, res)
   }

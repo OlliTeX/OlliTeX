@@ -79,7 +79,7 @@ function ThinFooter({
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    LibreLeaf
+                    OlliTeX
                   </a>{' '}
                   — a fork of{' '}
                   <a
@@ -117,7 +117,7 @@ function ThinFooter({
           <OLRow>
             <OLCol lg={12}>
               <p className="copyright-notice">
-                LibreLeaf is a fork of Overleaf Community Edition™, an
+                OlliTeX is a fork of Overleaf Community Edition™, an
                 open-source project by Overleaf, distributed under the terms
                 of the AGPLv3 license. This deployment is not operated, supported
                 or endorsed by Overleaf® and is provided "AS IS" with all

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * i18n linter (owner 2026-09-07, "Forgejo-style i18n linter for LibreLeaf").
+ * i18n linter (owner 2026-09-07, "Forgejo-style i18n linter for OlliTeX").
  *
  * Guards the WHOLE translation chain, not just one link:
  *
