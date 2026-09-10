@@ -42,22 +42,35 @@ Source material (in `../typst_addon`):
    (`clsi_typst-overleaf`), and web reaches it at loopback
    (`CLSI_TYPEST_URL=http://127.0.0.1:3014`) — no new compose service, no nginx change,
    works identically in the e2e image stack.
-5. **Runtime gate ships OFF by default** (`COMPILE_TYPEST_ENABLED`): menu hidden,
-   clsi_typst answers 501. We control rollout; nothing breaks if the flag stays off.
+5. **Rollout decision (owner, 2026-09-10): `COMPILE_TYPEST_ENABLED` defaults to ON.** The menu is visible from day one; the 501 hard-fail in clsi_typst stays as the safety net if the service is down. Rollback = set `COMPILE_TYPEST_ENABLED=false` in env (menu hides, router unmounts, 501).
 6. **New browser deps** (both from their `services/web/package.json`):
    `codemirror-lang-typst@^0.4.0` (lezer typst grammar, wasm) and
    `@typstyle/typstyle-wasm-bundler@^0.13.18` (in-browser formatter, wasm-pack bundler
    target) + two webpack `webassembly/async` rules (they added them to
    `webpack.config.js` — we must re-add the same rules on top of our current webpack
    config).
-7. **Compile is docker-only**, image `pandoc/typst:3-alpine` (typst 0.14.x, single
-   static binary, no system fonts), sandbox contract copied from clsi (uid 33:33,
-   `NetworkDisabled`, `CapDrop ALL`, seccomp profile from clsi — verified to load on
-   alpine), `Entrypoint: []` quirk handled. Word count via wordometer-style
-   compile-time injection + pdfjs-dist last-page text (their clsi_typst does this).
-   **No SyncTeX / click-to-source, no LSP, no SVG output in v1** (their explicit
-   decisions §0 — typst emits no synctex and native SVG carries no span data; the
-   tinymist WASM renderer that provides those is deliberately out of scope).
+7. **Compile is docker-only**, image `pandoc/typst:latest-alpine` **pinned by digest**,
+   containing the **current stable typst 0.15.1** (verified 2026-09-10: tag pushed
+   2026-09-08; `typst --version` = 0.15.1 (9dfd3a08); also carries pandoc 3.11 as a
+   bonus). Owner decision (2026-09-10): "current stable version" — NOT the older
+   0.14.2 the addon branch used (they did not choose it deliberately — `3-alpine`
+   resolved to 0.14.x at the time and they pinned without auditing the typst inside).
+   Verified live on 0.15.1 today: docker compile as uid 33:33 → real PDFs (hello +
+   bibliography docs); **modern `#bibliography` + `~@key` citations work** (the 0.14
+   `#cite` breakage is gone — the addon's citation-free article workaround is retired;
+   our article template ships proper citations = tex parity); error output still
+   miette-style `┌─ file:line:col` (salvaged `typst-log-parser` shape-compatible;
+   T1 gate re-captures the 5-case corpus on 0.15.1). Sandbox contract copied from
+   clsi (uid 33:33, `NetworkDisabled`, `CapDrop ALL`, seccomp profile from clsi,
+   `Entrypoint: []` quirk handled). Word count via wordometer-style compile-time
+   injection + pdfjs-dist last-page text (their clsi_typst does this; re-verify
+   numbers on 0.15.1 in T2).
+   **No SyncTeX** from a plain compile (typst emits no syncTeX sidecar; native SVG
+   carries no span data — addon-verified) — that gap is closed in v1.5 via the
+   tinymist **typst-ts-wasm** browser route instead (see §6 T2.5).
+8b. **Parity-first rule for depth (owner, 2026-09-10):** "do what brings us closer to
+   functional equality between tex and typst" — depth items are scoped by the
+   tex↔typst parity delta, not by convenience (list in §6 T2.5).
 8. **Editor parity delivered** (their P3/P4, salvaged from the old `../typst` fork +
    the `texlyre` reference and re-ported to this codebase): `.typ` syntax highlighting,
    lezer linter diagnostics in the lint gutter, `#heading` outline (core lezer
@@ -173,10 +186,15 @@ the image** (clsi already works this way). So:
    `exec /sbin/setuser www-data node /overleaf/services/clsi_typst/app.js >>
    /var/log/overleaf/clsi_typst.log 2>&1`. (Check how our Dockerfile enumerates
    runit services — mirror whatever registers `clsi-overleaf`.)
-3. **Env (settings + env.sh)**: `COMPILE_TYPEST_ENABLED` (owner-controlled rollout,
-   **default false**), `CLSI_TYPEST_URL=http://127.0.0.1:3014` (loopback — web and
-   clsi_typst are in the same container), `TYPST_DOCKER_IMAGE=pandoc/typst:3-alpine`
-   (pinnable), `TYPST_ENABLE_DOCKER=true`. Document in our runbook.
+3. **Env (settings + env.sh)**: `COMPILE_TYPEST_ENABLED` (**default true** — owner
+   rollout decision 2026-09-10; set `false` only to disable/rollback),
+   `CLSI_TYPEST_URL=http://127.0.0.1:3014` (loopback — web and clsi_typst are in the
+   same container), `TYPST_DOCKER_IMAGE` pinned to the **digest** of
+   `pandoc/typst:latest-alpine@sha256:92cacfbca16676429c57d3cc9b80dd1d4c037c6e4b2e2b283170fb9252cb6221`
+   (amd64 image containing typst 0.15.1; `latest-alpine` kept as the human label;
+   re-pin the digest on each typst bump — a bump is a gated task: template/fixture +
+   error corpus + wordometer re-verify), `TYPST_ENABLE_DOCKER=true`. Document in our
+   runbook.
 4. **Image pull**: `docker pull pandoc/typst:3-alpine` on the build host and the e2e
    host (stock image, no build).
 5. **nginx**: no change (loopback; their §6.2 decision "no extra nginx needed for v1"
@@ -194,9 +212,33 @@ the image** (clsi already works this way). So:
   (ClisiManager, compiler-setting, new-project-button, typst-log-parser,
   typst-wrap-commands, typst-foundation); **clsi's own suite unchanged + green**
   (our DockerRunner regression test included); webpack build GREEN (wasm rules);
-  `COMPILE_TYPEST_ENABLED` unset → `/project/new/typst` 404, menu hidden, and a
+  **image pin live**: `docker pull` the digest → `typst --version` = 0.15.1;
+  **error corpus re-captured on 0.15.1** (5 addon cases; parser tests updated to the
+  new captures — miette shape verified compatible 2026-09-10);
+  **article template ships proper citations** (`#bibliography` + `~@key` — verified
+  working on 0.15.1; the 0.14 citation-free workaround is retired);
+  flag-OFF path (env override `COMPILE_TYPEST_ENABLED=false`): menu hidden,
+  `/project/new/typst` 404,
   hand-rolled `POST …/compile` with compiler `typst` to clsi_typst → **501**.
-  No e2e delta required (nothing user-visible yet).
+  No e2e UI delta required yet (no live service in T1).
+
+**T2.5 — Parity gap closure (v1.5, owner rule: "closer to functional equality")**
+The tex↔typst parity deltas, ordered by gap size — each a separate gated commit,
+none a prerequisite for T1–T4:
+1. **PDF click-to-source + live render**: tinymist **typst-ts-wasm** in a browser
+   worker — the exact route `texlyre` proved (bundles `typst-ts-renderer` +
+   `typst-ts-web-compiler` in `public/core/…wasm`; typst-ts-web-compiler compiles
+   in-browser, typst-ts-renderer provides span data = the "SVG is the synctex"
+   capability a plain compile lacks). Port that worker pattern to our preview pane
+   for `.typ` projects on both routes; the docker-compiled PDF stays as baseline
+   fallback. Gate: click a PDF position on a `.typ` project → cursor lands on the
+   source line (mirror of the tex synctex e2e).
+2. **Hover math preview** on inline math in `.typ` (tex has it) — small, reuses the
+   LaTeX math-preview plumbing.
+3. **LSP (typlst/tinymist)** only if 1+2 leave an observable intelligence gap
+   (cross-file semantic completion); otherwise the F4 completion pass already covers
+   the common cases (`#cite`, `#label`, `#include`).
+4. **Markdown→Typst conversion** stays out (not a tex↔typst parity item).
 
 **T2 — clsi_typst live inside the image (docker compile → real PDF)**
 - §5.1 + §5.2 image + runit wiring; `pandoc/typst:3-alpine` pulled on both hosts.
@@ -240,28 +282,46 @@ the image** (clsi already works this way). So:
 | en.json corruption (past incident) | diff the 3 added keys by hand after merge; `i18n-lint` + object-shape check. |
 | Feature bleed: typst menu appears for non-admin/flag-off | Runtime gate is `ExposedSettings.typstEnabled`; T1 gate asserts hidden menu + 501 with flag off. |
 | clsi (LaTeX) regressions | clsi untouched in the port; clsi suite + live tex compile are gates at T1/T2/T3. |
-| typst 0.14 quirks (`#cite` broken in the stock image's build — their F3.8 note) | templates ship citation-free; `.bib` works for F4 completion; document in the README. Bumping the typst image version is a 1-line env change (`TYPST_DOCKER_IMAGE`) when we want modern `#cite`. |
+| typst version drift (0.15.1 → future) breaking templates/parsers | digest pin; re-pin is a GATED task (template + error corpus + wordometer re-verify); floating `latest` tags forbidden. |
 | Dual-route drift (`/editor` vs `/Project`) | typst surfaces live in shared core/module code; T3 gate repeats key steps on both routes. |
 
-## 8. Owner decisions (before T4)
+## 8. Owner decisions (RESOLVED 2026-09-10)
 
-1. **Rollout**: keep `COMPILE_TYPEST_ENABLED` default **false** until you flip it (assumed yes — matches "flags off by default" in their P5 and owner safety preference).
-2. **Typst image pin**: stock `pandoc/typst:3-alpine` (typst 0.14.x) for v1 — OK, or want a newer typst (newer `#cite` etc., but template/fixture re-verification needed)?
-3. **v2 depth (out of scope now, listed for later)**: tinymist WASM in-browser renderer (click-to-source + live preview), LSP (typlst/tinymist), SVG output with span data, markdown→typst conversion. None planned.
+1. **Rollout: `COMPILE_TYPEST_ENABLED` defaults ON** (owner: "I prefer ON by
+   default"). The 501 hard-fail stays as the mis-route safety net; env flip to
+   `false` is the rollback path.
+2. **Typst image = current stable (0.15.1)** at
+   `pandoc/typst:latest-alpine@sha256:92cacfbca16676429c57d3cc9b80dd1d4c037c6e4b2e2b283170fb9252cb6221`
+   (owner: "I prefer the current stable version"). Verified live 2026-09-10:
+   compile-as-uid33 → real PDFs; modern `#bibliography`/`#cite` citations work (the
+   0.14 breakage the addon worked around is gone); miette error shape compatible
+   with the salvaged log parser; digest-pin + re-pin procedure documented. (Why the
+   other LLM ended up on 0.14.x: `pandoc/typst:3-alpine` resolved to an older typst
+   at their dev time and was pinned without auditing the typst version inside.)
+3. **Depth = parity-driven** (owner: "do what brings us closer to functional
+   equality between tex and typst") → the ordered gap list in §6 T2.5: (a) PDF
+   click-to-source + live render via tinymist typst-ts-wasm (texlyre's proven
+   route — the biggest parity delta), (b) hover math preview for `.typ`, (c) LSP
+   only if a semantic gap remains, (d) markdown conversion stays out.
 
 ## 9. Definition of done (on THIS branch)
 
 - [ ] T1–T4 gates green, LaTeX path bit-for-bit unchanged (clsi zero diff, clsi suite
       identical baseline).
-- [ ] With flag on, a fresh Typst project (empty AND article) created from the UI modal
-      compiles to a PDF in the existing preview on **both** `/editor` and `/Project`;
-      errors parse to `file:line:col` with click-to-line; wordcount returns
-      wordometer-class numbers; linter/outline/`#cite`/`#label`/`#include`
-      completion/Format/bold/italic work on `.typ`.
-- [ ] Flag off: menu hidden, `/project/new/typst` 404, clsi_typst 501 (verified both).
-- [ ] Sandbox contract: compile runs in `pandoc/typst` container, uid 33:33,
-      `NetworkDisabled`, `CapDrop ALL`, seccomp on (re-verify on the pinned image).
+- [ ] With the default config (flag ON), a fresh Typst project (empty AND
+      article-with-citations) created from the UI modal compiles to a PDF in the
+      existing preview on **both** `/editor` and `/Project`; errors parse to
+      `file:line:col` with click-to-line; wordcount returns wordometer-class numbers;
+      linter/outline/`#cite`/`#label`/`#include` completion/Format/bold/italic work
+      on `.typ`.
+- [ ] Env-override `COMPILE_TYPEST_ENABLED=false`: menu hidden, `/project/new/typst`
+      404, clsi_typst 501 (rollback path verified).
+- [ ] Sandbox contract: compile runs in the pinned `pandoc/typst` (typst 0.15.1)
+      container, uid 33:33, `NetworkDisabled`, `CapDrop ALL`, seccomp on
+      (re-verify the profile on this image in T2).
 - [ ] No synctex output for typst (assert in e2e — their DoD item).
-- [ ] Prod rollout gated behind owner flip; rollback = env flag (code stays inert).
+- [ ] Prod rollout: image swap + owner smoke pass with their own account (no fixture
+      users in prod); rollback = env flag `false` (code stays inert).
+- [ ] v1.5 parity items (§6 T2.5) tracked as separate gated tasks; none gates v1.
 - [ ] Docs: `clsi_typst/README.md` + runbook section (envs, image, how to add another
       compiler later) + README "Typst support" note.
