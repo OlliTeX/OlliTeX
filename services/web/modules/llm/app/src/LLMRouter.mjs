@@ -230,14 +230,18 @@ export default {
         )
         logger.debug({}, '[LLM] Route registered: POST /user/llm-settings/grammar')
 
-        // overleaf-lab: /user/llm-settings is the dedicated BYO settings page
-        // (Account menu 'AI Settings' and the Account Settings card link here).
+        // 2026-09-16 (owner note): the legacy /user/llm-settings BYO page is
+        // REMOVED — the hub leaf mysettings.llm.general manages the same
+        // /user/llm-providers* APIs. 301 redirect (pattern: /admin/panel);
+        // the JSON endpoints above stay (the hub consumes them).
         webRouter.get(
             '/user/llm-settings',
             AuthenticationController.requireLogin(),
-            LLMSettingsController.llmSettingsPage
+            function (req, res) {
+                res.redirect(301, '/hub#/mysettings.llm.general')
+            }
         )
-        logger.debug({}, '[LLM] Route registered: GET /user/llm-settings (settings page)')
+        logger.debug({}, '[LLM] Route registered: GET /user/llm-settings (301 -> hub)')
 
         if (Settings.llm && Settings.llm.allowUserSettings) {
             logger.debug({}, '[LLM] BYO enabled by deployment config')

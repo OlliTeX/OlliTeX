@@ -142,7 +142,7 @@ export function AccountMenuItems({
         {t('account_settings')}
       </NavDropdownLinkItem>
       {getMeta('ol-ExposedSettings')?.llmAllowUserSettings ? (
-        <NavDropdownLinkItem href="/user/llm-settings">
+        <NavDropdownLinkItem href="/hub#/mysettings.llm.general">
           {t('ai_settings', 'AI Settings')}
         </NavDropdownLinkItem>
       ) : null}

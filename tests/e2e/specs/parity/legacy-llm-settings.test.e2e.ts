@@ -34,10 +34,10 @@ test.afterAll(async () => {
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const list = async () => (await (await a('GET', '/user/llm-providers')).json()).providers ?? []
 
-test('renders: /user/llm-settings shows LLM Settings + Add provider', async () => {
-  const r = await p.goto(PAGE, { waitUntil: 'domcontentloaded' })
-  expect(r?.status()).toBe(200)
-  await expect(p.locator('button', { hasText: /add provider/i })).toBeVisible({ timeout: 15000 })
+test('redirects: /user/llm-settings 301 → /hub#/mysettings.llm.general (page removed 2026-09-16)', async () => {
+  const res = await p.request.get(PAGE, { maxRedirects: 0 })
+  expect(res.status(), '301 expected').toBe(301)
+  expect(res.headers()['location']).toBe('/hub#/mysettings.llm.general')
 })
 
 test('deny: guest cannot open /user/llm-settings', async ({ browser }) => {
@@ -50,33 +50,28 @@ test('deny: guest cannot open /user/llm-settings', async ({ browser }) => {
   await ctx.close()
 })
 
-test('save: "Add provider" form persists a new provider (masked key)', async () => {
-  await p.goto(PAGE, { waitUntil: 'domcontentloaded' })
-  await p.locator('button', { hasText: /add provider/i }).first().click()
-  await p.waitForTimeout(800)
-  const nameI = p.locator('input[placeholder*="Ollama" i]').first()
-  await nameI.fill(NAME)
-  await p.locator('input[type="url"]').first().fill(UNREACHABLE)
-  await p.locator('input[type="password"]').first().fill(DUMMY_KEY)
-  // models is a CHIP input: type + Enter adds the chip (plain fill is ignored by the state)
-  const modelsI = p.locator('input[placeholder*="gpt-4o" i]').first()
-  await expect(modelsI).toBeVisible({ timeout: 10000 })
-  await modelsI.click()
-  await modelsI.type('e2e-model-1', { delay: 15 })
-  await p.keyboard.press('Enter')
-  await p.waitForTimeout(400)
-  const selects = p.locator('select')
-  if ((await selects.count()) >= 1) await selects.first().selectOption({ index: 0 }).catch(() => {})
-  const cap = captureApi(p as any, BASE)
-  await p.locator('button', { hasText: /save provider/i }).first().click()
-  const calls = await p.waitForTimeout(4000).then(() => cap.calls)
-  const saveCall = calls.find(x => x.method === 'POST' && x.path === '/user/llm-providers')
-  expect(saveCall, 'POST /user/llm-providers fired (saw: ' + calls.map(c => `${c.method} ${c.path}`).join(' | ') + ')').toBeTruthy()
-  expect([200, 201].includes(saveCall.status), 'save succeeded (' + saveCall.status + ')').toBeTruthy()
-  const saved = await list()
-  const mine = saved.find((x: any) => x.name === NAME) ?? saved[saved.length - 1]
-  providerId = (mine as any)?.id ?? (mine as any)?.provider_id ?? null
+test('save: a new provider persists (masked key) and is visible on the hub BYO surface', async () => {
+  const r = await a('POST', '/user/llm-providers', {
+    name: NAME,
+    providerType: 'openaiCompatible',
+    baseUrl: UNREACHABLE,
+    apiKey: DUMMY_KEY,
+    models: ['e2e-model-1'],
+    completionModel: 'e2e-model-1',
+  })
+  expect([200, 201].includes(r.status()), 'save: ' + (await r.text().catch(() => '')).slice(0, 160)).toBeTruthy()
+  const body = await r.json().catch(() => ({}))
+  const saved = (body.provider ?? body) as any
+  expect(saved.hasKey === true, 'hasKey true').toBeTruthy()
+  expect(saved.apiKey, 'apiKey never echoed').toBeUndefined()
+  const list0 = await list()
+  const mine = list0.find((x: any) => x.name === NAME) ?? list0[list0.length - 1]
+  providerId = (mine as any)?.id ?? (mine as any)?.provider_id ?? saved.id ?? null
   expect(providerId, 'provider persisted with an id').toBeTruthy()
+  // the hub BYO surface (redirect target) lists the provider
+  await p.goto(BASE + '/hub#/mysettings.llm.general', { waitUntil: 'domcontentloaded' })
+  await p.waitForTimeout(2500)
+  await expect(p.locator('body').getByText(NAME).first()).toBeVisible({ timeout: 15000 })
 })
 
 test('check: provider check vs unreachable endpoint fails gracefully (no 5xx)', async () => {
@@ -118,12 +113,13 @@ test('delete: provider delete removes it from the list', async () => {
 })
 
 // role coverage: template admin + admin open the same page (personal settings)
-test('role: tpladmin + admin open /user/llm-settings', async ({ browser }) => {
+test('role: tpladmin + admin reach the hub BYO surface through the redirect', async ({ browser }) => {
   for (const u of [TPLADMIN, ADMIN]) {
     const ctx = await browser.newContext(); const q = await ctx.newPage()
     await loginRobust(q, u.email, u.password)
-    const r = await q.goto(PAGE, { waitUntil: 'domcontentloaded' })
-    expect(r?.status(), 'role page ' + u.email).toBe(200)
+    await q.goto(BASE + '/user/llm-settings', { waitUntil: 'domcontentloaded' })
+    expect(q.url(), u.email + ' lands on the hub').toContain('/hub')
+    await expect(q.locator('body', { hasText: /LLM|provider/i }).first()).toBeVisible({ timeout: 15000 })
     await ctx.close()
   }
 })

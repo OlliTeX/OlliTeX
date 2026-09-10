@@ -24,11 +24,9 @@
 
 import { getUsageSummary } from './LLMUsage.mjs' // overleaf-lab (usage meter)
 import { z } from 'zod'
-import Settings from '@overleaf/settings'
 import logger from '@overleaf/logger'
 import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import { User } from '../../../../app/src/models/User.mjs'
-import UserSettingsHelper from '../../../../app/src/Features/Project/UserSettingsHelper.mjs'
 import { expressify } from '@overleaf/promise-utils'
 import { encryptSecret, normalizeStoredSecret, storedToPlaintext } from './LLMCrypto.mjs'
 import { normalizeProviderSpec, chatText, listModels, detectProviderType, PROVIDER_TYPES, assertPublicLlmBaseUrl } from './LLMClient.mjs'
@@ -442,44 +440,6 @@ async function scanProviderModels(req, res) {
 
 // Redirect: BYO rows live in Account Settings (core section). Kept as a
 // redirect so old bookmarks / navbar entries do not 404.
-async function llmSettingsPage(req, res) {
-    // overleaf-lab: dedicated BYO settings page (the Account ▸ 'AI Settings' item
-    // and the Account Settings card both link here; it used to be a redirect to
-    // the generic settings page, which showed no LLM UI at all).
-    // 2026-09-11 (R11 fix): read the hydrated env directly (same source as
-    // the JSON routes) — Settings.llm may be a pre-hydration snapshot.
-    const allowUser =
-        process.env.LLM_ALLOW_USER_SETTINGS === 'true' ||
-        !!(Settings.llm && Settings.llm.allowUserSettings)
-    // WS5: keep the page-level surface consistent with the API — disabled BYO
-    // deployments answer 403 for the page as well (not just the JSON routes).
-    if (!allowUser) {
-        return res.status(403).json({ ok: false, error: 'disabled', message: 'BYO provider settings are disabled on this deployment (LLM_ALLOW_USER_SETTINGS). Use the site backend.' })
-    }
-    const userId = SessionManager.getLoggedInUserId(req.session)
-    const userDoc = userId ? await User.findOne({ _id: userId }).lean() : null
-    const context = {
-        user: {
-            firstName: userDoc?.first_name || '',
-            lastName: userDoc?.last_name || '',
-            email: userDoc?.email || '',
-            llmSettings: { allowed: allowUser },
-        },
-        featureFlags: { chatEnabled: true, completionEnabled: true },
-        // 2026-09 (P, owner): shared down-left account menu (ThemeToggle) reads
-        // its theme from ol-userSettings — provide the local like the golden pages.
-        userSettings: userDoc
-            ? await UserSettingsHelper.buildUserSettings(req, res, userDoc)
-            : { user: {} },
-        // 2026-09: proper page <title> + blue user-settings nav gradient.
-        title: 'LLM Settings',
-        blueNav: true,
-        // 2026-09 (owner): no footer on this page.
-        showThinFooter: false,
-    }
-    res.render(new URL('../../app/views/llm-settings.pug', import.meta.url).pathname, context)
-}
-
 /*
  * overleaf-lab (owner request 2026-08-26): user-scoped shared LLM model
  * selection. The single "Select LLM Model" choice (File menu) drives every AI
@@ -832,7 +792,6 @@ export default {
     isUserSettingsAllowed,
     requireUserSettingsAllowed,
     MAX_PROVIDERS_PER_USER,
-    llmSettingsPage, // sync render - must NOT be expressified (no .catch)
     getProvidersJson: expressify(getProvidersJson),
     addProvider: expressify(addProvider),
     updateProvider: expressify(updateProvider),

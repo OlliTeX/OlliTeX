@@ -23,7 +23,7 @@ type LlmSiteSection = {
 }
 
 /**
- * 2026-09-16 (owner queue item 1): the "Instance LLM settings (admin)" card,
+ * 2026-09-16 (owner queue item 1): the "Rate Limiter" card,
  * ported to the hub. The card lived only on the legacy /user/llm-settings
  * page (and the old /admin/site LLM tab) and drove the *site-settings*
  * `llm` section — a separate, instance-wide flag set from the per-feature

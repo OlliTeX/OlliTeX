@@ -24,10 +24,10 @@ files:
   hub: specs/parity/hub-llm-settings.test.e2e.ts
 
 features:
-  - id: renders
+  - id: renders   # 2026-09-16: legacy page removed; legacy side now asserts the 301 redirect to the hub
     kind: page
     desc: page lists providers + "Add provider"
-    legacy_test: renders
+    legacy_test: redirects
     hub_test: renders
 
   - id: denied

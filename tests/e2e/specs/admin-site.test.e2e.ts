@@ -92,9 +92,8 @@ test('pandoc toggles + persists via /hub native leaf (site_settings round-trip)'
   }
 })
 
-test('admin sees the LLM instance card on /user/llm-settings (R11-6)', async ({ page }) => {
+test('admin sees the LLM instance (Rate Limiter) card on the hub (R11-6, moved + relabeled 2026-09-16)', async ({ page }) => {
   await go(page)
-  const res = await page.goto('/user/llm-settings')
-  expect(res?.status() ?? 200).toBe(200)
-  await expect(page.locator('text=/Instance LLM settings/i').first()).toBeVisible({ timeout: 20_000 })
+  await page.goto('/hub#/site.llm.instance', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('text=/Rate Limiter/i').first()).toBeVisible({ timeout: 20_000 })
 })

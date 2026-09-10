@@ -21,7 +21,7 @@ function LLMUserSection() {
                 )}
             </p>
             <a
-                href="/user/llm-settings"
+                href="/hub#/mysettings.llm.general"
                 className="btn btn-secondary"
                 aria-label={t('llm_section_open', 'Open AI settings')}
                 style={{ marginTop: '0.5rem' }}
