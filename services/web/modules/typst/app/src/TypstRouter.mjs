@@ -49,9 +49,14 @@ async function newTypstProject(req, res, next) {
   const { body } = parseReq(req, newTypstProjectSchema)
   const projectName = body.projectName
 
-  // template selection ('basic' default, 'article') — anything unrecognized
-  // falls back to 'basic'.
-  const templateId = body.template === 'article' ? 'article' : 'basic'
+  // template selection ('basic' default; 'article', 'example' — owner
+  // 2026-09-13: Typst translation of the TeX example project). Anything
+  // unrecognized falls back to 'basic' so a malformed value can never
+  // create an empty project.
+  const TEMPLATES_PROJECT_IDS = ['basic', 'article', 'example']
+  const templateId = TEMPLATES_PROJECT_IDS.includes(body.template)
+    ? body.template
+    : 'basic'
 
   // create project with compiler 'typst' (safeCompilers allow-list, plan §5.2)
   const project = await ProjectCreationHandler.promises.createBlankProject(
@@ -60,17 +65,32 @@ async function newTypstProject(req, res, next) {
     { compiler: 'typst' }
   )
 
-  // seed the project files from the F2.5/F3.8 template (basic: one doc,
-  // article: main.typ + references.bib). The first file is always `main.typ`
-  // → the root doc (§3.9).
+  // seed the project files (basic: one doc, article: main.typ + references.bib,
+  // example: main.typ + sample.bib + frog.jpg binary). Doc entries go via
+  // addDoc; binary assets (filePath) via addFile — the same mechanism the
+  // TeX example project uses for frog.jpg. The first entry is always the
+  // root doc (§3.9).
   const templateFiles = buildTemplateFiles(projectName, templateId)
   let mainDoc
   for (let i = 0; i < templateFiles.length; i++) {
+    const tf = templateFiles[i]
+    if (tf.filePath) {
+      await ProjectEntityUpdateHandler.promises.addFile(
+        project._id,
+        project.rootFolder[0]._id,
+        tf.name,
+        tf.filePath,
+        null,
+        userId,
+        null
+      )
+      continue
+    }
     const { doc } = await ProjectEntityUpdateHandler.promises.addDoc(
       project._id,
       project.rootFolder[0]._id,
-      templateFiles[i].name,
-      templateFiles[i].lines,
+      tf.name,
+      tf.lines,
       userId,
       null
     )

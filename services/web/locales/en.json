@@ -4183,6 +4183,7 @@
   "tutorials": "Tutorials",
   "type_a_command": "Type a command…",
   "typst_project_template_article": "Article",
+  "typst_project_template_example": "Example (full showcase)",
   "uk": "Ukrainian",
   "unable_to_extract_the_supplied_zip_file": "Opening this content on Overleaf failed because the zip file could not be extracted. Please ensure that it is a valid zip file. If this keeps happening for links on a particular site, please report this to them.",
   "unable_to_load_current_plan_details": "We couldn’t load your current plan details. Please try again.",

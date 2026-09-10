@@ -35,6 +35,32 @@ describe('modules/typst: new-project templates (F3.8)', function () {
     expect(mainSrc).toContain('~@example:2025')
   })
 
+  it('renders the example template (owner 2026-09-13: TeX example translation) —\n     main.typ + sample.bib docs and frog.jpg as a binary filePath', function () {
+    const result = buildTemplateFiles('My Paper', 'example')
+    expect(result.map(f => f.name)).toEqual(['main.typ', 'sample.bib', 'frog.jpg'])
+
+    // docs are text (lines), the image is a disk path (addFile contract)
+    expect(result[0].lines).toEqual(expect.any(Array))
+    expect(result[2].filePath).toMatch(/frog\.jpg$/)
+    expect(result[2].lines).toBeUndefined()
+
+    const mainSrc = result[0].lines.join('\n')
+    // faithful translation of the TeX example's showcase sections
+    expect(mainSrc).toContain('Introduction')
+    expect(mainSrc).toContain('<fig:frog>')
+    expect(mainSrc).toContain('@fig:frog')
+    expect(mainSrc).toContain('<tab:widgets>')
+    expect(mainSrc).toContain('image("frog.jpg"')
+    expect(mainSrc).toContain('~@greenwade93')
+    expect(mainSrc).toContain('#bibliography("sample.bib"')
+    expect(mainSrc).toContain('#set page(width: 8.5in, height: 11in')
+    expect(mainSrc).toContain('#set text(lang:')
+    expect(mainSrc).toContain('OlliTeX')
+
+    const bibSrc = result[1].lines.join('\n')
+    expect(bibSrc).toContain('greenwade93')
+  })
+
   it('falls back to the basic template for an unrecognized id', function () {
     expect(buildTemplateFiles('My Paper', 'bogus')).toEqual(
       buildTemplateFiles('My Paper', 'basic')

@@ -28,11 +28,14 @@ type Props = {
 }
 
 // F3.8: 'basic' default + the one 'article' template (plan §11 "empty + one
-// article"). The modal radio sends `template` in the POST body.
-const TEMPLATES = [
-  { id: 'basic', labelKey: 'blank_typst_project' },
-  { id: 'article', labelKey: 'typst_project_template_article' },
-]
+// article"). Owner 2026-09-13: 'example' — the TeX example project
+// translated to Typst (rich showcase: figures, tables, math, citations).
+// The modal radio sends `template` in the POST body.
+const TEMPLATES = ['basic', 'article', 'example']
+
+// NOTE (i18n): labels are rendered via literal translation-key calls below
+// so the i18next scanner extracts them into the runtime bundle (the
+// #10/#12 fix) — keys passed as variables are invisible to the scanner.
 
 function TypstNewProjectModalWrapper({ onHide }: Props) {
   const { t } = useTranslation()
@@ -91,7 +94,7 @@ function TypstNewProjectModalWrapper({ onHide }: Props) {
           </OLFormGroup>
           <OLFormGroup controlId="typst-project-template">
             <OLFormLabel>{t('project_template')}</OLFormLabel>
-            {TEMPLATES.map(({ id, labelKey }) => (
+            {TEMPLATES.map(id => (
               <OLFormLabel key={id} htmlFor={`typst-template-${id}`}>
                 <input
                   id={`typst-template-${id}`}
@@ -102,7 +105,11 @@ function TypstNewProjectModalWrapper({ onHide }: Props) {
                   onChange={() => setTemplate(id)}
                 />
                 {' '}
-                {t(labelKey)}
+                {id === 'basic'
+                  ? t('blank_typst_project')
+                  : id === 'article'
+                    ? t('typst_project_template_article')
+                    : t('typst_project_template_example')}
               </OLFormLabel>
             ))}
           </OLFormGroup>

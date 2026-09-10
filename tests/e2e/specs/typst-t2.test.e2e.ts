@@ -23,7 +23,7 @@ export default {
 
 async function newTypstProject(
   page: import('@playwright/test').Page,
-  opts: { name: string; article?: boolean }
+  opts: { name: string; article?: boolean; example?: boolean }
 ): Promise<void> {
   await page.goto('/project')
   await expect(
@@ -55,6 +55,12 @@ async function newTypstProject(
     const articleRadio = modal.locator('#typst-template-article')
     await expect(articleRadio).toBeVisible({ timeout: 10_000 })
     await articleRadio.check({ force: true })
+  }
+  if (opts.example) {
+    // (1c) Example template radio (owner 2026-09-13: TeX example translation)
+    const exampleRadio = modal.locator('#typst-template-example')
+    await expect(exampleRadio).toBeVisible({ timeout: 10_000 })
+    await exampleRadio.check({ force: true })
   }
 
   await modal.locator('button:has-text("Create")').click()
@@ -148,6 +154,30 @@ test.describe('typst T2 live matrix', () => {
       const body = await page.locator('body').innerText()
       expect(body).toContain('#bibliography')
       expect(body).toMatch(/~@/)
+    }).toPass({ timeout: 30_000 })
+
+    await expectPdfRendered(page)
+  })
+
+  test('example typst project (translation of the TeX example) ships files and compiles', async ({
+    page,
+    context,
+  }) => {
+    await login(page, USER)
+
+    const name = `T2 example ${Date.now() % 1_000_000}`
+    await newTypstProject(page, { name, example: true })
+
+    // template proof: the project file tree carries all three seeds
+    // (main.typ + sample.bib + frog.jpg — the binary asset proves the
+    // addFile path worked). Content assertions are unit-covered
+    // (TypstRouter.test.mjs) + the PDF compile below proves the file set
+    // is complete and valid for this typst build.
+    await expect(async () => {
+      const body = await page.locator('body').innerText()
+      expect(body).toContain('main.typ')
+      expect(body).toContain('sample.bib')
+      expect(body).toContain('frog.jpg')
     }).toPass({ timeout: 30_000 })
 
     await expectPdfRendered(page)

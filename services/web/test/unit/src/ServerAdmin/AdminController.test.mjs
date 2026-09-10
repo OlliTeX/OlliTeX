@@ -170,12 +170,26 @@ describe('AdminController', function () {
   describe('createMessage', function () {
     it('should create the message and redirect', function (ctx) {
       ctx.req.body = { content: 'a system message' }
-      ctx.SystemMessageManager.createMessage.callsFake((content, cb) => cb())
+      ctx.SystemMessageManager.createMessage.callsFake(
+        (content, placements, cb) => cb()
+      )
       ctx.controller.createMessage(ctx.req, ctx.res, ctx.next)
       ctx.SystemMessageManager.createMessage
-        .calledWith('a system message')
+        .calledWith('a system message', [])
         .should.equal(true)
       ctx.res.redirect.calledWith('/admin#system-messages').should.equal(true)
+    })
+
+    // Owner #17b (2026-09-13): per-message placements pass through.
+    it('should pass placements through (#17b)', function (ctx) {
+      ctx.req.body = { content: 'm', placements: ['editor', 'hub'] }
+      ctx.SystemMessageManager.createMessage.callsFake(
+        (content, placements, cb) => cb()
+      )
+      ctx.controller.createMessage(ctx.req, ctx.res, ctx.next)
+      ctx.SystemMessageManager.createMessage
+        .calledWith('m', ['editor', 'hub'])
+        .should.equal(true)
     })
   })
 

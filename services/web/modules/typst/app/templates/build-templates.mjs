@@ -20,17 +20,33 @@ const TEMPLATES = {
     { source: 'project_files/article/main.typ', name: 'main.typ' },
     { source: 'project_files/article/references.bib', name: 'references.bib' },
   ],
+  // Owner 2026-09-13: translation of the TeX example project
+  // (app/templates/project_files/example-project-sp) — the rich showcase:
+  // title/abstract, sections, frog figure, widgets table, lists, math,
+  // citations. `frog.jpg` is a binary asset added via addFile (same
+  // mechanism as the TeX example project).
+  example: [
+    { source: 'project_files/example/main.typ', name: 'main.typ' },
+    { source: 'project_files/example/sample.bib', name: 'sample.bib' },
+    { source: 'project_files/example/frog.jpg', name: 'frog.jpg', binary: true },
+  ],
 }
 
 /**
  * Render the template file set for `templateId` (unknown id → 'basic').
- * Returns `[{ name, lines }]`, `name` = project-internal filename,
- * `lines` = `project_name`-substituted content split for `addDoc`.
+ * Doc entries return `[{ name, lines }]`; binary assets return
+ * `[{ name, filePath }]` (caller uses `addFile`, not `addDoc`). The first
+ * entry is always the root doc (`main.typ`). Kept as a pure module (no
+ * @overleaf/logger, no env) so the mocha/vitest unit test can import it
+ * without the router's dependency chain.
  */
 export function buildTemplateFiles(projectName, templateId) {
   const files = TEMPLATES[templateId] ?? TEMPLATES.basic
-  return files.map(({ source, name }) => {
+  return files.map(({ source, name, binary }) => {
     const outputPath = path.join(import.meta.dirname, source)
+    if (binary) {
+      return { name, filePath: outputPath }
+    }
     const output = _.template(fs.readFileSync(outputPath).toString())({
       project_name: projectName || 'My project',
     })

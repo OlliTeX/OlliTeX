@@ -12,6 +12,16 @@ vi.mock('../../../../app/src/Features/Errors/Errors.js', () =>
   vi.importActual('../../../../app/src/Features/Errors/Errors.js')
 )
 
+// Editor-wave (#14/#15): loadEditor hydrates the instance Appearance theme
+// from the hubthemes collection. Unit env has no Mongo connection, so mock
+// the module to its documented fail-safe value (null = no custom theme)
+// instead of letting the mongoose query buffer into test timeouts.
+vi.mock('../../../../modules/ollitex-hub/app/src/HubTheme.mjs', () => ({
+  getHubTheme: vi.fn(async () => null),
+  saveHubTheme: vi.fn(),
+  clearHubTheme: vi.fn(),
+}))
+
 const MODULE_PATH = path.join(
   import.meta.dirname,
   '../../../../app/src/Features/Project/ProjectController'
@@ -323,27 +333,6 @@ describe('ProjectController', function () {
       default: ctx.ProjectHelper,
     }))
 
-    vi.doMock(
-      '../../../../app/src/Features/Subscription/SubscriptionLocator',
-      () => ({
-        default: ctx.SubscriptionLocator,
-      })
-    )
-
-    vi.doMock(
-      '../../../../app/src/Features/Subscription/SubscriptionController',
-      () => ({
-        default: ctx.SubscriptionController,
-      })
-    )
-
-    vi.doMock(
-      '../../../../app/src/Features/Subscription/LimitationsManager',
-      () => ({
-        default: ctx.LimitationsManager,
-      })
-    )
-
     vi.doMock('../../../../app/src/Features/Tags/TagsHandler', () => ({
       default: ctx.TagsHandler,
     }))
@@ -418,13 +407,6 @@ describe('ProjectController', function () {
       default: ctx.Features,
     }))
 
-    vi.doMock(
-      '../../../../app/src/Features/Subscription/FeaturesUpdater',
-      () => ({
-        default: ctx.FeaturesUpdater,
-      })
-    )
-
     vi.doMock('../../../../app/src/Features/User/UserGetter', () => ({
       default: ctx.UserGetter,
     }))
@@ -457,13 +439,6 @@ describe('ProjectController', function () {
       })
     )
 
-    vi.doMock(
-      '../../../../app/src/Features/Subscription/SubscriptionViewModelBuilder',
-      () => ({
-        default: ctx.SubscriptionViewModelBuilder,
-      })
-    )
-
     vi.doMock('../../../../app/src/Features/Spelling/SpellingHandler', () => ({
       default: {
         promises: {
@@ -485,10 +460,6 @@ describe('ProjectController', function () {
         default: ctx.InstitutionsGetter,
       })
     )
-
-    vi.doMock('../../../../app/src/Features/Survey/SurveyHandler', () => ({
-      default: ctx.SurveyHandler,
-    }))
 
     vi.doMock(
       '../../../../app/src/Features/Project/ProjectAuditLogHandler',
