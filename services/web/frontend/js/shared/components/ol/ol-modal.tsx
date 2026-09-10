@@ -18,7 +18,7 @@ import {
 } from '@/features/editor-v2/variant'
 
 type OLModalProps = ModalProps & {
-  size?: 'sm' | 'lg'
+  size?: 'sm' | 'lg' | 'xl' | number
   onHide: () => void
   show?: boolean
   themed?: boolean
@@ -50,6 +50,7 @@ export function OLModal({
   ...props
 }: OLModalProps) {
   const { t } = useTranslation()
+  const legacySize = size === 'sm' ? 'sm' : 'lg'
   // P3 editor renovation: on the /editor route (once the P1 shell gate is
   // ready) the modal surface is the Mantine Modal frame — same API surface
   // (show/onHide/size), same children, Mantine's built-in focus trap and
@@ -64,7 +65,10 @@ export function OLModal({
         <MantineModal
           opened={show}
           onClose={onHide}
-          size={size === 'sm' ? 'sm' : 'lg'}
+          // 'xl' / custom widths exist on the Mantine surface (image editor,
+          // owner #6); the legacy react-bootstrap frame maps xl→lg (its
+          // widest named size).
+          size={size === 'sm' ? 'sm' : size === 'lg' ? 'lg' : size === 'xl' || typeof size === 'number' ? size : 'lg'}
           withinPortal
           trapFocus
           position="center"
@@ -97,6 +101,7 @@ export function OLModal({
     <Modal
       show={show}
       onHide={onHide}
+      size={legacySize}
       className={classNames({ 'modal-themed': themed }, className)}
       backdropClassName={classNames(
         { 'modal-backdrop-themed': themed },

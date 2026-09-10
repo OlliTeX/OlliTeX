@@ -79,9 +79,9 @@ function SecuritySection() {
                     )}
                   </div>
                 </div>
-                <!-- OlliTeX fork (free-only): the SaaS group-SSO enrollment
-                     route (/subscription/:groupId/sso_enrollment) was removed;
-                     institutional SSO is configured by the site admin instead. -->
+                {/* OlliTeX fork (free-only): the SaaS group-SSO enrollment route
+                     (/subscription/:groupId/sso_enrollment) was removed;
+                     institutional SSO is configured by the site admin instead. */}
               </div>
             )
           )}

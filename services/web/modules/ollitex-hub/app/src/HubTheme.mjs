@@ -3,6 +3,9 @@
 // A SINGLE small document (collection `hubthemes`, id 'default') holds the
 // admin's custom theme for /hub: per-light/dark mode colors, fonts, radius.
 // Scope is the HUB only (nav_structure.md §8.8: "affects the hub in both modes").
+// 2026-09-13 owner wave (#14/#15): the editor page also renders this theme
+// (ProjectController.mjs + project/editor/_meta.pug) so the editor chrome and
+// module modals share one instance design language. Document contract unchanged.
 // All reads/writes are safe (failures logged, flow continues) so a Mongo
 // hiccup can never break /hub rendering.
 import logger from '@overleaf/logger'

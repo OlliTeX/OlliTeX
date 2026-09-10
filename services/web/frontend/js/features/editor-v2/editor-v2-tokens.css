@@ -55,6 +55,51 @@ html[data-mantine-color-scheme='dark'] .ol-editor-mantine {
   font-family: var(--mantine-font-family);
 }
 
+/* Owner #2 (2026-09-13 editor wave): ONE pill height across the toolbar.
+   The legacy button sizing (title toggle · history/layout icon buttons ·
+   Share) is scoped under `.ide-redesign-toolbar` in toolbar-redesign.scss,
+   which this frame does not use — so they fell out at different heights
+   (36/38px default btn vs the btn-sm Share pill). Normalize every action
+   pill to the Share-pill (btn-sm) height and one shared center line. */
+.ol-editor-mantine .ol-v2-toolbar {
+  --v2-pill-height: 24px;
+
+  .btn,
+  .ide-redesign-toolbar-project-dropdown-toggle,
+  .ide-redesign-toolbar-button-icon {
+    height: var(--v2-pill-height);
+    min-height: var(--v2-pill-height);
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+
+    .button-content {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--mantine-spacing-xs, 4px);
+    }
+
+    .material-symbols {
+      font-size: 20px;
+      line-height: 1;
+    }
+  }
+
+  /* icon-only pills stay square */
+  .ide-redesign-toolbar-button-icon {
+    width: var(--v2-pill-height);
+    padding: 0;
+    border-radius: var(--border-radius-full, 9999px);
+  }
+
+  /* text pills: one padding + type scale (was 16px default vs 14px sm) */
+  .ide-redesign-toolbar-project-dropdown-toggle,
+  .btn-sm {
+    font-size: var(--mantine-font-size-sm, 14px);
+    padding: 0 10px;
+  }
+}
+
 .ol-editor-mantine .ol-v2-rail-nav {
   width: 56px;
   flex-shrink: 0;
@@ -74,4 +119,24 @@ html[data-mantine-color-scheme='dark'] .ol-editor-mantine {
   position: absolute;
   top: 6px;
   right: 6px;
+}
+
+/* Owner #4 (2026-09-13 editor wave): the lower rail actions mix 40px
+   Mantine ActionIcons with legacy 32px `.ide-rail-tab-link` buttons →
+   the grid was skewed on both axes. Put every rail control on the same
+   40px tile so the column reads as one aligned stack. */
+.ol-editor-mantine .ol-v2-rail .ide-rail-tab-link {
+  width: 40px;
+  height: 40px;
+}
+
+.ol-editor-mantine .ol-v2-rail .ide-rail-tab-link .ide-rail-tab-link-icon {
+  line-height: 40px;
+}
+
+.ol-editor-mantine .ol-v2-rail-dropdown-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
 }

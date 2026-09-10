@@ -18,6 +18,7 @@ import Settings from '@overleaf/settings'
 import AuthorizationManager from '../Authorization/AuthorizationManager.mjs'
 import InactiveProjectManager from '../InactiveData/InactiveProjectManager.mjs'
 import ProjectUpdateHandler from './ProjectUpdateHandler.mjs'
+import { getHubTheme } from '../../../../modules/ollitex-hub/app/src/HubTheme.mjs'
 import ProjectGetter from './ProjectGetter.mjs'
 import PrivilegeLevels from '../Authorization/PrivilegeLevels.mjs'
 import SessionManager from '../Authentication/SessionManager.mjs'
@@ -1024,10 +1025,23 @@ const _ProjectController = {
           'sharing-updates'
         )
 
+      // Instance Appearance theme (Site settings → GENERAL → Appearance):
+      // rendered as page meta so the editor chrome + module modals share
+      // the /hub design language (owner #14/#15, 2026-09-13 wave). Fail-safe:
+      // a Mongo hiccup can never block the editor page.
+      let hubTheme = null
+      try {
+        const t = await getHubTheme()
+        if (t && t.light && t.dark) hubTheme = t
+      } catch (e) {
+        hubTheme = null
+      }
+
       res.render(template, {
         title: project.name,
         priority_title: true,
         bodyClasses: ['editor'],
+        hubTheme,
         project_id: project._id,
         projectName: project.name,
         canUseClsiCache:

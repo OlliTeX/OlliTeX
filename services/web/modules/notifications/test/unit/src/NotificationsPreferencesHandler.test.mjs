@@ -127,7 +127,9 @@ describe('NotificationsPreferencesHandler', function () {
     // 12 project keys + the merged-in global muteAllNotifications flag
     expect(Object.keys(prefs)).toHaveLength(13)
     expect(prefs.muteAllNotifications).toBe(false)
-    expect(Object.values(prefs).every(Boolean)).toBe(false)
+    const twelve = Object.keys(prefs).filter(k => k !== 'muteAllNotifications')
+    expect(twelve).toHaveLength(12)
+    expect(twelve.every(k => prefs[k] === true)).toBe(true)
   })
 
   it('forwards stored preferences and normalizes missing keys to true', async function (ctx) {
@@ -140,6 +142,42 @@ describe('NotificationsPreferencesHandler', function () {
 
     expect(prefs.commentOnOwnProject).toBe(false)
     expect(prefs.trackedChangesOnOwnProject).toBe(true)
+  })
+
+  it('falls back to hub-managed global defaults for missing project keys', async function (ctx) {
+    // Owner #21 (2026-09-13 editor wave): the /hub notification page stores
+    // per-type defaults in the global document; a project opened for the
+    // first time inherits them (explicit per-project values still win).
+    ctx.getProject.mockResolvedValue(makeProject('owner', 'user-1'))
+    ctx.notificationsPreferences.findOne
+      .mockResolvedValueOnce(null) // no project doc
+      .mockResolvedValueOnce({
+        muteAllNotifications: false,
+        commentOnOwnProject: false, // hub table switched comments OFF
+        commentOnInvitedProject: false,
+      })
+
+    const prefs = await ctx.Handler.promises.getProjectPreferences('user-1', 'p-1')
+
+    expect(prefs.commentOnOwnProject).toBe(false)
+    expect(prefs.commentOnInvitedProject).toBe(false)
+    expect(prefs.trackedChangesOnOwnProject).toBe(true)
+    expect(prefs.repliesOnAuthoredThread).toBe(true)
+  })
+
+  it('keeps explicit per-project values over the global defaults', async function (ctx) {
+    ctx.getProject.mockResolvedValue(makeProject('owner', 'user-1'))
+    ctx.notificationsPreferences.findOne
+      .mockResolvedValueOnce({ commentOnOwnProject: true })
+      .mockResolvedValueOnce({
+        muteAllNotifications: false,
+        commentOnOwnProject: false,
+        commentOnInvitedProject: false,
+      })
+
+    const prefs = await ctx.Handler.promises.getProjectPreferences('user-1', 'p-1')
+
+    expect(prefs.commentOnOwnProject).toBe(true)
   })
 
   it('merges the global muteAllNotifications flag into the project view', async function (ctx) {
@@ -208,24 +246,27 @@ describe('NotificationsPreferencesHandler', function () {
     const global = await ctx.Handler.promises.saveGlobalPreferences('user-1', {
       muteAllNotifications: true,
     })
-    expect(global).toEqual({
-      muteAllNotifications: true,
-      notificationDelayMinutes: null,
-    })
+    // Owner #21: the global doc also carries the per-type notification
+    // defaults (all true by default) for the /hub notification table.
+    expect(global.muteAllNotifications).toBe(true)
+    expect(global.notificationDelayMinutes).toBeNull()
+    expect(global.commentOnOwnProject).toBe(true)
+    expect(Object.keys(global)).toHaveLength(14)
     expect(ctx.notificationsPreferences.updateOne).toHaveBeenCalledWith(
       { user_id: expect.any(FakeObjectId), project_id: null },
-      { $set: { muteAllNotifications: true, notificationDelayMinutes: null } },
+      { $set: global },
       { upsert: true }
     )
 
-    // a user-defined delay round-trips through the same handler
+    // a user-defined delay rounds-trips through the same handler
     const withDelay = await ctx.Handler.promises.saveGlobalPreferences('user-1', {
       muteAllNotifications: true,
       notificationDelayMinutes: '42',
+      // a hub-table toggle round-trips too
+      trackedChangesOnOwnProject: false,
     })
-    expect(withDelay).toEqual({
-      muteAllNotifications: true,
-      notificationDelayMinutes: 42,
-    })
+    expect(withDelay.muteAllNotifications).toBe(true)
+    expect(withDelay.notificationDelayMinutes).toBe(42)
+    expect(withDelay.trackedChangesOnOwnProject).toBe(false)
   })
 })

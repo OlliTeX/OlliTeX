@@ -5,6 +5,7 @@ import { callbackifyAll } from '@overleaf/promise-utils'
 import ProjectGetter from '../../../../app/src/Features/Project/ProjectGetter.mjs'
 import Errors from '../../../../app/src/Features/Errors/Errors.js'
 import {
+  _defaultProjectPreferences,
   normalizeProjectPreferences,
   normalizeGlobalPreferences,
 } from './PreferenceNormalizer.mjs'
@@ -72,9 +73,21 @@ async function getProjectPreferences(userId, projectId) {
     }),
   ])
 
+  // Owner #21 (2026-09-13 editor wave): resolution order per key —
+  // per-project value > global (hub-managed) defaults > compiled defaults.
+  // `saveProjectPreferences` historically UPSERTS the FULL 12-key set (the
+  // editor radio writes all-or-mostly values), so an existing project doc
+  // still overrides the globals explicitly — only genuinely missing keys
+  // fall through. Projects saved before the global defaults existed keep
+  // their stored values.
+  const globalDefaults = normalizeGlobalPreferences(globalPreference)
+  const base = {}
+  for (const key of Object.keys(_defaultProjectPreferences())) {
+    base[key] = globalDefaults[key]
+  }
   const preferences = preference
-    ? normalizeProjectPreferences(preference)
-    : normalizeProjectPreferences({})
+    ? normalizeProjectPreferences({ ...base, ...preference })
+    : normalizeProjectPreferences({ ...base })
 
   // Contract: the frontend hook (use-project-notification-preferences.ts)
   // reads `muteAllNotifications` from this response to render the

@@ -11,7 +11,6 @@ import AutoCloseBracketsSetting from '@/features/ide-settings/components/editor-
 import AutoCompleteSetting from '@/features/ide-settings/components/editor-settings/auto-complete-setting'
 import CodeCheckSetting from '@/features/ide-settings/components/editor-settings/code-check-setting'
 import PreviewTabsSetting from '@/features/ide-settings/components/editor-settings/preview-tabs-setting'
-import KeybindingSetting from '@/features/ide-settings/components/editor-settings/keybinding-setting'
 import PDFViewerSetting from '@/features/ide-settings/components/editor-settings/pdf-viewer-setting'
 import importOverleafModules from '../../../../macros/import-overleaf-module.macro'
 import SpellCheckSetting from '@/features/ide-settings/components/editor-settings/spell-check-setting'
@@ -145,10 +144,10 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
                 key: 'previewTabs',
                 component: <PreviewTabsSetting />,
               },
-              {
-                key: 'mode',
-                component: <KeybindingSetting />,
-              },
+              // Owner #20 (2026-09-13 editor wave): the Vim/Emacs keybinding
+              // setting is removed from the editor — it lives on the hub
+              // (mysettings.keybindings), which is now the canonical home
+              // for user-level editor preferences.
               {
                 key: 'pdfViewer',
                 component: <PDFViewerSetting />,
@@ -335,9 +334,12 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
         key: 'account_settings',
         title: t('account_settings'),
         icon: 'settings',
-        // 2026-09 owner decision: the canonical account-settings URL on this
-        // deployment is /user/mysettings (our own shell page).
-        href: '/user/mysettings',
+        // Owner #17 (2026-09-13 editor wave): account settings point to the
+        // hub (mysettings.account), the canonical settings surface on this
+        // deployment. (2026-09 owner decision: the canonical account-settings
+        // URL on this deployment is /user/mysettings (our own shell page)
+        // — the hub route renders the same content.)
+        href: '/hub#/mysettings.account',
       },
     ],
     [

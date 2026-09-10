@@ -88,6 +88,9 @@ type Props = {
   onAddFromOrcid?: () => void
   /** Zotero import (P4) — shown in the Add menu when the host wires it. */
   onAddFromZotero?: () => void
+  /** Upload .bib file (owner #11, 2026-09-13 editor wave) — parity with
+   *  the /hub library Add menu; shown when the host wires it. */
+  onAddUpload?: () => void
 }
 
 export default function BibEntryList({
@@ -113,6 +116,7 @@ export default function BibEntryList({
   onAddFromLibrary,
   onAddFromOrcid,
   onAddFromZotero,
+  onAddUpload,
 }: Props) {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
@@ -187,6 +191,15 @@ export default function BibEntryList({
               <OLDropdownItem description={t('BibTeX, DOI')} onClick={onAddPaste}>
                 {t('Paste references')}
               </OLDropdownItem>
+              {/* Owner #11 (2026-09-13 editor wave): the /hub library Add
+                  menu offers "Upload .bib file" and the editor's did not —
+                  the two menus should match (the editor keeps its extra
+                  "Import from Library"). */}
+              {onAddUpload ? (
+                <OLDropdownItem description={t('.bib file')} onClick={onAddUpload}>
+                  {t('Upload .bib file')}
+                </OLDropdownItem>
+              ) : null}
               <OLDropdownItem onClick={onAddManual}>
                 {t('Enter manually')}
               </OLDropdownItem>

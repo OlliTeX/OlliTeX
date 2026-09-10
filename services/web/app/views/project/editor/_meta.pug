@@ -7,6 +7,11 @@ meta(name="ol-user" data-type="json" content=user)
 meta(name="ol-learnedWords" data-type="json" content=learnedWords)
 meta(name="ol-anonymous" data-type="boolean" content=anonymous)
 meta(name="ol-brandVariation" data-type="json" content=brandVariation)
+//- Instance Appearance theme (Site settings → GENERAL → Appearance):
+//- governs the editor chrome + module modals in shared/mantine/provider.tsx
+//- (owner #14/#15, 2026-09-13 wave). Absent when the admin has not set one.
+if hubTheme
+	meta(name="ol-hub-theme" data-type="json" content=JSON.stringify(hubTheme))
 meta(name="ol-isTokenMember" data-type="boolean" content=isTokenMember)
 meta(name="ol-isRestrictedTokenMember" data-type="boolean" content=isRestrictedTokenMember)
 meta(name="ol-ownerHasSharingUpdates" data-type="boolean" content=ownerHasSharingUpdates)

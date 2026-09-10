@@ -120,6 +120,7 @@ function ImageEditorModal({
   const treeRef = useRef<TreeNode | null>(null)
 
   const [ready, setReady] = useState(false)
+  const readyRef = useRef(false)
   const [failed, setFailed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -171,6 +172,7 @@ function ImageEditorModal({
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
     const markReady = () => {
+      readyRef.current = true
       if (!cancelled && mountedRef.current) {
         setReady(true)
       }
@@ -384,6 +386,10 @@ function ImageEditorModal({
         // same .then that fires 'Load'). Keep Save disabled until the
         // image really is on the canvas — never upload a blank canvas
         // over a project file.
+        // Owner #6 (2026-09-13 editor wave): the deadline used to expire
+        // SILENTLY — the modal sat on "Loading…" forever with a blank
+        // canvas and Save disabled, no way to recover. An expired
+        // deadline now surfaces the standard failure panel (Retry).
         const deadline = Date.now() + 20_000
         const tick = () => {
           if (cancelled || !mountedRef.current) return
@@ -398,6 +404,11 @@ function ImageEditorModal({
           }
           if (Date.now() < deadline) {
             setTimeout(tick, 150)
+            return
+          }
+          if (!readyRef.current) {
+            setFailed(true)
+            setError(t('image_edit_failed'))
           }
         }
         setTimeout(tick, 150)
@@ -509,7 +520,9 @@ function ImageEditorModal({
 
   return (
     <OLModal
-      size="lg"
+      // Owner #6 (2026-09-13 editor wave): an image editor needs real
+      // canvas space — widest named sizes (Mantine xl=780, legacy lg=800).
+      size="xl"
       show
       className="toast-image-editor-modal"
       onHide={requestClose}
@@ -530,11 +543,12 @@ function ImageEditorModal({
               padding: '48px 24px',
             }}
           >
-            <p>{t('image_edit_failed')}</p>
+            <p>{error || t('image_edit_failed')}</p>
             <OLButton
               variant="primary"
               onClick={() => {
                 setFailed(false)
+                readyRef.current = false
                 setError(null)
                 dirtyRef.current = false
                 setInitTick(n => n + 1)

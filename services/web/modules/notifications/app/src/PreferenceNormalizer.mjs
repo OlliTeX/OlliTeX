@@ -32,6 +32,11 @@ function normalizeGlobalPreferences(preferences) {
     notificationDelayMinutes: normalizeGlobalDelayMinutes(
       preferences?.notificationDelayMinutes
     ),
+    // Owner #21 (2026-09-13 editor wave): the /hub notification page manages
+    // per-type notification "defaults" in the global document. Projects
+    // without their own override for a key fall back to these (see
+    // getProjectPreferences in NotificationsPreferencesHandler.mjs).
+    ...normalizeProjectPreferences(preferences || {}),
   }
 }
 

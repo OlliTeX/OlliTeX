@@ -38,19 +38,22 @@ export function RailAccountMenu() {
         </div>
       )}
       {email && <OLDropdownDivider />}
-      <OLDropdownItem href="/project" role="menuitem">
+      {/* Owner #1 (2026-09-13 editor wave): the editor rail account menu
+          follows the OlliTEX /hub structure — the legacy pages are retired;
+          hub folder ids resolve to their first leaf (projects.all, ...). */}
+      <OLDropdownItem href="/hub#/projects" role="menuitem">
         {t('projects')}
       </OLDropdownItem>
-      <OLDropdownItem href="/library" role="menuitem">
+      <OLDropdownItem href="/hub#/library" role="menuitem">
         {t('library')}
       </OLDropdownItem>
-      <OLDropdownItem href="/templates" role="menuitem">
+      <OLDropdownItem href="/hub#/templates" role="menuitem">
         {t('templates')}
       </OLDropdownItem>
-      <OLDropdownItem href="/user/mysettings" role="menuitem">
+      <OLDropdownItem href="/hub#/mysettings" role="menuitem">
         {t('account_settings')}
       </OLDropdownItem>
-      <OLDropdownItem href="/user/llm-settings" role="menuitem">
+      <OLDropdownItem href="/hub#/mysettings.llm" role="menuitem">
         {t('nav.aiSettings', 'AI Settings')}
       </OLDropdownItem>
       <OLDropdownDivider />

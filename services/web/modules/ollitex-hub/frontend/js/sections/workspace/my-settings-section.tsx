@@ -28,6 +28,44 @@ function getMetaJson(name: string): any {
   }
 }
 
+// Editor code-theme options. The editor page exposes these as the
+// ol-editorThemes / ol-legacyEditorThemes meta; the /hub page does not,
+// so read them when present and fall back to the canonical set (mirrors
+// the theme registry; the values are the actual code-theme names stored
+// in user settings editorLightTheme/editorDarkTheme).
+const LIGHT_EDITOR_THEMES = [
+  { value: 'eclipse', label: 'Eclipse' },
+  { value: 'overleaf_light', label: 'Overleaf light' },
+  { value: 'textmate', label: 'Textmate' },
+]
+const DARK_EDITOR_THEMES = [
+  { value: 'cobalt', label: 'Cobalt' },
+  { value: 'dracula', label: 'Dracula' },
+  { value: 'monokai', label: 'Monokai' },
+  { value: 'overleaf_dark', label: 'Overleaf dark' },
+]
+const LEGACY_EDITOR_THEMES = [
+  'ambiance', 'chaos', 'chrome', 'clouds', 'clouds_midnight',
+  'crimson_editor', 'dawn', 'dreamweaver', 'github', 'gob',
+  'gruvbox', 'idle_fingers', 'iplastic', 'katzenmilch', 'kr_theme',
+  'kuroir', 'merbivore', 'merbivore_soft', 'mono_industrial',
+  'nord_dark', 'pastel_on_dark', 'solarized_dark', 'solarized_light',
+  'sqlserver', 'terminal', 'tomorrow', 'tomorrow_night',
+  'tomorrow_night_blue', 'tomorrow_night_bright',
+  'tomorrow_night_eighties', 'twilight', 'vibrant_ink', 'xcode',
+].map(v => ({ value: v, label: v.replace(/_/g, ' ') + ' (Legacy)' }))
+
+function themeGroups(metaName: string, fallback: { value: string; label: string }[]) {
+  const meta = getMetaJson(metaName)
+  if (Array.isArray(meta) && meta.length > 0) {
+    return meta.map((m: any) => ({
+      value: m.name,
+      label: String(m.name).replace(/_/g, ' '),
+    }))
+  }
+  return fallback
+}
+
 function useUserSettings() {
   const [settings, setSettings] = useState<any>(() => getMetaJson('ol-userSettings') || {})
   const [user] = useState<any>(() => {
@@ -201,14 +239,17 @@ function AppearanceTab() {
     setRadio(radioForStored(settings?.overallTheme))
   }, [settings?.overallTheme])
 
-  const save = async (value: string) => {
-    setRadio(value)
+  const save = async (patch: Record<string, unknown>, note: string) => {
     setBusy(true)
     try {
-      // setTheme (shared store) applies locally + writes the meta tag + POSTs
-      // the valid stored value ('' | 'light-' | 'system') to /user/settings.
-      await setTheme(storedForRadio(value))
-      notify({ message: 'Theme saved.', color: 'teal' })
+      if ('overallTheme' in patch) {
+        // setTheme (shared store) applies locally + writes the meta tag + POSTs
+        // the valid stored value ('' | 'light-' | 'system') to /user/settings.
+        await setTheme(storedForRadio(String(patch.overallTheme)))
+      } else {
+        await saveUserSettings(patch)
+      }
+      notify({ message: note, color: 'teal' })
       refresh()
     } catch (e: any) {
       notify({ message: e.message, color: 'red' })
@@ -217,46 +258,150 @@ function AppearanceTab() {
     }
   }
 
+  // Owner #16 (2026-09-13 editor wave): the Appearance page is now the
+  // CENTRAL point for appearance — overall theme, the code-editor theme
+  // pair (light/dark, which the editor follows per active overall theme),
+  // and the editor font (size / family / line height). The editor
+  // settings modal keeps its in-context copies (same store, so both
+  // surfaces stay in sync automatically).
+  const lightThemes = themeGroups('ol-editorThemes', LIGHT_EDITOR_THEMES)
+  const darkThemes = DARK_EDITOR_THEMES
+  const legacyThemes = themeGroups('ol-legacyEditorThemes', LEGACY_EDITOR_THEMES)
+  const lightGroups = [
+    { label: 'Current', items: lightThemes },
+    ...(legacyThemes.length ? [{ label: 'Legacy', items: legacyThemes }] : []),
+  ]
+  const darkGroups = [
+    { label: 'Current', items: darkThemes },
+    ...(legacyThemes.length ? [{ label: 'Legacy', items: legacyThemes }] : []),
+  ]
+  const FONT_SIZES = ['10', '11', '12', '13', '14', '16', '18', '20', '22', '24']
+
   return (
-    <Card withBorder paddings="lg" radius="lg">
-      <Stack gap="md">
-        <Text size="sm" c="dimmed">
-          Applies to the whole workspace (this area, the project list, and the editor chrome).
-        </Text>
-        <RadioGroup
-          value={radio}
-          onChange={v => void save(String(v))}
-          label={<Text size="sm" fw={600}>Appearance</Text>}
-        >
-          <Stack gap="sm">
-            <Radio value="system" label="Match system appearance" description="Follows your OS light/dark setting." />
-            <Radio value="light" label="Light" description="Always light." />
-            <Radio value="dark" label="Dark" description="Always dark." />
-          </Stack>
-        </RadioGroup>
-        {busy ? <Text size="xs" c="dimmed">Saving…</Text> : null}
-      </Stack>
-    </Card>
+    <Stack gap="md">
+      <Card withBorder paddings="lg" radius="lg">
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Applies to the whole workspace (this area, the project list, the editor chrome and its modals).
+          </Text>
+          <RadioGroup
+            value={radio}
+            onChange={v => void save({ overallTheme: String(v) }, 'Theme saved.')}
+            label={<Text size="sm" fw={600}>Appearance</Text>}
+          >
+            <Stack gap="sm">
+              <Radio value="system" label="Match system appearance" description="Follows your OS light/dark setting." />
+              <Radio value="light" label="Light" description="Always light." />
+              <Radio value="dark" label="Dark" description="Always dark." />
+            </Stack>
+          </RadioGroup>
+          {busy ? <Text size="xs" c="dimmed">Saving…</Text> : null}
+        </Stack>
+      </Card>
+
+      <Card withBorder paddings="lg" radius="lg">
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            The code editor follows the active appearance: light UI uses the
+            light editor theme, dark UI uses the dark one.
+          </Text>
+          <Group gap="md" wrap="wrap">
+            <div style={{ width: 260 }}>
+              <Text size="sm" fw={600} mb={6}>
+                Editor theme — light interface
+              </Text>
+              <NativeSelect
+                itemGroups={lightGroups}
+                value={settings?.editorLightTheme || 'textmate'}
+                onChange={e => void save({ editorLightTheme: e.currentTarget.value }, 'Editor theme saved.')}
+                aria-label="Editor theme for the light interface"
+              />
+            </div>
+            <div style={{ width: 260 }}>
+              <Text size="sm" fw={600} mb={6}>
+                Editor theme — dark interface
+              </Text>
+              <NativeSelect
+                itemGroups={darkGroups}
+                value={settings?.editorDarkTheme || 'overleaf_dark'}
+                onChange={e => void save({ editorDarkTheme: e.currentTarget.value }, 'Editor theme saved.')}
+                aria-label="Editor theme for the dark interface"
+              />
+            </div>
+          </Group>
+        </Stack>
+      </Card>
+
+      <Card withBorder paddings="lg" radius="lg">
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Text formatting inside the code editor.
+          </Text>
+          <Group gap="md" wrap="wrap">
+            <div style={{ width: 180 }}>
+              <Text size="sm" fw={600} mb={6}>
+                Font size
+              </Text>
+              <NativeSelect
+                value={settings?.fontSize ? String(settings.fontSize) : ''}
+                onChange={e => void save({ fontSize: e.currentTarget.value ? Number(e.currentTarget.value) : null }, 'Editor font saved.')}
+                data={FONT_SIZES}
+                placeholder="Default (12px)"
+                aria-label="Editor font size"
+              />
+            </div>
+            <div style={{ width: 240 }}>
+              <Text size="sm" fw={600} mb={6}>
+                Font family
+              </Text>
+              <NativeSelect
+                value={settings?.fontFamily || 'lucida'}
+                onChange={e => void save({ fontFamily: e.currentTarget.value }, 'Editor font saved.')}
+                data={[
+                  { value: 'monaco', label: 'Monaco / Menlo / Consolas' },
+                  { value: 'lucida', label: 'Lucida / Source Code Pro' },
+                  { value: 'opendyslexicmono', label: 'OpenDyslexic Mono' },
+                ]}
+                aria-label="Editor font family"
+              />
+            </div>
+            <div style={{ width: 180 }}>
+              <Text size="sm" fw={600} mb={6}>
+                Line height
+              </Text>
+              <NativeSelect
+                value={settings?.lineHeight || 'normal'}
+                onChange={e => void save({ lineHeight: e.currentTarget.value }, 'Editor font saved.')}
+                data={[
+                  { value: 'compact', label: 'Compact' },
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'wide', label: 'Wide' },
+                ]}
+                aria-label="Editor line height"
+              />
+            </div>
+          </Group>
+          <Text size="xs" c="dimmed">
+            “Dark mode PDF preview” is a per-project option and stays in the
+            project's Settings → Appearance (in the editor).
+          </Text>
+        </Stack>
+      </Card>
+    </Stack>
   )
 }
 
 function EditorTab() {
   const { settings, refresh } = useUserSettings()
-  const [fontSize, setFontSize] = useState<number | null>(settings?.fontSize ?? null)
   const [autoPair, setAutoPair] = useState<boolean>(settings?.autoPairDelimiters ?? true)
   const [syntaxValidation, setSyntaxValidation] = useState<boolean>(settings?.syntaxValidation ?? true)
-  const [, setPdfViewer] = useState<boolean>(settings?.pdfViewer ?? 'latexWork')
   const [mathPreview, setMathPreview] = useState<boolean>(settings?.mathPreview ?? true)
-  const [family, setFamily] = useState<string>(settings?.fontFamily || 'lucida')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    setFontSize(settings?.fontSize ?? null)
     setAutoPair(settings?.autoPairDelimiters ?? true)
     setSyntaxValidation(settings?.syntaxValidation ?? true)
-    setPdfViewer(settings?.pdfViewer !== false)
     setMathPreview(settings?.mathPreview ?? true)
-    setFamily(settings?.fontFamily || 'lucida')
   }, [settings])
 
   const save = async (patch: Record<string, unknown>) => {
@@ -275,39 +420,10 @@ function EditorTab() {
   return (
     <Card withBorder paddings="lg" radius="lg">
       <Stack gap="lg">
-        <Group gap="md" wrap="wrap">
-          <div style={{ width: 180 }}>
-            <Text size="sm" fw={600} mb={6}>
-              Default font size
-            </Text>
-            <NativeSelect
-              value={fontSize ? String(fontSize) : ''}
-              onChange={e => {
-                const v = e.currentTarget.value
-                setFontSize(v ? Number(v) : null)
-                void save({ fontSize: v ? Number(v) : null })
-              }}
-              data={['9', '10', '11', '12', '13', '14', '16', '18']}
-              placeholder="Instance default"
-            />
-          </div>
-          <div style={{ width: 240 }}>
-            <Text size="sm" fw={600} mb={6}>
-              Editor font
-            </Text>
-            <NativeSelect
-              value={family}
-              onChange={e => {
-                setFamily(e.currentTarget.value)
-                void save({ fontFamily: e.currentTarget.value })
-              }}
-              data={[
-                { value: 'lucida', label: 'Lucida (default)' },
-                { value: 'dejavu', label: 'DejaVu Sans Mono' },
-              ]}
-            />
-          </div>
-        </Group>
+        <Text size="sm" c="dimmed">
+          Editing behavior. (Font size, family and line height live in the
+          Appearance page — the central appearance point, owner #16.)
+        </Text>
         <Stack gap="sm">
           {[
             {

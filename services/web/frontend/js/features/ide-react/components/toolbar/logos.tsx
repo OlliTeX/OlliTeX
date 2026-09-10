@@ -18,7 +18,9 @@ export const ToolbarLogos = ({ cobranding }: ToolbarLogosProps) => {
         overlayProps={{ delay: 0, placement: 'bottom' }}
       >
         <div className="ide-redesign-toolbar-home-button">
-          <a href="/project" className="ide-redesign-toolbar-home-link">
+          {/* Owner #9 (2026-09-13 editor wave): home/logo goes to the user's
+              projects in the /hub (legacy /project retired). */}
+          <a href="/hub#/projects" className="ide-redesign-toolbar-home-link">
             <span className="toolbar-ol-logo" aria-label={t('overleaf_logo')} />
             <MaterialIcon type="home" className="toolbar-ol-home-button" />
           </a>

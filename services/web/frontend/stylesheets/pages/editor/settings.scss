@@ -160,3 +160,63 @@
 .ide-setting-highlighted {
   box-shadow: 0 1px 10px 0 rgb(102 175 233 / 80%);
 }
+
+// Owner #18/#19a (2026-09-13 editor wave): the Settings tab pane had a
+// fixed 500px height + its own scrollbar NESTED inside the modal's own
+// scroller (Mantine Modal-body in /editor, the outer .modal overflow in
+// the legacy /project bootstrap frame) → TWO scrollbars; and beside the
+// 300px sidebar the labels were crushed instead of using the space next
+// to their controls. Frame-agnostic (keyed on the settings body class,
+// present in BOTH frames, ol-modal.tsx): the tab pane becomes a static
+// growing block so exactly one scroller remains (the modal itself), and
+// the modal therefore grows as TALL as its content — "not tall enough"
+// is gone for every tab (Compiler, etc.).
+.ide-settings-modal-body {
+  .ide-settings-tab-content {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  // label column takes the free space; the control keeps its natural
+  // width on the right (rows are justify-content: space-between)
+  .ide-setting .ide-setting-title,
+  .ide-setting .ide-setting-description {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ide-setting .ide-setting-input {
+    flex: 0 0 auto;
+    margin-left: var(--spacing-05);
+  }
+}
+
+// Mantine frame (/editor): the Mantine Modal-body is the single scroller.
+.ol-mant-modal .mantine-Modal-body {
+  overflow-y: auto;
+  max-height: 80vh;
+}
+
+// Legacy bootstrap frame (/project): cap the dialog to the viewport and
+// let .modal-body be the single scroll region (the tab pane is static now
+// — one scrollbar, and the modal is as tall as the viewport allows, so
+// "not tall enough" is fixed there too). :has() keeps this scoped to
+// JUST the settings modal (modern browsers only — an app requirement).
+.modal:has(.ide-settings-modal-body) {
+  .modal-dialog {
+    max-height: calc(100vh - 6rem);
+  }
+
+  .modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+  }
+
+  .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}

@@ -9,6 +9,7 @@ export default function IntegrationCard({
   description,
   icon,
   showPaywallBadge,
+  titleBadge,
 }: {
   href?: string
   onClick?: () => void
@@ -16,6 +17,7 @@ export default function IntegrationCard({
   description: string
   icon: React.ReactNode
   showPaywallBadge: boolean
+  titleBadge?: React.ReactNode
 }) {
   const { t } = useTranslation()
 
@@ -27,6 +29,7 @@ export default function IntegrationCard({
           <div className="integrations-panel-card-title" translate="no">
             {title}
           </div>
+          {titleBadge}
           {showPaywallBadge && (
             <OLBadge
               prepend={<MaterialIcon type="star" />}

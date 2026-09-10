@@ -114,6 +114,12 @@ export function MantineRailNavChrome({
     action: () => setActiveModal('keyboard-shortcuts'),
   }
 
+  // Owner #3 (2026-09-13 editor wave): the renovated rail carries the hotkeys
+  // button as a first-class action, so the legacy Help DROPDOWN is dropped here
+  // (its only editor-relevant entry was "Keyboard shortcuts"). The /project
+  // legacy rail keeps the Help button untouched (no standalone shortcut there).
+  const visibleActions = actions.filter(a => a.key !== 'support')
+
   return (
     <nav
       className={classNames('ide-rail ol-v2-rail', {
@@ -165,7 +171,7 @@ export function MantineRailNavChrome({
           aria-label={t('help_editor_settings', 'Help and settings')}
         >
           <V2RailAction action={shortcutsAction} />
-          {actions
+          {visibleActions
             .filter(shouldIncludeElement)
             .map(action =>
               'dropdown' in action && action.dropdown ? (

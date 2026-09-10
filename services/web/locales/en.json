@@ -4646,6 +4646,7 @@
   "zotero_groups_loading_error": "There was an error loading groups from Zotero",
   "zotero_groups_relink": "There was an error accessing your Zotero data. This was likely caused by lack of permissions. Please re-link your account and try again.",
   "zotero_integration": "Zotero integration",
+  "zotero_link_from_mysettings": "Not linked — connect your account in My settings",
   "zotero_is_premium": "Zotero integration is a premium feature",
   "zotero_reference_loading_error": "Error, could not load references from Zotero",
   "zotero_reference_loading_error_expired": "Zotero token expired, please re-link your account",

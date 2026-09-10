@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import '@mantine/core/styles.css'
@@ -9,6 +9,11 @@ import {
   onColorSchemeChange,
   setTheme,
 } from './overall-theme'
+import {
+  buildThemePatch,
+  getAppliedHubTheme,
+  onAppliedHubThemeChange,
+} from '../../../../modules/ollitex-hub/frontend/js/hub/hub-theme'
 
 /**
  * Shared Mantine 9.6.0 shell for OlliTeX pages (hubs, settings, admin).
@@ -36,6 +41,26 @@ const hubColorSchemeManager = {
   unsubscribe: () => {},
 }
 
+// Owner #14/#15 (2026-09-13 editor wave): the instance Appearance theme
+// (Site settings → GENERAL → Appearance, /api/hub-theme) now governs
+// EVERY Mantine surface, not just /hub — editor chrome, module modals
+// (Zotero, equation, settings…), auth pages. One design language per
+// instance, admin-controlled. Applied in the shared provider so new
+// surfaces inherit it automatically; live-updates when an admin applies
+// a theme (onAppliedHubThemeChange), no page reload needed.
+function useAppliedThemePatch(): Record<string, unknown> | null {
+  const [autoPatch, setAutoPatch] = useState<Record<string, unknown> | null>(
+    () => buildThemePatch(getAppliedHubTheme()),
+  )
+  useEffect(() => {
+    setAutoPatch(buildThemePatch(getAppliedHubTheme()))
+    return onAppliedHubThemeChange(t =>
+      setAutoPatch(buildThemePatch(t))
+    )
+  }, [])
+  return autoPatch
+}
+
 export default function OlliTProvider({
   children,
   themePatch,
@@ -43,6 +68,10 @@ export default function OlliTProvider({
   children: React.ReactNode
   themePatch?: Record<string, unknown>
 }) {
+  const autoPatch = useAppliedThemePatch()
+  // an explicit prop (e.g. the hub's own live patch) wins over the
+  // provider-wide auto patch; without a custom theme both are null
+  const effectivePatch = themePatch || autoPatch || null
   // Portals (modals, dropdowns) mount on <body>, OUTSIDE the MantineProvider
   // wrapper element. Mantine 9 scopes most default/dark variable swaps with
   // [data-mantine-color-scheme] selectors, so portaled surfaces kept the
@@ -64,23 +93,25 @@ export default function OlliTProvider({
   // the default brand theme. Without a patch this is exactly the previous
   // behaviour, so other bundles are unaffected.
   const theme = useMemo(() => {
-    if (!themePatch || typeof themePatch !== 'object') return ollitexTheme
+    if (!effectivePatch || typeof effectivePatch !== 'object')
+      return ollitexTheme
     const colors = {
       ...(ollitexTheme as any).colors,
-      ...(themePatch.colors as Record<string, unknown> | undefined),
+      ...(effectivePatch.colors as Record<string, unknown> | undefined),
     }
     const components = {
       ...
         ((ollitexTheme as any).components as Record<string, unknown> | undefined),
-      ...((themePatch.components as Record<string, unknown> | undefined) || {}),
+      ...((effectivePatch.components as Record<string, unknown> | undefined) ||
+        {}),
     }
     return {
       ...(ollitexTheme as any),
-      ...(themePatch as any),
+      ...(effectivePatch as any),
       colors,
       components,
     }
-  }, [themePatch])
+  }, [effectivePatch])
 
   return (
     <MantineProvider

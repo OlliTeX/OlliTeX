@@ -462,6 +462,31 @@ const grammarTheme = EditorView.baseTheme({
       backgroundColor: '#e0e0e0',
     },
   },
+  // Owner #13 (2026-09-13 editor wave): the tooltip above hardcodes light
+  // colors (white box, #888 source text, #f5f5f5 suggestion chips) — under a
+  // dark code theme (overall-theme-dark) a suggestion like "recompile"
+  // rendered as gray text on a gray chip, i.e. unreadable. The dark variant
+  // follows the app's neutral scale (both defined in foundations/colors.scss
+  // for light + dark UIs) so the popup tracks the active editor theme.
+  '.overall-theme-dark .cm-grammar-tooltip': {
+    backgroundColor: 'var(--neutral-80, #2f3a4c)',
+    border: '1px solid var(--neutral-60, #677283)',
+    color: 'var(--neutral-10, #f4f5f6)',
+  },
+  '.overall-theme-dark .cm-grammar-tooltip-entry + .cm-grammar-tooltip-entry': {
+    borderTop: '1px solid var(--neutral-70, #495365)',
+  },
+  '.overall-theme-dark .cm-grammar-tooltip-source': {
+    color: 'var(--neutral-40, #afb5c0)',
+  },
+  '.overall-theme-dark .cm-grammar-tooltip-action': {
+    backgroundColor: 'var(--neutral-70, #495365)',
+    border: '1px solid var(--neutral-60, #677283)',
+    color: 'var(--neutral-10, #f4f5f6)',
+    '&:hover': {
+      backgroundColor: 'var(--neutral-60, #677283)',
+    },
+  },
 })
 
 // ═══════════════════════════════════════════════════════════════════════

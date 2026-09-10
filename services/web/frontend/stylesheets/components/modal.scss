@@ -102,11 +102,32 @@
   }
 }
 
+// Owner #5 (2026-09-13 editor wave): the close "X" shrank with the Mantine
+// reframe — 32px button with a 16px glyph (the app base style draws a tiny
+// 10px X) in EVERY modal header, legacy and Mantine-body alike (both
+// themes, hub + editor + modules).
+.modal-header .btn-close {
+  width: 32px;
+  height: 32px;
+  padding: 8px;
+  background-size: 16px auto;
+}
+
 // OLiT Mantine surface (the /editor OLModal branch): the modal is
 // portaled outside the app's theme scope, so the active scheme's token set
 // is mirrored here — legacy body AND Mantine chrome follow the app's
 // light/dark theme (owner contract: "the modal theme follows the app").
 .ol-mant-modal {
+  // Mantine-native header modals: the close ActionIcon is the same
+  // 32px button (owner #5) instead of the default small icon.
+  .mantine-Modal-header .mantine-ActionIcon-root,
+  .mantine-Modal-header button {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+
   // Consistent modal chrome (both schemes, owner report: title font and
   // padding varied between modals): one header rhythm, one title metric.
   .modal-header {

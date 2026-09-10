@@ -5,11 +5,9 @@ import {
   useProjectNotificationPreferences,
 } from '../../hooks/use-project-notification-preferences'
 import LoadingSpinner from '@/shared/components/loading-spinner'
-import { useFeatureFlag } from '@/shared/context/split-test-context'
 
 export default function ProjectNotificationsSetting() {
   const { t } = useTranslation()
-  const commentMentionsEnabled = useFeatureFlag('comment-mentions')
   const { notificationLevel, setNotificationLevel, isLoading } =
     useProjectNotificationPreferences()
 
@@ -17,20 +15,17 @@ export default function ProjectNotificationsSetting() {
     return <LoadingSpinner loadingText={t('loading')} />
   }
 
+  // Owner #19b/#21 (2026-09-13 editor wave): the fine-grained choice
+  // ("All project activity" / "Replies to your activity only") and the
+  // per-activity-type table moved to the hub (My settings › Email —
+  // /hub#/mysettings.email). Here the setting is just On/Off + the link.
+  // (The old link pointed at /user/notification-preferences, which is not
+  // the canonical settings surface on this deployment.)
   const options: Array<RadioOption<SettableNotificationLevel>> = [
     {
       value: 'all',
-      label: t('all_project_activity'),
+      label: t('on'),
       description: t('all_project_activity_description'),
-    },
-    {
-      value: 'replies',
-      label: commentMentionsEnabled
-        ? t('mentions_and_replies_only')
-        : t('replies_to_your_activity_only'),
-      description: commentMentionsEnabled
-        ? t('mentions_and_replies_only_description')
-        : t('replies_to_your_activity_only_description'),
     },
     {
       value: 'off',
@@ -45,7 +40,7 @@ export default function ProjectNotificationsSetting() {
         <div className="ide-setting-description">
           {t('project_notifications_muted_description')}{' '}
           <a
-            href="/user/notification-preferences"
+            href="/hub#/mysettings.email"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -57,13 +52,19 @@ export default function ProjectNotificationsSetting() {
           <RadioButtonSetting
             id="projectNotifications"
             options={options}
-            value={notificationLevel}
-            onChange={setNotificationLevel}
+            // a project saved with the legacy "replies" level reads as "on"
+            // here (its exact type mix is managed on the hub page)
+            value={
+              notificationLevel === 'all' || notificationLevel === 'replies'
+                ? 'all'
+                : 'off'
+            }
+            onChange={value => setNotificationLevel(value)}
           />
 
           <div className="global-notifications-link">
             <a
-              href="/user/notification-preferences"
+              href="/hub#/mysettings.email"
               target="_blank"
               rel="noopener noreferrer"
             >

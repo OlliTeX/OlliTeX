@@ -101,6 +101,30 @@ function BibEditorPanel() {
   const [orcidOpen, setOrcidOpen] = useState(false)
   // P4: "Import from Zotero" (Add dropdown) — the zotero-picker modal.
   const [zoteroOpen, setZoteroOpen] = useState(false)
+  // Owner #11 (2026-09-13 editor wave): "Upload .bib file" in the Add
+  // menu (parity with the /hub library Add menu). Same pipeline as the
+  // library page: hidden file input → read text → BibImportModal
+  // pre-filled (initialText).
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [uploadText, setUploadText] = useState('')
+  const openUpload = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+  const handleFileUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ''
+      if (!file) return
+      try {
+        setUploadText(await file.text())
+        setImportOpen(true)
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('bib file upload read failed:', err)
+      }
+    },
+    []
+  )
   // Item 3: "Enter manually" opens the Add-reference modal (SaaS parity).
   const [manualShow, setManualShow] = useState(false)
   const [bulkDeleteGuard, setBulkDeleteGuard] = useState<
@@ -624,11 +648,16 @@ function BibEditorPanel() {
                   : undefined
               }
               openDocName={openDocName}
-              onAddPaste={() => setImportOpen(true)}
+              onAddPaste={() => {
+                // clear any stale upload text so "Paste references" is blank
+                setUploadText('')
+                setImportOpen(true)
+              }}
               onAddManual={() => setManualShow(true)}
               onAddFromLibrary={() => setLibraryImportOpen(true)}
               onAddFromOrcid={() => setOrcidOpen(true)}
               onAddFromZotero={() => setZoteroOpen(true)}
+              onAddUpload={openUpload}
             />
             {selection?.kind === 'existing' && previewEntry ? (
               <BibEntryPreview
@@ -679,14 +708,27 @@ function BibEditorPanel() {
         onConfirm={handleConfirmBulkDelete}
       />
 
-      {/* C5 paste import (the Add dropdown "Paste references") */}
+      {/* C5 paste import (the Add dropdown "Paste references") — and the
+          owner-#11 "Upload .bib file" flow (pre-filled via initialText). */}
       <BibImportModal
         show={importOpen}
         existingIds={entries.map(e => e.id)}
         source={source}
         expectedSource={sourceMirror.current}
+        initialText={uploadText}
         onImport={handleImportEntries}
         onHidden={() => setImportOpen(false)}
+      />
+      {/* Hidden .bib file picker (owner #11): mirrors the library page's
+          "Upload .bib file" input. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".bib,application/x-bibtex,text/plain"
+        style={{ display: 'none' }}
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={e => void handleFileUpload(e)}
       />
       <BibManualModal
         show={manualShow}

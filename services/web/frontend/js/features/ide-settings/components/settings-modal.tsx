@@ -35,7 +35,11 @@ const SettingsModal = () => {
     <OLModal
       show={show}
       onHide={() => setShow(false)}
-      size="lg"
+      // Owner #19 (2026-09-13 editor wave): a taller/wider modal — the
+      // Compiler (and other) tabs no longer need their own scrollbars,
+      // and the label|control rows get room instead of compressed labels
+      // (owner #18).
+      size="xl"
       backdropClassName={
         activeTab === 'appearance'
           ? 'ide-settings-modal-transparent-backdrop'

@@ -192,12 +192,17 @@ export default function AppearanceSection() {
           variant="light"
           color="teal"
           icon={<Icon name="palette" size={18} />}
-          title="Instance-wide hub theme"
+          title="Instance-wide appearance theme"
           style={{ fontSize: 13.5 }}
         >
-          Changes apply to <b>everyone's</b> /hub (not just you), in both light and dark mode.
-          Nothing here affects the editor or any other page. Press <b>Apply</b> to publish, or
-          <b> Import/Export</b> to keep a JSON copy on your machine.
+          {/* Owner #14/#15 (2026-09-13 editor wave): this theme is the single
+              design language for the whole Mantine surface of the instance —
+              /hub AND the editor chrome + its modals (Zotero, Settings,
+              Share, …). It applies live, no reload needed. */}
+          Changes apply to <b>everyone's</b> /hub <b>and editor</b> (not just you), in
+          both light and dark mode — one design language per instance. Press
+          <b> Apply</b> to publish, or <b>Import/Export</b> to keep a JSON copy on your
+          machine.
         </Alert>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
