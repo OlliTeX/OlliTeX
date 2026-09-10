@@ -91,8 +91,13 @@ test('trash-restore: hub row control → POST /library/references/delete {ids} �
   const id = created?.items?.[0]?._id ?? created?.items?.[0]?.id
   expect(id, 'entry created via API (deterministic row); body=' + JSON.stringify(created).slice(0, 160)).toBeTruthy()
   await pg.reload({ waitUntil: 'domcontentloaded' })
+  // 2026-09-13 (owner #5): the library is cursor-paged (oldest first, 25/page) —
+  // a just-created entry lands on the LAST page, so reach it through the
+  // library's own search (parity with the legacy search box).
+  await pg.locator('input[placeholder*="Search key" i]').first().fill(delKey)
+  await pg.waitForTimeout(1600)
   const delRow = pg.locator('tr', { hasText: delKey }).first()
-  await expect(delRow).toBeVisible({ timeout: 8000 })
+  await expect(delRow).toBeVisible({ timeout: 10000 })
   const cap = captureApi(pg as any, BASE)
   const delRows = pg.locator('tr', { hasText: delKey })
   expect(await delRows.count(), 'row with the new key exists').toBeGreaterThan(0)

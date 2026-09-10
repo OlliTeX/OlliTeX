@@ -151,8 +151,10 @@ test.describe('hub admin users (parity vs /admin/user)', () => {
     await ensureRow(p, u.email)
     const cap = captureApi(p as any, BASE)
     await openRowMenu(p, u.email)
-    await p.getByRole('menuitem', { name: /update/i }).click()
-    const dlg = p.locator('[role="dialog"]').filter({ hasText: /update/i }).last()
+    // 2026-09-13 (owner #24): the menu item is “Edit…” (legacy parity); the
+    // modal is titled “Edit user” and saves with the same /admin/user/:id/update.
+    await p.getByRole('menuitem', { name: /edit/i }).click()
+    const dlg = p.locator('[role="dialog"]').filter({ hasText: /edit user/i }).last()
     await dlg.locator('input').first().fill('HubParity')
     await dlg.locator('button', { hasText: /save|update|apply/i }).last().click()
     await waitForCall(cap, c => c.some(x => x.method === 'POST' && x.path === `/admin/user/${u.id}/update`), 'POST update')

@@ -72,7 +72,7 @@ async function hubPage(req, res) {
   res.render(
     Path.resolve(__dirname, '../views/hub'),
     {
-      title: 'LibreLeaf Hub',
+      title: 'OlliTeX Hub',
       ...locals,
     }
   )

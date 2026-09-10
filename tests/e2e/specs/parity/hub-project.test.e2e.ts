@@ -74,9 +74,9 @@ test('create: "New project" → Blank project → POST /project/new (project lan
   await p.locator('[role="menuitem"]', { hasText: 'Blank project' }).first().click()
   const dlg = p.locator('[role="dialog"]').last()
   await expect(dlg).toBeVisible({ timeout: 5000 })
-  const nameInput = dlg.locator('input[type="text"], input:not([type])').first()
+  const nameInput = dlg.locator('input[placeholder*="project" i], input:not([type])').first()
   await nameInput.fill(name)
-  await dlg.locator('button', { hasText: /create|start/i }).last().click()
+  await dlg.locator('button', { hasText: /create/i }).last().click()
   await expect(async () => {
     const c = (cap as any).calls.find((x: any) => x.method === 'POST' && x.path === '/project/new')
     expect(c, 'POST /project/new fired (saw: ' + (cap as any).calls.map((x: any) => x.method + ' ' + x.path + '→' + x.status).join(', ') + ')').toBeTruthy()
