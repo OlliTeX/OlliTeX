@@ -35,7 +35,7 @@
    inkscape:window-x="0"
    inkscape:window-y="0"
    inkscape:window-maximized="1"
-   inkscape:current-layer="g578" />
+   inkscape:current-layer="svg580" />
  <defs
    class="ClipPathGroup"
    id="defs2">
@@ -61,7 +61,10 @@
   </clipPath>
  
     
-   </defs>
+   
+      
+      
+     </defs>
  <defs
    id="defs17">
   <font
@@ -304,30 +307,9 @@
    class="BackgroundObjects" />
   </g>
  </g><g
-   class="Page"
-   id="g578"
-   transform="translate(-73.801443,-132.2276)">
-      <g
-   class="TextShape"
-   id="g39"
-   transform="matrix(1.1344424,0,0,1.1344424,-1096.4588,162.87061)"
-   style="fill:#000000">
-       
-      <text
-   xml:space="preserve"
-   style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:987.777px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;writing-mode:lr-tb;direction:ltr;fill:#000000;stroke:none;stroke-width:96.4999"
-   x="1903.4624"
-   y="1356.1017"
-   id="text580"><tspan
-     sodipodi:role="line"
-     id="tspan580"
-     style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1411.11px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;stroke:none;stroke-width:96.5"
-     x="1903.4624"
-     y="1356.1017">OlliTeX</tspan></text></g>
-      <g
    class="Graphic"
    id="g577"
-   transform="translate(-423.33335,3.0750605)">
+   transform="translate(-497.13479,-129.15254)">
        <g
    id="id4">
         <rect
@@ -3530,24 +3512,23 @@
          </g>
         </g>
        </g>
-      </g>
-     <g
+      </g><g
    class="TextShape"
    id="g581"
-   transform="matrix(1.1344423,0,0,1.1344423,-1096.4588,135.83256)"
+   transform="matrix(1.1344423,0,0,1.1344423,-1170.2602,3.60496)"
    style="fill:#000000">
        
       <text
    xml:space="preserve"
-   style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:987.777px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;writing-mode:lr-tb;direction:ltr;fill:#000000;stroke:none;stroke-width:96.4999"
-   x="1903.4624"
-   y="1356.1017"
+   style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1277.37px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;writing-mode:lr-tb;direction:ltr;fill:#000000;stroke:none;stroke-width:124.792"
+   x="1751.418"
+   y="1855.7758"
    id="text581"><tspan
      sodipodi:role="line"
      id="tspan581"
-     style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1411.11px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke:none;stroke-width:96.5;fill:#000000"
-     x="1903.4624"
-     y="1356.1017">OlliTeX</tspan></text></g></g>
+     style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1824.82px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;stroke:none;stroke-width:124.792"
+     x="1751.418"
+     y="1855.7758">OlliTeX</tspan></text></g>
  <g
    class="SlideGroup"
    id="g580">
