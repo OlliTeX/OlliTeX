@@ -1,115 +1,163 @@
 <h1 align="center">
   <br>
-  <img src="services/web/public/logo_full.svg" alt="OlliTeX" width="360">
+  <img src="tools/logo/logo.svg" alt="OlliTeX" width="190">
+  <br><br>
+  <img src="tools/logo/logo-horizontal.png" alt="OlliTeX — real-time collaborative authoring" width="340">
 </h1>
 
-<h4 align="center">An open-source, free, online real-time collaborative LaTeX editor.</h4>
-
 <p align="center">
-  <a href="https://github.com/davrot/6.3.0_post">Source</a> •
+  <a href="#why-ollitex">Why OlliTeX?</a> •
+  <a href="#features">Features</a> •
+  <a href="#getting-started">Getting started</a> •
+  <a href="#contributing">Contributing</a> •
   <a href="#license">License</a>
 </p>
 
-<img src="doc/screenshot.png" alt="A screenshot of a project being edited in OlliTeX">
+<img src="doc/screenshot.png" alt="A project being edited in OlliTeX" width="100%">
 <p align="center">
   Figure 1: A project being edited in OlliTeX.
 </p>
 
 ## OlliTeX
 
-**OlliTeX is a fork of [Overleaf Community Edition](https://github.com/overleaf/overleaf)
-(open source, GNU AGPL v3)** — extended and maintained as a free, self-hostable
-product. Overleaf runs a hosted commercial service at
-[www.overleaf.com](https://www.overleaf.com); OlliTeX contains no subscription,
-billing, or paid-plan components, and no advertising of premium services.
+**OlliTeX is a free, self-hostable, real-time collaborative authoring platform
+for LaTeX — and, since 2026, for Typst too.**
 
-This fork builds on three open-source lineages (see [`CREDITS`](CREDITS.md)):
+It is a fork of [Overleaf Community Edition](https://github.com/overleaf/overleaf)
+(open source, GNU AGPL v3), extended and maintained as a complete product.
+Overleaf runs a hosted commercial service at
+[www.overleaf.com](https://www.overleaf.com); OlliTeX contains **no**
+subscription, billing, or paid-plan components, and no advertising of premium
+services — it is a fork, full stop.
 
-- [Overleaf Community Edition](https://github.com/overleaf/overleaf) (Copyright Overleaf, AGPL v3)
-- [overleaf-cep](https://github.com/yu-i-i/overleaf-cep) "Extended CE" extensions by yu-i-i
-- The 6.3.0 port + extension work in this repository (davrot)
+## Why OlliTeX?
+
+The name is a small piece of etymological wordplay that sits exactly on the
+two meanings of *latex*.
+
+**Olli** — from the **Olmec** ("Olmeco") civilization of Mesoamerica, the
+"rubber culture": the people who, around 1500 BCE, first tapped the
+*Hevea* rubber tree, vulcanized the sap by mixing it with the juice of
+*Ipomoea alba*, and made the legendary bouncing rubber ball of the
+Mesoamerican ballgame. In Nahuatl the word for rubber is **ātlātl** —
+literally *"water of the water"* (ātl = water), because the milky white
+sap that oozes from the cut bark looks like water. The Olmecs were, in
+short, the first *latex* engineers.
+
+**-TeX** — from TeX, Donald Knuth's typesetting system, and — by extension —
+LaTeX (*La* + *TeX*), Leslie Lamport's macro layer on top of it. This is the
+**second** meaning of "latex": the typesetting macro package, where a few
+typed symbols render as a full equation.
+
+So **OlliTeX = the Olmecs' rubber, meets TeX's precise ink.** A document
+system that behaves like the Olmec ball itself — *resilient, stretchy, and
+capable of springing back after a hard hit* — while delivering the accuracy
+only a real typesetting engine can: **rubber typesetting, with a
+Mesoamerican accent.**
+
+> And, as a practical wink to every student who has ever watched a 40-page
+> PDF compile: the OlliTeX compile queue does not bounce — it *flows*, like
+> sap, like water, like ātlātl.
 
 ## Features
 
-This "extended" edition of Overleaf CE includes:
+Everything in Overleaf CE (real-time collaborative editing, track changes and
+comments, sandboxed compiles with TeX Live image selection, template gallery,
+import/export, Git & GitHub sync, SAML/LDAP/OIDC authentication, advanced
+administrator tools) **plus** the OlliTeX-specific stack:
 
-- Sandboxed compiles with TeX Live image selection
-- Sign Up page
-- LDAP authentication
-- SAML authentication
-- OpenID Connect authentication
-- Real-time track changes and comments
-- Symbol palette
-- Template gallery
-- Import file from external URL
-- Git integration
-- GitHub synchronization
-- AI Assistant: LLM-powered chat, inline completion, compliance review, and
-  grammar checking (LanguageTool and/or LLM, per-user settings + admin control
-  page, plus an optional self-hosted LanguageTool service)
-- Zotero integration
-- Reference Search and Pick Tool
-- Document Import (`.docx`, `.md`) and Export (`.docx`, `.md`, `.html`)
-- Advanced administrator tools for managing user accounts and projects
-- Logo tools
+- **Typst as a first-class format** — create, edit, and compile Typst
+  documents alongside LaTeX: a dedicated `clsi_typst` compile service,
+  Typst project templates (blank, article with bibliography, worked example),
+  syntax highlighting and formatting in the source editor.
+- **The integrated control hub at [`/hub`](#)** — one pane for everything:
+  the user workspace (projects, tags, templates, library, sessions, settings)
+  and the full admin surface (users, projects, active sessions, instance
+  stats, site settings, LLM administration, templates) in a single
+  Mantine-styled console with hash-addressable leaves.
+- **Renovated editor** — a modern Mantine design-system layer
+  (`/editor/:id`, dual-run identical to the classic `/Project/:id` URL),
+  command palette, rail/toolbar redesign, theme tokens.
+- **AI features, admin-gated and BYO** — LLM-powered chat, inline
+  completion, and compliance review; bring-your-own provider (OpenAI-compatible
+  endpoints, per-user) with per-feature rate limiting (instance rate, daily
+  token budgets) on a single hub page; grammar checking via LanguageTool
+  and/or LLM; an optional self-hosted LanguageTool service.
+- **Extended collaboration tools** — Zotero integration, Mendeley, reference
+  search & pick, equation editor, symbol palette, diagram canvas,
+  document import (`.docx`, `.md`) and export (`.docx`, `.md`, `.html`),
+  WebDAV/Nextcloud sync, Dropbox, sign-up page.
+- **Operations toolkit** — environment-driven configuration
+  (`server-ce/config/env.sh` + `tools/toolkit` seed), a central
+  [Makefile](Makefile) entry point, an AGPL-compliant rebrand with provenance
+  kept visible ([BRANDING.md](BRANDING.md)).
 
 > [!CAUTION]
-> Community Edition is intended for use in environments where **all** users are
-> trusted. It is **not** appropriate for scenarios where isolation of users is
-> required due to Sandbox Compiles not being available. When not using
-> Sandboxed Compiles, users have full read and write access to the `sharelatex`
-> container resources (filesystem, network, environment variables) when running
-> LaTeX compiles. Therefore, in any environment where not all users can be
-> fully trusted, it is strongly recommended to use Sandboxed Compiles.
+> Community Edition is intended for use in environments where **all** users
+> are trusted. It is **not** appropriate for scenarios where isolation of
+> users is required, since Sandboxed Compiles is not always active. When not
+> using Sandboxed Compiles, users have full read and write access to the
+> `sharelatex` container resources (filesystem, network, environment
+> variables) when running compiles. Where not all users can be fully
+> trusted, it is strongly recommended to use Sandboxed Compiles.
 
-## Installation
+## Getting started
 
-Build the server image from `server-ce/`:
+### Build & run
 
 ```
 cd server-ce
-make all          # builds sharelatex/sharelatex:<rev> (+ TeX Live base image)
+make all          # builds sharelatex/sharelatex:ext-6.3.0-port (+ TeX Live base image)
 ```
 
 The [`Dockerfile-base`](server-ce/Dockerfile-base) builds the
-`sharelatex/sharelatex-base:*` image (dependencies + TeX Live), and
-[`Dockerfile`](server-ce/Dockerfile) builds
-`sharelatex/sharelatex:*` on top of it.
+`sharelatex/sharelatex-base:*` image (dependencies + TeX Live) and
+[`Dockerfile`](server-ce/Dockerfile) builds the application image on top.
+Configuration lives in [`server-ce/config/env.sh`](server-ce/config/env.sh)
+(plus toolkit seeds under `tools/toolkit`) — one place for site name, URL,
+auth providers, LLM admin gates, compile images, and so on.
 
-The [Phusion base-image](https://github.com/phusion/baseimage-docker)
-(extended by the `base` image) provides a VM-like container in which to run the
-services. Baseimage uses the `runit` service manager to manage services, and
-init scripts from the `server-ce/runit` folder are added.
+A ready-to-run local deployment (nginx + overleaf + mongo + redis) lives in
+[`develop/docker-compose.yml`](develop/docker-compose.yml).
 
-A ready-to-run deployment example (nginx + overleaf + mongo + redis) lives in
-`develop/docker-compose.yml`; a disposable end-to-end test stack (12 journey
-tests, self-seeding fixtures) lives in [`tests/e2e`](tests/e2e) — see
-[`tests/e2e/README.md`](tests/e2e/README.md) for `stack-up` /
-`playwright test` / `stack-down`.
+### Development
 
-## Development
+- Central entry point: `make help` (targets: `build`, `unit`, `hub`, `lint`,
+  `format`, `ci`, `deploy-test`, `image`).
+- The production web build is `cd services/web && yarn webpack:production`
+  — this is the canonical gate; `yarn webpack` starts the *dev server*.
+- In-repo unit/integration suites: `cd services/web && yarn test:unit`
+  (Vitest, all projects) or the root `make unit`.
+- [`ext_explain.md`](ext_explain.md) documents the extension surface
+  (features, settings, module wiring) of the fork.
+- [`BRANDING.md`](BRANDING.md) documents the OlliTeX rebrand and how to swap
+  the logo set (final art belongs in `tools/logo/` and the referenced app
+  paths).
 
-- In-repo regression tests: `cd services/web && yarn test:unit` (Vitest) and
-  the frontend suite (Mocha) — see `services/web/package.json` scripts.
-- `ext_explain.md` documents the extension surface (features, settings,
-  module wiring) for the whole fork.
-- `BRANDING.md` documents the OlliTeX branding and how to swap the logo set.
+### Testing
 
-## Testing
+- End-to-end suite: [`tests/e2e`](tests/e2e) — a disposable, self-seeding
+  stack (`scripts/stack-up.sh` → `playwright test` → `scripts/stack-down.sh`)
+  covering smoke, admin site settings, LLM/BYO, grammar, keybindings,
+  notifications, Zotero, Typst compiles, and a **legacy↔hub parity harness**
+  (every removed legacy page is asserted to redirect and its capability to
+  exist on the hub; see `tests/e2e/parity/check.mjs`).
+- The suite's structure was inspired by the testing practices of
+  [Forgejo](https://codeberg.org/forgejo/forgejo).
 
-The end-to-end test suite in [`tests/e2e`](tests/e2e) covers: smoke
-(login → project → compile → PDF), admin site settings, BYO LLM providers,
-grammar checking, keybindings, notifications, Zotero, and WebDAV/Dropbox
-graceful behavior. The suite's structure and approach were inspired by the
-testing practices of [Forgejo](https://codeberg.org/forgejo/forgejo).
+## Contributing
+
+OlliTeX is a community fork; contributions are welcome. Please read
+[`CONTRIBUTING.md`](CONTRIBUTING.md), keep the AGPL notices intact, and run
+`make ci` before opening a pull request.
 
 ## Authors
 
 - [The Overleaf Team](https://www.overleaf.com/about) — Community Edition
 - [yu-i-i](https://github.com/yu-i-i) — Extended CE features; adapted code
   listed in [`CREDITS`](CREDITS.md)
-- [davrot](https://github.com/davrot) — 6.3.0 port, extensions, and
-  maintenance of this fork
+- [davrot](https://github.com/davrot) — the 6.3.0 port, the OlliTeX
+  extension stack, and maintenance of this fork
 
 ## License
 

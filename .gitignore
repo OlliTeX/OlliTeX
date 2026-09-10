@@ -18,3 +18,26 @@ services/web/.cache/
 
 # reproducible phase-0 crawl artifacts (regenerable via parity/crawl/crawl.mjs)
 tests/e2e/parity/reference/
+
+# build temp working docs (kept on disk as owner reference; excluded from the
+# OlliTeX repo tree — see .gitignore owner note 2026-09-16)
+/PLAN.md
+/plan_6.2.0_6.2.1.md
+/plan_6.2.1_6.2.2.md
+/plan_6.2.2_6.3.0.md
+/BIB_ORCID_TEMPLATES_PLAN.md
+/EDITOR_RENOVATION_PLAN.md
+/MODULE_MANTINE_PLAN.md
+/SSO_MULTI_PROVIDER_PLAN.md
+/TYPST_INTEGRATION_PLAN.md
+/UI_ROUND10_PLAN.md
+/UI_ROUND11_PLAN.md
+/UI_ROUND12_PLAN.md
+/BUGHUNT_REPORT.md
+/BUG_HUNT_*.md
+/BUG_AUDIT_*.md
+/MODULE_HYGIENE_REPORT.md
+/SSO_TEST_ENV_README.md
+/TOOLKIT_ENV_GAP.md
+/todo_07_09_2026.md
+/nav_structure.md
