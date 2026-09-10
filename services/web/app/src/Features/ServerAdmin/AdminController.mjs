@@ -195,6 +195,21 @@ const AdminController = {
       res.redirect('/admin#system-messages')
     })
   },
+
+  // Owner #17c (2026-09-13): delete a single system message (the legacy admin
+  // page only offered “clear all”).
+  deleteMessage(req, res, next) {
+    const messageId = req.params.message_id
+    SystemMessageManager.deleteMessage(String(messageId), function (error) {
+      if (error) {
+        return next(error)
+      }
+      if (req.xhr || req.headers.accept?.includes('application/json')) {
+        return res.json({ success: true })
+      }
+      res.redirect('/admin#system-messages')
+    })
+  },
 }
 
 export default AdminController

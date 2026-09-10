@@ -1200,6 +1200,12 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthorizationMiddleware.ensureUserIsSiteAdmin,
     AdminController.clearMessages
   )
+  // Owner #17c (2026-09-13): per-message delete from the hub admin pane.
+  webRouter.delete(
+    '/admin/messages/:message_id',
+    AuthorizationMiddleware.ensureUserIsSiteAdmin,
+    AdminController.deleteMessage
+  )
 
   privateApiRouter.get('/perfTest', (req, res) => {
     plainTextResponse(res, 'hello')

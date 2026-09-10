@@ -32,6 +32,17 @@ const SystemMessageManager = {
     await this.refreshCache()
   },
 
+  // single-message delete (owner #17c, 2026-09-13: only “clear all” existed)
+  async deleteMessage(messageId) {
+    const deleted = await SystemMessage.deleteOne({ _id: messageId }).exec()
+    if (deleted.deletedCount === 0) {
+      throw new Error('System message not found')
+    }
+    await SystemMessageManager.notifyOtherPods()
+    await this.refreshCache()
+    return true
+  },
+
   async notifyOtherPods() {
     if (!Settings.notifyOnSystemMessageChanges) return
     const redisFeatureSettings = Settings.redis.pubsub || Settings.redis.web
