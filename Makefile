@@ -197,9 +197,14 @@ test: test-go ## Run repo tests (Go services; node front-end uses 'unit'/'hub')
 go-build: ## Build all Go service binaries into ./bin
 	@mkdir -p bin
 	$(GO) build -o bin/linked-url-proxy ./cmd/linked-url-proxy
+	$(GO) build -o bin/webdavinterface ./cmd/webdavinterface
 
 .PHONY: go-run-linked-url-proxy
 go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
 	$(GO) run ./cmd/linked-url-proxy
+
+.PHONY: go-run-webdavinterface
+go-run-webdavinterface: ## Run the webdavinterface Go service (dev)
+	$(GO) run ./cmd/webdavinterface
 
 .DEFAULT_GOAL := help
