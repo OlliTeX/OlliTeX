@@ -24,6 +24,27 @@ import { handleValidationError } from '@overleaf/validation-tools'
 logger.initialize('clsi')
 logger.logger.serializers.clsiRequest = LoggerSerializers.clsiRequest
 
+// 2026-09 (owner #10): sandboxed compiles are MANDATORY — the DockerRunner
+// needs host paths for its bind-mounts. Fail fast at startup with a clear
+// message instead of breaking at the first compile.
+{
+  const missing = [
+    ['SANDBOXED_COMPILES_HOST_DIR_COMPILES', Settings.path?.sandboxedCompilesHostDirCompiles],
+    ['SANDBOXED_COMPILES_HOST_DIR_CACHE', Settings.path?.sandboxedCompilesHostDirCache],
+    ['SANDBOXED_COMPILES_HOST_DIR_OUTPUT', Settings.path?.sandboxedCompilesHostDirOutput],
+  ]
+    .filter(([, v]) => !v)
+    .map(([k]) => k)
+  if (missing.length) {
+    console.error(
+      '[clsi] FATAL: sandboxed compiles are mandatory in OlliTeX, but unset: ' +
+        missing.join(', ') +
+        ' (see the overleaf compose environment / toolkit seed)'
+    )
+    process.exit(1)
+  }
+}
+
 Metrics.open_sockets.monitor(true)
 Metrics.memory.monitor(logger)
 Metrics.leaked_sockets.monitor(logger)

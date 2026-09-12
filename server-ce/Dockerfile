@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/root/.cache \
 
 # Add the actual source files
 # ---------------------------
-COPY --parents libraries/ services/ tools/migrations/ /overleaf/
+COPY --parents libraries/ services/ tools/migrations/ docs/RELEASE_NOTES.md /overleaf/
 
 # Pre-stage the PnP cache zips for the three git-sourced codemirror dev deps
 # (byte-identical to the zips shipped in the official 6.3.0 image; checksums

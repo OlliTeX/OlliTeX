@@ -130,12 +130,17 @@ if (process.env.ALLOWED_COMPILE_GROUPS) {
   }
 }
 
-if ((process.env.DOCKER_RUNNER || process.env.SANDBOXED_COMPILES) === 'true') {
+// 2026-09 (owner #10): sandboxed (Docker) compiles are MANDATORY in OlliTeX —
+// the local (in-container) compile path is removed. The DockerRunner ships in
+// this repository, so there is no paid-tier gate on this feature anymore;
+// the default compile image is the official texlive/texlive:latest-full
+// (pin a different image via TEXLIVE_IMAGE / ALL_TEX_LIVE_DOCKER_IMAGES).
+{
   if (
-    !fs.existsSync(Path.join(__dirname, '..', 'app', 'js', 'DockerRunner.mjs')) // 2026-09 (K, owner): 6.3.0 ships the runner as ESM (DockerRunner.mjs)
+    !fs.existsSync(Path.join(__dirname, '..', 'app', 'js', 'DockerRunner.mjs'))
   ) {
     console.error(
-      'Sandboxed compiles are only available with Overleaf Server Pro. Compare Server Pro with Community Edition here: https://docs.overleaf.com/on-premises/welcome/server-pro-vs.-community-edition'
+      'Sandboxed compiles require the bundled DockerRunner.mjs (services/clsi/app/js/DockerRunner.mjs). This file is part of this repository — restore it to continue.'
     )
     process.exit(1)
   }
@@ -147,7 +152,7 @@ if ((process.env.DOCKER_RUNNER || process.env.SANDBOXED_COMPILES) === 'true') {
       image:
         process.env.TEXLIVE_IMAGE ||
         process.env.TEX_LIVE_DOCKER_IMAGE ||
-        (process.env.ALL_TEX_LIVE_DOCKER_IMAGES || 'quay.io/sharelatex/texlive-full:latest').split(',')[0].trim(),
+        (process.env.ALL_TEX_LIVE_DOCKER_IMAGES || 'texlive/texlive:latest-full').split(',')[0].trim(),
       env: {
         HOME: '/tmp',
         CLSI: 1,
@@ -258,10 +263,4 @@ if ((process.env.DOCKER_RUNNER || process.env.SANDBOXED_COMPILES) === 'true') {
   module.exports.path.sandboxedCompilesHostDirOutput =
     process.env.SANDBOXED_COMPILES_HOST_DIR_OUTPUT ||
     process.env.OUTPUT_HOST_DIR
-  if (!module.exports.path.sandboxedCompilesHostDirOutput) {
-    // TODO(das7pad): Enforce in a future major version of Server Pro.
-    // throw new Error(
-    //   'SANDBOXED_COMPILES enabled, but SANDBOXED_COMPILES_HOST_DIR_OUTPUT not set'
-    // )
-  }
 }

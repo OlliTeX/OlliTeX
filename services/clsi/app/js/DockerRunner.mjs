@@ -32,7 +32,11 @@ const DockerRunner = {
     command = command.map(arg =>
       arg.toString().replace('$COMPILE_DIR', '/compile')
     )
-    if (image == null) {
+    if (image == null || image === '' || image === 'undefined') {
+      // Clients built with URLSearchParams.stringify(undefined) request the
+      // literal string "undefined" (CE has no allowedImages guard, so it would
+      // otherwise reach Docker verbatim). Treat it as "no image requested".
+      // 2026-09 (word-count regression, paired with the web-side guard).
       image = Settings.clsi.docker.image
     }
 

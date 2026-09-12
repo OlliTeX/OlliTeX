@@ -139,6 +139,23 @@ services:
     volumes:
       - redis-data:/data
 
+  # 2026-09-16 (owner task T5): free local SMTP relay + capture API.
+  # Reuses the dev web build (node is present; entrypoint overridden).
+  # Check captured mail: curl http://127.0.0.1:8025/api/messages
+  smtpsink:
+    build:
+      context: ..
+      dockerfile: services/web/Dockerfile
+      target: dev
+    # env -u NODE_OPTIONS: the web build preloads its Yarn PnP hooks, which
+    # break running a standalone CJS script; the sink needs none of them.
+    entrypoint: ["env", "-u", "NODE_OPTIONS", "node"]
+    command: ["/sink/smtp-sink.js"]
+    volumes:
+      - ../tests/e2e/tools/smtp-sink.js:/sink/smtp-sink.js:ro
+    ports:
+      - "127.0.0.1:8025:8025"
+
   web:
     build:
       context: ..
@@ -157,13 +174,26 @@ services:
       # page (Admin > LLM Settings). See services/web/modules/languagetool.
       - LANGUAGE_TOOL_HOST=languagetool
       - LANGUAGE_TOOL_PORT=8010
+      # 2026-09-16 (owner task T5): local SMTP sink -> enables the
+      # password-reset / test e-mail / registration mails in local dev.
+      - OVERLEAF_EMAIL_FROM_ADDRESS=OlliTeX <noreply@example.com>
+      - OVERLEAF_EMAIL_DRIVER=smtp
+      - OVERLEAF_EMAIL_SMTP_HOST=smtpsink
+      - OVERLEAF_EMAIL_SMTP_PORT=1025
+      - OVERLEAF_EMAIL_SMTP_SECURE=false
+      # 2026-09 (mega-batch): SP cert for SAML SP-signing metadata (test fixture)
+      - OVERLEAF_SAML_PUBLIC_CERT=/e2e-saml/sp-cert.pem
+      # template gallery on by default (admin can toggle in /hub)
+      - OVERLEAF_TEMPLATE_GALLERY=true
     command: ["node", "app.mjs"]
     volumes:
       - sharelatex-data:/var/lib/overleaf
       - web-data:/overleaf/services/web/data
+      - ../tests/e2e/fixtures/saml/sp-cert.pem:/e2e-saml/sp-cert.pem:ro
     depends_on:
       - mongo
       - redis
+      - smtpsink
       - chat
       - clsi
       - docstore

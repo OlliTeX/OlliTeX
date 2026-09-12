@@ -1338,8 +1338,17 @@ async function wordCount(
     'wordcount',
     limits.compiler
   )
-  url.searchParams.set('file', filename)
-  url.searchParams.set('image', req.compile.options.imageName)
+  // Only set the query params when the values are real: URLSearchParams
+  // stringifies undefined as the text "undefined", which clsi would then pass
+  // straight to Docker ("No such image: undefined:latest") and break word
+  // count on CE instances (CE has no imageName and no allowedImages guard).
+  // 2026-09 (e2e regression: word-count modal 500).
+  if (filename != null) {
+    url.searchParams.set('file', filename)
+  }
+  if (req.compile.options.imageName) {
+    url.searchParams.set('image', req.compile.options.imageName)
+  }
 
   const requestWordCount = async opts => {
     const { body } = await _makeRequestWithClsiServerId(
@@ -1407,7 +1416,10 @@ async function syncTeX(
     'compileFromClsiCache',
     compileFromClsiCache && ['alpha', 'priority'].includes(compileGroup)
   )
-  url.searchParams.set('imageName', imageName)
+  // Same undefined-stringification guard as wordcount (see above).
+  if (imageName) {
+    url.searchParams.set('imageName', imageName)
+  }
   for (const [key, value] of Object.entries(validatedOptions)) {
     url.searchParams.set(key, value)
   }
