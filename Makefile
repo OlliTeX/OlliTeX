@@ -198,6 +198,9 @@ go-build: ## Build all Go service binaries into ./bin
 	@mkdir -p bin
 	$(GO) build -o bin/linked-url-proxy ./cmd/linked-url-proxy
 	$(GO) build -o bin/webdavinterface ./cmd/webdavinterface
+	$(GO) build -o bin/dropboxinterface ./cmd/dropboxinterface
+	$(GO) build -o bin/githubinterface ./cmd/githubinterface
+	$(GO) build -o bin/datamanipulator ./cmd/datamanipulator
 
 .PHONY: go-run-linked-url-proxy
 go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
@@ -206,5 +209,17 @@ go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
 .PHONY: go-run-webdavinterface
 go-run-webdavinterface: ## Run the webdavinterface Go service (dev)
 	$(GO) run ./cmd/webdavinterface
+
+.PHONY: go-run-dropboxinterface
+go-run-dropboxinterface: ## Run the dropboxinterface Go service (dev)
+	$(GO) run ./cmd/dropboxinterface
+
+.PHONY: go-run-githubinterface
+go-run-githubinterface: ## Run the githubinterface Go service (dev)
+	$(GO) run ./cmd/githubinterface
+
+.PHONY: go-run-datamanipulator
+go-run-datamanipulator: ## Run the datamanipulator Go service (dev)
+	$(GO) run ./cmd/datamanipulator
 
 .DEFAULT_GOAL := help
