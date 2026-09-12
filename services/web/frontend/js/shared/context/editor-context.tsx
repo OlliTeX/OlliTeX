@@ -1,8 +1,6 @@
 import {
   createContext,
-  Dispatch,
   FC,
-  SetStateAction,
   useCallback,
   useContext,
   useEffect,
@@ -19,11 +17,6 @@ import { useModalsContext } from '@/features/ide-react/context/modals-context'
 import { WritefullAPI } from './types/writefull-instance'
 import { Cobranding } from '../../../../types/cobranding'
 import { SymbolWithCharacter } from '../../../../modules/symbol-palette/frontend/js/data/symbols'
-
-type UpgradeTrackChangesModal = {
-  show: boolean
-  location?: string
-}
 
 export const EditorContext = createContext<
   | {
@@ -46,10 +39,6 @@ export const EditorContext = createContext<
       setTokenResetDate: (date: Date) => void
       writefullInstance: WritefullAPI | null
       setWritefullInstance: (instance: WritefullAPI) => void
-      upgradeTrackChangesModal: UpgradeTrackChangesModal
-      setUpgradeTrackChangesModal: Dispatch<
-        SetStateAction<UpgradeTrackChangesModal>
-      >
     }
   | undefined
 >(undefined)
@@ -114,8 +103,6 @@ export const EditorProvider: FC<React.PropsWithChildren> = ({ children }) => {
       : new Date()
   })
 
-  const [showUpgradeModal, setShowUpgradeModal] =
-    useState<UpgradeTrackChangesModal>({ show: false })
 
   const isPendingEditor = useMemo(
     () =>
@@ -203,8 +190,6 @@ export const EditorProvider: FC<React.PropsWithChildren> = ({ children }) => {
       setTokenResetDate,
       writefullInstance,
       setWritefullInstance,
-      upgradeTrackChangesModal: showUpgradeModal,
-      setUpgradeTrackChangesModal: setShowUpgradeModal,
     }),
     [
       cobranding,
@@ -226,8 +211,6 @@ export const EditorProvider: FC<React.PropsWithChildren> = ({ children }) => {
       setTokenResetDate,
       writefullInstance,
       setWritefullInstance,
-      showUpgradeModal,
-      setShowUpgradeModal,
     ]
   )
 

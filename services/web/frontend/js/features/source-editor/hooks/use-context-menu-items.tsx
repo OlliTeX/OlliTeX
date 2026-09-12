@@ -28,8 +28,6 @@ import {
 } from '../commands/clipboard'
 import { showClipboardPasteErrorToast } from '../components/clipboard-toasts'
 import { isVisual } from '../extensions/visual/visual'
-import { useEditorContext } from '@/shared/context/editor-context'
-import { useTrackingChangesMode } from '@/shared/hooks/use-tracking-changes-mode'
 import {
   sendContextMenuEvent,
   ContextMenuItemSegmentation,
@@ -57,9 +55,6 @@ export const useContextMenuItems = () => {
   const { shortcuts } = useCommandRegistry()
   const { features } = useProjectContext()
   const requestedPdfSyncRef = useRef(false)
-  const { setUpgradeTrackChangesModal } = useEditorContext()
-  const trackingChangesMode = useTrackingChangesMode()
-  const isReview = trackingChangesMode === 'review'
   const { changesInSelection, acceptChangesHandler, rejectChangesHandler } =
     useTrackedChangesActions()
   const { openDocWithId } = useEditorManagerContext()
@@ -165,14 +160,8 @@ export const useContextMenuItems = () => {
   const handleToggleTrackChanges = wrapForContextMenu(
     wantTrackChanges ? 'back-to-editing' : 'suggest-edits',
     () => {
-      // Matching the logic in review toggle to ensure consistency for server pro
-      if (!features.trackChanges && !isReview) {
-        setUpgradeTrackChangesModal({
-          show: true,
-          location: 'editor-context-menu',
-        })
-        return true
-      }
+      // SaaS sweep (2026-09-16, owner): track changes is free in OlliTeX —
+      // the paid-tier upgrade gate is gone.
       window.dispatchEvent(new Event('toggle-track-changes'))
       return true
     }

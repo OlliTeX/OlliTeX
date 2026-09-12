@@ -1,6 +1,3 @@
-import OLBadge from '@/shared/components/ol/ol-badge'
-import MaterialIcon from '@/shared/components/material-icon'
-import { useTranslation } from 'react-i18next'
 
 export default function IntegrationCard({
   href,
@@ -8,7 +5,6 @@ export default function IntegrationCard({
   title,
   description,
   icon,
-  showPaywallBadge,
   titleBadge,
 }: {
   href?: string
@@ -16,11 +12,8 @@ export default function IntegrationCard({
   title: string
   description: string
   icon: React.ReactNode
-  showPaywallBadge: boolean
   titleBadge?: React.ReactNode
 }) {
-  const { t } = useTranslation()
-
   const content = (
     <div className="integrations-panel-card-contents">
       <div className="integrations-panel-card-icon">{icon}</div>
@@ -30,15 +23,6 @@ export default function IntegrationCard({
             {title}
           </div>
           {titleBadge}
-          {showPaywallBadge && (
-            <OLBadge
-              prepend={<MaterialIcon type="star" />}
-              bg="light"
-              className="integrations-panel-card-premium-badge"
-            >
-              {t('premium')}
-            </OLBadge>
-          )}
         </div>
         <p className="integrations-panel-card-description">{description}</p>
       </div>

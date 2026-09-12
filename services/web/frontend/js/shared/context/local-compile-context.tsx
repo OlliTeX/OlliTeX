@@ -497,6 +497,12 @@ export const LocalCompileProvider: FC<React.PropsWithChildren> = ({
     rootDocId: string | null | undefined
   } | null>(null)
   const recordedActionsRef = useRef<Record<string, boolean>>({})
+  // 2026-09-11 (owner #10, sandboxed compiles): a compile may still be
+  // running in the sandbox sibling container when we get a
+  // "compile-in-progress" (423) answer. Instead of parking on the error
+  // surface forever, retry the compile a few times on a growing interval
+  // so the UI recovers automatically.
+  const inProgressRetryRef = useRef(0)
   const recordAction = useCallback((action: string) => {
     recordedActionsRef.current[action] = true
   }, [])
@@ -595,17 +601,29 @@ export const LocalCompileProvider: FC<React.PropsWithChildren> = ({
 
       switch (data.status) {
         case 'success':
+          inProgressRetryRef.current = 0
           setError(undefined)
           setShowLogs(false)
           break
 
         case 'stopped-on-first-error':
+          inProgressRetryRef.current = 0
           setError(undefined)
           setShowLogs(true)
           break
 
         case 'clsi-maintenance':
         case 'compile-in-progress':
+          if (inProgressRetryRef.current < 5) {
+            // keep the gentle “still compiling” surface, then auto-retry —
+            // the sandbox compile will have finished by then
+            inProgressRetryRef.current += 1
+            window.setTimeout(() => {
+              void compiler.compile({})
+            }, 7_000 * inProgressRetryRef.current)
+          }
+          setError(data.status)
+          break
         case 'exited':
         case 'failure':
         case 'project-too-large':
@@ -668,6 +686,7 @@ export const LocalCompileProvider: FC<React.PropsWithChildren> = ({
     setLogEntries,
     setLogEntryAnnotations,
     setPdfFile,
+    compiler,
   ])
 
   // switch to logs if there's an error

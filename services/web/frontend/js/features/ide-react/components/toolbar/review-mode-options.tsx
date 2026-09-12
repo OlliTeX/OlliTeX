@@ -6,7 +6,6 @@ import { sendMB } from '@/infrastructure/event-tracking'
 import { useIdeReactContext } from '../../context/ide-react-context'
 import { usePermissionsContext } from '../../context/permissions-context'
 import { useProjectContext } from '@/shared/context/project-context'
-import { useEditorContext } from '@/shared/context/editor-context'
 import { NestedMenuBarDropdown } from '@/shared/components/menu-bar/menu-bar-dropdown'
 import { useUserContext } from '@/shared/context/user-context'
 
@@ -29,7 +28,6 @@ const ReviewModeOptions: React.FC = () => {
   const { write, trackedWrite } = usePermissionsContext()
   const { permissionsLevel } = useIdeReactContext()
   const { features } = useProjectContext()
-  const { setUpgradeTrackChangesModal } = useEditorContext()
   const user = useUserContext()
 
   const mode = getMode(permissionsLevel, wantTrackChanges)
@@ -69,19 +67,14 @@ const ReviewModeOptions: React.FC = () => {
             if (mode === 'review') {
               return
             }
-            if (!features.trackChanges) {
-              setUpgradeTrackChangesModal({
-                show: true,
-                location: 'menu-bar',
-              })
-            } else {
-              sendMB('editing-mode-change', {
-                role: permissionsLevel,
-                previousMode: mode,
-                newMode: mode,
-              })
-              window.dispatchEvent(new Event('toggle-track-changes'))
-            }
+            // SaaS sweep (2026-09-16, owner): OlliTeX is fully open source and
+            // has no paid tier — track changes is free, no upgrade modal.
+            sendMB('editing-mode-change', {
+              role: permissionsLevel,
+              previousMode: mode,
+              newMode: mode,
+            })
+            window.dispatchEvent(new Event('toggle-track-changes'))
           }}
           leadingIcon="rate_review"
           active={trackedWrite && mode === 'review'}

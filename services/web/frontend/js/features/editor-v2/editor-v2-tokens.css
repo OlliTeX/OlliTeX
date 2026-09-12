@@ -26,27 +26,35 @@
   --border-radius-base: 8px;
 }
 
+/* 2026-09 (a11y hardening): the editor chrome text tokens must NOT route
+   through `--mantine-color-text`. That variable flips with Mantine's scheme
+   state, which can lag the app's body[data-theme] (mixed-scheme flash on
+   boot / theme switches) — axe flags the history-panel switch
+   (toggle-switch-all-history) when the two disagree. Pin both schemes to the
+   app's own neutral extremes (dark text on light surfaces, light text on
+   dark surfaces) so the pair holds ≥4.5:1 in every state.
+   light: #1b1c1d on #ffffff ≈ 17:1 · dark: #f4f5f6 on #1b222c ≈ 15:1 */
 html[data-mantine-color-scheme='light'] .ol-editor-mantine {
-  --content-primary: var(--mantine-color-text);
-  --content-primary-themed: var(--mantine-color-text);
+  --content-primary: #1b1c1d;
+  --content-primary-themed: #1b1c1d;
   --content-secondary: var(--mantine-color-gray-7);
   --content-secondary-themed: var(--mantine-color-gray-7);
   --bg-primary-themed: var(--mantine-color-white);
   --bg-secondary-themed: var(--mantine-color-gray-0);
   --border-divider-themed: var(--mantine-color-border);
-  --toolbar-btn-color: var(--mantine-color-text);
+  --toolbar-btn-color: #1b1c1d;
 }
 
 html[data-mantine-color-scheme='dark'] .ol-editor-mantine {
-  --content-primary: var(--mantine-color-text);
-  --content-primary-themed: var(--mantine-color-text);
+  --content-primary: #f4f5f6;
+  --content-primary-themed: #f4f5f6;
   --content-secondary: var(--mantine-color-gray-4);
   --content-secondary-themed: var(--mantine-color-gray-4);
-  --content-primary-dark: var(--mantine-color-text);
+  --content-primary-dark: #f4f5f6;
   --bg-primary-themed: var(--mantine-color-dark-9);
   --bg-secondary-themed: var(--mantine-color-dark-8);
   --border-divider-themed: var(--mantine-color-border);
-  --toolbar-btn-color: var(--mantine-color-text);
+  --toolbar-btn-color: #f4f5f6;
 }
 
 /* P2 — renovated chrome (Mantine toolbar frame + rail icon bar) */

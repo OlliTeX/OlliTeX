@@ -14,9 +14,7 @@ import { usePermissionsContext } from '@/features/ide-react/context/permissions-
 import usePersistedState from '@/shared/hooks/use-persisted-state'
 import { sendMB } from '@/infrastructure/event-tracking'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
-import { useProjectContext } from '@/shared/context/project-context'
 import { useCodeMirrorViewContext } from '@/features/source-editor/components/codemirror-context'
-import { useEditorContext } from '@/shared/context/editor-context'
 import { useTrackingChangesMode } from '@/shared/hooks/use-tracking-changes-mode'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
 
@@ -28,8 +26,6 @@ function ReviewModeDropdownItems() {
   const mode = useTrackingChangesMode()
   const { permissionsLevel } = useIdeReactContext()
   const { write, trackedWrite } = usePermissionsContext()
-  const { features } = useProjectContext()
-  const { setUpgradeTrackChangesModal } = useEditorContext()
   const showViewOption = permissionsLevel === 'readOnly'
   const view = useCodeMirrorViewContext()
 
@@ -67,24 +63,18 @@ function ReviewModeDropdownItems() {
             view.focus()
             return
           }
-          if (!features.trackChanges) {
-            setUpgradeTrackChangesModal({
-              show: true,
-              location: 'review-switcher',
-            })
+          // SaaS sweep (2026-09-16, owner): track changes is free in OlliTeX.
+          sendMB('editing-mode-change', {
+            role: permissionsLevel,
+            previousMode: mode,
+            newMode: 'review',
+          })
+          if (user?.id) {
+            saveTrackChangesForCurrentUser(true)
           } else {
-            sendMB('editing-mode-change', {
-              role: permissionsLevel,
-              previousMode: mode,
-              newMode: 'review',
-            })
-            if (user?.id) {
-              saveTrackChangesForCurrentUser(true)
-            } else {
-              saveTrackChanges({ on_for_guests: true })
-            }
-            view.focus()
+            saveTrackChanges({ on_for_guests: true })
           }
+          view.focus()
         }}
         description={
           permissionsLevel === 'review' && !trackedWrite

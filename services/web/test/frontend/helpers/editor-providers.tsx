@@ -340,8 +340,6 @@ export function makeEditorProvider({
       setWritefullInstance: () => {},
       cobranding,
       isRestrictedTokenMember,
-      upgradeTrackChangesModal: { show: false },
-      setUpgradeTrackChangesModal: () => {},
     }
 
     return (

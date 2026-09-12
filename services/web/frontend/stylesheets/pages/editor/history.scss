@@ -98,11 +98,16 @@ history-root {
     flex: 1;
 
     // guaranteed-readable label in both light and dark (secondary tokens
-    // can fall below 4.5:1 on mid dark surfaces)
+    // can fall below 4.5:1 on mid dark surfaces) — 2026-09 a11y hardening:
+    // pin to a solid, scheme-stable pair (never inherit mid tones over a
+    // semi-transparent or Mantine-state-driven surface).
     span {
       display: block;
 
       color: var(--content-primary-themed);
+      background-color: var(--bg-primary-themed);
+      border-radius: 4px;
+      padding: 2px 0;
     }
   }
 

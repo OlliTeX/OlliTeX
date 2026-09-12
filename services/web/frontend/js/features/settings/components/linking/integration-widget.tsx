@@ -1,6 +1,5 @@
 import { useCallback, useState, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import OLBadge from '@/shared/components/ol/ol-badge'
 import getMeta from '../../../../utils/meta'
 import { sendMB } from '../../../../infrastructure/event-tracking'
 import OLButton from '@/shared/components/ol/ol-button'
@@ -12,9 +11,6 @@ import {
   OLModalTitle,
 } from '@/shared/components/ol/ol-modal'
 
-function trackUpgradeClick(integration: string) {
-  sendMB('settings-upgrade-click', { integration })
-}
 
 function trackLinkingClick(integration: string) {
   sendMB('link-integration-click', { integration, location: 'Settings' })
@@ -69,7 +65,6 @@ export function IntegrationLinkingWidget({
       <div className="description-container">
         <div className="title-row">
           <h4 id={id}>{title}</h4>
-          {!hasFeature && <OLBadge bg="info">{t('premium_feature')}</OLBadge>}
         </div>
         <p className="small">
           {description}{' '}

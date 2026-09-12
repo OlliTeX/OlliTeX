@@ -28,7 +28,6 @@ import { useProjectContext } from '@/shared/context/project-context'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
 import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
 import { useEditorPropertiesContext } from '@/features/ide-react/context/editor-properties-context'
-import UpgradeTrackChangesModal from '@/features/review-panel/components/upgrade-track-changes-modal'
 
 // TODO: remove this when definitely no longer used
 export * from './codemirror-context'
@@ -122,7 +121,6 @@ function CodeMirrorEditorComponents({
         ))}
       {features.trackChangesVisible && <ReviewPanelTabsHeaderPortal />}
       {features.trackChangesVisible && <ReviewPanelRoot />}
-      {features.trackChangesVisible && <UpgradeTrackChangesModal />}
 
       {sourceEditorComponents.map(
         ({ import: { default: Component }, path }) => (
