@@ -43,3 +43,5 @@ tests/e2e/parity/reference/
 /nav_structure.md
 /BRANDING.md
 /ext_explain.md
+# Go service build output (make go-build)
+/bin/

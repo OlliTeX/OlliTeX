@@ -104,8 +104,8 @@ image: ## Rebuild the server-ce docker image (make all)
 	cd $(IMAGE_DIR) && make all
 
 .PHONY: clean
-clean: ## Remove local caches (prettier/eslint)
-	rm -rf ./.cache
+clean: ## Remove local caches (prettier/eslint) + Go binaries
+	rm -rf ./.cache ./bin ./coverage-go.out
 
 .PHONY: wiki-shots
 wiki-shots: ## Regenerate the wiki screenshots + data-safety gate (needs the e2e stack up)
@@ -143,5 +143,63 @@ release: selftest ## Gate + docker image; promotion (push/cycle/probe) stays a m
 hooks-install: ## Install repo git hooks (pre-push fast gate) — `git config core.hooksPath hooks`
 	git config core.hooksPath hooks
 	@echo "git hooks enabled (core.hooksPath=hooks); run this on each fresh clone"
+
+# ----------------------------------------------------------------------------
+# Go microservice conversions (owner task 0-6, 2026-09-12).
+#
+# 1:1 Go ports of the Node.js microservices live under services/<name>.go
+# (package services); runnable entrypoints live under cmd/<service>/. The
+# Makefile targets follow the Forgejo Go convention (lint-go / fmt / tidy /
+# test). Toolchain: Go 1.27 (https://go.dev/dl/go1.27.1.linux-amd64.tar.gz).
+# These are core-tool based (gofmt / go vet / go test) so they run offline.
+# ----------------------------------------------------------------------------
+GO      ?= go
+GO_PKGS ?= ./services/... ./cmd/...
+
+.PHONY: go-check
+go-check: ## Verify the Go toolchain is present and >= 1.27
+	@$(GO) version
+	@$(GO) env GOVERSION
+
+.PHONY: fmt-go
+fmt-go: ## gofmt (write) on the Go services
+	$(GO) fmt $(GO_PKGS)
+
+.PHONY: fmt
+fmt: fmt-go ## Forgejo-friendly alias for fmt-go
+
+.PHONY: lint-go-vet
+lint-go-vet: ## go vet on the Go services
+	$(GO) vet $(GO_PKGS)
+
+.PHONY: lint-go-fix
+lint-go-fix: ## Apply auto-fixes (gofmt -w) to the Go services
+	$(GO) fmt $(GO_PKGS)
+
+.PHONY: lint-go
+lint-go: ## Go lint gate: gofmt-clean + go vet (+ golangci-lint if installed)
+	@test -z "$$(gofmt -l services/*.go 2>/dev/null)" || { echo "gofmt: reformat the files above (make fmt-go)"; exit 1; }
+	$(GO) vet $(GO_PKGS)
+	@if command -v golangci-lint >/dev/null 2>&1; then golangci-lint run $(GO_PKGS); else echo "(golangci-lint not installed — applied core go vet; optional: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest)"; fi
+
+.PHONY: tidy
+tidy: ## go mod tidy
+	$(GO) mod tidy
+
+.PHONY: test-go
+test-go: ## Run the Go service test suite (race detector + coverage)
+	$(GO) test -race -cover -count=1 $(GO_PKGS)
+
+.PHONY: test
+test: test-go ## Run repo tests (Go services; node front-end uses 'unit'/'hub')
+
+.PHONY: go-build
+go-build: ## Build all Go service binaries into ./bin
+	@mkdir -p bin
+	$(GO) build -o bin/linked-url-proxy ./cmd/linked-url-proxy
+
+.PHONY: go-run-linked-url-proxy
+go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
+	$(GO) run ./cmd/linked-url-proxy
 
 .DEFAULT_GOAL := help
