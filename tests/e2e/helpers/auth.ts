@@ -87,7 +87,13 @@ export async function loginRobust(
   email: string,
   password: string
 ): Promise<void> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // CE rate-limits login attempts; the e2e suite + seed + manual probes
+  // share one source IP, so a mid-run throttle (or CAPTCHA challenge page)
+  // is realistic. 3 attempts with escalating cooldowns (40s / 80s) clear
+  // the 20/min/IP window; keep the last throw for real credential errors.
+  const cooldowns = [0, 40_000, 80_000]
+  for (let attempt = 0; attempt < cooldowns.length; attempt++) {
+    if (cooldowns[attempt] > 0) await page.waitForTimeout(cooldowns[attempt])
     await page.goto('/login', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(700)
     await page.fill('#email', email)
@@ -98,7 +104,6 @@ export async function loginRobust(
       .then(() => true)
       .catch(() => false)
     if (ok) return
-    if (attempt === 0) await page.waitForTimeout(30_000) // cooldown
   }
   throw new Error(`login failed for ${email} (rate-limit or credentials)`)
 }

@@ -21,29 +21,45 @@ test.describe('M5 template gallery surfaces', () => {
     page = await c.newPage()
     page.on('pageerror', (e: Error) => pageErrors.push(String(e)))
     await loginRobust(page, 'e2e-admin@e2e.test', 'Ol-Fixture-9x7K')
+
+    // 2026-09-11 (mega-batch): the "template details" test needs at least one
+    // published template. Earlier full-suite greens relied on ANOTHER spec
+    // having created one first (order-fragile on fresh stacks); make it
+    // deterministic: publish one from the seed project when none exists.
+    try {
+      const lst = await api(page, 'GET', '/api/templates')
+      const j: any = await lst.json().catch(() => null)
+      const arr: any[] = Array.isArray(j) ? j : (j?.templates || j?.items || [])
+      if (arr.length === 0) {
+        const pj: any = await api(page, 'GET', '/api/projects').then(r => r.json().catch(() => null))
+        const parr: any[] = Array.isArray(pj) ? pj : (pj?.projects || [])
+        const seed = parr.find(x => (x.name || x.title) === 'e2e-seed-project') || parr[0]
+        if (seed?._id) {
+          await api(page, 'POST', '/template/new/' + seed._id, {
+            name: 'E2E seed template',
+            category: 'academic-journal',
+          }).catch(() => {}) // best-effort fixture; absence is asserted below
+        }
+      }
+    } catch { /* the fixture is permissive (the test tolerates an empty list) */ }
   })
 
   test.afterAll(async () => {
     await c.close().catch(() => {})
   })
 
-  test('template gallery: legacy surface, zero Mantine Button leak, works', async () => {
+  test('template gallery: legacy route retired → hub gallery renders (owner items 7+9)', async () => {
+    // the legacy /templates page is removed; the route 301s into the hub
+    // gallery, which is where the Mantine-surface QA now applies.
     await page.goto(B + '/templates', { waitUntil: 'load' })
     await page.waitForTimeout(3500)
+    expect(page.url(), 'redirected into the hub gallery').toMatch(/\/hub#\/?templates/i)
     const body = await page.locator('body').innerText()
-    expect(body.toLowerCase(), 'the template gallery must render').toMatch(/template/i)
-    const legacyButtons = await page.locator('.btn').count()
-    const mantineButtons = await page.locator('.mantine-Button-root').count()
-    expect(
-      legacyButtons,
-      'gallery affordances must stay legacy OLButtons on the context-free page'
-    ).toBeGreaterThanOrEqual(0)
-    expect(mantineButtons, 'no Mantine Buttons on the context-free gallery page').toBe(0)
+    expect(body.toLowerCase(), 'the hub gallery must render').toMatch(/template/i)
     expect(pageErrors, 'no pageerrors: ' + pageErrors.join(' | ')).toEqual([])
   })
 
-  test('template details: legacy surface, zero leak', async () => {
-    // find a template id via the API (admin sees all)
+  test('template details: legacy route retired → hub gallery (owner item 9)', async () => {
     const res = await api(page, 'GET', '/api/templates')
     const list: any = await res.json().catch(() => [])
     const arr = Array.isArray(list) ? list : list?.items || list?.templates || []
@@ -52,10 +68,8 @@ test.describe('M5 template gallery surfaces', () => {
     const id = tpl._id || tpl.id
     await page.goto(B + '/template/' + id, { waitUntil: 'load' })
     await page.waitForTimeout(3000)
+    expect(page.url(), 'redirected into the hub gallery').toMatch(/\/hub#\/?templates/i)
     const body = await page.locator('body').innerText()
-    expect(body.toLowerCase(), 'the template details must render').toMatch(/template|use template|edit|delete|bundle/i)
-    const mantineButtons = await page.locator('.mantine-Button-root').count()
-    expect(mantineButtons, 'no Mantine Buttons on the context-free details page').toBe(0)
-    expect(pageErrors, 'no pageerrors: ' + pageErrors.join(' | ')).toEqual([])
-  })
-})
+    expect(body.toLowerCase(), 'the hub gallery must render').toMatch(/template/i)
+    expect(pageErrors, 'no pageerrors: ' + pageErrors.join(' | ').slice(0, 240)).toEqual([])
+  })})

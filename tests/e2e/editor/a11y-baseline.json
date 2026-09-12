@@ -1,14 +1,9 @@
 {
-  "capturedAt": "2026-09-09T15:43:14.313Z",
-  "url": "/Project/6aa17e896827dafb3ab161ad",
+  "capturedAt": "2026-09-12T09:52:44.691Z",
+  "url": "/Project/6aa520e3e3bdf04afd04d2d2",
   "base": {
     "label": "editor base surface",
-    "critical": [
-      {
-        "id": "button-name",
-        "nodes": 1
-      }
-    ],
+    "critical": [],
     "serious": [],
     "moderate": []
   },

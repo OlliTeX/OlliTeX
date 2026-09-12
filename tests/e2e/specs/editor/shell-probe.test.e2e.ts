@@ -32,14 +32,23 @@ test('renovated shell active on /editor: marker + dataset + shell CSS loaded + I
     return {
       markerClass: root ? root.classList.contains('ol-editor-mantine') : false,
       datasetVariant: root ? (root.dataset.olEditorVariant ?? '') : '',
-      shellCss: Array.from(document.querySelectorAll('link[rel=stylesheet]'))
-        .map(l => l.getAttribute('href') || '')
-        .some(h => /\/894-[0-9a-f]+\.css/.test(h)),
+      shellCss: (() => {
+        try {
+          for (const ss of document.styleSheets) {
+            try {
+              for (const r of ss.cssRules) {
+                if (String(r.cssText || '').includes('ol-editor-mantine')) return true
+              }
+            } catch {}
+          }
+        } catch {}
+        return false
+      })(),
     }
   })
   expect(probe.markerClass, 'expected .ol-editor-mantine on #ide-root').toBe(true)
   expect(probe.datasetVariant).toBe('mantine')
-  expect(probe.shellCss, 'shell chunk CSS (Mantine) must be loaded on /editor').toBe(true)
+  expect(probe.shellCss, 'shell CSS rules (editor-v2 tokens) must be loaded on /editor').toBe(true)
 })
 
 test('renovated shell dormant on /Project: marker absent, shell CSS not loaded', async ({ page }) => {
@@ -55,9 +64,18 @@ test('renovated shell dormant on /Project: marker absent, shell CSS not loaded',
     const root = document.getElementById('ide-root')
     return {
       markerClass: root ? root.classList.contains('ol-editor-mantine') : false,
-      shellCss: Array.from(document.querySelectorAll('link[rel=stylesheet]'))
-        .map(l => l.getAttribute('href') || '')
-        .some(h => /\/894-[0-9a-f]+\.css/.test(h)),
+      shellCss: (() => {
+        try {
+          for (const ss of document.styleSheets) {
+            try {
+              for (const r of ss.cssRules) {
+                if (String(r.cssText || '').includes('ol-editor-mantine')) return true
+              }
+            } catch {}
+          }
+        } catch {}
+        return false
+      })(),
     }
   })
   expect(probe.markerClass, 'legacy /Project must not carry the renovated marker').toBe(false)

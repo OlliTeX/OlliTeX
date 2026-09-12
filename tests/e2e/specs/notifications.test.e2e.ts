@@ -24,21 +24,25 @@ test('notification preferences: legacy URL redirects to hub; mute toggle round-t
   const bodyText = await page.locator('body').innerText()
   expect(bodyText.toLowerCase()).toMatch(/notification/)
 
-  const mute = page.getByRole('switch').first()
+  const mute = page.locator('label.mantine-Switch-body').first()
   if ((await mute.count()) === 0) {
     test.info().annotations.push({ type: 'skip', description: 'mute control not on this revision' })
     return
   }
 
-  const want = !(await mute.isChecked())
-  await mute.click({ force: true }) // Mantine Switch: the track span covers the input
+  // 2026-09 (mega-batch): the role=switch input is visually hidden under the
+  // styled track — force-clicking the input does not reliably toggle it.
+  // Click the Mantine label (labels natively toggle their input).
+  const muteInput = mute.locator('input').first()
+  const want = !(await muteInput.isChecked())
+  await mute.click()
   await page.waitForTimeout(1200)
 
   // persist across reload
   await page.goto('/hub#/mysettings.email', { waitUntil: 'domcontentloaded' })
-  await expect(page.getByRole('switch').first()).toBeChecked(want)
+  await expect(page.locator('label.mantine-Switch-body').first().locator('input').first()).toBeChecked(want)
 
   // restore
-  await page.getByRole('switch').first().click({ force: true })
+  await page.locator('label.mantine-Switch-body').first().click()
   await page.waitForTimeout(900)
 })

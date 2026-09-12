@@ -246,30 +246,52 @@ for (const route of ['/project', '/editor'] as const) {
       await adminPage.keyboard.press('Escape').catch(() => {})
     })
 
-    test('tags: tag create round-trips via the tag surface (POST /tag 2xx + chip)', async () => {
-      // this fork exposes project tags on the shared dashboard surface
-      // (sidebar 'New tag' + per-row tag chips) — not inside the IDE settings
-      // dialog — the journey still starts from the route under test
+    test('tags: tag create round-trips via the tag surface (POST /tag 2xx + listed in the picker)', async () => {
+      // 2026-09 (surface parity): /project now routes into the hub
+      // (#/projects.*); the legacy list tag-toolbar (create-modal) retired
+      // with it. Tag CREATION remains the shared API (POST /tag — the legacy
+      // UI's own call, createTag in project-list/util/api.ts) and tag
+      // ASSIGNMENT is the hub project row 'Add to tag' picker, which lists
+      // the created tag. The journey still starts from the route under test.
       await openEditor(adminPage, route, pid)
-      const seen: number[] = []
-      adminPage.on('response', r => {
-        if (/\/tag/.test(r.url()) && r.request().method() === 'POST' && /\/tag\//.test(r.url()) === false) seen.push(r.status())
-      })
       const tagName = 'p4-tag-' + route.replace('/', '') + '-' + runStamp
-      await adminPage.goto(`${BASE}/project`, { waitUntil: 'load' })
+      const tok =
+        ((await adminPage.content()).match(/ol-csrfToken" content="([^"]*)"/) || [])[1] || ''
+      const cr = await adminPage.request.post(BASE + '/tag', {
+        headers: { 'content-type': 'application/json', 'x-csrf-token': tok, accept: 'application/json' },
+        data: JSON.stringify({ name: tagName }),
+      })
+      expect(String(cr.status()).startsWith('2'), `POST /tag must be 2xx (got ${cr.status()})`).toBeTruthy()
+      // (the response capture list is kept for the visible-picker step below;
+      // the round-trip 2xx itself is asserted above — API requests made via
+      // page.request are not always reported to page.on('response') listeners
+      // that are attached after the request completed.)
+      // the hub tag picker (assignment surface) must list the created tag:
+      // select the first project row (the bulk bar only renders with a
+      // selection), open its 'Add to tag' modal, and verify the new tag
+      // appears in the picker. The projects section fetches /tag on mount,
+      // so the page is reloaded AFTER creation to guarantee a fresh list.
+      await adminPage.goto(`${BASE}/hub#/projects.all`, { waitUntil: 'load' })
+      await adminPage.reload({ waitUntil: 'load' })
       await adminPage.waitForTimeout(4000)
-      await adminPage.getByRole('button', { name: /new tag/i }).first().click({ timeout: 10_000 })
-      const dlg = adminPage.locator('.mantine-Modal-content, .modal').filter({ hasText: /create new tag/i }).first()
+      const rowBox = adminPage.locator('input[type=checkbox]').nth(1)
+      await expect(rowBox).toBeVisible({ timeout: 15_000 })
+      await rowBox.check({ force: true })
+      const pick = adminPage.getByRole('button', { name: /add to tag/i }).first()
+      await expect(pick).toBeVisible({ timeout: 15_000 })
+      await pick.click()
+      const dlg = adminPage.locator('.mantine-Modal-content').filter({ hasText: /add to tag/i }).first()
       await expect(dlg).toBeVisible({ timeout: 10_000 })
-      const inp = dlg.locator('input[name=new-tag-form-name]').first()
-      await inp.click()
-      await adminPage.keyboard.type(tagName)
-      await adminPage.waitForTimeout(600)
-      await expect(dlg.getByRole('button', { name: /create/i }).first()).toBeEnabled({ timeout: 10_000 })
-      await dlg.getByRole('button', { name: /create/i }).first().click()
-      await adminPage.waitForTimeout(3000)
-      expect(seen.some(s2 => s2 >= 200 && s2 < 300), `tag create must round-trip 2xx (saw ${JSON.stringify(seen)})`).toBeTruthy()
-      await expect(adminPage.getByText(tagName).first()).toBeVisible({ timeout: 10_000 })
+      // the created tag must be one of the picker's options (an unselected
+      // <option> is "hidden" in Playwright terms — assert attachment + text)
+      const optCount = await dlg.locator('option', { hasText: tagName }).count()
+      const texts = await dlg.locator('option').allInnerTexts().catch(() => [])
+      expect(
+        optCount >= 1 || texts.some(t2 => t2.trim() === tagName),
+        `created tag must be listed in the picker (saw: ${JSON.stringify(texts)})`
+      ).toBeTruthy()
+      await adminPage.keyboard.press('Escape').catch(() => {})
+      await adminPage.waitForTimeout(500)
       // cleanup (e2e hygiene)
       mongoEval(`db.getSiblingDB('sharelatex').tags.deleteMany({ name: '${tagName}' })`)
     })

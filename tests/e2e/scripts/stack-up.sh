@@ -28,6 +28,19 @@ gen_b64() { openssl rand -base64 32; }
 } > .env.test
 echo "[stack] generated fresh bootstrap secrets (.env.test, gitignored)"
 
+# 2026-09 (PDF-404 root fix): the sandboxed-compile dirs are bind-mounted at
+# /var/lib/overleaf/data/{compiles,cache,output} (SAME PATH on host, per the
+# docker-daemon contract, AND the path the image's baked clsi-nginx.conf
+# serves output from). Pre-create them owned by the texlive image user (uid
+# 33) so the sandbox container can write; the docker daemon would
+# otherwise create them root-owned and compiles would fail with EACCES.
+for d in compiles cache output; do
+  mkdir -p "/var/lib/overleaf/data/$d" 2>/dev/null || true
+  chmod 777 "/var/lib/overleaf/data/$d" 2>/dev/null || true
+  chown 33:33 "/var/lib/overleaf/data/$d" 2>/dev/null || true
+
+done
+
 "${DC[@]}" up -d
 
 echo "[stack] waiting for /login (timeout 900s)..."

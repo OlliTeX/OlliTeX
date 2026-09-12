@@ -77,8 +77,13 @@ async function expectPdfRendered(page: import('@playwright/test').Page) {
   // wait for the pdf pane to settle. Success = the viewer's Download link
   // (points at the compiled output.pdf) or the paged preview; failure =
   // the standard "There was a problem" / error surface.
+  // 2026-09 (owner #10): sandboxes compiles now run in a sibling pandoc/typst
+  // container asynchronously — the download link can appear while the
+  // sibling is still finishing, so keep polling until the artifact actually
+  // fetches as a real PDF (the previous instant-fetch 404 was this race).
+  const link = page.locator('a[href*="output.pdf"], a:has-text("Download PDF")').first()
   await expect(async () => {
-    const bodyText = (await page.locator('body').innerText()).slice(0, 200_000)
+    const bodyText = (await page.locator('body').innerText().catch(() => '')).slice(0, 200_000)
     const failed =
       /There was a problem rendering|Compile error|typst: error|Compilation failed/i.test(
         bodyText
@@ -89,18 +94,20 @@ async function expectPdfRendered(page: import('@playwright/test').Page) {
     const preview = await page
       .locator('[aria-label="PDF preview"], .pdf-preview-pane')
       .count()
-    expect(failed).toBe(false)
-    expect(download > 0 || preview > 0).toBeTruthy()
-  }).toPass({ timeout: 120_000 })
-
-  // hard assertion: the compiled artifact exists and is a real PDF
-  const link = page.locator('a[href*="output.pdf"]').first()
-  const href = await link.getAttribute('href')
-  expect(href).toBeTruthy()
-  const resp = await page.request.get(href)
-  expect(resp.ok()).toBeTruthy()
-  const buf = await resp.body()
-  expect(buf.subarray(0, 5).toString()).toBe('%PDF-')
+    if (failed) throw new Error('compile error surface visible')
+    if (download === 0 && preview === 0) throw new Error('no download/preview yet')
+    const href = await link.getAttribute('href').catch(() => null)
+    if (href) {
+      const resp = await page.request.get(href)
+      const ok = resp.ok()
+      if (ok) {
+        const buf = await resp.body()
+        if (buf.subarray(0, 5).toString() !== '%PDF-') throw new Error('not a PDF yet')
+        return
+      }
+    }
+    throw new Error('PDF artifact not ready')
+  }).toPass({ timeout: 180_000 })
 }
 
 test.describe.configure({ mode: 'serial' })

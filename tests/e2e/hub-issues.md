@@ -6,7 +6,7 @@ Verified against: production `https://psintern.neuro.uni-bremen.de/hub` (owner c
 
 | # | sev | area (leaf) | Issue → Required state | Status |
 |---|-----|-------------|------------------------|--------|
-| 0 | P2 | brand | **Rename OlliTex → LibreLeaf**: every user-visible occurrence (hub header, page titles, navbar, footers, manifest, about). Internal code identifiers may stay; document the mapping. | open |
+| 0 | P2 | brand | **Rename OlliTex → LibreLeaf** → REVERSED 2026-09-16 by owner: all user-visible occurrences are **OlliTeX** again (footers/titles/manifest; `web.sitemanifest.json` name = OlliTeX; Makefile + e2e comments updated). Stale compiled `app/views/*.js` build residue + generated `public/` bundles regenerate on build. | done |
 | 1 | P2 | hub header | Replace icon+text block (OlliTex / "Workspace & administration") with **logo_full.svg** (app logo asset). | open |
 | 2 | P1 | `#/overview` | "Instance management" shortcut buttons (Site settings/Manage users/Manage projects/Templates/LLM instance) do nothing → **make them navigate** to the hub sections (Q4: or remove). | open |
 | 3 | P2 | `#/projects.*` | **Remove** in-page filter tab group (Projects/Your projects/Shared with you/Archived) — rail already has these. | open |

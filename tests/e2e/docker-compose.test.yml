@@ -12,12 +12,14 @@ name: ol-e2e
 
 services:
   mongo:
-    # 6.0: fresh mongo 8.x builds are kernel-incompatible on this host
-    # (7.0.0 kernel: SERVER-121912 gate on 8.3-late/8.4, hard segfaults
-    # under load on 8.0/8.2) — verified 6.0 survives the migration load.
-    # The image's "Mongo >= 8.0" boot check is overridden via OL_MIN_MONGO_*
-    # (production default unchanged; see check-mongodb.mjs).
-    image: mongo:6.0
+    # 2026-09-16 (owner task T9): same DB as prod (mongo 8.3). Fresh 8.x used
+    # to segfault on this host's kernel (SERVER-121912 / SHSTK) — the fix is
+    # the GLIBC hwcaps workaround the toolkit already uses for the prod
+    # mongo (tools/toolkit/lib/docker-compose.mongo.yml). Data volume is
+    # disposable: stack-reset + reseed after the bump.
+    image: mongo:8.3
+    environment:
+      GLIBC_TUNABLES: glibc.cpu.hwcaps=-SHSTK
     command: --replSet overleaf
     volumes:
       - mongo-data:/data/db
@@ -43,6 +45,27 @@ services:
       retries: 20
     networks: [e2e]
 
+  # 2026-09-16 (owner task T5): free in-stack SMTP relay + capture API.
+  # Zero registry pulls (Mailpit image unreachable from this box): a
+  # zero-dependency Node sink on the local overleaf node image (node 24).
+  # SMTP :1025 (in-network, no auth) · API :8025 → 127.0.0.1:18025 for the
+  # smtp-capture spec.
+  smtpsink:
+    image: ${OVERLEAF_IMAGE:-sharelatex/sharelatex:main}
+    # env -u NODE_OPTIONS: the overleaf image preloads its Yarn PnP hooks
+    # (--require .pnp.cjs / --import .pnp.register.mjs), which breaks running
+    # a standalone CJS script; the sink needs none of them.
+    entrypoint: ['env', '-u', 'NODE_OPTIONS', 'node']
+    command: ['/sink/smtp-sink.js']
+    environment:
+      SINK_SMTP_PORT: '1025'
+      SINK_API_PORT: '8025'
+    volumes:
+      - ./tools/smtp-sink.js:/sink/smtp-sink.js:ro
+    ports:
+      - '127.0.0.1:18025:8025'
+    networks: [e2e]
+
   overleaf:
     image: ${OVERLEAF_IMAGE:-sharelatex/sharelatex:ext-6.3.0-port}
     hostname: overleaf
@@ -62,15 +85,51 @@ services:
       # reads these; the tex clsi is untouched)
       TYPST_COMPILES_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
       TYPST_OUTPUT_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
+      # 2026-09-16 (owner #10): tex compiles are SANDBOX-MANDATORY (clsi
+      # DockerRunner; LocalCommandRunner removed). SAME-PATH contract: the
+      # texlive/texlive:latest-full image (uid 33) bind-mounts these host
+      # dirs at the identical container paths.
+      # 2026-09 (PDF-404 root fix): the image's baked clsi-nginx.conf serves
+      # compile OUTPUT from root /var/lib/overleaf/data/output/<pid>-<uid>/
+      # generated-files/<buildId>/ — so the sandbox OUTPUT path MUST be exactly
+      # that path (the reference deployments all use it; our local-data/* path
+      # made every editor PDF + template-bundle PDF 404 in this stack).
+      # Same-path bind keeps the docker-daemon (host) contract intact.
+      SANDBOXED_COMPILES_HOST_DIR_COMPILES: /var/lib/overleaf/data/compiles
+      SANDBOXED_COMPILES_HOST_DIR_CACHE: /var/lib/overleaf/data/cache
+      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: /var/lib/overleaf/data/output
       # python-runner module: test stack exercises it (CE flag via
       # splitTestOverrides; see settings.defaults.js 'overleaf-code')
       ENABLE_PYTHON_RUNNER: 'true'
       OT_JWT_AUTH_KEY: ${OT_JWT_AUTH_KEY}
       OVERLEAF_SESSION_SECRET: ${OVERLEAF_SESSION_SECRET}
       OVERLEAF_INVITE_TOKEN_SECRET: ${OVERLEAF_INVITE_TOKEN_SECRET}
-      # test-stack only: allow mongo 6.0 (host kernel breaks fresh 8.x)
+      # test-stack only: allow the mongo floor check (prod default unchanged;
+      # see check-mongodb.mjs)
       OL_MIN_MONGO_VERSION: '6.0'
       OL_MIN_MONGO_FCV: '6.0'
+      # 2026-09-16 (owner task T5): local SMTP relay (Mailpit) — NO paid
+      # service. Wires the app EmailSender (password-reset/invitations/
+      # registration mails); the hub "test e-mail" button resolves the same
+      # values via the site-settings email fallback. Verify spec:
+      # specs/parity/smtp-capture.test.e2e.ts (sink API on 127.0.0.1:18025).
+      OVERLEAF_EMAIL_FROM_ADDRESS: 'OlliTeX <noreply@e2e.test>'
+      OVERLEAF_EMAIL_DRIVER: smtp
+      OVERLEAF_EMAIL_SMTP_HOST: smtpsink
+      OVERLEAF_EMAIL_SMTP_PORT: '1025'
+      OVERLEAF_EMAIL_SMTP_SECURE: 'false'
+      # 2026-09 (mega-batch): SP public cert for SAML SP-signing metadata
+      # (the app reads the path at request time; test-only fixture keypair).
+      OVERLEAF_SAML_PUBLIC_CERT: /e2e-saml/sp-cert.pem
+      # Template gallery: admin-managed, but the e2e stack must default to ON
+      # so the template parity specs (managetpl, gallery) have a live API on
+      # every fresh stack (stored sections can override at test time).
+      OVERLEAF_TEMPLATE_GALLERY: 'true'
+      # Disposable test stack: the e2e suite + seed + manual probes share one
+      # source IP and CE's login limiter (20/min/IP) throttles legitimate
+      # test logins mid-run. This ONLY affects the test stack — the core
+      # default (rate limiting ON) is untouched for real deployments.
+      OVERLEAF_DISABLE_RATE_LIMITS: 'true'
       LLM_KEY_SECRET: ${LLM_KEY_SECRET}
       # internal service auth (history-v1 requires these under NODE_ENV=production;
       # project-history & web authenticate with the same values)
@@ -109,6 +168,12 @@ services:
       LOG_LEVEL: info
     volumes:
       - ol-data:/var/lib/overleaf
+      # 2026-09 (mega-batch): test-only SAML SP cert (OVERLEAF_SAML_PUBLIC_CERT)
+      - ./fixtures/saml/sp-cert.pem:/e2e-saml/sp-cert.pem:ro
+      # 2026-09-16 (owner #10): clsi sandbox-compile dirs on a HOST path
+      # (same-path contract with the compile sibling container; see the
+      # note at the bottom of stack/settings.js)
+      - ./stack/settings.js:/etc/overleaf/settings.js:ro
       - /var/run/docker.sock:/var/run/docker.sock
       # typst sandbox compile dirs (clsi_typst DockerRunner SAME-PATH
       # contract): host dir bind-mounted at the identical container path so
@@ -116,6 +181,11 @@ services:
       # the same files (see server-ce/runit/clsi_typst-overleaf/run)
       - ./local-data/typst/compiles:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
       - ./local-data/typst/output:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
+      # 2026-09-16 (owner #10): tex sandbox compile dirs (texlive/texlive:latest-full, uid 33)
+      # host dirs created+owned by scripts/stack-reset.sh (uid 33, the texlive image user)
+      - /var/lib/overleaf/data/compiles:/var/lib/overleaf/data/compiles
+      - /var/lib/overleaf/data/cache:/var/lib/overleaf/data/cache
+      - /var/lib/overleaf/data/output:/var/lib/overleaf/data/output
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     healthcheck:
