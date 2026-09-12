@@ -18,11 +18,13 @@ test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const all = async () => (await a('GET', '/admin/site-settings')).json().catch(() => null)
 
-test('renders: /admin/site shows the site settings surface', async () => {
-  expect(p.url(), 'on the page').toContain('/admin/site')
+test('redirect: /admin/site forwards admins to the hub Site settings (owner 2026-09-11 item 5)', async () => {
+  // The legacy /admin/site page was retired — the URL now 302s to the hub's
+  // Site section; every former page section lives there (parity is asserted
+  // in hub-admin-site.test.e2e.ts). Non-admins still get a hard deny (below).
+  expect(p.url(), 'redirected into the hub').toContain('/hub')
   const body = (await p.locator('body').innerText()) || ''
-  expect(/site settings|miscellaneous|sign.?up|settings/i.test(body), 'settings surface').toBeTruthy()
-  await expect(p.locator('input:visible, select:visible, button:visible, [role="switch"]').first()).toBeVisible({ timeout: 15000 })
+  expect(/site|settings|hub/i.test(body), 'hub site surface rendered').toBeTruthy()
 })
 
 test('deny: non-site-admins are denied /admin/site', async ({ browser }) => {

@@ -204,6 +204,22 @@ async function hubHealth(req, res) {
   res.json(out)
 }
 
+// 2026-09-16 (owner task T10/#8, P1): release notes (docs/RELEASE_NOTES.md)
+// for the hub Overview card. Static, trusted content — served as-is.
+async function getReleaseNotes(req, res) {
+  const file = Path.resolve(
+    __dirname,
+    '../../../../../../docs/RELEASE_NOTES.md'
+  )
+  try {
+    const text = await import('node:fs/promises').then(m => m.readFile(file, 'utf8'))
+    res.set('Content-Type', 'text/markdown; charset=utf-8')
+    return res.send(text)
+  } catch (err) {
+    return res.status(404).json({ error: 'release notes not available' })
+  }
+}
+
 export default {
   hubPage: expressify(hubPage),
   redirectToHub: expressify(redirectToHub),
@@ -211,6 +227,7 @@ export default {
   saveTheme: expressify(saveTheme),
   clearTheme: expressify(clearTheme),
   hubHealth: expressify(hubHealth),
+  getReleaseNotes: expressify(getReleaseNotes),
 
   // kept for one release for in-flight tabs/bookmarks beyond the redirects
   adminHubPage: expressify(async (req, res) => {

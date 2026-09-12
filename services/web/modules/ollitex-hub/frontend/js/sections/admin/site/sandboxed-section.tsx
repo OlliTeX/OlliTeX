@@ -45,15 +45,13 @@ export function SandboxedSection() {
   return (
     <SectionShell
       title="Sandboxed compiles"
-      badge="docker"
-      enabled={Boolean(v.enabled)}
-      onEnabled={x => up({ enabled: x })}
-      description="Docker-based sandboxed compilation (clsi) and the selectable compile images."
+      badge="mandatory"
+      description="Docker-based sandboxed compilation (clsi) and the selectable compile images. Sandboxed compiles are ALWAYS ON in OlliTeX (owner #10): there is no local (in-container) compile mode and no toggle to turn it off."
       footerNote="Changes apply on the next container cycle."
       flash={flash}
       onSave={() => void save({
-        enabled: Boolean(v.enabled),
-        dockerRunner: Boolean(v.enabled),
+        enabled: true, // always on in OlliTeX (no toggle; flag kept for settings-shape compat)
+        dockerRunner: true, // always on in OlliTeX
         hostDir: String(v.hostDir || ''),
         socketPath: String(v.socketPath || ''),
         extraFlags: String(v.extraFlags || ''),

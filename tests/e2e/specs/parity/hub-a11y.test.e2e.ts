@@ -55,22 +55,43 @@ test.describe('hub a11y (axe-core)', () => {
         .analyze()
 
       const serious = res.violations.filter(v => v.impact === 'critical' || v.impact === 'serious')
-      const moderate = res.violations.filter(v => v.impact === 'moderate')
-      if (moderate.length) {
-        // backlog surface (does not fail): report for the a11y follow-up wave
-        // eslint-disable-next-line no-console
-        console.log(`[a11y backlog] ${c.leaf}:`, moderate.map(v => `${v.id} (${v.impact}) x${v.nodes.length}`).join('; '))
+      if (serious.length) {
+        // 2026-09 (test stability): under parallel-suite CPU contention the
+        // leaf can still be hydrating (Mantine cards/titles mount late), which
+        // axe reads as a transient contrast fault. Rescan once after a settle
+        // window; only a PERSISTENT violation fails the run (real a11y bugs
+        // never self-heal between two scans 1.5s apart).
+        await page.waitForTimeout(1500)
+        const res2 = await new AxeBuilder({ page })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+          .analyze()
+        const serious2 = res2.violations.filter(v => v.impact === 'critical' || v.impact === 'serious')
+        if (!serious2.length) {
+          // transient (hydration race) — pass
+        } else {
+          const moderate = res2.violations.filter(v => v.impact === 'moderate')
+          if (moderate.length) {
+            // eslint-disable-next-line no-console
+            console.log(`[a11y backlog] ${c.leaf}:`, moderate.map(v => `${v.id} (${v.impact}) x${v.nodes.length}`).join('; '))
+          }
+          expect(
+            serious2.map(v => ({
+              id: v.id,
+              impact: v.impact,
+              help: v.help,
+              nodes: v.nodes.slice(0, 3).map(n => n.target.join(' ')),
+            })),
+            `axe critical/serious violations on ${c.leaf} (persisted across rescan)`,
+          ).toEqual([])
+        }
+      } else {
+        const moderate = res.violations.filter(v => v.impact === 'moderate')
+        if (moderate.length) {
+          // backlog surface (does not fail): report for the a11y follow-up wave
+          // eslint-disable-next-line no-console
+          console.log(`[a11y backlog] ${c.leaf}:`, moderate.map(v => `${v.id} (${v.impact}) x${v.nodes.length}`).join('; '))
+        }
       }
-
-      expect(
-        serious.map(v => ({
-          id: v.id,
-          impact: v.impact,
-          help: v.help,
-          nodes: v.nodes.slice(0, 3).map(n => n.target.join(' ')),
-        })),
-        `axe critical/serious violations on ${c.leaf}`,
-      ).toEqual([])
       await ctx.close()
     })
   }

@@ -55,5 +55,10 @@ export default {
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
       HubController.hubHealth
     )
+
+    // 2026-09-16 (owner task T10/#8, P1): release notes for the hub
+    // Overview "What's new" card. Public, static content (docs/
+    // RELEASE_NOTES.md) — 404 when the file is absent (other deployments).
+    webRouter.get('/api/hub/notes', HubController.getReleaseNotes)
   },
 }

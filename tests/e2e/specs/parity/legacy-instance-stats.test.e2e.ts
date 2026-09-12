@@ -22,7 +22,10 @@ const a = (method: string, path: string, body?: unknown) => api(p, method, path,
 const cfg = async () => (await a('GET', '/admin/instance-stats/api/alert-config')).json().catch(() => null)
 
 test('renders: /admin/instance-stats shows the dashboard (sections + window control)', async () => {
-  expect(p.url(), 'on the page').toContain('/admin/instance-stats')
+  // 2026-09-11 (hub wave): the legacy page was retired — the URL forwards
+  // admins into the hub stats leaf (hub#/site.general.stats); the dashboard
+  // itself (series API + alert config) is asserted below at the API level.
+  expect(p.url(), 'forwarded into the hub stats leaf').toMatch(/\/hub#/)
   const body = (await p.locator('body').innerText()) || ''
   expect(/users|project|storage|system/i.test(body), 'dashboard sections present').toBeTruthy()
   await expect(p.locator('select, [role="combobox"]').first()).toBeVisible({ timeout: 10000 })

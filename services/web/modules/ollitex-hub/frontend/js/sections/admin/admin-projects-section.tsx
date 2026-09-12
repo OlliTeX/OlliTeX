@@ -56,7 +56,10 @@ function pname(p: any): string {
   return p?.name || p?.title || 'Untitled'
 }
 function powner(p: any): string {
-  // admin projects API returns owner as a user-id string; accept ref shapes too
+  // admin projects API returns owner as a user-id string (owner_ref);
+  // accept ref shapes too. Last resort: the owner e-mail (server-side it is
+  // normalized via the project doc; see ProjectListController.
+  // resolveProjectUserId).
   if (typeof p?.owner === 'string') return p.owner
   return p?.owner_ref || p?.ownerId || p?.owner?._id || p?.owner?.email || ''
 }

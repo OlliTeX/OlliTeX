@@ -190,6 +190,8 @@ export const SECTION_KNOWN_KEYS = {
     'lastNameAtt',
     'isAdminAtt',
     'updateUserDetailsOnLogin',
+    // 2026-09-11 (owner batch 2 item 4): editable operation timeout (ms)
+    'timeout',
   ],
   'sandboxed-compiles': [
     'enabled',
@@ -1012,6 +1014,11 @@ export function validateSsoLdapSection(value) {
   }
   if (value.searchAttributes !== undefined && typeof value.searchAttributes === 'string' && value.searchAttributes.length > 0) {
     try { JSON.parse(value.searchAttributes) } catch { errors.push('searchAttributes must be a JSON array string') }
+  }
+  // 2026-09-11 (owner batch 2 item 4): timeout is an optional positive number (ms)
+  if (value.timeout !== undefined) {
+    const n = Number(value.timeout)
+    if (!Number.isFinite(n) || n <= 0) errors.push('timeout must be a positive number (ms)')
   }
   return errors
 }

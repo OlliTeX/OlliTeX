@@ -13,6 +13,7 @@ import {
 import { getJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 import { PageError, PageLoading } from '../../shared/page-state'
+import WhatSNew from './whats-new'
 
 const METRICS = [
   { key: 'user_count', label: 'Users', suffix: '' },
@@ -106,6 +107,8 @@ export default function AdminInstanceSection({ onNavigate }: { onNavigate?: (id:
 
   return (
     <Stack gap="md">
+      {/* 2026-09-16 (P1 #8): "What's new" from docs/RELEASE_NOTES.md */}
+      <WhatSNew />
       {error ? <PageError label="Couldn’t load instance stats" detail={error} onRetry={() => void load()} /> : null}
       <SimpleGrid cols={{ base: 1, sm: 2, xl: 3 }} spacing="md">
         {METRICS.map(m => (

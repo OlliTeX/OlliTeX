@@ -79,16 +79,37 @@ test('signup: the hub sign-up section PUT round-trips', async () => {
 test('sso: the hub SSO leaves PUT the same sso-* endpoints (with the server guard)', async () => {
   const before = await all()
   for (const s of ['sso-saml', 'sso-oidc', 'sso-ldap']) {
-    const keep = before[s]
-    const ok = await a('PUT', `/admin/site-settings/${s}`, { ...keep, enabled: false })
-    expect(ok.status(), `${s} default save status ${ok.status()}`).toBeLessThan(400)
-    const afterOk = await all()
-    expect(afterOk[s].enabled, `${s} enabled=false persisted`).toBeFalsy()
-    const guarded = await a('PUT', `/admin/site-settings/${s}`, { ...keep, enabled: true })
-    expect(guarded.status(), `${s} enable-without-creds rejected (got ${guarded.status()})`).toBeGreaterThanOrEqual(400)
-    expect(guarded.status()).toBeLessThan(500)
-    const after = await all()
-    expect(after[s].enabled, `${s} still disabled`).toBeFalsy()
+    const keep = before[s] || {}
+    try {
+      // disabling is always allowed
+      const ok = await a('PUT', `/admin/site-settings/${s}`, { ...keep, enabled: false })
+      expect(ok.status(), `${s} disable status ${ok.status()}`).toBeLessThan(400)
+      const afterOk = await all()
+      expect(afterOk[s].enabled, `${s} enabled=false persisted`).toBeFalsy()
+
+      // the server guard (state-independent): enabling WITHOUT credentials
+      // must be rejected, whatever the previously stored config was
+      const guarded = await a('PUT', `/admin/site-settings/${s}`, {
+        enabled: true,
+        identityServiceName: 'Guard Probe',
+        issuer: '',
+        entryPoint: '',
+        authorizationURL: '',
+        tokenURL: '',
+        url: '',
+        clientID: '',
+        idpCert: '',
+        privateKey: '',
+      })
+      expect(guarded.status(), `${s} enable-without-creds rejected (got ${guarded.status()})`).toBeGreaterThanOrEqual(400)
+      expect(guarded.status()).toBeLessThan(500)
+      const after = await all()
+      expect(after[s].enabled, `${s} still disabled`).toBeFalsy()
+    } finally {
+      // restore the section exactly as found (the e2e seed leaves SAML
+      // configured; the other two disabled)
+      await a('PUT', `/admin/site-settings/${s}`, keep).catch(() => {})
+    }
   }
 })
 

@@ -81,6 +81,7 @@ export const HUB_NAV: HubNode[] = [
       { id: 'mysettings.password', label: 'Change password', icon: 'key' },
       { id: 'mysettings.keybindings', label: 'Keybindings', icon: 'keyboard' },
       { id: 'mysettings.sync', label: 'Project synchronisation', icon: 'cloud_sync' },
+      { id: 'mysettings.gitsync', label: 'Git integration', icon: 'commit' },
       { id: 'mysettings.references', label: 'Reference managers', icon: 'menu_book' },
       { id: 'mysettings.sessions', label: 'Sessions', icon: 'computer' },
       { id: 'mysettings.appearance', label: 'Appearance', icon: 'palette' },

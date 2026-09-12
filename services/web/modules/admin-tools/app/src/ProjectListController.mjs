@@ -1,4 +1,5 @@
 import _ from 'lodash'
+import { ObjectId } from 'mongodb'
 import { expressify } from '@overleaf/promise-utils'
 import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import ProjectHelper from '../../../../app/src/Features/Project/ProjectHelper.mjs'
@@ -174,16 +175,54 @@ function _hasActiveFilter(filters) {
   )
 }
 
+async function resolveProjectUserId(body, projectId) {
+  // 2026-09 (hub admin-projects regression): the hub's client-side owner
+  // resolver can deliver an empty/invalid userId, which made
+  // `new ObjectId('')` throw BSONError (500) in ProjectDeleter. Prefer a
+  // valid client value, else fall back to the project's own owner so the
+  // trash/untrash/undelete bookkeeping stays deterministic.
+  const raw = body && body.userId
+  const s = raw == null ? '' : String(raw)
+  if (ObjectId.isValid(s)) {
+    return s
+  }
+  let id = null
+  try {
+    // Promise API (mongoose-wrapper statics are callback-shaped; mirror the
+    // Project.find(...).exec() pattern already used by _getProjects above).
+    const proj = await Project.findById(projectId, {
+      owner_ref: 1,
+      'owner._id': 1,
+    })
+      .lean()
+      .exec()
+    id =
+      (proj
+        ? proj.owner_ref != null
+          ? String(proj.owner_ref)
+          : proj.owner && proj.owner._id != null
+            ? String(proj.owner._id)
+            : null
+        : null) || null
+  } catch (err) {
+    if (err && err.name === 'ObjectValidationError') throw err
+  }
+  if (id == null) {
+    throw new OError('cannot resolve a valid user for project trash bookkeeping')
+  }
+  return id
+}
+
 async function trashProjectForUser(req, res) {
   const projectId = req.params.project_id
-  const { userId } = req.body
+  const userId = await resolveProjectUserId(req.body, projectId)
   await ProjectDeleter.promises.trashProject(projectId, userId)
   res.sendStatus(200)
 }
 
 async function untrashProjectForUser(req, res) {
   const projectId = req.params.project_id
-  const { userId } = req.body
+  const userId = await resolveProjectUserId(req.body, projectId)
   await ProjectDeleter.promises.untrashProject(projectId, userId)
   res.sendStatus(200)
 }
@@ -198,7 +237,7 @@ async function deleteProject(req, res) {
 
 async function undeleteProject(req, res) {
   const projectId = req.params.project_id
-  const { userId } = req.body
+  const userId = await resolveProjectUserId(req.body, projectId)
   const undelededProject = await ProjectDeleter.promises.undeleteProject(projectId, { userId })
   await ProjectDeleter.promises.untrashProject(projectId, userId)
 

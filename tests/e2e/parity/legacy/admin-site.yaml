@@ -27,7 +27,10 @@ features:
   - id: renders
     kind: page
     desc: the site settings page/index renders for the site admin
-    legacy_test: renders
+    # 2026-09-11 (owner item 5): /admin/site was retired in favour of the
+    # hub Site section — the legacy URL now REDIRECTS (legacy spec "redirect");
+    # the hub side still renders the full settings index.
+    legacy_test: redirect
     hub_test: renders
 
   - id: denied

@@ -9,6 +9,7 @@ import LibrarySection from '../sections/workspace/library-section'
 import NotificationsSettingsSection from '../sections/workspace/notifications-settings-section'
 import MySettingsSection from '../sections/workspace/my-settings-section'
 import KeybindingsSection from '../sections/workspace/keybindings-section'
+import GitIntegrationSection from '../sections/workspace/git-integration-section'
 import LlmSettingsSection from '../sections/workspace/llm-settings-section'
 import AppearanceSection from '../sections/appearance-section'
 import AdminInstanceSection from '../sections/admin/admin-instance-section'
@@ -182,6 +183,10 @@ export function renderLeaf(node: HubNode): React.ReactNode {
           </Card>
         </Stack>
       )
+    case 'mysettings.gitsync':
+      // 2026-09-11 (owner batch 2 item 6): Git integration (git-bridge
+      // personal access tokens) — restored from the legacy /user/mysettings
+      return <GitIntegrationSection key={node.id} />
     case 'mysettings.references':
       return (
         <Stack key={node.id} gap="md">

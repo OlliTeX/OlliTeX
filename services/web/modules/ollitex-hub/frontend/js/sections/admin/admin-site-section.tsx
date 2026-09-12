@@ -450,7 +450,6 @@ export default function AdminSiteSection({
     }
   }
 
-  const meta = NAV.find(n => n.id === active)
   const initial = settings ? pick(settings, active) : {}
 
   const renderContent = () => {
@@ -670,10 +669,10 @@ export default function AdminSiteSection({
       </nav>
       ) : null}
       <main style={{ flex: 1, minWidth: 0, overflowY: 'auto', maxHeight: 'calc(100vh - 120px)', padding: 12, background: 'var(--mantine-color-body)' }}>
+        {/* 2026-09-11 (owner batch 2 item 2): no second section title here —
+            the hub page header (h2) already carries it; the duplicate bold
+            “Sign-up” (and co.) was removed. */}
         <Stack gap="md" maw={920}>
-          <Text fw={700} size="lg">
-            {meta?.label}
-          </Text>
           {renderContent()}
         </Stack>
       </main>

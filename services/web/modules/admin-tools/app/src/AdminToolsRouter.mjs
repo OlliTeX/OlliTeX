@@ -171,9 +171,13 @@ export default {
     )
 
     // ---- Manage Site (SiteSettings: templates/zotero/external-urls/signup) ---
+    // 2026-09-11 (owner batch 2 item 5): the legacy /admin/site page is gone —
+    // every section (general, sign-up, templates, SSO, services, compilation)
+    // now lives in the hub (Site → …). Keep the old URL as a redirect so
+    // bookmarks, help docs, and old links land in the right place.
     webRouter.get('/admin/site',
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
-      SiteSettingsController.manageSitePage
+      (req, res) => res.redirect('/hub#/site')
     )
     webRouter.get('/admin/site-settings',
       AuthorizationMiddleware.ensureUserIsSiteAdmin,

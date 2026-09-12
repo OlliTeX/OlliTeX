@@ -1,3 +1,39 @@
+/* 2026-09 (a11y hardening, hub admin health/stats axe): pin the Mantine text
+ * tokens to scheme-stable OL neutrals. `--mantine-color-text` / `-dimmed`
+ * otherwise resolve from Mantine's scheme state, which can disagree with the
+ * app body theme mid-boot (mixed-scheme flash) and fail WCAG AA on the admin
+ * hub surfaces. Values hold ≥4.5:1 on every hub surface in both schemes. */
+html[data-mantine-color-scheme='light'] .ol-hub-scroll,
+html[data-mantine-color-scheme='light'] .mantine-Portal {
+  --mantine-color-text: #1b1c1d;
+  --mantine-color-text-dimmed: #5b6472;
+}
+html[data-mantine-color-scheme='dark'] .ol-hub-scroll,
+html[data-mantine-color-scheme='dark'] .mantine-Portal {
+  --mantine-color-text: #f4f5f6;
+  --mantine-color-text-dimmed: #a6aebc;
+}
+
+/* 2026-09 (a11y, hub health/stats axe `color-contrast`): Mantine's
+ * light-variant Badge pairs its tinted bg (shade 0) with shade-6 text —
+ * only ≈2.7:1 even on the OL palettes (teal: #c3fae8/#087f5b = 2.66).
+ * The badge backgrounds are always light tints in both schemes, so pin the
+ * label to a neutral near-dark that holds ≥4.5:1 on every one of them. */
+.ol-hub-scroll .mantine-Badge-root[data-variant='light'] .mantine-Badge-label,
+.mantine-Portal .mantine-Badge-root[data-variant='light'] .mantine-Badge-label {
+  color: #1b1c1d !important;
+}
+
+/* 2026-09 (a11y, hub stats axe `color-contrast`): same Mantine weak-pair
+ * class — light-variant Alert titles use a mid-shade tint text (e.g. warning
+ * #e67700 on #fff3bf = 2.69:1). Alert light backgrounds are always light
+ * tints, so pin the title text to the same neutral near-dark. */
+.ol-hub-scroll .mantine-Alert-root[data-variant='light'] .mantine-Alert-title,
+.ol-editor-mantine .mantine-Alert-root[data-variant='light'] .mantine-Alert-title,
+.mantine-Portal .mantine-Alert-root[data-variant='light'] .mantine-Alert-title {
+  color: #1b1c1d !important;
+}
+
 /* overleaf-lab (Wave A #8): unified /hub scrollbars — slim, theme-aware,
  * same visual language as the editor scrollbars (.code-scroll etc.).
  * Applied to the rail (.ol-hub-scroll) and the main content area (hub-root).
