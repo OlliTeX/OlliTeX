@@ -1,7 +1,20 @@
-import WordCountModal from '@/features/word-count-modal/components/word-count-modal'
+// Word count — server (texcount) renderer, tested in isolation.
+//
+// 2026-09 (OlliTeX, File → Word count scoping): the File → Word count modal
+// now ALWAYS shows the CURRENT file (the one open in the editor), computed
+// client-side (see WordCountClient + countWordsInFile with includeIncludedFiles
+// = false). The previous default rendered the project-wide texcount figure,
+// which counted the whole project regardless of which file was open — the
+// owner wanted the current file instead.
+//
+// WordCountServer (and its WordCounts renderer) is no longer wired into the
+// modal, but it remains a usable component. This spec keeps it covered by
+// mounting it directly with the endpoint intercepted (same provider tree as
+// before — EditorProviders/ReactContextRoot supplies LocalCompileProvider).
+import { WordCountServer } from '@/features/word-count-modal/components/word-count-server'
 import { EditorProviders } from '../../../helpers/editor-providers'
 
-describe('<WordCountModal />', function () {
+describe('<WordCountServer />', function () {
   beforeEach(function () {
     cy.interceptCompile()
   })
@@ -13,11 +26,10 @@ describe('<WordCountModal />', function () {
 
     cy.mount(
       <EditorProviders projectId="project-1">
-        <WordCountModal show handleHide={cy.stub()} />
-      </EditorProviders>
+        <WordCountServer />
+      </EditorProviders>,
     )
 
-    cy.findByText('Word count')
     cy.findByText(/something went wrong/).should('not.exist')
   })
 
@@ -31,8 +43,8 @@ describe('<WordCountModal />', function () {
 
     cy.mount(
       <EditorProviders projectId="project-1">
-        <WordCountModal show handleHide={cy.stub()} />
-      </EditorProviders>
+        <WordCountServer />
+      </EditorProviders>,
     )
 
     cy.findByText('Loading…').then(() => {
@@ -49,8 +61,8 @@ describe('<WordCountModal />', function () {
 
     cy.mount(
       <EditorProviders projectId="project-1">
-        <WordCountModal show handleHide={cy.stub()} />
-      </EditorProviders>
+        <WordCountServer />
+      </EditorProviders>,
     )
 
     cy.findByText('Sorry, something went wrong')
@@ -65,8 +77,8 @@ describe('<WordCountModal />', function () {
 
     cy.mount(
       <EditorProviders projectId="project-1">
-        <WordCountModal show handleHide={cy.stub()} />
-      </EditorProviders>
+        <WordCountServer />
+      </EditorProviders>,
     )
 
     cy.findByText('This is a test')
@@ -88,8 +100,8 @@ describe('<WordCountModal />', function () {
 
     cy.mount(
       <EditorProviders projectId="project-1">
-        <WordCountModal show handleHide={cy.stub()} />
-      </EditorProviders>
+        <WordCountServer />
+      </EditorProviders>,
     )
 
     cy.findByText((content, element) => {

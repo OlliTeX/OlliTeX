@@ -22,15 +22,54 @@ async function openCard(page: any) {
   const rail = page
     .locator("[data-rr-ui-event-key='integrations'], [aria-label^='Integrations']")
     .first()
-  await rail.click({ timeout: 8000 }).catch(() => {})
-  await page.waitForTimeout(1500)
   const btn = page
     .locator('button.integrations-panel-card-button')
     .filter({ hasText: /sync this project with webdav/i })
     .first()
-  await btn.evaluate((el: any) => el.scrollIntoView({ block: 'center' })).catch(() => {})
-  await btn.click({ timeout: 8000, force: true })
-  await page.waitForTimeout(2500)
+  // (re)open the integrations panel only if the card isn't already attached —
+  // the rail is a toggle, so re-clicking an open panel would close it again.
+  const attached = (await btn.count().catch(() => 0)) > 0
+  if (!attached) {
+    await rail.click({ timeout: 8000, force: true }).catch(() => {})
+    // the card renders once the project context lands; wait for it to attach
+    await btn.waitFor({ state: 'attached', timeout: 20_000 }).catch(() => {})
+  }
+  await page.waitForTimeout(800)
+  // 2026-09-12 (green gate): the integrations panel scrolls inside its own
+  // container; plain el.scrollIntoView sometimes leaves the card out of the
+  // viewport. scrollIntoViewIfNeeded waits for real, then a direct
+  // scrollTop nudge of the scrolling ancestor as a fallback.
+  await btn.scrollIntoViewIfNeeded({ timeout: 10_000 }).catch(() => {})
+  await btn.evaluate((el: any) => {
+    let node: any = el.parentElement
+    while (node && node !== document.body) {
+      const scroller = node.scrollHeight > node.clientHeight + 4
+      if (scroller) {
+        node.scrollTop = el.offsetTop - (node.clientHeight - el.offsetHeight) / 2
+        break
+      }
+      node = node.parentElement
+    }
+    el.scrollIntoView({ block: 'center' })
+  }).catch(() => {})
+  await page.waitForTimeout(300)
+  // 2026-09-12 (M1 flake fix): a single card click while the integrations
+  // panel is still settling can miss (the modal never opens) — the test then
+  // times out waiting for its frame. Retry the card click up to 3 times, and
+  // stop as soon as a real modal frame (Mantine on /editor, legacy RB on
+  // /Project) is visible. The integrations drawer uses neither class, so this
+  // is a reliable "the modal opened" probe.
+  for (let i = 0; i < 3; i++) {
+    await btn.click({ timeout: 8000 }).catch(() => {})
+    await page.waitForTimeout(1200)
+    const modalOpen = await page
+      .locator('.mantine-Modal-content, .modal-content')
+      .first()
+      .isVisible()
+      .catch(() => false)
+    if (modalOpen) return
+  }
+  await page.waitForTimeout(1500)
 }
 
 test.describe('M1 webdav sync-modal Mantine gate', () => {

@@ -19,6 +19,14 @@ import CommandDropdown, {
 import { useRailContext } from '../../context/rail-context'
 import useIsNetworkStalled from '@/features/ide-react/hooks/use-is-network-stalled'
 import WordCountModal from '@/features/word-count-modal/components/word-count-modal'
+// 2026-09 (owner batch: selected-text word count): File → Word count captures
+// the active editor selection and shows it as an EXTRA section — the
+// whole-document count is always shown (reviewer guidance on the community
+// selected-word-count contribution).
+import {
+  captureEditorSelection,
+  clearPendingSelection,
+} from '@/features/word-count-modal/utils/word-count-selection'
 import { isSplitTestEnabled } from '@/utils/splitTestUtils'
 import { useDetachCompileContext as useCompileContext } from '@/shared/context/detach-compile-context'
 import { useProjectSettingsContext } from '@/features/ide-settings/context/project-settings-context'
@@ -29,7 +37,7 @@ import importOverleafModules from '../../../../../macros/import-overleaf-module.
 import ReviewModeOptions from './review-mode-options'
 
 const menubarExtraComponents = importOverleafModules(
-  'menubarExtraComponents'
+  'menubarExtraComponents',
 ) as {
   import: { default: ElementType }
 }[]
@@ -69,6 +77,9 @@ export const ToolbarMenuBar = () => {
         label: t('word_count_lower'),
         disabled: !wordCountEnabled,
         handler: () => {
+          // capture (or clear) the editor selection for the modal's
+          // optional Selection section, then open the whole-document count
+          captureEditorSelection()
           setShowWordCountModal(true)
         },
         id: 'word_count',
@@ -83,7 +94,14 @@ export const ToolbarMenuBar = () => {
         id: 'copy_project',
       },
     ],
-    [t, setView, view, wordCountEnabled, anonymous, isDisabledDueToNetworkStall]
+    [
+      t,
+      setView,
+      view,
+      wordCountEnabled,
+      anonymous,
+      isDisabledDueToNetworkStall,
+    ],
   )
   const fileMenuStructure: MenuStructure = useMemo(
     () => [
@@ -128,7 +146,7 @@ export const ToolbarMenuBar = () => {
         children: ['open-settings'],
       },
     ],
-    [t]
+    [t],
   )
 
   const editMenuStructure: MenuStructure = useMemo(
@@ -142,7 +160,7 @@ export const ToolbarMenuBar = () => {
         children: ['find', 'select-all'],
       },
     ],
-    []
+    [],
   )
 
   const insertMenuStructure: MenuStructure = useMemo(
@@ -177,10 +195,10 @@ export const ToolbarMenuBar = () => {
         children: ['comment'],
       },
       ...insertMenuSections.flatMap(
-        ({ import: { default: sections } }) => sections
+        ({ import: { default: sections } }) => sections,
       ),
     ],
-    [t]
+    [t],
   )
 
   const formatMenuStructure: MenuStructure = useMemo(
@@ -211,7 +229,7 @@ export const ToolbarMenuBar = () => {
         ],
       },
     ],
-    [t]
+    [t],
   )
 
   const pdfControlsMenuSectionStructure: MenuSectionStructure = useMemo(
@@ -232,7 +250,7 @@ export const ToolbarMenuBar = () => {
         },
       ],
     }),
-    [t]
+    [t],
   )
 
   const commandPaletteMenuSectionStructure: MenuSectionStructure = useMemo(
@@ -240,7 +258,7 @@ export const ToolbarMenuBar = () => {
       id: 'command-palette-group',
       children: ['command-palette'],
     }),
-    []
+    [],
   )
 
   const {
@@ -365,7 +383,10 @@ export const ToolbarMenuBar = () => {
       </MenuBar>
       <WordCountModal
         show={showWordCountModal}
-        handleHide={() => setShowWordCountModal(false)}
+        handleHide={() => {
+          clearPendingSelection()
+          setShowWordCountModal(false)
+        }}
       />
       <EditorCloneProjectModalWrapper
         show={showCloneProjectModal}
@@ -375,7 +396,7 @@ export const ToolbarMenuBar = () => {
       {menubarExtraComponents.map(
         ({ import: { default: Component } }, index) => (
           <Component key={index} />
-        )
+        ),
       )}
     </>
   )

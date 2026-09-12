@@ -9,7 +9,6 @@ import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-ope
 import { useFileTreePathContext } from '@/features/file-tree/contexts/file-tree-path'
 import { debugConsole } from '@/utils/debugging'
 import { signalWithTimeout } from '@/utils/abort-signal'
-import { isMainFile } from '@/features/pdf-preview/util/editor-files'
 import { countWordsInFile } from '@/features/word-count-modal/utils/count-words-in-file'
 import { createSegmenters } from '@/features/word-count-modal/utils/segmenters'
 import { WordCountsClient } from './word-counts-client'
@@ -19,8 +18,7 @@ export const WordCountClient: FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [data, setData] = useState<WordCountData | null>(null)
-  const { projectSnapshot, project } = useProjectContext()
-  const rootDocId = project?.rootDocId
+  const { projectSnapshot } = useProjectContext()
   const { spellCheckLanguage } = useProjectSettingsContext()
   const { openDocs } = useEditorManagerContext()
   const { currentDocument } = useEditorOpenDocContext()
@@ -40,14 +38,19 @@ export const WordCountClient: FC = () => {
 
         if (signal.aborted) return null
 
-        const currentDocSnapshot = currentDocument.getSnapshot()
-        const currentRootDocId = isMainFile(currentDocSnapshot)
-          ? currentDocument.doc_id
-          : rootDocId
-        if (!currentRootDocId) return null
+        // 2026-09 (OlliTeX, File → Word count scoping): count the file the user
+        // currently has OPEN in the editor — the "current file" — not the whole
+        // project. The previous behaviour anchored the count on the main/root
+        // document and walked every \input/\include, so it always reported the
+        // project's word count regardless of which file was open. We anchor on
+        // the open doc and do NOT follow its includes into the rest of the
+        // project (includeIncludedFiles = false below), which is also how the
+        // Selection section already counts (standalone parse, no include walk).
+        const currentDocId = currentDocument.doc_id
+        if (!currentDocId) return null
 
-        const currentRootDocPath = pathInFolder(currentRootDocId)
-        if (!currentRootDocPath) return null
+        const currentDocPath = pathInFolder(currentDocId)
+        if (!currentDocPath) return null
 
         const data: WordCountData = {
           encode: 'ascii',
@@ -75,9 +78,10 @@ export const WordCountClient: FC = () => {
         countWordsInFile(
           data,
           projectSnapshot,
-          currentRootDocPath,
+          currentDocPath,
           '/',
-          segmenters
+          segmenters,
+          false,
         )
 
         return data
@@ -85,7 +89,14 @@ export const WordCountClient: FC = () => {
 
       countWords()
         .then(data => {
-          setData(data)
+          if (data) {
+            setData(data)
+          } else {
+            // no resolvable current file (e.g. a non-document tab) — surface
+            // the error state rather than spinning forever or rendering blank
+            debugConsole.warn('word-count: no current file to count')
+            setError(true)
+          }
         })
         .catch(error => {
           debugConsole.error(error)
@@ -94,6 +105,13 @@ export const WordCountClient: FC = () => {
         .finally(() => {
           setLoading(false)
         })
+    } else {
+      // 2026-09 (OlliTeX, File → Word count scoping): the count is anchored on
+      // the file open in the editor; when there is none, resolve the loading
+      // state with the error view instead of an infinite spinner.
+      debugConsole.warn('word-count: no open document available to count')
+      setError(true)
+      setLoading(false)
     }
   }, [
     signal,
@@ -101,7 +119,6 @@ export const WordCountClient: FC = () => {
     projectSnapshot,
     segmenters,
     currentDocument,
-    rootDocId,
     pathInFolder,
   ])
 

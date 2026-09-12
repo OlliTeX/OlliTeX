@@ -39,7 +39,13 @@ test('webdav + dropbox status graceful (no 5xx) + settings render', async ({ pag
     `dropbox status must not 5xx: ${(await dbx.text().catch(() => '')).slice(0, 200)}`
   ).toBeLessThan(500)
 
-  const res = await page.goto('/user/mysettings')
+  // 2026-09-12: the legacy /user/mysettings page was REMOVED (301 → hub), but
+  // the user-level WebDAV/Dropbox "Project synchronisation" card still lives on
+  // the legacy /user/settings page (settings/components/linking-section). That
+  // is the surface this render check asserts (git-bridge + notifications both
+  // deep-link to /user/settings#project-sync). The R11 no-5xx guard above is
+  // the meaningful regression pin; this only pins that the card still renders.
+  const res = await page.goto('/user/settings')
   expect(res?.status() ?? 200).toBe(200)
   await page.waitForTimeout(1_500)
   const body = await page.locator('body').innerText()

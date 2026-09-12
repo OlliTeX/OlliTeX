@@ -4,8 +4,14 @@ import { loginRobust } from '../../helpers/auth'
 import { api, mongoEval } from '../../parity/harness'
 import { ADMIN, USER, TPLADMIN } from '../../fixtures/credentials'
 
-// Parity baseline (legacy /templates/manage) — template-administration
-// contract. Roles: admin + template admin (canManageTemplates); user denied.
+/**
+ * Parity baseline for the RETIRED legacy /templates/manage page (owner
+ * item 7, 2026-09-16) — /templates/manage now 301s into the hub admin leaf
+ * /hub#/site.general.managetpl. The template-administration API contract
+ * (admin-list, bundle import/import-url, edit, delete) is unchanged and is
+ * what the hub uses. Roles: admin + template admin (canManageTemplates);
+ * plain users are denied the management APIs.
+ */
 const BASE = 'http://127.0.0.1:7420'
 const BUNDLE = '/tmp/tplfix/parity-tpl-bundle.zip'
 let p: any = null
@@ -21,19 +27,22 @@ test.afterAll(async () => {
 
 const tplCount = () => Number(mongoEval('db.templates.countDocuments({})'))
 
-test('renders: /templates/manage loads for site admin', async () => {
-  const r = await p.goto(BASE + '/templates/manage', { waitUntil: 'domcontentloaded' })
-  expect(r?.status()).toBe(200)
-  await p.waitForTimeout(1500)
+test('redirects: /templates/manage 301s into the hub admin leaf (legacy page removed)', async () => {
+  // logged-in admin: the 301 target is the hub management section.
+  const r = await p.request.get(BASE + '/templates/manage', { maxRedirects: 0 })
+  expect(r.status(), 'expected 301, got ' + (await r.text().catch(() => '')).slice(0, 140)).toBe(301)
+  expect(r.headers()['location']).toBe('/hub#/site.general.managetpl')
 })
 
-test('denied: plain user cannot open /templates/manage', async ({ browser }) => {
+test('denied: a plain user never sees a management surface via the legacy route', async ({ browser }) => {
   const ctx = await browser.newContext(); const q = await ctx.newPage()
   await loginRobust(q, USER.email, USER.password)
-  const resp = await q.goto(BASE + '/templates/manage', { waitUntil: 'domcontentloaded' }).catch(() => null)
-  const body = (await q.locator('body').innerText().catch(() => '')) || ''
-  const denied = resp?.status() === 403 || !/template/i.test(body) || /not authorized|forbidden|403/i.test(body)
-  expect(denied, 'user must be denied (got ' + (resp?.status()) + ')').toBeTruthy()
+  // the legacy page is gone for EVERYONE (301 into the hub); the management
+  // ACTION that mattered is the API — a plain user must be denied there.
+  const r = await q.request.get(BASE + '/templates/manage', { maxRedirects: 0 })
+  expect([301, 302].includes(r.status()), 'legacy route: ' + r.status()).toBeTruthy()
+  const deniedApi = await q.request.get(BASE + '/api/templates/admin-list')
+  expect([401, 403].includes(deniedApi.status()), 'admin-list denied for plain user (got ' + deniedApi.status() + ')').toBeTruthy()
   await ctx.close()
 })
 
@@ -138,10 +147,12 @@ test('categories: PUT /admin/site-settings/templates persists and restores', asy
     expect([200, 204].includes(r.status()), 'save templates config (' + txt.slice(0, 100) + ')').toBeTruthy()
   }
   await save(sec)                       // full section round-trip
-  await save({ enabled: false })        // toggle gallery off
+  await save({ ...sec, enabled: false }) // toggle gallery off (preserve categories!)
   const off = await (await api(p, 'GET', '/admin/site-settings')).json()
   expect((off?.templates ?? off?.sections?.templates)?.enabled, 'gallery toggled off').toBeFalsy()
-  await save({ enabled: true })         // restore
+  // 2026-09-12 (green gate): RESTORE the full section — a bare { enabled: true }
+  // replace wiped the categories array and order-flaked the gallery specs.
+  await save({ ...sec, enabled: true })
   const cats = await (await api(p, 'GET', '/api/template/categories')).json()
   expect(Array.isArray(cats), 'enabled categories list returns an array').toBeTruthy()
 })

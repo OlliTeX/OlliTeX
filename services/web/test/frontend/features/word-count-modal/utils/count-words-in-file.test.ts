@@ -36,25 +36,25 @@ describe('word-count', function () {
       'word-count.tex': {
         content: await readFile(
           path.join(__dirname, 'word-count.tex'),
-          'utf-8'
+          'utf-8',
         ),
       },
       'word-count-with-ignored-sections.tex': {
         content: await readFile(
           path.join(__dirname, 'word-count-with-ignored-sections.tex'),
-          'utf-8'
+          'utf-8',
         ),
       },
       'extra-words.tex': {
         content: await readFile(
           path.join(__dirname, 'extra-words.tex'),
-          'utf-8'
+          'utf-8',
         ),
       },
       'subfolder/extra-words.tex': {
         content: await readFile(
           path.join(__dirname, 'extra-words.tex'),
-          'utf-8'
+          'utf-8',
         ),
       },
     }
@@ -73,7 +73,7 @@ describe('word-count', function () {
       this.projectSnapshot,
       'word-count.tex',
       '/',
-      this.segmenters
+      this.segmenters,
     )
 
     expect(this.data).to.deep.include({
@@ -98,7 +98,7 @@ describe('word-count', function () {
       this.projectSnapshot,
       'word-count-with-ignored-sections.tex',
       '/',
-      this.segmenters
+      this.segmenters,
     )
 
     expect(this.data).to.deep.include({

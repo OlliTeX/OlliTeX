@@ -146,12 +146,16 @@ export const WordCountsClient: FC<{ data: WordCountData }> = ({ data }) => {
       </Row>
       <Row className="word-count-row py-2">
         <Col xs={12}>
-          <b>{t('inline_math')}:</b> {data.mathInline}
+          {/* Keep the SAME labels as the server renderer (word-counts.tsx) so
+            the File → Word count modal reads identically regardless of which
+            counter backs it — the established contract is "Math Inline" /
+            "Math Display" (math_inline / math_display), not "Inline math". */}
+          <b>{t('math_inline')}:</b> {data.mathInline}
         </Col>
       </Row>
       <Row className="word-count-row py-2 pb-0">
         <Col xs={12}>
-          <b>{t('display_math')}:</b> {data.mathDisplay}
+          <b>{t('math_display')}:</b> {data.mathDisplay}
         </Col>
       </Row>
     </Container>

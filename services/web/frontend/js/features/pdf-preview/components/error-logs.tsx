@@ -8,7 +8,6 @@ import PdfLogsEntries from '@/features/pdf-preview/components/pdf-logs-entries'
 import PdfPreviewErrorBoundaryFallback from '@/features/pdf-preview/components/pdf-preview-error-boundary-fallback'
 import withErrorBoundary from '@/infrastructure/error-boundary'
 import { useDetachCompileContext as useCompileContext } from '@/shared/context/detach-compile-context'
-import { Nav, NavLink, TabContainer, TabContent } from 'react-bootstrap'
 import { LogEntry as LogEntryData } from '@/features/pdf-preview/util/types'
 import LogEntry from './log-entry'
 import PdfClearCacheButton from '@/features/pdf-preview/components/pdf-clear-cache-button'
@@ -65,13 +64,44 @@ function ErrorLogs({
   const includeWarnings = activeTab === 'all' || activeTab === 'warnings'
 
   return (
-    <TabContainer onSelect={changeTab} defaultActiveKey={activeTab ?? 'all'}>
-      <Nav defaultActiveKey="all" className="error-logs-tabs">
-        {tabs.map(tab => (
-          <TabHeader key={tab.key} tab={tab} active={activeTab === tab.key} />
-        ))}
-      </Nav>
-      <TabContent className="error-logs new-error-logs">
+    // 2026-09-12 (a11y fix, green gate): replaced the react-bootstrap
+    // TabContainer + Nav + TabContent combo with explicit tab ARIA. RB 2.x's
+    // Nav/NavItem emits role="tab" + aria-controls pointing at pane ids that
+    // its (v1-era) TabContent never renders — 42 dangling aria-controls
+    // idrefs (axe aria-valid-attr-value, critical) on every editor page.
+    // Same classes as before (logs.scss keeps styling it); one real
+    // tabpanel that always renders and follows the selected tab.
+    <div className="error-logs">
+      <div role="tablist" className="error-logs-tabs">
+        {tabs.map(tab => {
+          const active = activeTab === tab.key
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              id={'error-logs-tab-' + tab.key}
+              role="tab"
+              aria-selected={active}
+              aria-controls="error-logs-tabpanel"
+              className={'error-logs-tab-header' + (active ? ' active' : '')}
+              onClick={() => changeTab(tab.key)}
+            >
+              {tab.label}
+              <div className="error-logs-tab-count">
+                {/* TODO: it would be nice if this number included custom errors */}
+                {formatErrorNumber(tab.entries?.length)}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+      <div
+        role="tabpanel"
+        id="error-logs-tabpanel"
+        aria-labelledby={'error-logs-tab-' + (activeTab ?? 'all')}
+        tabIndex={0}
+        className="error-logs new-error-logs tab-content"
+      >
         <div className="logs-pane-content">
           <RollingBuildSelectedReminder />
           <CheckpointCompilesEnabledReminder />
@@ -122,8 +152,8 @@ function ErrorLogs({
             </div>
           )}
         </div>
-      </TabContent>
-    </TabContainer>
+      </div>
+    </div>
   )
 }
 
@@ -139,22 +169,9 @@ function formatErrorNumber(num: number | undefined) {
   return Math.floor(num).toString()
 }
 
-const TabHeader = ({ tab, active }: { tab: ErrorLogTab; active: boolean }) => {
-  return (
-    <NavLink
-      eventKey={tab.key}
-      className="error-logs-tab-header"
-      active={active}
-      as="button"
-    >
-      {tab.label}
-      <div className="error-logs-tab-count">
-        {/* TODO: it would be nice if this number included custom errors */}
-        {formatErrorNumber(tab.entries?.length)}
-      </div>
-    </NavLink>
-  )
-}
+// (2026-09-12) TabHeader helper removed with the react-bootstrap tabs:
+// the tab buttons are now rendered inline above (proper tab ARIA, no
+// dangling aria-controls).
 
 export default withErrorBoundary(memo(ErrorLogs), () => (
   <PdfPreviewErrorBoundaryFallback type="logs" />

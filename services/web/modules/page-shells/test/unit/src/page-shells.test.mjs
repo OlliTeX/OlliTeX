@@ -14,7 +14,10 @@ import { describe, it, expect } from 'vitest'
 import captureRender from '../../../app/src/captureRender.mjs'
 
 // <web>/modules/page-shells/test/unit/src  ->  five levels up = <web>
-const web = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../..')
+const web = resolve(
+  fileURLToPath(new URL('.', import.meta.url)),
+  '../../../../..',
+)
 const repoApp = resolve(web, 'app')
 const moduleDir = resolve(web, 'modules/page-shells')
 const read = p => readFileSync(p, 'utf8')
@@ -26,31 +29,35 @@ describe('PSH view mirrors', () => {
   it('/admin/panel is a 301 redirect to the hub and its artifacts are removed', () => {
     const router = read(resolve(moduleDir, 'app/src/PageShellsRouter.mjs'))
     expect(router).toContain("'/admin/panel'")
-    expect(router).toContain('res.redirect(301, \'/hub#/overview\')')
+    expect(router).toContain("res.redirect(301, '/hub#/overview')")
     expect(router).not.toContain('AdminPanelShellController')
-    expect(existsSync(resolve(moduleDir, 'app/views/admin-panel.pug'))).toBe(false)
-    expect(existsSync(resolve(moduleDir, 'app/src/AdminPanelShellController.mjs'))).toBe(false)
-    expect(existsSync(resolve(moduleDir, 'frontend/js/pages/panel-shell.js'))).toBe(false)
+    expect(existsSync(resolve(moduleDir, 'app/views/admin-panel.pug'))).toBe(
+      false,
+    )
+    expect(
+      existsSync(resolve(moduleDir, 'app/src/AdminPanelShellController.mjs')),
+    ).toBe(false)
+    expect(
+      existsSync(resolve(moduleDir, 'frontend/js/pages/panel-shell.js')),
+    ).toBe(false)
   })
 
-  it('user-my-settings.pug mirrors upstream user/settings.pug on all meta tags + entrypoint', () => {
-    const upstream = read(resolve(repoApp, 'views/user/settings.pug'))
-    const shell = read(resolve(moduleDir, 'app/views/user-my-settings.pug'))
-
-    const metaNames = [...upstream.matchAll(/name='(ol-[A-Za-z0-9-]+)'/g)].map(m => m[1])
-    expect(metaNames.length).toBeGreaterThanOrEqual(20)
-    for (const name of metaNames) {
-      expect(shell, `missing meta ${name}`).toContain(`name='${name}'`)
-    }
-    // Same React app
-    expect(shell).toContain("- entrypoint = 'pages/user/settings'")
-    expect(shell).toContain('#settings-page-root')
-    expect(shell).toContain('layout-react')
+  it('/user/mysettings is a 301 redirect to the hub and its artifacts are removed (owner 2026-09-12)', () => {
+    const router = read(resolve(moduleDir, 'app/src/PageShellsRouter.mjs'))
+    expect(router).toContain("'/user/mysettings'")
+    expect(router).toContain("res.redirect(301, '/hub#/mysettings.account')")
+    expect(router).not.toContain('MySettingsShellController')
+    expect(
+      existsSync(resolve(moduleDir, 'app/views/user-my-settings.pug')),
+    ).toBe(false)
+    expect(
+      existsSync(resolve(moduleDir, 'app/src/MySettingsShellController.mjs')),
+    ).toBe(false)
   })
 
   it('module files exist and the module is registered', () => {
     expect(existsSync(resolve(moduleDir, 'index.mjs'))).toBe(true)
-    for (const f of ['PageShellsRouter.mjs', 'captureRender.mjs', 'MySettingsShellController.mjs']) {
+    for (const f of ['PageShellsRouter.mjs', 'captureRender.mjs']) {
       expect(existsSync(resolve(moduleDir, 'app/src', f)), f).toBe(true)
     }
     const defaults = read(resolve(web, 'config/settings.defaults.js'))
@@ -104,8 +111,13 @@ describe('PSH upstream stability (hard constraint: no upstream edits)', () => {
       const full = resolve(repoApp, f.replace(/^app\//, ''))
       expect(existsSync(full), f).toBe(true)
     }
-    // The settings shell controller IMPORTS the upstream handler (policy check).
-    const settingsCtl = read(resolve(moduleDir, 'app/src/MySettingsShellController.mjs'))
-    expect(settingsCtl).toContain('User/UserPagesController.mjs')
+    // 2026-09-12 (owner late-ToDo item 1): the my-settings shell controller was
+    // REMOVED — /user/mysettings is now a 301 to the hub account leaf, so this
+    // module no longer re-exposes the upstream settings handler through a shell
+    // controller. Assert the removal (consistent with the redirect test above)
+    // rather than reading the now-absent file.
+    expect(
+      existsSync(resolve(moduleDir, 'app/src/MySettingsShellController.mjs')),
+    ).toBe(false)
   })
 })

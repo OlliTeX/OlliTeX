@@ -133,18 +133,38 @@ export async function ensureFixtureTemplate(browser: import('@playwright/test').
   const { ADMIN } = (await import('../fixtures/credentials')) as any
   const c = await browser.newContext()
   const q = await c.newPage()
+  // 2026-09-12 (green gate): hoisted so the finally-block category self-heal
+  // can see it (declared inside `try` would be out of scope there).
+  let csrf: string | null = null
   try {
     await loginRobust(q, ADMIN.email, ADMIN.password)
     // CSRF token comes from a rendered page's meta tag (this fork's POST
     // guard: X-CSRF-TOKEN is required, like the manage-spec's api() helper).
     await q.goto(BASE + '/project', { waitUntil: 'domcontentloaded' }).catch(() => {})
-    const csrf = await q.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)
+    csrf = await q.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)
     const j = await (async () => {
       const r = await q.request.get(BASE + '/api/templates', csrf ? { headers: { 'X-CSRF-TOKEN': csrf } } : {})
       return r.json().catch(() => ({}))
     })()
     const arr: any[] = j.templates ?? (Array.isArray(j) ? j : [])
-    if (arr.some(x => (x.name || '') === 'Parity Fixture Template')) return
+    const existing = arr.find(x => (x.name || '') === 'Parity Fixture Template')
+    if (existing) {
+      // 2026-09-12 (green gate): the gallery filters by the PATH form
+      // (category = '/templates/<key>'); a fixture seeded via
+      // POST /template/new keeps the bare key and never matches the filter —
+      // normalize it once (edit accepts { category }).
+      const cat: string = String(existing.category || '')
+      if (cat && !cat.startsWith('/templates/')) {
+        const r2 = await q.request.post(
+          BASE + '/template/' + (existing.id || existing._id) + '/edit',
+          { headers: csrf ? { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' }, data: JSON.stringify({ category: '/templates/' + cat }) }
+        )
+        if (![200, 204].includes(r2.status())) {
+          console.warn('ensureFixtureTemplate: category normalize returned ' + r2.status())
+        }
+      }
+      return
+    }
     const fs = await import('node:fs')
     const src = '/tmp/tplfix'
     if (!fs.existsSync(src + '/source.zip') || !fs.existsSync(src + '/output.pdf')) {
@@ -173,6 +193,49 @@ export async function ensureFixtureTemplate(browser: import('@playwright/test').
       throw new Error(`ensureFixtureTemplate: import failed (${r.status()})`)
     }
   } finally {
+    await ensureTemplateCategories(q, csrf)
     await c.close().catch(() => {})
+  }
+}
+
+/**
+ * 2026-09-12 (green gate): the `templates` site-settings section must carry a
+ * non-empty `categories` array — GET /api/template/categories is served ONLY
+ * from that array (TemplateGalleryManager.getEnabledCategories), and the
+ * legacy-templates-manage "persists and restores" spec used to REPLACE the
+ * section with { enabled } only, wiping it — order-dependent flake for both
+ * template-gallery parity specs. Self-heal here: every spec that ensures the
+ * fixture template also re-asserts the canonical category list, regardless of
+ * what ran before it.
+ */
+async function ensureTemplateCategories(q: import('@playwright/test').Page, csrf: string | null): Promise<void> {
+  const h = csrf ? { 'X-CSRF-TOKEN': csrf } : {}
+  try {
+    const all = await q.request.get(BASE + '/admin/site-settings', { headers: h })
+    const j = (await all.json().catch(() => ({}))) as any
+    const sec = (j.templates ?? j.sections?.templates) as any
+    const cats = Array.isArray(sec?.categories) ? sec.categories : []
+    if (cats.length > 0) return // already intact
+  } catch {
+    // section not readable (shouldn't happen: admin session) → re-seed anyway
+  }
+  const canonical = [
+    { key: 'academic-journal', name: 'Academic journals', enabled: true },
+    { key: 'book', name: 'Books', enabled: true },
+  ]
+  const base = (async () => {
+    try {
+      const j = (await (await q.request.get(BASE + '/admin/site-settings', { headers: h })).json()) as any
+      const sec = j.templates ?? j.sections?.templates ?? {}
+      return { enabled: sec.enabled !== false, ...sec }
+    } catch {
+      return { enabled: true }
+    }
+  })()
+  const merged = { ...(await base), categories: canonical }
+  const r = await q.request.put(BASE + '/admin/site-settings/templates', { headers: h, data: JSON.stringify(merged) })
+  if (![200, 204].includes(r.status())) {
+    // non-fatal: the categories spec will tell the story if this ever regresses
+    console.warn('ensureFixtureTemplate: categories re-seed returned ' + r.status())
   }
 }

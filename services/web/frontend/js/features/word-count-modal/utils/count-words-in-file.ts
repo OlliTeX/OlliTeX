@@ -116,10 +116,20 @@ export const countWordsInFile = (
   projectSnapshot: IncludedFileSnapshot,
   relativePath: string,
   basePath: string,
-  segmenters: Segmenters
+  segmenters: Segmenters,
+  // When false, only the file at `relativePath` is counted — its \input/\include
+  // statements are NOT followed into the rest of the project. This is the mode
+  // the File → Word count modal uses, so it reports words in the CURRENT file
+  // the user has open rather than words in the whole project.
+  includeIncludedFiles: boolean = true,
 ) => {
   walkIncludedFiles(projectSnapshot, relativePath, basePath, (file, recurse) =>
-    countWordsInParsedFile(data, file, recurse, segmenters)
+    countWordsInParsedFile(
+      data,
+      file,
+      includeIncludedFiles ? recurse : () => {},
+      segmenters,
+    ),
   )
 }
 
@@ -127,7 +137,7 @@ const countWordsInParsedFile = (
   data: WordCountData,
   { docPath, content, tree }: IncludedFile,
   recurse: (includePath: string) => void,
-  segmenters: Segmenters
+  segmenters: Segmenters,
 ) => {
   debugConsole.log(`Counting words in ${docPath}`)
 
@@ -366,7 +376,7 @@ const countWordsInParsedFile = (
 
     for (const value of segmenters.word.segment(
       // replace - and _ with a word character, so that hyphenated words are counted as one word
-      text.replace(/\w[-_]\w/g, 'aaa')
+      text.replace(/\w[-_]\w/g, 'aaa'),
     )) {
       if (value.isWordLike) {
         data[counter.word]++
@@ -375,7 +385,7 @@ const countWordsInParsedFile = (
 
     for (const _value of segmenters.character.segment(
       // replace multiple spaces with a single space
-      text.replace(/\s+/, ' ').trim()
+      text.replace(/\s+/, ' ').trim(),
     )) {
       // TODO: option for whether to include whitespace?
       // if (!whiteSpaceRe.test(value.segment)) {

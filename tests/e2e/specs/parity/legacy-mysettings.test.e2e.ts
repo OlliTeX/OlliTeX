@@ -23,12 +23,23 @@ const userId = () => mongoEval('db.users.findOne({ email: "e2e-user@e2e.test" })
 const doc = (field: string) => mongoEval(`db.users.findOne({ _id: ObjectId("${userId()}") }).${field}`)
 const ok = (code: number) => [200, 204].includes(code)
 
-test('renders: /user/mysettings loads for a logged-in user', async () => {
+test('redirect: /user/mysettings 301s into the hub (legacy page removed, owner 2026-09-12)', async () => {
   const page = u()
-  const r = await page.goto(BASE + '/user/mysettings', { waitUntil: 'domcontentloaded' })
-  expect(r?.status()).toBe(200)
-  await page.waitForTimeout(1500)
-  await expect(page).not.toHaveTitle(/login/i)
+  // No redirect following: the route itself must be a 301 into the hub;
+  // the hub #/mysettings.account surface (not this legacy page) is the
+  // settings contract from here on.
+  const _redirectHop = await page.goto(BASE + '/user/mysettings', { waitUntil: 'domcontentloaded', waitUntilRedirect: undefined as never }).catch(() => null)
+  void _redirectHop
+  const r = await page.request.get(BASE + '/user/mysettings', { maxRedirects: 0 }).catch(() => null)
+  const loc = r?.headers()['location'] || ''
+  const status = r?.status() || 0
+  expect(
+    (status === 301 || status === 302) && /hub.*mysettings/i.test(loc),
+    'expected 301 → /hub#/mysettings.*, got ' + status + ' ' + loc.slice(0, 90)
+  ).toBeTruthy()
+  // and the hub target actually renders the settings surface
+  await page.goto(BASE + '/hub#/mysettings.account', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('body')).toContainText(/account|settings/i, { timeout: 15000 })
 })
 
 test('denied: unauthenticated guests do not reach settings', async ({ page }) => {

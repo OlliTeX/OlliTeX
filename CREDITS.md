@@ -69,6 +69,31 @@ The Python runner module (browser-side Python execution for `.py` files via
 2026-09-06 (settings + toast wiring, the run-button safety caveat, and
 in-repo unit/E2E test coverage).
 
+## Selected-text word count (File → Word count)
+
+The selection-aware word counting shown in the editor's File → Word count
+menu (the "Selection" section — words, headings, inline/display math for the
+currently selected LaTeX text) is ported from the community contribution
+`feature/selected_text_word_count` in
+[hnd0hng/overleaf-cep](https://github.com/hnd0hng/overleaf-cep)
+(`services/web/modules/selected-word-count`), by
+[hnd0hng](https://github.com/hnd0hng), integrated per the upstream reviewer
+guidance: the action stays in File → Word count (not the floating menu), the
+dialog always shows the whole-document count and adds the selection count
+when text is selected (2026-09-14). Typst selections use a documented
+approximate word count.
+
+## OIDC admin promotion (non-standard claims)
+
+The OpenID Connect admin check — promoting users to admin based on a claim
+value, now supporting NON-STANDARD claims read from the raw userinfo payload
+with UserInfo taking priority over the ID token — follows the community fix
+"OIDC: enable non standard claims in admin check" (PR #230) and "give priority
+to UserInfo" by [Juan Antonio Zuloaga
+Mellino](https://github.com/xvan) (@xvan), ported to this tree on 2026-09-12
+(owner item) together with the matching /hub → Site settings → SSO · OIDC
+"Claim mapping" fields.
+
 ## Inspiration
 
 The local-first, self-hosted approach to LaTeX editing was inspired by
