@@ -14,10 +14,20 @@ import (
 )
 
 // WriteJSON writes a JSON body with the given status code.
+// WriteJSON writes a JSON body exactly like Express' res.json: Content-Type
+// `application/json; charset=utf-8` and the precise JSON byte sequence (no
+// trailing newline — verified against the Node services, whose Content-Length
+// equals the exact body length).
 func WriteJSON(w http.ResponseWriter, code int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
+	b, err := json.Marshal(v)
+	if err != nil {
+		// JSON marshalling of plain values effectively never fails; if it does,
+		// the status line is already on the wire and we emit an empty body.
+		return
+	}
+	_, _ = w.Write(b)
 }
 
 // WriteJSONErr writes an error-shaped JSON body (1:1 with the Node

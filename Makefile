@@ -204,6 +204,8 @@ go-build: ## Build all Go service binaries into ./bin
 	$(GO) build -o bin/githubinterface ./cmd/githubinterface
 	$(GO) build -o bin/datamanipulator ./cmd/datamanipulator
 	$(GO) build -o bin/filestore ./cmd/filestore
+	$(GO) build -o bin/notifications ./cmd/notifications
+	$(GO) build -o bin/chat ./cmd/chat
 
 .PHONY: go-run-linked-url-proxy
 go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
@@ -228,5 +230,13 @@ go-run-datamanipulator: ## Run the datamanipulator Go service (dev)
 .PHONY: go-run-filestore
 go-run-filestore: ## Run the filestore Go service (dev)
 	$(GO) run ./cmd/filestore
+
+.PHONY: go-run-notifications
+go-run-notifications: ## Run the notifications Go service (dev)
+	$(GO) run ./cmd/notifications
+
+.PHONY: go-run-chat
+go-run-chat: ## Run the chat Go service (dev)
+	$(GO) run ./cmd/chat
 
 .DEFAULT_GOAL := help

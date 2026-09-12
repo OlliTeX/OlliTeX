@@ -58,6 +58,40 @@ func LimitBody(h http.Handler, limit int64) http.Handler {
 	return LimitBodyWith(h, limit, http.StatusRequestEntityTooLarge, "payload too large")
 }
 
+// LimitBodyJSON is the JSON-overflow variant of LimitBodyWith: on overflow it
+// responds `code` with the exact JSON body {"message":"<message>"} as
+// application/json; charset=utf-8 — the 1:1 behaviour of services/chat, whose
+// four-argument global error handler renders body-parser's entity.too.large
+// error as 500 {"message":"Internal error: request entity too large"}.
+func LimitBodyJSON(h http.Handler, limit int64, code int, message string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !methodHasBody(r.Method) || r.Body == nil {
+			h.ServeHTTP(w, r)
+			return
+		}
+		overflow := func() {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(code)
+			_, _ = w.Write([]byte(`{"message":"` + message + `"}`))
+		}
+		if r.ContentLength > limit {
+			overflow()
+			return
+		}
+		buf, err := io.ReadAll(io.LimitReader(r.Body, limit+1))
+		if err != nil {
+			overflow()
+			return
+		}
+		if int64(len(buf)) > limit {
+			overflow()
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(buf))
+		h.ServeHTTP(w, r)
+	})
+}
+
 func methodHasBody(method string) bool {
 	switch method {
 	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
