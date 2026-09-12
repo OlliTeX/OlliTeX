@@ -1,3 +1,4 @@
+import express from 'express'
 import logger from '@overleaf/logger'
 
 import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.mjs'
@@ -27,6 +28,12 @@ export default {
 
     webRouter.post(
       '/template/new/:Project_id',
+      // 2026-09 (publish regression): this module route mounts ahead of the
+      // app-level body parsers, so req.body arrives EMPTY and the publish
+      // fails with a Zod "buildId undefined" (the "recompile" 400). Parse the
+      // body right here, per-route, like the upload routes do.
+      express.json({ limit: '160mb' }),
+      express.urlencoded({ extended: true, limit: '160mb' }),
       ensureGalleryEnabled,
       AuthenticationController.requireLogin(),
       RateLimiterMiddleware.rateLimit(rateLimiterNewTemplate),
@@ -34,11 +41,13 @@ export default {
       TemplateGalleryController.createTemplateFromProject
     )
 
+    // 2026-09 (owner items 7+9): the legacy template PAGES are retired — the
+    // gallery lives at /hub#/templates.all and management at
+    // /hub#/site.general.managetpl. Old deep links/bookmarks 301-redirect
+    // there instead of 404-ing.
     webRouter.get(
       '/template/:template_id',
-      ensureGalleryEnabled,
-      RateLimiterMiddleware.rateLimit(rateLimiter),
-      TemplateGalleryController.templateDetailsPage
+      (req, res) => res.redirect(301, '/hub#/templates.all')
     )
 
     // 3b (2026-08-28): template bundle save/import (admin console).
@@ -56,11 +65,14 @@ export default {
       TemplateGalleryController.getAdminTemplateListJSON
     )
 
+    // 8b (2026-09-16, owner): the hub gallery offers "Download bundle" to ALL
+    // signed-in users (parity with the legacy detail page's open card actions),
+    // so the bundle export is no longer management-only (login + rate limit stay).
+    // IMPORTS stay management-only (import replaces published templates).
     webRouter.get(
       '/template/:template_id/bundle',
       AuthenticationController.requireLogin(),
       RateLimiterMiddleware.rateLimit(rateLimiterNewTemplate),
-      TemplateAuthorizationMiddleware.ensureTemplateManagementAccess,
       TemplateGalleryController.downloadTemplateBundle
     )
     webRouter.post(
@@ -77,27 +89,25 @@ export default {
     // templates must work while the public gallery is switched off.
     webRouter.post(
       '/template/bundle/import-url',
+      express.json({ limit: '160mb' }),
       AuthenticationController.requireLogin(),
       RateLimiterMiddleware.rateLimit(rateLimiterNewTemplate),
       TemplateAuthorizationMiddleware.ensureTemplateManagementAccess,
       TemplateGalleryController.importTemplateBundleFromUrl
     )
 
-    // R6 item 5/9 (2026-08-29): manage page for template gallery admins
-    // (list + download + import from file/url) — beyond the site-admin
-    // console, for users holding the scoped role only. Works while the
-    // public gallery is off (it is still gated by management access).
+    // 2026-09 (owner item 7): /templates/manage retired → hub admin leaf.
+    // Must stay registered before /templates/:category? below.
     webRouter.get(
       '/templates/manage',
       AuthenticationController.requireLogin(),
-      RateLimiterMiddleware.rateLimit(rateLimiter),
-      TemplateAuthorizationMiddleware.ensureTemplateManagementAccess,
-      TemplateGalleryController.templateAdminPage
+      (req, res) => res.redirect(301, '/hub#/site.general.managetpl')
     )
 
     webRouter.post(
       '/template/:template_id/edit',
       ensureGalleryEnabled,
+      express.json({ limit: '160mb' }),
       AuthenticationController.requireLogin(),
       RateLimiterMiddleware.rateLimit(rateLimiter),
       TemplateAuthorizationMiddleware.ensureTemplateManagementAccess,
@@ -113,11 +123,10 @@ export default {
       TemplateGalleryController.deleteTemplate
     )
 
+    // 2026-09 (owner item 9): /templates (any category) retired → hub gallery.
     webRouter.get(
       '/templates/:category?',
-      ensureGalleryEnabled,
-      RateLimiterMiddleware.rateLimit(rateLimiter),
-      TemplateGalleryController.templatesCategoryPage
+      (req, res) => res.redirect(301, '/hub#/templates.all')
     )
 
     webRouter.get(

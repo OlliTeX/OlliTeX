@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
 
   ActionIcon,
@@ -24,8 +24,32 @@ import Icon from '../../shared/icons'
 import ConfirmModal from '../../shared/confirm-modal'
 import { PageError, PageLoading } from '../../shared/page-state'
 
-type Category = { key: string; name?: string; enabled?: boolean }
-type GallerySection = { enabled?: boolean; categories?: Category[] }
+type Category = {
+  key: string
+  name?: string
+  enabled?: boolean
+  description?: string
+  publishable?: boolean
+  url?: string
+}
+// Keep the full server object — saveSection round-trips it, so extra fields
+// (allUsersCanManageTemplates / nonAdminCanPublishTemplates / …) are never
+// accidentally wiped by a partial save (owner batch 1, 2026-09-11).
+type GallerySection = {
+  enabled?: boolean
+  categories?: Category[]
+  allUsersCanManageTemplates?: boolean
+  nonAdminCanPublishTemplates?: boolean
+  [k: string]: any
+}
+type TemplateAdmin = {
+  id: string
+  email: string
+  firstName?: string
+  lastName?: string
+  isAdmin?: boolean
+  hasTemplateFlag?: boolean
+}
 type GalleryTemplate = {
   template_id?: string
   id?: string
@@ -45,6 +69,10 @@ function tname(t: any): string {
 
 export default function AdminTemplatesSection() {
   const [sectionCfg, setSectionCfg] = useState<GallerySection | null>(null)
+  // 2026-09 (mega-batch): refs backing the optimistic + serialized saveSection
+  const cfgRef = useRef<GallerySection | null>(null)
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve())
+  if (cfgRef.current !== sectionCfg) cfgRef.current = sectionCfg
   const [cfgError, setCfgError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [list, setList] = useState<GalleryTemplate[] | null>(null)
@@ -55,6 +83,11 @@ export default function AdminTemplatesSection() {
   const [confirmDel, setConfirmDel] = useState<GalleryTemplate | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editTpl, setEditTpl] = useState<GalleryTemplate | null>(null)
+  const [counts, setCounts] = useState<Record<string, number | null>>({})
+  const [admins, setAdmins] = useState<TemplateAdmin[] | null>(null)
+  const [revokeBusy, setRevokeBusy] = useState<string | null>(null)
+  const [editCat, setEditCat] = useState<Category | null>(null)
+  const [editCatDraft, setEditCatDraft] = useState<{ name: string; description: string }>({ name: '', description: '' })
   const [editForm, setEditForm] = useState<{ name?: string; descriptionMD?: string; authorMD?: string; license?: string; category?: string; language?: string }>({})
   const [editCategories, setEditCategories] = useState<Array<{ key: string; name: string; url: string }>>([])
   const [savingEdit, setSavingEdit] = useState(false)
@@ -86,10 +119,13 @@ export default function AdminTemplatesSection() {
     try {
       const all = await getJSON('/admin/site-settings')
       const tpl = (all && (all.templates || all.sections?.templates)) || {}
+      // full object — legacy /admin/site parity (owner batch 1): keep the
+      // site-wide switches + category publishable/description fields intact.
       setSectionCfg({
-        enabled: tpl.enabled !== false,
+        ...tpl,
         categories: Array.isArray(tpl.categories) ? tpl.categories : [],
       })
+      setCounts((tpl as any).counts || {})
     } catch (err: any) {
       setCfgError((err?.data?.message as string) || String(err?.message || err))
     }
@@ -100,6 +136,10 @@ export default function AdminTemplatesSection() {
     } catch {
       setList([])
     }
+    // R6 item 7 parity: users with the template gallery admin flag
+    getJSON<any>('/admin/site/template-admins')
+      .then(d => setAdmins(Array.isArray(d?.users) ? d.users : []))
+      .catch(() => setAdmins(null))
     setLoading(false)
   }, [])
 
@@ -107,19 +147,32 @@ export default function AdminTemplatesSection() {
     void load()
   }, [load])
 
-  const saveSection = async (patch: Partial<GallerySection>) => {
-    if (!sectionCfg) return
-    const next = { ...sectionCfg, ...patch }
-    try {
+  const saveSection = (patch: Partial<GallerySection>) => {
+    // 2026-09 (mega-batch): optimistic + serialized saves. The switches are
+    // prop-controlled from sectionCfg and saveSection PUTs the FULL section;
+    // with two rapid clicks the second full-state PUT used to carry the
+    // stale (pre-first-click) state and overwrite the first flip (e2e
+    // "admins flip persisted" flake). Now: the local state is bumped
+    // immediately (so every subsequent save composes on the latest value)
+    // and saves run one-after-another in order.
+    if (!sectionCfg) return Promise.resolve()
+    const base = cfgRef.current ?? sectionCfg
+    const next = { ...base, ...patch }
+    setSectionCfg(next)
+    cfgRef.current = next
+    const run = saveChainRef.current.then(async () => {
       await putJSON('/admin/site-settings/templates', { body: next })
-      setSectionCfg(next)
       notify({ message: 'Template gallery settings saved.', color: 'teal' })
-    } catch (err: any) {
+    }).catch((err: any) => {
+      // the optimistic bump stays visible until the reload restores truth
+      void load()
       notify({
         message: (err?.data?.message as string) || 'Could not save settings.',
         color: 'red',
       })
-    }
+    })
+    saveChainRef.current = run.catch(() => undefined)
+    return run
   }
 
   // Mantine 9.6 quirk (PG-TH-1): FileInput onChange can deliver the File,
@@ -219,30 +272,202 @@ export default function AdminTemplatesSection() {
             />
           </Group>
 
+          {/* owner batch 1 (2026-09-11): the two site-wide permissions the
+              legacy /admin/site Templates tab had — restore exact copy + ids */}
+          <Group justify="space-between" wrap="nowrap" gap="sm">
+            <div>
+              <Text fw={700}>All users are template gallery admins</Text>
+              <Text size="sm" c="dimmed" mt={4}>
+                Grants every logged-in user the template gallery admin role (manage templates
+                only — no other admin powers). When off, the role can be assigned per user on
+                the user page.
+              </Text>
+            </div>
+            <Switch
+              checked={Boolean(sectionCfg?.allUsersCanManageTemplates)}
+              onChange={() => void saveSection({ allUsersCanManageTemplates: !sectionCfg?.allUsersCanManageTemplates })}
+              color="ollitex"
+            />
+          </Group>
+          <Group justify="space-between" wrap="nowrap" gap="sm">
+            <div>
+              <Text fw={700}>Non-admins can publish templates</Text>
+              <Text size="sm" c="dimmed" mt={4}>
+                Allow any user to propose/publish templates (otherwise template admins only).
+              </Text>
+            </div>
+            <Switch
+              checked={Boolean(sectionCfg?.nonAdminCanPublishTemplates)}
+              onChange={() => void saveSection({ nonAdminCanPublishTemplates: !sectionCfg?.nonAdminCanPublishTemplates })}
+              color="ollitex"
+            />
+          </Group>
+
+          {/* owner batch 1: full category table (legacy /admin/site parity):
+              Name → /templates/<key>, Status, Publishable, Templates count,
+              Description, Edit (name/description modal) */}
           {sectionCfg?.categories?.length ? (
             <Stack gap="xs">
-              <Text size="sm" fw={600}>
-                Categories
-              </Text>
-              {sectionCfg.categories.map(c => (
-                <Group key={c.key} justify="space-between" wrap="nowrap">
-                  <Text size="sm">{c.name || c.key}</Text>
-                  <Switch
-                    size="xs"
-                    checked={c.enabled !== false}
-                    color="ollitex"
-                    onChange={() =>
-                      void saveSection({
-                        categories: (sectionCfg?.categories || []).map(x =>
-                          x.key === c.key ? { ...x, enabled: x.enabled === false } : x
-                        ),
-                      })
-                    }
-                  />
-                </Group>
-              ))}
+              <Table withTableBorder style={{ borderRadius: 10, overflow: 'hidden' }}>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Name</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th title="Whether non-admin users may publish templates in this category (overrides the site-wide setting). Site admins can always publish.">Publishable</Table.Th>
+                    <Table.Th>Templates</Table.Th>
+                    <Table.Th>Description</Table.Th>
+                    <Table.Th aria-label="Edit category" style={{ width: 70 }} />
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {sectionCfg.categories.map(c => (
+                    <Table.Tr key={c.key}>
+                      <Table.Td>
+                        <Anchor href={`/templates/${c.key}`} target="_blank" rel="noreferrer" size="sm" fw={500}>
+                          {c.name || c.key}
+                        </Anchor>
+                      </Table.Td>
+                      <Table.Td>
+                        <Switch
+                          size="xs"
+                          checked={c.enabled !== false}
+                          color="ollitex"
+                          onChange={() =>
+                            void saveSection({
+                              categories: (sectionCfg?.categories || []).map(x =>
+                                x.key === c.key ? { ...x, enabled: x.enabled === false } : x
+                              ),
+                            })
+                          }
+                        />
+                      </Table.Td>
+                      <Table.Td>
+                        <Switch
+                          size="xs"
+                          checked={c.publishable !== false}
+                          color="ollitex"
+                          onChange={() =>
+                            void saveSection({
+                              categories: (sectionCfg?.categories || []).map(x =>
+                                x.key === c.key ? { ...x, publishable: x.publishable === false } : x
+                              ),
+                            })
+                          }
+                        />
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm">{counts[c.key] == null ? '—' : counts[c.key]}</Text>
+                      </Table.Td>
+                      <Table.Td style={{ maxWidth: 320 }}>
+                        <Text size="sm" c="dimmed" lineClamp={1}>
+                          {c.description || '—'}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        <Button
+                          size="xs"
+                          variant="default"
+                          onClick={() => {
+                            setEditCat(c)
+                            setEditCatDraft({ name: c.name || '', description: c.description || '' })
+                          }}
+                        >
+                          Edit
+                        </Button>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
             </Stack>
           ) : null}
+          <Text size="xs" c="dimmed">
+            Template bundles (create / edit / import individual templates) live in the template
+            gallery admin: <Anchor href="/templates/manage" target="_blank" rel="noreferrer">/templates/manage</Anchor>
+          </Text>
+        </Stack>
+      </Card>
+
+      {/* R6 item 7 parity: who holds the template gallery admin role */}
+      <Card withBorder paddings="lg" radius="lg">
+        <Stack gap="sm">
+          <Text fw={700}>Template gallery admins</Text>
+          <Text size="sm" c="dimmed">
+            Template gallery admins can manage templates (create, edit in place, download/import
+            bundles) without full site admin powers. Assign the role on the user page (Create /
+            Update account).
+          </Text>
+          {admins === null ? (
+            <Text size="sm" c="dimmed">—</Text>
+          ) : admins.length === 0 ? (
+            <Text size="sm" c="dimmed">No users have the template gallery admin role yet.</Text>
+          ) : (
+            <Table withTableBorder style={{ borderRadius: 10, overflow: 'hidden' }}>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Name</Table.Th>
+                  <Table.Th>Email</Table.Th>
+                  <Table.Th style={{ width: 150, textAlign: 'right' }} />
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {admins.map(u => {
+                  const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim()
+                  return (
+                    <Table.Tr key={u.id}>
+                      <Table.Td>
+                        <Text size="sm" fw={600}>
+                          {fullName || u.email}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {u.isAdmin ? 'Site admin' : 'Template gallery admin'}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Anchor href={`/admin/user/${u.id}`} size="sm" target="_blank" rel="noreferrer">
+                          {u.email}
+                        </Anchor>
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        {!u.isAdmin && u.hasTemplateFlag ? (
+                          <Button
+                            size="xs"
+                            variant="light"
+                            color="red"
+                            loading={revokeBusy === u.id}
+                            onClick={() => {
+                              setRevokeBusy(u.id)
+                              void postJSON(`/admin/user/${u.id}/update`, {
+                                body: { canManageTemplates: false },
+                              })
+                                .then(() => {
+                                  notify({ message: 'Template admin role revoked.', color: 'teal' })
+                                  return getJSON<any>('/admin/site/template-admins')
+                                })
+                                .then(d => setAdmins(Array.isArray(d?.users) ? d.users : []))
+                                .catch((err: any) =>
+                                  notify({
+                                    message: (err?.data?.message as string) || 'Could not revoke the role.',
+                                    color: 'red',
+                                  })
+                                )
+                                .finally(() => setRevokeBusy(null))
+                            }}
+                          >
+                            Revoke
+                          </Button>
+                        ) : (
+                          <Text size="xs" c="dimmed">
+                            Managed via site-admin role
+                          </Text>
+                        )}
+                      </Table.Td>
+                    </Table.Tr>
+                  )
+                })}
+              </Table.Tbody>
+            </Table>
+          )}
         </Stack>
       </Card>
 
@@ -456,7 +681,23 @@ export default function AdminTemplatesSection() {
               value={editForm.descriptionMD ?? ''}
               onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, descriptionMD: v })) }}
             />
-            <TextInput mt="sm" label="License (markdown)" value={editForm.license ?? ''} onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, license: v })) }} />
+            {/* 6 (2026-09-16, owner): the legacy manage page used a license DROPDOWN
+                (cc_by_4.0 / lppl_1.3c / other) — restore that instead of free text. */}
+            <NativeSelect
+              mt="sm"
+              label="License"
+              value={
+                ['cc_by_4.0', 'lppl_1.3c', 'other'].includes(editForm.license ?? (editTpl as any)?.license ?? '')
+                  ? editForm.license ?? (editTpl as any)?.license
+                  : 'other'
+              }
+              onChange={e => { const v = e.currentTarget.value; setEditForm(f => ({ ...f, license: v })) }}
+              data={[
+                { value: 'cc_by_4.0', label: 'Creative Commons CC BY 4.0' },
+                { value: 'lppl_1.3c', label: 'LaTeX Project Public License 1.3c' },
+                { value: 'other', label: 'Other (as stated in the work)' },
+              ]}
+            />
           </div>
           <div style={{ width: '45%', minWidth: 220 }}>
             <Text size="xs" fw={600} mb={4}>Preview</Text>

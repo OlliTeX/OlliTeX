@@ -3,9 +3,14 @@ import { loginRobust } from '../../helpers/auth'
 import { api, killProject, ensureFixtureTemplate } from '../../parity/harness'
 import { USER } from '../../fixtures/credentials'
 
-// Parity baseline (legacy /templates gallery) — browse templates + start a
-// project from one. Contract proven live: /api/templates, /api/template/
-// categories, /template/:id, POST /project/new {projectName, template}.
+/**
+ * Parity baseline for the RETIRED legacy /templates gallery (owner items 7+9,
+ * 2026-09-16). The legacy pages no longer render: /templates[/:category] and
+ * /template/:id 301-redirect into the hub (gallery: /hub#/templates.all).
+ * The functional contract survives on the API + project-creation surface
+ * that the hub gallery uses: /api/templates, /api/template/categories,
+ * /template/:id/preview (thumbnail/PDF), POST /project/new {projectName, template}.
+ */
 const BASE = 'http://127.0.0.1:7420'
 let p: any = null
 
@@ -28,21 +33,14 @@ const tpl = async () => {
   return t
 }
 
-test('renders: /templates gallery shows h1 + fixture template card', async () => {
-  const r = await p.goto(BASE + '/templates', { waitUntil: 'domcontentloaded' })
-  expect(r?.status()).toBe(200)
-  // the gallery heading renders as the H2 "All templates" in this build
-  await expect(p.locator('h1, h2', { hasText: /templates/i }).first()).toBeVisible({ timeout: 15000 })
-  const t = await tpl()
-  // default sort is "Last updated" + pagination, so the long-lived fixture
-  // can sit off page 1. The header sort control is a button; sort by title
-  // ("Parity Fixture Template" sorts ahead of the churned "Parity Hub Import" rows).
-  const titleBtn = p.getByRole('button', { name: /title/i }).first()
-  if (await titleBtn.count().catch(() => 0)) {
-    await titleBtn.click()
-    await p.waitForTimeout(600)
-  }
-  await expect(p.locator(`a[href*="${t.id}"]`).first()).toBeVisible({ timeout: 15000 })
+test('redirects: /templates 301s into the hub gallery (legacy page removed)', async () => {
+  // maxRedirects:0 — page.goto would follow the redirect (Playwright policy).
+  const r = await p.request.get(BASE + '/templates', { maxRedirects: 0 })
+  expect(r.status(), 'legacy /templates must be a 301, got ' + (await r.text().catch(() => '')).slice(0, 140)).toBe(301)
+  expect(r.headers()['location'], 'redirect target').toBe('/hub#/templates.all')
+  const r2 = await p.request.get(BASE + '/templates/academic-journal', { maxRedirects: 0 })
+  expect(r2.status(), 'category page 301').toBe(301)
+  expect(r2.headers()['location']).toBe('/hub#/templates.all')
 })
 
 test('gate: guests see a login prompt, not template content', async ({ browser }) => {
@@ -63,13 +61,22 @@ test('list: GET /api/templates returns the fixture template with its meta', asyn
   expect(t.version, 'version').toBeTruthy()
 })
 
-test('detail: /template/:id shows name, "Open as Template", "View PDF"', async () => {
+test('detail: /template/:id 301s; preview endpoints (thumbnail + PDF) stay live', async () => {
   const t = await tpl()
-  const r = await p.goto(BASE + '/template/' + t.id, { waitUntil: 'domcontentloaded' })
-  expect(r?.status()).toBe(200)
-  await expect(p.locator('text=Parity Fixture Template').first()).toBeVisible({ timeout: 15000 })
-  expect((await p.locator('body').innerText()).toLowerCase(), 'use action present').toMatch(/open as template|start|use/i)
-  expect((await p.locator('body').innerText()).toLowerCase(), 'pdf view present').toMatch(/view pdf/i)
+  const r = await p.request.get(BASE + '/template/' + t.id, { maxRedirects: 0 })
+  expect(r.status(), 'legacy detail page must 301, got ' + (await r.text().catch(() => '')).slice(0, 140)).toBe(301)
+  expect(r.headers()['location']).toBe('/hub#/templates.all')
+  // the hub gallery's "View PDF" + thumbnail use the preview endpoint —
+  // it must still serve (PNG thumbnail)
+  const th = await p.request.get(BASE + '/template/' + t.id + '/preview', { params: { style: 'thumbnail' } })
+  expect([200, 404].includes(th.status()), 'thumbnail preview: ' + th.status()).toBeTruthy()
+  if (th.status() === 200) {
+    expect((th.headers()['content-type'] || '').startsWith('image/'), 'PNG content-type, got ' + th.headers()['content-type']).toBeTruthy()
+  }
+  // "View PDF": versioned PDF (or 404 when none was compiled — tolerate either,
+  // the legacy contract had the same shape)
+  const pdf = await p.request.get(BASE + '/template/' + t.id + '/preview')
+  expect([200, 404].includes(pdf.status()), 'preview PDF: ' + pdf.status()).toBeTruthy()
 })
 
 test('use: starting a project from the template creates it', async () => {

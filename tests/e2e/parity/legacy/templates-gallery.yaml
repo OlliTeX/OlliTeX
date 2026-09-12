@@ -1,10 +1,14 @@
 # Functional matrix — legacy /templates (gallery) — owner list "templates"
 # Roles: gallery requires login (CE default: guests see a login prompt);
 #   any logged-in user can browse + start projects from templates.
-# Contract (server-verified on e2e stack, with fixture template):
+# 2026-09-16 (owner items 7+9): the legacy PAGES are retired — /templates
+#   [/:category] and /template/:id now 301-redirect to /hub#/templates.all
+#   (see redirects feature). The functional contract survives on the API
+#   surface the hub gallery uses:
 #   GET  /api/templates[?by=&order=&category=]   → { templates: [{id,version,name,author,description,category,lastUpdated}] }
 #   GET  /api/template/categories                 → [{key,name}]
-#   GET  /template/:id                            → detail ("Open as Template", "View PDF")
+#   GET  /template/:id/preview[?style=thumbnail]  → PDF / PNG thumbnail
+#   GET  /template/:id/bundle                     → zip bundle (all signed-in users)
 #   POST /project/new { projectName, template }   → project created from template
 # Fixture: "Parity Fixture Template" imported via /template/bundle/import
 # (see templates-manage specs).
@@ -14,17 +18,17 @@ roles:
   admin: full
   tpladmin: full
   user: full
-  guest: login-prompt
+  guest: login-prompt   # the hub behind the redirects enforces login
 
 files:
   legacy: specs/parity/legacy-templates-gallery.test.e2e.ts
   hub: specs/parity/hub-templates-gallery.test.e2e.ts
 
 features:
-  - id: renders
+  - id: redirects
     kind: page
-    desc: gallery renders h1 + template card for the fixture template
-    legacy_test: renders
+    desc: RETIRED (owner items 7+9): /templates[/:category] and /template/:id 301 → /hub#/templates.all
+    legacy_test: redirects
     hub_test: renders
 
   - id: gate
@@ -40,12 +44,21 @@ features:
     legacy_test: list
     hub_test: list
 
-  - id: detail
-    kind: page
-    desc: template detail shows name + "Open as Template" + "View PDF"
-    behavior: { endpoint: GET /template/:id }
+  - id: use-card
+    kind: card
+    desc: hub card: "Use template" + "View PDF" + thumbnail + "Download bundle"
+    behavior:
+      - { endpoint: GET /template/:id/preview?style=thumbnail, note: "PNG" }
+      - { endpoint: GET /template/:id/preview, note: "PDF" }
+      - { endpoint: GET /template/:id/bundle, note: "zip; all signed-in users since 8b" }
     legacy_test: detail
     hub_test: detail
+  - id: detail
+    kind: page
+    desc: (legacy /template/:id — retired; 301 → hub gallery; success surface = the hub card)
+    behavior: { endpoint: GET /template/:id, note: "301" }
+    legacy_test: redirects
+    hub_test: renders
 
   - id: use
     kind: button

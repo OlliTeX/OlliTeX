@@ -1,4 +1,5 @@
 import Settings from '@overleaf/settings'
+import logger from '@overleaf/logger'
 import { getSection } from '../../../../app/src/Features/SiteSettings/SiteSettingsManager.mjs'
 import TemplateAuthorizationHelper from './TemplateAuthorizationHelper.mjs'
 import HttpErrorHandler from '../../../../app/src/Features/Errors/HttpErrorHandler.mjs'
@@ -14,6 +15,18 @@ async function ensureTemplateManagementAccess(req, res, next) {
   // "all users are template gallery admins", or the legacy
   // OVERLEAF_TEMPLATES_USER_ID.
   const isPrivileged = await TemplateAuthorizationHelper.hasTemplateAdminAccess(user, userId)
+
+  // 2026-09-11 (mega-batch): log the authz decision inputs (debug level —
+  // the e2e "plain user 200" incident turned out to be a test-order state
+  // leak, not an authz hole; the log stays for ops visibility).
+  try {
+    logger.debug({
+      route: req.originalUrl,
+      userId,
+      sessionUser: user ? { isAdmin: user.isAdmin, flags: user.flags, keys: Object.keys(user) } : null,
+      isPrivileged,
+    }, 'tpl-gallery: ensureTemplateManagementAccess decision')
+  } catch {}
 
   if (isPrivileged) return next()
 
@@ -37,7 +50,10 @@ async function ensureTemplateManagementAccess(req, res, next) {
         // fall through to the legacy check below
       }
     }
-    if (Settings.templates?.nonAdminCanManage) return next()
+    if (Settings.templates?.nonAdminCanManage) {
+      try { logger.debug({ userId }, 'tpl-gallery: legacy nonAdminCanManage env → allow') } catch {}
+      return next()
+    }
     return HttpErrorHandler.forbidden(req, res)
   }
 

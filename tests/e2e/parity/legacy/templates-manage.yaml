@@ -2,7 +2,7 @@
 # Roles: admin + template admin (canManageTemplates) = full; user = denied.
 # Template fixture: e2e import of a bundle (template.json+source.zip+output.pdf)
 # creates "Parity Fixture Template"; tests use throwaway imports + cleanup.
-page: /templates/manage
+page: /templates/manage   # retired 2026-09-16 (owner item 7) → 301 /hub#/site.general.managetpl
 id: templates-manage
 roles:
   admin: full
@@ -14,18 +14,19 @@ files:
   hub: specs/parity/hub-templates-manage.test.e2e.ts
 
 features:
-  - id: renders
+  - id: redirects
     kind: page
-    desc: manage page renders the template list for admin and template admin
-    legacy_test: renders
+    desc: RETIRED (owner item 7): /templates/manage 301 → /hub#/site.general.managetpl (admin)
+    legacy_test: redirects
     hub_test: renders
 
   - id: denied
     kind: access
-    desc: plain user cannot open /templates/manage (403)
+    desc: plain user denied the management API (legacy route itself 301s for everyone)
     legacy_test: denied
     hub_test: deny
 
+  - id: list
     kind: table
     desc: admin template list (name/version/owner)
     behavior: { endpoint: GET /api/templates/admin-list }

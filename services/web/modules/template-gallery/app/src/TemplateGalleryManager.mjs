@@ -302,10 +302,9 @@ async function getTemplateBundle({ templateId, userId }) {
   if (!template) {
     throw new OError('Template not found', { status: 404, templateId })
   }
-  const { canOverride } = await canUserOverrideTemplate(template, userId)
-  if (!canOverride) {
-    throw new OError('not allowed to download this template bundle', { status: 403 })
-  }
+  // 2026-09-16 (owner item 8b): bundle download is for ALL signed-in users —
+  // the template source/PDF is public gallery content (the legacy detail page
+  // let anyone open it as a project), so no override permission is required.
   const { zip: zipUrl, pdf: pdfUrl } = _bundleAssetUrls(
     String(template._id),
     template.version

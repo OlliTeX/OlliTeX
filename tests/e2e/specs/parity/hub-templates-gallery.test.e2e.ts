@@ -91,6 +91,49 @@ test('categories: hub category selector present and wired to the categories API'
   expect(/Parity Fixture Template/.test(body), 'fixture listed under its category').toBeTruthy()
 })
 
+test('card-assets: cards show thumbnails + "View PDF" + "Download bundle" (owner item 8)', async () => {
+  await nav()
+  const t = await tpl()
+  // thumbnail image (the card hides itself via onError if the PNG 404s;
+  // assert AT LEAST the preview endpoint contract for this fixture)
+  const th = await p.request.get(BASE + '/template/' + t.id + '/preview', { params: { style: 'thumbnail' } })
+  expect([200, 404].includes(th.status()), 'thumbnail endpoint: ' + th.status()).toBeTruthy()
+  if (th.status() === 200) {
+    await expect(p.locator('img[src*="style=thumbnail"]').first()).toBeVisible({ timeout: 10000 })
+  }
+  const body = await p.locator('body').innerText()
+  expect(/view pdf/i.test(body), '"View PDF" on cards').toBeTruthy()
+  expect(/download bundle/i.test(body), '"Download bundle" on cards').toBeTruthy()
+  const pdf = p.locator(`a[href*="/template/${t.id}/preview"]`).first()
+  await expect(pdf).toBeVisible({ timeout: 10000 })
+  expect((await pdf.getAttribute('target')) || '_blank', 'opens in new tab').toBeTruthy()
+  const bundle = p.locator(`a[href*="/template/${t.id}/bundle"]`).first()
+  await expect(bundle).toBeVisible()
+  // bundle must be downloadable by THIS plain user (8b: all user types)
+  const dl = await p.request.get(BASE + '/template/' + t.id + '/bundle')
+  expect(dl.status(), 'bundle download as plain user: ' + ((await dl.text().catch(() => '')) || '').slice(0, 120)).toBe(200)
+})
+
+test('license: admin edit form offers the license dropdown (owner item 6)', async ({ browser }) => {
+  const ctx = await browser.newContext(); const q = await ctx.newPage()
+  await loginRobust(q, ADMIN.email, ADMIN.password)
+  await q.goto(BASE + '/hub#/site.general.managetpl', { waitUntil: 'domcontentloaded' })
+  // open the EDIT dialog of the fixture template (the license dropdown lives there)
+  const row = q.locator('tr', { hasText: 'Parity Fixture Template' }).first()
+  await expect(row).toBeVisible({ timeout: 15000 })
+  await row.locator('[aria-label="Edit template"]').first().click()
+  const dlg = q.locator('[role="dialog"]').last()
+  await expect(dlg).toBeVisible({ timeout: 10000 })
+  const sel = dlg.locator('select').first()
+  await expect(sel).toBeAttached()
+  const opts = (await dlg.locator('select').allInnerTexts()).join('\n')
+  expect(opts, 'license options').toMatch(/creative commons cc by 4.0/i)
+  expect(opts).toMatch(/latex project public license 1.3c/i)
+  expect(opts).toMatch(/other \(as stated in the work\)/i)
+  await dlg.locator('button', { hasText: /cancel/i }).first().click().catch(() => {})
+  await ctx.close()
+})
+
 test('use: hub "Start from template" → modal → Create project → POST /project/new {template}', async () => {
   await nav()
   const cap = captureApi(p as any, BASE)

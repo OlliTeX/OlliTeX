@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Anchor,
   Badge,
   Button,
   Card,
   Group,
+  Image,
   Modal,
   NativeSelect,
   SimpleGrid,
@@ -198,6 +200,18 @@ export default function TemplatesSection({
         <SimpleGrid cols={{ base: 1, sm: 2, xl: 3 }} spacing="md">
           {filtered.map(t => (
             <Card key={t.id} withBorder paddings="md" radius="lg" mah="100%" miw={280}>
+              {/* 8a (2026-09-16, owner): the legacy gallery showed a preview
+                  thumbnail on every card (legacy: /template/:id/preview?style=thumbnail).
+                  Hide the image if the template has no compiled preview yet. */}
+              <Image
+                src={`/template/${t.id}/preview?version=${encodeURIComponent(String(t.version || 'latest'))}&style=thumbnail`}
+                alt={t.name}
+                h={150}
+                fit="cover"
+                radius="md"
+                mbd="md"
+                onError={e => { e.currentTarget.style.display = 'none' }}
+              />
               <Group justify="space-between" wrap="nowrap" gap="xs">
                 <Text fw={600} size="md" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                   {t.name}
@@ -228,19 +242,42 @@ export default function TemplatesSection({
                 </Group>
               ) : null}
               <Card.Section mt="md">
-                <Button
-                  size="sm"
-                  color="ollitex"
-                  fullWidth
-                  leftSection={<Icon name="rocket_launch" size={16} />}
-                  onClick={() => {
-                    setUsing(t)
-                    setProjectName('')
-                    setCreateErr(null)
-                  }}
-                >
-                  Use template
-                </Button>
+                <Group gap="xs">
+                  <Button
+                    size="sm"
+                    color="ollitex"
+                    grow
+                    leftSection={<Icon name="rocket_launch" size={16} />}
+                    onClick={() => {
+                      setUsing(t)
+                      setProjectName('')
+                      setCreateErr(null)
+                    }}
+                  >
+                    Use template
+                  </Button>
+                </Group>
+                {/* 8b (2026-09-16, owner): the legacy detail page offered View PDF +
+                    Download bundle; restore both for all user types (the bundle
+                    endpoint is login-gated, no longer management-only). */}
+                <Group gap="xs" mt="xs">
+                  <Anchor
+                    href={`/template/${t.id}/preview?version=${encodeURIComponent(String(t.version || 'latest'))}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    size="sm"
+                  >
+                    <Icon name="visibility" size={16} /> View PDF
+                  </Anchor>
+                  <Anchor
+                    href={`/template/${t.id}/bundle`}
+                    target="_blank"
+                    rel="noreferrer"
+                    size="sm"
+                  >
+                    <Icon name="download" size={16} /> Download bundle
+                  </Anchor>
+                </Group>
               </Card.Section>
             </Card>
           ))}

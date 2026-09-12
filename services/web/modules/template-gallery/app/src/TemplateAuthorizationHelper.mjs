@@ -16,17 +16,22 @@
  * nothing else on the site.
  */
 import Settings from '@overleaf/settings'
+import logger from '@overleaf/logger'
 import { getSection } from '../../../../app/src/Features/SiteSettings/SiteSettingsManager.mjs'
 import AdminAuthorizationHelper from '../../../../app/src/Features/Helpers/AdminAuthorizationHelper.mjs'
 import UserGetter from '../../../../app/src/Features/User/UserGetter.mjs'
 
 async function hasTemplateAdminAccess(user, userId) {
-  if (AdminAuthorizationHelper.hasAdminAccess(user)) return true
+  if (AdminAuthorizationHelper.hasAdminAccess(user)) {
+    try { logger.debug({ userId }, 'tpl-gallery: admin path → allow') } catch {}
+    return true
+  }
   if (userId) {
     if (
       Settings.templates?.user_id != null &&
       String(Settings.templates.user_id) === String(userId)
     ) {
+      try { logger.debug({ userId }, 'tpl-gallery: legacy user_id path → allow') } catch {}
       return true
     }
     try {
@@ -34,10 +39,31 @@ async function hasTemplateAdminAccess(user, userId) {
         userId,
         { isAdmin: 1, flags: 1 }
       )
-      if (dbUser?.isAdmin) return true
-      if (dbUser?.flags && dbUser.flags.canManageTemplates) return true
+      if (dbUser?.isAdmin) {
+        try { logger.debug({ userId }, 'tpl-gallery: dbUser.isAdmin → allow') } catch {}
+        return true
+      }
+      if (dbUser?.flags && dbUser.flags.canManageTemplates) {
+        try { logger.debug({ userId }, 'tpl-gallery: flags.canManageTemplates → allow') } catch {}
+        return true
+      }
       const section = await getSection('templates', Settings)
-      if (section && section.allUsersCanManageTemplates === true) return true
+      if (section && section.allUsersCanManageTemplates === true) {
+        try { logger.debug({ userId }, 'tpl-gallery: allUsersCanManageTemplates → allow') } catch {}
+        return true
+      }
+      try {
+        logger.debug(
+          {
+            userId,
+            admin: !!(user && user.isAdmin),
+            dbUser: dbUser ? { isAdmin: dbUser.isAdmin, flags: dbUser.flags } : null,
+            user_id_env: Settings.templates?.user_id ?? null,
+            allUsers: section?.allUsersCanManageTemplates ?? null,
+          },
+          'tpl-gallery: no path grants access → deny'
+        )
+      } catch {}
     } catch (err) {
       // fail closed, but keep going: the legacy id check above already ran
     }
