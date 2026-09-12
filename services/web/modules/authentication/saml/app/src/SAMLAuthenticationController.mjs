@@ -147,9 +147,25 @@ const SAMLAuthenticationController = {
   },
   getSPMetadata(req, res) {
     const samlStratery = passport._strategy('saml')
-    res.setHeader('Content-Disposition', `attachment; filename="${samlStratery._saml.options.issuer}-meta.xml"`)
+    // Fresh instances store no SSO config (D7: stored-only), and disabled
+    // providers leave a STUB strategy registered (sso-runtime — no .saml,
+    // no generator): both cases answer a clean 503 instead of a 500
+    // TypeError (2026-09, T5/mega-batch: fresh-stack 500 regression +
+    // stub leak when an admin disables SAML without restart).
+    const generator =
+      samlStratery &&
+      typeof samlStratery.generateServiceProviderMetadata === 'function'
+      ? samlStratery
+      : null
+    if (!generator) {
+      return res.status(503).json({
+        message:
+          'SAML is not configured on this instance yet — set Site settings → SSO → SAML first',
+      })
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="${generator._saml.options.issuer}-meta.xml"`)
     xmlResponse(res,
-      samlStratery.generateServiceProviderMetadata(
+      generator.generateServiceProviderMetadata(
         Settings._samlDbProvider?.decryptionCert || readFilesContentFromEnv(process.env.OVERLEAF_SAML_DECRYPTION_CERT),
         Settings._samlDbProvider?.publicCert || readFilesContentFromEnv(process.env.OVERLEAF_SAML_PUBLIC_CERT)
       )

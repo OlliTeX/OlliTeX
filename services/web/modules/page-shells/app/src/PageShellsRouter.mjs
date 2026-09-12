@@ -1,20 +1,17 @@
 import logger from '@overleaf/logger'
-import MySettingsShellController from './MySettingsShellController.mjs'
 import AuthorizationMiddleware from '../../../../app/src/Features/Authorization/AuthorizationMiddleware.mjs'
 import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.mjs'
-import PermissionsController from '../../../../app/src/Features/Authorization/PermissionsController.mjs'
 
 /**
  * PSH — Page shells router (UI-R10 W8).
  *
- *   GET /admin/panel     Site-admin shell over the upstream /admin tabset.
- *   GET /user/mysettings Logged-in shell over the upstream /user/settings
- *                        account page (same locals, same React app).
- *
- * Both are thin SAME-ORIGIN wrappers: the upstream handlers are invoked
- * directly (their locals are captured by intercepting res.render) and then
- * rendered into this module's own views. The upstream pages themselves
- * keep working on their original URLs.
+ * Both legacy shell pages are removed — the hubs are the single settings
+ * surfaces:
+ *   GET /admin/panel     → 301 /hub#/overview   (owner queue 4, 2026-09-10)
+ *   GET /user/mysettings → 301 /hub#/mysettings.account
+ *                          (owner late item, 2026-09-12: "remove the old
+ *                          page https://…/user/mysettings"; the workspace
+ *                          hub #/mysettings.* leaves are the equivalent)
  */
 const PageShellsRouter = {
   apply(webRouter) {
@@ -23,8 +20,9 @@ const PageShellsRouter = {
     webRouter.get(
       '/user/mysettings',
       AuthenticationController.requireLogin(),
-      PermissionsController.useCapabilities(),
-      MySettingsShellController.mySettingsPage
+      function (req, res) {
+        res.redirect(301, '/hub#/mysettings.account')
+      }
     )
 
     // 2026-09-10 (owner queue 4): the legacy admin panel page is removed —

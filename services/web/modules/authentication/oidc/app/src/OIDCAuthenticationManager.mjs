@@ -15,7 +15,9 @@ const OIDCAuthenticationManager = {
       providerId,
     } = Settings.oidc
     const email = profile.emails[0].value
-    const oidcUserId = (attUserId === 'email') ? email : profile[attUserId]
+    // 2026-09 (owner OIDC item): the user-id claim may be non-standard —
+    // fallback to the raw userinfo payload (`_json`) like the admin claim below.
+    const oidcUserId = (attUserId === 'email') ? email : (profile[attUserId] || profile._json?.[attUserId])
     const firstName = profile.name?.givenName || ""
     const lastName  = profile.name?.familyName || ""
     let isAdmin = false
@@ -23,7 +25,15 @@ const OIDCAuthenticationManager = {
       if (attAdmin === 'email') {
         isAdmin = (email === valAdmin)
       } else {
-        isAdmin = (profile[attAdmin] === valAdmin)
+        // 2026-09 (owner OIDC item): enable non-standard claims in the admin
+        // check — profile[attAdmin] (mapped claims) OR the raw userinfo
+        // payload profile._json?.[attAdmin]; UserInfo takes priority over the
+        // ID token (controller resolves uiProfile ?? idProfile).
+        // Ported from "OIDC: enable non standard claims in admin check" +
+        // "give priority to UserInfo" by Juan Antonio Zuloaga Mellino (@xvan,
+        // https://github.com/xvan) — see CREDITS.md.
+        const adminClaim = profile[attAdmin] || profile._json?.[attAdmin]
+        isAdmin = (adminClaim === valAdmin)
       }
     }
     const oidcUserData = null // Possibly it can be used later

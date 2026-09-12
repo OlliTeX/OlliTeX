@@ -15,7 +15,10 @@ features:
   - id: renders
     kind: page
     desc: settings page renders for any logged-in user (role-gated to self)
-    legacy_test: renders
+    # 2026-09-12 (owner late item): the legacy /user/mysettings PAGE is
+    # removed — the URL now 301-redirects into the hub (legacy spec
+    # "redirect"); the hub #/mysettings.* surface renders the same contract.
+    legacy_test: redirect
     hub_test: renders
 
   - id: denied

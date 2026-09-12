@@ -60,7 +60,16 @@ const OIDCAuthenticationController = {
       }
     )(req, res, next)
   },
-  async doPassportLogin(req, issuer, profile, context, idToken, accessToken, refreshToken, done) {
+  // 2026-09 (owner OIDC item): arity-10 verify callback per
+  // passport-openidconnect 0.1.2 — (req, issuer, uiProfile, idProfile,
+  // context, idToken, accessToken, refreshToken, params, done) — so the
+  // UserInfo profile (with `_json` = raw userinfo payload, carrying
+  // NON-STANDARD claims) is available. Ported from the community fix
+  // "OIDC: enable non standard claims in admin check" + "give priority to
+  // UserInfo" by Juan Antonio Zuloaga Mellino (@xvan,
+  // https://github.com/xvan) — see CREDITS.md.
+  async doPassportLogin(req, issuer, uiProfile, idProfile, context, idToken, accessToken, refreshToken, params, done) {
+    const profile = uiProfile ?? idProfile // idProfile fallback if userinfo is skipped
     let user, info
     try {
       if(req.session.intent === 'link') {

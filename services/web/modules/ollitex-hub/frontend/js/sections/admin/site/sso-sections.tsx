@@ -83,7 +83,7 @@ export function SsoSamlSection() {
       </Group>
       <Group gap="xs" wrap="wrap">
         <Text size="xs" c="dimmed">Your SP metadata for the IdP admin:</Text>
-        <Anchor href="/saml/metadata" target="_blank" rel="noreferrer" size="sm">/saml/metadata</Anchor>
+        <Anchor href="/saml/meta" target="_blank" rel="noreferrer" size="sm">/saml/meta</Anchor>
       </Group>
     </SectionShell>
   )
@@ -102,6 +102,18 @@ export function SsoOidcSection() {
     clientID: str0((d as any).clientID),
     clientSecret: '',
     scope: str0((d as any).scope, 'openid profile email'),
+    // 2026-09 (owner OIDC item): the claim-mapping + admin-promotion fields
+    // that were previously env/DB-only are now editable here (they feed
+    // Settings.oidc.* via ssoConfigLoader → OIDCModuleManager):
+    attUserId: str0((d as any).attUserId, 'id'),
+    attAdmin: str0((d as any).attAdmin),
+    valAdmin: str0((d as any).valAdmin),
+    updateUserDetailsOnLogin: bool0((d as any).updateUserDetailsOnLogin),
+    allowedEmailDomains: str0(
+      Array.isArray((d as any)?.allowedOIDCEmailDomains)
+        ? (d as any).allowedOIDCEmailDomains.join(',')
+        : (d as any)?.allowedOIDCEmailDomains
+    ),
   }))
   const secretSet = Boolean((data as any)?.clientSecretSet)
   if (!data && !error) return <Loading label="Loading OIDC settings…" />
@@ -133,6 +145,12 @@ export function SsoOidcSection() {
         clientID: String(v.clientID || ''),
         clientSecret: String(v.clientSecret || ''),
         scope: String(v.scope || ''),
+        // claim mapping + admin promotion (owner OIDC item):
+        attUserId: String(v.attUserId || ''),
+        attAdmin: String(v.attAdmin || ''),
+        valAdmin: String(v.valAdmin || ''),
+        updateUserDetailsOnLogin: Boolean(v.updateUserDetailsOnLogin),
+        allowedOIDCEmailDomains: String(v.allowedEmailDomains || ''),
       })}
     >
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
@@ -156,6 +174,27 @@ export function SsoOidcSection() {
         <Field label="Client ID" required value={String(v.clientID || '')} onChange={x => up({ clientID: x })} />
         <SecretField label="Client secret" set={Boolean(secretSet)} value={String(v.clientSecret || '')} onChange={x => up({ clientSecret: x })} hint="Leave empty to keep the stored secret." />
       </Group>
+      {/* 2026-09 (owner OIDC item): claim mapping + admin promotion — the
+          fields that back the (now non-standard-claim-aware) admin check. */}
+      <SectionTitle top>Claim mapping</SectionTitle>
+      <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
+        <Field label="User ID claim" value={String(v.attUserId || '')} onChange={x => up({ attUserId: x })} placeholder="id" hint={'Claim used as the stable OIDC user id ("email" = the email). Non-standard claims are read from the userinfo payload.'} />
+      </Group>
+      <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
+        <SwitchRow label="Update profile on login" checked={Boolean(v.updateUserDetailsOnLogin)} onChange={x => up({ updateUserDetailsOnLogin: x })} />
+      </Group>
+      <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
+        <Field label="Admin claim" value={String(v.attAdmin || '')} onChange={x => up({ attAdmin: x })} placeholder="groups" hint={'Claim (standard or non-standard) whose value marks an admin ("email" = use the email).'} />
+        <Field label="Admin claim value" value={String(v.valAdmin || '')} onChange={x => up({ valAdmin: x })} placeholder="admins" hint="Expected value of the admin claim." />
+      </Group>
+      <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
+        <Field label="Allowed email domains" value={String(v.allowedEmailDomains || '')} onChange={x => up({ allowedEmailDomains: x })} placeholder="corp.example.com, other.example.com" hint="Comma-separated; empty = any domain." />
+      </Group>
+      <div className="muted-hint" style={{ fontSize: '0.82em', opacity: 0.72 }}>
+        Non-standard claims (e.g. <code>groups</code>, <code>role</code>) are matched against the raw
+        userinfo payload — <b>userinfo takes priority</b> over ID-token claims
+        (see docs/wiki/admins/08-sso-saml-oidc.md + CREDITS.md for the fix provenance).
+      </div>
     </SectionShell>
   )
 }
@@ -212,6 +251,8 @@ export function SsoLdapSection() {
         lastNameAtt: String(v.lastNameAtt || ''),
         isAdminAtt: String(v.isAdminAtt || ''),
         updateUserDetailsOnLogin: Boolean(v.updateUserDetailsOnLogin),
+        // 2026-09-11 (owner batch 2 item 4): editable operation timeout (ms)
+        timeout: v.timeout === '' || v.timeout === undefined ? undefined : Number(v.timeout),
       })}
     >
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
@@ -223,7 +264,17 @@ export function SsoLdapSection() {
         <Field label="Bind DN" value={String(v.bindDN || '')} onChange={x => up({ bindDN: x })} placeholder="cn=admin,dc=example,dc=com" width="100%" />
         <SecretField label="Bind credentials" set={Boolean(credsSet)} value={String(v.bindCredentials || '')} onChange={x => up({ bindCredentials: x })} hint="Leave empty to keep the stored password." width="100%" />
       </Group>
-      <Text size="xs" c="dimmed" mb="xs">Timeout: 10 000 ms (fixed)</Text>
+      <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
+        <Field
+          label="Timeout (ms)"
+          type="number"
+          value={v.timeout === undefined || v.timeout === null ? '10000' : String(v.timeout)}
+          onChange={x => up({ timeout: x })}
+          placeholder="10000"
+          hint="Operation timeout in milliseconds (blank = instance default 10 000)."
+          width="100%"
+        />
+      </Group>
       <SectionTitle top>Search</SectionTitle>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
         <Field label="Search base" required value={String(v.searchBase || '')} onChange={x => up({ searchBase: x })} placeholder="ou=people,dc=example,dc=com" />

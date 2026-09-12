@@ -327,6 +327,13 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   await Modules.applyRouter(webRouter, privateApiRouter, publicApiRouter)
 
   // .getMessages will generate an empty response for anonymous users.
+  // 2026-09 (T5): whitelist it for anonymous access too — the global login
+  // gate answers 401 (WWW-Authenticate: OverleafLogin) to anonymous JSON
+  // clients, so the controller's "empty response for anonymous" intent never
+  // applied to the frontend surface on signed-out pages (console noise + dead
+  // banner). Logged-out visitors legitimately see site-wide messages (login
+  // page, register page).
+  AuthenticationController.addEndpointToLoginWhitelist('/system/messages')
   webRouter.get('/system/messages', SystemMessageController.getMessages)
 
   webRouter.get(

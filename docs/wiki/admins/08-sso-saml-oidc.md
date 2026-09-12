@@ -19,6 +19,25 @@ When a provider is enabled, the login page offers **Institutional login**
 alongside e-mail/password; account claims (e-mail, first/last name) map to
 the OlliTeX user automatically.
 
+### OIDC claim mapping & admin promotion
+
+The **SSO · OIDC** leaf also covers the claim-mapping fields (previously
+env/DB-only, added 2026-09-12):
+
+| Field | Purpose |
+|---|---|
+| User ID claim | claim used as the stable OIDC user id (`email` = use the e-mail) |
+| Update profile on login | refresh name/e-mail from the IdP at each login |
+| Admin claim / Admin claim value | claim (+ expected value) that promotes a user to **site admin** (`email` allowed) |
+| Allowed email domains | optional comma-separated domain allow-list |
+
+Non-standard claims (e.g. `groups`, `role`) are matched against the **raw
+userinfo payload, with UserInfo taking priority over ID-token claims** —
+ported from the community fix by Juan Antonio Zuloaga Mellino (@xvan),
+see CREDITS.md. The legacy `/user/mysettings` settings page is removed
+since 2026-09-12: the URL now 301-redirects to the hub
+(`/hub#/mysettings.account`).
+
 > Secrets (IdP private keys, OIDC client secrets, LDAP bind passwords) are
 > stored encrypted server-side. Describe them in runbooks by **name and
 > purpose only** — never paste the actual values.
