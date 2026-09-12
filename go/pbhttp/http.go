@@ -1,4 +1,4 @@
-package services
+package pbhttp
 
 import (
 	"fmt"
@@ -11,8 +11,7 @@ import (
 // HTTPStatusError carries an HTTP status code alongside a message. It mirrors
 // the convention used across the Overleaf Node.js microservices where an error
 // is tagged with `err.info = { status: N }` and the handler writes that status
-// back to the caller. Shared by all Go service conversions in this package so
-// they can reuse one idiom without colliding.
+// back to the caller.
 type HTTPStatusError struct {
 	Status int    // HTTP status to return (0 -> caller defaults to 500)
 	Msg    string // human-readable message (without any prefix)
@@ -43,36 +42,34 @@ func HTTPStatusErr(status int, msg string, err error) *HTTPStatusError {
 	return &HTTPStatusError{Status: status, Msg: msg, Err: err}
 }
 
-// Status returns the HTTP status of err if it is (or wraps) an
+// StatusOf returns the HTTP status of err if it is (or wraps) an
 // *HTTPStatusError, otherwise 0.
 func StatusOf(err error) int {
 	for err != nil {
 		if se, ok := err.(*HTTPStatusError); ok {
 			return se.Status
 		}
-		err = func() error {
-			if u, ok := err.(interface{ Unwrap() error }); ok {
-				return u.Unwrap()
-			}
-			return nil
-		}()
+		if u, ok := err.(interface{ Unwrap() error }); ok {
+			err = u.Unwrap()
+			continue
+		}
+		break
 	}
 	return 0
 }
 
-// Message returns the message of err if it is (or wraps) an *HTTPStatusError,
-// otherwise the raw Error() text.
+// MessageOf returns the message of err if it is (or wraps) an
+// *HTTPStatusError, otherwise the raw Error() text.
 func MessageOf(err error) string {
 	for err != nil {
 		if se, ok := err.(*HTTPStatusError); ok && se.Msg != "" {
 			return se.Msg
 		}
-		err = func() error {
-			if u, ok := err.(interface{ Unwrap() error }); ok {
-				return u.Unwrap()
-			}
-			return nil
-		}()
+		if u, ok := err.(interface{ Unwrap() error }); ok {
+			err = u.Unwrap()
+			continue
+		}
+		break
 	}
 	if err != nil {
 		return err.Error()
@@ -100,10 +97,10 @@ func WritePlainText(w http.ResponseWriter, code int, text string) {
 	_, _ = w.Write([]byte(text))
 }
 
-// resolveHostDNS looks up all addresses for hostname using the system
+// ResolveHostDNS looks up all addresses for hostname using the system
 // resolver. It is the default DNS backend for the proxy services and is
 // overrideable in tests via the per-service config.
-func resolveHostDNS(hostname string) ([]netip.Addr, error) {
+func ResolveHostDNS(hostname string) ([]netip.Addr, error) {
 	ips, err := net.LookupHost(hostname)
 	if err != nil {
 		return nil, err
@@ -119,17 +116,17 @@ func resolveHostDNS(hostname string) ([]netip.Addr, error) {
 	return out, nil
 }
 
-// firstAddr returns the first address or a zero value plus a not-found flag.
-func firstAddr(addrs []netip.Addr) (netip.Addr, bool) {
+// FirstAddr returns the first address or a zero value plus a not-found flag.
+func FirstAddr(addrs []netip.Addr) (netip.Addr, bool) {
 	if len(addrs) == 0 {
 		return netip.Addr{}, false
 	}
 	return addrs[0], true
 }
 
-// containsAny reports whether any of the strings in list equals or is a
-// substring prefix of s (helper for small allow-list checks).
-func containsAny(list []string, s string) bool {
+// ContainsAny reports whether any of the strings in list equals (case-folded)
+// s — a helper for small allow-list checks.
+func ContainsAny(list []string, s string) bool {
 	for _, v := range list {
 		if strings.EqualFold(v, s) {
 			return true
@@ -138,8 +135,7 @@ func containsAny(list []string, s string) bool {
 	return false
 }
 
-// fmtStatusErrorf is a convenience for building a *HTTPStatusError from a
-// format string (kept here so the services do not each re-implement it).
-func fmtStatusError(status int, format string, a ...any) *HTTPStatusError {
+// FmtStatusError builds an *HTTPStatusError from a format string.
+func FmtStatusError(status int, format string, a ...any) *HTTPStatusError {
 	return &HTTPStatusError{Status: status, Msg: fmt.Sprintf(format, a...)}
 }

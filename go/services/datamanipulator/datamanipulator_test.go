@@ -1,4 +1,4 @@
-package services
+package datamanipulator
 
 import (
 	"encoding/base64"
@@ -479,5 +479,107 @@ func TestDMAuthEnforced(t *testing.T) {
 	defer r2.Body.Close()
 	if r2.StatusCode != 200 {
 		t.Fatalf("with token = %d (want 200)", r2.StatusCode)
+	}
+}
+
+// --- HTTP handler wrapper tests (route wiring + request/response contract 1:1) ---
+
+func dmRead(t *testing.T, r *http.Response) string {
+	t.Helper()
+	b, _ := io.ReadAll(r.Body)
+	r.Body.Close()
+	return string(b)
+}
+
+func TestDM_HandlerFileGet(t *testing.T) {
+	srv := dmMux(t, "")
+	defer srv.Close()
+	r, err := http.Get(srv.URL + "/file?project_id=0123456789ab&path=main.tex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantB64 := base64.StdEncoding.EncodeToString([]byte("hello"))
+	body := dmRead(t, r)
+	if r.StatusCode != 200 || !strings.Contains(body, "content_base64") || !strings.Contains(body, wantB64) {
+		t.Fatalf("fileGet = %d %s (want 200 + b64)", r.StatusCode, body)
+	}
+	r2, err := http.Get(srv.URL + "/file?project_id=0123456789ab&path=missing.tex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body2 := dmRead(t, r2)
+	if r2.StatusCode != 404 {
+		t.Fatalf("fileGet missing = %d %s (want 404)", r2.StatusCode, body2)
+	}
+}
+
+func TestDM_HandlerFileDelete(t *testing.T) {
+	srv := dmMux(t, "")
+	defer srv.Close()
+	req, _ := http.NewRequest("DELETE", srv.URL+"/file?project_id=0123456789ab&path=main.tex", nil)
+	r, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := dmRead(t, r)
+	if r.StatusCode != 200 || !strings.Contains(body, "\"success\":true") {
+		t.Fatalf("fileDelete = %d %s (want 200 success)", r.StatusCode, body)
+	}
+	req2, _ := http.NewRequest("DELETE", srv.URL+"/file?project_id=0123456789ab&path=missing", nil)
+	r2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body2 := dmRead(t, r2)
+	if r2.StatusCode != 404 {
+		t.Fatalf("fileDelete missing = %d %s (want 404)", r2.StatusCode, body2)
+	}
+}
+
+func TestDM_HandlerPull(t *testing.T) {
+	srv := dmMux(t, "")
+	defer srv.Close()
+	body := `{"remote_files":[{"relative_path":"new.txt","content_base64":"aGk=","size":2}],"confirm_remote_deletions":false}`
+	r, err := http.Post(srv.URL+"/pull?project_id=0123456789ab", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := dmRead(t, r)
+	if r.StatusCode != 200 || !strings.Contains(out, "downloaded") || !strings.Contains(out, "conflicts") {
+		t.Fatalf("pull = %d %s (want 200 + result keys)", r.StatusCode, out)
+	}
+}
+
+func TestDM_HandlerCompare(t *testing.T) {
+	srv := dmMux(t, "")
+	defer srv.Close()
+	tree := `{"entries":[{"relative_path":"a.txt","checksum":"x"}],"totalFiles":1}`
+	body := `{"left_tree":` + tree + `,"right_tree":` + tree + `}`
+	r, err := http.Post(srv.URL+"/compare", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := dmRead(t, r)
+	if r.StatusCode != 200 {
+		t.Fatalf("compare = %d %s (want 200)", r.StatusCode, out)
+	}
+	for _, k := range []string{"conflicts", "onlyInLeft", "onlyInRight", "identical"} {
+		if !strings.Contains(out, k) {
+			t.Fatalf("compare missing %q: %s", k, out)
+		}
+	}
+}
+
+func TestDM_HandlerSyncFull(t *testing.T) {
+	srv := dmMux(t, "")
+	defer srv.Close()
+	body := `{"remote_files":[{"relative_path":"sync.txt","content_base64":"aGk=","size":2}]}`
+	r, err := http.Post(srv.URL+"/sync/full?project_id=0123456789ab", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := dmRead(t, r)
+	if r.StatusCode != 200 || !strings.Contains(out, "summary") {
+		t.Fatalf("syncFull = %d %s (want 200 + summary)", r.StatusCode, out)
 	}
 }

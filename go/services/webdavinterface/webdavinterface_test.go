@@ -1,4 +1,4 @@
-package services
+package webdavinterface
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	pbhttp "ollitex/go/pbhttp"
 )
 
 // fakeWebDAV is an in-memory WebDAV server used to drive the client +
@@ -485,16 +487,16 @@ func TestWD_SanitizeURLForLogging(t *testing.T) {
 }
 
 func TestWD_TimingSafeEqual(t *testing.T) {
-	if !timingSafeEqual("abc", "abc") {
+	if !pbhttp.TimingSafeEqual("abc", "abc") {
 		t.Fatal("equal should be true")
 	}
-	if timingSafeEqual("abc", "abd") {
+	if pbhttp.TimingSafeEqual("abc", "abd") {
 		t.Fatal("different should be false")
 	}
-	if timingSafeEqual("abc", "abcd") {
+	if pbhttp.TimingSafeEqual("abc", "abcd") {
 		t.Fatal("different length should be false")
 	}
-	if !timingSafeEqual("", "") {
+	if !pbhttp.TimingSafeEqual("", "") {
 		t.Fatal("empty equal should be true")
 	}
 }
@@ -622,3 +624,98 @@ func wdDo(t *testing.T, method, url string, body map[string]interface{}, header 
 }
 
 var _ = time.Now // keep import
+
+// --- HTTP handler wrapper tests (route wiring + request/response contract 1:1) ---
+
+const wdBasicAuth = "Basic " + "dXU6cA==" // base64("u:p")
+
+func TestWD_HandlerMkdir(t *testing.T) {
+	_, srv := wdStart(t)
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	mux := httptest.NewServer(h.Mux())
+	defer mux.Close()
+	code, body := wdDo(t, "POST", mux.URL+"/mkdir", map[string]interface{}{"server_url": srv.URL, "username": "u", "password": "p", "path": "/hdir"}, nil)
+	if code != 200 || !strings.Contains(body, "\"created\":true") {
+		t.Fatalf("mkdir got %d %s", code, body)
+	}
+	code, body = wdDo(t, "POST", mux.URL+"/mkdir", map[string]interface{}{"server_url": srv.URL, "username": "u", "password": "p", "path": "/docs"}, nil)
+	if code != 200 || !strings.Contains(body, "\"created\":false") {
+		t.Fatalf("mkdir exists got %d %s", code, body)
+	}
+	code, body = wdDo(t, "POST", mux.URL+"/mkdir", map[string]interface{}{"username": "u"}, nil)
+	if code != 400 || !strings.Contains(body, "Missing required fields") {
+		t.Fatalf("mkdir missing got %d %s", code, body)
+	}
+}
+
+func TestWD_HandlerMove(t *testing.T) {
+	_, srv := wdStart(t)
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	mux := httptest.NewServer(h.Mux())
+	defer mux.Close()
+	code, body := wdDo(t, "POST", mux.URL+"/move", map[string]interface{}{"server_url": srv.URL, "username": "u", "password": "p", "src": "/notes.txt", "dst": "/renamed.txt"}, nil)
+	if code != 200 || !strings.Contains(body, "\"moved\":true") {
+		t.Fatalf("move got %d %s", code, body)
+	}
+	code, _ = wdDo(t, "POST", mux.URL+"/move", map[string]interface{}{"server_url": srv.URL, "username": "u", "password": "p", "src": "/gone.txt", "dst": "/x"}, nil)
+	if code != 404 {
+		t.Fatalf("move missing got %d (want 404)", code)
+	}
+	code, body = wdDo(t, "POST", mux.URL+"/move", map[string]interface{}{"server_url": srv.URL, "username": "u", "password": "p"}, nil)
+	if code != 400 {
+		t.Fatalf("move missing-fields got %d %s (want 400)", code, body)
+	}
+}
+
+func TestWD_HandlerFileGet(t *testing.T) {
+	_, srv := wdStart(t)
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	mux := httptest.NewServer(h.Mux())
+	defer mux.Close()
+	hdr := map[string]string{"X-Server-Url": srv.URL, "X-Username": "u", "Authorization": wdBasicAuth}
+	code, body := wdDo(t, "GET", mux.URL+"/file?path=/notes.txt", nil, hdr)
+	wantB64 := base64.StdEncoding.EncodeToString([]byte("hello notes"))
+	if code != 200 || !strings.Contains(body, wantB64) || !strings.Contains(body, "\"path\":\"/notes.txt\"") {
+		t.Fatalf("fileGet got %d %s", code, body)
+	}
+	code, _ = wdDo(t, "GET", mux.URL+"/file?path=/nope.txt", nil, hdr)
+	if code != 404 {
+		t.Fatalf("fileGet missing got %d (want 404)", code)
+	}
+	code, _ = wdDo(t, "GET", mux.URL+"/file?path=/notes.txt", nil, map[string]string{"X-Server-Url": srv.URL, "X-Username": "u"})
+	if code != 401 {
+		t.Fatalf("fileGet noauth got %d (want 401)", code)
+	}
+}
+
+func TestWD_HandlerFilePost(t *testing.T) {
+	_, srv := wdStart(t)
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	mux := httptest.NewServer(h.Mux())
+	defer mux.Close()
+	cb := base64.StdEncoding.EncodeToString([]byte("uploaded bytes"))
+	code, body := wdDo(t, "POST", mux.URL+"/file", map[string]interface{}{"server_url": srv.URL, "username": "u", "password": "p", "path": "/up.txt", "content_base64": cb}, nil)
+	if code != 200 || !strings.Contains(body, "\"uploaded\":true") {
+		t.Fatalf("filePost got %d %s", code, body)
+	}
+	code, body = wdDo(t, "POST", mux.URL+"/file", map[string]interface{}{"server_url": srv.URL, "username": "u", "password": "p", "path": "/up2.txt"}, nil)
+	if code != 400 {
+		t.Fatalf("filePost missing got %d %s (want 400)", code, body)
+	}
+}
+
+func TestWD_HandlerFileDelete(t *testing.T) {
+	_, srv := wdStart(t)
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	mux := httptest.NewServer(h.Mux())
+	defer mux.Close()
+	hdr := map[string]string{"X-Server-Url": srv.URL, "X-Username": "u", "Authorization": wdBasicAuth}
+	code, body := wdDo(t, "DELETE", mux.URL+"/file?path=/notes.txt", nil, hdr)
+	if code != 200 || !strings.Contains(body, "\"deleted\":true") {
+		t.Fatalf("fileDelete got %d %s", code, body)
+	}
+	code, body = wdDo(t, "DELETE", mux.URL+"/file?path=/nope.txt", nil, hdr)
+	if code != 200 || !strings.Contains(body, "\"notFound\":true") {
+		t.Fatalf("fileDelete missing got %d %s (want 200 notFound)", code, body)
+	}
+}

@@ -12,17 +12,17 @@ import (
 	"syscall"
 	"time"
 
-	"ollitex/services"
+	dropboxinterface "ollitex/go/services/dropboxinterface"
 )
 
 func main() {
-	cfg := services.DropboxConfig{
+	cfg := dropboxinterface.DropboxConfig{
 		ServiceToken: os.Getenv("SHARED_SERVICE_TOKEN"),
-		APIBase:      firstNonEmpty(os.Getenv("DROPBOX_API_BASE"), "https://api.dropbox.com/2"),
+		APIBase:      firstNonEmpty(os.Getenv("DROPBOX_API_BASE"), "https://api.dropboxapi.com/2"), // dropbox SDK default (Node: new Dropbox({...}))
 		ContentBase:  firstNonEmpty(os.Getenv("DROPBOX_CONTENT_BASE"), "https://content.dropboxapi.com/2"),
 	}
-	listen := firstNonEmpty(os.Getenv("PORT"), "3071")
-	handlers := &services.DropboxHandlers{Cfg: cfg}
+	listen := firstNonEmpty(os.Getenv("DROPBOXINTERFACE_PORT"), "4003") // Node: process.env.DROPBOXINTERFACE_PORT || 4003
+	handlers := &dropboxinterface.DropboxHandlers{Cfg: cfg}
 	srv := &http.Server{
 		Addr:         ":" + listen,
 		Handler:      handlers.Mux(),

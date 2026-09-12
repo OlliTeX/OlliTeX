@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"ollitex/services"
+	githubinterface "ollitex/go/services/githubinterface"
 )
 
 func firstNonEmpty(vals ...string) string {
@@ -27,7 +27,7 @@ func firstNonEmpty(vals ...string) string {
 }
 
 func main() {
-	cfg := services.GHIConfig{
+	cfg := githubinterface.GHIConfig{
 		WorkRoot:     firstNonEmpty(os.Getenv("GITHUBINTERFACE_WORKDIR_ROOT"), filepath.Join(os.TempDir(), "ghif")),
 		ServiceToken: os.Getenv("SHARED_SERVICE_TOKEN"),
 	}
@@ -37,7 +37,7 @@ func main() {
 		}
 	}
 	listen := firstNonEmpty(os.Getenv("GITHUBINTERFACE_PORT"), "4013")
-	mux := services.NewGHIHandlerMux(cfg)
+	mux := githubinterface.NewGHIHandlerMux(cfg)
 	srv := &http.Server{
 		Addr:         ":" + listen,
 		Handler:      mux,

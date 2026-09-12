@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"time"
 
-	"ollitex/services"
+	webdavinterface "ollitex/go/services/webdavinterface"
 )
 
 func main() {
@@ -35,7 +35,7 @@ func main() {
 			port = n
 		}
 	}
-	handlers := &services.WebDAVHandlers{Cfg: services.WebDAVConfig{ServiceToken: os.Getenv("SHARED_SERVICE_TOKEN")}}
+	handlers := &webdavinterface.WebDAVHandlers{Cfg: webdavinterface.WebDAVConfig{ServiceToken: os.Getenv("SHARED_SERVICE_TOKEN")}}
 	srv := &http.Server{
 		Addr:         net.JoinHostPort("0.0.0.0", strconv.Itoa(port)),
 		Handler:      handlers.Mux(),

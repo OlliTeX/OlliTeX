@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"ollitex/services"
+	datamanipulator "ollitex/go/services/datamanipulator"
 )
 
 func firstNonEmpty(vals ...string) string {
@@ -25,14 +25,14 @@ func firstNonEmpty(vals ...string) string {
 }
 
 func main() {
-	cfg := services.DMConfig{
+	cfg := datamanipulator.DMConfig{
 		ProjectsRoot: firstNonEmpty(os.Getenv("DATAMANIPULATOR_PROJECTS_ROOT"), "/projects"),
 		ServiceToken: os.Getenv("SHARED_SERVICE_TOKEN"),
 	}
 	listen := firstNonEmpty(os.Getenv("DATAMANIPULATOR_PORT"), "4001")
 	srv := &http.Server{
 		Addr:         ":" + listen,
-		Handler:      services.NewDMHandlers(cfg).Mux(),
+		Handler:      datamanipulator.NewDMHandlers(cfg).Mux(),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}

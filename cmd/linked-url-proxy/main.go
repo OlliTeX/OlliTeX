@@ -22,11 +22,11 @@ import (
 	"syscall"
 	"time"
 
-	"ollitex/services"
+	linkedurlproxy "ollitex/go/services/linked-url-proxy"
 )
 
 func main() {
-	cfg := services.NewLinkedURLProxyConfigFromEnv(os.Getenv)
+	cfg := linkedurlproxy.NewLinkedURLProxyConfigFromEnv(os.Getenv)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

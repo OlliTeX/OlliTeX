@@ -147,14 +147,16 @@ hooks-install: ## Install repo git hooks (pre-push fast gate) — `git config co
 # ----------------------------------------------------------------------------
 # Go microservice conversions (owner task 0-6, 2026-09-12).
 #
-# 1:1 Go ports of the Node.js microservices live under services/<name>.go
-# (package services); runnable entrypoints live under cmd/<service>/. The
-# Makefile targets follow the Forgejo Go convention (lint-go / fmt / tidy /
-# test). Toolchain: Go 1.27 (https://go.dev/dl/go1.27.1.linux-amd64.tar.gz).
-# These are core-tool based (gofmt / go vet / go test) so they run offline.
+# 1:1 Go ports of the Node.js microservices live under go/services/<name>/
+# (one package per service, mirroring the Node module layout) with a shared
+# helper package go/pbhttp; runnable entrypoints live under cmd/<service>/.
+# The live Node folders remain services/<name>/. The Makefile targets follow
+# the Forgejo Go convention (lint-go / fmt / tidy / test). Toolchain: Go 1.27
+# (https://go.dev/dl/go1.27.1.linux-amd64.tar.gz). These are core-tool based
+# (gofmt / go vet / go test) so they run offline.
 # ----------------------------------------------------------------------------
 GO      ?= go
-GO_PKGS ?= ./services/... ./cmd/...
+GO_PKGS ?= ./go/... ./cmd/...
 
 .PHONY: go-check
 go-check: ## Verify the Go toolchain is present and >= 1.27
@@ -178,7 +180,7 @@ lint-go-fix: ## Apply auto-fixes (gofmt -w) to the Go services
 
 .PHONY: lint-go
 lint-go: ## Go lint gate: gofmt-clean + go vet (+ golangci-lint if installed)
-	@test -z "$$(gofmt -l services/*.go 2>/dev/null)" || { echo "gofmt: reformat the files above (make fmt-go)"; exit 1; }
+	@test -z "$$(gofmt -l go/ cmd/ 2>/dev/null)" || { echo "gofmt: reformat the files above (make fmt-go)"; exit 1; }
 	$(GO) vet $(GO_PKGS)
 	@if command -v golangci-lint >/dev/null 2>&1; then golangci-lint run $(GO_PKGS); else echo "(golangci-lint not installed — applied core go vet; optional: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest)"; fi
 
@@ -201,6 +203,7 @@ go-build: ## Build all Go service binaries into ./bin
 	$(GO) build -o bin/dropboxinterface ./cmd/dropboxinterface
 	$(GO) build -o bin/githubinterface ./cmd/githubinterface
 	$(GO) build -o bin/datamanipulator ./cmd/datamanipulator
+	$(GO) build -o bin/filestore ./cmd/filestore
 
 .PHONY: go-run-linked-url-proxy
 go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
@@ -221,5 +224,9 @@ go-run-githubinterface: ## Run the githubinterface Go service (dev)
 .PHONY: go-run-datamanipulator
 go-run-datamanipulator: ## Run the datamanipulator Go service (dev)
 	$(GO) run ./cmd/datamanipulator
+
+.PHONY: go-run-filestore
+go-run-filestore: ## Run the filestore Go service (dev)
+	$(GO) run ./cmd/filestore
 
 .DEFAULT_GOAL := help

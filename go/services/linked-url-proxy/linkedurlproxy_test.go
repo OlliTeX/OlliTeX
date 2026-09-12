@@ -1,4 +1,4 @@
-package services
+package linkedurlproxy
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	pbhttp "ollitex/go/pbhttp"
 )
 
 // loopbackResolver resolves every hostname to 127.0.0.1 (so the pinned dialer
@@ -30,9 +32,7 @@ func lupTestConfig() *LinkedURLProxyConfig {
 }
 
 // lupAllowLoopback opts a config in to allowing the local (loopback) httptest
-// upstreams via an allow-list entry. Production config has NO allow-list, so
-// loopback stays blocked by the 1:1 unicast rule; the allow-list is the
-// supported mechanism to permit specific targets (mirroring a real allow-list).
+// upstreams via an allow-list entry.
 func lupAllowLoopback(c *LinkedURLProxyConfig) *LinkedURLProxyConfig {
 	c.AllowedResources = regexp.MustCompile(`127\.0\.0\.1`)
 	return c
@@ -43,7 +43,7 @@ func mustStatus(t *testing.T, err error, want int) {
 	if err == nil {
 		t.Fatalf("expected error with status %d, got nil", want)
 	}
-	got := StatusOf(err)
+	got := pbhttp.StatusOf(err)
 	if got != want {
 		t.Fatalf("expected status %d, got %d (err=%v)", want, got, err)
 	}
@@ -80,7 +80,6 @@ func TestLinkedURL_ConfigFromEnv(t *testing.T) {
 	if cfg.Host != "0.0.0.0" {
 		t.Fatalf("Host = %q", cfg.Host)
 	}
-	// Defaults preserved when env unset.
 	cfg2 := NewLinkedURLProxyConfigFromEnv(func(k string) string { return "" })
 	if cfg2.MaxRedirects != 5 || cfg2.Port != 3066 || cfg2.Host != "127.0.0.1" || cfg2.MaxUploadSize != 50*1024*1024 {
 		t.Fatalf("defaults changed: %+v", cfg2)
@@ -166,8 +165,8 @@ func TestLinkedURL_IsBlockedIP(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error")
 				}
-				if StatusOf(err) != 500 {
-					t.Fatalf("expected 500, got statusOf=%d (%v)", StatusOf(err), err)
+				if pbhttp.StatusOf(err) != 500 {
+					t.Fatalf("expected 500, got statusOf=%d (%v)", pbhttp.StatusOf(err), err)
 				}
 				return
 			}
@@ -225,8 +224,6 @@ func TestLinkedURL_CheckURLAccess(t *testing.T) {
 	})
 }
 
-// setUpstream returns an httptest server whose handler is provided; the URL is
-// always http://127.0.0.1:<port>.
 func setUpstream(t *testing.T, h http.HandlerFunc) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(h)
@@ -262,11 +259,10 @@ func TestLinkedURL_FetchTooLarge(t *testing.T) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Length", "1048576")
 		w.WriteHeader(200)
-		// Body shorter than declared length is fine; the guard keys on the header.
 		_, _ = w.Write([]byte("small"))
 	})
 	cfg := lupAllowLoopback(lupTestConfig())
-	cfg.MaxUploadSize = 100 // 100 bytes
+	cfg.MaxUploadSize = 100
 	_, err := cfg.ValidateAndFetch(context.Background(), srv.URL+"/big", 0)
 	mustStatus(t, err, 413)
 }
@@ -275,7 +271,7 @@ func TestLinkedURL_FetchRedirectFollows(t *testing.T) {
 	srv := setUpstream(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/a":
-			w.Header().Set("Location", "/b") // relative; resolved by ResolveReference
+			w.Header().Set("Location", "/b")
 			w.WriteHeader(302)
 		case "/b":
 			w.Header().Set("Content-Type", "text/plain")
@@ -361,11 +357,8 @@ func TestLinkedURL_HandlerFullFlow(t *testing.T) {
 		_, _ = w.Write([]byte("ok"))
 	})
 	cfg := lupAllowLoopback(lupTestConfig())
-	// Expose the proxy on a real listener (its own httptest server) so the
-	// handler path (query parsing, headers, streaming) is exercised end to end.
 	proxy := httptest.NewServer(cfg.Handler())
 	defer proxy.Close()
-
 	resp, err := http.Get(proxy.URL + "/?url=" + urlEncode(up.URL+"/x"))
 	if err != nil {
 		t.Fatalf("get: %v", err)
@@ -387,7 +380,7 @@ func TestLinkedURL_HandlerBlockedIP(t *testing.T) {
 	up := setUpstream(t, func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("x")) })
 	cfg := lupAllowLoopback(lupTestConfig())
 	cfg.BlockedNetworks = []string{"127.0.0.0/8"}
-	cfg.AllowedResources = nil // remove allow-list so the 1:1 unicast/CIDR block applies (loopback -> 403)
+	cfg.AllowedResources = nil
 	proxy := httptest.NewServer(cfg.Handler())
 	defer proxy.Close()
 	resp, err := http.Get(proxy.URL + "/?url=" + urlEncode(up.URL+"/x"))
@@ -400,7 +393,6 @@ func TestLinkedURL_HandlerBlockedIP(t *testing.T) {
 	}
 }
 
-// urlEncode encodes a target URL for the ?url= query param.
 func urlEncode(s string) string {
 	return url.QueryEscape(s)
 }

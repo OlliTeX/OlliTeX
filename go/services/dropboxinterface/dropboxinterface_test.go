@@ -1,4 +1,4 @@
-package services
+package dropboxinterface
 
 import (
 	"context"
@@ -209,8 +209,8 @@ func TestDBX_List(t *testing.T) {
 	if notes.Rev == nil || *notes.Rev != "r2" {
 		t.Fatalf("rev = %v", notes.Rev)
 	}
-	if notes.Mtime == "" {
-		t.Fatal("mtime empty")
+	if notes.Mtime == nil || *notes.Mtime != "2026-01-02T03:04:05.000Z" {
+		t.Fatalf("mtime = %v", notes.Mtime)
 	}
 }
 
@@ -460,4 +460,82 @@ func dbxDo(method, url string, body map[string]interface{}, header map[string]st
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
 	return resp.StatusCode
+}
+
+// dbxBody is like dbxDo but also returns the response body for contract asserts.
+func dbxBody(method, url string, body map[string]interface{}, header map[string]string) (int, string) {
+	var rd io.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		rd = strings.NewReader(string(b))
+	}
+	req, err := http.NewRequest(method, url, rd)
+	if err != nil {
+		panic(err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range header {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(b)
+}
+
+// --- HTTP handler wrapper tests (route wiring + request/response contract 1:1) ---
+
+func TestDBX_HandlerMkdir(t *testing.T) {
+	f := dbxStart(t)
+	h := &DropboxHandlers{Cfg: DropboxConfig{APIBase: f.srv.URL, ContentBase: f.srv.URL}}
+	srv := httptest.NewServer(h.Mux())
+	defer srv.Close()
+	code := dbxHTTP(srv.URL+"/mkdir", map[string]interface{}{"access_token": f.goodToken, "path": "/hnew"}, nil)
+	if code != 200 {
+		t.Fatalf("mkdir got %d (want 200)", code)
+	}
+	code = dbxHTTP(srv.URL+"/mkdir", map[string]interface{}{"access_token": f.goodToken, "path": "/exists"}, nil)
+	if code != 200 {
+		t.Fatalf("mkdir exists got %d (want 200)", code)
+	}
+	code = dbxHTTP(srv.URL+"/mkdir", map[string]interface{}{"access_token": f.goodToken}, nil)
+	if code != 400 {
+		t.Fatalf("mkdir missing got %d (want 400)", code)
+	}
+}
+
+func TestDBX_HandlerMove(t *testing.T) {
+	f := dbxStart(t)
+	h := &DropboxHandlers{Cfg: DropboxConfig{APIBase: f.srv.URL, ContentBase: f.srv.URL}}
+	srv := httptest.NewServer(h.Mux())
+	defer srv.Close()
+	code, body := dbxBody("POST", srv.URL+"/move", map[string]interface{}{"access_token": f.goodToken, "src": "/a", "dst": "/b"}, nil)
+	if code != 200 || !strings.Contains(body, "\"success\":true") {
+		t.Fatalf("move got %d %s", code, body)
+	}
+	code, _ = dbxBody("POST", srv.URL+"/move", map[string]interface{}{"access_token": f.goodToken}, nil)
+	if code != 400 {
+		t.Fatalf("move missing got %d (want 400)", code)
+	}
+}
+
+func TestDBX_HandlerFilePost(t *testing.T) {
+	f := dbxStart(t)
+	h := &DropboxHandlers{Cfg: DropboxConfig{APIBase: f.srv.URL, ContentBase: f.srv.URL}}
+	srv := httptest.NewServer(h.Mux())
+	defer srv.Close()
+	cb := base64.StdEncoding.EncodeToString([]byte("file bytes"))
+	code, body := dbxBody("POST", srv.URL+"/file", map[string]interface{}{"access_token": f.goodToken, "path": "/up.bin", "content_base64": cb}, nil)
+	if code != 200 || !strings.Contains(body, "\"uploaded\":true") || !strings.Contains(body, "rev777") {
+		t.Fatalf("filePost got %d %s", code, body)
+	}
+	code, _ = dbxBody("POST", srv.URL+"/file", map[string]interface{}{"access_token": f.goodToken, "path": "/up.bin"}, nil)
+	if code != 400 {
+		t.Fatalf("filePost missing got %d (want 400)", code)
+	}
 }
