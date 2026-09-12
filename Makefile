@@ -1,5 +1,5 @@
 # ============================================================================
-# overleaf-lab (LibreLeaf) — central Makefile
+# OlliTeX (overleaf-lab) — central Makefile
 #
 # "One Makefile controls everything" (Forgejo convention, 2026-09-07, owner).
 # Every day-to-day operation — build, unit tests, hub integration suite,
@@ -7,10 +7,14 @@
 #
 #   make help          list targets
 #   make ci            build + full unit + hub frontend suite (green gate)
+#   make selftest      FULL local gate: lint + ci (our free replacement for
+#                      hosted CI — this box IS the runner, 2026-09-16)
+#   make release       selftest → docker image → (owner: push + cycle + probe)
 #   make e2e           stack up + playwright suite
 #   make wiki-shots    regenerate docs/wiki screenshots (needs the e2e stack)
 #   make wiki-check    wiki docs gate (links + data-safety scan) for CI
 #   make image         rebuild the server-ce docker image
+#   make hooks-install install the repo git pre-push fast gate
 #
 # Notes:
 #   * The repo uses Yarn PnP — always use `yarn`, never npm/npx inside
@@ -114,5 +118,30 @@ wiki-check: ## Wiki docs gate only (links + data-safety scan; for CI)
 .PHONY: all
 all: ## Alias for ci
 	$(MAKE) ci
+
+# ----------------------------------------------------------------------------
+# 2026-09-16 (owner task 11): the free CI replacement. No hosted runner, no
+# minutes: this box runs everything. `make selftest` = the whole green gate
+# locally; `make release` = gate + image, then the owner does the two manual
+# promotion steps (push + prod cycle) on purpose.
+# ----------------------------------------------------------------------------
+.PHONY: selftest
+selftest: ## Full local gate (no hosted CI): lint + build + i18n + unit + hub
+	$(MAKE) lint
+	$(MAKE) ci
+
+.PHONY: release
+release: selftest ## Gate + docker image; promotion (push/cycle/probe) stays a manual owner step
+	$(MAKE) image
+	@echo ""
+	@echo "next (owner, on purpose):"
+	@echo "  1) docker push sharelatex/sharelatex:main   (+ ext tag if you want the alias)"
+	@echo "  2) cd /data_1/docker/compose_cep && sh cycle_overleafserver.sh"
+	@echo "  3) run the 17-point prod probe (https://psintern… login, admin)"
+
+.PHONY: hooks-install
+hooks-install: ## Install repo git hooks (pre-push fast gate) — `git config core.hooksPath hooks`
+	git config core.hooksPath hooks
+	@echo "git hooks enabled (core.hooksPath=hooks); run this on each fresh clone"
 
 .DEFAULT_GOAL := help

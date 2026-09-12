@@ -189,7 +189,13 @@ module.exports = defineConfig({
       },
     ],
     ...reporterOptions,
-    hookTimeout: process.env.CI ? 20_000 : 10_000,
+    // 2026-09 (IMPROVEMENTS P0.3): TpdsProjectFlusher (fully mocked, no I/O)
+    // intermittently blew the default 5s under parallel load on the shared box
+    // (passes standalone x3) — and its beforeEach (dynamic import of the
+    // module under test) hit the 10s hook budget under the full-parallel run.
+    // 30s keeps real failures fast while removing the contention flake.
+    hookTimeout: 30_000,
+    testTimeout: process.env.CI ? 30_000 : 20_000,
     coverage: {
       enabled: COVERAGE_ENABLED,
       // Add 'sequential' / 'parallel' to the folder

@@ -483,15 +483,13 @@ export default async function (webRouter, privateApiRouter, publicApiRouter) {
       sentryRelease: Settings.sentry.release,
       hotjarId: Settings.hotjar?.id,
       hotjarVersion: Settings.hotjar?.version,
-      gaToken:
-        Settings.analytics &&
-        Settings.analytics.ga &&
-        Settings.analytics.ga.token,
-      gaTokenV4:
-        Settings.analytics &&
-        Settings.analytics.ga &&
-        Settings.analytics.ga.tokenV4,
-      propensityId: Settings?.analytics?.propensity?.id,
+      // 2026-09 (owner audit item): external analytics REMOVED — OlliTeX never
+      // loads Google Analytics / sends telemetry; expose no tokens (the
+      // upstream conditional loader is a documented no-op, see
+      // app/views/_google_analytics.pug). Kept as null for schema compat.
+      gaToken: null,
+      gaTokenV4: null,
+      propensityId: null,
       cookieDomain: Settings.cookieDomain,
       templateLinks: Settings.templateLinks,
       labsEnabled: Settings.labs && Settings.labs.enable,

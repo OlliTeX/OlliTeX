@@ -87,14 +87,23 @@ administrator tools) **plus** the OlliTeX-specific stack:
   [Makefile](Makefile) entry point, an AGPL-compliant rebrand with provenance
   kept visible (see the local `BRANDING.md` handoff notes).
 
-> [!CAUTION]
-> Community Edition is intended for use in environments where **all** users
-> are trusted. It is **not** appropriate for scenarios where isolation of
-> users is required, since Sandboxed Compiles is not always active. When not
-> using Sandboxed Compiles, users have full read and write access to the
-> `sharelatex` container resources (filesystem, network, environment
-> variables) when running compiles. Where not all users can be fully
-> trusted, it is strongly recommended to use Sandboxed Compiles.
+> [!IMPORTANT]
+> **Compiles are always sandboxed.** OlliTeX enforces the sandboxed
+> (Docker-based) compile runner: every compile — LaTeX *and* Typst — runs in
+> an isolated compile container, so users can never read or write the
+> server container's filesystem, network, or environment while compiling.
+> The local (in-container) compile path and the local TeX Live installation
+> have been removed from the server image.
+>
+> - Default compile image: **`texlive/texlive:latest-full`** (the official
+>   TeX Live image); pin a specific build with the `TEXLIVE_IMAGE`
+>   environment variable or [`tools/toolkit/lib/images.env`](tools/toolkit/lib/images.env).
+> - The server needs access to a Docker socket (or rootless Docker) so the
+>   compile containers can start — the same mechanism that runs the Typst
+>   compile containers. Mounting the Docker socket is the standard way to
+>   run sandboxed compiles; keep the Docker host itself trusted, and note
+>   the bundled seccomp profile (`services/clsi/seccomp/clsi-profile.json`)
+>   restricts the compile containers.
 
 ## Getting started
 
@@ -118,9 +127,11 @@ A ready-to-run local deployment (nginx + overleaf + mongo + redis) lives in
 ### Development
 
 - Central entry point: `make help` (targets: `build`, `unit`, `hub`, `lint`,
-  `format`, `ci`, `deploy-test`, `image`).
+  `format`, `ci`, `selftest`, `release`, `deploy-test`, `image`, `hooks-install`).
 - The production web build is `cd services/web && yarn webpack:production`
-  — this is the canonical gate; `yarn webpack` starts the *dev server*.
+  — this is the canonical gate. `yarn webpack:dev` starts the *dev server*
+  (since 2026-09 the bare `yarn webpack` warns and runs the production
+  build; previously it was the misnamed dev server — IMPROVEMENTS P0.4).
 - In-repo unit/integration suites: `cd services/web && yarn test:unit`
   (Vitest, all projects) or the root `make unit`.
 - `ext_explain.md` documents the extension surface (features, settings,

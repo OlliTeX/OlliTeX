@@ -228,6 +228,14 @@ const settings = {
       process.env.SUBNET_RATE_LIMITER_DISABLED !== 'false',
   },
 
+  // Opt-in kill switch for ALL server rate limiters (login 20/min/IP,
+  // compile, etc.). Exists in the core RateLimiter (Settings.disableRateLimits)
+  // but was never configurable in CE. Intended for disposable test stacks
+  // where a shared source IP legitimately produces high login volume
+  // (e2e suite + seed + manual probes share one IP). Production deployments
+  // must never set this.
+  disableRateLimits: process.env.OVERLEAF_DISABLE_RATE_LIMITS === 'true',
+
   // These credentials are used for authenticating api requests
   // between services that may need to go over public channels
   httpAuthUsers,
@@ -521,5 +529,13 @@ const http = require('node:http')
 http.globalAgent.maxSockets = 300
 const https = require('node:https')
 https.globalAgent.maxSockets = 300
+
+// 2026-09 (owner audit item: no external analytics):
+// OlliTeX sends NO analytics/telemetry to overleaf.com (or anywhere).
+// analytics.enabled=false keeps POST /event/:event a no-op (202), and the
+// upstream Google-Analytics HTML loader is a documented no-op
+// (app/views/_google_analytics.pug). Pinned here so no deployment override
+// can silently re-enable external analytics by flipping one env var.
+settings.analytics = { enabled: false }
 
 module.exports = settings

@@ -1,0 +1,21 @@
+#!/bin/sh
+# OlliTeX pre-push fast gate (2026-09-16, owner task 11 — free CI alternative).
+#
+# What runs HERE: cheap, deterministic, no docker — i18n chain + eslint
+# (zero-warning policy). What runs in `make release` (on purpose, before any
+# push of a promotion batch): the heavy gate (webpack production build +
+# full vitest) and the docker image. What stays manual (owner): docker push
+# + prod cycle + the 17-point prod probe.
+#
+# Bypass deliberately: only `git push --no-verify` (loud, auditable).
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+
+echo "[pre-push] fast gate: i18n"
+make --no-print-directory i18n
+
+echo "[pre-push] fast gate: lint"
+make --no-print-directory lint
+
+echo "[pre-push] OK — heavy gate + image: make release (owner step)"
