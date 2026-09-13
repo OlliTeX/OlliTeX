@@ -104,6 +104,11 @@ const SECTION_ENV_MAPS = {
     GIT_BRIDGE_HOST: git.host || '',
     GIT_BRIDGE_PORT: git.port ?? '',
   }),
+  'typst': (t) => ({
+    // default ON if absent (product default: COMPILE_TYPEST_ENABLED !== 'false')
+    COMPILE_TYPEST_ENABLED: b(t.enabled === undefined ? true : t.enabled),
+    CLSI_TYPEST_URL: t.url ?? '',
+  }),
   'github-sync': (gh) => ({
     GITHUB_SYNC_ENABLED: b(gh.enabled),
     GITHUB_SYNC_CLIENT_ID: gh.clientId || gh.clientID || '',

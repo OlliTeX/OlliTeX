@@ -98,6 +98,9 @@ export const SECRET_FIELDS = {
   // R9 (2026-08-29): six new admin-managed sections.
   'github-sync': ['clientSecret'],
   email: ['pass', 'sesSecret'],
+  // 2026-09-14 (owner): storage gateway credentials (masked in GET, kept
+  // when PUT empty) — local SeaweedFS usually runs anonymous (both empty).
+  storage: ['s3Secret'],
   // 2026-09-04 (owner #10): WebDAV / Dropbox service secrets, admin-managed.
   webdav: ['cipherPassword', 'previousCipherPassword'],
   dropbox: ['appSecret'],
@@ -206,6 +209,7 @@ export const SECTION_KNOWN_KEYS = {
     'compileBodySizeLimitMb',
   ],
   'git-integration': ['enabled', 'host', 'port'],
+  'typst': ['enabled', 'url'],
   'github-sync': [
     'enabled',
     'clientId',
@@ -279,6 +283,20 @@ export const SECTION_KNOWN_KEYS = {
     'webdavInterfaceUrl',
     'dropboxInterfaceUrl',
     'dataManipulatorUrl',
+  ],
+  // 2026-09-14 (owner): local object storage — filestore + docstore
+  // backends on SeaweedFS (or any S3 gateway) vs the flat fs layout.
+  // Stored values are written into the shared env.sh managed block so all
+  // in-container services apply them on the next cycle (D2-style restart).
+  storage: [
+    'backend',
+    's3Endpoint',
+    's3AccessKeyId',
+    's3Secret',
+    'templateFilesBucket',
+    'projectBlobsBucket',
+    'globalBlobsBucket',
+    'docstoreArchiveBucket',
   ],
 }
 
@@ -557,6 +575,11 @@ function envSeeds(env, coreSettings, stored) {
       enabled: boolFromEnv(env.GIT_BRIDGE_ENABLED) === true,
       host: env.GIT_BRIDGE_HOST || 'git-bridge',
       port: Number(env.GIT_BRIDGE_PORT) > 0 ? Number(env.GIT_BRIDGE_PORT) : 8000,
+    },
+    'typst': {
+      // owner 2026-09-10: typst compiles default ON (COMPILE_TYPEST_ENABLED !== 'false').
+      enabled: env.COMPILE_TYPEST_ENABLED !== 'false',
+      url: env.CLSI_TYPEST_URL || '',
     },
     'github-sync': {
       enabled: boolFromEnv(env.GITHUB_SYNC_ENABLED) === true,
@@ -1085,6 +1108,14 @@ export function validateGitIntegrationSection(value) {
   return errors
 }
 
+export function validateTypstSection(value) {
+  const errors = []
+  if (typeof value !== 'object' || value === null) return ['body must be a JSON object']
+  if ('enabled' in value && typeof value.enabled !== 'boolean') errors.push('enabled must be a boolean')
+  if ('url' in value && typeof value.url !== 'string') errors.push('url must be a string')
+  return errors
+}
+
 export function validateGithubSyncSection(value) {
   const errors = []
   if (typeof value !== 'object' || value === null) return ['body must be a JSON object']
@@ -1309,6 +1340,29 @@ export function validateServicesSection(value) {
   return errors
 }
 
+export function validateStorageSection(value) {
+  const errors = []
+  if (typeof value !== 'object' || value === null) return ['body must be a JSON object']
+  // backend: 'fs' (flat local files) or 's3' (SeaweedFS / S3 gateway); empty
+  // means "keep the server default" (recorded, not written to env.sh).
+  if (value.backend !== undefined && !['', 'fs', 's3'].includes(value.backend)) {
+    errors.push(`backend must be 'fs' or 's3' (got '${value.backend}')`)
+  }
+  errors.push(...checkStrings(value, [
+    's3Endpoint', 's3AccessKeyId', 's3Secret',
+    'templateFilesBucket', 'projectBlobsBucket', 'globalBlobsBucket',
+    'docstoreArchiveBucket',
+  ]))
+  // bucket names: S3 grammar (no spaces; '/' not meaningful in a name)
+  for (const k of ['templateFilesBucket', 'projectBlobsBucket', 'globalBlobsBucket', 'docstoreArchiveBucket']) {
+    const v = value[k]
+    if (typeof v === 'string' && v && !/^[a-z0-9][a-z0-9.\-_]{1,62}$/.test(v)) {
+      errors.push(`${k} must be a valid bucket name (lowercase letters, digits, . _ -; 3-63 chars)`)
+    }
+  }
+  return errors
+}
+
 export const SECTION_VALIDATORS = {
   templates: validateTemplatesSection,
   zotero: validateZoteroSection,
@@ -1320,6 +1374,7 @@ export const SECTION_VALIDATORS = {
   'sso-ldap': validateSsoLdapSection,
   'sandboxed-compiles': validateSandboxedCompilesSection,
   'git-integration': validateGitIntegrationSection,
+  'typst': validateTypstSection,
   'github-sync': validateGithubSyncSection,
   email: validateEmailSection,
   'linked-file-types': validateLinkedFileTypesSection,
@@ -1332,4 +1387,5 @@ export const SECTION_VALIDATORS = {
   llm: validateLlmSection,
   branding: validateBrandingSection,
   services: validateServicesSection,
+  storage: validateStorageSection,
 }

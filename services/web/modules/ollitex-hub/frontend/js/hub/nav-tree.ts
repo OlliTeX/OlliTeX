@@ -175,11 +175,20 @@ export const HUB_NAV: HubNode[] = [
         ],
       },
       {
+        id: 'site.storage',
+        label: 'Storage',
+        icon: 'cloud',
+        children: [
+          { id: 'site.storage.local', label: 'Local storage (SeaweedFS)', icon: 'cloud', render: 'site-sec', siteId: 'storage' },
+        ],
+      },
+      {
         id: 'site.compilation',
         label: 'Compilation',
         icon: 'build',
         children: [
           { id: 'site.compilation.sandboxed', label: 'Sandboxed compiles', icon: 'build', render: 'site-sec', siteId: 'sandboxed-compiles' },
+          { id: 'site.compilation.typst', label: 'Typst compiles', icon: 'description', render: 'site-sec', siteId: 'typst' },
           { id: 'site.compilation.pandoc', label: 'Pandoc', icon: 'swap_vert', render: 'site-sec', siteId: 'pandoc' },
           { id: 'site.compilation.git', label: 'Git integration', icon: 'commit', render: 'site-sec', siteId: 'git-integration' },
           { id: 'site.compilation.github', label: 'GitHub sync', icon: 'cloud_sync', render: 'site-sec', siteId: 'github-sync' },

@@ -186,12 +186,86 @@ describe('SiteSettings', () => {
         'sso-ldap',
         'sso-oidc',
         'sso-saml',
+        'storage',
         'templates',
         'webdav',
         'zotero',
       ])
     })
+
+    it('storage: backend fs|s3, S3 grammar buckets, strings (owner 2026-09-14)', () => {
+      const { validateStorageSection } = globalThis.__ssm
+      expect(validateStorageSection({ backend: 'fs' })).to.deep.equal([])
+      expect(validateStorageSection({
+        backend: 's3',
+        s3Endpoint: 'http://127.0.0.1:8333',
+        templateFilesBucket: 'filestore-template',
+        projectBlobsBucket: 'filestore-blobs',
+        globalBlobsBucket: 'filestore-global-blobs',
+        docstoreArchiveBucket: 'docstore-archive',
+      })).to.deep.equal([])
+      // invalid backend
+      const badBackend = validateStorageSection({ backend: 'gcs' })
+      expect(badBackend.some(e => e.includes('backend'))).to.be.true
+      // bad bucket name
+      const badBucket = validateStorageSection({ backend: 's3', projectBlobsBucket: 'Bad Name!' })
+      expect(badBucket.some(e => e.includes('projectBlobsBucket'))).to.be.true
+      // empty = keep server default (valid)
+      expect(validateStorageSection({ backend: '' })).to.deep.equal([])
+    })
   })
+
+describe('StorageEnvFile (managed env fragment)', () => {
+  const mod = await import('../../../../app/src/Features/SiteSettings/StorageEnvFile.mjs')
+
+  it('renders ${VAR:-value} lines (compose env wins) and round-trips', () => {
+    const section = {
+      backend: 's3',
+      s3Endpoint: 'http://127.0.0.1:8333',
+      s3AccessKeyId: 'ak',
+      s3Secret: 'sk',
+      templateFilesBucket: 'filestore-template',
+      projectBlobsBucket: 'filestore-blobs',
+      globalBlobsBucket: 'filestore-global-blobs',
+      docstoreArchiveBucket: 'docstore-archive',
+    }
+    const content = mod.renderStorageEnvFile(section)
+    expect(content).to.include('export OVERLEAF_FILESTORE_BACKEND=${OVERLEAF_FILESTORE_BACKEND:-s3}')
+    expect(content).to.include('export BACKEND=${BACKEND:-s3}')
+    expect(content).to.include('export BUCKET_NAME=${BUCKET_NAME:-docstore-archive}')
+    expect(content).to.include('export AWS_S3_ENDPOINT=${AWS_S3_ENDPOINT:-http://127.0.0.1:8333}')
+
+    // the fragment is valid shell (sh -n) — the services source it at boot
+    const { execFileSync } = await import('node:child_process')
+    execFileSync('sh', ['-n', '-c', content], { stdio: 'pipe' })
+
+    // parse round-trip recovers the key values
+    const parsed = mod.parseStorageEnvFile(content)
+    expect(parsed.backend).to.equal('s3')
+    expect(parsed.s3Endpoint).to.equal('http://127.0.0.1:8333')
+    expect(parsed.templateFilesBucket).to.equal('filestore-template')
+    expect(parsed.docstoreArchiveBucket).to.equal('docstore-archive')
+  })
+
+  it('writes to the OVERLEAF_STORAGE_ENV_FILE override (atomic, readable)', async () => {
+    const os = await import('node:os')
+    const path = await import('node:path')
+    const fs = await import('node:fs/promises')
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'storageenv-'))
+    process.env.OVERLEAF_STORAGE_ENV_FILE = path.join(dir, 'env.d', 'ollitex-storage.sh')
+    // the module reads the override at import time — re-import with query to pick it up
+    const fresh = await import('../../../../app/src/Features/SiteSettings/StorageEnvFile.mjs?fresh=' + Date.now())
+    await fs.mkdir(path.join(dir, 'env.d'), { recursive: true })
+    const target = await fresh.writeStorageEnv({ backend: 's3', s3Endpoint: 'http://x:8333' })
+    const back = await fresh.readStorageEnv()
+    expect(back).not.to.be.null
+    expect(back.section.backend).to.equal('s3')
+    expect(back.section.s3Endpoint).to.equal('http://x:8333')
+    expect(target).to.equal(process.env.OVERLEAF_STORAGE_ENV_FILE)
+    await fs.rm(dir, { recursive: true, force: true })
+    delete process.env.OVERLEAF_STORAGE_ENV_FILE
+  })
+})
 
   describe('R9 §7.2 section validators (2026-08-29)', () => {
     it('sandboxed compiles: image table rules (D4)', () => {

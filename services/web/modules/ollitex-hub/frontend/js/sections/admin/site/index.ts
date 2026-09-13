@@ -19,6 +19,8 @@ import {
   ZoteroSection,
 } from './simple-sections'
 import { SandboxedSection } from './sandboxed-section'
+import { StorageSection } from './storage-section'
+import { TypstSection } from './typst-section'
 
 export const NATIVE_SITE_SECTIONS: Record<string, ComponentType> = {
   'sso-saml': SsoSamlSection,
@@ -27,9 +29,11 @@ export const NATIVE_SITE_SECTIONS: Record<string, ComponentType> = {
   email: EmailSection,
   branding: BrandingSection,
   services: ServicesSection,
+  storage: StorageSection,
   // leaf siteIds are the site-settings section ids (nav-tree.ts)
   languagetool: GrammarSection,
   'sandboxed-compiles': SandboxedSection,
+  typst: TypstSection,
   pandoc: PandocSection,
   'git-integration': GitSection,
   'github-sync': GithubSection,

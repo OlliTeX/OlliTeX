@@ -23,6 +23,16 @@ import {
   maskSecrets,
   SECTION_VALIDATORS,
 } from '../../../../app/src/Features/SiteSettings/SiteSettingsManager.mjs'
+import {
+  buildStorageEnvLines,
+  readStorageEnv,
+  removeStorageEnv,
+  renderStorageEnvFile,
+  storageEnvPath,
+  writeStorageEnv,
+} from '../../../../app/src/Features/SiteSettings/StorageEnvFile.mjs'
+import fs from 'node:fs/promises'
+import { getRawReqInput } from '../../../../app/src/infrastructure/Validation.mjs'
 import { Template } from '../../../template-gallery/app/src/models/Template.mjs'
 
 const __dirname = Path.dirname(fileURLToPath(import.meta.url))
@@ -56,7 +66,7 @@ export default {
    * templates: per-category template counts.
    */
   getSiteSettings: expressify(async (req, res) => {
-    const [templates, zotero, mendeley, externalUrl, signup, ssoSaml, ssoOidc, ssoLdap, sandboxedCompiles, gitIntegration, githubSync, email, linkedFileTypes, pandoc, webdav, dropbox, misc, languagetool, llm, branding, services] = await Promise.all([
+    const [templates, zotero, mendeley, externalUrl, signup, ssoSaml, ssoOidc, ssoLdap, sandboxedCompiles, gitIntegration, typst, githubSync, email, linkedFileTypes, pandoc, webdav, dropbox, misc, languagetool, llm, branding, services, storage] = await Promise.all([
       getSection('templates', Settings),
       getSection('zotero', Settings),
       getSection('mendeley', Settings),
@@ -67,6 +77,7 @@ export default {
       getSection('sso-ldap', Settings),
       getSection('sandboxed-compiles', Settings),
       getSection('git-integration', Settings),
+      getSection('typst', Settings),
       getSection('github-sync', Settings),
       getSection('email', Settings),
       getSection('linked-file-types', Settings),
@@ -79,6 +90,7 @@ export default {
       getSection('llm', Settings),
       getSection('branding', Settings),
       getSection('services', Settings),
+      getSection('storage', Settings),
     ])
 
     // Template counts per category (same source as the gallery).
@@ -108,6 +120,7 @@ export default {
       'sso-ldap': maskSecrets('sso-ldap', ssoLdap),
       'sandboxed-compiles': maskSecrets('sandboxed-compiles', sandboxedCompiles),
       'git-integration': maskSecrets('git-integration', gitIntegration),
+      typst: maskSecrets('typst', typst),
       'github-sync': maskSecrets('github-sync', githubSync),
       email: maskSecrets('email', email),
       'linked-file-types': maskSecrets('linked-file-types', linkedFileTypes),
@@ -120,6 +133,25 @@ export default {
       llm: maskSecrets('llm', llm),
       branding: maskSecrets('branding', branding),
       services: maskSecrets('services', services),
+      // 2026-09-14 (owner): local storage — stored section wins; when the
+      // admin never saved one, fall back to the live (effective) env values
+      // so the hub shows the state of the running stack, plus a flag for
+      // whether a managed env fragment is in place.
+      storage: () => {
+        const masked = maskSecrets('storage', storage) || {}
+        const managed = readStorageEnv()
+        const base = masked && Object.keys(masked).length > 0 ? masked : (managed && managed.section) || {}
+        // secret never echoed back via the env fallback (UI shows an empty
+        // "leave empty to keep" field instead)
+        if (!masked || Object.keys(masked).length === 0) base.s3Secret = undefined
+        return {
+          ...base,
+          backend: base.backend || 'fs',
+          envManaged: Boolean(managed),
+          envPath: managed ? managed.path : undefined,
+          appliesOn: 'next container restart',
+        }
+      }(),
     })
   }),
 
@@ -128,7 +160,8 @@ export default {
    * (validated; secrets encrypted at rest).
    */
   updateSiteSettings: expressify(async (req, res) => {
-    const section = req.params.section
+    const { params, body } = getRawReqInput(req)
+    const section = params.section
     const validator = SECTION_VALIDATORS[section]
     if (!validator) {
       return HttpErrorHandler.unprocessableEntity(
@@ -137,15 +170,57 @@ export default {
         `Unknown section: ${section}`
       )
     }
-    const errors = validator(req.body)
+    const errors = validator(body)
     if (errors.length > 0) {
       return HttpErrorHandler.unprocessableEntity(req, res, errors.join('; '))
     }
 
-    const result = await setSection(
-      section,
-      cleanSectionInput(section, req.body)
-    )
+    const clean = cleanSectionInput(section, body)
+
+    // Storage (2026-09-14, owner): the env fragment is written FIRST and
+    // the DB save second; a DB failure rolls the fragment back so the two
+    // never disagree. When the section is cleared to "fs", the fragment
+    // still writes the fs backend (explicit rollback path).
+    let previousManaged = null
+    let restoreEnv = null
+    if (section === 'storage') {
+      previousManaged = await readStorageEnv()
+      if (clean && Object.keys(clean).length > 0) {
+        await writeStorageEnv(clean) // throws → 500, DB untouched
+      } else {
+        await removeStorageEnv()
+      }
+    }
+
+    let result
+    try {
+      result = await setSection(section, clean)
+    } catch (err) {
+      if (section === 'storage') {
+        // roll the fragment back so env and DB never disagree
+        try {
+          if (previousManaged) {
+            await fs.writeFile(
+              storageEnvPath(),
+              renderStorageEnvFile(previousManaged.section),
+              { mode: 0o644 }
+            )
+          } else {
+            await removeStorageEnv()
+          }
+        } catch (rollbackErr) {
+          logger.error(
+            { err: rollbackErr, section },
+            'site-settings: storage env rollback failed'
+          )
+        }
+      }
+      throw err
+    }
+
+    if (section === 'storage') {
+      result = { ...result, appliesOn: 'next container restart', envLines: buildStorageEnvLines(clean || {}) }
+    }
     logger.info(
       { section, result, userId: req.session?.user?.id },
       'site-settings: section updated'
