@@ -1,0 +1,97 @@
+# env-diff allow file — see tools/service-parity/env-diff.mjs
+# Format:
+#   <svc> <ENV> <reason…>            Node reads it, Go port doesn't — allowed, with reason
+#   <svc> GO_EXTRA <ENV> <reason…>   Go reads it, Node doesn't — allowed, with reason
+
+# --- chat ------------------------------------------------------------------
+# Node defines these but never reads them for chat behaviour (its apis.web
+# config is defined-but-unused in 6.3.0 — chat makes no outbound web calls).
+chat WEB_HOST defined-but-unused in Node 6.3.0 chat (apis.web config never read)
+chat WEB_PORT defined-but-unused in Node 6.3.0 chat (apis.web config never read)
+chat WEB_API_USER defined-but-unused in Node 6.3.0 chat (apis.web config never read)
+chat WEB_API_PASSWORD defined-but-unused in Node 6.3.0 chat (apis.web config never read)
+# Shadow-run escape hatch (Phase A4).
+chat GO_EXTRA PORT shadow-run port escape hatch (Phase A4); Node binds the chat port internally
+# Node test-only.
+chat TEST_NAME_PATTERN Node test-config (mocha spec filter); not a runtime input
+
+# --- docstore ---------------------------------------------------------------
+# Out-of-scope backends/behaviours for the Go port (scope decision 2026-09:
+# fs + s3 only). AWS_S3_PARTSIZE: Node multipart-part sizing for S3; the Go
+# s3x client PUTs whole objects (documents ≤ MAX_DOC_LENGTH), so part-size is
+# moot. GCS_* / FALLBACK_* / COPY_ON_MISS: GCS backend + fallback bucket
+# mapping + copy-on-miss are not part of the Go scope.
+docstore AWS_S3_PARTSIZE Node multipart part-size; Go s3x PUTs whole objects (≤ MAX_DOC_LENGTH)
+docstore GCS_API_ENDPOINT out of scope: Go port supports fs + s3 only
+docstore GCS_PROJECT_ID out of scope: Go port supports fs + s3 only
+docstore GCS_UNLOCK_BEFORE_DELETE out of scope: Go port supports fs + s3 only
+docstore GCS_DELETED_BUCKET_SUFFIX out of scope: Go port supports fs + s3 only
+docstore GCS_DELETE_CONCURRENCY out of scope: Go port supports fs + s3 only
+docstore FALLBACK_BACKEND out of scope: Go port supports fs + s3 only
+docstore FALLBACK_BUCKET_MAPPING out of scope: Go port supports fs + s3 only
+docstore COPY_ON_MISS out of scope: Node copy-on-miss archiver behaviour not ported (documented gap)
+# AWS S3 path-style is hard-wired true in Go (SeaweedFS/MinIO compatibility).
+docstore AWS_S3_PATH_STYLE hard-wired path-style=true in Go s3x (this deployment runs path-style gateways)
+docstore TEST_NAME_PATTERN Node test-config (mocha spec filter); not a runtime input
+# Shadow-run escape hatches (Phase A4) — intentionally Go-only.
+docstore GO_EXTRA PORT shadow-run port escape hatch (Phase A4); Node binds 3016 internally
+docstore GO_EXTRA AWS_KEY CE-style alt key name (Go chain AWS_ACCESS_KEY_ID||AWS_KEY)
+docstore GO_EXTRA AWS_SECRET CE-style alt secret name (Go chain AWS_SECRET_ACCESS_KEY||AWS_SECRET)
+docstore GO_EXTRA OVERLEAF_FILESTORE_S3_ENDPOINT shared filestore endpoint name (Go chain fallback)
+
+# --- filestore ---------------------------------------------------------------
+filestore AWS_S3_PARTSIZE Node multipart part-size; Go s3x PUTs whole objects
+filestore AWS_S3_PATH_STYLE hard-wired path-style=true in Go s3x
+filestore AWS_S3_TEMPLATE_FILES_BUCKET_NAME out of scope: template storage stays in the web service
+filestore AWS_S3_USER_FILES_DEK_BUCKET_NAME out of scope: S3 user-files KMS-DEK encryption not ported
+filestore AWS_S3_USER_FILES_STORAGE_CLASS out of scope: storage-class tagging not needed here
+filestore GCS_API_ENDPOINT out of scope: Go port supports fs + s3 only
+filestore GCS_PROJECT_ID out of scope: Go port supports fs + s3 only
+filestore GCS_UNLOCK_BEFORE_DELETE out of scope: Go port supports fs + s3 only
+filestore GCS_DELETED_BUCKET_SUFFIX out of scope: Go port supports fs + s3 only
+filestore GCS_DELETE_CONCURRENCY out of scope: Go port supports fs + s3 only
+filestore GCS_TEMPLATE_FILES_BUCKET_NAME out of scope: Go port supports fs + s3 only
+filestore FALLBACK_BACKEND out of scope: Go port supports fs + s3 only
+filestore FALLBACK_BUCKET_MAPPING out of scope: Go port supports fs + s3 only
+filestore COPY_ON_MISS out of scope: Node copy-on-miss behaviour not ported (documented gap)
+filestore S3_BUCKET_CREDENTIALS Node docker-compose test-fixture helper; not a runtime input
+filestore MINIO_ROOT_USER Node docker-compose test-fixture credential; not a runtime input
+filestore MINIO_ROOT_PASSWORD Node docker-compose test-fixture credential; not a runtime input
+filestore NODE_ENV Node runtime mode flag; Go needs none
+filestore METRICS_APP_NAME Node metrics-wrapper label; Go health endpoint needs none
+filestore GRACEFUL_SHUTDOWN_DELAY_SECONDS Go implements a fixed 30 s in-flight drain (closeListener + grace timer) instead
+# Known-scope gaps (documented in GO_CUTOVER_PLAN risk register): the Go
+# template route serves direct object GETs; Node's allowRedirects 302 mode and
+# signed-URL expiry (LINK_EXPIRY_TIMEOUT) are not enabled in this deployment.
+filestore LINK_EXPIRY_TIMEOUT known gap: signed-URL expiry not needed in this deployment (template flow = direct GET)
+filestore ALLOW_REDIRECTS known gap: Node allowRedirects 302 mode not ported (template flow = direct GET)
+filestore TEST_NAME_PATTERN Node test-config (mocha spec filter); not a runtime input
+# Go reads the CE/env names directly (Node gets them via the shared settings
+# layer outside the per-service scan) — parity by design, listed for clarity.
+filestore GO_EXTRA FILESTORE_BACKEND Node default alias read via shared settings layer (outside scan)
+filestore GO_EXTRA OVERLEAF_FILESTORE_BACKEND Node reads via shared settings layer (outside scan)
+filestore GO_EXTRA OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID Node reads via shared settings layer (outside scan)
+filestore GO_EXTRA OVERLEAF_FILESTORE_S3_ENDPOINT Node reads via shared settings layer (outside scan)
+filestore GO_EXTRA OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY Node reads via shared settings layer (outside scan)
+filestore GO_EXTRA OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME Node reads via shared settings layer (outside scan)
+filestore GO_EXTRA OVERLEAF_HISTORY_BLOBS_BUCKET Node reads via shared settings layer (outside scan)
+filestore GO_EXTRA OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET Node reads via shared settings layer (outside scan)
+filestore GO_EXTRA PORT shadow-run port escape hatch (Phase A4); Node binds 3009 internally
+
+# --- githubinterface ---------------------------------------------------------
+githubinterface GHIF_TEST_DEBUG Node test-only debug flag; not a runtime input
+# Node bounds per-request git buffers via this; Go streams git subprocess IO
+# through bounded buffers internally (see go/services/githubinterface git.go).
+githubinterface GITHUBINTERFACE_MAX_BUFFER_MB Go implements an internal bounded buffer for git subprocess IO
+
+# --- linked-url-proxy --------------------------------------------------------
+linked-url-proxy GO_EXTRA PORT shadow-run port escape hatch (Phase A4); Node uses services.web.api.port
+
+# --- notifications -----------------------------------------------------------
+notifications TEST_NAME_PATTERN Node test-config (mocha spec filter); not a runtime input
+
+# --- dropboxinterface --------------------------------------------------------
+# Go env overrides for the upstream base (test/parity shadowing; Node reads
+# the same config keys via the shared settings layer, so not a behaviour gap).
+dropboxinterface GO_EXTRA DROPBOX_API_BASE test/shadow override for the DropBase API base (Node: shared settings layer)
+dropboxinterface GO_EXTRA DROPBOX_CONTENT_BASE test/shadow override for the Content API base (Node: shared settings layer)
