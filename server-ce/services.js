@@ -12,25 +12,10 @@ module.exports = [
     name: 'clsi',
   },
   {
-    name: 'filestore',
-  },
-  {
-    name: 'docstore',
-  },
-  {
-    name: 'chat',
-  },
-  {
-    name: 'notifications',
-  },
-  {
     name: 'project-history',
   },
   {
     name: 'history-v1',
-  },
-  {
-    name: 'linked-url-proxy',
   },
 ]
 

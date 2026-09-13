@@ -1,3 +1,8 @@
+# Hot-reload overlays for the develop stack (docker/docker-compose.dev.yml).
+# The five previously-listed Node services (chat, docstore, filestore,
+# linked-url-proxy, notifications) were replaced by their Go implementations
+# (go/services/<name>) and removed from the tree, so they no longer have a
+# Node source to hot-reload and are dropped here.
 services:
   clsi:
     command: ["node", "--watch", "app.js"]
@@ -10,28 +15,6 @@ services:
       - ../services/clsi/app.js:/overleaf/services/clsi/app.js
       - ../services/clsi/config:/overleaf/services/clsi/config
 
-  chat:
-    command: ["node", "--watch", "app.js"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9231:9229"
-    volumes:
-      - ../services/chat/app:/overleaf/services/chat/app
-      - ../services/chat/app.js:/overleaf/services/chat/app.js
-      - ../services/chat/config:/overleaf/services/chat/config
-
-  docstore:
-    command: ["node", "--watch", "app.js"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9233:9229"
-    volumes:
-      - ../services/docstore/app:/overleaf/services/docstore/app
-      - ../services/docstore/app.js:/overleaf/services/docstore/app.js
-      - ../services/docstore/config:/overleaf/services/docstore/config
-
   document-updater:
     command: ["node", "--watch", "app.js"]
     environment:
@@ -42,17 +25,6 @@ services:
       - ../services/document-updater/app:/overleaf/services/document-updater/app
       - ../services/document-updater/app.js:/overleaf/services/document-updater/app.js
       - ../services/document-updater/config:/overleaf/services/document-updater/config
-
-  filestore:
-    command: ["node", "--watch", "app.js"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9235:9229"
-    volumes:
-      - ../services/filestore/app:/overleaf/services/filestore/app
-      - ../services/filestore/app.js:/overleaf/services/filestore/app.js
-      - ../services/filestore/config:/overleaf/services/filestore/config
 
   history-v1:
     command: ["node", "--watch", "app.js"]
@@ -67,28 +39,6 @@ services:
       - ../services/history-v1/storage:/overleaf/services/history-v1/storage
       - ../services/history-v1/knexfile.js:/overleaf/services/history-v1/knexfile.js
       - ../services/history-v1/migrations:/overleaf/services/history-v1/migrations
-
-  linked-url-proxy:
-    command: ["node", "--watch", "app.mjs"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9241:9229"
-    volumes:
-      - ../services/linked-url-proxy/app:/overleaf/services/linked-url-proxy/app
-      - ../services/linked-url-proxy/config:/overleaf/services/linked-url-proxy/config
-      - ../services/linked-url-proxy/app.mjs:/overleaf/services/linked-url-proxy/app.mjs
-
-  notifications:
-    command: ["node", "--watch", "app.ts"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9236:9229"
-    volumes:
-      - ../services/notifications/app:/overleaf/services/notifications/app
-      - ../services/notifications/app.ts:/overleaf/services/notifications/app.ts
-      - ../services/notifications/config:/overleaf/services/notifications/config
 
   project-history:
     command: ["node", "--watch", "app.js"]

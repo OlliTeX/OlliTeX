@@ -250,6 +250,38 @@ then prod: `make release` → owner push + `cycle_overleafserver.sh` →
 No data, no client, no migration involved; in-flight state (archive locks)
 self-resolves within the lock TTL (≈60 s).
 
+## Phase D — Node removal (2026-09-16)
+
+With all nine cutover gates green and recorded above, the Node implementations
+were removed from the tree:
+
+* Deleted dirs: `services/{chat,datamanipulator,docstore,dropboxinterface,filestore,
+  githubinterface,linked-url-proxy,notifications,webdavinterface}/`
+  (-~2.1 MB of service code, -571 lockfile lines incl. now-orphaned package
+  closure like `strict-url-sanitise`).
+* `package.json` workspaces: nine entries removed; `yarn workspaces list` is
+  exact (clsi, clsi_typst, document-updater, history-v1, project-history,
+  real-time, web + web scripts); `yarn install` re-ran clean (PnP + lockfile).
+* `server-ce/runit/<svc>-overleaf/run`: nine scripts rewritten — Go binary is
+  now the **unconditional** implementation (same env, same log file, same user,
+  same port). `USE_GO_*` env vars are no-ops on the new scripts.
+* `develop/docker-compose.yml` / `.dev.yml`: the five standalone Node service
+  definitions + hot-reload mounts (chat, docstore, filestore, linked-url-proxy,
+  notifications) removed; both compose files validate.
+* `server-ce/Dockerfile`: comment updated to state Go is canonical.
+* `tests/e2e/specs/parity/service-linked-url.test.e2e.ts`: now 2 legs
+  (Go e2e 21/21 + Go LIVE 21/21); the Node baseline leg is retired — the
+  Node==Go comparison happened pre-removal (record #1) and remains the pinned
+  contract.
+* `services/web/test/acceptance/src/mocks/MockChatApi.mjs`: comment now points
+  at the Go chat service (the mock stands in for chat's API shape, unchanged).
+
+Remaining Node services (kept, not part of this cutover): clsi, clsi_typst,
+clsi-cache/clsi-lb (if present), document-updater, history-v1, project-history,
+real-time, analytics/freegeoip/idp/latexqc/templates/third-party-* (SaaS-only
+where not in the CE tree), and the web app itself (→ own plan:
+`WEB_GO_PLAN.md`).
+
 ## Risk register (what we explicitly guard against)
 
 | # | Risk | Guard |

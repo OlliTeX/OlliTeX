@@ -67,12 +67,14 @@ ADD server-ce/config/env.sh /etc/overleaf/env.sh
 # them at start via /etc/overleaf/env.sh. Pre-created so no runtime fs race.
 RUN mkdir -p /etc/overleaf/env.d && chown www-data:www-data /etc/overleaf/env.d && chmod 775 /etc/overleaf/env.d
 
-# Go microservice binaries (1:1 replacements; USE_GO_* runit switches select
-# them). Built on the host by `make go-build` (offline box — no golang stage
-# in the image) and shipped whole; the runit scripts exec
-# /usr/local/bin/go-services/<svc> when the flag is set.
-# (Missing dir is a no-op warning, never a build failure — the services are
-# optional until the cutover flags are turned on.)
+# Go microservice binaries — the CANONICAL implementations of the nine
+# microservices (chat, docstore, filestore, notifications, linked-url-proxy,
+# datamanipulator, webdavinterface, dropboxinterface, githubinterface); the
+# Node versions were removed from the tree after the Node==Go contract gates
+# went green (GO_CUTOVER_PLAN Phase C/D, 2026-09-16). Built on the host by
+# `make go-build` (offline box — no golang stage in the image) and shipped
+# whole; the runit scripts exec /usr/local/bin/go-services/<svc>
+# unconditionally.
 COPY bin/ /usr/local/bin/go-services/
 RUN chmod 755 /usr/local/bin/go-services/* 2>/dev/null || true
 

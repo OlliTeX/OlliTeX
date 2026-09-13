@@ -2,8 +2,10 @@ import AbstractMockApi from './AbstractMockApi.mjs'
 import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { parseReq, z, zz } from '@overleaf/validation-tools'
 
-// Mirrors services/chat/app/js/Features/Messages/MessageHttpSchemas.js (this
-// mock stands in for chat's own API in web's acceptance tests). This mock's
+// Mirrors the chat service's MessageHttpSchemas contract — the chat
+// implementation as of 2026-09-16 is go/services/chat (Node
+// Services/chat/app/js/... was removed from the tree). This mock stands in
+// for chat's own API in web's acceptance tests. This mock's
 // own routes bind params as snake_case (project_id/thread_id/message_id)
 // where chat's real Express routes bind the same URL shapes as camelCase
 // (projectId/threadId/messageId) -- param names never travel over the wire,

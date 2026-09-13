@@ -1,13 +1,9 @@
 #!/bin/bash
 
+# filestore is served by its Go implementation (cutover plan, Phase C complete
+# 2026-09-16: Node==Go contract gates green on e2e + live). The Node version
+# was removed from this tree; Go is the canonical implementation.
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 
-# Go 1:1 replacement (cutover plan A3, owner-approved 2026-09-14):
-# USE_GO_FILESTORE=true (env.sh or compose env) selects the Go binary; otherwise the
-# canonical Node entrypoint runs unchanged.
-# Rollback = unset USE_GO_FILESTORE + `sv restart filestore-overleaf` — same env, same log file, same user.
-if [ "$USE_GO_FILESTORE" = "true" ]; then
-    exec /sbin/setuser www-data /usr/local/bin/go-services/filestore >> /var/log/overleaf/filestore.log 2>&1
-fi
-exec /sbin/setuser www-data /usr/bin/node /overleaf/services/filestore/app.js >> /var/log/overleaf/filestore.log 2>&1
+exec /sbin/setuser www-data /usr/local/bin/go-services/filestore >> /var/log/overleaf/filestore.log 2>&1

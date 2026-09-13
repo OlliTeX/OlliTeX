@@ -1,9 +1,5 @@
 volumes:
   clsi-cache:
-  filestore-public-files:
-  filestore-template-files:
-  filestore-uploads:
-  filestore-user-files:
   mongo-data:
   redis-data:
   sharelatex-data:
@@ -11,13 +7,6 @@ volumes:
   history-v1-buckets:
 
 services:
-  chat:
-    build:
-      context: ..
-      dockerfile: services/chat/Dockerfile
-    env_file:
-      - dev.env
-
   clsi:
     build:
       context: ..
@@ -44,34 +33,12 @@ services:
     volumes:
       - ${PWD}/output:/output:ro
       - ../services/clsi/nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
-
-  docstore:
-    build:
-      context: ..
-      dockerfile: services/docstore/Dockerfile
-    env_file:
-      - dev.env
-
   document-updater:
     build:
       context: ..
       dockerfile: services/document-updater/Dockerfile
     env_file:
       - dev.env
-
-  filestore:
-    build:
-      context: ..
-      dockerfile: services/filestore/Dockerfile
-    env_file:
-      - dev.env
-    #    environment:
-    #      - ENABLE_CONVERSIONS=true
-    volumes:
-      - filestore-public-files:/overleaf/services/filestore/public_files
-      - filestore-template-files:/overleaf/services/filestore/template_files
-      - filestore-uploads:/overleaf/services/filestore/uploads
-
   history-v1:
     build:
       context: ..
@@ -87,14 +54,6 @@ services:
       PERSISTOR_BACKEND: fs
     volumes:
       - history-v1-buckets:/buckets
-
-  linked-url-proxy:
-    build:
-      context: ..
-      dockerfile: services/linked-url-proxy/Dockerfile
-    env_file:
-      - dev.env
-
   mongo:
     image: mongo:8
     command: --replSet overleaf
@@ -110,14 +69,6 @@ services:
       # replica set. This override is not needed when running the setup after
       # starting up mongo.
       - mongo:127.0.0.1
-
-  notifications:
-    build:
-      context: ..
-      dockerfile: services/notifications/Dockerfile
-    env_file:
-      - dev.env
-
   project-history:
     build:
       context: ..
@@ -194,14 +145,9 @@ services:
       - mongo
       - redis
       - smtpsink
-      - chat
       - clsi
-      - docstore
       - document-updater
-      - filestore
       - history-v1
-      - linked-url-proxy
-      - notifications
       - project-history
       - real-time
       - languagetool
