@@ -34,3 +34,15 @@ if [ -f /etc/container_environment.sh ]; then
   # shellcheck disable=SC1091
   . /etc/container_environment.sh
 fi
+
+# 2026-09-14 (owner): admin-managed env fragments (e.g. the hub's Storage
+# section — filestore/docstore backend + SeaweedFS gateway). Written by the
+# web service on save (www-data), sourced by every runit service at start.
+# Fragments use ${VAR:-value} so explicit container/compose env always
+# wins; changes apply on the next container cycle.
+if [ -d /etc/overleaf/env.d ]; then
+  for _f in /etc/overleaf/env.d/*.sh; do
+    [ -f "$_f" ] && . "$_f"
+  done
+  unset _f
+fi

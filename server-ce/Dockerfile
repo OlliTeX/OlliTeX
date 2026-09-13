@@ -62,6 +62,20 @@ ADD server-ce/runit /etc/service
 # ------------------------------------------
 ADD server-ce/config/env.sh /etc/overleaf/env.sh
 
+# Admin-managed env fragments (hub → Site → Storage etc.): www-data (the web
+# service user) writes the fragments on save; every runit service sources
+# them at start via /etc/overleaf/env.sh. Pre-created so no runtime fs race.
+RUN mkdir -p /etc/overleaf/env.d && chown www-data:www-data /etc/overleaf/env.d && chmod 775 /etc/overleaf/env.d
+
+# Go microservice binaries (1:1 replacements; USE_GO_* runit switches select
+# them). Built on the host by `make go-build` (offline box — no golang stage
+# in the image) and shipped whole; the runit scripts exec
+# /usr/local/bin/go-services/<svc> when the flag is set.
+# (Missing dir is a no-op warning, never a build failure — the services are
+# optional until the cutover flags are turned on.)
+COPY bin/ /usr/local/bin/go-services/
+RUN chmod 755 /usr/local/bin/go-services/* 2>/dev/null || true
+
 # Configure nginx
 # ---------------
 ADD server-ce/nginx/nginx.conf.template /etc/nginx/templates/nginx.conf.template

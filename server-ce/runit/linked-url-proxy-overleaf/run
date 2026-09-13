@@ -9,4 +9,11 @@ fi
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 
+# Go 1:1 replacement (cutover plan A3, owner-approved 2026-09-14):
+# USE_GO_LINKED_URL_PROXY=true (env.sh or compose env) selects the Go binary; otherwise the
+# canonical Node entrypoint runs unchanged.
+# Rollback = unset USE_GO_LINKED_URL_PROXY + `sv restart linked-url-proxy-overleaf` — same env, same log file, same user.
+if [ "$USE_GO_LINKED_URL_PROXY" = "true" ]; then
+    exec /sbin/setuser www-data /usr/local/bin/go-services/linked-url-proxy >> /var/log/overleaf/linked-url-proxy.log 2>&1
+fi
 exec /sbin/setuser www-data /usr/bin/node $NODE_PARAMS /overleaf/services/linked-url-proxy/app.mjs >> /var/log/overleaf/linked-url-proxy.log 2>&1

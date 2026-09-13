@@ -9,4 +9,11 @@ fi
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 
+# Go 1:1 replacement (cutover plan A3, owner-approved 2026-09-14):
+# USE_GO_CHAT=true (env.sh or compose env) selects the Go binary; otherwise the
+# canonical Node entrypoint runs unchanged.
+# Rollback = unset USE_GO_CHAT + `sv restart chat-overleaf` — same env, same log file, same user.
+if [ "$USE_GO_CHAT" = "true" ]; then
+    exec /sbin/setuser www-data /usr/local/bin/go-services/chat >> /var/log/overleaf/chat.log 2>&1
+fi
 exec /sbin/setuser www-data /usr/bin/node $NODE_PARAMS /overleaf/services/chat/app.js >> /var/log/overleaf/chat.log 2>&1
