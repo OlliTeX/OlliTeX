@@ -14,7 +14,6 @@
 // `seaweed-migrate` whenever (tools live in the repo, cmd/seaweed-migrate).
 
 import React from 'react'
-import React from 'react'
 import { Anchor, Group, Text } from '@mantine/core'
 import {
   Field,
