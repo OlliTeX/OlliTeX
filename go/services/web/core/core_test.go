@@ -2,17 +2,17 @@ package core
 
 import (
 	"bufio"
-	"encoding/base64"
-	neturl "net/url"
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -26,7 +26,7 @@ type fakeRedis struct {
 	conn net.Conn
 	m    map[string]string // key -> value
 	ttl  map[string]int
-	ops  []string          // command log (for NX/XX assertions)
+	ops  []string // command log (for NX/XX assertions)
 }
 
 func startFakeRedis(t *testing.T) (*fakeRedis, string) {
@@ -113,7 +113,7 @@ func atoi(s string) int {
 func (fr *fakeRedis) exec(args []string) []byte {
 	fr.mu.Lock()
 	defer fr.mu.Unlock()
- cmd := strings.ToUpper(args[0])
+	cmd := strings.ToUpper(args[0])
 	switch cmd {
 	case "PING":
 		return []byte("+PONG\r\n")
@@ -279,7 +279,7 @@ func TestCsrfTokenMatchesNodeAlgorithm(t *testing.T) {
 	sha := sha1.Sum([]byte(salt + "-" + secret))
 	want := salt + "-" + b64urlNoPad(sha[:])
 	// build the same token via our internal pieces
-	got := salt + "-" + csrfHash(salt + "-" + secret)
+	got := salt + "-" + csrfHash(salt+"-"+secret)
 	if got != want {
 		t.Fatalf("token derivation: got %q want %q", got, want)
 	}
@@ -520,9 +520,10 @@ func TestAppAnonymousUnknownRouteRedirectsToLogin(t *testing.T) {
 	// Node A (pinned: anonymous /project 302 carries Set-Cookie overleaf.sid
 	// — the rolling middleware touches every webRouter session, so even a
 	// brand-new one is persisted + cookie-d; /status alone is exempt
-	// because it rides publicApiRouter without the session chain):
+	// because it rides publicApiRouter without the session chain). The
+	// value is node-`cookie`-module encoded (s%3A...), pinned live.
 	sid := w.Header().Get("Set-Cookie")
-	if !strings.HasPrefix(sid, "overleaf.sid=s:") {
+	if !strings.HasPrefix(sid, "overleaf.sid=s%3A") {
 		t.Fatalf("web-router anonymous response must issue the session cookie, got %q", sid)
 	}
 	// and the doc must be in the shared store

@@ -202,7 +202,7 @@ func (st *SessionStore) StartAnonymous(req *http.Request) (*Session, error) {
 		cs := st.newAnonymousSession()
 		return cs, nil
 	}
-	sid := strings.TrimPrefix(raw.Value, "s:")
+	sid := strings.TrimPrefix(decodeCookieValue(raw.Value), "s:")
 	sid = unsignCookie(sid, st.cfg.SessionSecrets)
 	if sid == "" {
 		// bad signature → treat as new
@@ -223,13 +223,23 @@ func (st *SessionStore) StartAnonymous(req *http.Request) (*Session, error) {
 	return sess, nil
 }
 
+// Fresh creates a brand-new unsaved session document with a new sid — the
+// login "session regeneration" primitive (Node: new sid doc + old destroyed;
+// P2 pin: the login response cookie is the NEW sid).
+func (st *SessionStore) Fresh() *Session {
+	if st.cfg.RollingSession == false {
+		// rolling disabled → keep same semantics minus the touch loop
+	}
+	return st.newAnonymousSession()
+}
+
 func (st *SessionStore) newAnonymousSession() *Session {
 	now := time.Now()
 	exp := now.Add(st.cfg.CookieLength)
 	s := &Session{
-		SessID:    st.newSID(),
-		Doc:       map[string]json.RawMessage{},
-		expires:   exp,
+		SessID:     st.newSID(),
+		Doc:        map[string]json.RawMessage{},
+		expires:    exp,
 		newSession: true,
 		Cookie: &SessionCookie{
 			OriginalMaxAge: st.cfg.CookieLengthMS,
@@ -246,6 +256,42 @@ func (st *SessionStore) newAnonymousSession() *Session {
 	// the first csrf-verified request DOES (secret allocated, doc saved,
 	// cookie issued).
 	return s
+}
+
+// decodeCookieValue — Node's `cookie` module URL-DECODES cookie values in
+// Set-Cookie (pinned: "s%3A..." on the wire); a conforming client returns
+// what the server sent, so the server must undo the encoding on read or
+// A/B sessions break (P1 pin: Node-created cookie 302'd by Go before the
+// fix). Values without % pass through unchanged (Go's own cookies are
+// raw, so this is a no-op for same-stack reads).
+func decodeCookieValue(v string) string {
+	if !strings.Contains(v, "%") {
+		return v
+	}
+	dec := make([]byte, 0, len(v))
+	for i := 0; i < len(v); i++ {
+		if v[i] == '%' && i+2 < len(v) {
+			d := func(b byte) int {
+				switch {
+				case b >= '0' && b <= '9':
+					return int(b - '0')
+				case b >= 'a' && b <= 'f':
+					return int(b-'a') + 10
+				case b >= 'A' && b <= 'F':
+					return int(b-'A') + 10
+				}
+				return -1
+			}
+			a, b := d(v[i+1]), d(v[i+2])
+			if a >= 0 && b >= 0 {
+				dec = append(dec, byte(a*16+b))
+				i += 2
+				continue
+			}
+		}
+		dec = append(dec, v[i])
+	}
+	return string(dec)
 }
 
 func (st *SessionStore) isDisabled(req *http.Request) bool {
@@ -362,6 +408,29 @@ func (cfg *Config) SignedCookieValue(sid string) string {
 // "Path=/; Expires=...; HttpOnly; SameSite=Lax" — Go emits attributes in
 // its canonical order; browsers/Node do not depend on the order, but we
 // pin the SET itself so the value+flags are identical).
+// cookieValueWire — Node's `cookie` module percent-ENCODES Set-Cookie
+// values (pinned live: overleaf.sid=s%3A...); encodeURIComponent keeps
+// A-Za-z0-9-_!~*'() and encodes the rest — exactly what a
+// cookie-signature value (base64 + ':' + '.') needs.
+func cookieValueWire(v string) string {
+	enc := func(c byte) string {
+		return fmt.Sprintf("%%%02X", c)
+	}
+	var b strings.Builder
+	for i := 0; i < len(v); i++ {
+		c := v[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+			b.WriteByte(c)
+		case c == '-', c == '_', c == '.', c == '!', c == '~', c == '*', c == '\'', c == '(', c == ')':
+			b.WriteByte(c)
+		default:
+			b.WriteString(enc(c))
+		}
+	}
+	return b.String()
+}
+
 func (s *Session) writeSessionCookie(w http.ResponseWriter, cfg *Config) {
 	if s.SessID == "" {
 		return
@@ -371,10 +440,11 @@ func (s *Session) writeSessionCookie(w http.ResponseWriter, cfg *Config) {
 		return
 	}
 	c := &http.Cookie{
-		Name:     cfg.CookieName,
-		Value:    cfg.SignedCookieValue(s.SessID),
-		Path:     s.Cookie.Path,
-		MaxAge:   int(time.Until(s.expires).Seconds()),
+		Name:  cfg.CookieName,
+		Value: cookieValueWire(cfg.SignedCookieValue(s.SessID)),
+		Path:  s.Cookie.Path,
+		// Node (express-session) sends Expires ONLY — no Max-Age (pinned
+		// live); MaxAge<=0 makes the stdlib omit the attribute.
 		Expires:  s.expires,
 		HttpOnly: true,
 		Secure:   cfg.SecureCookie,

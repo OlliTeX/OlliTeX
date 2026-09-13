@@ -29,8 +29,8 @@ type Config struct {
 	CookieDomain   string // COOKIE_DOMAIN (empty = absent cookie domain attr)
 
 	// app identity / misc
-	AppName string // APP_NAME || "OlliTeX" (settings.appName)
-	SiteURL string // SITE_URL || "http://localhost:8000"
+	AppName        string   // APP_NAME || "OlliTeX" (settings.appName)
+	SiteURL        string   // SITE_URL || "http://localhost:8000"
 	AllowedOrigins []string // ALLOWED_ORIGINS || siteUrl (comma list)
 	ExpoHostname   bool     // EXPOSE_HOSTNAME
 
@@ -40,12 +40,12 @@ type Config struct {
 	RedisAddr     string // REDIS_HOST:REDIS_PORT (default 127.0.0.1:6379)
 	RedisPassword string // REDIS_PASSWORD (empty = no AUTH — the e2e/live redis)
 	RedisDB       string // REDIS_DB index ('' or '0' = default)
-	MongoURI  string // mongoh chain (MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://HOST/sharelatex)
+	MongoURI      string // mongoh chain (MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://HOST/sharelatex)
 
 	// Feature directories
-	PublicDir    string // services/web/public (static root)
-	LocalesDir   string // services/web/locales
-	ViewsDir     string // not used by Go (templates live in go/...), kept for parity scripts
+	PublicDir  string // services/web/public (static root)
+	LocalesDir string // services/web/locales
+	ViewsDir   string // not used by Go (templates live in go/...), kept for parity scripts
 
 	// health checks
 	SmokeTestUserID string // SMOKE_TEST_USER_ID (empty → /health_check/mongo 500, Node parity)
@@ -129,7 +129,17 @@ func LoadConfig() (*Config, error) {
 		mongoURI = "mongodb://" + env("MONGO_HOST", "127.0.0.1") + "/sharelatex"
 	}
 
-	siteURL := env("SITE_URL", "http://localhost:8000")
+	// Node: siteUrl = process.env.OVERLEAF_SITE_URL || 'http://localhost'
+	// (server-ce/config/settings.js) — keep SITE_URL as a legacy alias.
+	siteURL := func() string {
+		if v := os.Getenv("OVERLEAF_SITE_URL"); v != "" {
+			return v
+		}
+		if v := os.Getenv("SITE_URL"); v != "" {
+			return v
+		}
+		return "http://localhost"
+	}()
 	allowedOrigins := []string{siteURL}
 	if v := os.Getenv("ALLOWED_ORIGINS"); v != "" {
 		allowedOrigins = strings.Split(v, ",")

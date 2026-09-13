@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"ollitex/go/pbhttp"
 )
@@ -38,8 +39,9 @@ type Feature struct {
 // Cxt is the per-request context feature handlers receive (the Go
 // equivalent of req + the useful session slice).
 type Cxt struct {
-	Req  *http.Request
-	Sess *Session
+	Req     *http.Request
+	Sess    *Session
+	SiteURL string // configured site URL (views' origin + siteUrl)
 }
 
 type fnPage func(*Cxt, *Res)
@@ -50,6 +52,9 @@ type App struct {
 	Cfg   *Config
 	Redis *RedisClient
 	Store *SessionStore
+	// Mongo lazy client (auth/user/site_settings features). Nil until
+	// SetMongo is called (cmd/web + tests wire it).
+	Mongo *MongoLazy
 	feats []Feature
 
 	// View renderers (P0: general/404 + general/500; login in P0-views).
@@ -59,6 +64,7 @@ type App struct {
 
 func (a *App) SetRender404(f fnPage) { a.Render404Web = f }
 func (a *App) SetRender500(f fnPage) { a.Render500 = f }
+func (a *App) SetMongo(m *MongoLazy) { a.Mongo = m }
 
 // New wires the app (callers: cmd/web + tests).
 func New(cfg *Config, rdb *RedisClient) *App {
@@ -126,7 +132,7 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 	}
 
 	res := &Res{W: w}
-	cxt := &Cxt{Req: r}
+	cxt := &Cxt{Req: r, SiteURL: a.Cfg.SiteURL}
 
 	// static (web profile; nginx usually answers first, but the app must
 	// be identical when it sees the request — serveStaticWrapper).
@@ -183,7 +189,7 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 					return
 				}
 				if a.Cfg.Profile == "web" && !rt.NoLogin && !cxt.Sess.IsLoggedIn() {
-					res.Redirect(r, 302, loginRedirectTarget(r))
+					a.globalLoginBounce(cxt, res, r)
 					a.maybeSaveSession(cxt, w, rw)
 					return
 				}
@@ -197,14 +203,23 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 	// fallback
 	if a.Cfg.Profile == "web" {
 		if !cxt.Sess.IsLoggedIn() {
-			res.Redirect(r, 302, loginRedirectTarget(r))
+			a.globalLoginBounce(cxt, res, r)
 			a.maybeSaveSession(cxt, w, rw)
 			return
 		}
-		if a.Render404Web != nil {
-			a.Render404Web(cxt, res)
-		} else {
-			res.SendStatus(404)
+		// Node: webRouter.get('*', notFound) — the 404 VIEW is the GET/HEAD
+		// catch-all; other methods fall through to the Express 404 page
+		// (pinned: anonymous/any-method tail). The view needs the session
+		// csrf token, hence it only renders here (post-gate).
+		switch r.Method {
+		case "GET", "HEAD":
+			if a.Render404Web != nil {
+				a.Render404Web(cxt, res)
+			} else {
+				res.SendStatus(404)
+			}
+		default:
+			pbhttp.ExpressNotFound(rw, r)
 		}
 	} else {
 		// api profile tail: express default 404 page (pinned:
@@ -221,6 +236,69 @@ func (a *App) serve500(cxt *Cxt, res *Res, err error) {
 		return
 	}
 	res.SendStatus(500)
+}
+
+// globalLoginBounce implements router.mjs:215 requireGlobalLogin for a
+// request that reached a login-required route without a session:
+//
+//	acceptsJson (XHR/API) → 401 + "WWW-Authenticate: OverleafLogin", empty
+//	  text/plain body (pinned anon XHR /restricted → 401, no body)
+//	otherwise → 302 /login with the session cookie, and the requested
+//	  path stashed as session.postLoginRedirect (Node
+//	  setRedirectInSession) so POST /login can send the user back.
+func (a *App) globalLoginBounce(cxt *Cxt, res *Res, r *http.Request) {
+	if cxt.Sess != nil {
+		safe := r.URL.Path
+		if r.URL.RawQuery != "" {
+			safe = safe + "?" + r.URL.RawQuery
+		}
+		if !isStaticRedirectPath(safe) {
+			cxt.Sess.Set("postLoginRedirect", safe)
+		}
+	}
+	if a.acceptsJSON(r) {
+		// pinned: 401 + WWW-Authenticate: OverleafLogin, body "Unauthorized"
+		res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		res.W.Header().Set("WWW-Authenticate", "OverleafLogin")
+		res.W.WriteHeader(401)
+		_, _ = res.W.Write([]byte("Unauthorized"))
+		return
+	}
+	res.Redirect(r, 302, loginRedirectTarget(r))
+}
+
+// isStaticRedirectPath mirrors the static-asset guard in
+// setRedirectInSession (never stash asset paths).
+func isStaticRedirectPath(v string) bool {
+	for _, p := range []string{"/socket.io/", "/js/", "/stylesheets/", "/img/"} {
+		if strings.HasPrefix(v, p) {
+			return true
+		}
+	}
+	end := []string{".png", ".jpeg", ".svg"}
+	lp := strings.ToLower(v)
+	for _, e := range end {
+		if strings.HasSuffix(lp, e) {
+			return true
+		}
+	}
+	return false
+}
+
+// AcceptsJSON is the exported gate/feature helper (see acceptsJSON).
+func AcceptsJSON(r *http.Request) bool { return new(App).acceptsJSON(r) }
+
+// acceptsJSON mirrors RequestContentTypeDetection.acceptsJson
+// (req.accepts(['html','json']) === 'json'): html wins on conflict, so a
+// plain browser ("*/*" or "text/html") is NOT json.
+func (a *App) acceptsJSON(r *http.Request) bool {
+	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+		return true
+	}
+	accept := strings.ToLower(r.Header.Get("Accept"))
+	hasHTML := strings.Contains(accept, "text/html") || strings.Contains(accept, "application/xhtml")
+	hasJSON := strings.Contains(accept, "application/json") || strings.Contains(accept, "application/*")
+	return hasJSON && !hasHTML
 }
 
 // ---- csrf plumbing ----
@@ -297,6 +375,20 @@ func (a *App) maybeSaveSession(cxt *Cxt, w http.ResponseWriter, rw *recWriter) {
 	}
 }
 
+// CommitSess persists sess and issues its Set-Cookie NOW — before the
+// handler writes any body — which is required for session
+// REGENERATION (login): the NEW sid must ride the very response that
+// completes the login (P2 pin: sid regenerated, old doc destroyed).
+func (a *App) CommitSess(sess *Session, w http.ResponseWriter) {
+	if sess == nil || sess.SessID == "" {
+		return
+	}
+	if err := a.Store.persist(sess); err != nil {
+		log.Printf("webgo: session persist: %v", err)
+	}
+	sess.writeSessionCookie(w, a.Cfg)
+}
+
 // routeNoSession reports whether the requested path is a NoSession route
 // (publicApiRouter/privateApiRouter parity).
 func (a *App) routeNoSession(r *http.Request) bool {
@@ -336,9 +428,8 @@ func (a *App) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 
 // loginRedirectTarget preserves the query string (express redirect +
 // getQueryString parity: '/login' + original '?a=b').
+// loginRedirectTarget — Node's gate always 302s to clean "/login" (the
+// pre-login target is stashed in session.postLoginRedirect, not the URL).
 func loginRedirectTarget(r *http.Request) string {
-	if q := r.URL.RawQuery; q != "" {
-		return "/login?" + q
-	}
 	return "/login"
 }

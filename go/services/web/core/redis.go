@@ -11,7 +11,6 @@ package core
 
 import (
 	"bufio"
-	"math/big"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
@@ -20,6 +19,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"strconv"
 	"strings"
@@ -119,7 +119,7 @@ func csrfHash(s string) string {
 // shape (pinned 2026-09-16).
 func CsrfToken(secret string) string {
 	salt := newCsrfSalt()
-	return salt + "-" + csrfHash(salt + "-" + secret)
+	return salt + "-" + csrfHash(salt+"-"+secret)
 }
 
 // VerifyCsrfToken mirrors csrf@3.1.0 Tokens.verify (split on the FIRST
@@ -136,7 +136,7 @@ func VerifyCsrfToken(secret, token string) bool {
 	if len(salt) != 8 {
 		return false
 	}
-	expected := salt + "-" + csrfHash(salt + "-" + secret)
+	expected := salt + "-" + csrfHash(salt+"-"+secret)
 	if len(expected) != len(token) {
 		return false
 	}
@@ -176,9 +176,9 @@ type RedisError struct{ Msg string }
 func (e *RedisError) Error() string { return "redis: " + e.Msg }
 
 type RedisClient struct {
-	mu   sync.Mutex
-	c    net.Conn
-	br   *bufio.Reader
+	mu sync.Mutex
+	c  net.Conn
+	br *bufio.Reader
 	// Addr is the redis endpoint; retained so a dropped connection can be
 	// re-established transparently (the web app tolerates a transient
 	// redis outage instead of crashing — better than the Node hard exit

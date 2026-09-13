@@ -229,6 +229,24 @@ with P2-auth, as planned — its interop half is already pinned by leg3a/3b.)
 
 ### P1 — leaf features (small blast radius; each = a quick win + more harness muscle)
 
+**✔ DONE 2026-09-13** — views engine (`go/services/web/views/`), `authpages`
+(login/POST·logout/restricted/register), `staticpages` (`/`, marketing 301s),
+`systemmessages`. Green: Go unit tests, 33/33 A/B battery direct-vs-direct,
+and the **3-leg flip-gate spec** `tests/e2e/specs/parity/web-go-p1-auth-flip.test.e2e.ts`
+(Node baseline / FLIP ON identical battery through nginx + A/B interop both ways +
+redis doc / FLIP OFF reversal). Contract pins (all pinned live vs Node):
+cookie
+**Expires-only, no Max-Age** + `s%3A…` wire encoding + Node-cookie-undecode on
+read; view `siteUrl`/origin from **`OVERLEAF_SITE_URL`** (settings.siteUrl, not
+proxied Host); **regeneration rides the login response** (`CommitSess`);
+`loginRedirectTarget` always `/login`; 401 body `Unauthorized`; anon
+`/restricted` XHR=401 vs page=302; `/system/messages` anon=`[]`; marketing gated;
+CSP per layout (React nonce vs restrictive); 404 view PATH/OLUSERS/OLUID slots;
+`loginEpoch` filter **type-sensitive** (no int64 coercion → 429); shadow needs
+`WEB_PORT=4010`; gate compares Set-Cookie **shape** with nonce/csrf/sid
+normalized (nonce class must include `+ / =`); redis key for the cookie sid =
+sid **minus** the `.sig` suffix.
+
 | feature | LOC | why safe/notes |
 |---|---|---|
 | HealthCheck | 83 | trivial |
