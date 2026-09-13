@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# web-go-flip — routes the flipped prefixes to the Go web shadow service
+# by injecting `include /etc/nginx/overflip-flips/…` into the overleaf
+# vhost (EXACT `location =` blocks from /usr/local/share/overleaf-flips;
+# see WEB_GO_PLAN.md §3 "flip mechanism").
+#
+# GATED: activates only when FLIP_GO_WEB_P0=1 (default off → the vhost is
+# never touched → zero behavior change for any deployment that does not
+# opt in). Once activated it self-heals: if the vhost is ever regenerated
+# (nginx image re-renders the template) the include is re-inserted and
+# nginx reloaded.
+#
+# Reversal: set FLIP_GO_WEB_P0=0, restart this service (it strips the
+# include), nginx reloads → 100% Node again.
+source /etc/overleaf/env.sh
+
+FLIP_SRC_DIR=/usr/local/share/overleaf-flips
+FLIP_DIR=/etc/nginx/overleaf-flips
+INCLUDE_LINE="  include ${FLIP_DIR}/web-p0.conf;"
+VHOST=/etc/nginx/sites-enabled/overleaf.conf
+MARKER="overleaf-flips/web-p0.conf"
+
+enabled() { [ "${FLIP_GO_WEB_P0:-0}" = "1" ]; }
+
+apply() {
+    [ -f "$FLIP_SRC_DIR/web-p0.conf" ] || { echo "web-go-flip: no flip source; skipping" >&2; return 1; }
+    mkdir -p "$FLIP_DIR"
+    cp -f "$FLIP_SRC_DIR/web-p0.conf" "$FLIP_DIR/web-p0.conf"
+    if ! grep -q "$MARKER" "$VHOST"; then
+        # insert the include directly above the `location / {` block
+        # (node is present in the image; line scan avoids sed/awk/regex
+        # escape-fragility across these three layers: shell -> bash -> node)
+        node -e '
+const fs = require("fs");
+const v = process.argv[1];
+const inc = "  include /etc/nginx/overleaf-flips/web-p0.conf;\n\n";
+let s = fs.readFileSync(v, "utf8");
+if (!s.includes("overleaf-flips/web-p0.conf")) {
+  const lines = s.split("\n");
+  const idx = lines.findIndex((l) => l.trim() === "location / {");
+  if (idx < 0) throw new Error("location / open line not found in vhost");
+  lines.splice(idx, 0, inc);
+  fs.writeFileSync(v, lines.join("\n"));
+}
+' "$VHOST"
+    fi
+    if nginx -t; then
+        nginx -s reload
+        echo "web-go-flip: P0 flip table applied"
+        return 0
+    fi
+    echo "web-go-flip: nginx -t failed; keeping previous config" >&2
+    return 1
+}
+
+strip() {
+    if grep -q "$MARKER" "$VHOST"; then
+        sed -i "/$MARKER/d" "$VHOST"
+        if nginx -t; then
+            nginx -s reload
+            echo "web-go-flip: flip table removed"
+        else
+            echo "web-go-flip: nginx -t failed after strip" >&2
+        fi
+    fi
+}
+
+echo "web-go-flip: starting (FLIP_GO_WEB_P0=${FLIP_GO_WEB_P0:-0})"
+while true; do
+    if enabled; then
+        apply
+    else
+        strip
+    fi
+    sleep 5
+done

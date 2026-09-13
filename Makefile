@@ -207,6 +207,7 @@ go-build: ## Build all Go service binaries into ./bin
 	$(GO) build -o bin/notifications ./cmd/notifications
 	$(GO) build -o bin/chat ./cmd/chat
 	$(GO) build -o bin/docstore ./cmd/docstore
+	$(GO) build -o bin/web ./cmd/web
 	$(GO) build -o bin/seaweed-migrate ./cmd/seaweed-migrate  ## fs <-> SeaweedFS(S3) conversion + health tool
 
 .PHONY: go-run-linked-url-proxy

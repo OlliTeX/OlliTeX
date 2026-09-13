@@ -83,6 +83,11 @@ RUN chmod 755 /usr/local/bin/go-services/* 2>/dev/null || true
 ADD server-ce/nginx/nginx.conf.template /etc/nginx/templates/nginx.conf.template
 ADD server-ce/nginx/overleaf.conf.template /etc/nginx/templates/overleaf.conf.template
 ADD server-ce/nginx/clsi-nginx.conf /etc/nginx/sites-enabled/clsi-nginx.conf
+# Ollitex Go web flips (WEB_GO_PLAN.md): exact-path location blocks that
+# the web-go-flip runit service injects into the overleaf vhost ONLY when
+# FLIP_GO_WEB_P0=1 (default off → inert).
+ADD server-ce/nginx/flips /usr/local/share/overleaf-flips
+RUN chmod 644 /usr/local/share/overleaf-flips/web-p0.conf
 
 
 # Configure log rotation

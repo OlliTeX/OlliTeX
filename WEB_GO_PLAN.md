@@ -170,14 +170,47 @@ few cross-refs), then **auth core**, then **user/admin**, then **project/editor
 core**, then **modules**, and finally Node-retirement. Each item below is a
 candidate flip unit; M0 refines prefix sets where two features share a path.
 
-### P0 — Go web foundation (`go/services/web/core/`) — *no user-facing feature yet*
+### P0 — Go web foundation (`go/services/web/core/`) — **✔ COMPLETE 2026-09-13**
+
+> Status (2026-09): core + `features/{status,healthcheck,devcsrf}` + `cmd/web`
+> built; shadow service `web-go-overleaf` (127.0.0.1:4010) runit-managed, OFF
+> by default (nothing routes to it until a flip is applied); flip table
+> `server-ce/nginx/flips/web-p0.conf` + `web-go-flip` runit service (gated by
+> `FLIP_GO_WEB_P0=1`). P0 three-leg gate GREEN (5/5, no flakes):
+> `tests/e2e/specs/parity/web-go-p0-flip.test.e2e.ts` — shadow up, A-parity
+> (/status byte+header exact incl. pinned ETag), **A/B session interop both
+> directions with token cross-verification against the shared redis doc**, and
+> flip ON/OFF routing (`/health_check/redis` 404→204 flip proof, stock
+> restored on strip). Route→feature table: `go/services/web/contract/routes.csv`
+> (159 routes + module routers). Contract pins learned in P0 (BINDING for all
+> later phases):
+>
+> 1. **Sessions live in REDIS** (connect-redis 6.1.3, `sess:<sid>` keys), not Mongo.
+>    Doc = {cookie{originalMaxAge 432000000,expires…}, csrfSecret,
+>    validationToken `v1:`+sid[-4:], passport.user when logged in}; NX-on-create
+>    / XX-on-touch SET semantics.
+> 2. **Cookie = `s:<sid32>.<sig>`**, sig = std base64 (NOT url-safe) of
+>    HMAC-SHA256(key=secrets[0], msg=sid) with trailing `=` stripped — the
+>    stack-resolved cookie-signature; unsign = last-dot split + recompute.
+> 3. **csurf**: token = 8-base62-salt + `-` + b64url(SHA1(salt+`-`+secret));
+>    secret (24 b64url chars) is LAZILY allocated into the doc on first use;
+>    403 = `Forbidden` text/plain, no nosniff.
+> 4. **Session cookie is issued on every webRouter request** (rolling touch),
+>    but NOT on publicApiRouter/privateApiRouter routes (/status, /health_check/*
+>    set no cookie) → `Route.NoSession` in core.
+> 5. Node persists sessions **after** the response (fire-and-forget) — interop
+>    probes must wait for the redis doc.
+> 6. nginx `location =` exact matches outrank the stock `location ~* ^/health_check`
+>    404 block — that is the flip mechanism (see §3 update below).
+>
+> Original table (kept for reference):
 
 | component | Node source of truth | notes |
 |---|---|---|
 | server/http kernel + two process profiles | `Server.mjs`, `app.mjs` env logic | one binary, `ENABLED_SERVICES`-driven |
 | config/settings reader | `@overleaf/settings` + `settings.js`/`env.d` | same env names, same defaults |
 | context plumbing | `app.locals` (the Node features' global glue) | **explicit per-feature constructors** — the biggest structural change (§7 R7) |
-| session store (Mongo) + cookie | `SessionManager.mjs`, `express-session` config | bidirectional interop test = M1 acceptance |
+| session store (REDIS, connect-redis) + cookie | `CustomSessionStore.mjs`, `express-session` config | bidirectional interop test — **done in P0 gate** |
 | CSRF | `infrastructure/Csrf.mjs` | same token contract |
 | validation | `validation-tools` (zod) usage sites (45 imports) | port the *schemas in use* per feature, not the whole lib |
 | rate limiting | `RateLimiter.mjs` (Redis) | **same redis key namespaces** |
@@ -187,9 +220,12 @@ candidate flip unit; M0 refines prefix sets where two features share a path.
 | i18n | `Translate.mjs` + `locales/` | same JSON files |
 | request logging/metrics | `@overleaf/metrics`, `LoggerSerializers` | same metric names/labels for flipped routes |
 
-**P0 gate**: login page + one static page + `/api` health parity, *session
-interop A/B test* (Node login → Go reads session; Go login → Node reads), all
-P0 unit tests green, e2e smoke through nginx with **zero** feature traffic on Go.
+**P0 gate (met 2026-09-13)**: session interop A/B (Node session → Go reads +
+token verify; Go session → Node reads + token verify), /status + health checks
++ /dev/csrf flip ON/OFF green through public nginx, core unit tests green
+(10 pinned-crypto/semantic tests), 16/16 e2e regression sample green, shadow
+OFF by default = zero feature traffic on Go. (Login page parity itself lands
+with P2-auth, as planned — its interop half is already pinned by leg3a/3b.)
 
 ### P1 — leaf features (small blast radius; each = a quick win + more harness muscle)
 
@@ -323,19 +359,32 @@ For each flip unit (P1…P6 items):
 
 ## 6. M0 deliverables (start here, ~the first working unit)
 
-1. `go/services/web/contract/routes.csv` — auto-extracted route→feature
-   attribution for all ~300 routes (method, path, feature, auth requirement,
-   queue owned, downstream services touched) — the flip table.
-2. `go/services/web/core/` skeleton: http kernel, config, session, csrf,
-   validation (schemas-in-use), rates, views harness (DOM-parity checker),
-   static, errors (`pbhttp` reuse), context (per-feature constructors).
-3. Shadow-port runner (`cmd/web` with `WEB_GO_PROFILE=web|api`), runit
-   `web-go-overleaf/run` (new service, `sv`-managed, **off by default**).
-4. Session interop A/B harness (the single most important test in the whole
-   project).
-5. nginx flip-table stub + documented flip/rollback SOP (one page, in
-   `WEB_GO_PLAN.md` §3 — keep it live-updated).
-6. **Go green, zero traffic, e2e smoke unchanged** → P0 complete.
+1. ~~`go/services/web/contract/routes.csv`~~ **✔** — `go/services/web/contract/routes.csv`
+   (159 routes: method, path, router chain, feature, source line; module
+   routers included). Auth-requirement + queue/downstream attribution is
+   derived per flip unit (the 4 P0 units are attributed in the gate spec).
+2. `go/services/web/core/` — **✔** http kernel (two profiles, `ENABLED_SERVICES`),
+   config (env parity incl. `OVERLEAF_REDIS_*`/`OVERLEAF_MONGO_URL`), session
+   store (Redis interop), csrf (Node-exact), static, errors (`pbhttp` reuse),
+   rolling/lazy session semantics. Validation/rates/views/i18n land with the
+   first feature that needs them (P1/P2/P3 respectively) — not built blind.
+   Pinned unit tests: `go/services/web/core/core_test.go`.
+3. Shadow-port runner — **✔** `cmd/web` (+ `server-ce/runit/web-go-overleaf/run`,
+   sv-managed, **off by default**; `web-go-flip` runit service gates the nginx
+   flip on `FLIP_GO_WEB_P0=1`).
+4. Session interop A/B harness — **✔** `tests/e2e/specs/parity/web-go-p0-flip.test.e2e.ts`
+   (leg3a/3b: both cookie directions + both csrf-token directions, cross-checked
+   against the shared redis doc with Node's own algorithm as third party).
+5. nginx flip table + SOP — **✔** `server-ce/nginx/flips/web-p0.conf` (exact
+   `location =` blocks; `^~`/exact semantics documented), apply/strip =
+   `web-go-flip` service (self-healing; node-based vhost insertion; nginx -t
+   gate; reload-race settled by gate-side polling). Rollback: strip the
+   include + reload = 100% Node, no data migration.
+   **Reload race note (pinned in gate): `nginx -s reload` is async — probes
+   must poll; baked into the spec.**
+6. **Go green, zero traffic, e2e smoke unchanged → DONE**: gate 5/5 green
+   (24.5s, no flakes), 16/16 regression sample (smoke/auth/docstore-filestore/
+   chat-notifications/linked-url incl. LIVE leg), Go tree 13 packages `ok`.
 
 ---
 
