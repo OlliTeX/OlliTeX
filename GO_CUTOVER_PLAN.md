@@ -235,6 +235,13 @@ webdavinterface, dropboxinterface, githubinterface — COMPLETE 2026-09-16.**
   checklist are the remaining follow-ups; github's `/check` upstream call is
   network-bound and cannot be exercised offline).
 
+**Image bake (done 2026-09-16):** `sharelatex/sharelatex:main` rebuilt from
+this HEAD (flat `bin/<svc>` layout — the canonical one the Dockerfile
+`COPY bin/` + run scripts expect; a transient `bin/go-services/` nested layout
+baked stale binaries and was removed). `cycle_overleafserver.sh` run; flags
+re-applied post-recreate; 9/9 Go serving, all functional + gate-contract probes
+pass (chat DELETE 204 == Node's `res.sendStatus(204)`), /login 200, /tmp 1777.
+
 **Stack-wide gates:** full e2e suite green with *all* flags on (test stack);
 then prod: `make release` → owner push + `cycle_overleafserver.sh` →
 `USE_GO_*=true` for all nine → 17-point prod probe → 24 h soak.
