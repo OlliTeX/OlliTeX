@@ -29,6 +29,12 @@ import (
 func main() {
 	cfg := chat.Config{}
 	cfg.WithDefaults()
+	// PORT = shadow-run escape hatch (cutover plan A4); default stays 3010.
+	if p := os.Getenv("PORT"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil {
+			cfg.Port = n
+		}
+	}
 
 	client, err := mongoh.Connect(context.Background(), mongoh.Options{
 		URI:         cfg.MongoURI,

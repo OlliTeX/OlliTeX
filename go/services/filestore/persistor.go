@@ -11,6 +11,37 @@ import (
 
 // --- FSPersistor (1:1 with libraries/object-persistor/src/FSPersistor.js) ---
 
+// Store is the persistor abstraction the filestore handlers program against.
+// Two backends implement it (1:1 with libraries/object-persistor):
+//
+//   - fseStore  — FSPersistor (BACKEND='fs', the CE default)
+//   - s3xStore  — S3Persistor on a SeaweedFS/S3 gateway (BACKEND='s3')
+//
+// Semantics both honour:
+//   - "location" is the bucket directory (fs) or the bucket NAME (s3) — the
+//     same env vars carry values of one kind in fs mode and of the other in
+//     s3 mode (CE: OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME, the
+//     OVERLEAF_HISTORY_*_BLOBS buckets).
+//   - keys are handler-level keys (may contain '/'); fs flattens '/'→'_' when
+//     useSubdirectories is off, S3 stores the key verbatim (Node S3Persistor
+//     does the same — only FSPersistor flattens).
+//   - missing key → fseNotFound (404); deleting a missing key is a no-op.
+type Store interface {
+	open(location, key string, reqUseSub bool) (io.ReadCloser, error)
+	objectSize(location, key string, reqUseSub bool) (int64, error)
+	objectMd5(location, key string, reqUseSub bool) (string, error)
+	exists(location, key string, reqUseSub bool) bool
+	sendStream(location, key string, r io.Reader, reqUseSub bool, sourceMd5 string) error
+	sendFile(location, key, source string, reqUseSub bool) error
+	copyObject(location, from, to string, reqUseSub bool) error
+	deleteObject(location, key string, reqUseSub bool) error
+	// deleteDirectory sweeps everything under the key prefix — fs does
+	// `<flattened key>_*`, S3 lists with Prefix=key (1:1 with Node
+	// S3Persistor.#listDirectory: `Prefix: key`, no trailing slash).
+	deleteDirectory(location, key string, reqUseSub bool) error
+	listFiles(location, key string, reqUseSub bool) []string
+}
+
 type fseStore struct {
 	useSubdirectories bool
 }
@@ -23,7 +54,7 @@ func (s *fseStore) fsPath(location, key string, reqUseSub bool) string {
 	return filepath.Join(location, key)
 }
 
-func (s *fseStore) open(location, key string, reqUseSub bool) (*os.File, error) {
+func (s *fseStore) open(location, key string, reqUseSub bool) (io.ReadCloser, error) {
 	f, err := os.Open(s.fsPath(location, key, reqUseSub))
 	if err != nil {
 		if os.IsNotExist(err) {

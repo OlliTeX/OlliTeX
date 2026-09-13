@@ -100,7 +100,7 @@ deploy-test: build ## Deploy the bundle into the test stack + restart (web cache
 	echo "test stack not ready after 120s" && exit 1
 
 .PHONY: image
-image: ## Rebuild the server-ce docker image (make all)
+image: go-build ## Rebuild the server-ce docker image (make all); ensure Go binaries are fresh
 	cd $(IMAGE_DIR) && make all
 
 .PHONY: clean
@@ -206,6 +206,8 @@ go-build: ## Build all Go service binaries into ./bin
 	$(GO) build -o bin/filestore ./cmd/filestore
 	$(GO) build -o bin/notifications ./cmd/notifications
 	$(GO) build -o bin/chat ./cmd/chat
+	$(GO) build -o bin/docstore ./cmd/docstore
+	$(GO) build -o bin/seaweed-migrate ./cmd/seaweed-migrate  ## fs <-> SeaweedFS(S3) conversion + health tool
 
 .PHONY: go-run-linked-url-proxy
 go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)

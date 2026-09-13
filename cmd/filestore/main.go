@@ -28,23 +28,28 @@ func firstNonEmpty(vals ...string) string {
 func main() {
 	cfg := filestore.FSTConfig{
 		// 1:1 with the Node config surface the CE image actually exports to the
-		// filestore process (server-ce/config/settings.js ce-fs block +
-		// services/filestore/config/settings.defaults.cjs). Unset values fall
-		// back to the same Node defaults in FSTConfig.withDefaults.
-		TemplateFiles:     os.Getenv("TEMPLATE_FILES_BUCKET_NAME"),
-		ProjectBlobs:      os.Getenv("OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET"),
-		GlobalBlobs:       os.Getenv("OVERLEAF_HISTORY_BLOBS_BUCKET"),
+		// filestore process (server-ce/config/settings.js `switch
+		// (OVERLEAF_FILESTORE_BACKEND)` block + the s3 fallback env names
+		// from services/filestore/config/settings.defaults.cjs). In s3 mode
+		// the three bucket values are BUCKET NAMES, not directories.
+		TemplateFiles:     firstNonEmpty(os.Getenv("OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME"), os.Getenv("TEMPLATE_FILES_BUCKET_NAME")),
+		ProjectBlobs:      firstNonEmpty(os.Getenv("OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET"), os.Getenv("OVERLEAF_EDITOR_PROJECT_BLOBS_BUCKET")),
+		GlobalBlobs:       firstNonEmpty(os.Getenv("OVERLEAF_HISTORY_BLOBS_BUCKET"), os.Getenv("OVERLEAF_EDITOR_BLOBS_BUCKET")),
 		EnableConversions: os.Getenv("ENABLE_CONVERSIONS") == "true",
 		Converter:         os.Getenv("CONVERTER"),
+		Backend:           firstNonEmpty(os.Getenv("OVERLEAF_FILESTORE_BACKEND"), os.Getenv("FILESTORE_BACKEND"), os.Getenv("BACKEND")),
+		S3Endpoint:        firstNonEmpty(os.Getenv("OVERLEAF_FILESTORE_S3_ENDPOINT"), os.Getenv("AWS_S3_ENDPOINT"), "http://127.0.0.1:8333"),
+		S3Key:             firstNonEmpty(os.Getenv("OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID"), os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_KEY")),
+		S3Secret:          firstNonEmpty(os.Getenv("OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY"), os.Getenv("AWS_SECRET_ACCESS_KEY"), os.Getenv("AWS_SECRET")),
 	}
-	// Node binds app.listen(port, host) with
-	//   port = settings.internal.filestore.port || 3009   (fixed 3009)
-	//   host = settings.internal.filestore.host || '0.0.0.0'
-	// and the service config sets host = LISTEN_ADDRESS || '127.0.0.1', so the
-	// effective default bind is 127.0.0.1:3009. Mirror that exactly.
 	host := firstNonEmpty(os.Getenv("LISTEN_ADDRESS"), "127.0.0.1")
-	listen := net.JoinHostPort(host, "3009")
-	mux := filestore.NewFSTHandlers(cfg).Mux()
+	port := firstNonEmpty(os.Getenv("PORT"), "3009") // Node: fixed 3009; PORT is a shadow-run escape hatch
+	listen := net.JoinHostPort(host, port)
+	h, herr := filestore.NewFSTHandlers(cfg)
+	if herr != nil {
+		log.Fatalf("filestore: %v", herr)
+	}
+	mux := h.Mux()
 	srv := &http.Server{
 		Addr:         listen,
 		Handler:      mux,

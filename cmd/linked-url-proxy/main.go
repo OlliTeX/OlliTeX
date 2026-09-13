@@ -27,6 +27,12 @@ import (
 
 func main() {
 	cfg := linkedurlproxy.NewLinkedURLProxyConfigFromEnv(os.Getenv)
+	// PORT = shadow-run escape hatch (cutover plan A4); default stays 3066.
+	if p := os.Getenv("PORT"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil {
+			cfg.Port = n
+		}
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

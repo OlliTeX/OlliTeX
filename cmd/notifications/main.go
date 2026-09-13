@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -27,7 +28,7 @@ import (
 func main() {
 	cfg := notifications.Config{
 		Host:       env("LISTEN_ADDRESS", "127.0.0.1"),
-		Port:       3042, // Node: fixed, no env override
+		Port:       envInt("PORT", 3042), // Node: fixed 3042; PORT = shadow-run escape hatch (A4)
 		MongoURI:   mongoURI(),
 		DB:         mongoh.DBFromURI(mongoURI(), "sharelatex"),
 		Collection: "notifications",
@@ -67,6 +68,15 @@ func main() {
 func env(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
+	}
+	return def
+}
+
+func envInt(k string, def int) int {
+	if v := os.Getenv(k); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return def
 }

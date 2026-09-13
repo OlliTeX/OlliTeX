@@ -78,6 +78,19 @@ type FSTConfig struct {
 	GlobalBlobs   string
 	UploadFolder  string
 
+	// Backend: '' | 'fs' | 's3' — 1:1 with OVERLEAF_FILESTORE_BACKEND (CE
+	// settings.js: 's3' vs default 'fs'). In s3 mode TemplateFiles/
+	// ProjectBlobs/GlobalBlobs are BUCKET NAMES, not directories.
+	Backend string
+	// S3Endpoint: OVERLEAF_FILESTORE_S3_ENDPOINT || AWS_S3_ENDPOINT (Node
+	// s3.endpoint). Empty → s3 mode requires it (the service fails fast).
+	S3Endpoint string
+	// S3Key/S3Secret: OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID ||
+	// AWS_ACCESS_KEY_ID and ..._SECRET... || AWS_SECRET_ACCESS_KEY.
+	// Empty = anonymous (SeaweedFS default).
+	S3Key    string
+	S3Secret string
+
 	EnableConversions bool
 	Converter         string
 	ConvertPrefix     []string
@@ -108,15 +121,36 @@ func (c *FSTConfig) withDefaults() {
 
 type FSTHandlers struct {
 	Cfg       FSTConfig
-	Store     *fseStore
+	Store     Store
 	Writer    *fseWriter
 	Converter *fseConverter
 	Handler   *fseHandler
 }
 
-func NewFSTHandlers(cfg FSTConfig) *FSTHandlers {
+// NewFSTHandlers wires the handlers over the chosen store backend. It
+// returns an error only in s3 mode, when the gateway is unreachable or a
+// required bucket cannot be ensured — booting a filestore that cannot write
+// would only 5xx the very first request, so fail at startup instead.
+func NewFSTHandlers(cfg FSTConfig) (*FSTHandlers, error) {
 	cfg.withDefaults()
-	store := &fseStore{useSubdirectories: cfg.UseSubdirectories}
+	var store Store
+	if cfg.Backend == "s3" {
+		s3s := newS3Store(cfg.S3Endpoint, cfg.S3Key, cfg.S3Secret)
+		// 1:1 with the Node s3 branch of CE settings.js: three buckets
+		// (template_files, project_blobs, global_blobs) — create them
+		// idempotently so a fresh SeaweedFS works without pre-seeding.
+		for _, b := range []string{cfg.TemplateFiles, cfg.ProjectBlobs, cfg.GlobalBlobs} {
+			if b == "" {
+				continue
+			}
+			if err := s3s.ensureBucket(b); err != nil {
+				return nil, fmt.Errorf("filestore: s3 bucket %q unavailable: %w", b, err)
+			}
+		}
+		store = s3s
+	} else {
+		store = &fseStore{useSubdirectories: cfg.UseSubdirectories}
+	}
 	writer := &fseWriter{uploadFolder: cfg.UploadFolder}
 	conv := &fseConverter{converter: cfg.Converter, prefix: cfg.ConvertPrefix, enable: cfg.EnableConversions}
 	return &FSTHandlers{
@@ -125,7 +159,7 @@ func NewFSTHandlers(cfg FSTConfig) *FSTHandlers {
 		Writer:    writer,
 		Converter: conv,
 		Handler:   &fseHandler{Store: store, Writer: writer, Converter: conv, TemplateB: cfg.TemplateFiles, EnableConv: cfg.EnableConversions},
-	}
+	}, nil
 }
 
 func (h *FSTHandlers) Mux() http.Handler {
@@ -165,7 +199,18 @@ func (h *FSTHandlers) bucketFile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	h.runFile(w, r, bucket, key, false)
+	switch r.Method {
+	case http.MethodGet:
+		h.runFile(w, r, bucket, key, false)
+	case http.MethodHead:
+		// Node declares no HEAD route here; Express mirrors HEAD onto the
+		// GET route (headers only) — runHead reproduces that.
+		h.runHead(w, r, bucket, key, false)
+	default:
+		// Node (Express) 404s unknown methods on a defined path (Go's mux
+		// would 405); keep the Node code.
+		http.NotFound(w, r)
+	}
 }
 
 func (h *FSTHandlers) globalBlobFile(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +220,7 @@ func (h *FSTHandlers) globalBlobFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := hash[:2] + "/" + hash[2:4] + "/" + hash[4:]
-	h.runFile(w, r, h.Cfg.GlobalBlobs, key, true)
+	h.historyMethod(w, r, h.Cfg.GlobalBlobs, key)
 }
 
 func (h *FSTHandlers) projectBlobFile(w http.ResponseWriter, r *http.Request) {
@@ -186,7 +231,20 @@ func (h *FSTHandlers) projectBlobFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := fseProjectKeyFormat(hid) + "/" + hash[:2] + "/" + hash[2:]
-	h.runFile(w, r, h.Cfg.ProjectBlobs, key, true)
+	h.historyMethod(w, r, h.Cfg.ProjectBlobs, key)
+}
+
+// historyMethod applies the Node method contract for the read-only
+// history/bucket routes: GET + Express-mirrored HEAD, everything else 404.
+func (h *FSTHandlers) historyMethod(w http.ResponseWriter, r *http.Request, bucket, key string) {
+	switch r.Method {
+	case http.MethodGet:
+		h.runFile(w, r, bucket, key, true)
+	case http.MethodHead:
+		h.runHead(w, r, bucket, key, true)
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 func (h *FSTHandlers) templateFile(w http.ResponseWriter, r *http.Request) {

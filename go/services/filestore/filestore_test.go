@@ -35,12 +35,15 @@ func newFST(t *testing.T) (*FSTHandlers, string) {
 			t.Fatal(err)
 		}
 	}
-	h := NewFSTHandlers(FSTConfig{
+	h, err := NewFSTHandlers(FSTConfig{
 		TemplateFiles: tpl,
 		ProjectBlobs:  pb,
 		GlobalBlobs:   gb,
 		UploadFolder:  filepath.Join(tmp, "uploads"),
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	return h, tmp
 }
 

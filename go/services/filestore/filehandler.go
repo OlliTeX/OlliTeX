@@ -15,7 +15,7 @@ var (
 )
 
 type fseHandler struct {
-	Store      *fseStore
+	Store      Store
 	Writer     *fseWriter
 	Converter  *fseConverter
 	TemplateB  string
