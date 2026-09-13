@@ -62,23 +62,45 @@ func (c *LinkedURLProxyConfig) isBlockedIP(ip netip.Addr) (bool, error) {
 	return false, nil
 }
 
-// isUnicast mirrors ipaddr.js `addr.range() === 'unicast'`: an address is
-// unicast only if it is not unspecified, loopback, multicast, private-use, or
-// link-local. Node blocks everything in the non-unicast range before checking
-// the blockedNetworks list, so those are blocked here too.
+// isUnicast mirrors ipaddr.js `addr.range() === 'unicast'` (allowed list).
+// Blocked (non-unicast): unspecified 0.0.0.0/32 + ::, loopback 127.0.0.0/8
+// + ::1, private 10.0.0.0/8 + 172.16.0.0/12 + 192.168.0.0/16 + fc00::/7,
+// link-local 169.254.0.0/16 + fe80::/10, multicast 224.0.0.0/4 + ff00::/8,
+// broadcast 255.255.255.255/32, reserved 240.0.0.0/4. ipaddr.js does NOT
+// classify 100.64.0.0/10 (CGNAT) or the rest of 0.0.0.0/8 (e.g. 0.0.0.1) as
+// non-unicast, so those two ranges stay allowed.
+var v4BlockedPrefixes = []netip.Prefix{
+	netip.PrefixFrom(netip.AddrFrom4([4]byte{0, 0, 0, 0}), 32),         // 0.0.0.0
+	netip.PrefixFrom(netip.AddrFrom4([4]byte{127, 0, 0, 0}), 8),        // loopback
+	netip.PrefixFrom(netip.AddrFrom4([4]byte{10, 0, 0, 0}), 8),         // private
+	netip.PrefixFrom(netip.AddrFrom4([4]byte{172, 16, 0, 0}), 12),      // private
+	netip.PrefixFrom(netip.AddrFrom4([4]byte{192, 168, 0, 0}), 16),     // private
+	netip.PrefixFrom(netip.AddrFrom4([4]byte{169, 254, 0, 0}), 16),     // link-local
+	netip.PrefixFrom(netip.AddrFrom4([4]byte{224, 0, 0, 0}), 4),        // multicast
+	netip.PrefixFrom(netip.AddrFrom4([4]byte{240, 0, 0, 0}), 4),        // reserved
+	netip.PrefixFrom(netip.AddrFrom4([4]byte{255, 255, 255, 255}), 32), // broadcast
+}
+
+var v6BlockedPrefixes = []netip.Prefix{
+	netip.PrefixFrom(netip.MustParseAddr("::"), 128),
+	netip.PrefixFrom(netip.MustParseAddr("::1"), 128),
+	netip.PrefixFrom(netip.MustParseAddr("fc00::"), 7),
+	netip.PrefixFrom(netip.MustParseAddr("fe80::"), 10),
+	netip.PrefixFrom(netip.MustParseAddr("ff00::"), 8),
+}
+
 func isUnicast(ip netip.Addr) bool {
 	ip = ip.Unmap()
-	if ip.IsUnspecified() || ip.IsLoopback() || ip.IsMulticast() || ip.IsPrivate() {
-		return false
-	}
 	if ip.Is4() {
-		a := ip.As4()
-		if a[0] == 169 && a[1] == 254 { // 169.254.0.0/16 link-local
-			return false
+		for _, p := range v4BlockedPrefixes {
+			if p.Contains(ip) {
+				return false
+			}
 		}
-	} else if ip.Is6() {
-		b := ip.As16()
-		if b[0] == 0xfe && b[1]&0xc0 == 0x80 { // fe80::/10 link-local
+		return true
+	}
+	for _, p := range v6BlockedPrefixes {
+		if p.Contains(ip) {
 			return false
 		}
 	}

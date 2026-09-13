@@ -91,15 +91,21 @@ func TestLinkedURL_Sanitize(t *testing.T) {
 		name     string
 		in       string
 		wantErr  bool
+		wantMsg  string
 		wantHost string
 		wantPath string
 	}{
 		{name: "ok http", in: "http://example.com/a", wantHost: "example.com", wantPath: "/a"},
-		{name: "normalize duplicate slashes", in: "http://example.com/a//b/..//c", wantHost: "example.com", wantPath: "/a/c"},
+		{name: "path preserved as-is (node does not rewrite)", in: "http://example.com/a//b/..//c", wantHost: "example.com", wantPath: "/a//b/..//c"},
 		{name: "empty path -> /", in: "http://example.com", wantHost: "example.com", wantPath: "/"},
-		{name: "bad scheme", in: "ftp://example.com/a", wantErr: true},
-		{name: "no host", in: "http:///a", wantErr: true},
-		{name: "unparseable", in: "http://exa mple.com/a b", wantErr: true},
+		{name: "bad scheme -> 500", in: "ftp://example.com/a", wantErr: true, wantMsg: "Invalid url to pass to open(): ftp://example.com/a"},
+		{name: "data scheme -> 500", in: "data:text/html,x", wantErr: true, wantMsg: "Invalid url to pass to open(): data:text/html,x"},
+		{name: "javascript scheme -> 500", in: "javascript:alert(1)", wantErr: true, wantMsg: "Invalid url to pass to open(): javascript:alert(1)"},
+		{name: "relative -> 500 (WHATWG new URL throws)", in: "example.com", wantErr: true, wantMsg: "Invalid url to pass to open(): example.com"},
+		{name: "garbage -> 500", in: "not a url", wantErr: true, wantMsg: "Invalid url to pass to open(): not a url"},
+		{name: "no host -> 500", in: "http:///a", wantErr: true, wantMsg: "Invalid url to pass to open(): http:///a"},
+		{name: "host with space -> 500 (WHATWG rejects)", in: "http://exa mple.com/a", wantErr: true, wantMsg: "Invalid url to pass to open(): http://exa mple.com/a"},
+		{name: "path > 2000 chars -> 400", in: "http://example.com/" + strings.Repeat("a", 2006), wantErr: true, wantMsg: "Invalid or unsafe URL path: /" + strings.Repeat("a", 2006)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -107,6 +113,9 @@ func TestLinkedURL_Sanitize(t *testing.T) {
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error for %q", tc.in)
+				}
+				if tc.wantMsg != "" && pbhttp.MessageOf(err) != tc.wantMsg {
+					t.Fatalf("message = %q, want %q", pbhttp.MessageOf(err), tc.wantMsg)
 				}
 				return
 			}
@@ -149,9 +158,17 @@ func TestLinkedURL_IsBlockedIP(t *testing.T) {
 		{name: "link-local blocked", ip: "169.254.1.1", wantBlock: true},
 		{name: "multicast blocked", ip: "224.0.0.1", wantBlock: true},
 		{name: "private (10/8) is non-unicast -> blocked", ip: "10.0.0.5", wantBlock: true},
+		{name: "private (172.16/12) blocked", ip: "172.20.1.1", wantBlock: true},
 		{name: "private (192.168/16) is non-unicast -> blocked", ip: "192.168.7.9", wantBlock: true},
+		{name: "unspecified blocked", ip: "0.0.0.0", wantBlock: true},
+		{name: "broadcast blocked", ip: "255.255.255.255", wantBlock: true},
+		{name: "reserved (240/4) blocked", ip: "240.0.0.1", wantBlock: true},
 		{name: "public unicast not blocked", ip: "8.8.8.8", wantBlock: false},
+		{name: "CGNAT (100.64/10) allowed (ipaddr: unicast)", ip: "100.64.3.4", wantBlock: false},
+		{name: "0.0.0.1 allowed (ipaddr: unicast)", ip: "0.0.0.1", wantBlock: false},
 		{name: "global IPv6 unicast not blocked", ip: "2001:4860:4860::8888", wantBlock: false},
+		{name: "ULA (fc00::/7) blocked", ip: "fd12:3456:789a::1", wantBlock: true},
+		{name: "v6 loopback blocked", ip: "::1", wantBlock: true},
 		{name: "blocked CIDR match", ip: "10.1.2.3", blocked: []string{"10.0.0.0/8"}, wantBlock: true},
 		{name: "blocked CIDR no-match", ip: "11.1.2.3", blocked: []string{"10.0.0.0/8"}, wantBlock: false},
 		{name: "ipv4-mapped blocked", ip: "::ffff:127.0.0.1", wantBlock: true},
@@ -320,6 +337,11 @@ func TestLinkedURL_FetchUpstreamErrorPassthrough(t *testing.T) {
 	cfg := lupAllowLoopback(lupTestConfig())
 	_, err := cfg.ValidateAndFetch(context.Background(), srv.URL+"/missing", 0)
 	mustStatus(t, err, 404)
+	// Node contract: RequestFailedError (OError message 'request failed') →
+	// body is exactly `Error: request failed`.
+	if got := pbhttp.MessageOf(err); got != "request failed" {
+		t.Fatalf("message = %q, want %q", got, "request failed")
+	}
 }
 
 func TestLinkedURL_FetchTimeout(t *testing.T) {
@@ -347,6 +369,68 @@ func TestLinkedURL_HandlerMissingURL(t *testing.T) {
 	}
 	b, _ := io.ReadAll(resp.Body)
 	if string(b) != "Missing ?url parameter" {
+		t.Fatalf("body = %q", b)
+	}
+}
+
+func TestLinkedURL_HandlerRoutingParity(t *testing.T) {
+	cfg := lupAllowLoopback(lupTestConfig())
+	srv := httptest.NewServer(cfg.Handler())
+	defer srv.Close()
+
+	// Express: undefined path -> 404 `Cannot <METHOD> <path>` (text/html).
+	if resp, err := http.Get(srv.URL + "/nope"); err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("GET /nope status = %d, want 404", resp.StatusCode)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		want404 := "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /nope</pre>\n</body>\n</html>\n"
+		if string(b) != want404 {
+			t.Fatalf("body = %q, want %q", b, want404)
+		}
+	} else {
+		t.Fatalf("get /nope: %v", err)
+	}
+
+	// Express: no route for unknown method on / -> 404 `Cannot POST /`.
+	if resp, err := http.Post(srv.URL+"/", "text/plain", nil); err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("POST / status = %d, want 404", resp.StatusCode)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		want404b := "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /</pre>\n</body>\n</html>\n"
+		if string(b) != want404b {
+			t.Fatalf("body = %q, want %q", b, want404b)
+		}
+	} else {
+		t.Fatalf("post /: %v", err)
+	}
+
+	// HEAD mirrors GET (no body): HEAD / -> 400 like GET /.
+	if req, err := http.NewRequest(http.MethodHead, srv.URL+"/", nil); err == nil {
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("head: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 400 {
+			t.Fatalf("HEAD / status = %d, want 400", resp.StatusCode)
+		}
+	}
+
+	// Invalid URL through the handler -> 500 with the exact node message.
+	resp, err := http.Get(srv.URL + "/?url=ftp%3A%2F%2Fexample.com%2Fx")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 500 {
+		t.Fatalf("bad-url status = %d, want 500", resp.StatusCode)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	if string(b) != "Error: Invalid url to pass to open(): ftp://example.com/x" {
 		t.Fatalf("body = %q", b)
 	}
 }

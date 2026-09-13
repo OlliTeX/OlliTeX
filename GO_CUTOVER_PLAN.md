@@ -140,6 +140,7 @@ Flip per service (each: flip → `sv status` → package `go test` → the servi
 Phase-B spec(s) green → 30 min log soak for `panic|warn` → next):
 
 1. **linked-url-proxy** — stateless outbound proxy, smallest surface
+   ✔ **CUTOVER COMPLETE (2026-09-16)** — see record below.
 2. **docstore** — already live-verified 30/30, most test-covered
 3. **filestore** — heavy state, heavy e2e coverage (templates/files/history)
 4. **notifications** — B4 journey is the gate
@@ -148,6 +149,31 @@ Phase-B spec(s) green → 30 min log soak for `panic|warn` → next):
 7. **webdavinterface** — B3 journey is the gate
 8. **dropboxinterface** — B5 mock journey is the gate
 9. **githubinterface** — unit + manual checklist (B8), last
+
+### Cutover records
+
+**#1 linked-url-proxy — COMPLETE 2026-09-16.**
+* Gate: `tests/e2e/specs/parity/service-linked-url.test.e2e.ts` — a 21-case
+deterministic contract battery (`tests/e2e/parity/lup/battery.js`) pinned 1:1 from
+Node sources (`LinkedUrlProxyController.mjs`, `strict-url-sanitise@0.0.1`,
+`als-normalize-urlpath@2.3.0`, `libraries/fetch-utils`): health, exact Express
+404 pages (`Cannot <METHOD> <url>`), missing-param 400, invalid-URL 500s with
+exact `Invalid url to pass to open(): <raw>` messages (ftp/data/javascript/relative/
+garbage), blocked-IP 403s (loopback/private/link-local), DNS-fail 421, upstream
+200 byte round-trip, upstream 404 → `Error: request failed`, 302 follow + >5-hop
+421, 413 too-large, 422 refused, 30s-timeout 408, >2000-char path 400.
+* Result: **Node (e2e) 21/21 == Go (e2e) 21/21 == Go (live overleafserver) 21/21**;
+`go test ./go/services/linked-url-proxy/` green (exact-message + Express-page +
+ipaddr.js-unicast-set assertions). Pre-fix Go battery red: 405→404, `N protocol is
+not allowed` 400→`Invalid url...` 500, `404 Not Found`→`request failed`, missing
+2000-char gate, `ipaddr` CGNAT/broadcast nuances fixed.
+* Live state: `overleafserver` running the repo `bin/go-services/linked-url-proxy`
+(flag `/etc/overleaf/env.d/ollitex-gocutover.sh`); `bin/` is what the image bakes
+(`server-ce/Dockerfile` COPY bin/), so the next image rebuild ships this binary.
+Rollback: remove flag file + `sv restart linked-url-proxy-overleaf`.
+* Test artifacts (loopback upstream :9991 + `OVERLEAF_LINKED_URL_ALLOWED_RESOURCES`
+escape hatch) are provisioned per-run by the spec and torn down on the live box
+after the live leg.
 
 **Stack-wide gates:** full e2e suite green with *all* flags on (test stack);
 then prod: `make release` → owner push + `cycle_overleafserver.sh` →

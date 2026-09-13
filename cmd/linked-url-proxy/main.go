@@ -43,7 +43,8 @@ func main() {
 		case "/":
 			cfg.Handler()(w, r)
 		default:
-			http.NotFound(w, r)
+			// Express default 404 page (1:1 with the Node service).
+			linkedurlproxy.ExpressNotFound(w, r)
 		}
 	})
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))

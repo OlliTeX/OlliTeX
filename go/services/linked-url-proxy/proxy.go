@@ -25,11 +25,13 @@ type linkedURLResult struct {
 }
 
 // Handler returns the HTTP handler implementing the Node.js `proxy` route
-// (`app.get('/', proxy)`), 1:1.
+// (`app.get('/', proxy)`), 1:1. Methods/paths not defined by Express fall to
+// the default 404 (`Cannot <METHOD> <url>`), so this handler reproduces that
+// instead of answering 405.
 func (c *LinkedURLProxyConfig) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			pbhttp.WritePlainText(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		if r.URL.Path != "/" || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
+			ExpressNotFound(w, r)
 			return
 		}
 		target := r.URL.Query().Get("url")
@@ -104,16 +106,22 @@ func (c *LinkedURLProxyConfig) ValidateAndFetch(ctx context.Context, rawURL stri
 		if loc == "" {
 			return nil, pbhttp.HTTPStatus(http.StatusMisdirectedRequest, "Redirect response missing Location header")
 		}
-		next := url.URL{}
+		// Follow the redirect through the same validation (SSRF-safe: the
+		// Location is re-validated against the blocked-IP rules), resolving
+		// relative Locations against the current URL (1:1 with
+		// `new URL(location, normalizedUrl)`).
 		if ref, uerr := url.Parse(loc); uerr == nil {
-			next = *u.ResolveReference(ref)
-		} else {
-			next = *u
+			next := *u.ResolveReference(ref)
+			return c.ValidateAndFetch(ctx, next.String(), redirectCount+1)
 		}
-		return c.ValidateAndFetch(ctx, next.String(), redirectCount+1)
+		// Unparseable Location: Node's `new URL(location, base)` throws → 500.
+		return nil, pbhttp.HTTPStatus(http.StatusInternalServerError, "invalid redirect location: "+loc)
 	default:
 		_ = resp.Body.Close()
-		return nil, &pbhttp.HTTPStatusError{Status: resp.StatusCode, Msg: resp.Status}
+		// Node: RequestFailedError (OError message 'request failed', info.status
+		// = upstream code) is rethrown to the proxy catch → body is exactly
+		// `Error: request failed` with the upstream status.
+		return nil, &pbhttp.HTTPStatusError{Status: resp.StatusCode, Msg: "request failed"}
 	}
 }
 
@@ -149,10 +157,15 @@ func (c *LinkedURLProxyConfig) newPinnedClient(u *url.URL, validated netip.Addr)
 // mapFetchError maps a transport-level error to the Node.js semantics:
 // timeout -> 408, otherwise 422 (Node: `err.type === "request-timeout" ? 408 : 422`).
 func (c *LinkedURLProxyConfig) mapFetchError(ctx context.Context, err error) (*linkedURLResult, error) {
-	if ctx.Err() == context.DeadlineExceeded || isTimeoutError(err) {
-		return nil, pbhttp.HTTPStatusErr(http.StatusRequestTimeout, "upstream request timed out", err)
+	cause := err
+	if ue, ok := err.(*url.Error); ok {
+		cause = ue
 	}
-	return nil, pbhttp.HTTPStatusErr(http.StatusUnprocessableEntity, "upstream request failed", err)
+	code := http.StatusUnprocessableEntity
+	if ctx.Err() == context.DeadlineExceeded || isTimeoutError(cause) {
+		code = http.StatusRequestTimeout
+	}
+	return nil, pbhttp.HTTPStatusErr(code, "upstream request failed: "+err.Error(), err)
 }
 
 // isTimeoutError reports whether err represents a network/HTTP timeout.
@@ -169,50 +182,53 @@ func isTimeoutError(err error) bool {
 	return false
 }
 
-// sanitizeLinkedURL is the 1:1 port of the Node URL sanitising + protocol +
-// path-normalisation checks (strict-url-sanitise + als-normalize-urlpath).
+// sanitizeLinkedURL is the 1:1 port of `strict-url-sanitise` + the node
+// controller's protocol/path gates. Node's library THROWS `Invalid url to
+// pass to open(): <raw>` for anything it refuses (bad parse, non-http(s)
+// scheme, empty host), which the proxy surfaces as **500** — reproduced
+// exactly here (status + message). Path handling: the node side only uses
+// `als-normalize-urlpath` as a VALIDITY gate (its null case: path > 2000
+// chars or protocol-prefixed) while fetching the original sanitized path,
+// so the fetched path is left untouched and only the 2000-char gate is
+// reproduced (400, per the controller).
 func sanitizeLinkedURL(rawURL string) (*url.URL, error) {
+	invalid := pbhttp.HTTPStatus(http.StatusInternalServerError, "Invalid url to pass to open(): "+rawURL)
 	u, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, pbhttp.HTTPStatus(http.StatusBadRequest, "Invalid or unsafe URL: "+rawURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		return nil, invalid
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, pbhttp.HTTPStatus(http.StatusBadRequest, u.Scheme+" protocol is not allowed")
+	// WHATWG special-scheme hosts reject control chars and " #/:<>?@[]\^|" —
+	// Go's net/url is far more lenient, so enforce the character set here to
+	// keep the 500 contract identical (`new URL()` would throw in Node).
+	host := u.Hostname()
+	if _, iperr := netip.ParseAddr(host); iperr != nil {
+		for _, r := range host {
+			if r < 0x21 || r == 0x7f || strings.ContainsRune(" #:<>?@[]\\^|", r) {
+				return nil, invalid
+			}
+		}
 	}
-	if u.Hostname() == "" {
-		return nil, pbhttp.HTTPStatus(http.StatusBadRequest, "Invalid or unsafe URL: "+rawURL)
-	}
-	p := u.Path
+	p := u.EscapedPath()
 	if p == "" {
-		p = "/"
-	}
-	cleaned := strings.Trim(strings.Trim(p, "/"), "")
-	if cleaned == "" {
 		u.Path = "/"
-	} else {
-		u.Path = "/" + pathClean(cleaned)
+	} else if len(p) > 2000 {
+		return nil, pbhttp.HTTPStatus(http.StatusBadRequest, "Invalid or unsafe URL path: "+p)
 	}
 	return u, nil
 }
 
-// pathClean collapses redundant slashes/dots in a path (a lightweight stand-in
-// for als-normalize-urlpath). It is pure and deterministic.
-func pathClean(p string) string {
-	parts := strings.Split(p, "/")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		switch part {
-		case "", ".":
-			// skip duplicate slashes and single dots
-		case "..":
-			if len(out) > 0 {
-				out = out[:len(out)-1]
-			}
-		default:
-			out = append(out, part)
-		}
-	}
-	return strings.Join(out, "/")
+// writeExpressNotFound mirrors Express's exact default 404 page
+// (finalhandler: text/html, `<!DOCTYPE html>...<pre>Cannot <METHOD> <url></pre>...`)
+// for undefined routes/methods — byte-identical to the Node service.
+func ExpressNotFound(w http.ResponseWriter, r *http.Request) {
+	msg := "Cannot " + r.Method + " " + r.URL.RequestURI()
+	msg = strings.NewReplacer(
+		"&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;",
+	).Replace(msg)
+	body := "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>" + msg + "</pre>\n</body>\n</html>\n"
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write([]byte(body))
 }
 
 // headerValue returns the first value for the header key (case-insensitive) or
