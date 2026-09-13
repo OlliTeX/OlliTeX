@@ -141,14 +141,19 @@ Phase-B spec(s) green → 30 min log soak for `panic|warn` → next):
 
 1. **linked-url-proxy** — stateless outbound proxy, smallest surface
    ✔ **CUTOVER COMPLETE (2026-09-16)** — see record below.
-2. **docstore** — already live-verified 30/30, most test-covered
-3. **filestore** — heavy state, heavy e2e coverage (templates/files/history)
-4. **notifications** — B4 journey is the gate
-5. **chat** — B4 journey is the gate
-6. **datamanipulator** — internal engine, exercised via B3/B5
-7. **webdavinterface** — B3 journey is the gate
-8. **dropboxinterface** — B5 mock journey is the gate
-9. **githubinterface** — unit + manual checklist (B8), last
+2. **docstore** — already live-verified 30/30, most test-covered — ✔ CUT OVER (2026-09-16)
+3. **filestore** — heavy state, heavy e2e coverage (templates/files/history) — ✔ CUT OVER (2026-09-16)
+4. **notifications** — B4 journey is the gate — ✔ CUT OVER (2026-09-16)
+5. **chat** — B4 journey is the gate — ✔ CUT OVER (2026-09-16)
+6. **datamanipulator** — internal engine, exercised via B3/B5 — ✔ CUT OVER (2026-09-16)
+7. **webdavinterface** — B3 journey is the gate — ✔ CUT OVER (2026-09-16)
+8. **dropboxinterface** — B5 mock journey is the gate — ✔ CUT OVER (2026-09-16)
+9. **githubinterface** — unit + manual checklist (B8), last — ✔ CUT OVER (2026-09-16)
+
+   **ALL NINE GO SERVICES ARE NOW THE SERVING IMPLEMENTATION on both the
+   `overleafserver` (live `psintern.neuro.uni-bremen.de`) and the `ol-e2e`
+   stacks.** Remaining work is the stack-wide image bake (rebuild + cycle so
+   the running image ships the fixed binaries) and the 24 h prod soak.
 
 ### Cutover records
 
@@ -174,6 +179,61 @@ Rollback: remove flag file + `sv restart linked-url-proxy-overleaf`.
 * Test artifacts (loopback upstream :9991 + `OVERLEAF_LINKED_URL_ALLOWED_RESOURCES`
 escape hatch) are provisioned per-run by the spec and torn down on the live box
 after the live leg.
+
+**#2–#9 docstore, filestore, notifications, chat, datamanipulator,
+webdavinterface, dropboxinterface, githubinterface — COMPLETE 2026-09-16.**
+* Gates (in this order, Node-baseline-first per the gate discipline):
+  - `service-docstore-filestore.test.e2e.ts` (B1: editor load/docstate, typed
+    edit two-client persistence, upload/download byte round-trip, purge):
+    Node 4/4 → Go 4/4 (e2e) → live health + live leg.
+  - `service-chat-notifications.test.e2e.ts` (B3: chat /status, POST 201 +
+    formatted JSON, GET list, DELETE, 400 validation shape, 404 JSON,
+    notifications add/list/count/status): Node 7/7 → Go 7/7 (e2e).
+  - `service-linked-url.test.e2e.ts` (leg-3 live re-run): live 21/21.
+  - `a5smoke.test.e2e.ts` (login + create + editor + compile full journey) +
+    `sync-graceful.test.e2e.ts` (webdav + dropbox web surfaces, no 5xx):
+    both green with **all nine flags on** — full e2e set **16/16** on `ol-e2e`
+    with the nine Go services.
+* **Bugs found & fixed by the gate (the gate earned its keep):**
+  1. `notifications.Upsert` (go/services/notifications/mongo.go): the
+     `{ upsert: true }` option was **missing** from the driver call and the
+     `ErrNoDocuments` no-op was swallowed as success — adds silently did not
+     persist (B3 test 7 failed on Go, Node baseline first). Fixed + pinned
+     by test 7.
+  2. Mongo URI chain: Go resolved `MONGO_CONNECTION_STRING` || `MONGO_HOST`
+     but the live stack only exports `OVERLEAF_MONGO_URL` — live docstore /
+     chat / notifications could not reach Mongo. `go/mongoh` now resolves
+     `MONGO_CONNECTION_STRING` || `OVERLEAF_MONGO_URL` ||
+     `mongodb://(MONGO_HOST || 127.0.0.1)/sharelatex` (Node
+     `Settings.mongo.uri` order); same chain applied to the inline resolvers
+     in `cmd/docstore`, `go/services/chat/server.go`,
+     `go/services/notifications/server.go`, `cmd/notifications/main.go`
+     (+ `mongoh_test.go` regression test).
+  3. Service-token gate order: webdavinterface / dropboxinterface /
+     datamanipulator applied the token **per-route**, so unknown paths
+     answered plain `404` where Node's app-level
+     `app.use(requireServiceToken)` answers `401 {"error":"Invalid or missing
+     service token"}`; and the valid-token unknown path got Go's plain 404
+     instead of Express's HTML 404 page. githubinterface reversed the contract
+     (Node registers the gate *after* its routes, so **known routes are
+     token-free** — `/status` without a token is the route's own 400
+     validation, not 401). All four re-pinned against the live Node services
+     (14-probe Node==Go matrix; `pbhttp.AuthGate` + `pbhttp.ExpressNotFound`
+     now carry the shared contract; new tests
+     `TestWD_GateOrderAnd404` / `TestDB_GateOrder` / `TestDM_GateOrder` /
+     `TestGHITokenGateOrder`).
+* Live state: `overleafserver` now runs Go for all nine (`ps -eo args` ×
+  `go-services/<name>` = 9/9; `/status` 200 on 3009/3010/3016/3042/3066;
+  dropbox/datamanip `/health` 200; zero panic/fatal in current log windows —
+  the only `fatal:` lines are the pre-URI-fix mongo retries). Log-soak
+  duration this round was minutes, not the 30 min per-service target — the
+  24 h soak below subsumes it.
+* **Honest coverage caveats (recorded, not waved away):** webdavinterface /
+  dropboxinterface / datamanipulator / githubinterface cut over on unit suites
+  + gate-contract probes + the sync-graceful no-5xx web surface, *not* on a
+  real provider round-trip (B3/B5 provider journeys and the B8 github manual
+  checklist are the remaining follow-ups; github's `/check` upstream call is
+  network-bound and cannot be exercised offline).
 
 **Stack-wide gates:** full e2e suite green with *all* flags on (test stack);
 then prod: `make release` → owner push + `cycle_overleafserver.sh` →

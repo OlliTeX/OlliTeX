@@ -508,24 +508,54 @@ func ghipost(t *testing.T, url string, body string, header map[string]string) (i
 	return resp.StatusCode, string(b)
 }
 
-func TestGHIAuthEnforced(t *testing.T) {
+func ghisimple(t *testing.T, method, url string, header map[string]string) (int, string, string) {
+	t.Helper()
+	req, _ := http.NewRequest(method, url, nil)
+	for k, v := range header {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(b), resp.Header.Get("Content-Type")
+}
+
+// TestGHITokenGateOrder pins the verified Node contract (server.mjs): the
+// service-token gate's app.use is registered AFTER all routes, so known routes
+// (/check, /health, ...) are served WITHOUT the token, and only UNKNOWN paths
+// hit the gate (401 missing/invalid token; valid token -> Express 404 page).
+func TestGHITokenGateOrder(t *testing.T) {
 	mux := NewGHIHandlerMux(GHIConfig{WorkRoot: t.TempDir(), ServiceToken: "sekret"})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
+	// Known route without token: must NOT be the gate's 401 (route runs).
 	code, body := ghipost(t, srv.URL+"/check", `{"server_url":"https://gh.com","token":"t"}`, nil)
-	if code != 401 || !strings.Contains(body, "service token") {
-		t.Fatalf("missing token expected auth 401, got %d (%s)", code, body)
+	if code == 401 && strings.Contains(body, "service token") {
+		t.Fatalf("gate must not intercept known routes, got %d (%s)", code, body)
 	}
-	code, body = ghipost(t, srv.URL+"/check", `{"server_url":"https://gh.com","token":"t"}`, map[string]string{"X-Service-Token": "wrong"})
-	if code != 401 || !strings.Contains(body, "service token") {
-		t.Fatalf("wrong token expected auth 401, got %d (%s)", code, body)
+	// /health is open in Node.
+	code, body, _ = ghisimple(t, http.MethodGet, srv.URL+"/health", nil)
+	if code != 200 || !strings.Contains(body, "githubinterface") {
+		t.Fatalf("/health expected 200 ok, got %d (%s)", code, body)
 	}
-	// correct service token must pass AUTH (the /check itself may still 401 because the
-	// upstream server is unreachable, but it must not be an auth rejection).
-	code, body = ghipost(t, srv.URL+"/check", `{"server_url":"https://gh.com","token":"t"}`, map[string]string{"X-Service-Token": "sekret"})
-	if strings.Contains(body, "service token") {
-		t.Fatalf("correct service token should pass auth, got auth rejection (%d %s)", code, body)
+	// Unknown path, no token -> 401 missing service token.
+	code, body, _ = ghisimple(t, http.MethodGet, srv.URL+"/zq", nil)
+	if code != 401 || !strings.Contains(body, `"missing service token"`) {
+		t.Fatalf("unknown no-token expected 401 missing, got %d (%s)", code, body)
+	}
+	// Unknown path, wrong token -> 401 invalid service token.
+	code, body, _ = ghisimple(t, http.MethodGet, srv.URL+"/zq", map[string]string{"X-Service-Token": "wrong"})
+	if code != 401 || !strings.Contains(body, `"invalid service token"`) {
+		t.Fatalf("unknown bad-token expected 401 invalid, got %d (%s)", code, body)
+	}
+	// Unknown path, correct token -> Express 404 page.
+	code, body, ct := ghisimple(t, http.MethodGet, srv.URL+"/zq", map[string]string{"X-Service-Token": "sekret"})
+	if code != 404 || !strings.Contains(body, "Cannot GET /zq") || !strings.Contains(ct, "text/html") {
+		t.Fatalf("unknown ok-token expected Express 404 page, got %d %q %q", code, body, ct)
 	}
 }
 

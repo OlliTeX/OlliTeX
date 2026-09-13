@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"ollitex/go/pbhttp"
 	linkedurlproxy "ollitex/go/services/linked-url-proxy"
 )
 
@@ -44,7 +45,7 @@ func main() {
 			cfg.Handler()(w, r)
 		default:
 			// Express default 404 page (1:1 with the Node service).
-			linkedurlproxy.ExpressNotFound(w, r)
+			pbhttp.ExpressNotFound(w, r)
 		}
 	})
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))

@@ -3,6 +3,7 @@ package notifications
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -33,7 +34,7 @@ func (c *Config) WithDefaults() {
 		c.Port = 3042 // Node has no env override for the notifications port.
 	}
 	if c.MongoURI == "" {
-		c.MongoURI = envOr("MONGO_CONNECTION_STRING", "")
+		c.MongoURI = envOrChain([]string{"MONGO_CONNECTION_STRING", "OVERLEAF_MONGO_URL"}, "")
 		if c.MongoURI == "" {
 			c.MongoURI = "mongodb://" + envOr("MONGO_HOST", "127.0.0.1") + "/sharelatex"
 		}
@@ -44,6 +45,15 @@ func (c *Config) WithDefaults() {
 	if c.Collection == "" {
 		c.Collection = "notifications"
 	}
+}
+
+func envOrChain(keys []string, def string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return def
 }
 
 func envOr(k, def string) string {

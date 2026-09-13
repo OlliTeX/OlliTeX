@@ -24,7 +24,7 @@ import (
 //
 //	host  = LISTEN_ADDRESS || '127.0.0.1'
 //	port  = 3010 (fixed — no env override)
-//	mongo = MONGO_CONNECTION_STRING || mongodb://MONGO_HOST||127.0.0.1/sharelatex
+//	mongo = MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://MONGO_HOST||127.0.0.1/sharelatex
 type Config struct {
 	Host     string
 	Port     int
@@ -41,7 +41,7 @@ func (c *Config) WithDefaults() {
 		c.Port = 3010
 	}
 	if c.MongoURI == "" {
-		c.MongoURI = envOr("MONGO_CONNECTION_STRING", "")
+		c.MongoURI = envOrChain([]string{"MONGO_CONNECTION_STRING", "OVERLEAF_MONGO_URL"}, "")
 		if c.MongoURI == "" {
 			c.MongoURI = "mongodb://" + envOr("MONGO_HOST", "127.0.0.1") + "/sharelatex"
 		}
@@ -49,6 +49,15 @@ func (c *Config) WithDefaults() {
 	if c.DB == "" {
 		c.DB = mongoh.DBFromURI(c.MongoURI, "sharelatex")
 	}
+}
+
+func envOrChain(keys []string, def string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return def
 }
 
 func envOr(k, def string) string {

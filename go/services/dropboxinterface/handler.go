@@ -28,18 +28,20 @@ func (h *DropboxHandlers) Mux() http.Handler {
 	warnFn := func() {
 		fmt.Println("warn: SHARED_SERVICE_TOKEN is unset; accepting unauthenticated requests (should be restricted to in-container callers)")
 	}
-	auth := pbhttp.RequireServiceToken(cfg.ServiceToken, warnFn)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		pbhttp.WriteJSON(w, 200, map[string]interface{}{"status": "ok", "service": "dropboxinterface"})
 	})
-	mux.HandleFunc("/check", auth(h.check))
-	mux.HandleFunc("/list", auth(h.list))
-	mux.HandleFunc("/mkdir", auth(h.mkdir))
-	mux.HandleFunc("/file", auth(h.file))
-	mux.HandleFunc("/move", auth(h.move))
+	mux.HandleFunc("/check", h.check)
+	mux.HandleFunc("/list", h.list)
+	mux.HandleFunc("/mkdir", h.mkdir)
+	mux.HandleFunc("/file", h.file)
+	mux.HandleFunc("/move", h.move)
+	// Node: app-level token gate with a /health exemption; unknown paths with
+	// a valid token get Express's 404 page (contract verified vs Node).
+	mux.HandleFunc("/", pbhttp.ExpressNotFound)
 	// 1:1 with Node express.json({ limit: '50mb' }).
-	return pbhttp.LimitBody(mux, 50<<20)
+	return pbhttp.LimitBody(pbhttp.AuthGate(mux, cfg.ServiceToken, warnFn, "/health"), 50<<20)
 }
 
 func (h *DropboxHandlers) client(accessToken string) (*DropboxClient, error) {

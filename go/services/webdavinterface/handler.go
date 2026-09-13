@@ -25,16 +25,20 @@ func (h *WebDAVHandlers) Mux() http.Handler {
 	warnFn := func() {
 		fmt.Println("warn: SHARED_SERVICE_TOKEN is unset; accepting unauthenticated requests (should be restricted to in-container callers)")
 	}
-	auth := pbhttp.RequireServiceToken(cfg.ServiceToken, warnFn)
-
 	mux := http.NewServeMux()
-	mux.HandleFunc("/check", auth(h.check))
-	mux.HandleFunc("/list", auth(h.list))
-	mux.HandleFunc("/mkdir", auth(h.mkdir))
-	mux.HandleFunc("/file", auth(h.file))
-	mux.HandleFunc("/move", auth(h.move))
+	mux.HandleFunc("/check", h.check)
+	mux.HandleFunc("/list", h.list)
+	mux.HandleFunc("/mkdir", h.mkdir)
+	mux.HandleFunc("/file", h.file)
+	mux.HandleFunc("/move", h.move)
+	// Node: app.use(requireServiceToken) is registered BEFORE all routes with
+	// NO exemption — any request without a valid token (even for unknown
+	// paths) gets 401 `{"error":"Invalid or missing service token"}`, and an
+	// unknown path WITH a valid token gets Express's 404 page. Verified
+	// against the Node service (both probes).
+	mux.HandleFunc("/", pbhttp.ExpressNotFound)
 	// 1:1 with Node express.json({ limit: '50mb' }).
-	return pbhttp.LimitBody(mux, 50<<20)
+	return pbhttp.LimitBody(pbhttp.AuthGate(mux, cfg.ServiceToken, warnFn), 50<<20)
 }
 
 func bodyJSON(r *http.Request, v interface{}) {

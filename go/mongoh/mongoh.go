@@ -81,11 +81,18 @@ func (o *Options) WithDefaults() {
 	}
 }
 
-// DefaultURI mirrors the Node `settings.mongo.url` 1:1:
+// DefaultURI mirrors the Node `settings.mongo.url` resolution:
 //
-//	MONGO_CONNECTION_STRING || `mongodb://${MONGO_HOST || '127.0.0.1'}/sharelatex`
+//	MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || `mongodb://${MONGO_HOST || '127.0.0.1'}/sharelatex`
+//
+// (Node reads settings.js `mongo.url` = OVERLEAF_MONGO_URL || mongodb://dockerhost/sharelatex;
+// MONGO_CONNECTION_STRING is kept first for deployments that set it explicitly —
+// the e2e stack sets both to the same value.)
 func DefaultURI() string {
 	if u := os.Getenv("MONGO_CONNECTION_STRING"); u != "" {
+		return u
+	}
+	if u := os.Getenv("OVERLEAF_MONGO_URL"); u != "" {
 		return u
 	}
 	host := os.Getenv("MONGO_HOST")

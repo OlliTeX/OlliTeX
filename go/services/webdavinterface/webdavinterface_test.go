@@ -719,3 +719,29 @@ func TestWD_HandlerFileDelete(t *testing.T) {
 		t.Fatalf("fileDelete missing got %d %s (want 200 notFound)", code, body)
 	}
 }
+
+// TestWD_GateOrderAnd404 pins the verified Node contract: the service-token
+// gate runs app-wide BEFORE routing (no /health exemption — Node's webdav
+// gate has none), so unknown paths answer 401 without a token, and Express's
+// 404 page with a valid token.
+func TestWD_GateOrderAnd404(t *testing.T) {
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{ServiceToken: "sekret", Sleep: func(time.Duration) {}}}
+	srv := httptest.NewServer(h.Mux())
+	defer srv.Close()
+
+	// Unknown path, no token -> 401 Invalid or missing service token.
+	code, body := wdDo(t, "GET", srv.URL+"/zq", nil, nil)
+	if code != 401 || !strings.Contains(body, "Invalid or missing service token") {
+		t.Fatalf("unknown no-token: got %d (%s)", code, body)
+	}
+	// Unknown path, valid token -> Express 404 HTML page.
+	code, body = wdDo(t, "GET", srv.URL+"/zq", nil, map[string]string{"X-Service-Token": "sekret"})
+	if code != 404 || !strings.Contains(body, "Cannot GET /zq") || !strings.Contains(body, "<!DOCTYPE html>") {
+		t.Fatalf("unknown ok-token expected Express 404 page, got %d (%s)", code, body)
+	}
+	// Node webdav gate has NO /health exemption.
+	code, body = wdDo(t, "GET", srv.URL+"/health", nil, nil)
+	if code != 401 || !strings.Contains(body, "Invalid or missing service token") {
+		t.Fatalf("webdav /health must be gated (Node has no exemption), got %d (%s)", code, body)
+	}
+}

@@ -583,3 +583,31 @@ func TestDM_HandlerSyncFull(t *testing.T) {
 		t.Fatalf("syncFull = %d %s (want 200 + summary)", r.StatusCode, out)
 	}
 }
+
+// TestDM_GateOrder pins the verified Node contract: app-wide token gate with
+// a /health exemption (Node datamanipulator gate exempts /health); unknown
+// paths with a valid token get Express's 404 page.
+func TestDM_GateOrder(t *testing.T) {
+	h := NewDMHandlers(DMConfig{ProjectsRoot: t.TempDir(), ServiceToken: "sekret"})
+	srv := httptest.NewServer(h.Mux())
+	defer srv.Close()
+
+	db, _ := http.Get(srv.URL + "/health")
+	if db.StatusCode != 200 {
+		t.Fatalf("/health open expected 200, got %d", db.StatusCode)
+	}
+	zq, _ := http.Get(srv.URL + "/zq")
+	zb, _ := io.ReadAll(zq.Body)
+	zq.Body.Close()
+	if zq.StatusCode != 401 || !strings.Contains(string(zb), "Invalid or missing service token") {
+		t.Fatalf("unknown no-token expected 401 gate, got %d (%s)", zq.StatusCode, zb)
+	}
+	req, _ := http.NewRequest("GET", srv.URL+"/zq", nil)
+	req.Header.Set("X-Service-Token", h.Cfg.ServiceToken)
+	z2, _ := http.DefaultClient.Do(req)
+	z2b, _ := io.ReadAll(z2.Body)
+	z2.Body.Close()
+	if z2.StatusCode != 404 || !strings.Contains(string(z2b), "Cannot GET /zq") {
+		t.Fatalf("unknown ok-token expected Express 404 page, got %d (%s)", z2.StatusCode, z2b)
+	}
+}

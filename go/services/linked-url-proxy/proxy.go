@@ -31,7 +31,7 @@ type linkedURLResult struct {
 func (c *LinkedURLProxyConfig) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
-			ExpressNotFound(w, r)
+			pbhttp.ExpressNotFound(w, r)
 			return
 		}
 		target := r.URL.Query().Get("url")
@@ -215,20 +215,6 @@ func sanitizeLinkedURL(rawURL string) (*url.URL, error) {
 		return nil, pbhttp.HTTPStatus(http.StatusBadRequest, "Invalid or unsafe URL path: "+p)
 	}
 	return u, nil
-}
-
-// writeExpressNotFound mirrors Express's exact default 404 page
-// (finalhandler: text/html, `<!DOCTYPE html>...<pre>Cannot <METHOD> <url></pre>...`)
-// for undefined routes/methods — byte-identical to the Node service.
-func ExpressNotFound(w http.ResponseWriter, r *http.Request) {
-	msg := "Cannot " + r.Method + " " + r.URL.RequestURI()
-	msg = strings.NewReplacer(
-		"&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;",
-	).Replace(msg)
-	body := "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>" + msg + "</pre>\n</body>\n</html>\n"
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusNotFound)
-	_, _ = w.Write([]byte(body))
 }
 
 // headerValue returns the first value for the header key (case-insensitive) or

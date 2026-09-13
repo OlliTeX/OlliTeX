@@ -71,33 +71,8 @@ func NewGHIHandlerMux(cfg GHIConfig) http.Handler {
 	cfg.withDefaults()
 	handlers := &GHIHandlers{Cfg: cfg, G: NewGHI(cfg)}
 	sem := make(chan struct{}, cfg.MaxOps)
-	auth := func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			if cfg.ServiceToken == "" {
-				next(w, r)
-				return
-			}
-			provided := r.Header.Get("X-Service-Token")
-			if provided == "" {
-				if a := r.Header.Get("Authorization"); len(a) > 7 && strings.ToLower(a[:7]) == "bearer " {
-					provided = strings.TrimSpace(a[7:])
-				}
-			}
-			if !ghiTimingEqual(cfg.ServiceToken, provided) {
-				msg := "missing service token"
-				if provided != "" {
-					msg = "invalid service token"
-				}
-				if cfg.ServiceToken != "" {
-					pbhttp.WriteJSONErr(w, 401, map[string]string{"error": msg})
-					return
-				}
-			}
-			next(w, r)
-		}
-	}
 	route := func(name string) http.HandlerFunc {
-		return auth(func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
@@ -105,8 +80,9 @@ func NewGHIHandlerMux(cfg GHIConfig) http.Handler {
 			default:
 				pbhttp.WriteJSONErr(w, 503, map[string]string{"error": "service busy; try again shortly"})
 			}
-		})
+		}
 	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		pbhttp.WriteJSON(w, 200, map[string]string{"status": "ok", "service": "githubinterface"})
@@ -124,6 +100,33 @@ func NewGHIHandlerMux(cfg GHIConfig) http.Handler {
 	mux.HandleFunc("/can-push", route("can-push"))
 	mux.HandleFunc("/branch-head", route("branch-head"))
 	mux.HandleFunc("/commits", route("commits"))
+	// Node: the token gate's app.use is registered AFTER all routes
+	// (server.mjs:980), so every known route — /health, /status, etc. —
+	// works WITHOUT a token, and only UNKNOWN paths hit the gate:
+	//   no token    -> 401 {"error":"missing service token"}
+	//   bad token   -> 401 {"error":"invalid service token"}
+	//   valid token -> Express's 404 page. (All three verified vs Node.)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if cfg.ServiceToken == "" {
+			pbhttp.ExpressNotFound(w, r)
+			return
+		}
+		provided := r.Header.Get("X-Service-Token")
+		if provided == "" {
+			if a := r.Header.Get("Authorization"); len(a) > 7 && strings.ToLower(a[:7]) == "bearer " {
+				provided = strings.TrimSpace(a[7:])
+			}
+		}
+		if !ghiTimingEqual(cfg.ServiceToken, provided) {
+			msg := "missing service token"
+			if provided != "" {
+				msg = "invalid service token"
+			}
+			pbhttp.WriteJSONErr(w, 401, map[string]string{"error": msg})
+			return
+		}
+		pbhttp.ExpressNotFound(w, r)
+	})
 	// 1:1 with Node express.json({ limit: '10mb' }).
 	return pbhttp.LimitBody(mux, 10<<20)
 }

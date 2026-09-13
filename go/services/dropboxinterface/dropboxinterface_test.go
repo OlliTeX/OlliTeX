@@ -539,3 +539,40 @@ func TestDBX_HandlerFilePost(t *testing.T) {
 		t.Fatalf("filePost missing got %d (want 400)", code)
 	}
 }
+
+// TestDB_GateOrder pins the verified Node contract: app-wide token gate with
+// a /health exemption (Node dropbox gate exempts /health); unknown paths with
+// a valid token get Express's 404 page.
+func TestDB_GateOrder(t *testing.T) {
+	h := &DropboxHandlers{Cfg: DropboxConfig{ServiceToken: "sekret"}}
+	srv := httptest.NewServer(h.Mux())
+	defer srv.Close()
+
+	getDb := func(url string, header map[string]string) (int, string) {
+	t.Helper()
+	req, _ := http.NewRequest("GET", url, nil)
+	for k, v := range header {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(b)
+}
+
+	code, body := getDb(srv.URL+"/health", nil)
+	if code != 200 || !strings.Contains(body, "dropboxinterface") {
+		t.Fatalf("/health open expected 200, got %d (%s)", code, body)
+	}
+	code, body = getDb(srv.URL+"/zq", nil)
+	if code != 401 || !strings.Contains(body, "Invalid or missing service token") {
+		t.Fatalf("unknown no-token expected 401 gate, got %d (%s)", code, body)
+	}
+	code, body = getDb(srv.URL+"/zq", map[string]string{"X-Service-Token": "sekret"})
+	if code != 404 || !strings.Contains(body, "Cannot GET /zq") || !strings.Contains(body, "<!DOCTYPE html>") {
+		t.Fatalf("unknown ok-token expected Express 404 page, got %d (%s)", code, body)
+	}
+}

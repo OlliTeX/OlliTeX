@@ -4,7 +4,7 @@
 //
 //	host  LISTEN_ADDRESS || 127.0.0.1
 //	port  3010
-//	mongo MONGO_CONNECTION_STRING || mongodb://${MONGO_HOST || 127.0.0.1}/sharelatex
+//	mongo MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://${MONGO_HOST || 127.0.0.1}/sharelatex
 //
 // The service shares the project database with the rest of Overleaf: rooms,
 // messages, users, projects, notifications, notificationsPreferences and

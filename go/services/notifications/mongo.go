@@ -6,6 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // mongoStore is the production Store: a 1:1 re-implementation of the Node
@@ -51,19 +52,13 @@ func (s *mongoStore) CountByUserKey(ctx context.Context, userID primitive.Object
 }
 
 func (s *mongoStore) Upsert(ctx context.Context, filter, setDoc primitive.M) error {
-	// Node: db.notifications.updateOne({ user_id: userId, key: notification.key },
-	//        { $set: { ...document } }, { upsert: true })
-	_, err := s.col.UpdateOne(ctx, filter, bson.D{{Key: "$set", Value: setDoc}})
-	if err != nil {
-		// UpdateOne returns ErrNoDocuments when the update matched nothing and
-		// upsert was not applied — not the case here (upsert always matches/creates).
-		// Surface any real error; the handler maps driver errors to 500 like Node.
-		if err == mongo.ErrNoDocuments {
-			return nil
-		}
-		return err
-	}
-	return nil
+	// Node: Notifications.updateOne({ user_id, key }, { $set: { ...doc } },
+	//       { upsert: true }) — the upsert option is REQUIRED: without it a
+	//       never-seen (user,key) pair matches nothing, the driver returns
+	//       ErrNoDocuments, and the add silently no-ops (B3 test 7 catches this).
+	_, err := s.col.UpdateOne(ctx, filter, bson.D{{Key: "$set", Value: setDoc}},
+		options.Update().SetUpsert(true))
+	return err
 }
 
 func (s *mongoStore) UnsetByID(ctx context.Context, userID, id primitive.ObjectID) error {

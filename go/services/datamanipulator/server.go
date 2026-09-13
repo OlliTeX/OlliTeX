@@ -73,12 +73,9 @@ func dmErrCode(err error) int {
 func (h *DMHandlers) Mux() http.Handler {
 	cfg := h.Cfg
 	handlers := h
-	auth := pbhttp.RequireServiceToken(cfg.ServiceToken, func() {
-		fmt.Println("SHARED_SERVICE_TOKEN is unset; accepting unauthenticated requests (should be restricted to in-container callers)")
-	})
-	dispatch := auth(func(w http.ResponseWriter, r *http.Request) {
+	dispatch := func(w http.ResponseWriter, r *http.Request) {
 		handlers.route(w, r)
-	})
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		pbhttp.WriteJSON(w, 200, map[string]string{"status": "ok", "service": "datamanipulator"})
@@ -90,8 +87,13 @@ func (h *DMHandlers) Mux() http.Handler {
 	mux.HandleFunc("/push", dispatch)
 	mux.HandleFunc("/compare", dispatch)
 	mux.HandleFunc("/sync/full", dispatch)
+	// Node: app-level token gate with a /health exemption; unknown paths with
+	// a valid token get Express's 404 page (contract verified vs Node).
+	mux.HandleFunc("/", pbhttp.ExpressNotFound)
 	// 1:1 with Node express.json({ limit: '10mb' }).
-	return pbhttp.LimitBody(mux, 10<<20)
+	return pbhttp.LimitBody(pbhttp.AuthGate(mux, cfg.ServiceToken, func() {
+		fmt.Println("SHARED_SERVICE_TOKEN is unset; accepting unauthenticated requests (should be restricted to in-container callers)")
+	}, "/health"), 10<<20)
 }
 
 func (h *DMHandlers) route(w http.ResponseWriter, r *http.Request) {

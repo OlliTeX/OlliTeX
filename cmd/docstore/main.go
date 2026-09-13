@@ -5,7 +5,7 @@
 // Config surface = services/docstore/config/settings.defaults.cjs (env names
 // and defaults kept 1:1):
 //
-//	MONGO_CONNECTION_STRING || mongodb://(MONGO_HOST || 127.0.0.1)/sharelatex
+//	MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://(MONGO_HOST || 127.0.0.1)/sharelatex
 //	MONGO_HAS_SECONDARIES === 'true'
 //	ARCHIVE_ON_SOFT_DELETE / KEEP_SOFT_DELETED_DOCS_ARCHIVED === 'true'
 //	BACKEND, HEALTH_CHECK_PROJECT_ID
@@ -73,9 +73,10 @@ func envInt64Or(k string, def int64) int64 {
 }
 
 func main() {
-	uri := envOr("MONGO_CONNECTION_STRING", "")
-	// Node: MONGO_CONNECTION_STRING || mongodb://${MONGO_HOST}/sharelatex ||
-	// mongodb://127.0.0.1/sharelatex
+	// Node: settings.mongo.url = OVERLEAF_MONGO_URL || mongodb://dockerhost/sharelatex;
+	// deployments may also set MONGO_CONNECTION_STRING (e2e sets both), so the
+	// chain is: MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://host/sharelatex.
+	uri := envOrChain([]string{"MONGO_CONNECTION_STRING", "OVERLEAF_MONGO_URL"}, "")
 	if uri == "" {
 		uri = "mongodb://" + envOr("MONGO_HOST", "127.0.0.1") + "/sharelatex"
 	}
