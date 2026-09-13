@@ -275,19 +275,68 @@ sid **minus** the `.sig` suffix.
 
 ### P2 — auth core (*every later phase depends on this*)
 
-| item | LOC | notes |
-|---|---|---|
-| Session/Authentication core | `Authentication` 1,373 | login/logout/verify/email-verify |
-| Captcha | 263 | recaptcha client contract |
-| PasswordReset | 478 | token emails (SMTP) |
-| Security | 264 | audit of auth |
-| TokenAccess | 1,085 | token endpoints (`/:token` route family) |
-| Authorization | 1,499 | role checks — used by admin routes |
-| modules/authentication/saml + oidc | (module) | SAML/OIDC handshakes — pin redirects |
+**Status (2026-09-13): implemented + gating.** Scope actually gated in P2
+(the rest — captcha, SAML/OIDC, admin authz — rides P3/P4 with their
+features):
 
-**P2 gate**: full login/register/logout/reset journeys e2e; Node-created
-session usable on Go-served page and vice versa under the flipped prefixes;
-admin authz matrix battery.
+| unit | surface | state |
+|---|---|---|
+| PasswordReset | GET/POST `/user/password/reset`, GET/POST `/user/password/set`, POST `/user/reconfirm` | flip-gated (`web-p2.conf`) |
+| TokenAccess | GET `/<rw-token>`, GET `/read/<ro-token>`, POST `…/grant` (×2) | flip-gated |
+| Sharing-updates consent | GET `/project/:id/sharing-updates`, POST `…/join`, `…/view` | flip-gated |
+
+Contract pins added by the P2 gate (Node = oracle, pinned live 2026-09-13):
+
+- **Global login gate** (`router.mjs:215`, `allowPublicAccess` default off):
+  every non-whitelisted route answers anon with 401
+  (`WWW-Authenticate: OverleafLogin`, `text/plain` `Unauthorized`,
+  CSP default policy) for `accepts-json`, else 302 `/login`
+  (`Found. Redirecting to /login` body, session cookie,
+  `session.postLoginRedirect` stashed). Whitelist (CE core):
+  `/login`, `/login/legacy`, `/read-only/one-time-login`, `/register`,
+  `/system/messages`, `/user/password/reset`, `/user/password/set`,
+  `/user/activate`, launchpad. **NOT whitelisted**: `/logout`,
+  `/restricted`, marketing 301s, the token grant family, reconfirm,
+  sharing-updates — all gate first. Go: `Route.NoLogin` flag +
+  `Cfg.AllowPublicAccess` (env `OVERLEAF_ALLOW_PUBLIC_ACCESS`).
+- **429 rate-limit response**: NO content-type header, body
+  `Rate limit reached, please try again later` (pinned via the P2 gate:
+  Node's 429 has an empty content-type).
+- Grant `checkAndGet` order: lookup → **token gate** (`tokenBased` else
+  404) → anon branches → higher-privilege shortcut → proceed.
+- `sendStatus(200)` success body is `OK` + newline (express `res.send`
+  appends `\n`); 204 moves are body-less.
+- **set POST success CT is `text/plain; charset=utf-8`** (live-pinned on
+  both stacks — NOT the naive `sendStatus` html default; the gateway
+  battery originally diffed exactly this).
+- **set POST missing-field 400**: zod fires on a MISSING key → body
+  `{"error":"Validation error: Invalid input: expected string, received
+  undefined at \"body.passwordResetToken\"","statusCode":400}` (field =
+  the absent required one; `password` first); PRESENT-but-empty hits the
+  handler branch → `400 {"message":{"key":"invalid-password"}}`.
+- `validatePassword` order: too-short → too-long → invalid-character →
+  contains-email.
+- Session cookie `Expires` (absolute) legitimately differs per leg — gate
+  normalizes it; nonce in CSP + bodies is normalized per-response.
+
+**P2 gate** (`tests/e2e/specs/parity/web-go-p2-flip.test.e2e.ts`,
+`server-ce/nginx/flips/web-p2.conf`): 3-leg battery — (1) Node baseline,
+(2) FLIP ON (Go must match byte-for-byte after nonce/csrf/expires
+normalization), (3) FLIP OFF (reversal) — covering pages, the reset
+matrix, the set-password validation matrix, the reset SUCCESS round-trip
+(with password restore), token pages, the grant matrix, the consent
+page/moves, and the 429 burst; the smtp-sink leg asserts both stacks sent
+the reset mail. Budget sections rest 66s between (password_reset 6/60s
+shared window); fixture token refs + password are restored in teardown.
+
+**P2 gate result (2026-09-13): 4/4 GREEN** — leg 1 Node baseline + leg 2
+FLIP-ON Go parity (0 diffs after nonce/csrf/expires normalization) + leg 3
+FLIP-OFF restore + leg 4 smtp-sink (≥5 reset mails, both stacks) pass;
+e2e-user password restored to original; stack left at Node-active baseline
+(shadow service stopped, flip stripped).
+
+Remaining P2 leftovers (ride later phases): captcha, SAML/OIDC handshakes,
+admin authz matrix, `/user/activate` (user-activate module, P3).
 
 ### P3 — user & admin surfaces
 

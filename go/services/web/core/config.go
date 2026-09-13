@@ -29,10 +29,11 @@ type Config struct {
 	CookieDomain   string // COOKIE_DOMAIN (empty = absent cookie domain attr)
 
 	// app identity / misc
-	AppName        string   // APP_NAME || "OlliTeX" (settings.appName)
-	SiteURL        string   // SITE_URL || "http://localhost:8000"
-	AllowedOrigins []string // ALLOWED_ORIGINS || siteUrl (comma list)
-	ExpoHostname   bool     // EXPOSE_HOSTNAME
+	AppName           string   // APP_NAME || "OlliTeX" (settings.appName)
+	SiteURL           string   // SITE_URL || "http://localhost:8000"
+	AllowedOrigins    []string // ALLOWED_ORIGINS || siteUrl (comma list)
+	ExpoHostname      bool     // EXPOSE_HOSTNAME
+	AllowPublicAccess bool     // OVERLEAF_ALLOW_PUBLIC_ACCESS === 'true' (disables the global login gate)
 
 	CacheStaticAssets bool // server-ce: true
 
@@ -178,6 +179,7 @@ func LoadConfig() (*Config, error) {
 		SiteURL:           siteURL,
 		AllowedOrigins:    allowedOrigins,
 		ExpoHostname:      os.Getenv("EXPOSE_HOSTNAME") == "true",
+		AllowPublicAccess: os.Getenv("OVERLEAF_ALLOW_PUBLIC_ACCESS") == "true",
 		CacheStaticAssets: os.Getenv("CACHE_STATIC_ASSETS") != "false",
 		RedisAddr:         redisHost + ":" + redisPort,
 		RedisPassword:     redisPass,

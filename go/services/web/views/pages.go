@@ -24,6 +24,13 @@ const (
 	slotPath    = "\x01PATH\x02"
 	slotOLUsers = "\x01OLUSERS\x02"
 	slotOLUID   = "\x01OLUID\x02"
+	// P2 slots (tools/webviews-capture-p2.py):
+	slotP2User     = "\x01USER\x02"
+	slotP2UserID   = "\x01USERID\x02"
+	slotResetErr   = "\x01RESETERR\x02"
+	slotEmailField = "\x01EMAIL\x02"
+	slotResetToken = "\x01RSTOKEN\x02"
+	slotPostURL    = "\x01POSTURL\x02"
 	// origin captured from the e2e fixtures (rewritten per request).
 	capturedOrigin = "http://127.0.0.1:7420"
 )
@@ -51,6 +58,11 @@ type PageData struct {
 	Path      string // request path (alternate link)
 	UserEmail string // session user email (Node: ol-usersEmail + navbar pill)
 	UserID    string // session user id (ol-user_id)
+	// P2 dynamic slots (empty strings render the anonymous/absent shape):
+	ResetErr   string // passwordReset meta: "" | "password_reset_token_expired"
+	EmailField string // setPassword form email input
+	ResetToken string // setPassword hidden token input
+	PostURL    string // token page postUrl meta, e.g. /<token>/grant
 }
 
 func (p PageData) finalize(html string) string {
@@ -63,6 +75,12 @@ func (p PageData) finalize(html string) string {
 	}
 	out = strings.ReplaceAll(out, slotOLUsers, p.UserEmail)
 	out = strings.ReplaceAll(out, slotOLUID, p.UserID)
+	out = strings.ReplaceAll(out, slotP2User, p.UserEmail)
+	out = strings.ReplaceAll(out, slotP2UserID, p.UserID)
+	out = strings.ReplaceAll(out, slotResetErr, p.ResetErr)
+	out = strings.ReplaceAll(out, slotEmailField, p.EmailField)
+	out = strings.ReplaceAll(out, slotResetToken, p.ResetToken)
+	out = strings.ReplaceAll(out, slotPostURL, p.PostURL)
 	orig := originOf(p.Origin)
 	if orig != "" {
 		out = strings.ReplaceAll(out, capturedOrigin, orig)
@@ -119,6 +137,12 @@ func StatusPage(w http.ResponseWriter, d PageData, status int, skeleton string) 
 	_, _ = io.WriteString(w, d.finalize(skeleton))
 }
 
+// Restricted403 — the CE access-denied render (403 + restricted view),
+// e.g. ensureUserCanReadProject on token-member-only projects (P2).
+func Restricted403(w http.ResponseWriter, d PageData) {
+	StatusPage(w, d, 403, restrictedHTML)
+}
+
 // LoginPage / RegisterPage / LogoutConfirmation / Restricted / NotFound.
 func LoginPage(w http.ResponseWriter, d PageData) { d.CSP = cspReact(d.Nonce); Page(w, d, loginHTML) }
 func RegisterPage(w http.ResponseWriter, d PageData) {
@@ -128,3 +152,21 @@ func RegisterPage(w http.ResponseWriter, d PageData) {
 func LogoutPage(w http.ResponseWriter, d PageData)     { Page(w, d, logoutHTML) }
 func RestrictedPage(w http.ResponseWriter, d PageData) { Page(w, d, restrictedHTML) }
 func NotFoundPage(w http.ResponseWriter, d PageData)   { StatusPage(w, d, 404, notFoundHTML) }
+
+// P2 (website-redesign layout — React shell, same CSP family as login).
+func PasswordResetPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	Page(w, d, passwordResetHTML)
+}
+func SetPasswordPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	Page(w, d, setPasswordHTML)
+}
+func TokenAccessPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	Page(w, d, tokenAccessLegacyHTML)
+}
+func SharingUpdatesPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	Page(w, d, sharingUpdatesHTML)
+}

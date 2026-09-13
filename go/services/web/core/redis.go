@@ -376,6 +376,44 @@ func (r *RedisClient) TTL(key string) (int64, error) {
 	return n, nil
 }
 
+// INCR for the rate-limit family (P2): Node's rate-limiter-flexible
+// issueKeyCount = plain INCR.
+func (r *RedisClient) INCR(key string) (int64, error) { return r.INCRBY(key, 1) }
+
+// EXPIRE for the rate-limit window (P2) + redis ops parity probes.
+func (r *RedisClient) EXPIRE(key string, sec int64) error {
+	_, err := r.command("EXPIRE", key, strconv.FormatInt(sec, 10))
+	return err
+}
+
+// SCAN (MATCH, COUNT) — removeSessionsFromRedis parity (P2): the Node
+// helper scans the whole keyspace for session docs, not a prefix filter.
+func (r *RedisClient) SCAN(match string, count int) (keys []string, err error) {
+	cursor := "0"
+	for i := 0; i < 10000; i++ {
+		v, e := r.command("SCAN", cursor, "MATCH", match, "COUNT", strconv.Itoa(count))
+		if e != nil {
+			return nil, e
+		}
+		arr, ok := v.([]any)
+		if !ok || len(arr) != 2 {
+			return nil, fmt.Errorf("SCAN reply shape: %T", v)
+		}
+		c, _ := arr[0].(string)
+		items, _ := arr[1].([]any)
+		for _, it := range items {
+			if s, ok := it.(string); ok {
+				keys = append(keys, s)
+			}
+		}
+		if c == "0" {
+			return keys, nil
+		}
+		cursor = c
+	}
+	return keys, nil
+}
+
 // INCRBY for the rate-limit family (P1).
 func (r *RedisClient) INCRBY(key string, n int64) (int64, error) {
 	v, err := r.command("INCRBY", key, strconv.FormatInt(n, 10))

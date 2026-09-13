@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"ollitex/go/pbhttp"
@@ -28,6 +30,11 @@ type Route struct {
 	// (which carry NO session/csrf middleware — pinned: Node /status sets
 	// no overleaf.sid cookie while /login does).
 	NoSession bool
+
+	// Pattern — Express-style regex route (P2a: /:token token access +
+	// consent routes). First/named capture group = route param (Cxt.Params
+	// ["token" / "1"]).
+	Pattern *regexp.Regexp
 }
 
 // Feature registers a group of routes (go/services/web/features/<x>).
@@ -41,7 +48,8 @@ type Feature struct {
 type Cxt struct {
 	Req     *http.Request
 	Sess    *Session
-	SiteURL string // configured site URL (views' origin + siteUrl)
+	SiteURL string            // configured site URL (views' origin + siteUrl)
+	Params  map[string]string // route params (P2a pattern routes)
 }
 
 type fnPage func(*Cxt, *Res)
@@ -183,15 +191,28 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 			if rt.Method != r.Method && r.Method != "HEAD" {
 				continue
 			}
-			if rt.Path == r.URL.Path {
+			if rt.Path == r.URL.Path || (rt.Pattern != nil && rt.Pattern.MatchString(r.URL.Path)) {
 				if rt.NoSession {
 					rt.Handler(cxt, res)
 					return
 				}
-				if a.Cfg.Profile == "web" && !rt.NoLogin && !cxt.Sess.IsLoggedIn() {
+				if a.Cfg.Profile == "web" && !a.Cfg.AllowPublicAccess && !rt.NoLogin && !cxt.Sess.IsLoggedIn() {
 					a.globalLoginBounce(cxt, res, r)
 					a.maybeSaveSession(cxt, w, rw)
 					return
+				}
+				if rt.Pattern != nil {
+					if m := rt.Pattern.FindStringSubmatch(r.URL.Path); m != nil {
+						cxt.Params = map[string]string{}
+						names := rt.Pattern.SubexpNames()
+						for i := 1; i < len(m) && i < len(names); i++ {
+							k := names[i]
+							if k == "" {
+								k = strconv.Itoa(i)
+							}
+							cxt.Params[k] = m[i]
+						}
+					}
 				}
 				rt.Handler(cxt, res)
 				a.maybeSaveSession(cxt, w, rw)
@@ -202,7 +223,7 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 
 	// fallback
 	if a.Cfg.Profile == "web" {
-		if !cxt.Sess.IsLoggedIn() {
+		if !a.Cfg.AllowPublicAccess && !cxt.Sess.IsLoggedIn() {
 			a.globalLoginBounce(cxt, res, r)
 			a.maybeSaveSession(cxt, w, rw)
 			return
@@ -256,7 +277,7 @@ func (a *App) globalLoginBounce(cxt *Cxt, res *Res, r *http.Request) {
 			cxt.Sess.Set("postLoginRedirect", safe)
 		}
 	}
-	if a.acceptsJSON(r) {
+	if a.acceptsJSON(r) || r.Header.Get("Authorization") != "" {
 		// pinned: 401 + WWW-Authenticate: OverleafLogin, body "Unauthorized"
 		res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		res.W.Header().Set("WWW-Authenticate", "OverleafLogin")
@@ -395,7 +416,8 @@ func (a *App) routeNoSession(r *http.Request) bool {
 	for _, f := range a.feats {
 		for i := range f.Routes {
 			rt := &f.Routes[i]
-			if rt.Path == r.URL.Path && rt.Method == r.Method {
+			if (rt.Path == r.URL.Path && rt.Method == r.Method) ||
+				(rt.Pattern != nil && rt.Pattern.MatchString(r.URL.Path) && rt.Method == r.Method) {
 				return rt.NoSession
 			}
 		}

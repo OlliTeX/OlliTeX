@@ -333,6 +333,14 @@ func (s *Session) Set(key string, v any) {
 	s.changed = true
 }
 
+// Del removes a top-level field (Node's `delete req.session.resetToken`).
+func (s *Session) Del(key string) {
+	if s.Doc != nil {
+		delete(s.Doc, key)
+		s.changed = true
+	}
+}
+
 // GetRaw returns the raw JSON of a top-level field.
 func (s *Session) GetRaw(key string) (json.RawMessage, bool) {
 	if s.Doc == nil {
