@@ -28,7 +28,7 @@ test('hub /#/site.storage.local renders the storage env-parameter section', asyn
 })
 
 test('API round trip: GET then PUT(s3) then PUT(fs-back) the storage section', async () => {
-  const g = await (await a('GET', '/admin/site-settings/storage')).json().catch(() => ({}))
+  const g = (await (await a('GET', '/admin/site-settings')).json().catch(() => ({}))).storage
   expect(g, 'storage GET').toBeTruthy()
   expect(g.backend, 'GET has a backend').toBeTruthy()
 
@@ -47,7 +47,7 @@ test('API round trip: GET then PUT(s3) then PUT(fs-back) the storage section', a
   const j1 = await put1.json().catch(() => ({}))
   expect(j1.envLines, 'response lists the env lines it wrote').toBeTruthy()
 
-  const g2 = await (await a('GET', '/admin/site-settings/storage')).json().catch(() => ({}))
+  const g2 = (await (await a('GET', '/admin/site-settings')).json().catch(() => ({}))).storage
   expect(g2.envManaged, 'managed fragment flag set').toBeTruthy()
   expect(g2.s3Endpoint).toBe('http://127.0.0.1:8333')
   // secret must be masked/absent on GET
@@ -62,6 +62,6 @@ test('API round trip: GET then PUT(s3) then PUT(fs-back) the storage section', a
   // rollback to fs (the documented rollback path)
   const put2 = await a('PUT', '/admin/site-settings/storage', { backend: 'fs', s3Endpoint: '', s3AccessKeyId: '', s3Secret: '', templateFilesBucket: '', projectBlobsBucket: '', globalBlobsBucket: '', docstoreArchiveBucket: '' })
   expect(put2.status(), `PUT fs-back (got ${put2.status()}: ${(await put2.text().catch(() => '')).slice(0, 160)})`).toBeLessThan(300)
-  const g3 = await (await a('GET', '/admin/site-settings/storage')).json().catch(() => ({}))
+  const g3 = (await (await a('GET', '/admin/site-settings')).json().catch(() => ({}))).storage
   expect(g3.backend, 'back to fs').toBe('fs')
 })
