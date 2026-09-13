@@ -67,7 +67,7 @@ services:
     networks: [e2e]
 
   overleaf:
-    image: ${OVERLEAF_IMAGE:-sharelatex/sharelatex:ext-6.3.0-port}
+    image: ${OVERLEAF_IMAGE:-sharelatex/sharelatex:main}
     hostname: overleaf
     depends_on:
       mongo:

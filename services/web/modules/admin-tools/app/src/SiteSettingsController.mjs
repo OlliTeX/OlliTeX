@@ -109,6 +109,26 @@ export default {
       })
     )
 
+    // 2026-09-14 (owner): local storage — stored section wins; when the
+    // admin never saved one, fall back to the live (effective) env values
+    // so the hub shows the state of the running stack, plus a flag for
+    // whether a managed env fragment is in place.
+    const maskedStorage = maskSecrets('storage', storage) || {}
+    const managedEnv = readStorageEnv()
+    const storageBase = (maskedStorage && Object.keys(maskedStorage).length > 0)
+      ? maskedStorage
+      : (managedEnv && managedEnv.section) || {}
+    const storageOut = {
+      ...storageBase,
+      backend: storageBase.backend || 'fs',
+      envManaged: Boolean(managedEnv),
+      envPath: managedEnv ? managedEnv.path : undefined,
+      appliesOn: 'next container restart',
+    }
+    // secret never echoed back via the env fallback (UI shows an empty
+    // "leave empty to keep" field instead)
+    if (!maskedStorage || Object.keys(maskedStorage).length === 0) storageOut.s3Secret = undefined
+
     res.json({
       templates: { ...maskSecrets('templates', templates), counts },
       zotero: maskSecrets('zotero', zotero),
@@ -133,25 +153,7 @@ export default {
       llm: maskSecrets('llm', llm),
       branding: maskSecrets('branding', branding),
       services: maskSecrets('services', services),
-      // 2026-09-14 (owner): local storage — stored section wins; when the
-      // admin never saved one, fall back to the live (effective) env values
-      // so the hub shows the state of the running stack, plus a flag for
-      // whether a managed env fragment is in place.
-      storage: () => {
-        const masked = maskSecrets('storage', storage) || {}
-        const managed = readStorageEnv()
-        const base = masked && Object.keys(masked).length > 0 ? masked : (managed && managed.section) || {}
-        // secret never echoed back via the env fallback (UI shows an empty
-        // "leave empty to keep" field instead)
-        if (!masked || Object.keys(masked).length === 0) base.s3Secret = undefined
-        return {
-          ...base,
-          backend: base.backend || 'fs',
-          envManaged: Boolean(managed),
-          envPath: managed ? managed.path : undefined,
-          appliesOn: 'next container restart',
-        }
-      }(),
+      storage: storageOut,
     })
   }),
 
