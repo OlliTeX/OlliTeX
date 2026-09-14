@@ -29,7 +29,7 @@ func Feature(a *core.App) core.Feature {
 		Routes: []core.Route{
 			{Method: "GET", Path: "/login", NoLogin: true, Handler: pageHandler(views.LoginPage)},
 			{Method: "POST", Path: "/login", NoLogin: true, Handler: postLogin(a)},
-			{Method: "GET", Path: "/register", NoLogin: true, Handler: pageHandler(views.RegisterPage)},
+			// GET /register → registrationpage feature (P3.4, P3.3-era move).
 			{Method: "GET", Path: "/logout", Handler: getLogoutPage},
 			{Method: "POST", Path: "/logout", Handler: postLogout(a)},
 			{Method: "GET", Path: "/restricted", Handler: pageHandler(views.RestrictedPage)},

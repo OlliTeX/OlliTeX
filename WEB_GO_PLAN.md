@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
-Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3),
-2026-09-14)**; remaining P3 leaves (SiteSettings et al.) + P4–P7 to come. Companion
+Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
+all 2026-09-14); remaining P3 leaves (user-activate, SiteSettings) + P4–P7 to come. Companion
 to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are Go-only
 as of `8090d454fb`).
 
@@ -547,6 +547,80 @@ form must stay percent-escaped verbatim); a sh-quoting bug in a pin helper had
 stored one unquoted session doc — cleaned (1 doc + 3 stale sets), Node
 restored. No Node source changes (container copy verified byte-equal before
 revert).
+
+#### P3.4 — registration page (module `registration-page`) — **✅ GATE 3/3 GREEN (2026-09-14)**
+Scope: `GET /register` (React shell, anon + logged-in) + `POST /register`
+(`ensureRegistrationEnabled` → rateLimit(5/60, bucket `getUserId(req)||req.ip`)
+→ create user + 7-day `password` one-time token + activation mail). Node
+source: `modules/registration-page/app/src/{RegistrationPageRouter,
+RegistrationPageController,UserRegistrationHandler}.mjs` +
+`app/src/Features/User/UserRegistrationHandler.mjs`.
+
+**Go implementation**:
+- Routes: `go/services/web/features/registrationpage/registrationpage.go`
+  now owns **both** `/register` routes (the duplicate `GET /register` was
+  removed from `features/authpages/authpages.go`); wired in `cmd/web/main.go`.
+- `views.RegisterPage` + anon skeleton (`go/services/web/views/pages.go`,
+  `pages_data.go`, `testregister_anon.html`, `register_rendertest_test.go`) —
+  byte-pinned to the live Node register page (nonce/CSRF/auth-state slots).
+- `core/tokens.go` gained `OneTimeTokens.NewWithExp` (7-day `password` token;
+  the existing `New` delegates with the prior 1h default).
+- `features/registrationpage/userdoc_gen.go` embeds Node's 42 static user-doc
+  defaults (int32 numerics); dynamic fields injected at runtime.
+- **`core.Send429` made wire-exact** (shared by P2 + P3.4): Node emits the
+  rate-limit 429 via `res.status(429); res.write(…); res.end()` → **chunked,
+  no Content-Type, no Content-Length**; Go now forces `Transfer-Encoding:
+  chunked` + empty CT (so net/http drops the auto Content-Length). P2's diff
+  ignores CL/TE so it stays green; P3.4's diff asserts it.
+
+**Node oracle pinned live (report `/tmp/p33pin.mjs` / reg pins)** — key
+contracts:
+- `GET /register` anon (enabled) → 200 text/html (React shell; nonce ×23,
+  `ol-csrfToken`, auth-state fields); logged-in inserts `sessionUser`.
+- `POST /register` no-csrf → 403 text/plain `Forbidden` (core csrf runs
+  before the rate-limit; does not consume budget).
+- validation (controller order): first/last non-string/`>100` → 400
+  `Too long name.`; unparsable/`>254`/no-`@` email → 400 `Invalid email
+  address.`; disallowed domain → 403 `Registration is not available for this
+  email domain.`; existing email (holdingAccount=false) → 409
+  `{"message":{"key":"account_with_this_email_exists"}}`.
+- happy → 200 `Registration successful. Please check your email to activate
+  your account.` **+ creates** user (random 32-byte-hex pw → bcrypt, `emails[]`,`
+  signUpDate`), **token** (`use=password`, 64-hex, expires ≈ 7d), **mail**
+  subject `Activate your OlliTeX Account` (CTA `/user/activate?token=…&user_id=…`).
+- logged-in → 302 `/` (rate bucketed by **userId**, not IP — NOT 429).
+- 6th consuming POST in 60s → 429 chunked `Rate limit reached, please try
+  again later` (shared Redis `rate-limit:postRegister:*` — the gate resets
+  it between legs).
+
+**Live A/B (Node :4000 vs Go :4010) 10/10 byte-parity PASS** (status, headers
+incl. CT/CSP/Location/Set-Cookie, bodies after nonce/csrf normalization,
+equal mail deltas) + created-user/token sanity (bcrypt hash, `use=password`,
+7-day expiry).
+
+**P3.4 gate** (`server-ce/nginx/flips/web-p3d.conf` + `tests/e2e/specs/
+parity/web-go-p3d-flip.test.e2e.ts`): leg1 Node baseline → leg2 FLIP ON
+`web-p3d.conf` (Go) byte-for-byte match → leg3 FLIP OFF Node reversal; each
+leg asserts the 10 HTTP cases + exactly-one activation mail (delta 1) +
+user/token side effects.
+
+**P3.4 gate result (2026-09-14): 3/3 GREEN.**
+
+**Live bugs found + fixed in P3.4**:
+1. **logged-in 429 vs 302** — Go consumed the rate limit under the IP bucket
+   for a logged-in POST (→ 429); Node buckets by `getUserId(req)||req.ip`
+   (→ 302). Fixed: `clientID = userId` when logged-in before `lim.Consume`.
+2. **429 Content-Length leak** — Go auto-set `Content-Length`; Node's
+   streamed 429 is chunked and has none. Fixed in shared `core.Send429`
+   (see above); P2 unaffected (its diff ignores CL/TE).
+3. **gate flip plumbing** — the CSP **header** nonce needed normalization in
+   the diff (body nonce was already handled); the sed strip line needed a
+   doubled backslash to survive JS→shell.
+
+**Flake note**: running P3.3 immediately after P2 in one matrix pass can
+fail a P3.3 leg — P2's deliberate 429-burst battery drains the shared login
+rate-limit budget in Redis (login is `loginRateLimitEmail`-gated), so a P3.3
+login misbehaves. With a recovered budget P3.3 is green; not a code defect.
 
 ### P4 — project core (the heavy centre; flip in listed sub-order)
 

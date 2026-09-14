@@ -27,6 +27,7 @@ import (
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/passwordreset"
+	"ollitex/go/services/web/features/registrationpage"
 	"ollitex/go/services/web/features/instancestats"
 	"ollitex/go/services/web/features/serveradmin"
 	"ollitex/go/services/web/features/staticpages"
@@ -119,6 +120,7 @@ func main() {
 	app.RegisterFeature(serveradmin.Feature(app))
 	app.RegisterFeature(instancestats.Feature(app))
 	app.RegisterFeature(userpages.Feature(app))
+	app.RegisterFeature(registrationpage.Feature(app))
 
 	// web profile: unknown-route 404 view (general/404) — Node
 	// webRouter.get('*', ErrorController.notFound).

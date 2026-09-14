@@ -45,6 +45,12 @@ const (
 	slot33RefErr   = "\x01REFE33\x02"
 	slot33CurrRow  = "\x01CURRROW33\x02" // sessions page: current session <tr>
 	slot33Rows     = "\x01OTHERROWS33\x02" // sessions page: other session <tr>s
+	// P3.4 register page (/register is per-auth-state dynamic; skeleton is
+	// the anonymous capture so these render empty/absent for anonymous and
+	// fill from the session user when logged in):
+	slotRegUsers = "\x01REGUSERS\x02" // ol-usersEmail content
+	slotRegUID   = "\x01REGUID\x02"   // ol-user_id: `` or ` content="…"`
+	slotRegSU    = "\x01REGSU\x02"    // navbar sessionUser fragment: `` or `,&quot;sessionUser&quot;:{&quot;email&quot;:&quot;…&quot;}`
 	// origin captured from the e2e fixtures (rewritten per request).
 	capturedOrigin = "http://127.0.0.1:7420"
 )
@@ -125,6 +131,18 @@ func (p PageData) finalize(html string) string {
 	out = strings.ReplaceAll(out, slot33RefErr, metaContentAttr(p.ReferenceLinkingErrorMessage))
 	out = strings.ReplaceAll(out, slot33CurrRow, p.SessionsCurrentRow)
 	out = strings.ReplaceAll(out, slot33Rows, p.SessionsOtherRows)
+	// P3.4 register page (anon skeleton; fills on a logged-in session):
+	out = strings.ReplaceAll(out, slotRegUsers, htmlAttrEsc(p.UserEmail))
+	if p.UserID == "" {
+		out = strings.ReplaceAll(out, slotRegUID, "")
+	} else {
+		out = strings.ReplaceAll(out, slotRegUID, ` content="`+htmlAttrEsc(p.UserID)+`"`)
+	}
+	if p.UserEmail == "" {
+		out = strings.ReplaceAll(out, slotRegSU, "")
+	} else {
+		out = strings.ReplaceAll(out, slotRegSU, `,&quot;sessionUser&quot;:{&quot;email&quot;:&quot;`+htmlAttrEsc(p.UserEmail)+`&quot;}`)
+	}
 	orig := originOf(p.Origin)
 	if orig != "" {
 		out = strings.ReplaceAll(out, capturedOrigin, orig)

@@ -44,6 +44,12 @@ func (o *OneTimeTokens) coll(ctx context.Context) *mongo.Collection {
 // New inserts a fresh token (64 hex chars), returns it. data carries
 // user_id + email (the CE password-reset shape).
 func (o *OneTimeTokens) New(ctx context.Context, use string, data bson.M) (string, error) {
+	return o.NewWithExp(ctx, use, data, time.Now().UTC().Add(time.Hour))
+}
+
+// NewWithExp inserts a fresh 64-hex token with an explicit expiry (the
+// registration activation token uses 7 days; the password-reset flow 1h).
+func (o *OneTimeTokens) NewWithExp(ctx context.Context, use string, data bson.M, expiresAt time.Time) (string, error) {
 	tok := make([]byte, 32)
 	if _, err := rand.Read(tok); err != nil {
 		return "", err
@@ -55,7 +61,7 @@ func (o *OneTimeTokens) New(ctx context.Context, use string, data bson.M) (strin
 		"token":     token,
 		"data":      data,
 		"createdAt": now,
-		"expiresAt": now.Add(time.Hour),
+		"expiresAt": expiresAt,
 	})
 	return token, err
 }
