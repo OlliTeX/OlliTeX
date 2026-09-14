@@ -466,6 +466,37 @@ rate-limiter sleeps are real) · P3.1 3/3 · P3.2 3/3. E2e left Node-active
 (flip stripped, shadow armed on :4010, config defaults 90/90, messages 0,
 instanceStats seed docs intact).
 
+#### P3.3 — user settings + sessions family — **⏸ ORACLE PINNED (2026-09-14), impl pending**
+Scope: `GET /user/settings` (React page), `POST /user/settings` (zod-strict
+updates incl. ace/zotero/keybindings + email branch), `GET /user/sessions`
+(plain page), `GET /user/sessions/list` (JSON), `POST /user/sessions/clear`
+(201 + security mail + audit + other-session purge).
+
+**Node oracle pinned live (report `/tmp/p33-pin-node.json`)** — key contracts:
+- anon: HTML GETs 302→/login; JSON Accept → 401 "Unauthorized" (text/plain);
+  POSTs without csrf → 403 "Forbidden" (csrf before the login gate).
+- `POST /user/settings {}` → **200 body `OK`** (text/plain; charset=utf-8);
+  unknown key → 400 `Validation error: Unrecognized key: "X" at "body[.zotero]"`
+  (application/json); wrong type → 400 `expected <T>, received <U> at "body.…"`;
+  non-object JSON roots: object/array/null through the parser (array/null → zod
+  400), scalar → body-parser 400 **HTML** error page (705B) — same split as P3.1.
+- `email` branch: own email → 200; malformed → 400 "Bad Request" (text/plain);
+  full email-change flow deferred (UserEmails module family, later P3 leaf).
+- sessions: list JSON `{currentSession:{ip_address,session_created},
+  sessions:[…]}`; **clear → 201 "Created" (text/plain)**; cleared sibling
+  session then 401; **repeat clear → 201 again (mail every time)**; audit op
+  `clear-sessions` in `userAuditLogEntries`.
+- **Node fault contract found live**: a single corrupt `sess:*` doc in the
+  `UserSessions:{uid}` set makes ALL sessions endpoints 500 (JSON.parse in
+  `getAllUserSessions`) — Go must replicate (and gate it deterministically).
+
+**P3.3 debug detour (recorded)**: Node `POST /user/login` 403 storm was
+probe-side (route is `POST /login`; csrf header is `x-csrf-token`; cookie wire
+form must stay percent-escaped verbatim); a sh-quoting bug in a pin helper had
+stored one unquoted session doc — cleaned (1 doc + 3 stale sets), Node
+restored. No Node source changes (container copy verified byte-equal before
+revert).
+
 ### P4 — project core (the heavy centre; flip in listed sub-order)
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
