@@ -169,11 +169,23 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 				// Node: the 403 goes out WITH the freshly issued session
 				// cookie (secret was allocated during the verify attempt)
 				// — headers still open, so save+cookie first.
+				//
+				// Order note (Server.mjs): csrf middleware (line ~233) is
+				// registered BEFORE helmet (line ~322), so the csrf 403
+				// response carries NONE of the web-baseline headers (pinned
+				// P0: no nosniff; P3.1: no helmet set on the 403).
 				a.sessionBeforeHandler(cxt, w, rw)
 				res.SendStatus(403)
 				return
 			}
 		}
+
+		// Server.mjs:322-360 — helmet + conditional no-cache at request
+		// time for everything AFTER the csrf check (gate bounces, routes,
+		// 404 views, rendered 500 — pinned P3.1 on all of them; the csrf
+		// 403 above is excluded by the ordering). Not applied to the
+		// NoSession publicApi responses (e.g. /status — no baseline there).
+		a.setWebBaseline(w, r, sess.IsLoggedIn())
 	}
 
 	// express-session semantics (pinned): the session cookie is attached

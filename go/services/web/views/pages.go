@@ -16,6 +16,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"ollitex/go/services/web/core"
 )
 
 const (
@@ -53,7 +55,8 @@ type PageData struct {
 	// CSP — Node sets a PER-LAYOUT policy (pinned live 2026-09-13):
 	// React app pages (login/register) allow nonce-script + strict-dynamic;
 	// plain views (logout/restricted/404) carry the restrictive policy.
-	CSP string
+	CSP        string
+	AdminEmail string // general/500 contact (Settings.adminEmail, P3.1)
 	// 404-only dynamic slots (the skeleton was captured logged-in):
 	Path      string // request path (alternate link)
 	UserEmail string // session user email (Node: ol-usersEmail + navbar pill)
@@ -123,6 +126,10 @@ func Page(w http.ResponseWriter, d PageData, skeleton string) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", csp)
+	// HttpPermissionsPolicy — rendered views only (pinned P3.1: the 500 view
+	// carries it, JSON routes do not). Set after the CSP so renderers can
+	// override either cleanly.
+	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
 	w.Header().Set("X-Powered-By", "Express")
 	w.WriteHeader(200)
 	_, _ = io.WriteString(w, d.finalize(skeleton))
@@ -130,8 +137,13 @@ func Page(w http.ResponseWriter, d PageData, skeleton string) {
 
 // StatusPage for 404/500-style views (Node: res.status(404).render(...)).
 func StatusPage(w http.ResponseWriter, d PageData, status int, skeleton string) {
+	csp := d.CSP
+	if csp == "" {
+		csp = cspRestrictive
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Security-Policy", "base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'")
+	w.Header().Set("Content-Security-Policy", csp)
+	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
 	w.Header().Set("X-Powered-By", "Express")
 	w.WriteHeader(status)
 	_, _ = io.WriteString(w, d.finalize(skeleton))
@@ -152,6 +164,24 @@ func RegisterPage(w http.ResponseWriter, d PageData) {
 func LogoutPage(w http.ResponseWriter, d PageData)     { Page(w, d, logoutHTML) }
 func RestrictedPage(w http.ResponseWriter, d PageData) { Page(w, d, restrictedHTML) }
 func NotFoundPage(w http.ResponseWriter, d PageData)   { StatusPage(w, d, 404, notFoundHTML) }
+
+// Error500Page — general/500 (pinned live P3.1: nonce-policy CSP like the
+// React layouts, PP header, deterministic 681-byte body, ETag W/"2a9-..").
+const error500HTML = `<!DOCTYPE html><html lang="en"><head><title>Something went wrong</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/stylesheets/main-style-78c09375767178f0ab97.css"></head><body class="full-height"><main class="content content-alt full-height" id="main-content"><div class="container full-height"><div class="error-container full-height"><div class="error-details"><p class="error-status">Something went wrong, sorry.</p>If the problem persists, please contact us at
+<a href="mailto:__ADMINEMAIL__" target="_blank">__ADMINEMAIL__</a>.<p class="error-actions"><a class="error-btn" href="/">Home</a></p></div></div></div></main></body></html>`
+
+func Error500Page(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	body := strings.ReplaceAll(error500HTML, "__ADMINEMAIL__", d.AdminEmail)
+	csp := d.CSP
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Security-Policy", csp)
+	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
+	w.Header().Set("ETag", core.EtagWeakBody(body))
+	w.Header().Set("X-Powered-By", "Express")
+	w.WriteHeader(500)
+	_, _ = io.WriteString(w, body)
+}
 
 // P2 (website-redesign layout — React shell, same CSP family as login).
 func PasswordResetPage(w http.ResponseWriter, d PageData) {

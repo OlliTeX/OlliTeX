@@ -1,7 +1,9 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
-Status: **PLAN** (not started). Companion to `GO_CUTOVER_PLAN.md` (Phase D complete:
-the nine microservices are Go-only as of `8090d454fb`).
+Status: **IN PROGRESS** — P0+M0 ✔, P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3,
+2026-09-14)**; remaining P3 (user/admin surfaces) + P4–P7 to come. Companion
+to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are Go-only
+as of `8090d454fb`).
 
 ---
 
@@ -348,6 +350,57 @@ Institutions (994), Email (2,134 — SMTP via nodemailer-equivalent), Analytics
 (1,461 — queue flip), InactiveProjectController + related (inside User/Project;
 split in M0), modules: registration-page (1,539), user-activate (2,045),
 page-shells (561) + instance-stats (2,409).
+
+#### P3.1 — ServerAdmin leaf (editor-state + system messages) — **✔ COMPLETE 2026-09-14**
+
+Go: `features/serveradmin/` (7 routes: `GET /admin/editor-state`,
+`POST /admin/openEditor|closeEditor|messages|messages/clear`,
+`PATCH|DELETE /admin/messages/:id`) + core helpers — `edstate.go` (tri-state
+`closeEditor {}` = site closed + editor OPEN: `editorIsOpen=undefined`→true),
+`headers.go` (`setWebBaseline` at request time after the csrf check),
+`authorize.go` (`RequireSiteAdmin` → 302 `/restricted?from=…`), `response.go`
+(`Redirect` Accept matrix: explicit `text/html`→`<p>…</p>`; `text/*`/`*/*`→
+plain; no Accept→plain; other→**empty body, no Content-Type**; all 302s
+`Vary: Accept`, no ETag) + `core.BareWrite` (express.json-rejection 400s carry
+NONE of the web-baseline: no CSP/nosniff/Set-Cookie — pinned live).
+
+Key pinned/learned behaviors (e2e mongo `sharelatex`):
+- **Mongo collection is `systemmessages`** (mongoose auto-pluralization of
+  model `SystemMessage`), NOT `system_messages` — the P1-era Go code used a
+  shadow collection; fixed in P3.1 (systemmessages.go + serveradmin.go).
+- **Non-object JSON roots** (`5`, `"str"`, `true`, unparseable) → express.json
+  strict rejection → **400 `{}`** with no baseline headers and NO set-cookie;
+  object/array roots reach zod → verbose 400 (`expected object, received
+  array` for `[1]`); `null` → `received null`. Go: `readBody` kind =
+  scalar/array/null/object, `BareWrite` for the bare shape.
+- Anonymous `/system/messages` → always `[]` (controller short-circuit);
+  logged-in → cached manager list (pubsub `refresh-system-messages` OR
+  20–30s background refresh; `NOTIFY_ON_SYSTEM_MESSAGE_CHANGES=true` needed
+  for the pubsub path). Go mutations `PUBLISH` the same channel so the Node
+  leg's cache refreshes (cross-stack parity in both flip directions).
+- Route params: Go patterns use named groups (`(?P<id>[^/]+)`) — the core
+  dispatcher maps `SubexpNames()` → `cxt.Params["id"]`.
+- **Shadow-binary gotcha**: the runit shadow runs the CONTAINER copy
+  `/usr/local/bin/go-services/web` — every change needs
+  `go build -o bin/web ./cmd/web && docker cp bin/web ol-e2e-overleaf-1:/usr/local/bin/go-services/web
+  && sv restart web-go-overleaf`. Also: after `sv restart`, the previous process
+  may still own :4010 briefly (graceful-shutdown overlap) — wait for the new pid
+  before driving it (observed phantom 404s during the overlap window).
+
+**P3.1 gate** (`tests/e2e/specs/parity/web-go-p3a-flip.test.e2e.ts`,
+`server-ce/nginx/flips/web-p3a.conf`): 3-leg battery — (1) Node baseline, (2)
+FLIP ON Go parity, (3) FLIP OFF reversal — covering authz probes (anon /
+non-admin bounce + 403 csrf), the editor-state tri-state sequence, the create
+validation matrix (zod issue strings verbatim incl. unknown-key ORDERING),
+PATCH matrix (xhr 200 `success` vs plain 302), DELETE matrix (200 / 500 page /
+302), clear + final slate; header set incl. CSP (nonce-normalized), ETag
+(skipped only for fresh-`_id` list bodies), Set-Cookie (sid/expiry
+normalized).
+
+**P3.1 gate result (2026-09-14): 3/3 GREEN** — leg 1 Node baseline + leg 2
+FLIP-ON Go parity (0 diffs after nonce/sid/expires normalization) + leg 3
+FLIP-OFF restore; stack left at Node-active baseline (shadow armed, flip
+stripped, messages cleared, editor open).
 
 ### P4 — project core (the heavy centre; flip in listed sub-order)
 

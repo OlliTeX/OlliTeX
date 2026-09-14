@@ -367,6 +367,15 @@ func (r *RedisClient) SETXXEX(key, value string, ttl time.Duration) error {
 
 func (r *RedisClient) DEL(key string) error { _, err := r.command("DEL", key); return err }
 
+// Publish implements redis PUBLISH. The Node SystemMessageManager listens
+// on the 'refresh-system-messages' channel (notifyOtherPods) and refreshes
+// its in-memory list cache; the Go mutations must announce the same way or
+// the unflipped GET /system/messages (Node-served) goes stale.
+func (r *RedisClient) Publish(channel, message string) error {
+	_, err := r.command("PUBLISH", channel, message)
+	return err
+}
+
 func (r *RedisClient) TTL(key string) (int64, error) {
 	v, err := r.command("TTL", key)
 	if err != nil {

@@ -25,11 +25,15 @@ func statusHandler(cxt *core.Cxt, res *core.Res) {
 		res.SendStatus(503) // "Service Unavailable"
 		return
 	}
-	if os.Getenv("SITE_OPEN") == "false" {
+	// Node /status (router.mjs publicApiRouter) reads the RUNTIME Settings:
+	// siteIsOpen (SITE_OPEN !== 'false') then editorIsOpen — the latter is
+	// mutated live by /admin/openEditor|closeEditor (Settings.editorIsOpen
+	// === false ⇒ closed; undefined also falsifies here — pinned P3.1).
+	if !core.SiteOpen() {
 		res.PlainText(200, "web site is closed (web)")
 		return
 	}
-	if os.Getenv("EDITOR_OPEN") == "false" {
+	if core.EditorClosed() {
 		res.PlainText(200, "web editor is closed (web)")
 		return
 	}

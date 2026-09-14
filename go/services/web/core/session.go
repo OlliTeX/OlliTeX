@@ -396,6 +396,37 @@ func (s *Session) IsLoggedIn() bool {
 	return string(p.User) != "" && string(p.User) != "null"
 }
 
+// UserIDHex returns the logged-in user id (hex 24) from the session doc —
+// passport.user._id first, legacy session.user._id fallback. The Node app
+// serializes user id into the session as a string (passport serializeUser);
+// ObjectID-style strings are what Authorization/audit paths consume.
+func (s *Session) UserIDHex() string {
+	if raw, ok := s.Doc["passport"]; ok {
+		var p struct {
+			User json.RawMessage `json:"user"`
+		}
+		if json.Unmarshal(raw, &p) == nil && string(p.User) != "null" && string(p.User) != "" {
+			if id := userDocID(p.User); id != "" {
+				return id
+			}
+		}
+	}
+	if raw, ok := s.Doc["user"]; ok && string(raw) != "null" {
+		return userDocID(raw)
+	}
+	return ""
+}
+
+func userDocID(raw json.RawMessage) string {
+	var u struct {
+		ID string `json:"_id"`
+	}
+	if json.Unmarshal(raw, &u) == nil {
+		return u.ID
+	}
+	return ""
+}
+
 // LogoutSessionID is provided for feature code; destroying happens via the
 // store.
 func (s *Session) Key() string { return sessionKeyPrefix + s.SessID }

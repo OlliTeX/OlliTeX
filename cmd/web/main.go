@@ -27,6 +27,7 @@ import (
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/passwordreset"
+	"ollitex/go/services/web/features/serveradmin"
 	"ollitex/go/services/web/features/staticpages"
 	"ollitex/go/services/web/features/status"
 	"ollitex/go/services/web/features/systemmessages"
@@ -112,6 +113,9 @@ func main() {
 	app.RegisterFeature(passwordreset.Feature(app))
 	app.RegisterFeature(tokenaccess.Feature(app))
 
+	// P3.1 surface: ServerAdmin leaf — system-message CRUD + editor gate.
+	app.RegisterFeature(serveradmin.Feature(app))
+
 	// web profile: unknown-route 404 view (general/404) — Node
 	// webRouter.get('*', ErrorController.notFound).
 	app.SetRender404(func(cxt *core.Cxt, res *core.Res) {
@@ -143,6 +147,21 @@ func main() {
 		// slash so the render is "7420/zzz-..." and not "7420//zzz-...".
 		pth := strings.TrimPrefix(cxt.Req.URL.Path, "/")
 		views.NotFoundPage(res.W, views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin, Path: pth, UserEmail: pe, UserID: uid})
+	})
+
+	// web profile: rendered 500 page (general/500) — the ServerAdmin
+	// leaf routes error into it (pinned: nonce CSP + Permissions-Policy
+	// + 681-byte deterministic body + weak ETag).
+	app.SetRender500(func(cxt *core.Cxt, res *core.Res) {
+		origin := cfg.SiteURL
+		if origin == "" {
+			origin = "http://" + cxt.Req.Host
+		}
+		adminEmail := os.Getenv("ADMIN_EMAIL")
+		if adminEmail == "" {
+			adminEmail = "placeholder@example.com"
+		}
+		views.Error500Page(res.W, views.PageData{Nonce: views.NewNonce(), Origin: origin, AdminEmail: adminEmail})
 	})
 
 	srv := &http.Server{
