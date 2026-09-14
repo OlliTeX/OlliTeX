@@ -58,6 +58,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: entPat, Handler: entitiesHandler(a)},
 			{Method: "GET", Pattern: memPat, Handler: membersHandler(a)},
 			{Method: "GET", Pattern: arPat, Handler: accessRequestsHandler(a)},
+			{Method: "POST", Pattern: renPat, Handler: renameHandler(a)},
 		},
 	}
 }

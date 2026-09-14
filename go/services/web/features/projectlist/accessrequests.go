@@ -180,11 +180,8 @@ func accessRequestsHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 		// canUserAdminProject = OWNER or (adminPrivilegeAvailable && siteAdmin)
-		canAdmin := oidHex(dget(*doc, "owner_ref")) == uid
-		if !canAdmin && adminPrivilegeAvailable() && loadUserAdmin(a, cxt, uid) {
-			canAdmin = true
-		}
-		if !canAdmin {
+		adm := canAdmin(uid, loadUserAdmin(a, cxt, uid), *doc)
+		if !adm {
 			if core.AcceptsJSON(cxt.Req) {
 				res.JSON(403, []byte(`{"message":"restricted"}`))
 			} else {

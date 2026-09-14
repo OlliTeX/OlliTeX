@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3** (all 2026-09-14).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3** (all 2026-09-14).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -957,6 +957,45 @@ getAccessRequests + CollaboratorsGetter.ProjectAccess.loadAccessRequestsView):
 
 ---
 
+#### P4.5 — project rename (`POST /project/:Project_id/rename`) — **✅ GATE 3/3 GREEN (2026-09-14)**
+
+First write (mutation) unit — opens the P4 write family. Wired exactly as Node
+(router.mjs:798 + ProjectController.renameProject + EditorController.renameProject
++ ProjectDetailsHandler.renameProject): `requireLogin → ensureUserCanAdminProject →
+renameProject`; `newName = newName.trim()`; `validateProjectName` (blank → 400);
+`Project.updateOne({_id},{name:newName})`; **no audit entry**; `res.sendStatus(200)`.
+
+- **Contract (live-oracle, A/B 6/6 byte-identical):**
+  `200 text/plain body "OK"` (+ project `name` set to the trimmed value, verified in Mongo);
+  blank name (trim→"") → `400 text/plain "Project name cannot be blank"`;
+  missing `newProjectName` → `400 application/json` zod `received undefined`;
+  non-string `newProjectName` (number) → `400 application/json` zod `received number`;
+  invalid (non-hex) id → `404 application/json` malformed (not accept-dep);
+  valid id, project absent → `404 HTML` general/404 (not accept-dep);
+  **anonymous → `403 text/plain "Forbidden"`** (CSRF fires before requireLogin — the core
+  enforces csrf globally for POST, so the handler's 401 branch is unreachable);
+  not admin → `403 restricted` (json/html; not reachable w/ the two e2e users).
+- **Validation order (faithful to Node):** 403-anon(CSRF) > 404 (absent/malformed) >
+  403 (not admin) > 400 (body) > 200 (OK). rename emits **no** audit-log entry.
+- **Files:** new `go/services/web/features/projectlist/rename.go` (renameHandler +
+  zodReceived + writeRename); `projectlist.go` registers `POST` `^/project/([^/]+)/rename$`;
+  `access.go` shares the new `canAdmin(uid, isAdmin, doc)` helper (also used by P4.4);
+  `accessrequests.go` refactored onto `canAdmin`. Reuses loadProject/validOID/malformed404/
+  views.NotFoundPage/Restricted403 + core.Res.SendStatus/PlainText/JSON/Redirect.
+- **Flip:** `server-ce/nginx/flips/web-p4e.conf` — regex location
+  `~ ^/project/[^/]+/rename\z` → `127.0.0.1:4010` (nginx location is method-agnostic;
+  one dynamic segment + literal suffix).
+- **Gate:** `tests/e2e/specs/parity/web-go-p4e-flip.test.e2e.ts` (3-leg Node → Go → Node;
+  each leg renames the SAME fixture to a DISTINCT name and asserts (a) responses
+  status/ct/body byte-match the baseline and (b) Mongo name == that leg's name;
+  error cases assert the name is unchanged; idempotent `webgo-p4e-ren` fixture) — **3 passed**;
+  P4.1/4.2/4.3/4.4 re-run **3/3 each**; full `go test ./go/...` green; stack left node-active.
+- **Pitfall:** `res.sendStatus(200)` body is the 2-byte literal `OK` (text/plain), NOT a
+  JSON `{}` — core.Res.SendStatus mirrors this. `UpdateOne` returns `(result, error)`
+  (two values); `nameVal` must be `any` (type-asserted), not a pre-typed string.
+
+---
+
 Remaining P4 sub-units (in listed sub-order):
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
@@ -965,8 +1004,8 @@ Remaining P4 sub-units (in listed sub-order):
    ratio in the whole plan.
 2. **Chat** (517) + **Notifications** (576, web-side proxy of the Go chat +
    notifications services).
-3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) —
-   split into M0-verified sub-features (list, crud, duplicate, delete, audit).
+3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) — **list
+   (P4.1) + rename (P4.5) done**; duplicate/delete/options/audit-writer stay.
 4. **Collaborators** (3,791) — the read-side `/project/:id/members` (P4.3) and
    `/project/:id/access-requests` (P4.4) are done; the remaining invite/manage
    /transfer-ownership **mutations** stay to come.

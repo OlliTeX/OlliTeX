@@ -131,6 +131,19 @@ func loadProject(a *core.App, cxt *core.Cxt, oid primitive.ObjectID) (*primitive
 	return &d, nil
 }
 
+// canAdmin mirrors canUserAdminProject: OWNER or (adminPrivilegeAvailable &&
+// site-admin). Used by ensureUserCanAdminProject-guarded routes (rename,
+// access-requests, delete/restore).
+func canAdmin(uid string, isAdmin bool, d primitive.D) bool {
+	if uid == "" {
+		return false
+	}
+	if oidHex(dget(d, "owner_ref")) == uid {
+		return true
+	}
+	return adminPrivilegeAvailable() && isAdmin
+}
+
 // loadUserAdmin returns the user's isAdmin flag (drives the
 // hasAdminProjectCapability branch of canUserReadProject; conservative).
 func loadUserAdmin(a *core.App, cxt *core.Cxt, uid string) bool {
