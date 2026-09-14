@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); remaining P3 leaves (user-activate, SiteSettings) + P4–P7 to come. Companion
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported — see P3.5 below) remaining P3 leaf = SiteSettings + P4–P7 to come. Companion
 to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are Go-only
 as of `8090d454fb`).
 
@@ -621,6 +621,52 @@ user/token side effects.
 fail a P3.3 leg — P2's deliberate 429-burst battery drains the shared login
 rate-limit budget in Redis (login is `loginRateLimitEmail`-gated), so a P3.3
 login misbehaves. With a recovered budget P3.3 is green; not a code defect.
+
+#### P3.5 — user-activate (activation page + admin user creation) — **🚫 OUT OF SCOPE (SaaS, NOT ported) — 2026-09-14**
+**Decision: deliberately excluded from the Go drop-in (owner instruction, 2026-09-14).**
+
+**Why it's SaaS / not a CE leaf:** in a clean CE install `GET /user/activate` is simply
+**not registered → 404** (owner-verified on the reference install:
+`GET /user/activate → 404 (Not Found)`). In *this* build the route is claimed by the
+`admin-tools` module (`AdminToolsRouter.mjs:18` → `UserListController.activate-
+AccountPage`), which shadows the clean `modules/user-activate` handler and is part of
+the SaaS / hub **admin user-management** surface. The clean `user-activate` module's
+own routes are dead here: `GET /admin/register` → general-**404** page, `POST /admin/
+register` → **"Cannot POST /admin/register"** (route unregistered), `GET /admin/user`
+→ **301** `/hub#/site.general.users.all` (hub).
+
+**Live Node contracts (pinned 2026-09-14, `/tmp/ua_pin_node.json`):**
+- `GET /user/activate` (admin-tools handler):
+  - missing `user_id` or `token` → **404** (general/404, 13932B)
+  - nested `user_id` (`?user_id[x]=y`) → **403** (user/restricted, 14070B)
+  - `user_id` a string, **no such user** → **404**
+  - `user_id` a string, **valid user** (any loginCount) → **500** — **a real Node
+    bug**: `admin-tools/…/UserListController.mjs:170` renders via
+    `Path.resolve(__dirname, …)` but **`__dirname` is never defined** (ESM) →
+    `ReferenceError: __dirname is not defined` → the generic 500 page (681B,
+    `Something went wrong`, `placeholder@example.com`, weak ETag, no x-powered-by).
+    **Consequence: a real user clicking their activation email gets a 500** — the
+    register→activate flow is broken end-to-end in the reference for the happy path.
+- `POST /admin/user/create`, `POST /admin/user/:id/send-activation`, `GET /admin/user/
+  :id/info`, … (9 `/admin/user/*` CRUD routes) = the **hub admin user-management**
+  backend — tracked as its own wave in `tests/e2e/hub-parity-plan.md`
+  (`#/site.general.users.*`, `parity/hub-admin-users`), **not** part of this leaf.
+
+**Action taken:**
+- **No Go port** of `/user/activate` or the admin user-creation routes
+  (P3.4 `features/registrationpage` — commit `5ae88d595f` — is the registration *page*,
+  a separate, already-ported leaf). The Go shadow simply does not own these routes;
+  the live Node (which keeps powering the hub admin backend) continues to serve them
+  unchanged, including the 500.
+- **Node/admin-tools left untouched** (it is the hub's live admin-users backend).
+- **Flagged for the owner:** the P3.4 registration-activation mail CTA points at
+  `/user/activate` — a SaaS/broken route. In a clean-CE target this activation CTA
+  is out of scope / non-functional; decide whether the register→activate flow is
+  wanted in-product (would be a **deliberate Node+Go feature change**, not a
+  drop-in) or dropped with the SaaS surface.
+- **Follow-up (owner, optional):** fix the Node `__dirname` bug in admin-tools
+  (`const __dirname = Path.dirname(fileURLToPath(import.meta.url))`) so
+  `/user/activate` renders — only if/when the SaaS admin surface is retained.
 
 ### P4 — project core (the heavy centre; flip in listed sub-order)
 
