@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3 — `basic` template done, `example` = P4.7b follow-up** (all 2026-09-14).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done** (all 2026-09-14).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1042,11 +1042,53 @@ Third write unit — the primary "New Project" flow. Node sources
 → `validateProjectName` + `_buildTemplate('mainbasic.tex')`
 → `DocstoreManager.updateDoc` (basic) + `HistoryManager.initializeProject` (basic)).
 
-**Scope:** `template: "basic"` / absent (the common case) is ported now. The
-`template: "example"` variant (extra filestore sample files + clsi warm-up) is
-**DEFERRED to P4.7b** — heavier (cross-service file + compile-cache setup); the flip for
-`/project/new` therefore serves `basic` correctly while `example` remains Node-handled
-until P4.7b lands (documented, no data corruption).
+**Scope:** `template: "basic"` / absent (the common case) is ported here. The
+`template: "example"` variant (main.tex + sample.bib + frog.jpg blob) is P4.7b below —
+both templates are now served by Go.
+
+#### P4.7b — example project creation (`POST /project/new` `{template:"example"}`) — **✅ GATE 3/3 GREEN (2026-09-14)**
+
+The "Example project" option in New Project. Node source
+(`ProjectCreationHandler.createExampleProject` = `_createBlankProject` (same project doc +
+project_history init as basic) **+** `_addExampleProjectFiles`:
+`_buildTemplate('main.tex')`→`_createRootDoc` (docstore rev0 + setRootDoc) +
+`_buildTemplate('sample.bib')`→`addDoc` (docstore rev0) + `addFile` of `frog.jpg`
+(`uploadFileFromDisk` → git-blob-SHA1 hash → `PUT {v1_history}/projects/{id}/blobs/{hash}`
+basicAuth `staging:$V1_HISTORY_PASSWORD` → fileRef pushed to `rootFolder.fileRefs`)).
+`populateClsiCacheForExampleProject` is a **fire-and-forget clsi cache warm** (a perf
+optimisation, not a creation contract) — **deferred**.
+
+**Contract (live oracle, A/B; id-free state capture):**
+- `200 application/json` `{ project_id, owner_ref, owner:{first_name,last_name,email,_id} }`
+- project doc: `rootFolder.docs=[main.tex, sample.bib]`;
+  `rootFolder.fileRefs=[{name:'frog.jpg', rev:0, linkedFileData:null,
+  hash:'5b889ef3cf71c83a4c027c4e4dc3d1a106b27809'}]` (git-blob-SHA1 of the frog);
+  `folders=[]`; `rootDoc_id`=main.tex doc id.
+- docstore: `main.tex` **118 lines**, `sample.bib` **10 lines** (rev 0).
+- `frog.jpg` blob: retrievable from history-v1, **byte-identical** to the template
+  (md5 `665777aa6c7c48794db02f5d69ccc24a`, 97080 bytes).
+- name/template validation + anonymous 403 (shared parse path) still pin-exact.
+
+- **Files:** new `go/services/web/features/projectlist/create_example.go`
+  (`crCreateExampleProject` + `crTemplateLines` + `crGitBlobHash` =
+  `sha1("blob <n>\x00"+bytes)` + `crUploadBlob` history-v1 PUT + env
+  `WEB_V1_HISTORY_URL`/`V1_HISTORY_USER`/`V1_HISTORY_PASSWORD`/`WEB_EXAMPLE_PROJECT_DIR`);
+  `create.go` refactored — `crInsertProject`/`crCreateDocRevision` parameterised so
+  basic + example share one doc shape, handler branches on `template`.
+- **Gate:** `tests/e2e/specs/parity/web-go-p4hb-flip.test.e2e.ts` (3-leg Node → Go → Node;
+  each leg: delete prior `webgo-p4hb-*` → example create + id-free state capture
+  (doc names, fileRef {name,rev,linkedFileData,hash}, docstore line-counts, frog-blob
+  md5+size) → error battery + anon → cleanup; cross-leg diffs compare the 200 body +
+  state + every error case) — **3 passed**; full P4.1–P4.7 re-run **3/3 each**;
+  `go test ./go/...` green; stack left node-active.
+- **Pitfalls:** (a) the fileRef `hash` is a **git blob SHA1**
+  (`sha1("blob <len>\x00"+bytes)`), *not* the raw md5 (md5 `665777…` ≠ hash `5b889ef3…`);
+  (b) the blob must be PUT to **history-v1** (`:3100/api`, basicAuth `staging`), and the
+  project must be registered first via project_history `:3054` (the same
+  `initializeProject` basic already calls);
+  (c) the `mongodb` driver only resolves from inside the pnpm workspace, so the gate's
+  state-capture script runs from `/overleaf/services/web`; (d) clsi cache warm is
+  intentionally **not** replicated (perf-only, fire-and-forget in Node).
 
 - **Contract (live oracle, A/B 13/13 + gate 3/3; id-normalized state):**
   `200 application/json` `{ project_id, owner_ref, owner:{first_name,last_name,email,_id} }`
@@ -1097,9 +1139,8 @@ Remaining P4 sub-units (in listed sub-order):
 2. **Chat** (517) + **Notifications** (576, web-side proxy of the Go chat +
    notifications services).
 3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) — **list (P4.1) +
-   rename (P4.5) + flag-writes archive/trash (P4.6) + basic-creation (P4.7) done**; the
-   `example`-template creation (P4.7b, filestore+clsi), duplicate/delete/restore/options/
-   settings/clone stay.
+   rename (P4.5) + flag-writes archive/trash (P4.6) + creation basic (P4.7) + example
+   (P4.7b) done**; duplicate/delete/restore/options/settings/clone stay.
 4. **Collaborators** (3,791) — the read-side `/project/:id/members` (P4.3) and
    `/project/:id/access-requests` (P4.4) are done; the remaining invite/manage
    /transfer-ownership **mutations** stay to come.

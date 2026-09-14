@@ -68,6 +68,18 @@ func crBasicTemplate() string {
 		"/overleaf/services/web/app/templates/project_files/mainbasic.tex")
 }
 
+// P4.7b — 'example' variant config. The template dir holds main.tex,
+// sample.bib and frog.jpg (free build uses the '-sp' suffix variant). The
+// history-v1 blob store is the same backend project-history(3054) initialises;
+// auth mirrors Node's HISTORY_V1_BASIC_AUTH (staging / V1_HISTORY_PASSWORD).
+func crV1HistoryBase() string { return crEnvOr("WEB_V1_HISTORY_URL", "http://127.0.0.1:3100/api") }
+func crV1HistoryUser() string { return crEnvOr("V1_HISTORY_USER", "staging") }
+func crV1HistoryPass() string { return crEnvOr("V1_HISTORY_PASSWORD", "") }
+func crExampleProjectDir() string {
+	return crEnvOr("WEB_EXAMPLE_PROJECT_DIR",
+		"/overleaf/services/web/app/templates/project_files/example-project-sp")
+}
+
 var crHTTP = &http.Client{Timeout: 12 * time.Second}
 
 var createMonthNames = []string{
@@ -319,16 +331,14 @@ func newProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 
-		// BASIC project (default + any non-'example' template value). The
-		// 'example' variant (files + clsi cache) is a P4.7b follow-up.
-		_ = body.template
-
-		pid := primitive.NewObjectID()
-		docID := primitive.NewObjectID()
-		rootID := primitive.NewObjectID()
-		crInsertProject(a, cxt, pid, docID, rootID, name, uid, u.spellCheckLanguage)
-		crCreateDocRevision(cxt, pid, docID, name, u.first, u.last)
-		crInitHistory(cxt, pid.Hex())
+		// Branch: 'example' (main.tex + sample.bib + frog.jpg blob) vs the
+		// default BASIC (mainbasic.tex). Both return the new project id.
+		var pid primitive.ObjectID
+		if body.tmplPresent && body.template == "example" {
+			pid = crCreateExampleProject(a, cxt, name, uid, u)
+		} else {
+			pid = crCreateBasicProject(a, cxt, name, uid, u)
+		}
 
 		b, _ := json.Marshal(crOut{
 			ProjectID: pid.Hex(),
@@ -342,6 +352,21 @@ func newProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		})
 		res.JSON(200, b)
 	}
+}
+
+// crCreateBasicProject: basic 'New Project' (mainbasic.tex -> main.tex).
+func crCreateBasicProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwnerUser) primitive.ObjectID {
+	pid := primitive.NewObjectID()
+	docID := primitive.NewObjectID()
+	rootID := primitive.NewObjectID()
+	docs := bson.A{bson.D{
+		{Key: "name", Value: "main.tex"},
+		{Key: "_id", Value: docID},
+	}}
+	crInsertProject(a, cxt, pid, rootID, docID, name, uid, u.spellCheckLanguage, docs, bson.A{})
+	crCreateDocRevision(cxt, pid, docID, crBasicDocLines(name, u.first, u.last))
+	crInitHistory(cxt, pid.Hex())
+	return pid
 }
 
 type crOwnerUser struct {
@@ -391,7 +416,11 @@ func loadOwnerUser(a *core.App, cxt *core.Cxt, uid string) (crOwnerUser, bool) {
 
 // crInsertProject writes the project document, mirroring Node's Mongoose
 // default field set + the basic project's rootFolder/main.tex.
-func crInsertProject(a *core.App, cxt *core.Cxt, pid, docID, rootID primitive.ObjectID, name, ownerRef, spellLang string) {
+// crInsertProject writes the project document, mirroring Node's Mongoose
+// default field set. The rootFolder contents (docs / fileRefs / rootDoc_id)
+// are parameterised so the BASIC ('main.tex') and EXAMPLE (main.tex, sample.bib,
+// frog.jpg) variants share one document shape.
+func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID, rootDocID primitive.ObjectID, name, ownerRef, spellLang string, docs bson.A, fileRefs bson.A) {
 	if a.Mongo == nil {
 		return
 	}
@@ -434,25 +463,21 @@ func crInsertProject(a *core.App, cxt *core.Cxt, pid, docID, rootID primitive.Ob
 		{Key: "rootFolder", Value: bson.A{bson.D{
 			{Key: "name", Value: "rootFolder"},
 			{Key: "_id", Value: rootID},
-			{Key: "docs", Value: bson.A{bson.D{
-				{Key: "name", Value: "main.tex"},
-				{Key: "_id", Value: docID},
-			}}},
-			{Key: "fileRefs", Value: []bson.D{}},
+			{Key: "docs", Value: docs},
+			{Key: "fileRefs", Value: fileRefs},
 			{Key: "folders", Value: []bson.D{}},
 		}}},
 		{Key: "deletedDocs", Value: []bson.D{}},
 		{Key: "collabratecUsers", Value: []primitive.M{}},
 		{Key: "__v", Value: 0},
 		{Key: "version", Value: 1},
-		{Key: "rootDoc_id", Value: docID},
+		{Key: "rootDoc_id", Value: rootDocID},
 	}
 	_, _ = db.Collection("projects").InsertOne(ctx, doc)
 }
 
 // crCreateDocRevision asks the docstore (Go service) for revision 0 of the doc.
-func crCreateDocRevision(cxt *core.Cxt, pid, docID primitive.ObjectID, name, first, last string) {
-	lines := crBasicDocLines(name, first, last)
+func crCreateDocRevision(cxt *core.Cxt, pid, docID primitive.ObjectID, lines []string) {
 	payload, _ := json.Marshal(map[string]any{
 		"lines":   lines,
 		"version": 0,
