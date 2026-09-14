@@ -56,6 +56,7 @@ func Feature(a *core.App) core.Feature {
 		Routes: []core.Route{
 			{Method: "GET", Path: "/user/projects", Handler: handler(a)},
 			{Method: "GET", Pattern: entPat, Handler: entitiesHandler(a)},
+			{Method: "GET", Pattern: memPat, Handler: membersHandler(a)},
 		},
 	}
 }

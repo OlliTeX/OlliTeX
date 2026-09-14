@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ GATE 3/3 GREEN; P4.2 project-entities ✔ GATE 3/3 GREEN** (both 2026-09-14).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ GATE 3/3 GREEN; P4.2 project-entities ✔ GATE 3/3 GREEN; P4.3 project-members ✔ GATE 3/3 GREEN** (all 2026-09-14).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -875,6 +875,46 @@ follow-up, left untouched here.
 
 ---
 
+#### P4.3 — project members (`GET /project/:Project_id/members`) — **✅ GATE 3/3 GREEN (2026-09-14)**
+
+The share-modal / "active members" list — the first, bounded read slice of the
+Collaborators sub-unit. Wired exactly as Node (router.mjs:545 +
+CollaboratorsController.getAllMembers +
+CollaboratorsGetter.getAllInvitedMembers + ProjectAccess.loadInvitedMembers):
+`requireLogin → (blockRestrictedUserFromProject) → ensureUserCanReadProject →
+{ members: [ … ] }` — invited members only (the OWNER and TOKEN-sourced members
+are **omitted**), order `collaborators → reviewers → readOnly` in array order
+(no dedup, no sort), `privileges` ∈ `readAndWrite|review|readOnly`, per-member
+key order `_id, first_name, last_name, email, privileges, signUpDate[, pendingEditor[, pendingReviewer]]`,
+missing-user members dropped, `signUpDate` an ISO string with ms (Node
+`JSON.stringify(Date)`).
+
+- **Contract (live-oracle, A/B 8/8 byte-identical):** owned/collab 200; no-access
+  403 `{"message":"restricted"}` (json) / Restricted (html); absent project 404
+  general/404 (html, not accept-dep); malformed id 404
+  `{"error":"Validation error: Invalid Mongo ObjectId at \"params.Project_id\"","statusCode":404}`
+  (not accept-dep); anon 401 (json) / 302 `/login` (html). Member rows batch-loaded
+  from `users` (projection `_id,email,first_name,last_name,signUpDate`).
+- **Pitfall:** when decoding member user docs into `primitive.D`, the driver
+  yielded the BSON `signUpDate` as a non-`time.Time` type — `signUpDateISO` must
+  accept `time.Time` *or* `primitive.DateTime` *or* an int64 ms epoch, then format
+  `2006-01-02T15:04:05.000Z`; handling only `time.Time` silently emitted `null`.
+- **Files:** new `go/services/web/features/projectlist/members.go` (membersHandler +
+  invitedMemberRows + loadUsers + signUpDateISO); `projectlist.go` registers
+  `GET` `^/project/([^/]+)/members$` (reuses P4.2 access/loadProject/validOID/malformed404
+  + views.NotFoundPage/Restricted403). Reuses the shared views restricted/404 pages
+  (PATH slot = `project/<id>/members`).
+- **Flip:** `server-ce/nginx/flips/web-p4c.conf` — regex location
+  `~ ^/project/[^/]+/members\z` → `127.0.0.1:4010` (one dynamic segment, empty id
+  falls through to Node 404).
+- **Gate:** `tests/e2e/specs/parity/web-go-p4c-flip.test.e2e.ts` (3-leg, Node oracle →
+  flip → Node reversal; 8-case battery; idempotent `webgo-p4c-{own,col,na}` fixtures;
+  `signUpDate` ISO asserted; 403 html normalized on nonce + csrf + site origin) — **3 passed**;
+  P4.1 + P4.2 gates re-run **3/3 + 3/3** (shared projectlist/views no regression);
+  stack left node-active.
+
+---
+
 Remaining P4 sub-units (in listed sub-order):
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
@@ -885,7 +925,9 @@ Remaining P4 sub-units (in listed sub-order):
    notifications services).
 3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) —
    split into M0-verified sub-features (list, crud, duplicate, delete, audit).
-4. **Collaborators** (3,791).
+4. **Collaborators** (3,791) — the read-side `/project/:id/members` (active members
+   list) is done as **P4.3**; the remaining invite/manage/transfer-ownership
+   mutations stay to come.
 5. **History** (2,556 — clients of history-v1/project-history services).
 6. **ThirdPartyDataStore** (1,189), **Templates** (293) + template-gallery
    module (5.3k), **Launchpad** (1,774).
