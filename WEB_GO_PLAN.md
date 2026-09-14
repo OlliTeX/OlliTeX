@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3** (all 2026-09-14).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3 — `basic` template done, `example` = P4.7b follow-up** (all 2026-09-14).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1033,6 +1033,59 @@ independently. All four ops are **no-audit** in this free build (`addEntryIfMana
   Node probe has no `docker` CLI, so Mongo state reads belong in the host-side gate
   (Playwright `execFileSync('docker','exec',mongoC,'mongosh…')`).
 
+#### P4.7 — basic project creation (`POST /project/new`) — **✅ GATE 3/3 GREEN (2026-09-14)**
+
+Third write unit — the primary "New Project" flow. Node sources
+(`router.mjs` `webRouter.post('/project/new',…newProject)` →
+`ProjectController.newProject` → `createBasicProject`/`createExampleProject`
+→ `ProjectCreationHandler.createBasicProject` = `_createBlankProject` + `_createRootDoc`
+→ `validateProjectName` + `_buildTemplate('mainbasic.tex')`
+→ `DocstoreManager.updateDoc` (basic) + `HistoryManager.initializeProject` (basic)).
+
+**Scope:** `template: "basic"` / absent (the common case) is ported now. The
+`template: "example"` variant (extra filestore sample files + clsi warm-up) is
+**DEFERRED to P4.7b** — heavier (cross-service file + compile-cache setup); the flip for
+`/project/new` therefore serves `basic` correctly while `example` remains Node-handled
+until P4.7b lands (documented, no data corruption).
+
+- **Contract (live oracle, A/B 13/13 + gate 3/3; id-normalized state):**
+  `200 application/json` `{ project_id, owner_ref, owner:{first_name,last_name,email,_id} }`
+  **+ a full Mongo project doc (Node's exact default field set) + docstore revision 0
+  (`mainbasic.tex`, 15 lines) + project_history `initializeProject`.**
+  Error battery (byte-pinned):
+  * `projectName` absent OR whitespace → `400 text/plain` `Project name cannot be blank`
+  * `projectName` has `/` → `400 text/plain` `Project name cannot contain / characters`
+  * `projectName` > 150 UTF-16 units → `400 text/plain` `Project name is too long`
+  * `projectName`/`template` non-string → `400 application/json`
+    `{error:"Validation error: Invalid input: expected string, received <T> at body.<f>",statusCode:400}`
+  * unrecognized body key → `400 application/json` `{error:"Validation error: Unrecognized key(s): "k" at "body"",statusCode:400}`
+  * body not a JSON object (number/string/null/boolean/array-root) OR invalid JSON → `400 application/json` `{}`
+  * anonymous → `403 text/plain` `Forbidden` (CSRF before requireLogin)
+  zod accumulates **all** errors joined by `"; "` (value-errors projectName→template,
+  then the unrecognized-key error; 13 cases total, Node-vs-Go A/B identical).
+- **Files:** new `go/services/web/features/projectlist/create.go` (~640 LoC:
+  `newProjectHandler` + `crParseCreateBody`/zod + `crNameError`/`crSanitizeControl`
+  /`crUTF16Len` + `crInsertProject` (Node's exact default doc) + `crBasicDocLines`
+  (`mainbasic.tex`) + docstore/project_history HTTP clients, env-overridable
+  `WEB_DOCSTORE_URL` / `WEB_PROJECT_HISTORY_URL` / `WEB_BASIC_PROJECT_TEMPLATE`);
+  `projectlist.go` registers `POST /project/new` (createNewPat `^/project/new$`).
+- **Flip:** `server-ce/nginx/flips/web-p4g.conf` — exact `location = /project/new` →
+  `127.0.0.1:4010`.
+- **Gate:** `tests/e2e/specs/parity/web-go-p4g-flip.test.e2e.ts` (3-leg Node → Go → Node;
+  each leg: delete prior `webgo-p4g-*` → success create asserting 200 + (id-normalized)
+  Mongo doc + docstore line-count → 13-case error battery + anon → cleanup; cross-leg
+  diffs compare the 200 body (ids normalized) + project doc + docstore + every error case)
+  — **3 passed**; P4.1–P4.6 re-run **3/3 each**; full `go test ./go/...` green; stack left node-active.
+- **Pitfalls:** (a) Node's project schema has **two differently-spelled** "collaborator"
+  keys — `collaborator`+`_refs` (the refs array) and `collaboratec`+`Users` (a different
+  spelling) — Go must emit each **exact byte sequence** (char-for-char), not the
+  "correct English" spelling (a one-char `o`/`l` miss is a real schema divergence); (b)
+  `spellCheckLanguage` inherits the **User model default `en`** (not the raw user-doc
+  value, which may be absent) — Go defaults empty → `"en"`; (c) mainbasic.tex is **15
+  lines after `split('\n')`** (trailing newline); the empty-body case is treated as `{}`
+  (projectName undefined → blank error);
+  (d) `overleaf.history.id` is a **hex string equal to the project `_id`** (not a new ObjectId).
+
 ---
 
 Remaining P4 sub-units (in listed sub-order):
@@ -1044,7 +1097,8 @@ Remaining P4 sub-units (in listed sub-order):
 2. **Chat** (517) + **Notifications** (576, web-side proxy of the Go chat +
    notifications services).
 3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) — **list (P4.1) +
-   rename (P4.5) + flag-writes archive/trash (P4.6) done**; duplicate/delete/restore/options/
+   rename (P4.5) + flag-writes archive/trash (P4.6) + basic-creation (P4.7) done**; the
+   `example`-template creation (P4.7b, filestore+clsi), duplicate/delete/restore/options/
    settings/clone stay.
 4. **Collaborators** (3,791) — the read-side `/project/:id/members` (P4.3) and
    `/project/:id/access-requests` (P4.4) are done; the remaining invite/manage
