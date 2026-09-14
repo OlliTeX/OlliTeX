@@ -103,6 +103,7 @@ var accessProj = bson.D{
 	{Key: "tokenAccessReadAndWrite_refs", Value: 1},
 	{Key: "tokenAccessReadOnly_refs", Value: 1},
 	{Key: "publicAccesLevel", Value: 1},
+	{Key: "editAccessRequests", Value: 1},
 	{Key: "rootFolder", Value: 1},
 }
 

@@ -57,6 +57,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Path: "/user/projects", Handler: handler(a)},
 			{Method: "GET", Pattern: entPat, Handler: entitiesHandler(a)},
 			{Method: "GET", Pattern: memPat, Handler: membersHandler(a)},
+			{Method: "GET", Pattern: arPat, Handler: accessRequestsHandler(a)},
 		},
 	}
 }

@@ -1,7 +1,6 @@
 package projectlist
 
 import (
-	"context"
 	"encoding/json"
 	"regexp"
 	"strings"
@@ -9,7 +8,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -95,46 +93,15 @@ func invitedMemberRows(doc *primitive.D) []memberRow {
 // loadUsers batch-loads the member user docs (Node: UserGetter.getUsers with
 // projection {_id, email, first_name, last_name, signUpDate}).
 func loadUsers(a *core.App, cxt *core.Cxt, rows []memberRow) map[string]primitive.D {
-	out := map[string]primitive.D{}
-	if a.Mongo == nil || len(rows) == 0 {
-		return out
-	}
-	oids := make([]primitive.ObjectID, 0, len(rows))
+	uids := make([]string, 0, len(rows))
 	for _, r := range rows {
-		if o, err := primitive.ObjectIDFromHex(r.uid); err == nil {
-			oids = append(oids, o)
-		}
+		uids = append(uids, r.uid)
 	}
-	if len(oids) == 0 {
-		return out
-	}
-	ctx, cancel := context.WithTimeout(cxt.Req.Context(), 10*time.Second)
-	defer cancel()
-	db, err := a.Mongo.DB(ctx)
-	if err != nil {
-		return out
-	}
-	cur, err := db.Collection("users").Find(ctx,
-		bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: oids}}}},
-		options.Find().SetProjection(bson.D{
-			{Key: "_id", Value: 1}, {Key: "email", Value: 1},
-			{Key: "first_name", Value: 1}, {Key: "last_name", Value: 1},
-			{Key: "signUpDate", Value: 1},
-		}))
-	if err != nil {
-		return out
-	}
-	defer cur.Close(ctx)
-	var docs []primitive.D
-	if cur.All(ctx, &docs) != nil {
-		return out
-	}
-	for i := range docs {
-		if h := oidHex(dget(docs[i], "_id")); h != "" {
-			out[h] = docs[i]
-		}
-	}
-	return out
+	return loadUsersHex(a, cxt, uids, bson.D{
+		{Key: "_id", Value: 1}, {Key: "email", Value: 1},
+		{Key: "first_name", Value: 1}, {Key: "last_name", Value: 1},
+		{Key: "signUpDate", Value: 1},
+	})
 }
 
 func membersHandler(a *core.App) func(*core.Cxt, *core.Res) {

@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ GATE 3/3 GREEN; P4.2 project-entities ✔ GATE 3/3 GREEN; P4.3 project-members ✔ GATE 3/3 GREEN** (all 2026-09-14).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3** (all 2026-09-14).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -915,6 +915,48 @@ missing-user members dropped, `signUpDate` an ISO string with ms (Node
 
 ---
 
+#### P4.4 — access-requests (`GET /project/:Project_id/access-requests`) — **✅ GATE 3/3 GREEN (2026-09-14)**
+
+The owner/admin-facing list of pending access requests (the second bounded read
+slice of the Collaborators sub-unit, same package + shared access infra as P4.3).
+Wired exactly as Node (CollaboratorsRouter + CollaboratorsController.
+getAccessRequests + CollaboratorsGetter.ProjectAccess.loadAccessRequestsView):
+`requireLogin → ensureUserCanAdminProject → { editAccessRequests: [ … ] }`.
+
+- **Contract (live-oracle, A/B 7/7 byte-identical):**
+  `200 {editAccessRequests:[{_id, email, first_name, last_name, privilegeLevel,
+  currentPrivilegeLevel, requestedAt}]}` — `privilegeLevel` = the level REQUESTED,
+  `currentPrivilegeLevel` = their CURRENT level (owner|readAndWrite|review|readOnly)
+  **or `false`** (`PrivilegeLevels.NONE`, a boolean) when not a member;
+  `requestedAt` = ISO-ms string; order = `project.editAccessRequests` array order
+  (no sort/dedup); rows whose user doc is gone are dropped; empty list → `[]`.
+- **Guard (`canUserAdminProject`):** `OWNER` **or** site-admin-with-`modify-project-setting`
+  (here `ADMIN_PRIVILEGE_AVAILABLE=true` → `owner || user.isAdmin`). Not admin →
+  `403 {"message":"restricted"}` (json) / Restricted (html). (Not A/B-able in this e2e:
+  the two fixture users are the owner and a site-admin, so both hit the 200/404 paths.)
+- **Error contract** (same family as P4.2/P4.3): absent project 404 general/404
+  (html, not accept-dep); malformed id 404 malformed JSON (not accept-dep); anon
+  401 (json) / 302 `/login` (html).
+- **Pitfall:** the shared `accessProj` (access.go) had to add `editAccessRequests: 1`
+  — without it `loadProject` returned a doc with no request rows and the 200 body
+  silently collapsed to `{"editAccessRequests":[]}` (members/entities still pass;
+  they ignore the extra projected field). `currentPrivilegeLevel: false` is a bare
+  JSON boolean (NOT the string "false") — `writeJSONVal` handles that.
+- **Files:** new `go/services/web/features/projectlist/accessrequests.go` (handler +
+  currentPrivLevel + loadUsersHex + writeJSONVal); `projectlist.go` registers
+  `GET` `^/project/([^/]+)/access-requests$`; `members.go` `loadUsers` now delegates to
+  the shared `loadUsersHex`; `access.go` `accessProj` gains `editAccessRequests`.
+- **Flip:** `server-ce/nginx/flips/web-p4d.conf` — regex location
+  `~ ^/project/[^/]+/access-requests\z` → `127.0.0.1:4010` (one dynamic segment +
+  literal suffix; empty id falls through to Node 404).
+- **Gate:** `tests/e2e/specs/parity/web-go-p4d-flip.test.e2e.ts` (3-leg Node → Go →
+  Node; 7-case battery; idempotent `webgo-p4d-{req,empty}` fixtures; pins
+  `currentPrivilegeLevel:false`, `requestedAt` ISO, row key order; 404 html normalized
+  on nonce+csrf+origin) — **3 passed**; P4.1/P4.2/P4.3 re-run **3/3 + 3/3 + 3/3**;
+  stack left node-active.
+
+---
+
 Remaining P4 sub-units (in listed sub-order):
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
@@ -925,9 +967,9 @@ Remaining P4 sub-units (in listed sub-order):
    notifications services).
 3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) —
    split into M0-verified sub-features (list, crud, duplicate, delete, audit).
-4. **Collaborators** (3,791) — the read-side `/project/:id/members` (active members
-   list) is done as **P4.3**; the remaining invite/manage/transfer-ownership
-   mutations stay to come.
+4. **Collaborators** (3,791) — the read-side `/project/:id/members` (P4.3) and
+   `/project/:id/access-requests` (P4.4) are done; the remaining invite/manage
+   /transfer-ownership **mutations** stay to come.
 5. **History** (2,556 — clients of history-v1/project-history services).
 6. **ThirdPartyDataStore** (1,189), **Templates** (293) + template-gallery
    module (5.3k), **Launchpad** (1,774).
