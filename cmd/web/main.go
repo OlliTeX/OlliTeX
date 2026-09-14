@@ -29,6 +29,7 @@ import (
 	"ollitex/go/services/web/features/passwordreset"
 	"ollitex/go/services/web/features/registrationpage"
 	"ollitex/go/services/web/features/instancestats"
+	"ollitex/go/services/web/features/projectlist"
 	"ollitex/go/services/web/features/serveradmin"
 	"ollitex/go/services/web/features/sitesettings"
 	"ollitex/go/services/web/features/staticpages"
@@ -125,6 +126,9 @@ func main() {
 
 	// P3.6 surface: Manage/Site SiteSettings leaf.
 	app.RegisterFeature(sitesettings.Feature(app))
+
+	// P4.1 surface: project list (GET /user/projects).
+	app.RegisterFeature(projectlist.Feature(app))
 
 	// web profile: unknown-route 404 view (general/404) — Node
 	// webRouter.get('*', ErrorController.notFound).

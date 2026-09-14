@@ -1,9 +1,9 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN (2026-09-14)** — **all of P3 complete.** Companion
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ GATE 3/3 GREEN (2026-09-14).** Companion
 to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are Go-only
-as of `8090d454fb`). P4–P7 to come.
+as of `8090d454fb`). P4.2–P7 to come.
 
 ---
 
@@ -756,6 +756,43 @@ initially p3e) called a nonexistent `POST /api/flush` (silent no-op) relying on
 before/after deltas to mask it; all three now use the real endpoint.
 
 ### P4 — project core (the heavy centre; flip in listed sub-order)
+
+#### P4.1 — project list (`GET /user/projects`) — **✅ GATE 3/3 GREEN (2026-09-14)**
+
+**Scope:** the project-list endpoint the hub/`projects` surface calls.
+**Go package: `go/services/web/features/projectlist/`** (3 files):
+`projectlist.go` (Feature + `buildList` + wire types), `format.go`
+(`viewModel` = per-user archived/trashed), `queries.go` (the six `projects`
+reads). Wired in `cmd/web/main.go`; flip `server-ce/nginx/flips/web-p4a.conf`;
+gate `tests/e2e/specs/parity/web-go-p4a-flip.test.e2e.ts`.
+
+**Route + pins (Node oracle, live 2026-09-14; A/B byte-identical):**
+- `GET /user/projects` (logged-in) → **200 `application/json`**
+  `{ "projects": [ {"_id", "name", "accessLevel"}, … ] }` — the ONLY three
+  fields per entry, in EXACT bucket order (owned → invite-readWrite/review/
+  readOnly → token-readAndWrite/readOnly, token buckets de-duplicated against
+  any id already listed), **no sorting**, and with projects the user is a
+  member of `archived[]` or `trashed[]` **omitted** (`.filter(!(archived||trashed))`).
+- **accessLevel strings (exact):** `owner` / `readWrite` (invite) / `review`
+  (invite) / `readOnly` (invite) / `readAndWrite` (token) / `readOnly` (token).
+- anon GET accept json → **401**; anon GET accept html → **302** `/login`
+  (the global `requireLogin` gate, shared with Node via the same redis session).
+
+**Pitfall caught by the live oracle:** the route wires
+`ProjectController.userProjectsJson` — the *simple* handler above. There is a
+separate, richer `ProjectListController.getProjectsJson`
+(`{totalSize, projects:[{id,…,lastUpdated,owner}]}`) that is **NOT** wired to
+this route in this build. Pinning from the higher-level controller would have
+produced the wrong shape; the **running Node response is authoritative** (as
+with P3.6).
+
+**Evidence:** A/B (Node:4000 vs Go:4010) byte-identical for both fixture users
+(admin 13853B / user 12965B, matching etag + content-length) and the anon
+401/302 contract; flip gate **leg1 Node / leg2 Go(flip) / leg3 Node** all
+byte-identical (**3 passed, 31.1s**). `go build` + `go vet` + `go test ./go/…`
+green (19 packages). Stack left node-active.
+
+---
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go
