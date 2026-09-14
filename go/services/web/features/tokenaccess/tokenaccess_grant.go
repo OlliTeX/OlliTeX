@@ -96,8 +96,9 @@ func consent(a *core.App, which string) func(*core.Cxt, *core.Res) {
 		// ensureUserCanReadProject: owner / named member (pinned: pure
 		// token-ref members get 403 Restricted).
 		if uid == "" || !(p.OwnerRef == uid || p.inRefs(p.CollabRefs, uid) || p.inRefs(p.ReadonlyNamedRefs, uid)) {
-			// Node renders the Restricted view with a 403
-			views.Restricted403(res.W, pageBase(cxt, nil))
+			// Node renders the Restricted view with a 403 (layout alternate link
+			// = the request path: subdomainDetails.url + currentUrl).
+			views.Restricted403(res.W, pageBase(cxt, func(d *views.PageData) { d.Path = "project/" + pidHex + "/sharing-updates" }))
 			return
 		}
 		// ensureUserCanUseSharingUpdatesConsentPage

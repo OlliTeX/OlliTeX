@@ -1,9 +1,9 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ GATE 3/3 GREEN (2026-09-14).** Companion
-to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are Go-only
-as of `8090d454fb`). P4.2–P7 to come.
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ GATE 3/3 GREEN; P4.2 project-entities ✔ GATE 3/3 GREEN** (both 2026-09-14).
+Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
+Go-only as of `8090d454fb`). P4.3–P7 to come.
 
 ---
 
@@ -793,6 +793,89 @@ byte-identical (**3 passed, 31.1s**). `go build` + `go vet` + `go test ./go/…`
 green (19 packages). Stack left node-active.
 
 ---
+
+#### P4.2 — project entities (`GET /project/:Project_id/entities`) — **✅ GATE 3/3 GREEN (2026-09-14)**
+
+**Scope:** the entity listing the file-tree/word-count surfaces call.
+**Go package: `go/services/web/features/projectlist/`** (added 2 files to the
+P4.1 package): `access.go` (read authorization — the Node
+`ensureUserCanReadProject` mirror) + `entities.go` (the route handler + the
+`rootFolder` recursive walk). Wired in `projectlist.go` (`pattern`,
+`pattern`, `handler`).
+
+**Route + pins (Node oracle, live 2026-09-14; A/B byte-identical 10/10):**
+- `GET /project/:Project_id/entities` (logged-in, owned, valid id) →
+  **200 `application/json`** `{ "project_id", "entities":[{ "path","type" }, …] }`
+  where `type` ∈ `doc` | `file` and `path` is the slash-joined tree path
+  (root = `""`, so `/name` for root children, `/sub/name` for a subfolder),
+  **sorted ascending by path**. The walk reads `rootFolder[0]` and recurses
+  `folder.folders`, emitting `folder.docs` → `doc` and `folder.fileRefs` →
+  `file` (via `IterablePath` = `folder[field] || []`, so absent folders are
+  empty, not an error).
+- **read authorization** (`canRead`, mirrors Node `ensureUserCanReadProject`): the
+  caller is the owner, or is named in `collaberator_refs` / `reviewer_refs` /
+  `readOnly_refs`, or the project is `publicAccesLevel ∈ {readOnly, full}` (or
+  `tokenBased` + named in `tokenAccess*Refs`), or the caller is an admin.
+- **accept-sensitive 403 (exists but no read access):** `accept json` → **403
+  `{ "message": "restricted" }`** (`application/json`); `accept html` → **403
+  text/html** Restricted view. (Pinned: NOT a 404 — the *project* exists, the
+  user just can't read it.)
+- **valid id, project absent** → **404 text/html general/404** (NOT
+  accept-dependent).
+- **INVALID (non-hex) id** → **404 `application/json`** the exact Node
+  validation body `{"error":"Validation error: Invalid Mongo ObjectId at
+  \"params.Project_id\"","statusCode":404}` (NOT accept-dependent, NOT the
+  general/404 view).
+- **anon** accept json → **401**; accept html → **302 /login** (the
+  `requireLogin` gate runs before the entities handler).
+
+**Contract detail caught while mirroring Node:** the `general/404` page uses
+the **request-relative path** in its `<link rel=alternate>`
+(`subdomainDetails.url + currentUrl`, `currentUrl` = the route path *without*
+a leading slash). The Go shared views kept `/restricted` hardcoded, so
+`PageData.Path` (the request relative path) is now fed into BOTH the `404`
+and `restricted` skeletons (`views/pages_data.go` — a single `PATH` slot each),
+and the three existing callers are corrected: `authpages` (`/restricted` →
+`Path: "restricted"`), the `tokenaccess` consent-403 (→ `Path`
+`"project/<id>/sharing-updates"`), and this route (→ `Path`
+`"project/<id>/entities"`). The `403`/`404` **bodies** are the only
+`accept`-sensitive outputs; the status codes are not.
+
+**Normalization in the gate:** the 403/404 **HTML** views embed a random
+per-render CSP nonce and a *salted random* csrf token
+(`8 base62 + "-" + base64(SHA1(salt+csrfSecret))` — the salts differ even
+Node→Node, so byte-parity is impossible); the gate normalizes nonce +
+`ol-csrfToken` + the `_csrf` value + the site origin before the body compare.
+JSON bodies (200 / 403-json / malformed-404-json) and their ETags are compared
+byte-for-byte. The `200` body is byte-identical (no random slots).
+
+**Files:** `features/projectlist/access.go`, `features/projectlist/entities.go`;
+`features/projectlist/projectlist.go` (route); `views/pages.go` (
+`PageData.Path` doc + `Restricted403` note), `views/pages_data.go` (PATH slot in
+both skeletons), `features/authpages/authpages.go` + `features/tokenaccess/
+tokenaccess_grant.go` (Path callers); flip `server-ce/nginx/flips/web-p4b.conf`
+(REGEX location `^/project/[^/]+/entities\z` — the id is a dynamic single
+segment, mirroring Node's `:Project_id`); gate `tests/e2e/specs/parity/
+web-go-p4b-flip.test.e2e.ts`.
+
+**Evidence:** A/B (Node:4000 vs Go:4010, shared session) **10/10 byte-identical**
+after nonce/csrf/sid normalization (owned-200, multi-entity, noaccess-403 json+html,
+unknown-404 html, malformed-404 json, anon-401/302); the shared `GET /restricted`
+route (authpages) re-verified **byte-identical** (no regression) after the
+skeleton `Path` change. Flip gate **leg1 Node / leg2 Go(flip) / leg3 Node** all
+match (**3 passed, 31.6s**). `go build` + `go vet` + `go test ./go/…` green
+(19 packages). Stack left node-active.
+
+**Known pre-existing edge (NOT introduced here, NOT part of P4.2 gate):** a
+*logged-in* user who is a *token-read-only* member (in
+`tokenAccessReadOnly_refs`) hitting `GET /project/<id>/sharing-updates` gets
+**Node 302 → /project/<id>** vs **Go 403** in this build — the consent branch on
+two sub-route (`tokenaccess`) differs; recorded for a future P2-tokenaccess
+follow-up, left untouched here.
+
+---
+
+Remaining P4 sub-units (in listed sub-order):
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go

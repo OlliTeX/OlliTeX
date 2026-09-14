@@ -34,16 +34,16 @@ const (
 	slotResetToken = "\x01RSTOKEN\x02"
 	slotPostURL    = "\x01POSTURL\x02"
 	// P3.3 slots (tools/webviews-capture-p3c.py):
-	slot33User     = "\x01USR33\x02"    // ol-user meta JSON (settings page)
-	slot33HBS      = "\x01HBS33\x02"    // ,&quot;hasSamlBeta&quot;:... fragment (or empty)
-	slot33HasPw    = "\x01HASPW33\x02"  // " content" (true) or "" (false)
-	slot33ShowAI   = "\x01AI33\x02"     // same bare-content boolean rule
-	slot33SamlMeta = "\x01SAMLM33\x02"  // ol-samlBeta content attribute (or none)
+	slot33User     = "\x01USR33\x02"   // ol-user meta JSON (settings page)
+	slot33HBS      = "\x01HBS33\x02"   // ,&quot;hasSamlBeta&quot;:... fragment (or empty)
+	slot33HasPw    = "\x01HASPW33\x02" // " content" (true) or "" (false)
+	slot33ShowAI   = "\x01AI33\x02"    // same bare-content boolean rule
+	slot33SamlMeta = "\x01SAMLM33\x02" // ol-samlBeta content attribute (or none)
 	slot33SsoMsg   = "\x01SSOM33\x02"
 	slot33SyncOk   = "\x01SYNCO33\x02"
 	slot33SyncErr  = "\x01SYNCX33\x02"
 	slot33RefErr   = "\x01REFE33\x02"
-	slot33CurrRow  = "\x01CURRROW33\x02" // sessions page: current session <tr>
+	slot33CurrRow  = "\x01CURRROW33\x02"   // sessions page: current session <tr>
 	slot33Rows     = "\x01OTHERROWS33\x02" // sessions page: other session <tr>s
 	// P3.4 register page (/register is per-auth-state dynamic; skeleton is
 	// the anonymous capture so these render empty/absent for anonymous and
@@ -84,16 +84,16 @@ type PageData struct {
 	ResetToken string // setPassword hidden token input
 	PostURL    string // token page postUrl meta, e.g. /<token>/grant
 	// P3.3 dynamic slots (userpages feature):
-	UserMetaJSON  string // settings page ol-user meta JSON (Node serializeUser order)
-	SamlBeta      string // session samlBeta ("" → ExposedSettings key + meta absent)
-	HasPassword   bool   // ol-hasPassword bare-content boolean meta
-	ShowAiFeatures bool  // ol-showAiFeatures bare-content boolean meta
-	SsoErrorMessage             string // settings page pop-flag metas
-	ProjectSyncSuccessMessage   string
-	ProjectSyncErrorMessage     string
+	UserMetaJSON                 string // settings page ol-user meta JSON (Node serializeUser order)
+	SamlBeta                     string // session samlBeta ("" → ExposedSettings key + meta absent)
+	HasPassword                  bool   // ol-hasPassword bare-content boolean meta
+	ShowAiFeatures               bool   // ol-showAiFeatures bare-content boolean meta
+	SsoErrorMessage              string // settings page pop-flag metas
+	ProjectSyncSuccessMessage    string
+	ProjectSyncErrorMessage      string
 	ReferenceLinkingErrorMessage string
-	SessionsCurrentRow          string // sessions page current <tr> (IP + moment date)
-	SessionsOtherRows           string // other sessions <tr>s (may be empty)
+	SessionsCurrentRow           string // sessions page current <tr> (IP + moment date)
+	SessionsOtherRows            string // other sessions <tr>s (may be empty)
 }
 
 func (p PageData) finalize(html string) string {

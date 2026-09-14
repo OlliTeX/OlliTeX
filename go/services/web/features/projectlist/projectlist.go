@@ -21,16 +21,19 @@
 // Contract (pinned 2026-09-14 against the LIVE Node oracle — do not trust the
 // higher-level ProjectListController; the wired handler is the simpler
 // ProjectController.userProjectsJson):
+//
 //   - projects = owned ∪ invite(readWrite/review/readOnly) ∪ token(readAndWrite/
 //     readOnly), in EXACTLY that bucket order (NO sorting), token buckets
 //     de-duplicated against any id already listed (cascading access wins).
+//
 //   - accessLevel per bucket (NOTE the exact strings):
 //
-//		owner / readWrite / review / readOnly / readAndWrite / readOnly
-//		OWNER   INVITE    INVITE   INVITE    TOKEN         TOKEN
+//     owner / readWrite / review / readOnly / readAndWrite / readOnly
+//     OWNER   INVITE    INVITE   INVITE    TOKEN         TOKEN
 //
 //   - projects where the user is a member of `archived[]` or `trashed[]` are
 //     OMITTED (`.filter(p => !(p.archived || p.trashed))`).
+//
 //   - each entry is exactly `{ _id, name, accessLevel }` (no totalSize, no
 //     user objects, no lastUpdated).
 //
@@ -52,6 +55,7 @@ func Feature(a *core.App) core.Feature {
 		Name: "projectlist",
 		Routes: []core.Route{
 			{Method: "GET", Path: "/user/projects", Handler: handler(a)},
+			{Method: "GET", Pattern: entPat, Handler: entitiesHandler(a)},
 		},
 	}
 }

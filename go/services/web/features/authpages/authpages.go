@@ -42,7 +42,7 @@ func pageData(cxt *core.Cxt) views.PageData {
 	if origin == "" {
 		origin = originOfReq(cxt)
 	}
-	return views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin}
+	return views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin, Path: "restricted"}
 }
 
 func pageHandler(f func(http.ResponseWriter, views.PageData)) func(*core.Cxt, *core.Res) {
