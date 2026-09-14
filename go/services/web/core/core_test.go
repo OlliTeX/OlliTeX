@@ -324,7 +324,7 @@ func TestSessionStoreRoundTrip(t *testing.T) {
 	cfg := testCfg(t, "test-secret")
 	st := NewSessionStore(rc, cfg)
 
-	sess := st.newAnonymousSession()
+	sess := st.newAnonymousSession("")
 	if sess.SessID == "" {
 		t.Fatal("new session must have an id")
 	}
@@ -391,7 +391,7 @@ func TestNXXXSemantics(t *testing.T) {
 	rc := &RedisClient{Addr: addr}
 	cfg := testCfg(t, "s")
 	st := NewSessionStore(rc, cfg)
-	n1 := st.newAnonymousSession()
+	n1 := st.newAnonymousSession("")
 	if err := st.persist(n1); err != nil {
 		t.Fatal(err)
 	}
@@ -491,6 +491,9 @@ func testStatusFeature() Feature {
 		Name: "status",
 		Routes: []Route{
 			{Method: "GET", Path: "/status", NoLogin: true, Handler: func(c *Cxt, r *Res) {
+				// The real status feature sets this (Node /status responses
+				// carry xpb; pinned P0 + re-pinned P3.2).
+				r.W.Header().Set("X-Powered-By", "Express")
 				r.PlainText(200, "web is alive (web)")
 			}},
 		},

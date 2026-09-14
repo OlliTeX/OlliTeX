@@ -1,6 +1,6 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
-Status: **IN PROGRESS** — P0+M0 ✔, P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3,
+Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3),
 2026-09-14)**; remaining P3 (user/admin surfaces) + P4–P7 to come. Companion
 to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are Go-only
 as of `8090d454fb`).
@@ -401,6 +401,70 @@ normalized).
 FLIP-ON Go parity (0 diffs after nonce/sid/expires normalization) + leg 3
 FLIP-OFF restore; stack left at Node-active baseline (shadow armed, flip
 stripped, messages cleared, editor open).
+
+#### P3.2 — instance-stats web leaf — **✔ COMPLETE 2026-09-14**
+
+Go: `features/instancestats/` (routes flipped:
+`GET /admin/instance-stats` → 301 `/hub#/site.general.stats`; `GET …/api/series`;
+`GET|PUT …/api/alert-config`; `POST …/api/send-test-alert-email`) + core:
+`core.NewMail()` (env-driven `OVERLEAF_EMAIL_SMTP_HOST/PORT/SECURE` +
+`OVERLEAF_EMAIL_FROM_ADDRESS`, envelope = local address of `Display <addr>`,
+`Client.Data()` writer MUST close to terminate the DATA phase — otherwise the
+next send fails with `250 "2.0.0 OK accepted"`), `core.SendStatus` parity, and
+the **X-Powered-By scoping fix**: Node emits `X-Powered-By: Express` ONLY on
+`/status` 200s, csrf-403s (`res.sendStatus`) and express.json-rejection 400s
+(`BareWrite`) — it was wrongly global in Go until P3.2 (removed; re-added at
+those three sites). `features/status` now owns the status xpb.
+
+Pinned node contract (p32pin.json; probe diff 0/42 cases):
+- 301 Accept matrix = the 302 matrix (status-independent rules): html→`<p>Moved
+  Permanently. Redirecting to …</p>`; text/plain / text-star / starstar / none→
+  plain; json|xml→**empty body, NO Content-Type**; `Vary: Accept`, no ETag.
+- anonymous: json accept→**401** `text/plain` + `WWW-Authenticate: OverleafLogin`
+  (via `res.SendStatus`, no xpb); else 302 `/login`.
+- non-admin: 302 `/restricted?from=%2F…` (percent-encoded path).
+- series: `{metric, window, points:[{day: epochMsUtcMidnight, values}]}`;
+  windows day/week/month/6m/year/all (all = `INSTANCE_STATS_RETENTION_DAYS ||
+  365` — Go guards `n > 0`); unknown/empty metric or window → 400
+  `{"message":"Invalid metric|window"}`; **duplicate query params = 400**
+  (Node `req.query.x` becomes an array → fails `typeof === 'string'`).
+- alert-config GET defaults `{"alertEmails":[],"alertEmail":"",
+  "diskWarningPercent":90,"ramWarningPercent":90}`; PUT validates emails first
+  (split `[\s,;]+`, dedupe, EMAIL_RE) then disk then ram (numbers in [1,100];
+  **non-integers legal**, stored as BSON doubles, round-tripped verbatim);
+  success `{"ok":true}`; errors `{"message":"…"}`; `emails` wins over legacy
+  `email`.
+- test alert: invalid → `{"message":"Invalid email address: <bad>"}` (no
+  recipients: no suffix); success `{"ok":true,"sentTo":[…]}`; subject
+  `[Overleaf] Instance stats alert test`; one mail per recipient.
+
+**P3.2 exposed + fixed a Go session-core divergence (P0 interop regression):**
+express-session KEEPS the cookie's id when a validly-signed cookie arrives
+with a **missing doc** (lazy-csrf 403 then writes `sess:<cookie-sid>`; the
+spec's D2 cross-check proved it live). Go `StartAnonymous` was re-randomizing
+the sid (`newAnonymousSession`); fixed to `newAnonymousSession(sid string)` —
+`""` keeps fresh-id semantics (no cookie / bad signature / `Fresh()`
+regeneration), cookie-id otherwise.
+
+**P0 spec staleness (fixed in the P0 spec):** since the P2 wire-encoding
+change both stacks percent-encode Set-Cookie (`s%3A…`); the P0 leg3b D2 slice
+(`gSigned.slice(2,34)`) must **decodeURIComponent first**, and the cookie sent
+to Node for the cross-check goes **verbatim** in wire form (double-encoding it
+broke the signature and the 403 looked like a token reject).
+
+**P3.2 gate** (`tests/e2e/specs/parity/web-go-p3b-flip.test.e2e.ts`,
+`server-ce/nginx/flips/web-p3b.conf`): 3-leg battery (~37 cases) — page 301
+Accept matrix (incl. the no-Accept raw-socket row fetch can't express), anon
+401/302 authz, non-admin bounces, series validation + all 7 windows,
+alert-config 400 matrix + float/int round-trips, csrf-403 (xpb Express),
+test-alert mail battery with **per-leg SMTP-sink deltas** (3 mails/leg,
+recipients asserted; multiset-diff tolerant of pre-existing probe mail).
+
+**P3.2 gate result (2026-09-14): 3/3 GREEN** (38s) + **full regression
+matrix all GREEN on the final binary**: P0 6/6 · P1 3/3 · P2 4/4 (17.7m —
+rate-limiter sleeps are real) · P3.1 3/3 · P3.2 3/3. E2e left Node-active
+(flip stripped, shadow armed on :4010, config defaults 90/90, messages 0,
+instanceStats seed docs intact).
 
 ### P4 — project core (the heavy centre; flip in listed sub-order)
 

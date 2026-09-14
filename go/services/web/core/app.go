@@ -110,9 +110,12 @@ func (w *recWriter) Write(b []byte) (int, error) {
 // session + csrf + routes + fallbacks), pinned in the P0 gate.
 func (a *App) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// express default + app-level headers (X-Powered-By from express,
-		// CSP from app.use(csp) — both pinned live on /status).
-		w.Header().Set("X-Powered-By", "Express")
+		// x-powered-by: Node sends it ONLY on the express res.send() paths
+		// that stay enabled — pinned live 2026-09-14 (P3.2): present on
+		// /status 200,csrf 403 (res.sendStatus) and the body-parser 400;
+		// ABSENT on page renders, res.json() API responses, redirects, the
+		// 401 login gate and 404s. Added per-route (status.go) and at the
+		// csrf-403 + BareWrite sites, NOT globally.
 		if a.Cfg.ExpoHostname {
 			if host, err := os.Hostname(); err == nil {
 				w.Header().Set("X-Served-By", host)
@@ -173,8 +176,11 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 				// Order note (Server.mjs): csrf middleware (line ~233) is
 				// registered BEFORE helmet (line ~322), so the csrf 403
 				// response carries NONE of the web-baseline headers (pinned
-				// P0: no nosniff; P3.1: no helmet set on the 403).
+				// P0: no nosniff; P3.1: no helmet set on the 403). Node sends
+			// it via res.sendStatus → X-Powered-By: Express present (pinned
+			// P3.2 on DELETE /status 403).
 				a.sessionBeforeHandler(cxt, w, rw)
+				res.W.Header().Set("X-Powered-By", "Express")
 				res.SendStatus(403)
 				return
 			}
@@ -290,11 +296,11 @@ func (a *App) globalLoginBounce(cxt *Cxt, res *Res, r *http.Request) {
 		}
 	}
 	if a.acceptsJSON(r) || r.Header.Get("Authorization") != "" {
-		// pinned: 401 + WWW-Authenticate: OverleafLogin, body "Unauthorized"
-		res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		// pinned: 401 + WWW-Authenticate: OverleafLogin, body "Unauthorized",
+		// text/plain; charset=utf-8 + weak ETag + Content-Length (express
+		// res.sendStatus — pinned P3.2); NO x-powered-by (Node: absent).
 		res.W.Header().Set("WWW-Authenticate", "OverleafLogin")
-		res.W.WriteHeader(401)
-		_, _ = res.W.Write([]byte("Unauthorized"))
+		res.SendStatus(401)
 		return
 	}
 	res.Redirect(r, 302, loginRedirectTarget(r))

@@ -256,6 +256,7 @@ test.describe.serial('web-go P0 flip gate (WEB_GO_PLAN M0)', () => {
       body: new URLSearchParams({ email: 'x@y.z', password: 'nope', _csrf: 'garbage-token-' + Date.now() }).toString(),
     })
     expect(bad.status, 'Node bad-csrf must be 403').toBe(403)
+    const bad = await fetch
 
     // ---- D1 doc in the shared redis ----
     const doc1Raw = await waitForSessionDoc(sid1)
@@ -281,7 +282,9 @@ test.describe.serial('web-go P0 flip gate (WEB_GO_PLAN M0)', () => {
     const goSet = parseHeaders(goAnon).get('set-cookie') ?? ''
     const gSigned = (goSet.match(/overleaf\.sid=([^;]+)/) ?? [])[1]
     expect(gSigned, 'Go 302 must issue the session cookie').toBeTruthy()
-    const gSid = gSigned!.slice(2, 34) // Go emits the raw (un-encoded) cookie value
+    // Both stacks percent-encode the cookie value on the wire (P2+):
+    // s%3A<32>.<sig> — decode before slicing out the id.
+    const gSid = decodeURIComponent(gSigned).slice(2, 34)
     // lazy-csrf: D2 gains its csrfSecret on first use — trigger it with the
     // garbage-403 probe (also the negative control for D2)
     const d2Reject = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" -H "Cookie: overleaf.sid=${gSigned}" --data "x=1&_csrf=zzz${Date.now()}" http://127.0.0.1:4010/post-route`)
@@ -297,7 +300,7 @@ test.describe.serial('web-go P0 flip gate (WEB_GO_PLAN M0)', () => {
     const nodeVerify = await fetch(`${BASE}/login`, {
       method: 'POST',
       redirect: 'manual',
-      headers: { cookie: `overleaf.sid=${encodeURIComponent(gSigned as string)}`, 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { cookie: `overleaf.sid=${gSigned}`, 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ email: 'nobody@nowhere.test', password: 'wrongpass1', _csrf: goStyleToken }).toString(),
     })
     expect(nodeVerify.status, 'Node must ACCEPT the token (not 403) on a Go-written session (401/400 login-fail expected, 403 = csrf rejected)').not.toBe(403)
@@ -305,7 +308,7 @@ test.describe.serial('web-go P0 flip gate (WEB_GO_PLAN M0)', () => {
     const nodeReject = await fetch(`${BASE}/login`, {
       method: 'POST',
       redirect: 'manual',
-      headers: { cookie: `overleaf.sid=${encodeURIComponent(gSigned as string)}`, 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { cookie: `overleaf.sid=${gSigned}`, 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ email: 'nobody@nowhere.test', password: 'wrongpass1', _csrf: 'garbage' + Date.now() }).toString(),
     })
     expect(nodeReject.status, 'Node must REJECT the garbage token (403)').toBe(403)

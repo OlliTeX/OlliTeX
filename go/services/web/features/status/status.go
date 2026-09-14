@@ -21,6 +21,9 @@ func isAPIProfile() bool {
 }
 
 func statusHandler(cxt *core.Cxt, res *core.Res) {
+	// Node /status responses carry X-Powered-By: Express (pinned P0 +
+	// re-pinned P3.2: present on this res.send path, absent elsewhere).
+	res.W.Header().Set("X-Powered-By", "Express")
 	if os.Getenv("WEB_GO_SHUTTING_DOWN") == "true" {
 		res.SendStatus(503) // "Service Unavailable"
 		return

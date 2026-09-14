@@ -31,16 +31,21 @@ type Mail struct {
 	Timeout int    // seconds; 0 = 15
 }
 
-// NewMail builds the transport from env (MAIL_HOST/PORT/SECURE/FROM),
-// mirroring settings.js's email block.
+// NewMail builds the transport from env, mirroring settings.js's email
+// block (services/web/config + server-ce settings.js):
+//
+//	fromAddress: OVERLEAF_EMAIL_FROM_ADDRESS
+//	  => { driver: smtp, host: OVERLEAF_EMAIL_SMTP_HOST, port: OVERLEAF_EMAIL_SMTP_PORT }
+//
+// MAIL_* fallbacks are kept for direct runs without the OVERLEAF_ env.
 func NewMail() *Mail {
 	m := &Mail{
-		Host:    envOr("MAIL_HOST", "smtpsink"),
-		Secure:  envOr("MAIL_SECURE", "false") == "true",
-		From:    envOr("MAIL_FROM", "OlliTeX <no-reply@localhost>"),
+		Host:    envOr("OVERLEAF_EMAIL_SMTP_HOST", envOr("MAIL_HOST", "smtpsink")),
+		Secure:  envOr("OVERLEAF_EMAIL_SMTP_SECURE", envOr("MAIL_SECURE", "false")) == "true",
+		From:    envOr("OVERLEAF_EMAIL_FROM_ADDRESS", envOr("MAIL_FROM", "OlliTeX <no-reply@localhost>")),
 		Timeout: 15,
 	}
-	if p, err := strconv.Atoi(envOr("MAIL_PORT", "1025")); err == nil {
+	if p, err := strconv.Atoi(envOr("OVERLEAF_EMAIL_SMTP_PORT", envOr("MAIL_PORT", "1025"))); err == nil {
 		m.Port = p
 	}
 	return m
@@ -51,6 +56,17 @@ func envOr(k, d string) string {
 		return v
 	}
 	return d
+}
+
+// envelopeFrom — nodemailer sets the SMTP MAIL FROM to the parsed local
+// address of the From header (the display name never rides the envelope).
+func envelopeFrom(from string) string {
+	if i := strings.LastIndexByte(from, '>'); i >= 0 {
+		if j := strings.LastIndexByte(from[:i], '<'); j >= 0 {
+			return from[j+1 : i]
+		}
+	}
+	return from
 }
 
 // Send delivers a text+html message (multipart/alternative, the Node
@@ -79,7 +95,7 @@ func (m *Mail) Send(to, subject, text, html string) error {
 		return err
 	}
 	defer c.Close()
-	if err := c.Mail(m.From); err != nil {
+	if err := c.Mail(envelopeFrom(m.From)); err != nil {
 		return err
 	}
 	if err := c.Rcpt(to); err != nil {
@@ -90,6 +106,13 @@ func (m *Mail) Send(to, subject, text, html string) error {
 		return err
 	}
 	_, err = io.WriteString(w, composeMIME(to, m.From, subject, text, html))
+	if err == nil {
+		// Close terminates DATA with the dot line (RFC 5321) and reads the
+		// server's 250. Skipping it left the session in DATA state; QuIT
+		// was swallowed as message content and the command read the
+		// dot-reply as an error (P3.2 live bug: 500 `250 "2.0.0 OK accepted"`).
+		err = w.Close()
+	}
 	if err == nil {
 		err = c.Quit()
 	}

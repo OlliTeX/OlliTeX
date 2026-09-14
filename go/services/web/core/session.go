@@ -199,14 +199,14 @@ func (st *SessionStore) StartAnonymous(req *http.Request) (*Session, error) {
 	raw, _ := req.Cookie(st.cfg.CookieName)
 	if raw == nil {
 		// brand new anonymous session
-		cs := st.newAnonymousSession()
+		cs := st.newAnonymousSession("")
 		return cs, nil
 	}
 	sid := strings.TrimPrefix(decodeCookieValue(raw.Value), "s:")
 	sid = unsignCookie(sid, st.cfg.SessionSecrets)
 	if sid == "" {
 		// bad signature → treat as new
-		cs := st.newAnonymousSession()
+		cs := st.newAnonymousSession("")
 		return cs, nil
 	}
 	sess, err := st.Get(sid)
@@ -214,7 +214,13 @@ func (st *SessionStore) StartAnonymous(req *http.Request) (*Session, error) {
 		return nil, err
 	}
 	if sess == nil {
-		cs := st.newAnonymousSession()
+		// Valid signed cookie (or one that LOST its doc): express-session
+		// KEEPS the cookie's id and creates the doc under it on first
+		// modification. Re-randomizing the sid here diverged from Node —
+		// P0 leg3b proved it live (Node's lazy-csrf 403 wrote
+		// sess:<cookie-sid>; the Go 403 wrote a fresh id, so the shared
+		// doc never appeared).
+		cs := st.newAnonymousSession(sid)
 		return cs, nil
 	}
 	if st.cfg.RollingSession {
@@ -230,14 +236,20 @@ func (st *SessionStore) Fresh() *Session {
 	if st.cfg.RollingSession == false {
 		// rolling disabled → keep same semantics minus the touch loop
 	}
-	return st.newAnonymousSession()
+	return st.newAnonymousSession("")
 }
 
-func (st *SessionStore) newAnonymousSession() *Session {
+// newAnonymousSession builds an unsaved session. sid=="" (no cookie, bad
+// signature, login regeneration) → fresh random id; otherwise the cookie's
+// id is carried (express-session identity preservation).
+func (st *SessionStore) newAnonymousSession(sid string) *Session {
+	if sid == "" {
+		sid = st.newSID()
+	}
 	now := time.Now()
 	exp := now.Add(st.cfg.CookieLength)
 	s := &Session{
-		SessID:     st.newSID(),
+		SessID:     sid,
 		Doc:        map[string]json.RawMessage{},
 		expires:    exp,
 		newSession: true,

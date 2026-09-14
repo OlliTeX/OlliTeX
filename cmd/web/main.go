@@ -27,6 +27,7 @@ import (
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/passwordreset"
+	"ollitex/go/services/web/features/instancestats"
 	"ollitex/go/services/web/features/serveradmin"
 	"ollitex/go/services/web/features/staticpages"
 	"ollitex/go/services/web/features/status"
@@ -115,6 +116,7 @@ func main() {
 
 	// P3.1 surface: ServerAdmin leaf — system-message CRUD + editor gate.
 	app.RegisterFeature(serveradmin.Feature(app))
+	app.RegisterFeature(instancestats.Feature(app))
 
 	// web profile: unknown-route 404 view (general/404) — Node
 	// webRouter.get('*', ErrorController.notFound).
