@@ -1,28 +1,28 @@
 package core
 
 import (
-	"crypto/tls"
-	"fmt"
-	"io"
-	"net"
-	"net/smtp"
+	"context"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	goma "github.com/wneessen/go-mail"
 )
 
-// Mail — outbound SMTP parity for the password-reset link (P2).
+// Mail — outbound SMTP parity for all web mails (P2 password-reset link,
+// P3.2 instance-stats alert, P3.3 security alerts).
 //
 // Node CE (nodemailer) pins carried here:
 //   - e2e/live transport: host `smtpsink`, port 1025, NO TLS (secure=false)
-//   - from: the configured sender (settings.email.from — `OlliTeX
-//     <no-reply@...>` shape in the stack env)
-//   - subject pinned by the battery: `Password Reset - OlliTeX`
+//   - from: the configured sender (settings.email.from)
+//   - envelope MAIL FROM = the local address of the From header (nodemailer
+//     parses the display name off the envelope — kept: envelopeFrom)
+//   - multipart/alternative text+html (nodemailer shape)
+//   - subject pinned per template, e.g. `Overleaf security note: <action>`
+//     (the node template hardcodes "Overleaf" — keep it byte-exact)
 //
-// The e2e gate pins recipient + subject + the CTA link + delivery; exact
-// MIME body parity is explicitly out of scope for P2 (the sink records
-// the subject line and the link, not the render).
+// Transport: wneessen/go-mail (owner-approved mail stack for P3).
 type Mail struct {
 	Host    string
 	Port    int
@@ -70,73 +70,50 @@ func envelopeFrom(from string) string {
 }
 
 // Send delivers a text+html message (multipart/alternative, the Node
-// nodemailer shape).
+// nodemailer shape) to `to` via SMTP.
 func (m *Mail) Send(to, subject, text, html string) error {
 	t := m.Timeout
 	if t <= 0 {
 		t = 15
 	}
-	addr := net.JoinHostPort(m.Host, strconv.Itoa(m.Port))
-	conn, err := net.DialTimeout("tcp", addr, time.Duration(t)*time.Second)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(time.Duration(t) * time.Second))
+	// nodemailer `secure: false` semantics: opportunistic STARTTLS (upgrade
+	// if the server advertises it, else plaintext). go-mail's DEFAULT is
+	// TLSMandatory, which hard-fails against plaintext sinks
+	// ("STARTTLS mode set to TLSMandatory, but target host does not
+	// support STARTTLS") — the e2e smtpsink is plaintext, pinned P3.2.
+	policy := goma.TLSOpportunistic
 	if m.Secure {
-		tc := tls.Client(conn, &tls.Config{ServerName: m.Host})
-		if hErr := tc.Handshake(); hErr != nil {
-			return hErr
-		}
-		conn = tc
+		policy = goma.TLSMandatory
 	}
-	c, err := smtp.NewClient(conn, m.Host)
+	c, err := goma.NewClient(m.Host, goma.WithPort(m.Port), goma.WithTLSPolicy(policy))
 	if err != nil {
 		return err
 	}
 	defer c.Close()
-	if err := c.Mail(envelopeFrom(m.From)); err != nil {
+	if env := envelopeFrom(m.From); env != "" {
+		c.SetDomain(env)
+	}
+	msg := goma.NewMsg()
+	if err := msg.EnvelopeFrom(envelopeFrom(m.From)); err != nil {
 		return err
 	}
-	if err := c.Rcpt(to); err != nil {
+	if err := msg.From(m.From); err != nil {
 		return err
 	}
-	w, err := c.Data()
-	if err != nil {
+	if err := msg.AddTo(to); err != nil {
 		return err
 	}
-	_, err = io.WriteString(w, composeMIME(to, m.From, subject, text, html))
-	if err == nil {
-		// Close terminates DATA with the dot line (RFC 5321) and reads the
-		// server's 250. Skipping it left the session in DATA state; QuIT
-		// was swallowed as message content and the command read the
-		// dot-reply as an error (P3.2 live bug: 500 `250 "2.0.0 OK accepted"`).
-		err = w.Close()
+	msg.Subject(subject)
+	msg.SetBodyString(goma.TypeTextPlain, text)
+	msg.AddAlternativeString(goma.TypeTextHTML, html)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(t)*time.Second)
+	defer cancel()
+	if err := c.DialAndSendWithContext(ctx, msg); err != nil {
+		return err
 	}
-	if err == nil {
-		err = c.Quit()
+	if err := msg.SendError(); err != nil {
+		return err
 	}
-	return err
+	return nil
 }
 
-// composeMIME renders the nodemailer-equivalent message (Date/From/To/
-// Subject headers, multipart/alternative body).
-func composeMIME(to, from, subject, text, html string) string {
-	boundary := "Olli" + fmt.Sprintf("%012d", time.Now().UnixNano())
-	var b strings.Builder
-	b.WriteString("Date: " + time.Now().UTC().Format("Mon, 02 Jan 2006 15:04:05") + " +0000 (UTC)\r\n")
-	b.WriteString("From: " + from + "\r\n")
-	b.WriteString("To: " + to + "\r\n")
-	b.WriteString("Subject: " + subject + "\r\n")
-	b.WriteString("MIME-Version: 1.0\r\n")
-	b.WriteString("Content-Type: multipart/alternative;\r\n")
-	b.WriteString("\tboundary=\"" + boundary + "\"\r\n\r\n")
-	b.WriteString("--" + boundary + "\r\n")
-	b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
-	b.WriteString(text + "\r\n\r\n")
-	b.WriteString("--" + boundary + "\r\n")
-	b.WriteString("Content-Type: text/html; charset=UTF-8\r\n\r\n")
-	b.WriteString(html + "\r\n\r\n")
-	b.WriteString("--" + boundary + "--\r\n")
-	return b.String()
-}

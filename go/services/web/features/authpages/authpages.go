@@ -80,7 +80,18 @@ func postLogout(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		_ = decodeBody(cxt, &body)
 		if cxt.Sess != nil {
-			_ = a.Store.Destroy(cxt.Sess.SessID)
+			if cxt.Sess.IsLoggedIn() {
+				// Node doLogout: untrackSession(user, sessionId) (SREM +
+				// PEXPIRE) around session.destroy.
+				sid := cxt.Sess.SessID
+				uid := cxt.Sess.UserIDHex()
+				_ = a.Store.Destroy(sid)
+				if uid != "" {
+					a.UntrackSession(uid, sid)
+				}
+			} else {
+				_ = a.Store.Destroy(cxt.Sess.SessID)
+			}
 		}
 		target := body.Redirect
 		if target == "" {
@@ -255,6 +266,11 @@ func postLogin(a *core.App) func(*core.Cxt, *core.Res) {
 			log.Printf("webgo-auth: old=%s created=%s rw-writes=%d", old.SessID, created.SessID, 0)
 		}
 		a.CommitSess(created, res.W)
+
+		// Node AuthenticationController post-login hook:
+		// UserSessionsManager.trackSession(user, req.sessionID) → SADD the
+		// session doc key into UserSessions:<uid> + PEXPIRE (5-day set pin).
+		a.TrackSession(idString(u.ID), created.SessID)
 
 		target := "/project"
 		if raw, ok := old.GetRaw("postLoginRedirect"); ok && len(raw) >= 2 {

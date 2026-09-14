@@ -33,6 +33,7 @@ import (
 	"ollitex/go/services/web/features/status"
 	"ollitex/go/services/web/features/systemmessages"
 	"ollitex/go/services/web/features/tokenaccess"
+	"ollitex/go/services/web/features/userpages"
 	"ollitex/go/services/web/views"
 )
 
@@ -117,6 +118,7 @@ func main() {
 	// P3.1 surface: ServerAdmin leaf — system-message CRUD + editor gate.
 	app.RegisterFeature(serveradmin.Feature(app))
 	app.RegisterFeature(instancestats.Feature(app))
+	app.RegisterFeature(userpages.Feature(app))
 
 	// web profile: unknown-route 404 view (general/404) — Node
 	// webRouter.get('*', ErrorController.notFound).

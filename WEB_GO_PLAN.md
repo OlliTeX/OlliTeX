@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
-Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3),
-2026-09-14)**; remaining P3 (user/admin surfaces) + P4–P7 to come. Companion
+Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3),
+2026-09-14)**; remaining P3 leaves (SiteSettings et al.) + P4–P7 to come. Companion
 to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are Go-only
 as of `8090d454fb`).
 
@@ -466,11 +466,62 @@ rate-limiter sleeps are real) · P3.1 3/3 · P3.2 3/3. E2e left Node-active
 (flip stripped, shadow armed on :4010, config defaults 90/90, messages 0,
 instanceStats seed docs intact).
 
-#### P3.3 — user settings + sessions family — **⏸ ORACLE PINNED (2026-09-14), impl pending**
+#### P3.3 — user settings + sessions family — **✅ GATE 3/3 GREEN (2026-09-14)**
 Scope: `GET /user/settings` (React page), `POST /user/settings` (zod-strict
 updates incl. ace/zotero/keybindings + email branch), `GET /user/sessions`
 (plain page), `GET /user/sessions/list` (JSON), `POST /user/sessions/clear`
 (201 + security mail + audit + other-session purge).
+
+**Gate green (flip `web-p3c.conf`, spec `web-go-p3c-flip.test.e2e.ts`)**:
+leg1 Node baseline battery (22+ cases) → leg2 FLIP ON byte-for-byte match →
+leg3 FLIP OFF reversal; per-leg pins: exactly 1 clear-mail
+(`Overleaf security note: active sessions cleared`) + 2 clear-sessions audit
+entries (Node-shape `{userId:ObjectId, operation:"clear-sessions"}`) per leg.
+Full matrix same day: P0 5/5 · P1 3/3 · P2 4/4 · P3.1 3/3 · P3.2 3/3
+(one 429 rate-limit flake on a P3.3 leg in the matrix run re-ran green).
+
+**Live bugs found + fixed in the P3.3 leg (all parity-breaking)**:
+1. **`UserSessions:{<uid>}` key split-brain** — Node's set key is
+   `UserSessions:{6aa4b8b5…}` (cluster hash-tag **with** the curly braces,
+   `UserSessionsRedis.sessionSetKey`); Go had `UserSessions:<uid>` → Go and
+   Node addressed **different** redis sets (Go lists never saw Node's
+   sessions and vice versa, clears purged the wrong set). Pinned from redis
+   MONITOR; fixed in `core.UserSessionsKey`.
+2. **go-mail TLS default hard-failed plaintext sinks** — go-mail v0.8.1
+   defaults to `TLSMandatory`; the e2e smtpsink is plaintext →
+   `dial failed: STARTTLS mode set to "TLSMandatory"…` and the sessions-clear
+   mail silently dropped. Fixed: `goma.WithTLSPolicy(TLSOpportunistic|
+   TLSMandatory)` per `secure` env (nodemailer `secure:false` semantics);
+   mail errors are now logged (Node: log & continue, never 500).
+3. **login response leaked TWO Set-Cookies** — the pre-handler pass queued
+   the old sid's cookie, then regeneration issued the new one (Node sends
+   exactly one: the new sid). `core.CommitSess` now revokes the pre-queued
+   Set-Cookie before issuing the regenerated one.
+4. **`customKeybindings` saved as a k/v ARRAY** — Node's mongoose Map shape
+   is a `{key:value}` document; the array shape broke Node's own `user.save()`
+   (500 on every later save). Fixed: Go writes `map[string]string`.
+5. **audit doc typing** — Go stored `userId`/`initiatorId` as hex strings +
+   string timestamp; Node stores ObjectIDs + BSON date. Fixed to
+   `primitive.ObjectID` + `time.Time` (audit count queries are ObjectId-
+   shaped).
+6. **`json.Marshal` HTML-escapes `<`** — the `<=255 characters` validation
+   message rendered as `\u003c=255`; Node's JSON.stringify keeps a literal
+   `<`. `validationError` now JSON-escapes without the HTML set.
+7. **`GET /user/sessions/list` empty list** — Node always emits `[]`; Go's
+   nil slice marshalled to `null`. All callers now get a non-nil slice.
+8. **`X-Powered-By` on rendered views** — Node's `res.render` views carry NO
+   xpb (only `res.send`/`res.json`/`sendStatus` do); removed from the Go
+   view writers (asserted in `pages_test.go`).
+9. **express.json body gate in core BEFORE csrf** — non-object/array JSON
+   roots (42, string, boolean, null, unparseable) → bare 400 `{}` with none
+   of the web-baseline headers (even anonymous); array roots pass the parser
+   → csrf 403 / handler zod 400. Pinned: `core.Res.BareWrite(400,"{}")`.
+10. **validation is multi-issue** — zod reports **all** issues joined by
+    "; " in SCHEMA definition order (then unrecognized keys in body order);
+    the first-error-wins draft was wrong (live-pinned against Node).
+11. **keybindings have NO validation length/count limits** (65/66 valid
+    entries → 200); the `slice(0,64)` + value filter (non-empty key, null
+    or 1..24 char string) is SAVE-time only.
 
 **Node oracle pinned live (report `/tmp/p33-pin-node.json`)** — key contracts:
 - anon: HTML GETs 302→/login; JSON Accept → 401 "Unauthorized" (text/plain);

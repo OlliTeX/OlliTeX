@@ -339,6 +339,59 @@ func (r *RedisClient) PING() error {
 	return nil
 }
 
+// ---------- set commands (P3.3 UserSessions parity) ----------
+
+// SADD adds members to a set (Node rclient.sadd / multi.sadd).
+func (r *RedisClient) SADD(key string, members ...string) error {
+	args := append([]string{"SADD", key}, members...)
+	if _, err := r.command(args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SREM removes members from a set (Node rclient.srem — variadic, one call
+// for many members per Node's `srem(key, keysToDelete)`).
+func (r *RedisClient) SREM(key string, members ...string) error {
+	args := append([]string{"SREM", key}, members...)
+	if _, err := r.command(args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SMEMBERS returns the full set (Node rclient.smembers — order: redis
+// hash order; Node iterates in that order; gates compare as sets).
+func (r *RedisClient) SMEMBERS(key string) ([]string, error) {
+	v, err := r.command("SMEMBERS", key)
+	if err != nil {
+		return nil, err
+	}
+	if v == nil {
+		return nil, nil
+	}
+	arr, ok := v.([]any)
+	if !ok {
+		return nil, &RedisError{Msg: "SMEMBERS: bad reply type"}
+	}
+	out := make([]string, 0, len(arr))
+	for _, e := range arr {
+		s, ok := e.(string)
+		if !ok {
+			return nil, &RedisError{Msg: "SMEMBERS: bad member type"}
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// PEXPIRE sets a millisecond TTL (Node rclient.pexpire with the
+// cookieSessionLength ms pin).
+func (r *RedisClient) PEXPIRE(key string, ms int64) error {
+	_, err := r.command("PEXPIRE", key, strconv.FormatInt(ms, 10))
+	return err
+}
+
 func (r *RedisClient) GET(key string) (string, bool, error) {
 	v, err := r.command("GET", key)
 	if err != nil {

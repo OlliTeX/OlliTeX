@@ -71,7 +71,10 @@ func TestPageStatusAndHeaders(t *testing.T) {
 	if w2.Header().Get("Content-Type") != "text/html; charset=utf-8" {
 		t.Fatalf("ct = %q", w2.Header().Get("Content-Type"))
 	}
-	if w2.Header().Get("X-Powered-By") != "Express" {
-		t.Fatalf("xpb = %q", w2.Header().Get("X-Powered-By"))
+	// Node res.render views carry NO X-Powered-By (pinned live 2026-09-14:
+	// /login + /user/settings + /user/sessions all absent; only res.send/
+	// res.json/sendStatus paths carry it).
+	if w2.Header().Get("X-Powered-By") != "" {
+		t.Fatalf("xpb on rendered view = %q", w2.Header().Get("X-Powered-By"))
 	}
 }

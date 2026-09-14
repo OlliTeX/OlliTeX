@@ -63,10 +63,26 @@ e.g. modernc.org/sqlite; no CGO).
   mistyped values rejected at `POST` (not at consumer read time).
 - Audit + rollback are first-class (the parity story: any admin change is
   reversible without a restart).
+- **Encryption (owner ask, 2026-09-14): a masterkey must protect the whole DB.
+  Two shapes considered:**
+  1. **SQLCipher** (true whole-file AES-256): standard, but requires cgo + the
+     sqlcipher C library in the Go build (our builds are host-side `go build -o
+     bin/…`; container has gcc, host build toolchain would need it too). Breaks
+     the current pure-Go/flat-bin build property of all other Go services.
+  2. **App-layer masterkey encryption (default for S0):** keep pure-Go SQLite
+     (modernc.org/sqlite, no CGO) and encrypt every value with AES-256-GCM
+     under a master key. **Owner-confirmed 2026-09-14: the masterkey is
+     supplied by exactly one of the few bootstrap env parameters — i.e.
+     `SETTINGS_MASTER_KEY` (env seed/exportable; never stored in the DB).**
+     Result: the file is useless without the key for all *values*; key names
+     and audit structure remain visible — acceptable for a config store.
+  Both satisfy "masterkey needed"; #1 is stronger (whole file opaque). S0
+  will implement #2 behind a `settings.Encryptor` seam so #1 (or a file-level
+  tool like `gocryptfs` on the file) can slot in later without rework.
 - Backup: SQLite file is the single source → backup strategy mandatory before
-  S3 (Open Q1).
-- Secrets at rest: file perms + optional app-layer encryption decision
-  (Open Q2).
+  S3 (file path + key custody together — the key must be backed up/exportable).
+- Secret at rest: covered by the encryption choice above (decision pending
+  owner confirmation of #1 vs #2 for the final shape).
 
 ## Risks
 - Bootstrap chicken-egg → explicit allowlist + first-boot seed.
@@ -77,8 +93,8 @@ e.g. modernc.org/sqlite; no CGO).
 
 ## Open questions (owner)
 1. SQLite location + backup policy (where does the file live on live + e2e).
-2. Which secrets are allowed in the store (COOKIE/SESSION secrets,
-   LLM_KEY_SECRET, CRYPTO_RANDOM lineage …) vs env-forever.
+2. ~~Which secrets are allowed in the store~~ → **encryption decision instead:
+   SQLCipher (cgo) vs app-layer AES-GCM masterkey (pure Go, S0 default)**.
 3. Auth model: shared service token in env (bootstrap exception) vs mTLS.
 4. Hot-reload semantics per consumer (poll interval / event push).
-5. Ordering: start this after WEB_GO P3 completes, or in parallel with P4+.
+5. Ordering: settled 2026-09-14 — **finish WEB_GO P3.3 first**, then S0.

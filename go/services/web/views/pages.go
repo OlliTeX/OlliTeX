@@ -33,6 +33,18 @@ const (
 	slotEmailField = "\x01EMAIL\x02"
 	slotResetToken = "\x01RSTOKEN\x02"
 	slotPostURL    = "\x01POSTURL\x02"
+	// P3.3 slots (tools/webviews-capture-p3c.py):
+	slot33User     = "\x01USR33\x02"    // ol-user meta JSON (settings page)
+	slot33HBS      = "\x01HBS33\x02"    // ,&quot;hasSamlBeta&quot;:... fragment (or empty)
+	slot33HasPw    = "\x01HASPW33\x02"  // " content" (true) or "" (false)
+	slot33ShowAI   = "\x01AI33\x02"     // same bare-content boolean rule
+	slot33SamlMeta = "\x01SAMLM33\x02"  // ol-samlBeta content attribute (or none)
+	slot33SsoMsg   = "\x01SSOM33\x02"
+	slot33SyncOk   = "\x01SYNCO33\x02"
+	slot33SyncErr  = "\x01SYNCX33\x02"
+	slot33RefErr   = "\x01REFE33\x02"
+	slot33CurrRow  = "\x01CURRROW33\x02" // sessions page: current session <tr>
+	slot33Rows     = "\x01OTHERROWS33\x02" // sessions page: other session <tr>s
 	// origin captured from the e2e fixtures (rewritten per request).
 	capturedOrigin = "http://127.0.0.1:7420"
 )
@@ -47,7 +59,6 @@ func NewNonce() string {
 	return nonceEnc.EncodeToString(b[:])
 }
 
-// PageData carries per-request dynamic values into the skeletons.
 type PageData struct {
 	CSRFToken string // session csrf token ("" → anonymous session must not appear here)
 	Nonce     string
@@ -66,6 +77,17 @@ type PageData struct {
 	EmailField string // setPassword form email input
 	ResetToken string // setPassword hidden token input
 	PostURL    string // token page postUrl meta, e.g. /<token>/grant
+	// P3.3 dynamic slots (userpages feature):
+	UserMetaJSON  string // settings page ol-user meta JSON (Node serializeUser order)
+	SamlBeta      string // session samlBeta ("" → ExposedSettings key + meta absent)
+	HasPassword   bool   // ol-hasPassword bare-content boolean meta
+	ShowAiFeatures bool  // ol-showAiFeatures bare-content boolean meta
+	SsoErrorMessage             string // settings page pop-flag metas
+	ProjectSyncSuccessMessage   string
+	ProjectSyncErrorMessage     string
+	ReferenceLinkingErrorMessage string
+	SessionsCurrentRow          string // sessions page current <tr> (IP + moment date)
+	SessionsOtherRows           string // other sessions <tr>s (may be empty)
 }
 
 func (p PageData) finalize(html string) string {
@@ -84,11 +106,60 @@ func (p PageData) finalize(html string) string {
 	out = strings.ReplaceAll(out, slotEmailField, p.EmailField)
 	out = strings.ReplaceAll(out, slotResetToken, p.ResetToken)
 	out = strings.ReplaceAll(out, slotPostURL, p.PostURL)
+	// P3.3 slots (value-only where set; bare-content boolean metas render
+	// a SPACE + `content` when true, nothing when false):
+	out = strings.ReplaceAll(out, slot33User, htmlAttrEsc(p.UserMetaJSON))
+	if p.SamlBeta != "" {
+		frag := `&quot;hasSamlBeta&quot;:&quot;` + htmlAttrEsc(p.SamlBeta) + `&quot;` + string(',')
+		out = strings.ReplaceAll(out, slot33HBS, frag)
+		out = strings.ReplaceAll(out, slot33SamlMeta, ` content="`+htmlAttrEsc(p.SamlBeta)+`"`)
+	} else {
+		out = strings.ReplaceAll(out, slot33HBS, "")
+		out = strings.ReplaceAll(out, slot33SamlMeta, "")
+	}
+	out = strings.ReplaceAll(out, slot33HasPw, boolAttr(p.HasPassword))
+	out = strings.ReplaceAll(out, slot33ShowAI, boolAttr(p.ShowAiFeatures))
+	out = strings.ReplaceAll(out, slot33SsoMsg, metaContentAttr(p.SsoErrorMessage))
+	out = strings.ReplaceAll(out, slot33SyncOk, metaContentAttr(p.ProjectSyncSuccessMessage))
+	out = strings.ReplaceAll(out, slot33SyncErr, metaContentAttr(p.ProjectSyncErrorMessage))
+	out = strings.ReplaceAll(out, slot33RefErr, metaContentAttr(p.ReferenceLinkingErrorMessage))
+	out = strings.ReplaceAll(out, slot33CurrRow, p.SessionsCurrentRow)
+	out = strings.ReplaceAll(out, slot33Rows, p.SessionsOtherRows)
 	orig := originOf(p.Origin)
 	if orig != "" {
 		out = strings.ReplaceAll(out, capturedOrigin, orig)
 	}
 	return out
+}
+
+// boolAttr — pug `content=bool` renders the ATTRIBUTE PRESENT (bare, empty
+// value) when true and ABSENT when false (pinned on ol-hasPassword et al.).
+func boolAttr(v bool) string {
+	if v {
+		return " content"
+	}
+	return ""
+}
+
+// metaContentAttr — string metas: ` content="ESC"` when truthy, nothing
+// when falsy (pinned: <meta name="ol-samlBeta"> vs content="CAP-SAMLBETA").
+func metaContentAttr(v string) string {
+	if v == "" {
+		return ""
+	}
+	return ` content="` + htmlAttrEsc(v) + `"`
+}
+
+// htmlAttrEsc — pug attribute escaping: & < > " (pug uses the HTML escape
+// set for attribute values).
+func htmlAttrEsc(s string) string {
+	r := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+		`"`, "&quot;",
+	)
+	return r.Replace(s)
 }
 
 // originOf normalizes "http://host" / "https://host" (strips paths).
@@ -124,15 +195,18 @@ func Page(w http.ResponseWriter, d PageData, skeleton string) {
 	if csp == "" {
 		csp = cspRestrictive
 	}
+	html := d.finalize(skeleton)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", csp)
 	// HttpPermissionsPolicy — rendered views only (pinned P3.1: the 500 view
 	// carries it, JSON routes do not). Set after the CSP so renderers can
 	// override either cleanly.
 	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
-	w.Header().Set("X-Powered-By", "Express")
+	// Node express etag on rendered views (pinned on /login + P3.3 pages):
+	// weak W/\"<hexlen>-<sha1-27>\".
+	w.Header().Set("ETag", core.EtagWeakBody(html))
 	w.WriteHeader(200)
-	_, _ = io.WriteString(w, d.finalize(skeleton))
+	_, _ = io.WriteString(w, html)
 }
 
 // StatusPage for 404/500-style views (Node: res.status(404).render(...)).
@@ -141,12 +215,13 @@ func StatusPage(w http.ResponseWriter, d PageData, status int, skeleton string) 
 	if csp == "" {
 		csp = cspRestrictive
 	}
+	html := d.finalize(skeleton)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
-	w.Header().Set("X-Powered-By", "Express")
+	w.Header().Set("ETag", core.EtagWeakBody(html))
 	w.WriteHeader(status)
-	_, _ = io.WriteString(w, d.finalize(skeleton))
+	_, _ = io.WriteString(w, html)
 }
 
 // Restricted403 — the CE access-denied render (403 + restricted view),
@@ -157,6 +232,19 @@ func Restricted403(w http.ResponseWriter, d PageData) {
 
 // LoginPage / RegisterPage / LogoutConfirmation / Restricted / NotFound.
 func LoginPage(w http.ResponseWriter, d PageData) { d.CSP = cspReact(d.Nonce); Page(w, d, loginHTML) }
+
+// SettingsPage — GET /user/settings (React layout: nonce CSP, pinned P3.3).
+func SettingsPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	Page(w, d, settingsHTML)
+}
+
+// SessionsPage — GET /user/sessions (layout-website-redesign — the same
+// nonce-script CSP per the live capture).
+func SessionsPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	Page(w, d, sessionsHTML)
+}
 func RegisterPage(w http.ResponseWriter, d PageData) {
 	d.CSP = cspReact(d.Nonce)
 	Page(w, d, registerHTML)
@@ -178,7 +266,6 @@ func Error500Page(w http.ResponseWriter, d PageData) {
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
 	w.Header().Set("ETag", core.EtagWeakBody(body))
-	w.Header().Set("X-Powered-By", "Express")
 	w.WriteHeader(500)
 	_, _ = io.WriteString(w, body)
 }

@@ -256,7 +256,6 @@ test.describe.serial('web-go P0 flip gate (WEB_GO_PLAN M0)', () => {
       body: new URLSearchParams({ email: 'x@y.z', password: 'nope', _csrf: 'garbage-token-' + Date.now() }).toString(),
     })
     expect(bad.status, 'Node bad-csrf must be 403').toBe(403)
-    const bad = await fetch
 
     // ---- D1 doc in the shared redis ----
     const doc1Raw = await waitForSessionDoc(sid1)

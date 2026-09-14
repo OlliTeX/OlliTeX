@@ -1,6 +1,8 @@
 package core
 
 import (
+	"bytes"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -165,6 +167,30 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 			return
 		}
 		cxt.Sess = sess
+
+		// express.json (body-parser) parity — Node Server.mjs registers
+		// express.json BEFORE the csrf middleware. Strict mode (default)
+		// accepts ONLY object/array JSON roots; a scalar root
+		// (number/string/boolean/null/unparseable) → 400 with exactly
+		// body "{}" + application/json + weak ETag — and, pinned P3.3,
+		// that happens BEFORE the csrf 403 even for anonymous requests.
+		// Array roots pass the parser (→ csrf 403 / handler 400).
+		if ct := strings.ToLower(r.Header.Get("Content-Type")); strings.Contains(ct, "json") &&
+			(r.Method == http.MethodPost || r.Method == http.MethodPut ||
+				r.Method == http.MethodPatch || r.Method == http.MethodDelete) {
+			if r.ContentLength > 0 || r.ContentLength < 0 {
+				raw, rerr := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+				if rerr == nil {
+					r.Body = io.NopCloser(bytes.NewReader(raw))
+					r.ContentLength = int64(len(raw))
+					trimmed := bytes.TrimSpace(raw)
+					if len(trimmed) > 0 && trimmed[0] != '{' && trimmed[0] != '[' {
+						res.BareWrite(400, []byte("{}"))
+						return
+					}
+				}
+			}
+		}
 
 		if mustCsrf(r.Method) {
 			token := csrfTokenFrom(r)
@@ -425,6 +451,11 @@ func (a *App) CommitSess(sess *Session, w http.ResponseWriter) {
 	if err := a.Store.persist(sess); err != nil {
 		log.Printf("webgo: session persist: %v", err)
 	}
+	// Regeneration: Node's login response carries EXACTLY ONE Set-Cookie
+	// (the new sid). The pre-handler pass may have queued the old sid's
+	// cookie into the (still unsent) headers — revoke it, then issue the
+	// new one (P3.3 pin: two cookies leaked, first = destroyed old sid).
+	w.Header().Del("Set-Cookie")
 	sess.writeSessionCookie(w, a.Cfg)
 }
 
