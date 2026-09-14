@@ -258,7 +258,7 @@ EOF`, true)
 }
 
 async function flushSink(): Promise<void> {
-  await fetch(SINK + '/api/flush', { method: 'POST' }).catch(() => {})
+  await fetch(SINK + '/api/messages', { method: 'DELETE' }).catch(() => {})
   await fetch(SINK + '/api/messages').catch(() => {})
 }
 

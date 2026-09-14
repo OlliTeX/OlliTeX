@@ -75,7 +75,7 @@ func TestValidEmail(t *testing.T) {
 		"a@",
 		"a@.co",
 		"a@b.",
-		"a b@c.co",   // space (JS \s)
+		"a b@c.co", // space (JS \s)
 		"a@b .co",
 		"\ta@b.co",
 	} {

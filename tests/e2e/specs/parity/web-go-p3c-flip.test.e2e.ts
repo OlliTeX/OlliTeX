@@ -304,7 +304,7 @@ function auditCount(mongoC: string, uid: string): number {
 }
 
 async function flushSink(): Promise<number> {
-  await fetch(SINK + '/api/flush', { method: 'POST' }).catch(() => {})
+  await fetch(SINK + '/api/messages', { method: 'DELETE' }).catch(() => {})
   const r = await fetch(SINK + '/api/messages')
   const env = (await r.json()) as { count: number }
   return env.count

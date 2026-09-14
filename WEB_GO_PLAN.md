@@ -1,9 +1,9 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported — see P3.5 below) remaining P3 leaf = SiteSettings + P4–P7 to come. Companion
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN (2026-09-14)** — **all of P3 complete.** Companion
 to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are Go-only
-as of `8090d454fb`).
+as of `8090d454fb`). P4–P7 to come.
 
 ---
 
@@ -667,6 +667,93 @@ register` → **"Cannot POST /admin/register"** (route unregistered), `GET /admi
 - **Follow-up (owner, optional):** fix the Node `__dirname` bug in admin-tools
   (`const __dirname = Path.dirname(fileURLToPath(import.meta.url))`) so
   `/user/activate` renders — only if/when the SaaS admin surface is retained.
+
+#### P3.6 — SiteSettings (Manage/Site backend) — **✅ GATE 3/3 GREEN (2026-09-14)**
+
+**Scope (ported): the *backend* of the Manage/Site settings leaf** — the admin
+settings read/validate/merge/persist + secret-cipher + e-mail-test surface of
+`app/src/Features/SiteSettings/SiteSettingsManager.mjs` + `SecretCipher.mjs`
++ `EnvHydrator.mjs`: 864 lines + ~500 lines behind 27 settings keys.
+**Not ported:** the React *frontend* form (the admin-tools/hub UI keeps calling
+these endpoints). The Go shadow is a strict 1:1 of the Node HTTP contract.
+
+**Go package: `go/services/web/features/sitesettings/`** (10 files, ~2.9k LoC):
+`orderedjson.go` (ordered JSON codec), `ordered.go` (ordered map helpers),
+`cipher.go` (HKDF-SHA512 + AES-256-CTR secret cipher + cross-runtime bridge
+`Open`/`EncryptText`/`DecryptText`), `seeds.go` (default section values),
+`seeds`/`section.go` (clean-input + merge + `*Set` masking), `storageenv.go`
+(managed-env fragment render/parse), `validators.go`, `manager.go`, `store.go`
+(mongo read/write), `routes.go` (5 handlers + rate limiter + template-admins).
+Feature is wired in `cmd/web/main.go`; flip conf `server-ce/nginx/flips/web-p3e.conf`
+proxies `/admin/site`, `/admin/site-settings{,/}`, `/admin/site/template-admins` to
+the Go shadow; gate `tests/e2e/specs/parity/web-go-p3e-flip.test.e2e.ts`.
+
+**Routes + pins (Node oracle, live 2026-09-14):**
+- `GET /admin/site` → **302 `/hub#/site`**; `GET /admin/site-settings` → **200
+  `application/json`** with the fixed 23-section order, secrets masked to `""` +
+  per-field `<name>Set` booleans, and `templates.counts` appended.
+- `PUT /admin/site-settings/:section` → **200** `{ok,upserted,modified}`; invalid
+  field → **422** `{message}`; unknown section → **422** `{message:"Unknown
+  section: …"}`. `PUT storage` → additionally `{appliesOn:"restart",envLines:[…]}`
+  (a real JSON **array**) and writes the managed env fragment.
+- `POST /admin/site-settings/email/test` → invalid `to` → **422**; valid → **200
+  `{ok:true}`** + one mail, subject `"[Overleaf] E-mail configuration test"`.
+- `GET /admin/site/template-admins` → **200** `{users:[…]}`.
+- AuthZ: anon JSON GET → **401**; anon html GET → **302 `/login`**; non-admin →
+  **302 `/restricted?from=…`**.
+- `PUT` is **CSRF-enforced**; `requireGlobalLogin` runs before `requireAdmin`;
+  `email/test` is rate-limited 5/min.
+
+**Key contracts / decisions:**
+- **Ordered JSON is mandatory.** Node `JSON.stringify` preserves insertion order;
+  map-keyed Go `json` marshals would alphabetise and break byte parity → a custom
+  ordered encoder (`orderedjson.go`) is used for all section bodies and the merged
+  response (`MergeOrdered(seed, stored)` = seed order, stored values win).
+- **Secret cipher is cross-runtime.** HKDF-SHA512 + AES-256-CTR, wire format
+  `ss::label:hex(salt):base64(CT):hex(iv)`. **Verified BOTH directions**: the Go
+  shadow decrypts Node-encrypted `sso-saml` `idpCert`/`privateKey`, and Node
+  decrypts a Go-encrypted secret; `encryptText`/`decryptText` round-trip on both
+  runtimes (`cmd/sscipher-probe` + `go test` golden vectors).
+- **Gate normalisation (documented divergences, not Go bugs):**
+  - `templates.counts` key order — Node builds it from `Promise.all` completions,
+    so order is nondeterministic; compared as a **sorted** object only.
+  - `storage.envManaged` / `storage.envPath` — Node's managed-env detection is
+    known to diverge from repo source (instrumented this cycle); dropped from the
+    equality, all other fields order-sensitive byte-parity.
+  - Volatile (`session_created`/`lastActive`/`updated_at`-family, nonces, dates,
+    ETag) handled by the standard gate normaliser.
+- **`GET /admin/site`** is a thin `requireAdmin` + redirect (parity with Node's
+  admin-tools router); **template-admins** reads the `isAdmin` + template flag and
+  `zotero` is intentionally excluded from the SSO secret wipe loop (Node
+  `SecretCipher` behaviour) while `mendeley` is in it.
+
+**Evidence (2026-09-14):** 13/13 A/B battery PASS (GET full-body, PUT
+  toggle+restore, PUT invalid-422, PUT unknown-422, PUT storage fs, email/test
+  422 + 200/mail, template-admins, anon 401/302, non-admin 302); cipher round-trip
+  ALL PASS; flip gate **leg1 Node / leg2 Go(flip) / leg3 Node** all byte-identical
+  (**3 passed, 32.9s**) including the mail side-effect. **P3 is now complete.**
+
+**File-split refactor (owner instruction, same cycle):** every oversized web-feature
+monolith was split into focused same-package files to keep Go files small for LLM
+context + maintainability (pure moves, zero behaviour change; `goimports` added,
+`go build` + `go vet` + `go test ./go/...` green, all of P3 re-verified green):
+`userpages.go 1325→{userpages.go 93, _settings.go 832, _view.go 192,
+_sessions.go 324}`, `instancestats.go 592→{instancestats.go 231, _series.go 198,
+_alerts.go 224}`, `serveradmin.go 588→{serveradmin.go 135, _editor.go 74,
+_messages.go 445}`, `authpages.go 546→{authpages.go 70, _login.go 469, _logout.go 54}`,
+`passwordreset.go 514→{passwordreset.go 295, _token.go 245}`, `tokenaccess.go
+471→{tokenaccess.go 148, _project.go 200, _grant.go 157}`, `registrationpage.go
+469→{registrationpage.go 170, _register.go 216, _signup.go 110}`, plus the
+service monoliths `docstore/routes.go 1094→{routes.go 105, routes_docs.go 597,
+routes_comments.go 178, routes_archive.go 295}` and `chat/handlers.go 951→
+{handlers.go 331, chat_sendedit.go 213, chat_threads.go 365, chat_clone.go 188}`.
+Largest web Go file after all splits: **userpages_settings.go 832 LoC** (no web
+file exceeds ~900).
+
+**Latent bug found + fixed this cycle:** the e2e smtp sink exposes only
+`DELETE /api/messages` (wipe) + `GET /api/messages` — but `web-go-p3c/p3d` (and
+initially p3e) called a nonexistent `POST /api/flush` (silent no-op) relying on
+before/after deltas to mask it; all three now use the real endpoint.
 
 ### P4 — project core (the heavy centre; flip in listed sub-order)
 

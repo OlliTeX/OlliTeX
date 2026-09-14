@@ -28,7 +28,7 @@ func TestReadBodyRootKind(t *testing.T) {
 		{`["a","b"]`, "array", false},
 		{`{}`, "", true},
 		{`null`, "null", false}, // express.json accepts null; zod → 'received null'
-		{"", "", true}, // truly empty body → express.json {}
+		{"", "", true},          // truly empty body → express.json {}
 	}
 	for _, c := range cases {
 		r := httptest.NewRequest("POST", "/admin/messages", strings.NewReader(c.body))

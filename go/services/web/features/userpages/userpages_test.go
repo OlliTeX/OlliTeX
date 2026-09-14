@@ -3,8 +3,8 @@ package userpages
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -41,14 +41,14 @@ func TestMomentUTC(t *testing.T) {
 func TestJsBoolCoercion(t *testing.T) {
 	// Node Boolean(): "" 0 null → false; "0" "x" → true
 	cases := map[any]bool{
-		nil:     false,
-		false:   false,
-		true:    true,
-		"":      false,
-		"0":     true,
-		"false": true,
+		nil:        false,
+		false:      false,
+		true:       true,
+		"":         false,
+		"0":        true,
+		"false":    true,
 		float64(0): false,
-		"x":     true,
+		"x":        true,
 	}
 	for in, want := range cases {
 		if got := jsBool(in); got != want {
