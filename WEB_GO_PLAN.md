@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3** (all 2026-09-14).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3** (all 2026-09-14).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -996,6 +996,45 @@ renameProject`; `newName = newName.trim()`; `validateProjectName` (blank → 400
 
 ---
 
+#### P4.6 — project flag-writes (archive/unarchive/trash/untrash) — **✅ GATE 3/3 GREEN (2026-09-14)**
+
+Second write unit — the per-user archived/trashed set mutations. Wired exactly as
+Node (router.mjs + ProjectController.archive/unarchive/trash/untrash +
+ProjectDeleter.mjs:156-188). **Key finding:** `archived` / `trashed` are **arrays of
+user ObjectIDs** (per-user sets), NOT booleans — each user's view is archived/trashed
+independently. All four ops are **no-audit** in this free build (`addEntryIfManaged`
+→ `findManagedSubscriptions` returns `[]` → no `projectAuditLogEntries` write). Guard =
+`requireLogin` + `ensureUserCanReadProject` (READ, like P4.2 `canRead`, not admin).
+
+- **Contract (live oracle, A/B + gate 3/3; state-aware):**
+  Each valid op → `200 text/plain` body `OK`, with the exact Mongo `$addToSet`/`$pull`:
+  `archive` = `$addToSet{archived:uid}` + `$pull{trashed:uid}`; `unarchive` = `$pull{archived:uid}`;
+  `trash` = `$addToSet{trashed:uid}` + `$pull{archived:uid}`; `untrash` = `$pull{trashed:uid}`.
+  invalid (non-hex) id → `404 application/json` malformed — **param name is route-specific
+  (`params.Project_id` for `/Project/…/archive`, `params.project_id` for `/project/…/trash`)**;
+  valid id, project absent → `404 HTML` general/404 (byte-equal after nonce-norm);
+  anonymous → `403 text/plain` `Forbidden` (CSRF before requireLogin; both stacks agree).
+- **Files:** new `go/services/web/features/projectlist/projectflags.go` (flagHandler +
+  applyFlagOp + flagOp/paramName + malformedMsg); `projectlist.go` registers POST/DELETE
+  `^/Project/([^/]+)/archive$` and POST/DELETE `^/project/([^/]+)/trash$`; reuses
+  loadProject/canRead/loadUserAdmin/validOID/views.NotFoundPage/Restricted403 +
+  core.Res.SendStatus/JSON/Redirect.
+- **Flip:** `server-ce/nginx/flips/web-p4f.conf` — two regex locations
+  (`~ ^/Project/[^/]+/archive\z` and `~ ^/project/[^/]+/trash\z`, each covering its
+  POST+DELETE pair; nginx location is method-agnostic) → `127.0.0.1:4010`.
+- **Gate:** `tests/e2e/specs/parity/web-go-p4f-flip.test.e2e.ts` (3-leg Node → Go → Node;
+  each leg: reset archived/trashed → run the 4 valid ops asserting 200 + per-op Mongo
+  state → error battery; cross-leg diffs compare **responses AND state**; idempotent
+  `webgo-p4f-flags` fixture) — **3 passed**; P4.1–P4.5 re-run **3/3 each**; full
+  `go test ./go/...` green; stack left node-active.
+- **Pitfalls:** (a) the malformed-404 message embeds the route param name, so trash must
+  emit `params.project_id` (lowercase) not `params.Project_id`; (b) raw HTML 404 bodies
+  differ only by the random CSP nonce — compare after normalization; (c) an in-container
+  Node probe has no `docker` CLI, so Mongo state reads belong in the host-side gate
+  (Playwright `execFileSync('docker','exec',mongoC,'mongosh…')`).
+
+---
+
 Remaining P4 sub-units (in listed sub-order):
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
@@ -1004,8 +1043,9 @@ Remaining P4 sub-units (in listed sub-order):
    ratio in the whole plan.
 2. **Chat** (517) + **Notifications** (576, web-side proxy of the Go chat +
    notifications services).
-3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) — **list
-   (P4.1) + rename (P4.5) done**; duplicate/delete/options/audit-writer stay.
+3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) — **list (P4.1) +
+   rename (P4.5) + flag-writes archive/trash (P4.6) done**; duplicate/delete/restore/options/
+   settings/clone stay.
 4. **Collaborators** (3,791) — the read-side `/project/:id/members` (P4.3) and
    `/project/:id/access-requests` (P4.4) are done; the remaining invite/manage
    /transfer-ownership **mutations** stay to come.

@@ -59,6 +59,10 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: memPat, Handler: membersHandler(a)},
 			{Method: "GET", Pattern: arPat, Handler: accessRequestsHandler(a)},
 			{Method: "POST", Pattern: renPat, Handler: renameHandler(a)},
+			{Method: "POST", Pattern: archPat, Handler: flagHandler(a, opArchive)},
+			{Method: "DELETE", Pattern: archPat, Handler: flagHandler(a, opUnarchive)},
+			{Method: "POST", Pattern: trashPat, Handler: flagHandler(a, opTrash)},
+			{Method: "DELETE", Pattern: trashPat, Handler: flagHandler(a, opUntrash)},
 		},
 	}
 }
