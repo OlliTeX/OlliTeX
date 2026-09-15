@@ -44,7 +44,7 @@ import (
 )
 
 // editorPagePattern — both main-shell prefixes, 24-hex project id.
-var editorPagePattern = regexp.MustCompile(`^/(?:editor|Project)/(?P<id>[0-9a-f]{24})$`)
+var editorPagePattern = regexp.MustCompile(`^/(?:editor|Project)/(?P<id>[0-9a-f]{24})(?P<role>/detacher|/detached)?$`)
 
 // Feature registers the editor page routes.
 func Feature(a *core.App) core.Feature {
@@ -94,6 +94,11 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 		ctx := cxt.Req.Context()
 		id := cxt.Params["id"]
 		oid := primitiveObjectID(id)
+		// P5.1b — detachRole: "" (main), "detacher" or "detached". Only
+		// "detached" changes the chrome; "detacher" + main share the ide-react
+		// chrome and differ only in ol-detachRole + currentUrl (both derived
+		// from the request path / the ol-detachRole slot below).
+		detachRole := strings.TrimPrefix(cxt.Params["role"], "/")
 
 		// load project first (Node order: requireLogin → canRead → load
 		// user).
@@ -146,13 +151,15 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 		projTags := anySlice(pdoc["tags"])
 
 		d := views.EditorData{
-			Nonce:      views.NewNonce(),
-			CSRF:       cxt.Sess.CsrfToken(),
+			Nonce:       views.NewNonce(),
+			CSRF:        cxt.Sess.CsrfToken(),
 			// Node <title> = "<projectName> - OlliTeX, Online LaTeX Editor"
-			// (pinned oracle: both /editor and /Project shells).
-			Title:      projName + " - OlliTeX, Online LaTeX Editor",
-			Origin:     cxt.SiteURL,
-			CurrentURL: currentURL,
+			// (pinned oracle: /editor, /Project AND the detach shells).
+			Title:       projName + " - OlliTeX, Online LaTeX Editor",
+			ProjectName: projName,
+			Origin:      cxt.SiteURL,
+			CurrentURL:  currentURL,
+			Detached:    detachRole == "detached",
 		}
 
 		// ---- raw slots ----
@@ -187,16 +194,21 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 
 		// ---- string/number (typed) slots ----
-		d.Typed = map[string]string{
-			"ol-maxDocLength":"2097152",
-			"ol-maxReconnectGracefullyIntervalMs":"30000",
-			"ol-otMigrationStage":"0",
-			"ol-defaultLatexCompiler":"pdflatex",
-			"ol-loadingText":"Loading",
-			"ol-translationIoNotLoaded":"Could not connect to WebSocket server",
-			"ol-translationLoadErrorMessage":"Could not load translations",
-			"ol-translationUnableToJoin":"Could not connect to collaboration server",
-		}
+			d.Typed = map[string]string{
+				"ol-maxDocLength":"2097152",
+				"ol-maxReconnectGracefullyIntervalMs":"30000",
+				"ol-otMigrationStage":"0",
+				"ol-defaultLatexCompiler":"pdflatex",
+				"ol-loadingText":"Loading",
+				"ol-translationIoNotLoaded":"Could not connect to WebSocket server",
+				"ol-translationLoadErrorMessage":"Could not load translations",
+				"ol-translationUnableToJoin":"Could not connect to collaboration server",
+			}
+			// P5.1b — ol-detachRole: empty on main (bare meta), "detacher"/
+			// "detached" on the detach shells (content=…).
+			if detachRole != "" {
+				d.Typed["ol-detachRole"] = detachRole
+			}
 
 		// ---- json slots ----
 		d.JSON = map[string]string{

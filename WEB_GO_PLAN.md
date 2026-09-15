@@ -1552,18 +1552,27 @@ v1-history :3100 (blob PUT), DU :3003 (setDocument + structure ops) — all shar
 
 ### P5 — editor & compile (highest coordination cost, deliberately last among core)
 
-> **Status (2026-09-15): P5.1a editor page ✔ GATE 3/3 GREEN (Node baseline → Go parity → Node re-baseline) + P4 project-list regression 3/3 + go build/vet/test green.**
-> Route `GET /editor/:id` + legacy `GET /Project/:id` (owner) now byte-parity on the 35 kB
-> editor bootstrap shell (68 `<meta name="ol-…">` slots + per-request CSP nonce + title +
-> ol-navbar.currentUrl). Go: `go/services/web/views` (slot renderer `EditorPage` + generated
-> `editorTemplate`) + `go/services/web/features/editorpages` (handler: user/project loads,
-> `serializeUser`/`buildUserSettings`/`ol-navbar`/pinned config JSON, response envelope), flip
-> `server-ce/nginx/flips/web-p51a.conf`, gate `tests/e2e/specs/parity/web-go-p51a-flip`.
+> **Status (2026-09-15): P5.1a editor page + P5.1b editor detach shell ✔ BOTH GATES 3/3 GREEN (Node baseline → Go parity → Node re-baseline) + P4 project-list regression 3/3 + go build/vet/test green. The whole editor PAGE surface (main + detacher + detached) is now Go.**
+> Route `GET /editor/:id` + legacy `GET /Project/:id` (owner) byte-parity on the 35 kB editor
+> bootstrap shell (68 `<meta name="ol-…">` slots + per-request CSP nonce + title +
+> ol-navbar.currentUrl), **and `/editor|/Project/:id/detacher` + `/detached`** (the
+> `ide-detached` chrome: `/stylesheets/ide-detached-*.css`, `<main id="pdf-preview-detached-root">`,
+> `ol-detachRole` detacher|detached, full-path currentUrl). Go: `go/services/web/views` (slot
+> renderer `EditorPage` selects `editorTemplate` vs the new generated `detachedTemplate`;
+> `__PROJNAME__`/`__TITLE__`/`__NONCE__`/`__ORIGIN__`/`__CURRENTURL__` placeholders, all slot +
+> title/name values html-escaped to match pug) + `go/services/web/features/editorpages` (one
+> handler for all 6 routes via detachRole; user/project loads, `serializeUser`/`buildUserSettings`/
+> `ol-navbar`/pinned config JSON, response envelope, 404/302/403 envelope parity) + unit tests
+> `views/editor_test.go`; flips `web-p51a.conf` (main) + `web-p51b.conf` (all 6); gates
+> `web-go-p51a-flip` + `web-go-p51b-flip`.
 > Findings pinned: editor CSP adds `img-src 'self' data: blob:`; `<title>` =
-> `<projectName> - OlliTeX, Online LaTeX Editor`; `ol-otMigrationStage` content=0; dates
-> decode as `primitive.DateTime` (ms epoch) — formatted to ISO-8601 UTC; csrf token rotates
-> per render (gate normalizes it). **P5.1b (deferred): `/editor/:id/detacher|detached`
-> (different ide-detached template) + P5.2 (editor real-time / DU/OT/compile control plane).**
+> `<projectName> - OlliTeX, Online LaTeX Editor`; twitter/og:title + `ol-projectName` render the
+> **real project name** (was a latent P5.1a bug — `WebGo-Ren-N` fixture was baked into the template;
+> fixed with a `__PROJNAME__` placeholder in both templates); `ol-otMigrationStage` content=0; dates
+> decode as `primitive.DateTime` (ms epoch) → ISO-8601 UTC; csrf rotates per render (gate normalizes);
+> the detach pages do NOT add `id="ol-detach-role"` (that attr is only on the main shell — the P3e
+> oracle was stale, Node truth = main-only, byte-verified in Node). **P5.1 done. Next: P5.2 (editor
+> real-time / DocumentUpdater / OT / compile control plane).**
 
 Editor (1,418: `/Editor/:id` open + OT plumbing to real-time),
 DocumentUpdater (600 — client of the document-updater service),

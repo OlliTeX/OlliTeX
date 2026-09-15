@@ -37,9 +37,11 @@ const (
 type EditorData struct {
 	Nonce       string
 	CSRF        string
-	Title       string // project name (title + ol-projectName + navbar currentUrl)
+	Title       string // project name + " - OlliTeX, Online LaTeX Editor"
+	ProjectName string // bare project name (twitter:title / og:title / ol-projectName)
 	Origin      string // "http://host[:port]" (alternate link + siteUrl context)
-	CurrentURL  string // "/editor/:id" or "/Project/:id" (alternate link + navbar)
+	CurrentURL  string // "/editor/:id" or "/Project/:id" + optional "/detacher"|"/detached"
+	Detached    bool   // true → the ide-react-detached chrome (GET .../detached)
 	JSON        map[string]string
 	Raw         map[string]string
 	Bool        map[string]bool
@@ -56,10 +58,16 @@ func edHTMLEscape(s string) string {
 }
 
 // EditorPage renders the editor page with byte parity to the Node oracle.
+// When d.Detached is true it renders the ide-react-detached chrome
+// (GET .../detached); otherwise the main editor chrome (main + /detacher),
+// which is identical except ol-detachRole + currentUrl (both slotted).
 func EditorPage(d EditorData) string {
 	s := editorTemplate
+	if d.Detached {
+		s = detachedTemplate
+	}
 	s = strings.ReplaceAll(s, "__NONCE__", d.Nonce)
-	s = strings.ReplaceAll(s, "__CSRF__", d.CSRF)
+	s = strings.ReplaceAll(s, "__PROJNAME__", edHTMLEscape(d.ProjectName))
 	s = strings.ReplaceAll(s, "__TITLE__", edHTMLEscape(d.Title))
 	s = strings.ReplaceAll(s, "__ORIGIN__", d.Origin)
 	s = strings.ReplaceAll(s, "__CURRENTURL__", edHTMLEscape(d.CurrentURL))
