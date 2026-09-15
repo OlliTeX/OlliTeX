@@ -18,4 +18,18 @@ export LISTEN_ADDRESS=127.0.0.1
 export ENABLED_SERVICES="web"
 export WEB_PORT="4010"
 
+# Private-API service credentials: the image bakes them into
+# /etc/overleaf/settings.js (genScript, build-time env) where the Node APIs
+# read them from; Go reads process env — export the pair (NUL-delimited to
+# survive any quoting) so basic-auth parity holds. /usr/bin/node is
+# explicit because runit's svd PATH is minimal.
+if [ -f /etc/overleaf/settings.js ]; then
+  WEB_PAIR=$(/usr/bin/node -p 'const s=require("/etc/overleaf/settings.js"); const u=Object.keys(s.httpAuthUsers||{}); u[0]?u[0]+":"+s.httpAuthUsers[u[0]]:""' 2>>/var/log/overleaf/web-go.log || true)
+  if [ -n "$WEB_PAIR" ] && [ "${WEB_PAIR#*:}" != "$WEB_PAIR" ]; then
+    export WEB_API_USER=${WEB_PAIR%%:*}
+    export WEB_API_PASSWORD=${WEB_PAIR#*:}
+  fi
+  echo "webgo: WEB_API_USER set=$([ -n "$WEB_API_USER" ] && echo yes || echo no) PASS-LEN=${#WEB_API_PASSWORD}" >>/var/log/overleaf/web-go.log
+fi
+
 exec /sbin/setuser www-data /usr/local/bin/go-services/web >> /var/log/overleaf/web-go.log 2>&1

@@ -1429,6 +1429,46 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
 - Full P4 regression green after P4.12b (45 flip tests; the same two leg-1
   flakies self-heal on retry as in prior runs).
 
+#### P4.12c — private API doc trio: `GET|POST /project/:Project_id/doc/:doc_id` (+ `?plain=1`) + `POST /project/:Project_id/doc/:doc_id/changes/reject` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+
+`services/web/app/src/Features/Documents/DocumentController.mjs` +
+`DocumentRouter.mjs` (privateApiRouter basic-auth surface, no session, no CSRF):
+
+- **Go**: `features/projectlist/docapi.go`
+  - basic auth gate first (Node order) → 401 `WWW-Authenticate: OverleafLogin`,
+    `text/plain "Unauthorized"` + ETag, **no** `nosniff` (errorController 401
+    path), XPB+CSP kept.
+  - `GET` → docstore GET + chat resolved-thread-ids → pinned key-order JSON
+    (`lines,version,ranges,pathname,projectHistoryType,historyRangesSupport,otMigrationStage,
+    [projectHistoryId],resolvedCommentIds`) — `otMigrationStage:0` literal pinned
+    (Node never omits); `?plain=1` → `text/plain` lines **+ `nosniff` (helmet on
+    `res.send`)**; ghost project/doc → 404 `Not Found`; bad-oid → 404 zod-VA JSON.
+  - `POST` (setDoc) → zod VA **params-first + exact messages** → docstore POST
+    (Node's own path is docstore-direct via ProjectEntityUpdateHandler — no DU) →
+    `{"rev":N[, "modified":true]}`.
+  - `POST .../changes/reject` → 204 + `ETag: W/"a-bAsFyilMr4Ra1hIU5PyoyFRunpI"`
+    (Node `res.status(204).send("No Content")` ETags the stripped body — replicated
+    verbatim).
+  - `NoSession` route option in `core/app.go` route struct (skips session+CSRF,
+    mirrors Node's privateApiRouter); XPB per-response (Go core otherwise omits it).
+- `runit/web-go-overleaf/run` exports `WEB_API_USER`/`WEB_API_PASSWORD` read from
+  `/etc/overleaf/settings.js` (container node one-liner; NUL-free `:`-delimited
+  parse).
+- **flip**: `web-p413.conf` (reject POST → Go) + `web-p411b.conf` extended to
+  `DELETE|GET|POST` for the doc pair (Node web profile has none of these routes →
+  flip retargets 7420 to the API contract).
+- **gate** `specs/parity/web-go-p413-flip.test.e2e.ts`: 19-case battery
+  (reset/get-plain/no-auth×2/wrong-cred/bad×2/ghost×2/no-auth-POST/VA×5/setDoc/
+  setDoc-noop/reject), Node :3000 oracle vs Go :4010 + Node baseline re-capture
+  (3-leg), state-dependent `modified`/rev shape-compared + etag-exempted; plus a
+  live-flip nginx acceptance leg (apply both confs → 7420 401/200/POST-200/204/
+  unflipped-PUT-403 → strip, with reload race-retry and post-reload fetch retry).
+  5/5 ×3 consecutive green; **47-test P4 regression green**; go build/vet/test green.
+- Gate-plumbing lessons (reusable): flip vhost splice is node-driven (no sed/shell
+  quoting), reload has a 3× retry, and nginx-assert fetches retry across the
+  reload window (dropped sockets); `runLeg` fails loud when a leg's write-cases are
+  unstable instead of returning a broken map.
+
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go
