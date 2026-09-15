@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green** (2026-09-15).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1284,6 +1284,42 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
   `proxy_set_header` inside `if`), gate `web-go-p4inv-flip.test.e2e.ts`
   (3 legs, ~40 cases, 6-mail assertion, sink-token recovery).
 - full `web-go P4` regression green after P4.10b (36 passed 3.6m).
+
+#### P4.11a — editor entity creation: `POST /project/:id/doc` + `POST /project/:id/folder` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+- Node oracle (probe 4, live-pinned 2026-09-15): addDoc 200
+  `{"name","_id"}` (trimmed name); doc store `POST
+  {docstore}/project/:pid/doc/:did` fired on every doc path that passes
+  `isCleanFilename` (blocked/dup 400s included); entity-count > 2000 →
+  i18n JSON; path > 1024 → 400 `path too long`; top-level blocked JS
+  property names (`toString`, `constructor`, … 14 words) → 400 `blocked
+  element name` (docs/files only, folders + subfolders exempt); duplicate →
+  400 `file already exists` (checked after the docstore call, matching
+  Node's `_putElement` order); bad/ghost parent → 404 page; non-member →
+  403 `{"message":"restricted"}`; anon + valid-CSRF → 401 `Unauthorized`;
+  PUT/GET method mismatch → Node 404 (flip method-guard proxies to Node);
+  strict body VA (`name:null` → `expected string, received null at
+  "body.name"`, extra key → `Unrecognized key at "body"`, `name:42` →
+  `expected string, received number`), raw name ≥ 150 chars → 400
+  text/plain `Bad Request`.
+- **Folder error shape diverges from doc** (pinned): invalid folder names
+  (`'   '`, `'../escape'`, `'a*b'`) → 400 `application/json`
+  `"Invalid File Name"` (i18n `invalid_file_name`); invalid **doc** names
+  → 400 text/plain `invalid element name`.
+- Go: `projectlist/entadd.go` (SafePath BADCHAR/BADFILE replica —
+  `[/\\*\x00-\x1F\x7F\x80-\x9F]`, `^.$|^..$|edge-space` — RE2-safe,
+  blocked-word table, full-tree parser tolerant of `primitive.M/A` driver
+  shapes, parent-folder resolver, docstore client, `_putElement` check
+  order, single `findOneAndUpdate` $push/$inc/$set write with
+  `rootFolder.N` filter → MatchedCount 0 → Node's 500), routes registered
+  in `projectlist.go`, flip `web-p411a.conf` (POST-only; other verbs proxy
+  to Node — no in-`if` `proxy_set_header`), gate
+  `web-go-p411a-flip.test.e2e.ts` (3 legs, ~35 cases, state anchor:
+  rootFolder tree names + version + lastUpdatedBy).
+- 404/500 page PATH slot: skel renders `origin + "/" + PATH` — pass the
+  request path **without** the leading slash (`TrimPrefix`) or the
+  alternate-`href` grows one byte vs Node (caught by the gate).
+- Full `web-go P4` regression green after P4.11a (39 passed 3.8m).
+
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go

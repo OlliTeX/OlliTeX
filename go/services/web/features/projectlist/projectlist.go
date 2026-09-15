@@ -88,6 +88,9 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: invSharePat, Handler: splitForbiddenHandler(a, false), NoLogin: true},
 			{Method: "POST", Pattern: invSharePat, Handler: splitForbiddenHandler(a, true), NoLogin: true},
 			{Method: "POST", Pattern: invShareValPat, Handler: splitForbiddenHandler(a, false), NoLogin: true},
+			// P4.11a editor entity creation (web-p411a flip)
+			{Method: "POST", Pattern: entDocPat, Handler: addEntityHandler(a, "doc")},
+			{Method: "POST", Pattern: entFolderPat, Handler: addEntityHandler(a, "folder")},
 		},
 	}
 }
