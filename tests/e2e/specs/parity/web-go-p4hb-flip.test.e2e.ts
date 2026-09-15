@@ -171,6 +171,7 @@ const out = {
   rootDocHex: /^[0-9a-f]{24}$/.test(String(p.rootDoc_id)),
   docLines, blob,
   name: p.name, compiler: p.compiler, spell: p.spellCheckLanguage,
+  version: p.version,
   grammarPicky: p.grammarPicky, publicAccesLevel: p.publicAccesLevel,
   readOnly: p.readOnly, active: p.active,
   hasCollabratecUsers: ('collabratecUsers' in p), tokensEmpty: (p.tokens || []).length === 0,
@@ -293,6 +294,7 @@ test.describe.serial('web-go P4.7b flip gate (WEB_GO_PLAN P4.7b example create)'
     expect(st.blob['frog.jpg'] && st.blob['frog.jpg'].size, 'frog blob size').toBe(FROG_SIZE)
     expect(st.folders, 'folders').toBe(0)
     expect(st.rootDocHex, 'rootDoc set').toBe(true)
+    expect(st.version, 'project version (Node $inc per addDoc/addFile: 2 docs + 1 file)').toBe(3)
     expect(leg1.errors.blankEx.status).toBe(400)
     expect(leg1.errors.blankEx.body).toBe('Project name cannot be blank')
     expect(leg1.errors.slashEx.body).toBe('Project name cannot contain / characters')

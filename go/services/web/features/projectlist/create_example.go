@@ -84,7 +84,9 @@ func crCreateExampleProject(a *core.App, cxt *core.Cxt, name, uid string, u crOw
 	// Same project doc + project-history init as basic (order: init before the
 	// blob PUT, mirroring Node — _createBlankProject runs before _addExample
 	// ProjectFiles, so the history exists when the frog.jpg blob lands).
-	crInsertProject(a, cxt, pid, rootID, mainDocID, name, uid, u.spellCheckLanguage, docs, fileRefs)
+	// version 3 = blank (0) + 2 addDocs (main.tex, sample.bib) + 1 addFile (frog.jpg),
+	// each Node structural edit is $inc version:1 (pinned: Node oracle project version = 3).
+	crInsertProject(a, cxt, pid, rootID, mainDocID, name, uid, u.spellCheckLanguage, docs, fileRefs, len(docs)+len(fileRefs))
 	crInitHistory(cxt, pid.Hex())
 
 	crCreateDocRevision(cxt, pid, mainDocID, mainLines)

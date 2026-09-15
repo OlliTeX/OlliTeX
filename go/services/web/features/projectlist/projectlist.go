@@ -65,6 +65,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "POST", Pattern: trashPat, Handler: flagHandler(a, opTrash)},
 			{Method: "DELETE", Pattern: trashPat, Handler: flagHandler(a, opUntrash)},
 			{Method: "POST", Pattern: restPat, Handler: restoreProjectHandler(a)},
+			{Method: "POST", Pattern: clonePat, Handler: cloneProjectHandler(a)},
 			{Method: "DELETE", Pattern: delPat, Handler: delProjectHandler(a)},
 		},
 	}

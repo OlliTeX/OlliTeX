@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned** (all 2026-09-14).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin** (all 2026-09-14/15).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1175,6 +1175,40 @@ stack left node-active.
   (f) login-heavy consecutive gate runs trip the per-IP login limiter → `clearRateLimits()`
   before each login now in the p4del/p4g/p4hb gates.
 
+#### P4.9 — project clone/duplicate (`POST /Project/:Project_id/clone`) — **✅ GATE 3/3 GREEN (2026-09-15)**
+
+`cloneProject` (ProjectController.mjs:398-461) + `ProjectDuplicator.mjs` — **read**
+access suffices (ensureUserCanReadProject); non-admins get the plain copy
+(isDebugCopy/cloneHistory/cloneRanges forced false).
+
+- oracle (example-src → `webgo-p4cl-copy`):
+  - response 200 application/json `{name,lastUpdated,project_id,owner_ref,owner}`;
+    cloned project = the same 30-key shape as basic creation, **no `segmentation`
+    persisted** (analytics-only), version **1** (single createNewFolderStructure $inc),
+    rootDoc = copied main.tex, docs [main.tex(118), sample.bib(10)], fileRef
+    frog.jpg same git-blob hash, fileRef shape `{name,created,rev,hash,_id}`
+    **WITHOUT linkedFileData** (Node's clone `File` shape — unlike the
+    example-create `linkedFileData:null`).
+  - frog blob present on the NEW project (md5 `665777aa6c7c…`, 97080 B) via v1
+    `copyBlob` (`?copyFrom=src`); source project/docstore/blob UNCHANGED.
+  - **quirk pinned**: `{}` (no projectName) → Node's `newProjectName.trim()`
+    TypeError → **500 generic HTML error page** — replicated; `"   "` → 400
+    text/plain blank; `"a/b"` → 400 text/plain slash; unknown key / wrong types /
+    array root → 400 JSON zod; missing → 404 HTML; malformed → 404 JSON validation;
+    non-member → 403 `restricted`; anon → 403 `Forbidden` (CSRF).
+- gate `web-go-p4clone-flip` (**3 passed 43s**): leg Node→Go→Node byte equality
+  (create, clone, 11-case battery, anon, in-container state capture incl.
+  linkedFileData-absent fileRef pin, docstore lines, frog md5/size, source pins).
+- **side finding pinned by the state diff**: Node's `version` is `$inc`ed per
+  structural edit (addDoc/addFile) — example project = **3** (2 docs + 1 file),
+  not 1; `crInsertProject` now takes the version per call site (basic 1, example
+  len(docs)+len(files), clone 1). p4hb gate now pins `version:3`.
+- files: `features/projectlist/clone.go` (new; cloneHandler/clParseCloneBody/
+  clZodReply/clDocLines/clCopyBlobs), `projectlist.go` (route), `create.go` /
+  `create_example.go` (version param), flip `web-p4clone.conf`, gate
+  `web-go-p4clone-flip.test.e2e.ts`, p4hb version pin.
+- full P4.1–P4.9 suite re-run green after the version fix (30 passed 2.5m).
+
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go
    docstore/filestore services already in production*: highest value/effort
@@ -1183,7 +1217,7 @@ stack left node-active.
    notifications services).
 3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) — **list (P4.1) +
    rename (P4.5) + flag-writes archive/trash (P4.6) + creation basic (P4.7) + example
-   (P4.7b) + delete/restore (P4.8) done**; duplicate/clone + options/settings stay.
+   (P4.7b) + delete/restore (P4.8) + clone (P4.9) done**; options/settings stay.
 4. **Collaborators** (3,791) — the read-side `/project/:id/members` (P4.3) and
    `/project/:id/access-requests` (P4.4) are done; the remaining invite/manage
    /transfer-ownership **mutations** stay to come.
