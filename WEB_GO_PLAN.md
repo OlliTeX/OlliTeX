@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done** (all 2026-09-14).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned** (all 2026-09-14).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1128,9 +1128,52 @@ optimisation, not a creation contract) — **deferred**.
   (projectName undefined → blank error);
   (d) `overleaf.history.id` is a **hex string equal to the project `_id`** (not a new ObjectId).
 
----
+#### P4.8 — project delete/restore — **✅ GATE 3/3 GREEN (2026-09-14)**
 
-Remaining P4 sub-units (in listed sub-order):
+Node source oracle (all pinned live before implementation):
+
+- `DELETE /Project/:Project_id` (router.mjs:778 → `ProjectController.deleteProject`
+  → `ProjectDeleter.deleteProject`):
+  1. `flushProjectToMongoAndDelete` = `DELETE {document-updater:3003}/project/{id}`
+     (204); **fallback chain on failure**: POST document-updater `/flush` →
+     POST project-history `/flush` → (on failure) POST project-history `/resync`
+     `{force:true}` → retry DELETE. (Replicated verbatim; services are up in e2e,
+     so the happy path is contract-visible.)
+  2. `POST {docstore:3016}/project/{id}/archive` — best-effort; **no-op in this
+     build** (mongo-based persistor: doc remains readable — pinned `200` from both).
+  3. per-member tag pulls — no `tags` collection in this build (no-op).
+  4. `deletedProjects.updateOne({deleterData.deletedProjectId}, {project: <FULL doc>,
+     deleterData: {...}}, {upsert:true})` (+ Mongoose `__v:0`).
+  5. `projects.deleteOne({_id})`; `hooks projectDeleted` — no listeners (no-op); audit
+     writer — no-op (free build).
+  6. → `200 text/plain "OK"`.
+- `POST /Project/:Project_id/restore` → `Project.updateOne({_id}, {$unset:{archived:true}})`
+  → `200 "OK"` (removes the `archived` field entirely).
+- Auth contract (live A/B): missing project → `404 text/html` NotFound page (even with
+  `accept: application/json`); malformed id → `404 application/json` validation error
+  embedding `params.Project_id`; non-member → `403 {"message":"restricted"}`;
+  anonymous → `403 text/plain Forbidden` (CSRF-first).
+
+Go: `go/services/web/features/projectlist/delete.go` (+2 routes in `projectlist.go`),
+flip conf `server-ce/nginx/flips/web-p4del.conf` (delete/restore/archive+new),
+gate `tests/e2e/specs/parity/web-go-p4del-flip.test.e2e.ts` — 3-leg (Node → Go → Node),
+per leg: 3 fixture creates + archive(B) + restore(B) + delete(C) + 8-case battery
+(owner/other/anon) + pre/post state pins; cross-leg diffs compare every response
+(nonce/csrf/`_csrf`-hidden/ids normalized) + normalized state — **3 passed**.
+Full P4 regression (P4.1–P4.8, 27 legs) re-run **all green**; `go build/vet/test` clean;
+stack left node-active.
+
+- **Pitfalls:** (a) mongo-driver v1.17 decodes BSON dates to **`primitive.DateTime`**
+  (not `time.Time`) when decoding into `primitive.D` — a `.(time.Time)` assertion on
+  `lastUpdated` silently dropped `deletedProjectLastUpdatedAt` (caught by the
+  deletedProjects state pin); (b) Node/Mongoose stores `deleterData` **`_id` first, then
+  the remaining keys ASCII-sorted** (pinned: not source order, not schema order) — Go
+  copies that order; (c) `deleterData` subdoc has its OWN fresh `_id` (≠ the
+  `deletedProjects` `_id`); (d) Node **drops** the `deletedProjectOverleafId` /
+  `*Token` keys when undefined (Go omits them too); (e) the 404 HTML page carries a
+  per-request `_csrf` hidden input (Node rotates it per request) — gate-normalized;
+  (f) login-heavy consecutive gate runs trip the per-IP login limiter → `clearRateLimits()`
+  before each login now in the p4del/p4g/p4hb gates.
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go
@@ -1140,7 +1183,7 @@ Remaining P4 sub-units (in listed sub-order):
    notifications services).
 3. **Project** (7,947: list/CRUD/duplicate/delete/options/audit log writer) — **list (P4.1) +
    rename (P4.5) + flag-writes archive/trash (P4.6) + creation basic (P4.7) + example
-   (P4.7b) done**; duplicate/delete/restore/options/settings/clone stay.
+   (P4.7b) + delete/restore (P4.8) done**; duplicate/clone + options/settings stay.
 4. **Collaborators** (3,791) — the read-side `/project/:id/members` (P4.3) and
    `/project/:id/access-requests` (P4.4) are done; the remaining invite/manage
    /transfer-ownership **mutations** stay to come.

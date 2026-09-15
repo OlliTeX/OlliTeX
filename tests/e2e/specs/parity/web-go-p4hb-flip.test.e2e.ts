@@ -198,7 +198,21 @@ interface Leg {
   anon: R
 }
 
+
+// login-rate-limit hygiene: consecutive gate legs/batches trip the per-IP
+// login limiter (403 on login). Clear the rate-limit keys before each login.
+function clearRateLimits(): void {
+  try {
+    const out = execFileSync('docker', ['ps', '--filter', 'name=ol-e2e-redis', '--format', '{{.Names}}'], { encoding: 'utf8' })
+    const rc = out.split('\n').find(Boolean)
+    if (!rc) return
+    const keys = execFileSync('docker', ['exec', rc, 'sh', '-c', 'redis-cli --scan --pattern "rate-limit:*"'], { encoding: 'utf8' }).split('\n').filter(Boolean)
+    for (const k of keys) execFileSync('docker', ['exec', rc, 'redis-cli', 'DEL', k], { encoding: 'utf8' })
+  } catch {}
+}
+
 async function battery(mongoC: string, overleafC: string): Promise<Leg> {
+  clearRateLimits()
   const { ck, csrf } = await login()
   const cr = await call('/project/new', { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': csrf, accept: 'application/json' }, cookie: ck, body: JSON.stringify({ projectName: PREFIX + 'gate', template: 'example' }) })
   const pid = (cr.body.match(/"project_id"\s*:\s*"([0-9a-f]{24})"/) || [])[1] || ''
