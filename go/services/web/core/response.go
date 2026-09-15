@@ -92,6 +92,12 @@ func (r *Res) SendStatus(code int) {
 	_, _ = r.W.Write([]byte(msg))
 }
 
+// NoContent mirrors modern express res.sendStatus(204): status only —
+// empty body, no Content-Type/ETag/Content-Length (node-pinned P4.10a).
+func (r *Res) NoContent() {
+	r.W.WriteHeader(204)
+}
+
 var redirectMessages = map[int]string{
 	301: "Moved Permanently",
 	303: "See Other",

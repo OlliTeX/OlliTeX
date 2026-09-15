@@ -67,6 +67,14 @@ func Feature(a *core.App) core.Feature {
 			{Method: "POST", Pattern: restPat, Handler: restoreProjectHandler(a)},
 			{Method: "POST", Pattern: clonePat, Handler: cloneProjectHandler(a)},
 			{Method: "DELETE", Pattern: delPat, Handler: delProjectHandler(a)},
+			// P4.10a collaborators (web-p4col flip)
+			{Method: "POST", Pattern: leavePat, Handler: leaveHandler(a)},
+			{Method: "POST", Pattern: reqAccPat, Handler: requestAccessHandler(a)},
+			{Method: "PUT", Pattern: userPat, Handler: setUserLevelHandler(a)},
+			{Method: "DELETE", Pattern: userPat, Handler: removeUserHandler(a)},
+			{Method: "DELETE", Pattern: accDeclPat, Handler: declineReqHandler(a)},
+			{Method: "POST", Pattern: accGrantPat, Handler: grantReqHandler(a)},
+			{Method: "POST", Pattern: xferPat, Handler: transferOwnerHandler(a)},
 		},
 	}
 }

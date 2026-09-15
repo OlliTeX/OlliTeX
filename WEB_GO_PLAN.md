@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin** (all 2026-09-14/15).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1209,6 +1209,41 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
   `web-go-p4clone-flip.test.e2e.ts`, p4hb version pin.
 - full P4.1–P4.9 suite re-run green after the version fix (30 passed 2.5m).
 
+#### P4.10a — collaborator mutations (set-level / leave / remove / access-requests / transfer) — **✅ GATE 3/3 GREEN (2026-09-15)**
+- Seven routes byte-pinned against Node: `PUT users/:uid` (3-way level +
+  track_changes $set shape), `POST leave` (login-only, no project check —
+  204 on ghost), `DELETE users/:uid` (admin; 10-key $pull, no match check),
+  `DELETE access-requests/:uid` (decline; optional notify mail),
+  `POST access-requests/:uid/grant` (admin; setLevel+hadRequest mail),
+  `POST request-access` (requestable-map 403, rebuild editAccessRequests,
+  owner mail), `POST transfer-ownership` (collab check, prev-owner→editor,
+  contacts both ways, TPDS flush, 2 mails).
+- Error contract: VA JSONs with QUOTED path (`at "body.privilegeLevel"`),
+  `{"message":"restricted"}` 403, `not found` 404 JSON (set unmatched) vs
+  HTML 404 page (grant unmatched / ghost grants), 204 = no body/CT (res.NoContent).
+- Mail = 8 per battery (3 request, 1 declined, 1 granted, 2 ownership);
+  Go sends synchronously (Node fires async — order unobservable through sink).
+- Debug lessons (cost hours):
+  1. **$addToSet field names**: readAndWrite→`collaberator_refs`,
+     review→`reviewer_refs`, readOnly→`readOnly_refs` — NOT the raw level
+     value (literal `review`/`readAndWrite`/`readOnly` fields wrote fine,
+     invisible in HTTP diffs; only mongo profile + typeof dumps exposed it).
+  2. **Mongo rejects $pull+$addToSet on the SAME field** ("would create a
+     conflict") but mongoose rewrites Node's update — Go must omit the add
+     target from the $pull list (RW branch: do not pull collab).
+  3. **Collab gates must load the FULL doc** (loadProjectFull): `name` (mail
+     subjects), `track_changes`, pending refs — the shared accessProj
+     projection silently omitted them → blank mail subjects, 403s.
+  4. `colVa` = `Validation error: <msg> at "<path>"` — path quoted, msg must
+     NOT repeat the path.
+  5. Transfer fixture MUST be a real `/project/new` project (TPDS flush
+     needs `overleaf.history.id`; raw-mongo-seeded → Node 500).
+- files: `features/projectlist/collab.go` (new ~750 lines), `core/response.go`
+  (NoContent 204), `projectlist.go` (7 routes), flip `web-p4col.conf`, gate
+  `web-go-p4col-flip.test.e2e.ts` (3-leg, 50+ cases, 8-mail assertion, ghost
+  coverage).
+- full `web-go P4` regression green after P4.10a (33 passed 3.2m).
+
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go
    docstore/filestore services already in production*: highest value/effort
@@ -1219,8 +1254,9 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
    rename (P4.5) + flag-writes archive/trash (P4.6) + creation basic (P4.7) + example
    (P4.7b) + delete/restore (P4.8) + clone (P4.9) done**; options/settings stay.
 4. **Collaborators** (3,791) — the read-side `/project/:id/members` (P4.3) and
-   `/project/:id/access-requests` (P4.4) are done; the remaining invite/manage
-   /transfer-ownership **mutations** stay to come.
+   `/project/:id/access-requests` (P4.4) are done; **P4.10a set-level / leave /
+   remove / request / grant / transfer mutations done**; the remaining invite
+   / sharing-link / token-acceptance flow (P4.10b) stays.
 5. **History** (2,556 — clients of history-v1/project-history services).
 6. **ThirdPartyDataStore** (1,189), **Templates** (293) + template-gallery
    module (5.3k), **Launchpad** (1,774).
