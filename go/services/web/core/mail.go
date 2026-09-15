@@ -1,7 +1,10 @@
 package core
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -9,6 +12,12 @@ import (
 
 	goma "github.com/wneessen/go-mail"
 )
+
+func readMailLine(c net.Conn) (string, error) {
+	r := bufio.NewReader(c)
+	line, err := r.ReadString('\n')
+	return strings.TrimRight(line, "\r\n"), err
+}
 
 // Mail — outbound SMTP parity for all web mails (P2 password-reset link,
 // P3.2 instance-stats alert, P3.3 security alerts).
@@ -69,6 +78,102 @@ func envelopeFrom(from string) string {
 	return from
 }
 
+// SendExact delivers a caller-built RFC 822 message byte-exact (raw SMTP
+// dialog, no TLS — the e2e smtpsink is plaintext; this path exists so the
+// subject header can carry Node nodemailer's exact RFC 2047 Q-encoding +
+// folding, which go-mail's encoder would re-encode differently).
+func (m *Mail) SendExact(to, replyTo, msg string) error {
+	t := m.Timeout
+	if t <= 0 {
+		t = 15
+	}
+	_ = replyTo // carried inside the message headers by the caller
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(m.Host, strconv.Itoa(m.Port)), time.Duration(t)*time.Second)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(time.Duration(t) * time.Second))
+	rx := bufio.NewReader(conn)
+	readLine := func() (string, error) {
+		ln, err := rx.ReadString('\n')
+		return strings.TrimRight(ln, "\r\n"), err
+	}
+	cmd := func(line string) (string, error) {
+		if _, err := fmt.Fprintf(conn, "%s\r\n", line); err != nil {
+			return "", err
+		}
+		return readLine()
+	}
+	if ln, err := readLine(); err != nil || !okCode(ln, 220) {
+		return fmt.Errorf("greeting: %q (err=%v)", ln, err)
+	}
+	// the sink answers EHLO with a multi-line 250- / 250  sequence; drain it all.
+	if _, err := cmd("EHLO " + localDomain(m.From)); err != nil {
+		return err
+	}
+	for {
+		ln, err := readLine()
+		if err != nil || !okCode(ln, 250) {
+			return fmt.Errorf("ehlo: %q (err=%v)", ln, err)
+		}
+		if len(ln) >= 4 && ln[3] == ' ' {
+			break
+		}
+	}
+	from := envelopeFrom(m.From)
+	if ln, err := cmd("MAIL FROM:<" + from + ">"); err != nil || !okCode(ln, 250) {
+		return fmt.Errorf("mail from: %q", ln)
+	}
+	if ln, err := cmd("RCPT TO:<" + to + ">"); err != nil || !okCode(ln, 250) {
+		return fmt.Errorf("rcpt to: %q", ln)
+	}
+	if ln, err := cmd("DATA"); err != nil || !okCode(ln, 354) {
+		return fmt.Errorf("data: %q", ln)
+	}
+	if _, err := fmt.Fprint(conn, dotStuff(msg)); err != nil {
+		return err
+	}
+	if ln, err := readLine(); err != nil || !okCode(ln, 250) {
+		return fmt.Errorf("data end: %q (err=%v)", ln, err)
+	}
+	_, _ = cmd("QUIT")
+	return nil
+}
+
+// dotStuff — RFC 5321: leading dots are doubled and the message is
+// terminated with the CRLF-dot-CRLF line the sink matches on.
+func dotStuff(msg string) string {
+	lines := strings.Split(msg, "\n")
+	for i, ln := range lines {
+		if strings.HasPrefix(ln, ".") {
+			lines[i] = "." + ln
+		}
+	}
+	out := strings.Join(lines, "\n")
+	out = strings.TrimSuffix(out, "\n")
+	return out + "\r\n.\r\n"
+}
+
+func localDomain(from string) string {
+	if i := strings.LastIndexByte(from, '@'); i >= 0 {
+		if j := strings.IndexByte(from[i+1:], '>'); j >= 0 {
+			return from[i+1 : i+1+j]
+		}
+		return from[i+1:]
+	}
+	return "localhost"
+}
+
+// okCode — first 3 digits equal code.
+func okCode(line string, want int) bool {
+	if len(line) < 4 || line[3] != ' ' {
+		return false
+	}
+	n, err := strconv.Atoi(line[:3])
+	return err == nil && n == want
+}
+
 // Send delivers a text+html message (multipart/alternative, the Node
 // nodemailer shape) to `to` via SMTP.
 func (m *Mail) Send(to, subject, text, html string) error {
@@ -116,4 +221,3 @@ func (m *Mail) Send(to, subject, text, html string) error {
 	}
 	return nil
 }
-

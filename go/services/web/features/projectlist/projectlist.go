@@ -75,6 +75,19 @@ func Feature(a *core.App) core.Feature {
 			{Method: "DELETE", Pattern: accDeclPat, Handler: declineReqHandler(a)},
 			{Method: "POST", Pattern: accGrantPat, Handler: grantReqHandler(a)},
 			{Method: "POST", Pattern: xferPat, Handler: transferOwnerHandler(a)},
+			// P4.10b invites + sharing links (web-p4inv flip; Node route order)
+			{Method: "POST", Pattern: invCreatePat, Handler: inviteCreateHandler(a)},
+			{Method: "GET", Pattern: invListPat, Handler: inviteListHandler(a)},
+			{Method: "DELETE", Pattern: invRevokePat, Handler: inviteRevokeHandler(a)},
+			{Method: "POST", Pattern: invResendPat, Handler: inviteResendHandler(a)},
+			{Method: "POST", Pattern: invAcceptPat, Handler: inviteAcceptHandler(a), NoLogin: true},
+			{Method: "GET", Pattern: invViewTokPat, Handler: inviteViewHandler(a), NoLogin: true},
+			{Method: "GET", Pattern: invTokensPat, Handler: tokensHandler(a)},
+			{Method: "GET", Pattern: invSplitPat, Handler: splitForbiddenHandler(a, true), NoLogin: true},
+			{Method: "POST", Pattern: invSplitPat, Handler: splitForbiddenHandler(a, true), NoLogin: true},
+			{Method: "GET", Pattern: invSharePat, Handler: splitForbiddenHandler(a, false), NoLogin: true},
+			{Method: "POST", Pattern: invSharePat, Handler: splitForbiddenHandler(a, true), NoLogin: true},
+			{Method: "POST", Pattern: invShareValPat, Handler: splitForbiddenHandler(a, false), NoLogin: true},
 		},
 	}
 }

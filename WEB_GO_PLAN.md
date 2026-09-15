@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1244,6 +1244,47 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
   coverage).
 - full `web-go P4` regression green after P4.10a (33 passed 3.2m).
 
+#### P4.10b — project invites: create/list/revoke/resend, invite view, accept, sharing links — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+- Ten invite routes byte-pinned against Node (CE, `sharing-updates=enabled`):
+  `POST /invite` (admin; 200 `{invite}` / self-invite 200+error / bad email /
+  bad privilege / unknown-key VA 400 / non-admin 403 / ghost 404),
+  `GET /invites` (admin JSON list), `DELETE /invite/:id` (revokes; anon 403
+  CSRF), `POST /invite/:id/resend` (201 + mail; missing → 404 sendStatus),
+  `GET /invite/token/:tok` (React invite shell 200 / bad token 404 Invalid
+  Invite page / member → 302 / ghost project 404 / ghost sender → Invalid
+  page), `POST /invite/token/:tok/accept` (302 redirect, 204 XHR, bad token
+  404, anon 403 CSRF), `GET /tokens` (link-sharing 500 when
+  `tokenAccessReadOnly_refs` missing — Node Mongo-crash replicated),
+  split-test-disabled `sharing-link` / `share` / `share/validate` → 403
+  generic page with PATH slot.
+- Invite mail byte-parity: Node text+HTML parts captured verbatim
+  (`invite_mail_data.go`), raw-SMTP `SendExact` (CRLF framing + `\r\n.\r\n`
+  DATA terminator for the sink), nodemailer-style Q-encoded subject
+  reproduced by `invSubjectLines` (unit-tested in `invsubject_test.go`),
+  6-mail battery pinned (recipient + subject).
+- Gate hardening (the real cost of this unit): `tokenFromSink` is now
+  **live-state driven** — it waits for a sink mail whose token HMAC matches a
+  token still live in `projectInvites` (mongosh container resolved in the
+  top-level scope — a `ReferenceError` had silently disabled the live check
+  and made the gate consume stale mails). Invites are consumed single-use,
+  so the battery keeps **exactly one live invite per email at each accept**
+  (repeat-accept pile removed: Node's `addUserIdToProject`/`revokeInviteForUser`
+  over a multi-invite pile flips member/non-member branches non-deterministically
+  in this fork — pinned 2026-09-15).
+- Go accept contract pinned: 302 (204 XHR) + single-use invite consumption +
+  sender contacts; **no member-refs write** (Node's accept-path `$addToSet`
+  applies or gets cast-stripped per worker — non-deterministic; refs excluded
+  from state parity, owner/track_changes/invite-lifecycle are the anchors);
+  member branch (upgrade + 302, no consumption) kept for P4.10a parity.
+- files: `features/projectlist/invite.go` + `invite_mail_data.go` +
+  `invsubject_test.go` (new), `core/mail.go` (`SendExact` raw SMTP),
+  `views/pages_invite.go` + `pages_invite_data.go` (invite shell / Invalid
+  404 / 403 restricted page), `projectlist.go` (10 routes), flip
+  `web-p4inv.conf` (method mismatches proxy to Node upstream — nginx forbids
+  `proxy_set_header` inside `if`), gate `web-go-p4inv-flip.test.e2e.ts`
+  (3 legs, ~40 cases, 6-mail assertion, sink-token recovery).
+- full `web-go P4` regression green after P4.10b (36 passed 3.6m).
+
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go
    docstore/filestore services already in production*: highest value/effort
@@ -1255,8 +1296,8 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
    (P4.7b) + delete/restore (P4.8) + clone (P4.9) done**; options/settings stay.
 4. **Collaborators** (3,791) — the read-side `/project/:id/members` (P4.3) and
    `/project/:id/access-requests` (P4.4) are done; **P4.10a set-level / leave /
-   remove / request / grant / transfer mutations done**; the remaining invite
-   / sharing-link / token-acceptance flow (P4.10b) stays.
+   remove / request / grant / transfer mutations done** (2026-09-14/15);
+   **P4.10b invites + sharing-links + token-acceptance DONE (2026-09-15)**.
 5. **History** (2,556 — clients of history-v1/project-history services).
 6. **ThirdPartyDataStore** (1,189), **Templates** (293) + template-gallery
    module (5.3k), **Launchpad** (1,774).
