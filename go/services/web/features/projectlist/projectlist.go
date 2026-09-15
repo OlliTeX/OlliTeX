@@ -95,6 +95,8 @@ func Feature(a *core.App) core.Feature {
 			{Method: "DELETE", Pattern: delDocPat, Handler: delEntityHandler(a, "doc")},
 			{Method: "DELETE", Pattern: delFilePat, Handler: delEntityHandler(a, "file")},
 			{Method: "DELETE", Pattern: delFolderPat, Handler: delEntityHandler(a, "folder")},
+			// P4.12a file proxy (web-p412 flip)
+			{Method: "GET", Pattern: fproxyPat, Handler: fileProxyHandler(a)},
 		},
 	}
 }
