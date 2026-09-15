@@ -1364,6 +1364,45 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
   Node 404-after-write case (covered by `delOrphan`).
 - Full `web-go P4` regression green after P4.11b (42 passed 4.2m).
 
+#### P4.12a — file proxy: `GET|HEAD /Project/:Project_id/file/:File_id` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+- Go: `features/projectlist/fileproxy.go` (`fileProxyHandler`, `fproxyFindFile`,
+  `fproxyHistoryID`) + route in `projectlist.go` + flip
+  `server-ce/nginx/flips/web-p412.conf` (GET|HEAD → Go; other verbs → Node;
+  case-sensitive `/Project/…` vs lowercase editor `/project/…`).
+- Chain: web → **history-v1 (Node, 127.0.0.1:3100)** `GET /api/projects/{hid}/blobs/{hash}`
+  (basic auth `staging:$V1_HISTORY_PASSWORD`; hash = 40-hex sha1)
+  → **Go filestore** read-only (local-FS backend
+  `/var/lib/overleaf/data/history/overleaf-project-blobs/<fmt(hid)>/<h[:2]>/<h[2:]>`,
+  `fseProjectKeyFormat` = pad-9 reverse 3/3/rest).
+  `overleaf.history.id` has a UNIQUE index (one history id per project).
+- Pinned Node oracle (gate battery, 12 cases): 200 member (CD
+  `attachment; filename="<name>"`, `Cache-Control: private, max-age=3600`,
+  **no Content-Type**, **chunked no-Content-Length**, body=blob); HEAD →
+  **404 empty** (history-v1 registers NO HEAD blob route in this fork —
+  quirk replicated); ghost file → 404 empty; ghost project → 404 app page;
+  bad oid → 404 JSON VA (`params.Project_id` / `params.File_id`,
+  statusCode 404); non-member → 403 (`{"message":"restricted"}` accept-json /
+  restricted page accept-html — page now renders the REQUESTER's email + id,
+  see fix below); anonymous → 401 `Unauthorized` (accept json) / 302 /login
+  (else); non-GET verbs → Node CSRF 403 `Forbidden` (even anonymous — flip
+  guard keeps them on Node, P4.11b-delPutMismatch precedent).
+- **Views bug fixed here (pre-existing):** `restrictedHTML` in
+  `go/services/web/views/pages_data.go` was captured with the capture user
+  BAKED IN (literal `ol-usersEmail` + `ol-user_id` + account-menu email,
+  plus 3 baked-in `_csrf` hidden values) — any requester other than the
+  capture user saw the wrong identity on EVERY Go 403-restricted page.
+  Now slotted (`\x01OLUSERS\x02` / `\x01OLUID\x02` / `\x01CSRF\x02`); the
+  non-member-with-different-user battery case pins it.
+- **Latent (deferred to a view-audit unit):** `pages_data_p2.go` (login /
+  register / token pages) still bakes the capture user into `ol-user` JSON
+  meta + `sessionUser` fragments — hidden in all prior gates because the
+  capture user == the only test user.
+- Gate tolerated deltas (documented in the spec): Node omits Content-Type
+  vs Go's net/http text sniff (browser fallback identical) — CT_NORMALIZED
+  set; Node forwards no Content-Length and Go now omits it too → both chunked.
+- Full `web-go P4` regression green after P4.12a (42 tests; leg-1 flakies
+  self-heal on retry as in prior runs).
+
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go
