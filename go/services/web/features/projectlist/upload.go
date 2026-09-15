@@ -152,35 +152,52 @@ func upJSUnits(s string) int {
 }
 
 func upUtf16leDecode(b []byte) (string, bool) {
-	if len(b)%2 != 0 {
-		return "", false
-	}
-	var sb strings.Builder
-	for i := 0; i+1 < len(b); i += 2 {
-		u := uint16(b[i]) | uint16(b[i+1])<<8
-		if u >= 0xD800 && u <= 0xDBFF && i+3 < len(b) {
-			low := uint16(b[i+2]) | uint16(b[i+3])<<8
-			if low >= 0xDC00 && low <= 0xDFFF {
-				sb.WriteRune(rune(0x10000 + (uint32(u-0xD800)<<10) + uint32(low-0xDC00)))
-				i += 2
-				continue
-			}
+	var out []rune
+	n := len(b)
+	i := 0
+	for i < n {
+		var u uint32
+		if i+1 < n {
+			u = uint32(b[i]) | uint32(b[i+1])<<8
+		} else {
+			u = uint32(b[i]) // odd tail byte: single unit (Node parity)
 		}
-		sb.WriteRune(rune(u))
+		if i+1 < n && u >= 0xD800 && u <= 0xDBFF {
+			if i+3 >= n {
+				return "", false // lone high surrogate
+			}
+			low := uint32(b[i+2]) | uint32(b[i+3])<<8
+			if low < 0xDC00 || low > 0xDFFF {
+				return "", false // high not followed by a low
+			}
+			out = append(out, rune(0x10000+(u-0xD800)<<10+(low-0xDC00)))
+			i += 4
+			continue
+		}
+		if u >= 0xD800 && u <= 0xDFFF {
+			return "", false // lone surrogate
+		}
+		out = append(out, rune(u))
+		i += 2
 	}
-	return sb.String(), true
+	return string(out), true
 }
 
 func upDecodeText(data []byte) (string, bool) {
 	if len(data) >= 2 && data[0] == 0xff && data[1] == 0xfe {
-		return upUtf16leDecode(data[2:])
+		// Node: Buffer.toString('utf16le') keeps the BOM unit (U+FEFF) as a
+		// character — decode the full buffer including the BOM bytes.
+		return upUtf16leDecode(data)
 	}
 	if utf8valid(data) {
 		return string(data), true
 	}
-	// latin1 fallback (Node default decoder); isEditable later rejects NUL chars.
-	text := strings.Map(func(r rune) rune { return rune(r & 0xff) }, string(data))
-	return text, true
+	// latin1 fallback (Node default decoder): byte → code point.
+	out := make([]rune, len(data))
+	for i, x := range data {
+		out[i] = rune(x)
+	}
+	return string(out), true
 }
 
 func utf8valid(b []byte) bool {
@@ -215,9 +232,10 @@ func utf8valid(b []byte) bool {
 	return true
 }
 
-// upClassify → ("doc", lines) | ("file", nil).
-func upClassify(data []byte, name string) (string, []string) {
-	if !upIsTextFile(name) {
+// upClassify → ("doc", lines) | ("file", nil). Mirrors FileTypeManager.getType
+// + isEditable (zip import AND single-file upload reuse this).
+func upClassify(data []byte, name string, existingDoc bool) (string, []string) {
+	if !existingDoc && !upIsTextFile(name) {
 		return "file", nil
 	}
 	if len(data) > upMaxTextLen {
@@ -915,7 +933,7 @@ func uploadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 		}
 
-		kind, lines := upClassify(data, name)
+		kind, lines := upClassify(data, name, tgt.existingDoc != nil)
 		if kind == "doc" {
 			upDoDoc(a, cxt, res, fail500, pj, tgt, name, lines, uid, *doc, upTrackChanges(entFld(*doc, "track_changes"), uid))
 			return

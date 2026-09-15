@@ -292,6 +292,9 @@ for (const leg of [
 
 test('nginx-bound: flipped 7420 surface serves the API contract', async () => {
   STATE = seedState()
+  // Defensive: clear any stale flip includes (a previously failed run in a
+  // batch can leave orphaned includes → nginx -t fails → whole battery red).
+  dexe(overleafC, `node -e 'const fs=require("fs");const p=process.argv[1];const s=fs.readFileSync(p,"utf8");const L=s.split(String.fromCharCode(10)).filter(x=>!x.includes("overleaf-flips/"));fs.writeFileSync(p,L.join(String.fromCharCode(10)))' /etc/nginx/sites-enabled/overleaf.conf`)
   for (const conf of FLIPS) flipConf(conf, 'apply')
   flipsApplied = true
   const auth = async () => {

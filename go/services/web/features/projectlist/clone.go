@@ -390,7 +390,7 @@ func cloneProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 		// version 1: Node's clone runs a single createNewFolderStructure ($inc version 1)
 		// on the blank project, regardless of entry count (pinned: clone oracle version = 1).
-		crInsertProject(a, cxt, pid, rootID, rootDoc, pr.name, uid, owner.spellCheckLanguage, docsOut, filesOut, 1)
+		crInsertProject(a, cxt, pid, rootID, &rootDoc, pr.name, uid, owner.spellCheckLanguage, docsOut, filesOut, 1)
 		// Node setCompiler: $set compiler from source (blank project default is
 		// pdflatex anyway; the source's value wins).
 		if a.Mongo != nil {

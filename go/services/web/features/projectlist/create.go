@@ -364,7 +364,7 @@ func crCreateBasicProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwne
 		{Key: "_id", Value: docID},
 	}}
 	// version 1: blank project (version 0) + one addDoc (main.tex) $inc.
-	crInsertProject(a, cxt, pid, rootID, docID, name, uid, u.spellCheckLanguage, docs, bson.A{}, 1)
+	crInsertProject(a, cxt, pid, rootID, &docID, name, uid, u.spellCheckLanguage, docs, bson.A{}, 1)
 	crCreateDocRevision(cxt, pid, docID, crBasicDocLines(name, u.first, u.last))
 	crInitHistory(cxt, pid.Hex())
 	return pid
@@ -421,7 +421,7 @@ func loadOwnerUser(a *core.App, cxt *core.Cxt, uid string) (crOwnerUser, bool) {
 // default field set. The rootFolder contents (docs / fileRefs / rootDoc_id)
 // are parameterised so the BASIC ('main.tex') and EXAMPLE (main.tex, sample.bib,
 // frog.jpg) variants share one document shape.
-func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID, rootDocID primitive.ObjectID, name, ownerRef, spellLang string, docs bson.A, fileRefs bson.A, version int) {
+func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID primitive.ObjectID, rootDocID *primitive.ObjectID, name, ownerRef, spellLang string, docs bson.A, fileRefs bson.A, version int) {
 	if a.Mongo == nil {
 		return
 	}
@@ -472,7 +472,12 @@ func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID, rootDocID primitiv
 		{Key: "collabratecUsers", Value: []primitive.M{}},
 		{Key: "__v", Value: 0},
 		{Key: "version", Value: version},
-		{Key: "rootDoc_id", Value: rootDocID},
+		{Key: "rootDoc_id", Value: func() any {
+			if rootDocID == nil {
+				return nil
+			}
+			return *rootDocID
+		}()},
 	}
 	_, _ = db.Collection("projects").InsertOne(ctx, doc)
 }

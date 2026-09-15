@@ -102,6 +102,8 @@ func Feature(a *core.App) core.Feature {
 			// P4.13a file upload (POST /Project/:id/upload — capital P, pinned;
 			// session+csrf applied by core — matches Node's csrf'd route)
 			{Method: "POST", Pattern: upPat, Handler: uploadHandler(a)},
+			// P4.13b new-project zip upload (POST /project/new/upload — session+csrf)
+			{Method: "POST", Pattern: nzipPat, Handler: newzipHandler(a)},
 			// P4.12c private API doc trio (web-p413 flip; basic auth in handler;
 			// NoSession = Node's privateApiRouter carries no session/csrf)
 			{Method: "GET", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiGetHandler(a))},
@@ -163,8 +165,11 @@ func buildList(a *core.App, cxt *core.Cxt, uid string) ([]ProjectItem, error) {
 
 	var formatted []view
 	seen := map[string]bool{}
-	add := func(v view, dedup bool) {
-		if dedup && seen[v.id] {
+	add := func(v view, _ bool) {
+		// Node dedups across ALL buckets in order (owned first → best access
+		// wins when the user is e.g. owner AND collaborator on the same
+		// project — p4col-gate leftovers expose the double entry).
+		if seen[v.id] {
 			return
 		}
 		seen[v.id] = true

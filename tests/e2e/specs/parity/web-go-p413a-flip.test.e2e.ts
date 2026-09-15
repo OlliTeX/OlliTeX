@@ -65,25 +65,25 @@ function FLIP(conf: string, mode: 'apply' | 'strip'): string {
   const inc = `  include /etc/nginx/overleaf-flips/${conf};\n`
   if (mode === 'apply') return `
 set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
 mkdir -p /etc/nginx/overleaf-flips
 cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf}
-if ! grep -q "overleaf-flips/${conf}" "$vhost"; then
-  node -e '
-    const fs=require("fs");const v=process.argv[1];
+# Defensive: drop stale flip includes from previously failed runs (orphaned
+# includes break nginx -t and cascade-fail later gates in the batch).
+node -e "const fs=require('fs');const p='/etc/nginx/sites-enabled/overleaf.conf';const s=fs.readFileSync(p,'utf8');const L=s.split(String.fromCharCode(10)).filter(x=>!x.includes('overleaf-flips/'));fs.writeFileSync(p,L.join(String.fromCharCode(10)))"
+grep -q "overleaf-flips/${conf}" "/etc/nginx/sites-enabled/overleaf.conf" && exit 0
+node -e '
+    const fs=require("fs");const v="/etc/nginx/sites-enabled/overleaf.conf";
     const inc="  include /etc/nginx/overleaf-flips/${conf};\\n\\n";
     let s=fs.readFileSync(v,"utf8");const l=s.split("\\n");
     const i=l.findIndex(x=>x.trim()==="location / {");
     if(i<0)throw new Error("location / not found");
-    l.splice(i,0,inc);fs.writeFileSync(v,l.join("\\n"));' "$vhost"
-fi
+    l.splice(i,0,inc);fs.writeFileSync(v,l.join("\\n"));'
 nginx -t && nginx -s reload && sleep 2
 `
   return `
 set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-if grep -q "overleaf-flips\\/${conf}" "$vhost"; then
-  sed -i "/overleaf-flips\\/${conf}/d" "$vhost"
+if grep -q "overleaf-flips\\/${conf}" "/etc/nginx/sites-enabled/overleaf.conf"; then
+  sed -i "/overleaf-flips\\/${conf}/d" "/etc/nginx/sites-enabled/overleaf.conf"
   nginx -t && nginx -s reload && sleep 2
 fi
 `
