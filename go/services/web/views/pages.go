@@ -15,6 +15,7 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"ollitex/go/services/web/core"
@@ -277,6 +278,15 @@ const error500HTML = `<!DOCTYPE html><html lang="en"><head><title>Something went
 <a href="mailto:__ADMINEMAIL__" target="_blank">__ADMINEMAIL__</a>.<p class="error-actions"><a class="error-btn" href="/">Home</a></p></div></div></div></main></body></html>`
 
 func Error500Page(w http.ResponseWriter, d PageData) {
+	if d.AdminEmail == "" {
+		// services/web settings: adminEmail = env OVERLEAF_ADMIN_EMAIL with the
+		// CE default fallback (views/general/500.pug / settings.js).
+		if v := os.Getenv("OVERLEAF_ADMIN_EMAIL"); v != "" {
+			d.AdminEmail = v
+		} else {
+			d.AdminEmail = "placeholder@example.com"
+		}
+	}
 	d.CSP = cspReact(d.Nonce)
 	body := strings.ReplaceAll(error500HTML, "__ADMINEMAIL__", d.AdminEmail)
 	csp := d.CSP

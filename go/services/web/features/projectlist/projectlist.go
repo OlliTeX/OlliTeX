@@ -99,6 +99,9 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: fproxyPat, Handler: fileProxyHandler(a)},
 			// P4.12b document download (web-p412 flip)
 			{Method: "GET", Pattern: docdlPat, Handler: docDownloadHandler(a)},
+			// P4.13a file upload (POST /Project/:id/upload — capital P, pinned;
+			// session+csrf applied by core — matches Node's csrf'd route)
+			{Method: "POST", Pattern: upPat, Handler: uploadHandler(a)},
 			// P4.12c private API doc trio (web-p413 flip; basic auth in handler;
 			// NoSession = Node's privateApiRouter carries no session/csrf)
 			{Method: "GET", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiGetHandler(a))},

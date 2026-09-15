@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green**; **P4.12a file proxy (`GET|HEAD /Project/:id/file/:File_id`) ✔ 3/3 x3 (history-v1→Go-filestore blob chain, no-CT/chunked 200 pin, HEAD-404 fork quirk, guest/VA/authz battery) — ALSO FIXED the baked-in-capture-user bug in `restrictedHTML` (Go 403-restricted pages now render the requesting user; a P2-page variant of the same bug is deferred to a view-audit unit)**; **P4.12b doc download (`GET|HEAD /Project/:id/doc/:Doc_id/download`) ✔ 3/3 x3 (DU fromVersion=-1 lines, CD attachment, HEAD-200 asymmetry, sendStatus-404 pin) — 45-test P4 regression green** (2026-09-15).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green**; **P4.12a file proxy (`GET|HEAD /Project/:id/file/:File_id`) ✔ 3/3 x3 (history-v1→Go-filestore blob chain, no-CT/chunked 200 pin, HEAD-404 fork quirk, guest/VA/authz battery) — ALSO FIXED the baked-in-capture-user bug in `restrictedHTML` (Go 403-restricted pages now render the requesting user; a P2-page variant of the same bug is deferred to a view-audit unit)**; **P4.12b doc download (`GET|HEAD /Project/:id/doc/:Doc_id/download`) ✔ 3/3 x3 (DU fromVersion=-1 lines, CD attachment, HEAD-200 asymmetry, sendStatus-404 pin) — 45-test P4 regression green** (2026-09-15). **P4.12c private API doc trio (GET|POST doc + changes/reject) ✔ 3/3 x3 (basic-auth surface, XPB+CSP pin, `NoSession` route option, 204 ETag quirk) — 47-test P4 regression green**; **P4.13a project upload (`POST /Project/:id/upload`) ✔ 3/3 x3 (thin-client upsert engine: docstore/v1H/DU call order, file↔doc swaps, cross-type 200+422/400/403/404/500 contract, `owner_ref`/docstore-seed env pins, `entCanWrite` collabRefs + 500-mailto parity fixes) — 65-test cross-regression green** (2026-09-15).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1468,6 +1468,69 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
   quoting), reload has a 3× retry, and nginx-assert fetches retry across the
   reload window (dropped sockets); `runLeg` fails loud when a leg's write-cases are
   unstable instead of returning a broken map.
+
+
+#### P4.13a — project upload: `POST /Project/:Project_id/upload` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+
+`UploadsRouter.mjs` + `ProjectUploadController.uploadFile` + `FileSystemImportManager` (addDoc/addFile) +
+`ProjectEntityUpdateHandler.upsertDoc/upsertFile` + `DocumentUpdaterHandler.updateProjectStructure`
+— the file↔doc swap engine. Thin-client surface: docstore :3016 (doc create/set),
+v1-history :3100 (blob PUT), DU :3003 (setDocument + structure ops) — all shared with Node.
+
+- **Go**: `go/services/web/features/projectlist/upload.go` (self-contained unit:
+  `upTarget` tree resolution, `upClassify` extension→content text/binary split
+  mirroring FileTypeManager, `upDoDoc`/`upDoFile`, `upDocstorePut`, `upDUSetDoc`,
+  `upUpdateStructure`, `upPutBlob`, `upSwap*`, `upPush*`, `upReplaceFile`).
+  Request order pinned from Node: csrf(global) → Project_id VA (404 JSON) →
+  folder_id PRESENT-validated (400 objectId; absent legal → root) → multer single
+  `qqfile` (no file → 400 invalid_upload_request; wrong field name → 500 HTML
+  page) → name length (422 invalid_filename) → project + `entCanWrite`
+  (403 `restricted` / `{"message":"restricted"}` accept-dependent) → SafePath
+  (422) → folder lookup (422 folder_not_found) → upsert.
+  - doc new: docstore POST → `$push docs {name,_id}` → DU add-doc.
+  - doc re-upload: DU setDocument only (DU flushes docstore + project).
+  - file new/upsert: v1H blob PUT (git-blob-SHA1) before the mongo write;
+    upsert = `$set fileRefs.idx.{_id,hash,linkedFileData:null,created}` +
+    `$inc version` + `$inc fileRefs.idx.rev` + DU [rename-file, add-file].
+  - file↔doc swaps: `$pull` one side, `$push` the other, DU [rename-*, add-*].
+- **Bug fixes found by this unit** (both latent, pre-existing):
+  (a) `entCanWrite` only read `collab_refs` + `owner_ref` — Node's real field is
+    `collaberator_refs` (typo included); Go now accepts both + `owner` fallback;
+  (b) `views.Error500Page` rendered an empty `mailto:` — now honors
+    `OVERLEAF_ADMIN_EMAIL` with the CE default `placeholder@example.com`
+    (Node `settings.adminEmail` parity).
+- **Seed/gate environment pin** (cost a long debug arc): a mongo-direct seeded
+  project MUST carry `owner_ref` + the `collab*_refs` family (Node
+  `CollaboratorsGetter.getProjectAccess` 500s on missing `owner_ref`) and
+  `main.tex` MUST be registered in the docstore (loopback :3016 — from inside
+  the overleaf container) or every DU `setDoc`/structure call 404s → Node's
+  catch-all `422 {"success":false}` / `500`.
+- **Contract** (fresh-session oracles, 2026-09-15): 200 doc / file+hash;
+  400 `invalid_upload_request`; 400 oid-VA for present-empty + malformed
+  `folder_id` (absent legal); malformed `Project_id` → 404; ghost project →
+  404 HTML Page-Not-Found; 403 `restricted` JSON (non-member, accept:json);
+  403 `Forbidden` text (anon, CSRF-first); 422 `invalid_filename` /
+  `folder_not_found`; 500 generic page with admin mail (wrong field name =
+  multer `LIMIT_UNEXPECTED_FILE`).
+- **flip**: `server-ce/nginx/flips/web-p413a.conf` (POST-only → Go; other
+  verbs fall back to Node).
+- **gate**: `specs/parity/web-go-p413a-flip.test.e2e.ts` — 17-case battery
+  (6 write legs incl. both cross-type swaps + 8 error legs + 3 auth legs),
+  3-leg Node→Go→Node with re-seed per leg + normalized state dump (tree flat
+  + version + lastUpdatedBy); multipart via browser fetch FormData with the
+  csrf token in the `x-csrf-token` header (both stacks accept it; avoids the
+  Go `FormValue` body-consumption path). normBody must cover the logout-form
+  `_csrf` hidden input (the Page Not Found page embeds it) — the one diff
+  found in the first leg-2 run. **3× consecutive gate green**; full P4
+  regression (p4a–p4g, p4hb, p411a/b, p412a/b, p412c trio, p4clone/col/del/
+  inv, p3x, p0/p1/p2) green (p4f/p3c leg-baseline flakes are pre-existing
+  wall-clock/session tails, green on solo re-runs); `go build/vet/test
+  ./go/... ./cmd/...` green.
+- **Deferred to P5**: socket emits on successful upload
+  (`reciveNewDoc` / `removeEntity` / `convertFileToDoc` / `convertDocToFile`)
+  and the `project-upload`/`file-upload` rate-limit counters (the gate stays
+  under the 20pts/60s budget; Go enforcement is optional until the editor
+  surface lands).
 
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +

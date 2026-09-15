@@ -479,10 +479,20 @@ func addEntityHandler(a *core.App, kind string) func(*core.Cxt, *core.Res) {
 // readOnly refs are NOT write access.
 func entCanWrite(uidHex string, doc primitive.D) bool {
 	own := oidHex(dget(doc, "owner_ref"))
+	if own == "" {
+		own = oidHex(dget(doc, "owner"))
+	}
 	if own != "" && own == uidHex {
 		return true
 	}
+	// Node's spelling wins: collaborators are indexed in `collab_refs`
+	// (typo included) — accept both to be robust against either seed shape.
 	for _, c := range entArr(dget(doc, "collab_refs")) {
+		if h := oidHex(c); h == uidHex {
+			return true
+		}
+	}
+	for _, c := range entArr(dget(doc, "collaberator_refs")) {
 		if h := oidHex(c); h == uidHex {
 			return true
 		}
