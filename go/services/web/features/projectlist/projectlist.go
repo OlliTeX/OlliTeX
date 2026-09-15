@@ -91,6 +91,10 @@ func Feature(a *core.App) core.Feature {
 			// P4.11a editor entity creation (web-p411a flip)
 			{Method: "POST", Pattern: entDocPat, Handler: addEntityHandler(a, "doc")},
 			{Method: "POST", Pattern: entFolderPat, Handler: addEntityHandler(a, "folder")},
+			// P4.11b editor entity deletion (web-p411b flip)
+			{Method: "DELETE", Pattern: delDocPat, Handler: delEntityHandler(a, "doc")},
+			{Method: "DELETE", Pattern: delFilePat, Handler: delEntityHandler(a, "file")},
+			{Method: "DELETE", Pattern: delFolderPat, Handler: delEntityHandler(a, "folder")},
 		},
 	}
 }

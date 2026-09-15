@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green** (2026-09-15).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green** (2026-09-15).
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1319,6 +1319,50 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
   request path **without** the leading slash (`TrimPrefix`) or the
   alternate-`href` grows one byte vs Node (caught by the gate).
 - Full `web-go P4` regression green after P4.11a (39 passed 3.8m).
+
+#### P4.11b — editor entity DELETION: `DELETE /project/:id/{doc,file,folder}/:entity_id` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+- Node oracle (live-pinned 2026-09-15): auth (anon → 401 sendStatus; anon +
+  **invalid** CSRF → core 403 `Forbidden`; non-member → 403
+  `{"message":"restricted"}`) → zz.objectId(params) → 404 **JSON** VA
+  `{"error":"Validation error: Invalid Mongo ObjectId at \"params.
+  <Project_id|entity_id>\"","statusCode":404}` (params level = 404, not 400)
+  → `flushProjectToMongo` (document-updater dead in this stack; failures
+  tolerated — deletes still 204) → **root-folder guard** → 422 text/plain
+  `cannot delete root folder` (requires `rootFolder[0]._id` present — a
+  malformed project without the id 500s on Node's `.toString()`; real
+  projects always have the id) → `findElement` (missing or wrong type →
+  404 page) → `findOneAndUpdate({_id}: {$pull: {<parentArrayPath>: {_id}},
+  $inc: {version:1}, $set: {lastUpdated, lastUpdatedBy}, [$unset
+  rootDoc_id]})` (MatchedCount 0 → Node 500) → **_cleanUpEntity**: per doc
+  in the deleted subtree → docstore `PATCH {docstore}/project/:pid/doc/:did
+  {deleted:true, deletedAt, name}`; **docstore 404 (doc not there) →
+  NotFoundError → HTTP 404 page AFTER the tree write already committed**
+  (pinned via seeded doc without docstore entry: state mutated + 404)
+  → 204 No Content (no body, no content-type).
+- Subtle pins: root-doc deletion **unsets `rootDoc_id`** (same write via
+  `$unset`); deleting a folder cleans every doc in its subtree (docstore
+  PATCH each); `findElement` order = element arrays before recursive
+  folders, folders in index order; doc→docs, file→fileRefs, folder→folders;
+  PUT to a DELETE route → flip method-guard → Node express default 404 page
+  (`Cannot PUT ...`).
+- Go: `projectlist/delent.go` (handler mirrors the Node order exactly, reuses
+  P4.11a tree parser + `entCanWrite` + `loadProjectFull` + `fireHTTP` +
+  `cduBase`; new: `delFind` mirror of `findElement`, `delSubtreeDocs`,
+  `entPatchDoc` docstore client, 404-VA `delParamVA`); routes registered in
+  `projectlist.go` with `([^/]+)` segment patterns (the core router would
+  404 non-hex paths before the handler ever ran — Node's Express passes
+  them through for the VA response); flip `web-p411b.conf` (DELETE-only
+  guards); gate `web-go-p411b-flip.test.e2e.ts` (3 legs, 20-case stateful
+  battery + state anchor: flat tree names + version + lastUpdatedBy +
+  rootDoc presence + docstore row count per project).
+- Driver quirk (cost a gate failure): `UpdateOne(ctx, filter, bson.A{...})`
+  is treated as an **aggregation pipeline** ("Unrecognized pipeline stage
+  name: '$pull'") — pass a top-level `bson.D` document for operator
+  updates; conditional append is `primitive.E`.
+- Seeded docs need **real docstore entries** (POST the Go docstore API, as
+  Node's addDoc does) — deleting a doc without an entry is a distinct
+  Node 404-after-write case (covered by `delOrphan`).
+- Full `web-go P4` regression green after P4.11b (42 passed 4.2m).
 
 
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
