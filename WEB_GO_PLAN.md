@@ -1582,6 +1582,54 @@ plane**).
 **P5 gate**: full open → edit (shared session with a Node-open second client) →
 compile → PDF render journey, plus disconnect/storm soak.
 
+**P5.2 — compile control plane (KICKOFF, scoped 2026-09-15; oracle captured):**
+The compile *engine* stays the Node `clsi` / `clsi_typst` services (alive, `clsi` on
+`:3013`). We port the **web control plane** (Go) that sits between the browser and
+clsi. Routes (all owner-gated, per-`Project_id`):
+- `POST /Project/:id/compile` → `CompileController.compile` (parse body/query;
+  `CompileManager.compile`: recently-compiled redis check, auto-compile limits,
+  `ensureRootDocumentIsValid`, project+limits, then `ClsiManager.sendRequest`).
+  **clsi contract** (Node `ClsiManager._buildRequest` → `_finaliseRequest`): POST
+  `{compile:{options:{buildId,editorId,compiler,timeout,imageName,draft,stopOn
+  OnFirstError,check,compileGroup,populateClsiCache,enablePdfCaching,flags,metrics
+  Method,metricsPath,…},baseHistoryVersion,rawSnapshot,rawChangeOperations,resources:
+  [{path,content}]‖[{path,url:<filestore blob>,modified}]}}` to `Settings.apis.clsi.url`
+  (= `http://clsi:3013`) at `/project/:pid/user/:uid/compile?compileBackendClass=…&
+  compileGroup=…`; typst → `:3014`. `resources` docs = `doc.lines.join('\n')` from the
+  **Go** docstore + files from **Go** filestore (both already ported). Web re-shapes clsi's
+  response into `res.json`.
+- `POST /Project/:id/compile/stop` → `CompileManager.stopCompile` → clsi `/compile/stop`; 200.
+- `GET /Project/:id/output/cached/output.overleaf.json` → `ClsiCacheController.getLatest
+  BuildFromCache` (clsi-cache; 404 when not populated — the e2e default).
+- `GET /download/project/:id/build/:build_id/output/output.pdf` → `CompileController
+  .downloadPdf`; `GET /download/project/:id/build/:editorBuildId/output/cached/:filename`
+  → `ClsiCacheController.downloadFromCache` (path-allowed filter).
+
+**Oracle (Node, success compile of a basic project):** `POST …/compile?check=validate&
+draft=true` → **200** `application/json`: `{"status":"success","outputFiles":[ output.aux,
+out.fdb_latexmk, output.fls, output.log, output.pdf(+size,createdAt,ranges), out.stdout,
+out.synctex.gz ] (each `{path,url,type,build}`), "outputFilesArchive":{"path":"output
+.zip",url,type:"zip"}, "compileGroup":"standard","compiler":"pdflatex","stats":{isInitial
+Compile,latex-runs,pdf-size,…},"timings":{sync,compile,output,compileE2E,…},"outputUrl
+Prefix":""}`. Absent (undefined → omitted): `buildId,clsiServerId,clsiCacheShard,
+validationProblems,pdfDownloadDomain,pdfCachingMinChunkSize`. The `outputFiles[].url` +
+`.build` carry clsi's **random per-compile buildId**; `createdAt` is a timestamp; `output
+Files[].url` point at **clsi's** output nginx (`/project/:pid/user/:uid/build/:build/output/
+:file`), not the web host.
+
+**P5.2 parity gate design (≠ the P4/P5.1 byte-diff gate):** a raw body diff is NOT valid
+because clsi's `buildId`, `createdAt`, `stats.*`, `timings.*` are non-deterministic per
+compile. The gate must compare the **structured contract** — `status`, `compileGroup`,
+`compiler`, `outputFiles` **set of `{path,type}`** + presence of `output.pdf`/`outputFiles
+Archive`, header `content-type` — and **normalize** `build`(id), `createdAt`, `size`?,
+`stats`, `timings` (assert shape, not values). Node baseline → Go parity → Node re-baseline,
+flushing the `clsi_recently_compiled` redis check between legs (else Go leg gets `too-
+recently-compiled`). **Go impl**: new `go/services/web/features/compile` (compile trigger
++ stop + cache/pdf read via the existing Go docstore/filestore + a small clsi HTTP client);
+recently-compiled + compile-limits (user settings) + root-doc validation reuse Go core redis
++ sitesettings. Split likely: P5.2a trigger+stop, P5.2b output/PDF/cache read. (Larger
+edge modes — history/incremental/png2pdf/clsi-cache — are separate, lower priority.)
+
 ### P6 — modules (41 total; each a self-contained flip, roughly in this order)
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
