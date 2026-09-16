@@ -1725,9 +1725,90 @@ Regression sweep after P6.1: P5.1a 3/3, P5.1b 3/3, P5.2a 3/3, P5.2b 3/3,
 P4.13b 3/3, P4.1 3/3, hub-endpoint-contract 2/2 — 23 e2e legs + contract
 battery, zero failures.
 
+**P6.2 — admin-tools project surface (DONE, GATE 4/4 GREEN, 2026-09-16):**
+`go/services/web/features/projectlist/admin.go` + `flips/web-p62.conf`,
+registered as `projectlist.AdminFeature` (distinct feature so the
+`/project/*` cores stay untouched). Node oracle pins captured live from
+the running Node (37 pins, `/tmp/p62_oracle.json` + log-verified BSONError
+root cause). Surface: `GET /admin/user`/`/admin/project` (301 →
+`/hub#/site.general.*`), `GET /admin/active-projects` (RT `/clients`
+projection, Basic auth `WEB_API_USER`), `POST /admin/user/:userId/projects`
+(`null` = all users; active + deletedProjects merge, Node
+`_formatProjectInfo` field order, undefined-omitted / explicit-null
+`lastUpdatedBy:null`, `_matchesFilters`, title `localeCompare`-style
+ascending with `\uffff` null-name slot, lodash-orderBy "missing last"
+for lastUpdated/deletedAt, 500 reproduction pins: bad `owner_ref` hex
+(`new ObjectId` BSONError) + non-ObjectID `trashed` elements +
+bad-sort OError), `POST trash|untrash` (`resolveProjectUserId` body-user
+with owner fallback, 200 OK), `DELETE /admin/project/:id` (soft delete —
+full P4 `deleteProjectExec` side-effect chain under the admin gate;
+admin `deleterData` = Node admin options exactly: **no**
+`deleterIpAddress`, **no** `deletedReason` — `deleteProjectExec` gained a
+`reason` param, P4 caller still passes `"user"`, zip-import unchanged),
+`POST undelete` (restore under the admin gate: same-`_id` re-insert,
+owner from body, name = `generateUniqueName` ("p62-sacrifice (Restored)"
+full-string pin), `deletedDocs` reset + docstore `deleteDoc` fires,
+deprecated record delete, untrash), `DELETE purge`
+(`expireDeletedProject` states: active → stale-record cleanup 200;
+record-missing → 404; already-redacted → 200; otherwise docstore
+`destroy` + history delete + (v1-history when `overleaf.history.id`
+present) + chat destroy + audit-log purge + PII redaction),
+`GET members` (`{owner, members}` admin wrapper shape over the P4
+`invitedMemberRows` core), and the P4 collaborator cores re-mounted under
+the admin gate (site-admin, no per-project ownership check — Node mounts
+the **same** controllers under `ensureUserIsSiteAdmin` only):
+invites list/create/revoke/resend, `PUT users/:uid`, `DELETE users/:uid`
+(204). Gates split by Node behavior: non-parseReq controllers
+(members/delete/undelete/trash/purge) → malformed `:id` = 500 HTML page;
+parseReq controllers → malformed `:id` = 404 `Invalid Mongo ObjectId at
+\"params.Project_id\"` (the P4 member-surface gate shape).
+
+**Parity bugs found by the gate/audit and fixed:**
+1. `deletedReason` was hard-coded `"user"` in the shared
+   `deleteProjectExec`; Node admin delete omits it (admin options =
+   `{deleterUser}` only). Parameterized `reason` (P4/zip unchanged,
+   admin passes `""`).
+2. Deleted-list rows read `deleterData` from the **project subdoc**;
+   Node reads it from the `deletedProjects` record (and its projection
+   selects exactly `deleterData.deletedAt/deleterId`). Moved the read to
+   the record; non-Date `deletedAt` now 500s like Node's `toISOString`
+   TypeError.
+3. `lastUpdatedBy` explicit-`null` (61 stored docs) was dropped;
+   Node emits `"lastUpdatedBy":null`. `lubNil` added; `name`/`nameNil`
+   and `owner:null` distinctions match Node's JSON semantics.
+4. The all-users list 500 (known bad fixture row "P52b NotMine",
+   `owner_ref` = 22-char string) now reproduces: `isTrashed` semantics
+   tightened (non-array `trashed`, non-ObjectID element, bad-owner hex
+   all 500 exactly when Node throws), verified against the Node log's
+   BSONError stack.
+5. Gate harness: the sacrificial project id is re-minted per leg —
+   `from=` redirect URLs (loc + body) and the create/delete rows are
+   normalized; pin-sanity asserts the oracle's full 400-message strings
+   via `JSON.parse` (escaped-quote `toContain` was byte-matching the
+   wrong shape and flake-skip-masked itself).
+
+Gate `web-go-p62-admin-flip.test.e2e.ts` (3 legs + oracle-anchor sanity):
+legacy 301 + member 302 + anon 302 matrix, sacrifice create, members
+before/after (184 B owner-only shape), admin-list 500 ×2 (pre/post
+soft-delete), owner-scoped **120 KB full title-sorted listing byte-diff**,
+bad-sort 500, trash/untrash 200s, invite 400 (267 B exact), put-user 400
+(187 B exact), del-user 204, sharing-link 404 + 400 (261 B exact),
+soft-delete 79 B `{deletedAt,deleterId}`, undelete 35 B name pin,
+soft-delete #2, purge + purge-again 200s, member 302/403-CSRF/no-
+token matrix, anon 302/403, badpid 500s, active-projects `[]` ×3 authz
+rows. **All 4 tests green (no flaky).**
+Regression sweep after P6.2: P6.1 4/4, P4.del 3/3, P4.col 3/3, P4.inv
+3/3, `go build ./...` + `go vet` + full `go test ./go/...` green. The
+sharing-link **create** success path (token AES-256-CTR/HKDF-SHA512,
+`2026.3-v3` label, `OVERLEAF_INVITE_TOKEN_SECRET`) is implemented
+(`atEncrypt`/`atDecrypt`) but is **not gate-pinned** (oracle pins only the
+404/400 rows); flagged for a future invite-token e2e. Admin audit-log
+entries (`sharing-link-created/updated`) are Node state side-effects not
+visible to any gated contract — deferred with the pin set.
+
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
--flipped P3/P4 endpoints + its own HubController), admin-tools (15k — lands
-after P3), llm (14.4k — external-provider client + rate limits + BYO-key crypto),
+-flipped P3/P4 endpoints + its own HubController), admin-tools **project
+surface DONE (P6.2)** (remaining: site/user surfaces), llm (14.4k — external-provider client + rate limits + BYO-key crypto),
 bib-editor (10.2k), github-sync (6.2k — client of the **Go** githubinterface),
 webdav (4.5k — client of the **Go** webdavinterface), dropbox (2.7k — client of
 the Go dropboxinterface), zotero (2.5k), mendeley (1.3k), orcid-picker (1.1k),

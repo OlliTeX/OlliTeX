@@ -2,24 +2,24 @@
 // Node oracle (FileStore/FileStoreController.mjs getFile/getFileHead),
 // pinned live 2026-09-15:
 //
-//	  order: anonymous → 302 /login (requireGlobalLogin, core bounce) →
-//	         zz.objectId(params) → 404 JSON VA (params.Project_id /
-//	         params.File_id, statusCode 404) → project load (ghost → 404 app
-//	         page) → ensureUserCanReadProject (non-member → 403 restricted
-//	         page, or JSON {"message":"restricted"} on accept:json) →
-//	         findElement file (missing → 404 EMPTY, no body/CT) →
-//	         GET {v1_history}/api/projects/{hid}/blobs/{hash} (basic auth
-//	         staging:$V1_HISTORY_PASSWORD; 404 → web 404 empty; other → 500
-//	         empty) → 200 with:
-//	             Content-Disposition: attachment; filename="<name>"
-//	             Cache-Control: private, max-age=3600
-//	             Content-Length only when the upstream provided one
-//	             **no Content-Type** (express never sets one — pinned)
-//	             body = the blob
+//	order: anonymous → 302 /login (requireGlobalLogin, core bounce) →
+//	       zz.objectId(params) → 404 JSON VA (params.Project_id /
+//	       params.File_id, statusCode 404) → project load (ghost → 404 app
+//	       page) → ensureUserCanReadProject (non-member → 403 restricted
+//	       page, or JSON {"message":"restricted"} on accept:json) →
+//	       findElement file (missing → 404 EMPTY, no body/CT) →
+//	       GET {v1_history}/api/projects/{hid}/blobs/{hash} (basic auth
+//	       staging:$V1_HISTORY_PASSWORD; 404 → web 404 empty; other → 500
+//	       empty) → 200 with:
+//	           Content-Disposition: attachment; filename="<name>"
+//	           Cache-Control: private, max-age=3600
+//	           Content-Length only when the upstream provided one
+//	           **no Content-Type** (express never sets one — pinned)
+//	           body = the blob
 //
-//	  HEAD quirk (pinned): history-v1 registers NO HEAD blob route in this
-//	  fork, so the Node HEAD → history 404 → web **404 empty** — replicated
-//	  directly (same observable result).
+//	HEAD quirk (pinned): history-v1 registers NO HEAD blob route in this
+//	fork, so the Node HEAD → history 404 → web **404 empty** — replicated
+//	directly (same observable result).
 package projectlist
 
 import (

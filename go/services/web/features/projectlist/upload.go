@@ -89,9 +89,9 @@ const (
 	upFolder422  = `{"success":false,"error":"folder_not_found"}`
 	upOid400     = `{"error":"Validation error: Invalid Mongo ObjectId at \"query.folder_id\"","statusCode":400}`
 
-	upNameMax    = 150
-	upMaxDocLen  = 2 * 1024 * 1024
-	upMaxTextLen = 3 * upMaxDocLen
+	upNameMax      = 150
+	upMaxDocLen    = 2 * 1024 * 1024
+	upMaxTextLen   = 3 * upMaxDocLen
 	upMultipartCap = 32 * 1024 * 1024
 )
 
@@ -115,7 +115,7 @@ var upTextExt = func() map[string]bool {
 	}
 	m := map[string]bool{}
 	for _, e := range exts {
-		m["." + strings.ToLower(e)] = true
+		m["."+strings.ToLower(e)] = true
 	}
 	return m
 }()
@@ -388,7 +388,6 @@ func upDelOp(kind, id, path string) bson.D {
 	}
 }
 
-
 // upJSONObj — bson.D (ordered) → map for encoding/json (json.Marshal of
 // bson.D serializes as an ARRAY — driver D has no encoding/json shape).
 // Recurses into nested D/A so inner objects (e.g. "ranges": {}) do not
@@ -437,18 +436,16 @@ func upJSONArray(a bson.A) []map[string]any {
 	return out
 }
 
-
-
 func upUpdateStructure(pj, uid string, version int64, historyID string, updates bson.A) bool {
 	if len(updates) < 1 {
 		return true
 	}
 	body, _ := json.Marshal(map[string]any{
-		"updates": upJSONArray(updates),
-		"userId": uid,
-		"version": version,
+		"updates":          upJSONArray(updates),
+		"userId":           uid,
+		"version":          version,
 		"projectHistoryId": historyID,
-		"source": "upload",
+		"source":           "upload",
 	})
 	resp, err := upHTTP.Post(upDUBase()+"/project/"+pj, "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -918,18 +915,18 @@ func uploadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			if relDir == "" {
 				// dirname empty → file lands in the resolved folder (no mkdirp).
 			} else {
-			nd, nt, ok := upMkdirp(a, uid, doc, tgt, relDir)
-			if !ok {
-				fail500()
-				return
-			}
-			doc = nd
-			root = entParseTree(entFld(*doc, "rootFolder"))
-			tgt = upResolveFolder(root, nt.folderID, name)
-			if tgt == nil {
-				fail500()
-				return
-			}
+				nd, nt, ok := upMkdirp(a, uid, doc, tgt, relDir)
+				if !ok {
+					fail500()
+					return
+				}
+				doc = nd
+				root = entParseTree(entFld(*doc, "rootFolder"))
+				tgt = upResolveFolder(root, nt.folderID, name)
+				if tgt == nil {
+					fail500()
+					return
+				}
 			}
 		}
 

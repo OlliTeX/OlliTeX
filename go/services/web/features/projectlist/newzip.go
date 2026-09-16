@@ -71,8 +71,8 @@ package projectlist
 import (
 	"archive/zip"
 	"bytes"
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -458,7 +458,7 @@ func nzipUserNames(a *core.App, cxt *core.Cxt, uid string) []string {
 		defer cur.Close(ctx)
 		for cur.Next(ctx) {
 			var d struct {
-				Name  string `bson:"name"`
+				Name string `bson:"name"`
 			}
 			if cur.Decode(&d) == nil && d.Name != "" {
 				seen = append(seen, d.Name)

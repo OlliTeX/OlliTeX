@@ -132,6 +132,7 @@ func main() {
 
 	// P4.1 surface: project list (GET /user/projects).
 	app.RegisterFeature(projectlist.Feature(app))
+	app.RegisterFeature(projectlist.AdminFeature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

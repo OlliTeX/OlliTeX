@@ -4,23 +4,23 @@
 //
 // Node oracle (DocumentUpdaterController.getDoc), pinned live 2026-09-15:
 //
-//	  order: anonymous → 401 'Unauthorized' (accept json) / 302 /login
-//	         (core global login bounce) → zz.objectId(params) → 404 JSON VA
-//	         (params.Project_id / params.Doc_id, statusCode 404 — the
-//	         enforce-log mode enforces logOnly schemas too, P1 pin) →
-//	         project load (ghost → 404 app page) → ensureUserCanReadProject
-//	         (non-member → 403 JSON {restricted} / restricted page) →
-//	         findElement type doc (missing → 404 sendStatus = text/plain
-//	         'Not Found') →
-//	         DU GET {cdu}/project/{pid}/doc/{did}?fromVersion=-1
-//	         (DU 404/error → web 500 sendStatus 'Internal Server Error')
-//	         → 200 with:
-//	             Content-Type: text/plain; charset=utf-8
-//	             Content-Disposition: attachment; filename="<doc.name>"
-//	             body = lines.join('\n')
+//	order: anonymous → 401 'Unauthorized' (accept json) / 302 /login
+//	       (core global login bounce) → zz.objectId(params) → 404 JSON VA
+//	       (params.Project_id / params.Doc_id, statusCode 404 — the
+//	       enforce-log mode enforces logOnly schemas too, P1 pin) →
+//	       project load (ghost → 404 app page) → ensureUserCanReadProject
+//	       (non-member → 403 JSON {restricted} / restricted page) →
+//	       findElement type doc (missing → 404 sendStatus = text/plain
+//	       'Not Found') →
+//	       DU GET {cdu}/project/{pid}/doc/{did}?fromVersion=-1
+//	       (DU 404/error → web 500 sendStatus 'Internal Server Error')
+//	       → 200 with:
+//	           Content-Type: text/plain; charset=utf-8
+//	           Content-Disposition: attachment; filename="<doc.name>"
+//	           body = lines.join('\n')
 //
-//	  HEAD: express auto-maps HEAD→GET — Node returns 200 with the same
-//	  headers (ETag/CL present) and NO body.
+//	HEAD: express auto-maps HEAD→GET — Node returns 200 with the same
+//	headers (ETag/CL present) and NO body.
 package projectlist
 
 import (

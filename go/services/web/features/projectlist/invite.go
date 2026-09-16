@@ -400,9 +400,9 @@ func invSendMail(a *core.App, to, senderMail, name, ownerMail, url, site string)
 
 // ==================== POST /project/:id/invite ====================
 
-func inviteCreateHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func inviteCreateHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		uid, doc, ok := gateAdmin(a, cxt, res)
+		uid, doc, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}
@@ -486,9 +486,9 @@ func inviteCreateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 // ==================== GET /project/:id/invites ====================
 
-func inviteListHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func inviteListHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		_, doc, ok := gateAdmin(a, cxt, res)
+		_, doc, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}
@@ -537,9 +537,9 @@ func inviteListHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 // ==================== DELETE /project/:id/invite/:invite_id ====================
 
-func inviteRevokeHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func inviteRevokeHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		_, _, ok := gateAdmin(a, cxt, res)
+		_, _, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}
@@ -555,9 +555,9 @@ func inviteRevokeHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 // ==================== POST /project/:id/invite/:invite_id/resend ====================
 
-func inviteResendHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func inviteResendHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		uid, doc, ok := gateAdmin(a, cxt, res)
+		uid, doc, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}

@@ -117,7 +117,7 @@ func loadProjectFull(a *core.App, cxt *core.Cxt, oid primitive.ObjectID) (*primi
 
 // deleteProjectExec mirrors ProjectDeleter.deleteProject side effects (steps
 // 2–6 above). The caller verified canAdmin + project existence.
-func deleteProjectExec(a *core.App, cxt *core.Cxt, oid primitive.ObjectID, project primitive.D, uid, ip string) {
+func deleteProjectExec(a *core.App, cxt *core.Cxt, oid primitive.ObjectID, project primitive.D, uid, ip, reason string) {
 	pid := oid.Hex()
 	hist := strings.TrimSuffix(crHistoryBase(), "/")
 	ds := strings.TrimSuffix(crDocstoreBase(), "/")
@@ -164,7 +164,7 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid primitive.ObjectID, proje
 	}
 
 	// 5. deletedProjects upsert (Node: {project, deleterData} + Mongoose __v).
-	deleterData := ddBuildDeleterData(oid, project, "user", uid, ip)
+	deleterData := ddBuildDeleterData(oid, project, reason, uid, ip)
 	if a.Mongo != nil {
 		ctx, cancel := context.WithTimeout(cxt.Req.Context(), 8*time.Second)
 		defer cancel()
@@ -216,8 +216,10 @@ func ddBuildDeleterData(pid primitive.ObjectID, project primitive.D, reason, uid
 	if ip != "" {
 		fields = append(fields, bson.E{Key: "deleterIpAddress", Value: ip})
 	}
+	if reason != "" {
+		fields = append(fields, bson.E{Key: "deletedReason", Value: reason})
+	}
 	fields = append(fields,
-		bson.E{Key: "deletedReason", Value: reason},
 		bson.E{Key: "deletedProjectId", Value: pid})
 	if v, ok := dget(project, "owner_ref").(primitive.ObjectID); ok {
 		fields = append(fields, bson.E{Key: "deletedProjectOwnerId", Value: v})
@@ -323,7 +325,7 @@ func delProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		if !ok {
 			return
 		}
-		deleteProjectExec(a, cxt, *oid, *doc, cxt.Sess.UserIDHex(), core.ClientIP(cxt.Req))
+		deleteProjectExec(a, cxt, *oid, *doc, cxt.Sess.UserIDHex(), core.ClientIP(cxt.Req), "user")
 		res.SendStatus(200)
 	}
 }

@@ -1,31 +1,32 @@
 // P4.12c — private API doc trio (router.mjs:1010-1023):
 //
-//	  GET  /project/:Project_id/doc/:doc_id           (DocumentController.getDocument)
-//	  POST /project/:Project_id/doc/:doc_id           (DocumentController.setDocument)
-//	  POST /project/:Project_id/doc/:doc_id/changes/reject
-//	                                                   (DocumentController.trackChangesRejected)
+//	GET  /project/:Project_id/doc/:doc_id           (DocumentController.getDocument)
+//	POST /project/:Project_id/doc/:doc_id           (DocumentController.setDocument)
+//	POST /project/:Project_id/doc/:doc_id/changes/reject
+//	                                                 (DocumentController.trackChangesRejected)
 //
 // Auth: `requirePrivateApiAuth` = basic auth against WEB_API_USER /
 // WEB_API_PASSWORD. NO session, NO membership check — service-to-service.
 // Node oracle (pinned 2026-09-15):
 //
-//	  no auth  + GET + accept json → 401 'Unauthorized' +
-//	                                 WWW-Authenticate: OverleafLogin
-//	  no auth  + GET + accept else  → 302 /login (Found. Redirecting to /login)
-//	  no auth  + POST               → 403 'Forbidden' (app-level cross-origin
-//	                               request block, before route logic)
-//	  wrong auth                    → 401 challenge
-//	  right auth                    → handler runs
+//	no auth  + GET + accept json → 401 'Unauthorized' +
+//	                               WWW-Authenticate: OverleafLogin
+//	no auth  + GET + accept else  → 302 /login (Found. Redirecting to /login)
+//	no auth  + POST               → 403 'Forbidden' (app-level cross-origin
+//	                             request block, before route logic)
+//	wrong auth                    → 401 challenge
+//	right auth                    → handler runs
 //
 // GET: project load (bad/ghost → 404 'Not Found') → findElement doc
 // (missing → NotFoundError → 404 'Not Found') →
-//   docstore GET {docstore}/project/{pid}/doc/{did} (fail → 500) →
-//   chat GET {chat}/project/{pid}/resolved-thread-ids (fail → 500) →
-//   ?plain(true) → 200 text/plain joined lines
-//   else → 200 JSON in Node key order:
-//     {lines, version, ranges, pathname, projectHistoryId?,
-//      projectHistoryType:"project-history", historyRangesSupport,
-//      otMigrationStage, resolvedCommentIds}
+//
+//	docstore GET {docstore}/project/{pid}/doc/{did} (fail → 500) →
+//	chat GET {chat}/project/{pid}/resolved-thread-ids (fail → 500) →
+//	?plain(true) → 200 text/plain joined lines
+//	else → 200 JSON in Node key order:
+//	  {lines, version, ranges, pathname, projectHistoryId?,
+//	   projectHistoryType:"project-history", historyRangesSupport,
+//	   otMigrationStage, resolvedCommentIds}
 //
 // POST (setDocument): {lines:[string], version:int, ranges, lastUpdatedAt?,
 // lastUpdatedBy?} → tree check (404 'Not Found' when absent) → docstore POST
@@ -56,7 +57,7 @@ import (
 )
 
 var (
-	docapiDlPat = regexp.MustCompile(`^/project/([^/]+)/doc/([^/]+)$`)
+	docapiDlPat  = regexp.MustCompile(`^/project/([^/]+)/doc/([^/]+)$`)
 	docapiRejPat = regexp.MustCompile(`^/project/([^/]+)/doc/([^/]+)/changes/reject$`)
 )
 
@@ -95,6 +96,7 @@ func basicAuthGate(res *core.Res, req *http.Request) bool {
 	apiUnauthorized(res)
 	return false
 }
+
 // dpath walks a document by nested keys (mongo-driver decodes nested docs
 // to primitive.M / maps).
 // apiText mirrors express res.sendStatus text (404/500) on the api process:
@@ -232,9 +234,9 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 		var ddoc struct {
-			Lines   []string          `json:"lines"`
-			Version *int              `json:"version"`
-			Ranges  json.RawMessage   `json:"ranges"`
+			Lines   []string        `json:"lines"`
+			Version *int            `json:"version"`
+			Ranges  json.RawMessage `json:"ranges"`
 		}
 		if jerr := json.Unmarshal(buf, &ddoc); jerr != nil || ddoc.Lines == nil {
 			apiText(res, http.StatusInternalServerError, "Internal Server Error")
@@ -316,7 +318,7 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			}
 		}
 		b.WriteString(`,"otMigrationStage":0`)
-docapiAfterOt:
+	docapiAfterOt:
 		// resolvedCommentIds = resolvedThreadIds ∩ ranges.comments[].id
 		commentSet := map[string]bool{}
 		if ddoc.Ranges != nil {
