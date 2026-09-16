@@ -1934,8 +1934,108 @@ P6.3a, P6.3b; P6.1 separately 3× consecutive green),
 `go build ./...` + `go vet ./...` + `go test ./go/services/web/...`
 all green; fixture residue swept (users / deletedUsers / tokens / audit).
 
-**Next**: the remaining P6 modules in plan order — next up llm
-(14.4k — external-provider client + rate limits + BYO-key crypto).
+**P6.4a — OlliTeX llm module, deterministic settings surface (DONE, GATE 5/5 STABLE ×2, 2026-09-16):**
+`features/llmsettings/` (8 files) + `core/badjson.go` (content-negotiated
+400 body) — the local-state slice of `services/web/modules/llm`:
+- **BYO provider rows**: GET/POST `/user/llm-providers` (dedupe models,
+  limit 10, SSRF guard, encrypted `apiKey` at rest), POST `/:id` (partial
+  merge `??`/`!==undefined` semantics, clearApiKey, legacy-row id adoption),
+  POST `/:id/delete`, POST `/check` + `/scan` (candidate-type retry loop
+  `[requested, ...others]`, LAST error wins, `auth`→401, `err.status||500`;
+  check adds `duration`; row-based check on a `.test` TLD = deterministic
+  NXDOMAIN for both stacks).
+- **Selected model**: GET/POST `/user/llm/selected-model` (ref regex
+  `^[A-Za-z0-9._\-/]+(:[A-Za-z0-9._\-/]+){0,2}$`, ≤500, `u:...` BYO refs;
+  bad-request/bad-ref/too-long pins).
+- **Compliance rubrics**: GET/POST `/user/llm-compliance` (sanitize: name
+  required (nameless dropped), id≤40/name≤200/guidelines≤20000/
+  scanPatterns≤4000, cap 50, per-line `LABEL :: regex` compile check;
+  `inherited` from admin file when user has none).
+- **Grammar prefs**: GET/POST `/user/llm-settings/grammar` (mode enum
+  validate, `llmModel` ref validate, language ≤64, blockedRules
+  trim/dedupe/cap 200, availability matrix + degrade-to-feasible,
+  effectiveMode/degraded in the save response).
+- **Usage**: GET `/user/llm-usage` + `/admin/llm/usage` (days clamp
+  1..365, `Number(days)||30`, contiguous byDay zeros, byAction top-12 /
+  byModel top-8 by totalTokens desc, `userId` filter site-vs-user scope).
+- **Admin file surface**: GET `/admin/llm/settings/json` (25-key
+  order-preserved display build + env fallbacks + decrypted flags),
+  POST `/admin/llm/settings` (Node merge: existing key order preserved,
+  explicit keys in code order, `llmApiKey` last (encrypted or cleared),
+  atomic tmp+rename chmod 600, `JSON.stringify(data,null,2)` byte parity),
+  POST `/admin/llm/settings/check` + `/admin/llm/models` (single attempt,
+  404 model-not-in-list, `LLM connection failed`/`Model scan failed`
+  shapes), GET `/admin/llm/usage`.
+- **Redirects + anon/denial matrix**: `/user/llm-settings` 301
+  `/hub#/mysettings.llm.general`, `/admin/llm/settings` 301
+  `/hub#/site.llm.instance`, anon 302 `/login`, member 302
+  `/restricted?from=...` (core chain).
+- **crypto parity**: scrypt(N=16384,r=8,p=1, salt
+  `overleaf-lab-llm-key-v1`) + AES-256-GCM `enc:v1:<iv>:<tag>:<ct>`
+  (base64) — pinned BOTH directions: Node-decrypts-Go and
+  Go-decrypts-Node cross-language regression test with real blobs
+  (`TestCrossLangCrypto`), roundtrip + no-secret plaintext passthrough +
+  garbage-to-empty tests.
+- **bad JSON 400 negotiation** (core): `accept: application/json` → 400
+  `{}`; otherwise → 400 705 B HTML page (byte-pinned `mailto:undefined`
+  page in `core/badjson.go`) — content-type AND body pinned in the gate
+  for both accepts.
+
+Parity gotchas each pinned in the gate:
+1. **`blockedURL` message** = Node's `fail(detail)` full string
+   `Blocked LLM base URL (<detail>). Point the provider at a reachable
+   public or LAN LLM endpoint.` — with the Node detail vocabulary
+   (loopback/local name, loopback range, cloud metadata / link-local
+   range, blocked IPv6 range, unspecified range, invalid URL, only
+   http(s)) and Node's check ORDER (scheme → host → names → IPv6 → IPv4);
+   10/192.168 private ranges are ALLOWED (Node is deliberately narrower).
+2. **row-based /check URL**: the retry loop's LAST error wins — for a
+   non-anthropic requested type the last candidate is anthropic, so the
+   surfaced URL is `<base>/v1/models` (the `/v1` is anthropic-only in
+   Node's `listModels`); `u_check_ssrfrow` pins exactly that.
+3. **update responses carry epoch-zero `createdAt`** (Node builds the
+   response from schema-stripped data) while the ADD response carries a
+   fresh ISO — both pinned.
+4. **`an_save_bad`** = `Invalid input: expected number, received string`
+   with the `{ok,error,errors[]}` envelope (zod-parallel in
+   `validateAdminSettings`).
+5. admin FILE write: Node `JSON.stringify(data, null, 2)` — no trailing
+   newline, 2-space, order-preserved (gate compares the file bytes with
+   only the `enc:v1` blobs normalized).
+6. **flaky root-caused + fixed (nginx reload race)**: the first request
+   after `nginx -s reload` can hit a killed worker (`SocketError: other
+   side closed`) — the gate now runs a two-good-response stabilize on the
+   flipped route after every flip, plus 5-attempt socket retry on the
+   call() helper.
+7. **`/dev/csrf` returns the raw token text** (not JSON) on both stacks —
+   the gate reads it as text.
+
+Deliberately OUT (P6.4b): the project-scoped live-LLM surface
+(`/project/:id/llm/{chat,completion,models,features,source-context,
+prompts,compile-fix,grammar,generate,compliance/*}`) — depends on real
+provider calls + token budgets + `recordUsage` semantics; the routes
+stay on Node (flip conf does not claim them).
+
+Gating: `flips/web-p64a.conf` (17 method-guarded locations) + gate
+`web-go-p64a-flip.test.e2e.ts` (leg 1 Node baseline 58 pins, leg 2 flip
+ON identical battery + FX (user doc LLM fields, admin FILE bytes,
+llmusages counts), leg 3 Node re-baseline, zero-diff both directions,
+pin-sanity anchors on the Node baseline: 201 add, 400 invalid update,
+400 blocked-url check, 705 B bad-JSON HTML + 2 B `{}` json-accept,
+400 bad-ref, 400 bad-grammar-mode, 200/400 admin save, 400/500 admin
+check shapes, 302 member denial, both 301s, admin usage 200; flip
+stripped + state (user LLM fields + admin file) restored in afterAll).
+Gate **5/5 green twice** (45.8 s / 46.0 s). Cross-language crypto
+pinned (Node `NODEDEC=cross-check` on the Go blob).
+
+Regression after P6.4a: **P6.4a 5/5 ×2, P6.3b 4/4, P6.3a 4/4, P6.2
+4/4, P6.1 4/4, smoke + a5smoke 2/2 all green**; `go build` + `go vet`
++ `go test ./go/services/web/...` green (incl. 9 new llmsettings unit
+tests).
+
+**Next**: P6.4b (project-scoped live-LLM chat/completion/review surface
+— needs a deterministic local mock provider seam, then parity batteries),
+then the remaining P6 list below.
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **project

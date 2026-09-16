@@ -185,7 +185,13 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 					r.ContentLength = int64(len(raw))
 					trimmed := bytes.TrimSpace(raw)
 					if len(trimmed) > 0 && trimmed[0] != '{' && trimmed[0] != '[' {
-						res.BareWrite(400, []byte("{}"))
+						// Scalar-root / unparseable body (P3.3, refined P6.4a):
+						// Node 400 with a CONTENT-NEGOTIATED body — JSON accept
+						// -> "{}"; html accept (or no Accept header, "*/*") ->
+						// the 705B error page (pinned: POST notjson with no
+						// Accept -> 400 page; accept: application/json -> 400 {};
+						// scalar 123/"str"/true follow the same negotiation).
+						badBody400(a, r, res)
 						return
 					}
 				}

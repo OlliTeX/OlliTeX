@@ -23,14 +23,15 @@ import (
 
 	"ollitex/go/mongoh"
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/adminusers"
 	"ollitex/go/services/web/features/authpages"
 	"ollitex/go/services/web/features/compile"
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/editorpages"
 	"ollitex/go/services/web/features/healthcheck"
-	"ollitex/go/services/web/features/adminusers"
 	"ollitex/go/services/web/features/hub"
 	"ollitex/go/services/web/features/instancestats"
+	"ollitex/go/services/web/features/llmsettings"
 	"ollitex/go/services/web/features/passwordreset"
 	"ollitex/go/services/web/features/projectlist"
 	"ollitex/go/services/web/features/registrationpage"
@@ -135,6 +136,11 @@ func main() {
 	app.RegisterFeature(projectlist.Feature(app))
 	app.RegisterFeature(projectlist.AdminFeature(app))
 	app.RegisterFeature(adminusers.Feature(app))
+
+	// P6.4a surface: OlliTeX llm module settings surface (BYO provider rows,
+	// selected model, compliance rubrics, usage, grammar prefs, admin LLM
+	// settings file + check/scan/usage; chat/completion/review is P6.4b).
+	app.RegisterFeature(llmsettings.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))
