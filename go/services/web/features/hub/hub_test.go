@@ -1,6 +1,11 @@
 package hub
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"go.mongodb.org/mongo-driver/bson"
+)
 
 // Parity pins against services/web/modules/ollitex-hub/app/src/HubTheme.mjs
 // (validateMode / COLOR_RE / message strings — byte-exact contract, the
@@ -152,5 +157,63 @@ func TestThemeJSONOrder(t *testing.T) {
 	want := `{"version":1,"light":{"primary":"#4f46e5","background":"#f8fafc","surface":"#ffffff","text":"#0f172a","dimmed":"#64748b","border":"#e2e8f0","button":"#4f46e5","buttonText":"#ffffff","fontFamily":"Inter, \"Segoe UI\", sans-serif","fontSize":15,"radius":10},"dark":{"primary":"#4f46e5","background":"#f8fafc","surface":"#ffffff","text":"#0f172a","dimmed":"#64748b","border":"#e2e8f0","button":"#4f46e5","buttonText":"#ffffff","fontFamily":"Inter, \"Segoe UI\", sans-serif","fontSize":15,"radius":10}}`
 	if s != want {
 		t.Fatalf("themeJSON:\n got: %s\nwant: %s", s, want)
+	}
+}
+
+// TestSerializeHubUserAceOrder — the hub ol-user meta ace serialization:
+// providers pinned first (stored subdocs keep stored key order), then the
+// canonical schema order with stored-??-default values; no-default paths
+// (overallTheme, syntaxValidation, …) absent when not stored; stored
+// provider blocks must NOT be duplicated by the extras pass.
+// Pinned live against Node /hub renders (admin rich + member sparse).
+func TestSerializeHubUserAceOrder(t *testing.T) {
+	adminAce, err := bson.Marshal(bson.D{
+		{Key: "mode", Value: "none"},
+		{Key: "theme", Value: "textmate"},
+		{Key: "overallTheme", Value: "light-"},
+		{Key: "syntaxValidation", Value: true},
+		{Key: "customKeybindings", Value: bson.D{}},
+		{Key: "zotero", Value: bson.D{{Key: "enabled", Value: true}, {Key: "groups", Value: bson.A{}}, {Key: "disablePersonalLibrary", Value: false}}},
+		{Key: "mendeley", Value: bson.D{{Key: "enabled", Value: true}, {Key: "groups", Value: bson.A{}}, {Key: "disablePersonalLibrary", Value: false}}},
+		{Key: "papers", Value: bson.D{{Key: "enabled", Value: true}, {Key: "groups", Value: bson.A{}}, {Key: "disablePersonalLibrary", Value: false}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := serializeHubUser("uid123", "admin@e2e.test", map[string]any{"first_name": "E2e"}, bson.Raw(adminAce))
+	want := `{"ace":{"zotero":{"enabled":true,"groups":[],"disablePersonalLibrary":false},"mendeley":{"enabled":true,"groups":[],"disablePersonalLibrary":false},"papers":{"enabled":true,"groups":[],"disablePersonalLibrary":false},"mode":"none","theme":"textmate","overallTheme":"light-","lightTheme":"textmate","darkTheme":"overleaf_dark","fontSize":12,"autoComplete":true,"autoPairDelimiters":true,"spellCheckLanguage":"en","pdfViewer":"pdfjs","syntaxValidation":true,"previewTabs":false,"mathPreview":true,"breadcrumbs":false,"editorTabs":true,"nonBlinkingCursor":false,"referencesSearchMode":"advanced","darkModePdf":false,"floatingMenu":true,"customKeybindings":{}},"_id":"uid123","email":"admin@e2e.test","first_name":"E2e","last_name":""}`
+	if out != want {
+		t.Fatalf("admin rich:\n got: %s\nwant: %s", out, want)
+	}
+	if n := strings.Count(out, `"zotero":`); n != 1 {
+		t.Fatalf("admin: zotero duplicated %d times", n)
+	}
+
+	// sparse stored ace (member fixture shape: only customKeybindings)
+	memberAce, err := bson.Marshal(bson.D{{Key: "customKeybindings", Value: bson.D{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out2 := serializeHubUser("u2", "m@e2e.test", map[string]any{}, bson.Raw(memberAce))
+	if strings.Contains(out2, `"overallTheme"`) {
+		t.Fatalf("sparse: overallTheme must be absent: %s", out2)
+	}
+	if strings.Contains(out2, `"syntaxValidation"`) {
+		t.Fatalf("sparse: syntaxValidation must be absent: %s", out2)
+	}
+	if n := strings.Count(out2, `"zotero":`); n != 1 {
+		t.Fatalf("sparse: zotero duplicated %d times", n)
+	}
+	// provider default block, node-pinned order: enabled,disablePersonalLibrary,groups
+	if !strings.Contains(out2, `"zotero":{"enabled":true,"disablePersonalLibrary":false,"groups":[]}`) {
+		t.Fatalf("sparse: provider default shape: %s", out2)
+	}
+	// missing ace entirely → fully canonical defaults
+	out3 := serializeHubUser("u3", "x@e2e.test", map[string]any{}, nil)
+	if n := strings.Count(out3, `"zotero":`); n != 1 {
+		t.Fatalf("nil ace: zotero duplicated %d times", n)
+	}
+	if !strings.HasPrefix(out3, `{"ace":{"zotero":`) {
+		t.Fatalf("nil ace: providers must lead: %s", out3)
 	}
 }

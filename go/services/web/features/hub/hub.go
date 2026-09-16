@@ -780,132 +780,125 @@ func releaseNotes() func(*core.Cxt, *core.Res) {
 // serialized verbatim, user-specific fields and all; pinned live: the
 // admin user's ace carries syntaxValidation + overallTheme, the member's
 // does not). The Go bson→map decode loses order, so the ace is decoded
-// serializeHubUser — the hub ol-user meta: {ace, _id, email,
-// first_name, last_name}. Node JSON.stringify's the HYDRATED mongoose
-// doc, so ace is not the stored raw value: mongoose fills the schema-
-// default ace paths. Two shapes pinned live 2026-09-16:
-//
-//	rich stored ace (has `theme`) → stored bytes + stored key order
-//	  (admin fixture, p34-happy et al. — stored order already starts
-//	  zotero/mendeley/papers and carries stored-only keys like
-//	  syntaxValidation/overallTheme where stored)
-//	sparse stored ace (e2e-user: {customKeybindings:{}}) / missing ace
-//	  → the canonical hydrated order: zotero,mendeley,papers,mode,theme,
-//	  lightTheme,darkTheme,fontSize,autoComplete,autoPairDelimiters,
-//	  spellCheckLanguage,pdfViewer,previewTabs,mathPreview,breadcrumbs,
-//	  editorTabs,nonBlinkingCursor,referencesSearchMode,darkModePdf,
-//	  floatingMenu,customKeybindings — schema defaults for absent values.
-func serializeHubUser(uid, email string, doc map[string]any, ace bson.Raw) string {
-	var aceJSON string
-	hasTheme := false
-	if els, err := ace.Elements(); err == nil {
-		for _, el := range els {
-			if el.Key() == "theme" || el.Key() == "mode" {
-				hasTheme = true
-			}
-		}
-	}
-	if len(ace) > 0 && hasTheme {
-		aceJSON = bsonToJSON(ace) // stored order, values verbatim
-	} else {
-		aceJSON = sparseAceJSON(bsonToMap(ace)) // canonical defaults shape
-	}
-	var b strings.Builder
-	b.WriteString(`{"ace":` + aceJSON + `,`)
-	b.WriteString(`"_id":"` + jesc(uid) + `"`)
-	b.WriteString(`,"email":"` + jesc(email) + `"`)
-	b.WriteString(`,"first_name":"` + jesc(strOf(doc["first_name"])) + `"`)
-	b.WriteString(`,"last_name":"` + jesc(strOf(doc["last_name"])) + `"}`)
-	return b.String()
+// hubAceCanonical — the fixed post-provider key order of the hydrated
+// ace subdocument (User.mjs ace schema order, providers excluded — they
+// are always pinned first by Node, empirically pinned live 2026-09-16).
+var hubAceCanonical = []string{
+	"mode", "theme", "overallTheme", "lightTheme", "darkTheme",
+	"fontSize", "autoComplete", "autoPairDelimiters",
+	"spellCheckLanguage", "pdfViewer", "syntaxValidation",
+	"fontFamily", "lineHeight", "previewTabs", "mathPreview",
+	"breadcrumbs", "editorTabs", "nonBlinkingCursor",
+	"referencesSearchMode", "darkModePdf", "floatingMenu",
+	"customKeybindings",
 }
 
+// hubAceDefaults — schema-default JSON literals for ace paths that have
+// them (no-default paths: overallTheme, syntaxValidation, fontFamily,
+// lineHeight — omitted when not stored).
+var hubAceDefaults = map[string]string{
+	"mode":                `"none"`,
+	"theme":               `"textmate"`,
+	"lightTheme":          `"textmate"`,
+	"darkTheme":           `"overleaf_dark"`,
+	"fontSize":            "12",
+	"autoComplete":        "true",
+	"autoPairDelimiters":  "true",
+	"spellCheckLanguage":  `"en"`,
+	"pdfViewer":           `"pdfjs"`,
+	"previewTabs":         "false",
+	"mathPreview":         "true",
+	"breadcrumbs":         "false",
+	"editorTabs":          "true",
+	"nonBlinkingCursor":   "false",
+	"referencesSearchMode": `"advanced"`,
+	"darkModePdf":         "false",
+	"floatingMenu":        "true",
+	"customKeybindings":   "{}",
+}
+
+// hubAceProviders — the three ref-provider blocks, always rendered first.
+var hubAceProviders = []string{"zotero", "mendeley", "papers"}
+
+// hubAceProviderDefault — the schema-default provider block (member
+// fixture shape, pinned live): enabled:true, disablePersonalLibrary:false,
+// groups:[] — in that key order.
+const hubAceProviderDefault = `{"enabled":true,"disablePersonalLibrary":false,"groups":[]}`
+
+// strOf — best-effort string extraction for scalar doc fields.
 func strOf(v any) string {
 	t, _ := v.(string)
 	return t
 }
 
-// sparseAceJSON — the canonical (defaults-hydrated) ace serialization.
-func sparseAceJSON(ace map[string]any) string {
-	dflt := func(k, def string) string {
-		if v, ok := ace[k]; ok && v != nil {
-			return anyJSON(v)
-		}
-		return def
-	}
-	parts := []string{}
-	parts = append(parts, `"zotero":`+aceProviderJSON(ace, "zotero"))
-	parts = append(parts, `"mendeley":`+aceProviderJSON(ace, "mendeley"))
-	parts = append(parts, `"papers":`+aceProviderJSON(ace, "papers"))
-	parts = append(parts, `"mode":`+dflt("mode", `"none"`))
-	parts = append(parts, `"theme":`+dflt("theme", `"textmate"`))
-	parts = append(parts, `"lightTheme":`+dflt("lightTheme", `"textmate"`))
-	parts = append(parts, `"darkTheme":`+dflt("darkTheme", `"overleaf_dark"`))
-	parts = append(parts, `"fontSize":`+dflt("fontSize", "12"))
-	parts = append(parts, `"autoComplete":`+dflt("autoComplete", "true"))
-	parts = append(parts, `"autoPairDelimiters":`+dflt("autoPairDelimiters", "true"))
-	parts = append(parts, `"spellCheckLanguage":`+dflt("spellCheckLanguage", `"en"`))
-	parts = append(parts, `"pdfViewer":`+dflt("pdfViewer", `"pdfjs"`))
-	parts = append(parts, `"previewTabs":`+dflt("previewTabs", "false"))
-	parts = append(parts, `"mathPreview":`+dflt("mathPreview", "true"))
-	parts = append(parts, `"breadcrumbs":`+dflt("breadcrumbs", "false"))
-	parts = append(parts, `"editorTabs":`+dflt("editorTabs", "true"))
-	parts = append(parts, `"nonBlinkingCursor":`+dflt("nonBlinkingCursor", "false"))
-	parts = append(parts, `"referencesSearchMode":`+dflt("referencesSearchMode", `"advanced"`))
-	parts = append(parts, `"darkModePdf":`+dflt("darkModePdf", "false"))
-	parts = append(parts, `"floatingMenu":`+dflt("floatingMenu", "true"))
-	parts = append(parts, `"customKeybindings":`+dflt("customKeybindings", "{}"))
-	// no-default paths — only when stored
-	for _, k := range []string{"overallTheme", "syntaxValidation", "fontFamily", "lineHeight"} {
-		if v, ok := ace[k]; ok && v != nil {
-			parts = append(parts, `"`+jesc(k)+`":`+anyJSON(v))
-		}
-	}
-	return "{" + strings.Join(parts, ",") + "}"
-}
-
-// aceProviderJSON — hydrated ref-provider block (enabled:true /
-// disablePersonalLibrary:false / groups:[] schema defaults, rebuilt in
-// the UserSettingsHelper order).
-func aceProviderJSON(ace map[string]any, p string) string {
-	v, ok := ace[p]
-	if !ok || v == nil {
-		return `{"enabled":true,"disablePersonalLibrary":false,"groups":[]}`
-	}
-	m, isMap := v.(map[string]any)
-	if !isMap {
-		return `{"enabled":true,"disablePersonalLibrary":false,"groups":[]}`
-	}
-	en := `true`
-	if x, hasK := m["enabled"]; hasK && x != nil {
-		en = anyJSON(x)
-	}
-	dpl := `false`
-	if x, hasK := m["disablePersonalLibrary"]; hasK && x != nil {
-		dpl = anyJSON(x)
-	}
-	groups := `[]`
-	if g, hasK := m["groups"]; hasK && g != nil {
-		if ga, ok2 := g.([]any); ok2 {
-			items := []string{}
-			for _, it := range ga {
-				if gm, ok3 := it.(map[string]any); ok3 {
-					if id, ok4 := gm["id"]; ok4 {
-						if sv, ok5 := id.(string); ok5 {
-							items = append(items, `{"id":"`+jesc(sv)+`"}`)
-						} else {
-							items = append(items, `{}`)
-						}
-					} else {
-						items = append(items, `{}`)
-					}
-				} else {
-					items = append(items, `{}`)
-				}
+func serializeHubUser(uid, email string, doc map[string]any, ace bson.Raw) string {
+	els, elErr := ace.Elements()
+	getEl := func(k string) (bson.RawValue, bool) {
+		for _, el := range els {
+			if el.Key() == k {
+				return el.Value(), true
 			}
-			groups = "[" + strings.Join(items, ",") + "]"
+		}
+		return bson.RawValue{}, false
+	}
+	stored := func(k string) (string, bool) {
+		v, ok := getEl(k)
+		if !ok || elErr != nil {
+			return "", false
+		}
+		if v.Type == bson.TypeNull || v.Type == bson.TypeUndefined {
+			return "", false
+		}
+		return bsonToJSONValue(v), true
+	}
+	parts := make([]string, 0, len(hubAceCanonical)+len(hubAceProviders))
+	for _, p := range hubAceProviders {
+		v, ok := getEl(p)
+		if ok && v.Type == bson.TypeEmbeddedDocument && len(v.Document()) > 0 {
+			// stored provider subdoc — its own stored key order is
+			// authoritative (pinned: admin stored order enabled,groups,
+			// disablePersonalLibrary renders verbatim).
+			parts = append(parts, `"`+p+`":`+bsonToJSON(v.Document()))
+		} else {
+			parts = append(parts, `"`+p+`":`+hubAceProviderDefault)
 		}
 	}
-	return `{"enabled":` + en + `,"disablePersonalLibrary":` + dpl + `,"groups":` + groups + `}`
+	known := map[string]bool{}
+	for _, k := range hubAceCanonical {
+		known[k] = true
+	}
+	for _, k := range hubAceProviders {
+		known[k] = true
+	}
+	for _, k := range hubAceCanonical {
+		if sv, ok := stored(k); ok {
+			parts = append(parts, `"`+k+`":`+sv)
+			continue
+		}
+		if d, hasD := hubAceDefaults[k]; hasD {
+			parts = append(parts, `"`+k+`":`+d)
+			continue
+		}
+		// not stored and no schema default → omitted (Node behaviour)
+	}
+	for _, el := range els {
+		if known[el.Key()] {
+			continue
+		}
+		v := el.Value()
+		if v.Type == bson.TypeNull || v.Type == bson.TypeUndefined {
+			continue
+		}
+		parts = append(parts, `"`+jesc(el.Key())+`":`+bsonToJSONValue(v))
+	}
+	var b strings.Builder
+	b.WriteString(`{"ace":{`)
+	b.WriteString(strings.Join(parts, ","))
+	b.WriteString(`},"_id":"` + jesc(uid) + `"`)
+	b.WriteString(`,"email":"` + jesc(email) + `"`)
+	b.WriteString(`,"first_name":"` + jesc(strOf(doc["first_name"])) + `"`)
+	b.WriteString(`,"last_name":"` + jesc(strOf(doc["last_name"])) + `"}`)
+	return b.String()
 }
 
 // bsonToMap — ordered-elements → Go map (order not preserved; use only

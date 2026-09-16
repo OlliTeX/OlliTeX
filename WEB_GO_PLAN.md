@@ -1861,12 +1861,81 @@ full-list byte-diff.
 Regression sweep after P6.3a: P6.2 4/4, P3.6 (site-settings) 3/3, P6.1 4/4,
 `go build ./...` + `go vet` + full `go test ./go/...` green.
 
-**Next (P6.3b)**: the admin user mutation surface —
-`POST /admin/user/create` (registerNewUser), `POST /admin/user/:id/update`,
-`POST /admin/user/:id/delete` (soft delete), `POST /admin/user/:id/restore`,
-`DELETE /admin/user/:id` (purge), `POST /admin/user/:id/send-activation`
-(email side-channel; UserDeleter + OwnershipTransfer + activation-token
-stack).
+**P6.3b — admin-tools user surface, mutations (DONE, GATE 4/4 STABLE, 2026-09-16):**
+`features/adminusers/mutations.go` (create / update / delete / restore /
+purge / send-activation) + `registrationpage.NewUserDoc()` export (42-key
+shape + `thirdPartyIdentifiers: []` + dynamic keys = 49, Node-parity)
++ `features/projectlist/userdelete.go` (`DeleteOwnedProjects`
+reason `account-deletion` / `RestoreOwnedDeletedProjects`)
++ `flips/web-p63b.conf` (6 method-guarded locations) + gate
+`web-go-p63b-flip.test.e2e.ts` (3 legs + live side-effect fx probes:
+doc shape, audit entries, `tokens` collection counts, `deletedUsers`
+record lifecycle, mail sink anchors; oracle anchors from 29 live pins,
+`/tmp/p63b_node.json`, plus fail-fast guards that reject the vacuous
+403-vs-403 diff if leg-1's `a_create_local` isn't 200).
+
+Parity gotchas each pinned in the gate:
+1. **mongo-driver-v1**: nested doc → `interface{}` decodes to
+unordered `primitive.M` — the deleted-user record / restore snapshot /
+purge readbacks decode into explicit `primitive.D` struct fields
+(`delRec63b`) to preserve byte order and fix the `deletedAt:null`
+decode bug.
+2. **token collection is `tokens`**, not `oneTimeTokens` (Go core was
+already right; the gate's fx probes + cleanup now use it; query with
+dotted `'data.email'` — exact-subdoc matches never hit
+`{user_id,email}`).
+3. **mongo exact-subdoc match trap**: `{data:{email}}` / `{user:{email}}`
+only match docs whose subdoc is EXACTLY that shape — the gate battery
+and cleanups had two of these (tokens + deletedUsers probes) silently
+returning 0/false on both legs — parity passed VACUOUSLY and only
+the oracle anchors exposed it.
+4. **purge semantics = Node `expireDeletedUser`**: the record is KEPT,
+`user` + `deleterData.deleterIpAddress` are redacted (unset), matched by
+`deleterData.deletedUserId` (the user snapshot is gone — the fx probe
+switches to that key post-purge); `b_purge_after_restore` → 422 is
+correct Node behaviour (findOne null → TypeError →
+"Something went wrong. The user is already deleted?").
+5. update key order = Node `Object.entries(body)` order with
+firstName/lastName ↔ first_name/last_name rename; `canManageTemplates`
+after the loop (site-admin → 409 implicit-role message);
+`email` path first; hand-built ordered JSON everywhere (Go maps would
+alphabetise).
+6. audit entries: add-email / change-primary-email /
+remove-email / delete-account with `initiatorId` = admin ObjectId,
+explicit `timestamp`; `thirdPartyIdentifiers: []` + random 16-char
+`referal_id` on create (49 keys).
+7. mail: registered ("Activate your OlliTeX Account") +
+security notes (hardcoded "Overleaf", NOT appName); count + recipient
++ subject pinned, bodies not byte-pinned; deferred: `toUserId`
+ownership transfer (Node delete supports it; documented),
+`InstitutionsAPI` / `subscribeToNewsletter` / `AnalyticsManager`
+(CE no-ops).
+
+**Regression-driven fixes folded into this unit's commit:**
+- **P6.1 flake root-caused + fixed**: Go hub `serializeHubUser` raw-stored
+branch was wrong against Node's mongoose hydration (Node renders the
+HYDRATED subdoc in canonical order — zotero/mendeley/papers pinned
+FIRST, then schema order, stored-??-default values, no-default paths
+omitted when absent; a stored provider subdoc keeps its own key order).
+Rewritten to the pinned canonical rule + `TestSerializeHubUserAceOrder`
+unit test; a provider-duplication bug in the first rewrite (extras pass
+re-appended stored providers) was caught by measuring page bytes
+(16528 vs Node's 16199) and unit-tested. Live parity: admin 16199 B /
+member 601-char ace, byte-identical both legs.
+- **p63a `f_search_none` anchor corrected**: it had anchored
+`totalSize > 0` for a nonsense search, which only ever matched because
+a phantom fixture user existed at that moment (it is gone; live Node
+returns 0 — the "no-lastName pass any search" theory was a misread).
+Anchored now to Node truth: nonsense search → 0, case-folded
+`E2E-ADMIN` → ≥1.
+
+Regression after P6.3b: **19/19 green, zero flaky** (P3.6, P6.1, P6.2,
+P6.3a, P6.3b; P6.1 separately 3× consecutive green),
+`go build ./...` + `go vet ./...` + `go test ./go/services/web/...`
+all green; fixture residue swept (users / deletedUsers / tokens / audit).
+
+**Next**: the remaining P6 modules in plan order — next up llm
+(14.4k — external-provider client + rate limits + BYO-key crypto).
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **project

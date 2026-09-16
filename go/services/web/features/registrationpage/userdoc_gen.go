@@ -120,3 +120,7 @@ func newUserDoc() bson.M {
 	}
 	return d
 }
+
+// NewUserDoc exposes the Node-parity default user document for other
+// features (P6.3b admin user create reuses the same baseline doc).
+func NewUserDoc() bson.M { return newUserDoc() }

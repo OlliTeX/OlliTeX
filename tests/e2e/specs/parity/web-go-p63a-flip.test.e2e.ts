@@ -257,9 +257,12 @@ test.describe(`@local web-go P6.3a (admin-tools user surface reads) parity`, () 
     expect(base.totalSize).toBeGreaterThan(0)
     expect(LEG1.f_admin.body).toContain('"totalSize":1')
     expect(JSON.parse(LEG1.f_admin.body).users[0].id).toBe(ADMIN_ID)
-    // search short-circuit sanity: the no-lastName rows pass ANY search
+    // Node truth (pinned live 2026-09-16): search is an in-memory
+    // email/firstName/lastName substring filter — a nonsense query matches
+    // nothing, while the case-folded probe 'E2E-ADMIN' still matches admin.
     const searchNone = JSON.parse(LEG1.f_search_none.body)
-    expect(searchNone.totalSize).toBeGreaterThan(0)
+    expect(searchNone.totalSize).toBe(0)
+    expect(JSON.parse(LEG1.f_search_case.body).totalSize).toBeGreaterThanOrEqual(1)
     expect(LEG1.s_badby.status).toBe(500)
     expect(LEG1.s_badorder.status).toBe(500)
     // name sort ignores the order flag (pinned: asc == desc)

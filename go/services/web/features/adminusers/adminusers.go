@@ -966,11 +966,24 @@ var usersPat = regexp.MustCompile(`^/admin/users$`)
 var infoPat = regexp.MustCompile(`^/admin/user/([^/]+)/info$`)
 
 func Feature(a *core.App) core.Feature {
+	fm := newMailBox63b(a)
 	return core.Feature{
-		Name: "p63a-admin-users",
+		Name: "p63-admin-users",
 		Routes: []core.Route{
 			{Method: "POST", Pattern: usersPat, Handler: listHandler(a)},
 			{Method: "GET", Pattern: infoPat, Handler: infoHandler(a)},
+			// P6.3b mutation surface (admin-tools UserListController).
+			{Method: "POST", Path: "/admin/user/create", Handler: createHandler63b(fm, a)},
+			{Method: "POST", Pattern: regexp.MustCompile(`^/admin/user/([0-9a-fA-F]{24})/send-activation$`),
+				Handler: sendActivationHandler63b(fm, a)},
+			{Method: "POST", Pattern: regexp.MustCompile(`^/admin/user/([0-9a-fA-F]{24})/update$`),
+				Handler: updateHandler63b(fm, a)},
+			{Method: "POST", Pattern: regexp.MustCompile(`^/admin/user/([0-9a-fA-F]{24})/delete$`),
+				Handler: deleteHandler63b(a)},
+			{Method: "POST", Pattern: regexp.MustCompile(`^/admin/user/([0-9a-fA-F]{24})/restore$`),
+				Handler: restoreHandler63b(a)},
+			{Method: "DELETE", Pattern: regexp.MustCompile(`^/admin/user/([0-9a-fA-F]{24})$`),
+				Handler: purgeHandler63b(a)},
 		},
 	}
 }
