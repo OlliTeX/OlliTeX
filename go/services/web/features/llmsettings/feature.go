@@ -44,7 +44,30 @@ import (
 var (
 	reProviderPat = regexp.MustCompile(`^/user/llm-providers/([^/]+)$`)
 	reProviderDel = regexp.MustCompile(`^/user/llm-providers/([^/]+)/delete$`)
+
+	// P6.4b — project-scoped llm routes (LLMRouter.mjs, ensureUserCanReadProject
+	// chain). First capture = Project_id; second (status/cancel) = jobId.
+	reLLMProj = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/%s$`)
 )
+
+// llmProjPath — compile the shared shape per segment (Node's exact paths).
+var (
+	reLLMModels     = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/models$`)
+	reLLMFeatures   = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/features$`)
+	reLLMSrcCtx     = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/source-context$`)
+	reLLMPrompts    = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/prompts$`)
+	reLLMChat       = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/chat$`)
+	reLLMCompletion = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/completion$`)
+	reLLMCompileFix = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/compile-fix$`)
+	reLLMGrammar    = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/grammar$`)
+	reLLMGenerate   = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/generate$`)
+	reLLMRubrics    = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/compliance/rubrics$`)
+	reLLMStart      = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/compliance/start$`)
+	reLLMStatus     = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/compliance/status/([^/]+)$`)
+	reLLMCancel     = regexp.MustCompile(`^/project/([0-9a-fA-F]{24})/llm/compliance/cancel/([^/]+)$`)
+)
+
+var _ = reLLMProj
 
 // ---------- constants (Node sources) ----------
 
@@ -84,6 +107,21 @@ func Feature(a *core.App) core.Feature {
 			{Method: "POST", Path: "/admin/llm/models", Handler: fs.adminScan},
 			{Method: "GET", Path: "/admin/llm/usage", Handler: fs.adminUsage},
 			{Method: "GET", Path: "/admin/llm/settings", Handler: fs.adminSettingsRedirect},
+			// P6.4b — project-scoped live-LLM surface (LLMChatController +
+			// LLMComplianceController; login chain = core global gate).
+			{Method: "GET", Pattern: reLLMModels, Handler: fs.llmGetModels},
+			{Method: "GET", Pattern: reLLMFeatures, Handler: fs.llmGetFeatures},
+			{Method: "GET", Pattern: reLLMSrcCtx, Handler: fs.llmSourceContext},
+			{Method: "GET", Pattern: reLLMPrompts, Handler: fs.llmGetPrompts},
+			{Method: "POST", Pattern: reLLMChat, Handler: fs.llmChat},
+			{Method: "POST", Pattern: reLLMCompletion, Handler: fs.llmCompletion},
+			{Method: "POST", Pattern: reLLMCompileFix, Handler: fs.llmCompileFix},
+			{Method: "POST", Pattern: reLLMGrammar, Handler: fs.llmGrammar},
+			{Method: "POST", Pattern: reLLMGenerate, Handler: fs.llmGenerate},
+			{Method: "GET", Pattern: reLLMRubrics, Handler: fs.llmComplianceRubrics},
+			{Method: "POST", Pattern: reLLMStart, Handler: fs.llmComplianceStart},
+			{Method: "GET", Pattern: reLLMStatus, Handler: fs.llmComplianceStatus},
+			{Method: "POST", Pattern: reLLMCancel, Handler: fs.llmComplianceCancel},
 		},
 	}
 }
@@ -225,13 +263,33 @@ func asMap(v any) (map[string]any, bool) {
 	switch t := v.(type) {
 	case map[string]any:
 		return t, true
+	case primitive.M:
+		out := make(map[string]any, len(t))
+		for k, x := range t {
+			out[k] = x
+		}
+		return out, true
+	case obj:
+		out := make(map[string]any, len(t))
+		for _, e := range t {
+			out[e.k] = e.v
+		}
+		return out, true
 	}
 	return nil, false
 }
 
+// asAnySlice — tolerant BSON array extraction: the driver decodes arrays
+// into interface{} targets as the NAMED type primitive.A, so a plain
+// v.([]any) assertion does not match.
 func asAnySlice(v any) []any {
-	if a, ok := v.([]any); ok {
-		return a
+	switch t := v.(type) {
+	case []any:
+		return t
+	case primitive.A:
+		out := make([]any, len(t))
+		copy(out, t)
+		return out
 	}
 	return nil
 }

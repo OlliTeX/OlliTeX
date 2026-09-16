@@ -2033,9 +2033,94 @@ Regression after P6.4a: **P6.4a 5/5 ×2, P6.3b 4/4, P6.3a 4/4, P6.2
 + `go test ./go/services/web/...` green (incl. 9 new llmsettings unit
 tests).
 
-**Next**: P6.4b (project-scoped live-LLM chat/completion/review surface
-— needs a deterministic local mock provider seam, then parity batteries),
-then the remaining P6 list below.
+**P6.4b — OlliTeX llm module, project-scoped live-LLM surface (DONE, GATE 5/5 GREEN, 2026-09-16):**
+`features/llmsettings/` extended with `project.go` (13 handlers +
+`allDocs`/`pickDoc`/`llmCall`), `compliance.go` (rubrics + job lifecycle
+with a single-flight queue mirroring Node's `processQueue`),
+`err500page.go` (Node's 681 B admin-save 500 HTML replica), `admin.go`
+(save-missing-`systemPrompt` → write-then-500 mirror), `feature.go`
+(17 project-scoped regex routes + `asMap`/`asAnySlice` hardening),
+`handlers_user.go` (`orderedRowOf` → `bson.D`). Node sources pinned:
+`LLMChatController.mjs`, `LLMComplianceController.mjs`, `LLMModelRef.mjs`,
+`LLMBudget.mjs`, `models/LLMReviewJob.mjs` (oracles
+`/tmp/p64b_oracle.mjs` → `/tmp/p64b_node.json`, `/tmp/p64b_job.mjs`).
+- **Routes (Node `LLMRouter.mjs` order)**: `POST
+  /project/:id/llm/{chat,completion,compile-fix,grammar,generate}`; `GET
+  /project/:id/llm/{models,features,source-context,prompts}`; compliance
+  `GET rubrics`, `POST start`, `GET status/:jobId`, `POST cancel/:jobId`
+  — all `ensureUserCanReadProject` (member-not-participant → JSON 403 /
+  HTML 302 `/restricted`, missing project → 404 HTML, anon → 302/403 core
+  chain).
+- **Lane resolution** (`LLMModelRef`): admin pool first (settings file:
+  `llmApiUrl`+`llmApiKey`+`allowedModels`), else user BYO rows (stored
+  encrypted, decrypted per request), `u:<row>:<model>` refs select rows
+  (`u:<8hex>:` prefix — gate normalizes the id). No lane → `403
+  {"ok":false,"error":"llm-disabled","message":"LLM service is not
+  configured"}` (chat/completion/generate); grammar adds the LT lane.
+- **Live parity seam = dead host**: `https://dead-llm.e2e.test/v1/`
+  (ENOTFOUND, offline-deterministic). Node shapes pinned: 2-attempt
+  routes → `LLM request failed: Failed after 2 attempts. Last error:
+  Cannot connect to API: getaddrinfo ENOTFOUND <host> (model: <m>)`;
+  compile-fix (1 attempt) → `Cannot connect to API: … (model: gpt-dead)`.
+  Go `llmCall` replicates attempt counts + `innerCause` extraction; gate
+  normalizes both stacks' network phrasing to `NETERR`.
+- **Compliance job lifecycle**: `start` → `running`(or `queued`
+  `position:1` when a prior job is still in flight — Node queue is
+  single-flight; Go mirrors with a per-start goroutine + in-flight gate);
+  status poll; `cancel` unknown-job → `200 {"ok":true}`; job doc in
+  `llmreviewjobs` (22-field Node mongoose shape; `documentTokensEstimate`
+  differs across stacks — Node counts UTF-16 units, Go bytes → gate
+  normalizes `EST`). Node-local quirk pinned: `chatObject` is broken in
+  this checkout (`schema is not a function`) so reviews end `done` with
+  `items[].status: "na"`+that evidence — Go reproduces the terminal
+  shape.
+- **Real bugs found + fixed by this gate** (all three were in committed
+  P6.4a code, exposed only now by cross-stack write/read):
+  1. **`primitive.A` named type**: Mongo driver v1 decodes `map[string]any`
+     values as `primitive.A` — `.([]any)` assertions FAILED silently, so
+     `allDocs`/`loadProjectDoc` saw zero docs (source-context `not_found`
+     on a real file). Hardened `asAnySlice()` with `case primitive.A`
+     (+ `asMap()` with `primitive.M`, `obj`). Rule: NEVER `.([]any)` a
+     driver-decoded `any`; always go through `asAnySlice`.
+  2. **ojson `obj`/`kv` Mongo corruption**: `kv{k,v}` fields are UNEXPORTED
+     → the BSON encoder writes `{}` per entry — BYO add stored
+     `llmProviders: [[{},{}×9]]`, compliance save echoed `rubrics: []`
+     (`asMap` dropped `obj` entries). Fix: `orderedRowOf` returns
+     `bson.D`; `saveUserCompliance` stores `bson.D` in Mongo, keeps the
+     ojson `obj` only for the HTTP response. Rule: **never pass ojson
+     `obj` values to the driver**; Mongo=`bson.D`, HTTP=`obj`.
+  3. **Node admin-save 500 contract**: missing `systemPrompt` string →
+     file IS written, then 500 + 681 B HTML — Go mirrors (write, then
+     `err500page`).
+- **Flip conf** `server-ce/nginx/flips/web-p64b.conf`: 2 method-guarded
+  regex locations (GET-set / POST-set). **Nginx config cannot use `{N}`
+  quantifiers** (config parser takes `{` as a block opener; `\{N\}` also
+  fails) — the 24-hex OID class is repeated explicitly.
+- **Gate** `tests/e2e/specs/parity/web-go-p64b-flip.test.e2e.ts` (3 legs +
+  pin-sanity, **5/5 green**): leg 1 Node baseline (no flips), leg 2 Go
+  parity with **CUMULATIVE flips (web-p64a + web-p64b)** — deliberate, so
+  the battery's BYO/compliance writes exercise the Go P6.4a write/read
+  paths (which is what exposed bugs 1–2), leg 3 Node re-baseline, zero-diff
+  both directions. Battery: authz 9, models 8 (BYO row lifecycle through
+  P6.4a Go routes), features 3, source-context 16, prompts 3, chat 6,
+  completion 2, compile-fix 5, grammar 3, generate 3, compliance 10, job
+  lifecycle 4 ≈ 70 pins + FX (budget before/after, `llmreviewjobs` docs,
+  user LLM profile, admin FILE bytes, `llmusages`). Normalized volatiles
+  (known list): `enc:v1`→ENC, provider `id`→PID, `u:PID:`, `jobId`→JOB,
+  timestamps→TS, `documentTokensEstimate`→EST, network phrasing→NETERR,
+  HTML `nonce=`→NONCE, `ol-csrfToken` meta→CSRF, `_csrf` hidden input→CSRF
+  (both stacks render per-request CSRF/nonce tokens on HTML pages), and
+  job-doc `_id` ObjectIDs→OID (stacks generate independent OIDs).
+  Determinism: dead-host ENOTFOUND, budget reset, `llmreviewjobs` dropped,
+  admin file restored (owner `www-data:www-data` mode 600), flip stripped
+  in afterAll. Gate time ≈ 5.5 min (dead-host retry windows dominate).
+
+Regression after P6.4b: **P6.4a 13/13, P6.3b, P6.3a, P6.2, P6.1, smoke
+all green**; `go build ./...` + `go vet` + `go test ./go/services/web/...`
+green.
+
+**Next**: remaining P6 module surfaces in the list below (each =
+oracle → Go → flip conf → 3-leg gate → regressions → commit).
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **project

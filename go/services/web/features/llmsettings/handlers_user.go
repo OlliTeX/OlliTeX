@@ -65,7 +65,7 @@ func (f *fs) loadProviders(cxt *core.Cxt, u *userDoc) ([]map[string]any, error) 
 			continue
 		}
 		id := rID(m)
-		_, isArr := m["models"].([]any)
+		isArr := asAnySlice(m["models"]) != nil
 		if id != "" && isArr {
 			providers = append(providers, m)
 		}
@@ -89,12 +89,12 @@ func (f *fs) loadProviders(cxt *core.Cxt, u *userDoc) ([]map[string]any, error) 
 		if first == nil {
 			first = u.llmModels
 		}
-		if a, ok := first.([]any); ok {
+		if a := asAnySlice(first); len(a) > 0 {
 			models = append(models, a...)
 		}
 		if s, ok := u.llmModelName.(string); ok && s != "" {
 			inModels := false
-			if a, ok := u.llmModels.([]any); ok {
+			if a := asAnySlice(u.llmModels); len(a) > 0 {
 				for _, e := range a {
 					if e == s {
 						inModels = true
@@ -106,12 +106,12 @@ func (f *fs) loadProviders(cxt *core.Cxt, u *userDoc) ([]map[string]any, error) 
 			}
 		}
 		cmList := make([]any, 0)
-		if a, ok := u.llmCompletionModels.([]any); ok {
+		if a := asAnySlice(u.llmCompletionModels); len(a) > 0 {
 			cmList = append(cmList, a...)
 		}
 		if s, ok := u.llmCompletionModel.(string); ok && s != "" {
 			inList := false
-			if a, ok := u.llmCompletionModels.([]any); ok {
+			if a := asAnySlice(u.llmCompletionModels); len(a) > 0 {
 				for _, e := range a {
 					if e == s {
 						inList = true
@@ -226,7 +226,7 @@ func publicRow(row map[string]any) obj {
 		createdAt = s
 	}
 	models := make([]any, 0)
-	if a, ok := row["models"].([]any); ok {
+	if a := asAnySlice(row["models"]); len(a) > 0 {
 		models = a
 	}
 	id := ""
@@ -255,18 +255,25 @@ func publicRow(row map[string]any) obj {
 }
 
 // orderedRowOf — stored row (Node key order for persisted rows).
-func orderedRowOf(m map[string]any) obj {
+// Returns bson.D so the mongo driver stores an ordered, BSON-typed
+// document. NOTE: ojson `obj`/`kv` values must never reach a Mongo write —
+// `kv` fields are unexported and the driver would encode each as `{}`
+// (observed corruption: llmProviders [[{},...]])
+func orderedRowOf(m map[string]any) bson.D {
 	keys := []string{"id", "name", "providerType", "baseUrl", "apiKey", "models", "completionModel", "enabled", "createdAt", "updatedAt"}
-	out := obj{}
+	seen := map[string]bool{}
+	out := bson.D{}
 	for _, k := range keys {
 		if v, ok := m[k]; ok {
-			out = out.set(k, v)
+			out = append(out, bson.E{Key: k, Value: v})
+			seen[k] = true
 		}
 	}
 	// extra keys (defensive) in stored order
 	for _, e := range mapKeys(m) {
-		if !out.has(e) {
-			out = out.set(e, m[e])
+		if !seen[e] {
+			out = append(out, bson.E{Key: e, Value: m[e]})
+			seen[e] = true
 		}
 	}
 	return out
@@ -952,7 +959,7 @@ func (f *fs) getUserCompliance(cxt *core.Cxt, res *core.Res) {
 	}
 	mine := false
 	rubrics := []any{}
-	if a, ok := u.compRubrics.([]any); ok && len(a) > 0 {
+	if a := asAnySlice(u.compRubrics); len(a) > 0 {
 		mine = true
 		rubrics = a
 	}
@@ -990,8 +997,15 @@ func (f *fs) saveUserCompliance(cxt *core.Cxt, res *core.Res) {
 		return
 	}
 	stored := make([]any, 0, len(sanitized))
+	respRubrics := make([]any, 0, len(sanitized))
 	for _, r := range sanitized {
-		stored = append(stored, jobj(
+		stored = append(stored, bson.D{
+			{Key: "id", Value: r["id"]},
+			{Key: "name", Value: r["name"]},
+			{Key: "guidelines", Value: r["guidelines"]},
+			{Key: "scanPatterns", Value: r["scanPatterns"]},
+		})
+		respRubrics = append(respRubrics, jobj(
 			"id", r["id"],
 			"name", r["name"],
 			"guidelines", r["guidelines"],
@@ -1012,7 +1026,7 @@ func (f *fs) saveUserCompliance(cxt *core.Cxt, res *core.Res) {
 		f.internal500(res, err)
 		return
 	}
-	jres(200, res, jobj("ok", true, "rubrics", stored))
+	jres(200, res, jobj("ok", true, "rubrics", respRubrics))
 }
 
 // ---------- user usage ----------
@@ -1243,7 +1257,7 @@ func grammarModelsList(f *fs, cxt *core.Cxt, u *userDoc, av map[string]any) ([]a
 				if s2, ok := row["name"].(string); ok && s2 != "" {
 					name = s2
 				}
-				if a, ok := row["models"].([]any); ok {
+				if a := asAnySlice(row["models"]); len(a) > 0 {
 					for _, modelId := range a {
 						if s2, isStr := modelId.(string); isStr {
 							models = append(models, jobj(

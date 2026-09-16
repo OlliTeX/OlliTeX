@@ -578,6 +578,17 @@ func (f *fs) adminSave(cxt *core.Cxt, res *core.Res) {
 		jres(500, res, jobj("ok", false, "error", "write-failed", "message", err.Error()))
 		return
 	}
+	// Node parity (LLMAdminController.mjs:339): the success log reads
+	// `systemPrompt.length` AFTER the file write — a save that omits
+	// systemPrompt (or sends null) crashes into Express's generic 500 page
+	// (P6.4b pin r_admin_set_reviewoff: 500 text/html 681B). The file stays
+	// written; the response is the error page.
+	if v, ok := body.get("systemPrompt"); !ok || v == nil {
+		res.W.Header().Set("Content-Type", "text/html; charset=utf-8")
+		res.W.WriteHeader(500)
+		_, _ = res.W.Write(err500Page)
+		return
+	}
 	jres(200, res, jobj("success", true))
 }
 
