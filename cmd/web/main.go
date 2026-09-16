@@ -24,13 +24,14 @@ import (
 	"ollitex/go/mongoh"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/authpages"
+	"ollitex/go/services/web/features/compile"
 	"ollitex/go/services/web/features/devcsrf"
-	"ollitex/go/services/web/features/healthcheck"
-	"ollitex/go/services/web/features/passwordreset"
-	"ollitex/go/services/web/features/registrationpage"
-	"ollitex/go/services/web/features/instancestats"
-	"ollitex/go/services/web/features/projectlist"
 	"ollitex/go/services/web/features/editorpages"
+	"ollitex/go/services/web/features/healthcheck"
+	"ollitex/go/services/web/features/instancestats"
+	"ollitex/go/services/web/features/passwordreset"
+	"ollitex/go/services/web/features/projectlist"
+	"ollitex/go/services/web/features/registrationpage"
 	"ollitex/go/services/web/features/serveradmin"
 	"ollitex/go/services/web/features/sitesettings"
 	"ollitex/go/services/web/features/staticpages"
@@ -133,6 +134,10 @@ func main() {
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))
+
+	// P5.2a surface: compile control plane (POST /Project/:id/compile +
+	// /compile/stop) — clsi stays Node; Go is the orchestration/response layer.
+	app.RegisterFeature(compile.Feature(app))
 
 	// web profile: unknown-route 404 view (general/404) — Node
 	// webRouter.get('*', ErrorController.notFound).

@@ -1630,6 +1630,33 @@ recently-compiled + compile-limits (user settings) + root-doc validation reuse G
 + sitesettings. Split likely: P5.2a trigger+stop, P5.2b output/PDF/cache read. (Larger
 edge modes — history/incremental/png2pdf/clsi-cache — are separate, lower priority.)
 
+**P5.2a — compile trigger + stop (DONE, GATE 3/3 GREEN, 2026-09-16):**
+`go/services/web/features/compile/compile.go` ports the web control plane:
+- `POST /project/:id/compile` (case-insensitive, like Express) → auth (404 invalid-id
+  JSON / 404 absent-id HTML / 403 non-member JSON-or-HTML), read-access check,
+  recently-compiled Redis guard (`SETNXEXReply`), clsi POST (free backend, project's
+  clsiGroup), 30s timeout, and the **exact Node response reshape** (status, outputFiles
+  with pathname-only URLs + build + pdf ranges/size, outputFilesArchive, compileGroup
+  (default `standard`), compiler, clsiServerId/clsiCacheShard, validationProblems,
+  stats, timings, outputUrlPrefix — present-empty-string passed through). 504 on
+  timeout/failure with `validationProblems: [{type: "compilationFailed"}]`.
+- `POST /project/:id/compile/stop` → clsi stop + `200 text/plain OK` (Node
+  `res.sendStatus(200)`), never errors (clsi resolves even when nothing compiles).
+- `core/redis.go` gained `SETNXEXReply` to distinguish "key already existed"
+  (recently-compiled) from "set now" on the `SET key true EX 1 NX` guard.
+- Flip: `server-ce/nginx/flips/web-p52a.conf` (POST-only, both routes → :4010).
+- Gate: `web-go-p52a-flip.test.e2e.ts` (3-leg, deterministic offline). Not a byte-diff —
+  it normalizes buildId/createdAt/size/nonce/csrf/hex-ids; compares status/CT/length/
+  body-shape. Covers: success (with real clsi PDF, output.pdf + output.zip archive),
+  PAIR (success + too-recently-compiled from a concurrent second compile), stop,
+  non-member 403 (JSON + accept-dependent HTML), anonymous Forbidden, invalid-mongo-ObjectId
+  404 JSON, absent-id 404 HTML. Node baseline ↔ Go ↔ Node re-baseline all pass.
+- `go build`/`go vet` clean; unit tests `features/compile` + `core` pass.
+
+**P5.2b (next)** — compile output/PDF read: `GET /project/:id/...` output endpoints
+(content-range for incremental pdf, output.zip archive, clsi-cache) — client of the
+**Go** docstore/filestore + the existing Node clsi, same 3-leg gate pattern.
+
 ### P6 — modules (41 total; each a self-contained flip, roughly in this order)
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already

@@ -411,6 +411,20 @@ func (r *RedisClient) SETNXEX(key, value string, ttl time.Duration) error {
 	return err
 }
 
+// SETNXEXReply is SET key value NX EX seconds with the reply surfaced:
+// true ⇒ the key was set now; false ⇒ it already existed (nil reply).
+// Node pattern: CompileManager._checkIfRecentlyCompiled does
+// rclient.set(key, true, 'EX', n, 'NX') and treats "OK" as not-recent
+// (anything else = recently compiled). Connection/protocol errors are
+// returned as error.
+func (r *RedisClient) SETNXEXReply(key, value string, ttl time.Duration) (bool, error) {
+	reply, err := r.command("SET", key, value, "NX", "EX", strconv.Itoa(int(ttl/time.Second)))
+	if err != nil {
+		return false, err
+	}
+	return reply == "OK", nil
+}
+
 // SETXXEX is SET key value XX EX seconds — the 'XX' path (in-place update
 // of an already-existing session).
 func (r *RedisClient) SETXXEX(key, value string, ttl time.Duration) error {
