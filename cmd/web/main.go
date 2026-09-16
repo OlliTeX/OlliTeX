@@ -28,6 +28,7 @@ import (
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/editorpages"
 	"ollitex/go/services/web/features/healthcheck"
+	"ollitex/go/services/web/features/adminusers"
 	"ollitex/go/services/web/features/hub"
 	"ollitex/go/services/web/features/instancestats"
 	"ollitex/go/services/web/features/passwordreset"
@@ -133,6 +134,7 @@ func main() {
 	// P4.1 surface: project list (GET /user/projects).
 	app.RegisterFeature(projectlist.Feature(app))
 	app.RegisterFeature(projectlist.AdminFeature(app))
+	app.RegisterFeature(adminusers.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

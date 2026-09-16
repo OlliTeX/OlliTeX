@@ -1806,6 +1806,68 @@ sharing-link **create** success path (token AES-256-CTR/HKDF-SHA512,
 entries (`sharing-link-created/updated`) are Node state side-effects not
 visible to any gated contract — deferred with the pin set.
 
+**P6.3a — admin-tools user surface, reads (DONE, GATE 4/4 GREEN, 2026-09-16):**
+`go/services/web/features/adminusers/` (new feature, registered in
+`cmd/web/main.go`) + `flips/web-p63a.conf`. Node oracle pins live-captured
+(37 pins, `/tmp/p63a_node.json`). Surface: `POST /admin/users`
+(admin user list) + `GET /admin/user/:userId/info`. The hub's live
+`#/site.general.users.*` table backend (the P3.5 owner decision excluded
+only the `/user/activate` page + the mutation surface — this is the read
+half of the same module).
+
+**Parity gotchas found by the oracle (each now pinned in the gate):**
+1. `page.{size,no}` is a **Node no-op** — `_sortAndPaginate` never slices;
+every pin returns the full filtered list (totalSize = filtered count).
+2. `sort.by === 'name'` ignores `sort.order` **entirely** (pinned:
+   `name_asc` and `name_desc` bodies byte-identical); comparator =
+   `(lastName,firstName,email)` with missing → `\uffff`,
+   case-insensitive (localeCompare sensitivity:'base' on this ASCII data),
+   stable.
+3. Non-name sorts = lodash `orderBy`: undefined values **first in desc /
+   last in asc** (pinned sequences: no-lastActive users lead the
+   lastActive-desc list in natural order; the two no-signUpDate users trail
+   signUpDate-asc and lead signUpDate-desc), stable on ties; string keys
+   lowercased; `bad by` / `bad order` → OError → 681 B 500 page.
+4. **search short-circuit quirk**: Node's exclusion clause is
+   `email -1 && first?.indexOf -1 && last?.indexOf -1`; a MISSING name
+   makes that operand `undefined` (≠ -1) so the row CANNOT be excluded —
+   pinned: the 28 no-lastName users pass ANY search (`f_search_none`
+   = exactly those 28); a NULL name would TypeError → 500; email always
+   required (`.email.toLowerCase()`).
+5. `f_saml` (and other unavailable auth-method filters) are inert because
+   the filter loop iterates `availableAuthMethods` = `['local']` only
+   (EXTERNAL_AUTH unset) — pinned: `f_saml` returns all 50.
+6. Row JSON = Node `JSON.stringify` presence semantics: missing
+   `last_name`/`isAdmin`/`signUpDate`/`lastActive`/`lastLoggedIn`/`loginCount`
+   **drop** the key (real data: 28 missing lastName, 1 missing isAdmin,
+   2 missing signUpDate, 47 missing lastActive); `canManageTemplates`,
+   `inactive`, `deleted`, `authMethods`, `allow*` always present;
+   `suspended`/`deletedAt` conditional; dates ISO-ms UTC. Hand-built
+   ordered emission (Go maps would alphabetise).
+7. body-shape pins: non-matching content types (text/plain, no CT) leave
+   `req.body` `{}` in Node → **200 full list** (not 4xx); JSON **array**
+   body destructures to no filters → 200; malformed JSON → `400 {}`;
+   urlencoded `filters[admin]=true` → qs nesting + string truthiness.
+8. `info`: `activationLink` from the first live password token
+   (use/password, data.user_id, expiresAt > now, no usedAt,
+   peekCount < MAX_PEEKS=4) else `null` (pinned nulls); ghost + bad id
+   both → `200 {…false}` (Node swallows the cast error).
+
+Gate `web-go-p63a-flip.test.e2e.ts` (3 legs + oracle anchors, **4/4 green
+FIRST RUN, no flaky**) over the full authz matrix (anon 403/'Forbidden'/
+302, member 302/empty-CT html-vs-json, 403 no-token), 10 filter pins,
+9 sort pins (incl. both 500s), 5 body-shape pins, 6 info pins, 15.6 KB
+full-list byte-diff.
+Regression sweep after P6.3a: P6.2 4/4, P3.6 (site-settings) 3/3, P6.1 4/4,
+`go build ./...` + `go vet` + full `go test ./go/...` green.
+
+**Next (P6.3b)**: the admin user mutation surface —
+`POST /admin/user/create` (registerNewUser), `POST /admin/user/:id/update`,
+`POST /admin/user/:id/delete` (soft delete), `POST /admin/user/:id/restore`,
+`DELETE /admin/user/:id` (purge), `POST /admin/user/:id/send-activation`
+(email side-channel; UserDeleter + OwnershipTransfer + activation-token
+stack).
+
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **project
 surface DONE (P6.2)** (remaining: site/user surfaces), llm (14.4k — external-provider client + rate limits + BYO-key crypto),
