@@ -1653,9 +1653,10 @@ edge modes — history/incremental/png2pdf/clsi-cache — are separate, lower pr
   404 JSON, absent-id 404 HTML. Node baseline ↔ Go ↔ Node re-baseline all pass.
 - `go build`/`go vet` clean; unit tests `features/compile` + `core` pass.
 
-**P5.2b (next)** — compile output/PDF read: `GET /project/:id/...` output endpoints
-(content-range for incremental pdf, output.zip archive, clsi-cache) — client of the
-**Go** docstore/filestore + the existing Node clsi, same 3-leg gate pattern.
+**P5.2b — compile output read (DONE, GATE 3/3 GREEN, 2026-09-16):**
+`go/services/web/features/compile/download.go` + routes in `compile.go Feature()`: `GET /download/project/:pid/build/:build_id/output/output.pdf` — authz (P4 preflight), param/query validation (404 JSON "Invalid buildId…" / 400 JSON editorId), sets `application/pdf` + `inline|attachment; filename="<safeProjectName>.pdf"` (Node `safeProjectName` = name minus `\p{L}\p{Nd}` → `_`), streams from clsi downloadHost (127.0.0.1:8080 here) forwarding ONLY Content-Length + Content-Type (+ `X-Accel-Buffering: no`), bare 404 (CT/CD kept) on upstream 404 — all pinned against the live Node oracle. `GET /project/:pid/output/cached/output.overleaf.json` → `SendStatus(404)` "Not Found". `GET /download/project/:pid/build/:editorBuildId/output/cached/:file` → editorId-buildId + filename allow-list validation, then bare 404 (Node `status(404).end()`, no CT) — the clsi-cache service is DISABLED in this stack (`CLSI_CACHE_INSTANCES=[]`), so the 404 shapes ARE the Node contract (enabled-clsi-cache behavior = documented out of scope). Unit: `safeProjectName` (CJK/Hebrew/digits parity), buildId regexes, cache allow-list. Flip `web-p52b.conf` (3 locations → :4010). Gate `web-go-p52b-flip.test.e2e.ts`: Node baseline → Go → Node re-baseline over pdf_inline/popup/badbid/missing, cached_json/file/badfile/badbid, auth403 (non-member fixture), anon, anon_json; PDF bodies compared after normalizing per-compile volatile fields (pdfTeX `D:…Z` + `/ID [...]` — two real compiles verified byte-identical after the two normalizations). Root-cause fixes were gate-side only (`x-csrf-token` body extraction; the two normalizations).
+
+**Regression sweep 2026-09-16 (all green):** P5.2a 3/3, P5.1a 3/3, P5.1b 3/3, P4.13b 3/3, P4.1 27 passed; `go build/vet/test ./go/... ./cmd/...` green; gofmt clean on P5.2b files (flagged files pre-existing).
 
 ### P6 — modules (41 total; each a self-contained flip, roughly in this order)
 

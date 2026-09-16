@@ -170,6 +170,10 @@ func Feature(a *core.App) core.Feature {
 		Routes: []core.Route{
 			{Method: "POST", Pattern: compilePat, Handler: compileHandler(a)},
 			{Method: "POST", Pattern: stopPat, Handler: stopHandler(a)},
+			// P5.2b — output read (download-PDF button + clsi-cache shapes)
+			{Method: "GET", Pattern: pdfDownloadPattern, Handler: pdfDownloadHandler(a)},
+			{Method: "GET", Pattern: cachedJSONPattern, Handler: cachedBuildJSONHandler(a)},
+			{Method: "GET", Pattern: cachedFilePattern, Handler: cachedFileHandler(a)},
 		},
 	}
 }
