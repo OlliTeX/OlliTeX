@@ -62,57 +62,50 @@ func edHTMLEscape(s string) string {
 // (GET .../detached); otherwise the main editor chrome (main + /detacher),
 // which is identical except ol-detachRole + currentUrl (both slotted).
 func EditorPage(d EditorData) string {
-	s := editorTemplate
+	t := editorTemplate
 	if d.Detached {
-		s = detachedTemplate
+		t = detachedTemplate
 	}
-	s = strings.ReplaceAll(s, "__NONCE__", d.Nonce)
-	s = strings.ReplaceAll(s, "__PROJNAME__", edHTMLEscape(d.ProjectName))
-	s = strings.ReplaceAll(s, "__TITLE__", edHTMLEscape(d.Title))
-	s = strings.ReplaceAll(s, "__ORIGIN__", d.Origin)
-	s = strings.ReplaceAll(s, "__CURRENTURL__", edHTMLEscape(d.CurrentURL))
-	for {
-		i := strings.Index(s, edSlotBeg)
-		if i < 0 {
-			break
-		}
-		j := strings.Index(s[i:], edSlotEnd)
-		if j < 0 {
-			break
-		}
-		inner := s[i+len(edSlotBeg) : i+j] // "ol-…:type"
-		k := strings.LastIndexByte(inner, ':')
-		name, dtype := inner[:k], inner[k+1:]
-		end := i + j + len(edSlotEnd)
-		var out string
-		switch dtype {
-		case "raw":
-			if v, ok := d.Raw[name]; ok && v != "" {
-				out = `<meta name="` + name + `" content="` + edHTMLEscape(v) + `">`
-			} else {
-				out = `<meta name="` + name + `">`
-			}
-		case "json":
-			if v, ok := d.JSON[name]; ok {
-				out = `<meta name="` + name + `" data-type="json" content="` + edHTMLEscape(v) + `">`
-			} else {
-				// Node omits content when the value is undefined (e.g. ol-brandVariation)
-				out = `<meta name="` + name + `" data-type="json">`
-			}
-		case "boolean":
-			if d.Bool[name] {
-				out = `<meta name="` + name + `" data-type="boolean" content>`
-			} else {
-				out = `<meta name="` + name + `" data-type="boolean">`
-			}
-		default: // string | number
-			if v, ok := d.Typed[name]; ok && v != "" {
-				out = `<meta name="` + name + `" data-type="` + dtype + `" content="` + edHTMLEscape(v) + `">`
-			} else {
-				out = `<meta name="` + name + `" data-type="` + dtype + `">`
-			}
-		}
-		s = s[:i] + out + s[end:]
-	}
-	return s
+	return ApplyPageSlots(t, PageSlots{
+		Nonce:       d.Nonce,
+		CSRF:        d.CSRF,
+		Title:       d.Title,
+		ProjectName: d.ProjectName,
+		Origin:      d.Origin,
+		CurrentURL:  d.CurrentURL,
+		JSON:        d.JSON,
+		Raw:         d.Raw,
+		Bool:        d.Bool,
+		Typed:       d.Typed,
+	})
+}
+
+// HubData — the /hub page per-request values (P6.1).
+type HubData struct {
+	Nonce     string
+	CSRF      string
+	Origin    string // site URL (alternate link)
+	HubAdmin  bool
+	GitBridge bool
+	JSON      map[string]string
+	Raw       map[string]string
+}
+
+// HubPage renders /hub (views/hub_template.go + slots).
+func HubPage(d HubData) string {
+	t := hubTemplate
+	return ApplyPageSlots(t, PageSlots{
+		Nonce:       d.Nonce,
+		CSRF:        d.CSRF,
+		Title:       "OlliTeX Hub - OlliTeX, Online LaTeX Editor",
+		ProjectName: "OlliTeX Hub",
+		Origin:      d.Origin,
+		CurrentURL:  "/hub",
+		JSON:        d.JSON,
+		Raw:         d.Raw,
+		Bool: map[string]bool{
+			"ol-hub-admin":        d.HubAdmin,
+			"ol-gitBridgeEnabled": d.GitBridge,
+		},
+	})
 }

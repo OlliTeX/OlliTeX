@@ -1660,6 +1660,71 @@ edge modes — history/incremental/png2pdf/clsi-cache — are separate, lower pr
 
 ### P6 — modules (41 total; each a self-contained flip, roughly in this order)
 
+**P6.1 — ollitex-hub (DONE, GATE 3/3 + SANITY GREEN, 2026-09-16):**
+`go/services/web/features/hub/hub.go` (+ `hub_test.go`) registered in
+`cmd/web/main.go`: the `/hub`, `/hub/admin`, `/hub/workspace` pages
+(`views/hub_template.go` + `views/pageslots.go` shared slot renderer with the
+P5.1a editor page; hub locals: per-user `ol-ExposedSettings`
+(canManageTemplatesMenu flip for admin), hub `ol-navbar` (customLogo +
+Library/Templates items, admin canDisplayAdminMenu/
+canDisplayProjectUrlLookup flip), `ol-hub-theme` page slot (stored theme JSON
+or `null`), `ol-user` (hydrated-ace parity — see below), `ol-userSettings`
+(shared `editorpages.BuildUserSettings` with mongoose-default semantics), hub
+`ol-footer` (`showThinFooter:false` override via `editorpages.HubFooterJSON`)).
+Theme API: `GET/PUT/DELETE /api/hub-theme` (CSRF-gated, PUT validates light
++ dark against the Node `validateMode` contract — 8 hex colors,
+fontFamily ≤300 chars, fontSize 12–22, radius 2–24 — errors
+`400 {"error":"<where>: ..."}`; malformed JSON → `400 {}`;
+`urlencoded` nested-body parity; upsert `hubthemes` doc `documentId:
+"default"` stored as an ORDERED canonical-key-order doc so Node's lean GET
+byte-match survives round-trips), `GET /api/hub/health` (admin; instance
++ featureGates pins from `server-ce/config/settings.js` + env, volatiles
+generatedAt/uptimeSec/platform/pid/mongo normalized by the gate),
+`GET /api/hub/notes` (RELEASE_NOTES.md bytes or `400/404`-free
+`{"error":"release notes not available"}`).
+
+**Parity bugs found by the gate and fixed** (each was a real divergence):
+1. `saveTheme` was missing the upsert flag — PUT on a cleared doc no-oped;
+   now `options.Update().SetUpsert(true)` (driver v1 API).
+2. Mongo driver v1.17 decodes a struct field typed `any` to `bson.D`, not
+   `map[string]any` — `modeFromStored` type-asserted the map and fell to
+   null; `themeDoc` now declares `Light/Dark bson.D` and serializes it
+   order-preserving (`bsonDJSON`, anyJSON extended with int32/bson.D).
+3. Go map `$set` randomized the stored light/dark key order; `orderedMode`
+   now stores canonical order (Node's validated-object order) so the
+   lean GET bytes match Node exactly (492 B canonical put/get pin).
+4. `ol-user.ace`: Node stringifies the hydrated mongoose doc. Rich stored
+   ace (admin, p34-happy) = stored-order verbatim; sparse stored ace
+   (e2e-user fixture: `{customKeybindings:{}}`) hydrates to the canonical
+   defaults shape (ref providers first — zotero/mendeley/papers — then the
+   field block, customKeybindings last). `serializeHubUser` implements both
+   paths (rich = `bsonToJSON` stored order; sparse =
+   `sparseAceJSON` + `aceProviderJSON` with the
+   `{enabled:true,disablePersonalLibrary:false,groups:[]}` defaults).
+5. `BuildUserSettings` (shared editor+hub): restored the mongoose schema-default
+   fill-in (mode/theme/fontSize/autoComplete/… with `syntaxValidation`
+   omitted when absent, `overallTheme` derived via the 2026-03-02
+   signUpDate cutoff when absent, ref-provider blocks rebuilt in
+   UserSettingsHelper order), fixing the P5.1a/P5.1b `ol-userSettings`
+   drift while keeping both editor gates green.
+6. Flip verification hardened: gate now asserts the exact include count
+   (`grep -c` = 0/1) after flip/strip, nginx-t passes, and the leg-2
+   routing leg is checked against a live-502 canary — a silent flip
+   no-op (Node-vs-Node) can no longer false-green.
+
+Gate `web-go-p61-hub-flip.test.e2e.ts` (3 legs + canonical put/get pin):
+login flows, both CSRF 403s, both admin-gate 302
+`/restricted?from=` bounces (member `Accept: application/json` → JSON 403;
+HTML → 302), theme validation 400 battery (light/dark × 12 field shapes,
+array-body, urlencoded, empty-body, malformed-JSON 400 {}), put/get
+canonical, clear + null get, both health JSON (volatile-normalized) +
+featureGates byte-pin, notes 1913 B byte-pin (md5
+`7468d83a9a1a5ccc1b48c951f6a2fd04`), page bytes for user/admin ×
+default/theme, workspace redirect. **All legs green.**
+Regression sweep after P6.1: P5.1a 3/3, P5.1b 3/3, P5.2a 3/3, P5.2b 3/3,
+P4.13b 3/3, P4.1 3/3, hub-endpoint-contract 2/2 — 23 e2e legs + contract
+battery, zero failures.
+
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools (15k — lands
 after P3), llm (14.4k — external-provider client + rate limits + BYO-key crypto),

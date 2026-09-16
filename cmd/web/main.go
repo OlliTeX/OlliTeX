@@ -28,6 +28,7 @@ import (
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/editorpages"
 	"ollitex/go/services/web/features/healthcheck"
+	"ollitex/go/services/web/features/hub"
 	"ollitex/go/services/web/features/instancestats"
 	"ollitex/go/services/web/features/passwordreset"
 	"ollitex/go/services/web/features/projectlist"
@@ -138,6 +139,10 @@ func main() {
 	// P5.2a surface: compile control plane (POST /Project/:id/compile +
 	// /compile/stop) — clsi stays Node; Go is the orchestration/response layer.
 	app.RegisterFeature(compile.Feature(app))
+
+	// P6 surface (P6.1): ollitex-hub module (/hub page, /hub legacy
+	// redirects, /api/hub-theme theme API, /api/hub/health, /api/hub/notes).
+	app.RegisterFeature(hub.Feature(app))
 
 	// web profile: unknown-route 404 view (general/404) — Node
 	// webRouter.get('*', ErrorController.notFound).

@@ -34,6 +34,7 @@ import (
 
 // jesc — JSON string escape (Node JSON.stringify: \" \\ \n \t and
 // \uXXXX for C0; does NOT escape < > &, which the renderer then HTML-escapes).
+
 func jesc(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -61,10 +62,18 @@ func jesc(s string) string {
 
 // ---- small typed readers over a decoded Mongo doc (map[string]any) ----
 
-func s(v any) string { if x, ok := v.(string); ok { return x }
-	return "" }
-func b(v any) bool { if x, ok := v.(bool); ok { return x }
-	return false }
+func s(v any) string {
+	if x, ok := v.(string); ok {
+		return x
+	}
+	return ""
+}
+func b(v any) bool {
+	if x, ok := v.(bool); ok {
+		return x
+	}
+	return false
+}
 func n(v any) int64 {
 	switch x := v.(type) {
 	case int32:
@@ -76,19 +85,26 @@ func n(v any) int64 {
 	case float64:
 		return int64(x)
 	}
-	return 0 }
+	return 0
+}
 func subM(m map[string]any, k string) map[string]any {
 	if x, ok := m[k].(map[string]any); ok {
 		return x
 	}
-	return nil }
+	return nil
+}
 func has(m map[string]any, k string) bool {
 	_, ok := m[k]
-	return ok && m[k] != nil }
+	return ok && m[k] != nil
+}
 
 // boolJSON — "true"/"false" (JSON).
-func boolJSON(v bool) string { if v { return "true" }
-	return "false" }
+func boolJSON(v bool) string {
+	if v {
+		return "true"
+	}
+	return "false"
+}
 
 // isoDate — Node `user.signUpDate` is serialized as an ISO-8601 UTC string
 // with 3-digit milliseconds (moment .toISOString()). The Go driver decodes
@@ -242,6 +258,9 @@ func refProviderJSON(doc map[string]any, p string) string {
 	ace := subM(doc, "ace")
 	var pr map[string]any
 	if ace != nil {
+		if x, hasK := ace[p]; hasK && x == nil {
+			return "null" // explicit null stored → Node returns null
+		}
 		if m, ok := ace[p].(map[string]any); ok {
 			pr = m
 		}
@@ -309,10 +328,49 @@ func buildUserSettings(doc map[string]any) string {
 	sstr.WriteString(`,"autoComplete":` + boolJSON(getB("autoComplete", true)))
 	sstr.WriteString(`,"autoPairDelimiters":` + boolJSON(getB("autoPairDelimiters", true)))
 	sstr.WriteString(`,"pdfViewer":"` + jesc(getS("pdfViewer", "pdfjs")) + `"`)
+	// syntaxValidation — NO schema default: present only when stored
+	// (2026-09-16 P6.1 pin: admin fixture emits it between pdfViewer and
+	// previewTabs, the member fixture does not).
+	if ace != nil {
+		if v, ok := ace["syntaxValidation"]; ok && v != nil {
+			sstr.WriteString(`,"syntaxValidation":` + boolJSON(b(v)))
+		}
+	}
 	sstr.WriteString(`,"previewTabs":` + boolJSON(getB("previewTabs", false)))
 	sstr.WriteString(`,"fontFamily":"` + jesc(getS("fontFamily", "lucida")) + `"`)
 	sstr.WriteString(`,"lineHeight":"` + jesc(getS("lineHeight", "normal")) + `"`)
-	sstr.WriteString(`,"overallTheme":"` + jesc(getS("overallTheme", "system")) + `"`)
+	// overallTheme — Node getOverallTheme(user): ace.overallTheme when
+	// stored (may be '' for the dark default), else the
+	// signUpDate < 2026-03-02T12:00:00Z cutoff ('' | 'system').
+	otStored := ""
+	otOk := false
+	if ace != nil {
+		if v, ok2 := ace["overallTheme"]; ok2 && v != nil {
+			otStored, otOk = s(v), true
+		}
+	}
+	ot := "system"
+	if otOk {
+		ot = otStored
+	} else {
+		// JS: `user.signUpDate < CUTOFF` — null/undefined → false → "system"
+		var sdMs int64
+		sdOk := false
+		switch t := doc["signUpDate"].(type) {
+		case primitive.DateTime:
+			sdMs, sdOk = int64(t), true
+		case int64:
+			sdMs, sdOk = t, true
+		case int32:
+			sdMs, sdOk = int64(t), true
+		case time.Time:
+			sdMs, sdOk = t.UnixMilli(), true
+		}
+		if sdOk && sdMs < int64(1772452800000) { // Date.UTC(2026, 2, 2, 12, 0, 0)
+			ot = ""
+		}
+	}
+	sstr.WriteString(`,"overallTheme":"` + jesc(ot) + `"`)
 	sstr.WriteString(`,"mathPreview":` + boolJSON(getB("mathPreview", true)))
 	sstr.WriteString(`,"breadcrumbs":` + boolJSON(getB("breadcrumbs", false)))
 	sstr.WriteString(`,"editorTabs":` + boolJSON(getB("editorTabs", true)))
