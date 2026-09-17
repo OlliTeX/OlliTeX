@@ -27,6 +27,7 @@ import (
 	"ollitex/go/services/web/features/authpages"
 	"ollitex/go/services/web/features/compile"
 	"ollitex/go/services/web/features/devcsrf"
+	"ollitex/go/services/web/features/dropbox"
 	"ollitex/go/services/web/features/editorpages"
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/hub"
@@ -168,6 +169,12 @@ func main() {
 	// project-name), DELETE state, POST /project/new/webdav) — unlinked
 	// sandbox pins (WEBDAV_ENABLED=true in the e2e env).
 	app.RegisterFeature(webdav.Feature(app))
+
+	// P6.10 surface: dropbox module (/user/dropbox/* status|connect|disconnect|
+	// oauth2|oauth/callback, /project/:id/dropbox/* (state|link|pull|push|files),
+	// DELETE state, POST /project/new/dropbox) — unlinked sandbox pins
+	// (DROPBOX_ENABLED=true in the e2e env; authz via the shared P4 chain).
+	app.RegisterFeature(dropbox.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

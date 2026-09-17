@@ -2453,9 +2453,77 @@ P6.4a, P6.4b, P6.5, P6.6, P6.7, P6.8, smoke, a5smoke — all green**;
 nginx flips left clean (0) after the sweep; webdav DB clean (0 docs in all
 four case-variants of the two collections).
 
-**Next**: dropbox (`services/web/modules/dropbox` — 2.7k, incl.
-`POST /project/new/dropbox`; client of the **Go** dropboxinterface
-service), then github-sync, then the residual P6 modules and **P7**
+**P6.10 — dropbox module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+`go/services/web/features/dropbox/` (7 files: `dropbox.go` routes/shared
+plumbing (authz chain + body helpers), `handlers.go` the 11 route bodies,
+`cipher.go` AES-256-GCM token cipher (DropboxCredentials.mjs port),
+`store.go` credential+state storage, `oauth.go` app-keys/state/authorize-
+URL, `helpers.go` (text responses + path normalization + state
+serializer), `dropbox_test.go`) — routes: `GET /user/dropbox/status`,
+`POST /user/dropbox/connect|disconnect`, `GET /user/dropbox/oauth2`,
+`GET /user/dropbox/oauth/callback`, `GET|DELETE /project/:id/dropbox/state`,
+`POST …/link|pull|push`, `GET …/files`, `POST /project/new/dropbox`.
+
+Storage (same live-verified traps as P6.9): all-lowercase collections
+`dropboxusercredentials` / `dropboxsyncprojectstates`; **userId stored as
+HEX STRING** (upsert on connect, deleteOne on disconnect, state docs
+scopped by `{path, ownerId}` on disconnect).
+
+Cipher (differs from the webdav/zotero/mendeley V3 family — Dropbox has
+its own): **AES-256-GCM**, token = `base64(iv12 ‖ ct ‖ tag16)`; key =
+`sha256('overleaf-dropbox-credentials-v2|' + WEBDAV_TOKEN_CIPHER_PASSWORD)`
+(SECRET_TOKEN fallback with the `-secret-token-fallback` purpose); legacy
+decrypt candidates = the 32-char `overleaf-dropbox-credentials-v2|`
+prefix + `NODE_ENV` raw keys (String `padEnd(32,'x').slice(0,32)`
+semantics). Node's `decipher.update(embedded, 'base64')` is an IDENTITY
+(`buf.toString('base64')` re-encoded) — so plain GCM is the faithful port
+and **tokens round-trip cross-stack**: verified both directions live
+(Node-encrypt→Go-decrypt and Go-encrypt→Node-decrypt under the same key).
+Sandbox parity pins (no cipher env at all): connect with a token →
+500 `No encryption secret available for Dropbox credentials (set
+WEBDAV_TOKEN_CIPHER_PASSWORD or SECRET_TOKEN)`; injected garbage token →
+link 500 `Token decryption failed` (handler-wrapped) vs new/dropbox 500
+`Decryption failed. Invalid token or encryption key.` (raw
+`err.message` passthrough — the two handlers catch differently, mirrored
+exactly).
+
+Gate (`specs/parity/web-go-p610-flip.test.e2e.ts`, 4-leg + pin sanity,
+cumulative 8-conf flipped P6.4a…P6.10, e2e instance dropbox-unlinked,
+DROPBOX_ENABLED=true): anon 401/302/403 chain incl. oauth2/callback;
+member unlinked battery (status
+`{connected:false}` / oauth2 503 text/html `Dropbox OAuth is not
+configured` / callback 400 text/html `Invalid Dropbox OAuth state` /
+connect-missing 400 / connect-sl 500-no-secret / unlink 200 /
+state `{connected:false}` / link 409 / pull-push-files 409 / new 400+409 /
+disconnect `{success:true,unlinkedProjects:"/"}`); **state GET is
+login-only in Node (no authz/no zod): bad-oid and ghost both 200
+`{connected:false}`, other-user 200** — while link/pull go the shared P4
+chain (bad-oid zod 404 `params.project_id`, ghost 404 HTML page, other
+403 restricted); garbage-credential cycle
+(status `{connected:true,path:"/",projects:[],lastSyncAt:null,
+lastSyncError:null}` → link/new decrypt 500s → pull 409 → disconnect
+clean → status false); DB anchors `dropboxusercredentials` 0→0 +
+`dropboxsyncprojectstates` 0 — **5/5 GREEN on the canonical `bin/web`**
+(md5 `3ba42621…`, deployed to the container, runit-restarted).
+
+Scope note (recorded): the Dropbox API client lives in the **Go
+dropboxinterface** service (P-service cutover) — this unit ports the
+route/offline-deterministic surface only; live network paths
+(`checkConnection`, import/export mirror, file listing) are pinned to
+their pre-network gates and would hit the same 500 shape as Node in the
+sandbox (no account, no app keys, no network). The `oauth2` 302 target
+and `oauth/callback` state exchange are live-only (app keys unset → both
+stacks answer at the 503/400 gates first).
+
+Regression after P6.10 (flip-gate sweep on the cumulative 8-conf): **P6.5,
+P6.7, P6.8, P6.9 gates all 5/5 GREEN (each re-deploys the canonical
+`bin/web` and re-verifies its own surface on top of the P6.10 flip),
+smoke + a5smoke green**; `go build ./...` + `go vet` + `go test
+./go/services/web/...` green; `bin/web` == container
+`/usr/local/bin/go-services/web` (3ba42621…); nginx flips left clean (0)
+after the gate; dropbox DB clean (0 docs, all case-variants).
+
+**Next**: github-sync, then the residual P6 modules and **P7**
 (union flips, Node web retirement, final sweep).
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
@@ -2463,8 +2531,7 @@ ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **project
 surface DONE (P6.2)** (remaining: site/user surfaces), llm (14.4k — external-provider client + rate limits + BYO-key crypto),
 bib-editor (10.2k), github-sync (6.2k — client of the **Go** githubinterface),
-webdav (4.5k — client of the **Go** webdavinterface), dropbox (2.7k — client of
-the Go dropboxinterface), zotero (2.5k), mendeley (1.3k), orcid-picker (1.1k),
+webdav (4.5k — client of the **Go** webdavinterface), zotero (2.5k), mendeley (1.3k), orcid-picker (1.1k),
 typst (1.3k), python-runner, languagetool (2k), notifications module (1.7k —
 preferences over the Go notifications service), diagram, latex-editor,
 webdav, github-sync, ce-ui, page-shells, server-ce-scripts,
