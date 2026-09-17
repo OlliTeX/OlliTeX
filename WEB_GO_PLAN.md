@@ -2323,10 +2323,67 @@ a5smoke — all green**; `go build ./...` + `go vet` +
 `go test ./go/services/web/core/... ./go/services/web/features/...` green;
 deployed `bin/web` md5 `cbe86e50…` matches the container copy.
 
-**Next**: mendeley (1.3k — same reference-provider shape as zotero but
-provider token exchange + collections/items API), then the remaining P6
-module surfaces (each = oracle → Go → flip conf → 3-leg gate → regressions
-→ commit).
+**P6.8 — mendeley reference-provider module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+`go/services/web/features/mendeley/` (4 files: `mendeley.go` routes,
+`settings.go` section resolution, `client.go` OAuth/API/creds, `cipher.go`
+per-provider cipher) + `sitesettings.OpenProvider(label, password)`
+(the shared V3 cipher primitives are already byte-compatible; only the key
+scope differs per provider). Five routes (Node registration order):
+
+- `GET /user/mendeley/status` — `{"configured":c,"connected":c}` (key
+  order pinned). `configured = section.enabled && clientId && clientSecret`
+  (stored site_settings `mendeley` section wins over the MENDELEY_* env
+  seed; `enabled` defaults TRUE when unset — unlike zotero's ENABLED_LINKED
+  FILE_TYPES seed). `connected` is only resolved when configured
+  (`user.refProviders.mendeley.encrypted` present + decryptable).
+- `GET /mendeley/groups` — unconfigured → `403
+  {"error":"not_configured","message":"mendeley_groups_relink"}`;
+  forbidden/expired/not-linked → `403 {"error":"forbidden",…}`; other →
+  `500 {"error":"internal","message":"mendeley_groups_loading_error"}`;
+  success → `{"groups":[{"id":String(id),"name":name||`Group ${id}`}…]}`.
+  (Live path: GET api.mendeley.com/groups?type=all — Bearer + refresh
+  before expiry; not exercisable in the sandbox without a linked account.)
+- `GET /user/mendeley/oauth` — 16-byte random `state` stored in the
+  session, then `302 https://api.mendeley.com/oauth/authorize?client_id=…
+  &redirect_uri=…&response_type=code&scope=all&state=…` (URLSearchParams
+  order); UNCONFIGURED → `_ensureConfigured` throws → catch →
+  `302 /hub#mysettings.references` (the state store then redirect shape is
+  mirrored on both stacks).
+- `GET /user/mendeley/oauth/callback` — state verified + consumed from
+  the session; code→token exchange (`POST /oauth/token` with Basic
+  client-id/secret, 400/401 → Forbidden class) + `storeCredentials`
+  (per-provider cipher) — every terminal path is the same
+  `302 /hub#mysettings.references`.
+- `POST /mendeley/unlink` — `$unset refProviders.mendeley` (no-op when
+  unlinked) → `200 text/plain OK`.
+
+Cipher scope — the mendeley key is per-provider (Node
+`createAccessTokenEncryptor('mendeley')`): `MENDELEY_CIPHER_PASSWORD` env
+or the auto-created key file `/var/lib/overleaf/data/.mendeley-cipher-key`
+(32 random bytes base64, mode 0600), label `MENDELEY_CIPHER_LABEL ||
+'2024.1-v3'` — a different password+label from zotero's OL_CEP-v3 key, so
+a mendeley token is NOT decryptable with zotero's key (Go matches).
+
+Gate (pinned 2026-09-17, the e2e instance is mendeley-UNCONFIGURED + user
+UNLINKED → zero api.mendeley.com traffic on the gate paths): anon
+`401/302/403` chain; member `status 200 {"configured":false,"connected":false}`,
+`groups 403 not_configured`, `oauth 302 /hub#mysettings.references`,
+`callback 302 /hub#mysettings.references`, `unlink 200 OK` — all
+byte-identical Node ≡ Go (direct dual-stack capture + gate legs 2/3), DB
+anchors `site_settings.mendeley == null` + `refProviders == {}` unchanged
+across the 4 legs; cumulative 6-conf flip incl. P6.4a…P6.8.
+
+Regression after P6.8 (full flip-gate sweep, all re-run this round):
+**P0 6/6, P1 3/3, P2 3/3, P3.3a–P3.6 (P3.3 leg-2 in-sweep flake — the
+standing sweep artifact — green on standalone re-run), P4.a–g/inv,
+P5.1a/b, P5.2a/b, P6.1, P6.2, P6.3a (pin-anchor flaky-green), P6.3b,
+P6.4a, P6.4b, P6.5, P6.6, P6.7, smoke, a5smoke — all green**;
+`go build ./...` + `go vet` + `go test` green; deployed `bin/web`
+md5 `f7493953…` matches the container copy.
+
+**Next**: webdav (4.5k — client of the **Go** webdavinterface service —
+folder browse + create-file), then the remaining P6 module surfaces (each
+= oracle → Go → flip conf → 3-leg gate → regressions → commit).
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already

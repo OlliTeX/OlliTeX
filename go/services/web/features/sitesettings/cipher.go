@@ -278,6 +278,15 @@ func (c *cipher) decryptText(tok string) (string, bool) {
 // as loadCipher).
 func Open() (*cipher, error) { return loadCipher() }
 
+// OpenProvider builds a cipher with an explicit label + password. Each
+// reference provider keeps its own key (the Node per-provider helpers:
+// MENDELEY_CIPHER_PASSWORD / .mendeley-cipher-key, zotero's
+// ZOTERO_TOKEN_CIPHER_PASSWORD / .token-cipher.json, …) so a token written
+// by one provider's key is never readable with another's.
+func OpenProvider(label string, password []byte) *cipher {
+	return &cipher{label: label, password: password}
+}
+
 func (c *cipher) DecryptText(tok string) (string, bool) { return c.decryptText(tok) }
 
 func (c *cipher) EncryptText(plain string) (string, error) { return c.encryptText(plain) }
