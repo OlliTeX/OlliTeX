@@ -2180,6 +2180,82 @@ Regression after P6.5: **P6.4b 5/5, P6.4a 5/5, P6.3b, P6.3a, P6.2,
 P6.1, smoke all green**; `go build ./...` + `go vet` +
 `go test ./go/services/web/...` green.
 
+**P6.6 — zotero reference-provider module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+New package `go/services/web/features/zotero/` (5 files: `zotero.go` routes+
+handlers, `enabled.go` site-setting gate, `creds.go` user-credential store +
+cipher bridge, `client.go` zotero.org API client, `oauth.go` zotero OAuth
+helper) + `core.Res.HTML` + `sitesettings.EncryptRaw/DecryptRaw`. Node sources
+pinned: `modules/zotero/app/src/{ZoteroRouter,ZoteroController,ZoteroSection,
+TokenManager,ZoteroApiClient,ZoteroOAuth,AccessTokenEncryptorHelper}.mjs`,
+`Features/SiteSettings/SiteSettingsManager.mjs`,
+`libraries/access-token-encryptor/lib/js/AccessTokenEncryptor.js`; oracle
+`/tmp/z_full.mjs` (disabled + enabled pin sets), direct smokes
+`/tmp/p66_gosmoke.mjs` + `/tmp/p66_gosmokeB.mjs` → `SMOKE-ALL-OK`.
+- **Routes (Node `ZoteroRouter.mjs` order, all `requireLogin`)**:
+  `GET /user/zotero/groups` (enabled-gated), `DELETE /user/zotero` (unlink
+  no-op when unlinked), `GET /user/zotero/status` (→ `false` unlinked, NO
+  enabled gate), `GET /user/zotero/oauth` (enabled-gated; starts RFC5849
+  three-legged dance — in the sandbox the zotero.org request-token call
+  fails fast → deterministic `400 {"message":"Failed to start Zotero
+  authorization"}` on BOTH stacks), `GET /user/zotero/oauth/callback`
+  (`MissingToken` → 403 `{"message":"Invalid OAuth token"}` before any
+  network), `GET /user/zotero/picker/{libraries,collections,items,bibtex}`
+  (enabled-gated; not-linked: groups → `200 null`, pickers → 409
+  `zotero_not_linked`, bibtex no-keys → 400 `no items selected` checked
+  BEFORE the linked-check).
+- **Enabled merge**: `site_settings.global.zotero.enabled` stored-wins over
+  seed `bool(OVERLEAF_ZOTERO) ?? ENABLED_LINKED_FILE_TYPES ⊇ zotero` (both
+  unset in e2e → seed false; lookup failure → ALLOW with warn; `false` →
+  403 `text/html` `Zotero is disabled on this site`). Anonymous
+  behavior is gated before the enabled check (401 json / 302 html /
+  403 non-GET, P1-pinned).
+- **Root-caused during instrumentation** (the "zotero never enables"
+  artifact): the web app's site-settings collection is **`site_settings`
+  (snake_case)** — `mongodb.mjs:117` `internalDb.collection('site_settings')` —
+  NOT `siteSettings`. Earlier writes to `db.siteSettings` created a stray
+  collection nobody reads (dropped). Both stacks now read the same
+  document; `enabled=true` flips every gated route 403 → its enabled
+  behavior in < 1 s (Node 5 s section cache is cleared by the gate's
+  `sv restart web-overleaf` between phases).
+- **Cipher interop**: zotero user creds = `user.refProviders.zotero
+  .apiKeyEncrypted` = `AccessTokenEncryptor.encryptJson({apiKey,
+  zoteroUserId})` — the **raw JSON-object payload form** (no `ss::` prefix),
+  NOT the `ss::` string form used for `site_settings` secrets. Added
+  `EncryptRaw/DecryptRaw` to `features/sitesettings/cipher.go` (same
+  HKDF-SHA512 + AES-CTR `OL_CEP-v3` scheme); zotero `clientSecret` stays on
+  `DecryptText/EncryptText` via `resolveZoteroClientSecret`.
+- **Gate gotchas (both fixed, pinned in the spec)**: (a) in-container
+  probes must hit `127.0.0.1:4000` for Node (7420 is host-mapped only,
+  unreachable in-container); (b) `execFileSync` with `stdio:'ignore'
+  ` discards stdout AND `capture=true` throws on curl exit≠0 — the wait
+  probes now read `e.stdout` from the throw (a latent P6.5 `waitGo`
+  bug, harmless there because Go was already up); (c) `mongosh print(
+  JSON.stringify(undefined))` writes NOTHING — state probes pin unset as
+  `null` via `?? null`. No rate limiter on this surface → no redis flush.
+- **Flip conf** `server-ce/nginx/flips/web-p66.conf`: 9 exact-match
+  `location =` blocks with the P6.5-proven method-guard idiom (non-matching
+  verb falls through to Node → Node 405 parity).
+- **Gate** `tests/e2e/specs/parity/web-go-p66-flip.test.e2e.ts` (4 legs +
+  pin-sanity, **5/5 green, 1.8 min**): cumulative flips (p64a+p64b+p65+p66);
+  34 pins per leg across BOTH phases (A disabled → `sv restart web-overleaf`
+  → B enabled → restore `null`); exact status/CT(MIME)/body/loc — zotero
+  bodies are exact constants, no normalization. Pin anchors: disabled
+  picker 403 `text/html`, status `200 false`, unlink `200 OK`, callback
+  `403 {"message":"Invalid OAuth token"}`; enabled groups `200 null`,
+  pickers `409 zotero_not_linked`, bibtex no-keys `400`, oauth `400`;
+  anon 401/302→`/login`/403 both phases.
+
+Regression after P6.6 (full flip-gate sweep, all re-run this round):
+**P0 6/6, P1 3/3, P2 3/3, P3.3a, P3.3b, P3.4, P3.6, P4.1–P4.13b
+(all 19 P4 gates incl. P4.13), P5.1a/b, P5.2a/b, P6.1, P6.2, P6.3a, P6.3b,
+P6.4a, P6.4b 5/5, P6.5 5/5, smoke, a5smoke — all green** (two sweep
+artifacts root-caused, neither a parity drift: P3.3 leg-2 login **429**
+from P2's login burst on the shared redis rate-limit key → green after
+flush; P6.3a pin-anchor tripped by live `tokens` docs left by the P2
+password-reset battery → green after marking them used — P6.3a legs
+Node≡Go passed throughout). `go build ./...` + `go vet` +
+`go test ./go/services/web/...` green; deployed `bin/web` md5-matched.
+
 **Next**: remaining P6 module surfaces in the list below (each =
 oracle → Go → flip conf → 3-leg gate → regressions → commit).
 

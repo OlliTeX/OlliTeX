@@ -41,6 +41,19 @@ func (r *Res) JSON(code int, b []byte) {
 	_, _ = r.W.Write(b)
 }
 
+// HTML mirrors express res.status(code).send('<string>'): a string body
+// infers Content-Type text/html (pinned P6.6 on the zotero disabled-403:
+// text/html; charset=utf-8 + nosniff + weak ETag + Content-Length, NO
+// X-Powered-By — helmet baseline applies, res.json/X-Powered-By do not).
+func (r *Res) HTML(code int, body string) {
+	r.W.Header().Set("X-Content-Type-Options", "nosniff")
+	r.W.Header().Set("Content-Type", "text/html; charset=utf-8")
+	r.W.Header().Set("ETag", EtagWeakBody(body))
+	r.W.Header().Set("Content-Length", fmt.Sprint(len(body)))
+	r.W.WriteHeader(code)
+	_, _ = r.W.Write([]byte(body))
+}
+
 // BareWrite emits a response with NO web-baseline headers. Mirrors Node's
 // ordering for express.json (body-parser) REJECTION 400s: the parser runs
 // before the csrf/helmet middleware, so the 400 {} for a non-object JSON

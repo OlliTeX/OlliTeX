@@ -43,6 +43,7 @@ import (
 	"ollitex/go/services/web/features/systemmessages"
 	"ollitex/go/services/web/features/tokenaccess"
 	"ollitex/go/services/web/features/userpages"
+	"ollitex/go/services/web/features/zotero"
 	"ollitex/go/services/web/views"
 )
 
@@ -146,6 +147,10 @@ func main() {
 	// P6.5 surface: bib-editor library (GET/POST/… /library/references*,
 	// PATCH /library/references/:key, + the two /library pages).
 	app.RegisterFeature(library.Feature(app))
+
+	// P6.6 surface: zotero module (/user/zotero/* — status/unlink/groups/
+	// oauth(+callback)/picker libraries|collections|items|bibtex).
+	app.RegisterFeature(zotero.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))
