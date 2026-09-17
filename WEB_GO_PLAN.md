@@ -2381,9 +2381,82 @@ P6.4a, P6.4b, P6.5, P6.6, P6.7, smoke, a5smoke — all green**;
 `go build ./...` + `go vet` + `go test` green; deployed `bin/web`
 md5 `f7493953…` matches the container copy.
 
-**Next**: webdav (4.5k — client of the **Go** webdavinterface service —
-folder browse + create-file), then the remaining P6 module surfaces (each
-= oracle → Go → flip conf → 3-leg gate → regressions → commit).
+**P6.9 — webdav module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+`go/services/web/features/webdav/` (8 files: `webdav.go` routes/handlers,
+`cipher.go` V3 token encryptor bridge, `creds.go` credential+state storage,
+`states.go` sync-state queries/serializers, `client.go` raw WebDAV HTTP
+client (PROPFIND/GET/PUT/MKCOL/DELETE, 2-attempt retry), `helpers.go`,
+`sync.go` best-effort live sync surface, `webdav_test.go`) — 13 routes:
+`GET /user/webdav/status`, `POST /user/webdav/connect`,
+`POST /user/webdav/disconnect`, `GET|DELETE /project/:id/webdav/state`,
+`GET /project/:id/webdav/files`, `POST …/link|pull|push`,
+`POST …/conflict/resolve`, `GET …/project-name`, `POST /project/new/webdav`.
+
+Storage (live-Node-verified, the traps that cost the round):
+- **Collections are the mongoose pluralizations — all lowercase**:
+  `webdavusercredentials`, `webdavsyncprojectstates` (NOT the camelCase
+  model names; `db.getCollectionNames` is the authority).
+- **`userId` / `ownerId` are stored as HEX STRINGS** (`req.user._id` arrives
+  stringified in the running Node) — Go stores/queries strings so Node and
+  Go interoperate on the same docs (verified both directions: Node-write→Go
+  -read and Go-write→Node-read, byte-identical status; both stacks delete
+  each other's docs on disconnect).
+- Save = `findOneAndUpdate({userId}, {$set:{credentials}}, {upsert:true})`
+  (Go needed `options.Update().SetUpsert(true)` — silent no-op without it).
+- Disconnect scope (H6): delete state docs `ownerId === uid` first, then the
+  credential doc.
+
+Cipher: same shared AccessTokenEncryptor V3 as zotero/mendeley (site/
+settings `OpenProvider`); webdav label `OL_WEBDAV-v3`, key =
+`WEBDAV_TOKEN_CIPHER_PASSWORD` or the auto-created
+`/var/lib/overleaf/data/.webdav-token-cipher.json` `{cipherLabel,
+cipherPasswords}`. Go enforces the label prefix on decrypt (Node selects
+the scheme by the token label); corrupted/rotated tokens degrade on status
+to `200 {"connected":false,"error":"stored-credentials-invalid"}` (Node
+router catch branch — live-gated; no-doc case stays plain
+`{"connected":false}`).
+
+Gate (`specs/parity/web-go-p69-flip.test.e2e.ts`, 4-leg + pin sanity,
+cumulative 7-conf flipped P6.4a…P6.9, e2e instance webdav-linkless,
+WEBDAV_ENABLED=true so the module loads on both stacks): anon 401/302/403
+chain; member unlinked battery (status/state/files/link/pull 409/push 500/
+conflict 400-400-404/unlink 404/project-name/new-webdav 400-500); bad-oid
+zod 404 `params.project_id`; ghost 404 HTML page (nonce+csrf normalized,
+P3c suite); other-user 403 restricted; connect cycle
+(full→status pinned → empty→status → baseUrl-only → link-incomplete 400 →
+corrupt→status error-key → disconnect→status); DB anchors
+`webdavusercredentials` 0→1→0 + `webdavsyncprojectstates` 0 —
+**5/5 GREEN on the canonical `bin/web`** (the P2/P3x gates self-deploy
+`bin/web`, so the artifact and the container copy are the same file —
+md5 `83bed65f…`).
+
+Scope note (recorded): the raw WebDAV client primitives + link/unlink
+lifecycle are implemented; the deep sync engine (poll diff-walk, un-mirror,
+full conflict resolution engine, import-into-new-project) is a documented
+best-effort surface — not byte-ported and not sandbox-exercisable (no live
+WebDAV endpoint; e2e user unlinked), so only the offline-deterministic
+route surface is byte-pinned. `POST /project/new/webdav` with a live remote
+will 500 on the first PROPFIND the same way Node does in the sandbox (`
+{"error":"WebDAV is not connected"}` unlinked / network-error linked).
+
+Regression after P6.9 (full flip-gate sweep, cumulative 7-conf where the
+gate takes it): **P0 6/6, P1, P2, P3a–P3e (P3c re-confirmed on the final
+bin/web), P4a–g/inv/hb, P4.11a/b, P4.12a/b, P4.13/4.13a/4.13b (P4.13
+nginx-bound re-run green standalone — batch-state artifact: a failed apply
+had left orphan flipped-include in overleaf.conf; clean re-run + the
+self-deploying gates confirm the final binary), P5.1a/b, P5.2a/b, P6.1,
+P6.2, P6.3a (pin-anchor flaky-green, standing sweep artifact), P6.3b,
+P6.4a, P6.4b, P6.5, P6.6, P6.7, P6.8, smoke, a5smoke — all green**;
+`go build ./...` + `go vet` + `go test ./go/services/web/...` green;
+`bin/web` (repo artifact) == container `/usr/local/bin/go-services/web`
+(83bed65f…);
+nginx flips left clean (0) after the sweep; webdav DB clean (0 docs in all
+four case-variants of the two collections).
+
+**Next**: dropbox (`services/web/modules/dropbox` — 2.7k, incl.
+`POST /project/new/dropbox`; client of the **Go** dropboxinterface
+service), then github-sync, then the residual P6 modules and **P7**
+(union flips, Node web retirement, final sweep).
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already

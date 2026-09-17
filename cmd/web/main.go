@@ -45,6 +45,7 @@ import (
 	"ollitex/go/services/web/features/systemmessages"
 	"ollitex/go/services/web/features/tokenaccess"
 	"ollitex/go/services/web/features/userpages"
+	"ollitex/go/services/web/features/webdav"
 	"ollitex/go/services/web/features/zotero"
 	"ollitex/go/services/web/views"
 )
@@ -161,6 +162,12 @@ func main() {
 	// P6.8 surface: mendeley module (/user/mendeley/status|oauth(+callback),
 	// /mendeley/groups, POST /mendeley/unlink — unconfigured sandbox pins).
 	app.RegisterFeature(mendeley.Feature(app))
+
+	// P6.9 surface: webdav module (/user/webdav/status|connect|disconnect,
+	// /project/:id/webdav/* (state|files|pull|push|conflict/resolve|link|
+	// project-name), DELETE state, POST /project/new/webdav) — unlinked
+	// sandbox pins (WEBDAV_ENABLED=true in the e2e env).
+	app.RegisterFeature(webdav.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))
