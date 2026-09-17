@@ -31,6 +31,7 @@ import (
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/hub"
 	"ollitex/go/services/web/features/instancestats"
+	"ollitex/go/services/web/features/library"
 	"ollitex/go/services/web/features/llmsettings"
 	"ollitex/go/services/web/features/passwordreset"
 	"ollitex/go/services/web/features/projectlist"
@@ -141,6 +142,10 @@ func main() {
 	// selected model, compliance rubrics, usage, grammar prefs, admin LLM
 	// settings file + check/scan/usage; chat/completion/review is P6.4b).
 	app.RegisterFeature(llmsettings.Feature(app))
+
+	// P6.5 surface: bib-editor library (GET/POST/… /library/references*,
+	// PATCH /library/references/:key, + the two /library pages).
+	app.RegisterFeature(library.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

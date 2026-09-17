@@ -52,6 +52,8 @@ const (
 	slotRegUsers = "\x01REGUSERS\x02" // ol-usersEmail content
 	slotRegUID   = "\x01REGUID\x02"   // ol-user_id: `` or ` content="…"`
 	slotRegSU    = "\x01REGSU\x02"    // navbar sessionUser fragment: `` or `,&quot;sessionUser&quot;:{&quot;email&quot;:&quot;…&quot;}`
+	// P6.5 library pages (/library, /library/trashed):
+	slotLibUsers = "\x01LIBUSERS\x02" // ol-userSettings content JSON (htmlAttrEsc'd at finalize)
 	// origin captured from the e2e fixtures (rewritten per request).
 	capturedOrigin = "http://127.0.0.1:7420"
 )
@@ -95,6 +97,7 @@ type PageData struct {
 	ReferenceLinkingErrorMessage string
 	SessionsCurrentRow           string // sessions page current <tr> (IP + moment date)
 	SessionsOtherRows            string // other sessions <tr>s (may be empty)
+	LibUsersJSON                 string // P6.5: ol-userSettings JSON (editorpages.BuildUserSettings)
 }
 
 func (p PageData) finalize(html string) string {
@@ -132,6 +135,7 @@ func (p PageData) finalize(html string) string {
 	out = strings.ReplaceAll(out, slot33RefErr, metaContentAttr(p.ReferenceLinkingErrorMessage))
 	out = strings.ReplaceAll(out, slot33CurrRow, p.SessionsCurrentRow)
 	out = strings.ReplaceAll(out, slot33Rows, p.SessionsOtherRows)
+	out = strings.ReplaceAll(out, slotLibUsers, htmlAttrEsc(p.LibUsersJSON))
 	// P3.4 register page (anon skeleton; fills on a logged-in session):
 	out = strings.ReplaceAll(out, slotRegUsers, htmlAttrEsc(p.UserEmail))
 	if p.UserID == "" {
@@ -256,6 +260,19 @@ func LoginPage(w http.ResponseWriter, d PageData) { d.CSP = cspReact(d.Nonce); P
 func SettingsPage(w http.ResponseWriter, d PageData) {
 	d.CSP = cspReact(d.Nonce)
 	Page(w, d, settingsHTML)
+}
+
+// LibraryView — GET /library (trash=false) + /library/trashed (true):
+// React shell (bib-editor entrypoint), pinned P6.5 (57-pin oracle
+// /tmp/p65_node.json). The two bodies differ only in ol-libraryView +
+// the navbar/alternate URL.
+func LibraryView(w http.ResponseWriter, d PageData, trash bool) {
+	d.CSP = cspReact(d.Nonce)
+	if trash {
+		Page(w, d, libraryTrashHTML)
+		return
+	}
+	Page(w, d, libraryHTML)
 }
 
 // SessionsPage — GET /user/sessions (layout-website-redesign — the same
