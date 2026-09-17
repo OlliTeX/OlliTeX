@@ -33,6 +33,7 @@ import (
 	"ollitex/go/services/web/features/instancestats"
 	"ollitex/go/services/web/features/library"
 	"ollitex/go/services/web/features/llmsettings"
+	"ollitex/go/services/web/features/orcidpicker"
 	"ollitex/go/services/web/features/passwordreset"
 	"ollitex/go/services/web/features/projectlist"
 	"ollitex/go/services/web/features/registrationpage"
@@ -151,6 +152,10 @@ func main() {
 	// P6.6 surface: zotero module (/user/zotero/* — status/unlink/groups/
 	// oauth(+callback)/picker libraries|collections|items|bibtex).
 	app.RegisterFeature(zotero.Feature(app))
+
+	// P6.7 surface: orcid-picker module (/orcid-picker/search|works|fetch-bib
+	// — live ORCID pub API; SSRF-guarded; deterministic 400/502/200 pins).
+	app.RegisterFeature(orcidpicker.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

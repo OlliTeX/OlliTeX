@@ -2259,7 +2259,77 @@ Node≡Go passed throughout). `go build ./...` + `go vet` +
 **Next**: remaining P6 module surfaces in the list below (each =
 oracle → Go → flip conf → 3-leg gate → regressions → commit).
 
+**P6.7 — orcid-picker reference-provider module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+`go/services/web/features/orcidpicker/` (4 files: `orcidpicker.go` routes,
+`client.go` fetch/search, `works.go` works+bibtex, `jstricks.go`
+Node-faithful string/number helpers, `ssrf.go` guard) registered in
+`cmd/web/main.go`. Three login-gated GETs (all the surface — the module has
+no state or writes):
+
+- `GET /orcid-picker/search?q=` — ORCID `expanded-search` (`rows=20`),
+  fielded `given-names:` / `family-name:` solr query when 2+ words,
+  results `{orcid-id, given-names, family-names, institution-name}`
+  re-mapped with the Node `||`/`?.` semantics and key order
+  `orcid, givenNames, familyNames, institutionNames`.
+- `GET /orcid-picker/works?orcid=` — per-group **first** work-summary,
+  `title.year?.value`/`year`/`type`/`put-code` (key **dropped** from JSON
+  when absent, as in Node), DOI from the first `external-id` with
+  `external-id-type==='doi'` and a truthy value, **stable year-descending
+  sort** (Node `parseInt || 0` comparator).
+- `GET /orcid-picker/fetch-bib?orcid=&putCode=` — 1) embedded
+  `citation` when `citation-type==='bibtex'` and value `.trim()` starts
+  with `@`; else 2) DOI content-negotiation via `doi.org` (accept
+  `application/x-bibtex, text/x-bibtex, text/bibliography; style=bibtex`,
+  only when the DOI matches `^10\.\d{4,9}/\S+$`), failure there is a
+  warn-and-fallthrough, never a 502; else 3) the exact Node template
+  `@<type>{<surname><year|nd>,…}` from the work record.
+
+Faithful `safeFetch`: per-hop SSRF check (exact port of
+`isPrivateAddress`: 0/8, 10/8, 127/8, 100.64/10, 169.254/16, 172.16/12,
+192.168/16, 198.18/15, ≥224/3, IPv4-mapped IPv6, `::`, `::1`, `fe80::/10`,
+`fc00::/7`, `fec0:`, `ff00::`), 10 s per-hop timeout (abort →
+"The operation was aborted"), manual redirect following ≤5 with relative
+Location resolution, 2 MB size cap, non-2xx →
+`Upstream API responded with <status>` — these strings are the exact
+undici/Node/V8 texts the 502 bodies carry. `encodeURIComponent`/
+`encodeURI`/`JSON.stringify` escape sets reproduced per-rune (no
+`x/text/normalize` dependency).
+
+Gate (pinned 2026-09-17): anon `401 Unauthorized` / bare-GET `302 → /login`
+/ non-GET `403 Forbidden`; the 400 battery byte-exact on both stacks
+(8 message pins incl. `putCode=Infinity` → 400 via `Number.isFinite`);
+`search "Alan Turing"` → `200 {"results":[]}` (zero registry match —
+deterministic in the sandbox); `works`/`fetch-bib` never-registered ORCID
+→ `502 {"error":"Upstream API responded with 404"}`; live pins compared
+leg-vs-leg: `search "Turing"` (2812 B), `works 0000-0002-0185-5110`
+(2414 B, 15 works year-desc), `fetch-bib …/17643012` (246 B, ORCID-embedded
+BibTeX) — all **byte-identical Node ≡ Go** in the direct dual-stack
+capture and in gate legs 2/3.
+
+Gotchas hit this unit: `safeFetch` initially drained the body **before**
+the status branch (empty 2xx text → JSON parse 502) — drain only on
+redirect/non-2xx/oversize; empty-array JSON (`{"results":}`) — wrap the
+joined items in `[…];` Go `sort` comparator **inverted** vs Node
+`yb-ya` (ascending came out) — `less(i,j) = year(i) > year(j)`;
+Node keeps the `orcid` key when the upstream value is `null`
+(`"orcid":null`, not a dropped key).
+
+Regression after P6.7 (full flip-gate sweep, all re-run this round):
+**P0 6/6, P1 3/3, P2 3/3, P3.3a…P3.6 (P3.3 legs Node≡Go; one in-sweep
+leg-2 flake green on standalone re-run), P4.a–g/inv (all re-run green
+after one Node-baseline rename flake), P5.1a/b, P5.2a/b, P6.1, P6.2,
+P6.3a (pin-anchor flaky-green), P6.3b, P6.4a, P6.4b, P6.5, P6.6, smoke,
+a5smoke — all green**; `go build ./...` + `go vet` +
+`go test ./go/services/web/core/... ./go/services/web/features/...` green;
+deployed `bin/web` md5 `cbe86e50…` matches the container copy.
+
+**Next**: mendeley (1.3k — same reference-provider shape as zotero but
+provider token exchange + collections/items API), then the remaining P6
+module surfaces (each = oracle → Go → flip conf → 3-leg gate → regressions
+→ commit).
+
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
+-flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **project
 surface DONE (P6.2)** (remaining: site/user surfaces), llm (14.4k — external-provider client + rate limits + BYO-key crypto),
 bib-editor (10.2k), github-sync (6.2k — client of the **Go** githubinterface),
