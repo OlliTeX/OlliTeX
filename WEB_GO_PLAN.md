@@ -2584,13 +2584,28 @@ registration-page, saml/oidc (with P2), toast-image, …
 (Exact set = M0 output from `modules/*/index.mjs` + `SaaSModule`/`CEUI`
 registries.)
 
-### P7 — Node retirement
+### P7 — (owner directive 2026-09-18, replaces the old Node-retirement P7)
 
-With all prefixes flipped and ≥ 24 h soak each: point both runit services at
-`bin/web` (exactly what Phase D did for the nine services), delete
-`services/web` (keep `public/` bundle, `locales/`, template project files,
-`test/` → re-homed), prune `package.json`/`services.js`/compose like Phase D,
-rebuild image, cycle both live stacks, full e2e suite green, commit record.
+1. Visit all `go/` sub-folders and describe their content and functionality in README.md files (placed in the corresponding sub-folders) such that LLMs and humans can use them to orient themselves and understand what the corresponding code does.
+2. Permanently switch to the web go backend (point both runit services at `bin/web`, exactly what Phase D did for the nine services), rebuild the image, cycle both live stacks, full e2e suite green (as far as the credentials for the external services allow), commit record.
+3. Fix errors that might occur during 2.
+4. Move the old node.js backend files into a junk folder. Use this as opportunity to check that everything was really converted (i.e. move only stuff that has a representation in the new go version). Owner deletes the junk folder later.
+5. Re-organize the frontend files `services/web` into `frontend/`. Follow a structure that mirrors `go/` allowing LLMs/humans to find the connected data more easily. Move the unused SaaS files and the old files for pages that have been already replaced by the new mantine structure plus the old editor page into a junk folder. Expectation: only the old project editor is the last non-mantine page. If this is not the case, convert the page to mantine.
+6. Relocate `services/web/public` to `public/` and `services/web/locales` to `locales/` (repo root).
+7. Visit all `frontend/` sub-folders and describe their content and functionality in README.md files (placed in the corresponding sub-folders) such that LLMs and humans can use them to orient themselves and understand what the corresponding code does.
+
+**Execution precondition (folded into 2/4):** flip the residual live
+P6 module routes first (so nothing is lost at Node retirement). Live
+audit 2026-09-18 of `services/web/modules/*/` route tables found residual
+route owners: track-changes (11 routes), notifications (prefs API +
+pages), languagetool (3), template-gallery (14), git-bridge (3 +
+oauth/token/info), tex-autoformatter (/api/format-tex), typst
+(/project/new/typst), instance-stats (admin api), page-shells
+(/user/mysettings, /admin/panel), launchpad (/launchpad),
+user-activate (/user/activate), admin-tools site surface
+(/admin/site-settings/*, /admin/site) — minus whatever the existing
+P0…P6 flip confs already cover (audit per-location against the flip
+set before converting).
 
 ---
 
