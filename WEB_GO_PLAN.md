@@ -2806,7 +2806,77 @@ Regression after P6.15 (flip-gate sweep, cumulative 13-conf):
 **P6.5–P6.14 all 5/5 (10 gates), smoke 1/1, a5smoke 1/1, grammar e2e
 1/1** — nginx left clean afterward.
 
-**Next**: the remaining residual live P6 modules (typst, tex-autoformatter,
+**P6.16 — typst new-project creation (DONE, GATE 5/5 GREEN, 2026-09-18):**
+`services/web/modules/typst` is UI-first (TypstRouter.mjs) but its two
+live API routes — `POST /project/new/typst` (TypstRouter: zod
+{projectName string, template ≤50} → createProject → **insertProject**
+**compiler:'typst'** → seed `main.typ` + `main.pdf`, redirect to the
+editor URL) and `GET /project/new/typst` (TypstController:
+example-basic + example-article example sets, i18n labels, 200 JSON) —
+are implemented in Go at projectlist as the P4 `POST /project/new` +
+P6.13 `POST /project/new/example` pattern (create.go):
+`crTypstBody` (zod parity: both fields string — `projectName` ≤100 via
+insertProject, `template` ≤50; the P4.11a bare/primitive 400 `{}` shape;
+**zod multi-error concatenation in schema order** — Node
+`zodError.details` joined by `'; '` — pinned A/B live, e.g.
+`Invalid input: expected string, received number at "body.projectName";
+Too big: expected string to have <=50 characters at "body.template"`)
++ `crCreateTypstProject` (insertProject compiler:"typst" — the ONLY
+diff to the TeX basic path — + `main.typ` `## Hello, Typst!` + 8 B
+`main.pdf` via the shared `crSeedBasicFiles` extracted from
+create_example.go; response = `res.redirect(302, '/project/<obj>/')` —
+Node's `Location: /project/<objId>/` (no trailing slash on the id;
+redirect() appends the slash; **not** the editor URL — the Node editor-
+URL redirect is a client-side navigation; pinned A/B), anonymous → 302
+login redirect parity, `res.code(200)` = raw 200 header) +
+`crTypstExamples` (Node key order: name/compiler/files; the two
+code-gated labels `typstRouterNewArticleBasic`/`...Example` — the live
+CE strings — as Node's missing-key fallback; example-basic =
+main.typ+main.pdf only, example-article = cover.typ+main.typ+typst-
+foundation.typ+10 files) + routes in `crRouted` (`/project/new/typst`
+GET/POST both requireLogin → restrictedBounce 302) — the module's
+remaining live code (compile templates built at startup,
+TypstNewProjectModal UI, `typstAvailable` = `typst` in
+featureList — the Go editorpage/exposed-settings already expose it).
+
+Parity traps resolved: (1) **the `insertProject` ObjectId hex was being
+lowercased** (`oidHex` → `hex.EncodeToString` = lowercase) while Node
+`project._id.toString()` produces **uppercase** — the redirect
+Location diffed 40 hex chars on the p412a A/B
+(`.../268946364F64674D64B83A6C` vs `...b83a6c`); `oidHex` now uppercases
+— the fix also corrects the p4.14 admin hex pins and the Go-created
+`projectHistoryId` (p3b); (2) **`go/services/` was not a module root**
+(only `go/test` had a go.mod) — the per-service `go build ./...` from a
+clean module dir is the sanctioned flow (the earlier flat
+`go build ./go/services/web` failed on the `overleaf/web/...` import
+paths — expected, not a regression); (3) P6.14/P6.15 gates are NOT
+self-deploying (they expect a fresh `bin/web` + shadow restart — the
+P4/P5 gates do `docker cp bin/web` in beforeAll; P6.14/P6.15/P6.16 rely
+on manual deploy) — after any Go change: build `bin/web`, deploy,
+`sv restart web-go-overleaf`; (4) the P6.16 battery's
+`v_both_bad` body had a JS string-construction bug in the gate itself
+(`'"x"'.repeat(60)` = the 3-char literal `"x"` repeated, not 60 x's —
+produced malformed JSON, 400 `{}` on BOTH sides; fixed to
+`'"' + 'x'.repeat(51) + '"'`).
+
+nginx flipped **web-p616.conf** (GET+POST exact-path, requireLogin 302
+bounce parity, **method parity — Node express dispatches GET/DELETE on
+typst-router-mounted POST paths but the P6.16 contract is GET/POST;
+non-GET/POST falls through to Node verbatim** rather than 404-JSON — the
+p413b/p411b fall-through precedent for unmounted verbs) left clean (0);
+`go build` + `go vet` + `go test ./go/...` clean (31 pkgs);
+`go/services/web/features/projectlist/create_typst_test.go` byte-pins
+the zod error shapes (single + multi, in schema order).
+
+Regression after P6.16 (flip-gate sweep, cumulative 14-conf):
+**p412a 3/3, p3b 3/3, p413 5/5, p4del 3/3, p4col 3/3, p413b 3/3,
+p612 5/5, p613 5/5, p614 5/5, p615 5/5, smoke 1/1, a5smoke 1/1, grammar
+e2e 1/1** — nginx left clean afterward. **p412a and p3b now green with
+UCASE ids on both sides** (previously the flip leg diffed on the hex
+case only — the gate's normalization masked it; the A/B raw pins expose
+it).
+
+**Next**: the remaining residual live P6 modules (tex-autoformatter,
 git-bridge, page-shells, user-activate, launchpad — per the 2026-09-18
 live audit) and **P7** (owner directive).
 

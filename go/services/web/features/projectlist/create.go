@@ -241,12 +241,23 @@ func crParseCreateBody(raw []byte) crParseResult {
 }
 
 // crZodReply marshals the 400 json {error,statusCode} with proper escaping.
+// crZodReply — Node 400 {"error":"Validation error: <issues>","statusCode":400}
+// with RAW '<'/'>' bytes (zod's Too big/Too small messages carry <=/>= —
+// Go's default json.Marshal HTML-escapes them to \\u003c/\\u003e; pinned
+// 2026-09-18 via the typst 'Too big ... <=100' A/B).
 func crZodReply(message string) []byte {
-	b, _ := json.Marshal(struct {
+	type env struct {
 		Error      string `json:"error"`
 		StatusCode int    `json:"statusCode"`
-	}{"Validation error: " + message, 400})
-	return b
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(env{"Validation error: " + message, 400}); err != nil {
+		return []byte(`{}`)
+	}
+	// json.Encoder appends a newline Node's res.json never has.
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n"))
 }
 
 // crBasicDocLines mirrors Node _buildTemplate('mainbasic.tex').
@@ -364,7 +375,7 @@ func crCreateBasicProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwne
 		{Key: "_id", Value: docID},
 	}}
 	// version 1: blank project (version 0) + one addDoc (main.tex) $inc.
-	crInsertProject(a, cxt, pid, rootID, &docID, name, uid, u.spellCheckLanguage, docs, bson.A{}, 1)
+	crInsertProject(a, cxt, pid, rootID, &docID, name, uid, u.spellCheckLanguage, "pdflatex", docs, bson.A{}, 1)
 	crCreateDocRevision(cxt, pid, docID, crBasicDocLines(name, u.first, u.last))
 	crInitHistory(cxt, pid.Hex())
 	return pid
@@ -421,7 +432,7 @@ func loadOwnerUser(a *core.App, cxt *core.Cxt, uid string) (crOwnerUser, bool) {
 // default field set. The rootFolder contents (docs / fileRefs / rootDoc_id)
 // are parameterised so the BASIC ('main.tex') and EXAMPLE (main.tex, sample.bib,
 // frog.jpg) variants share one document shape.
-func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID primitive.ObjectID, rootDocID *primitive.ObjectID, name, ownerRef, spellLang string, docs bson.A, fileRefs bson.A, version int) {
+func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID primitive.ObjectID, rootDocID *primitive.ObjectID, name, ownerRef, spellLang, compiler string, docs bson.A, fileRefs bson.A, version int) {
 	if a.Mongo == nil {
 		return
 	}
@@ -446,7 +457,7 @@ func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID primitive.ObjectID,
 		{Key: "pendingEditor_refs", Value: e},
 		{Key: "pendingReviewer_refs", Value: e},
 		{Key: "publicAccesLevel", Value: "private"},
-		{Key: "compiler", Value: "pdflatex"},
+		{Key: "compiler", Value: compiler},
 		{Key: "spellCheckLanguage", Value: spellLang},
 		{Key: "deletedByExternalDataSource", Value: false},
 		{Key: "description", Value: ""},
