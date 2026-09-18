@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -193,6 +194,18 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 						// scalar 123/"str"/true follow the same negotiation).
 						badBody400(a, r, res)
 						return
+					}
+					if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') {
+						// P6.14: express.json PARSES the whole root — an
+						// object/array-shaped body that is NOT valid JSON
+						// ({bad / [1,) also 400s BEFORE the csrf 403 (pinned
+						// live on the Node leg: POST {bad without csrf -> 400 {},
+						// not 403). Valid object/array roots pass here.
+						var probe any
+						if perr := json.Unmarshal(trimmed, &probe); perr != nil {
+							badBody400(a, r, res)
+							return
+						}
 					}
 				}
 			}

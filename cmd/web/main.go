@@ -35,6 +35,7 @@ import (
 	"ollitex/go/services/web/features/library"
 	"ollitex/go/services/web/features/llmsettings"
 	"ollitex/go/services/web/features/mendeley"
+	"ollitex/go/services/web/features/notifications"
 	"ollitex/go/services/web/features/orcidpicker"
 	"ollitex/go/services/web/features/passwordreset"
 	"ollitex/go/services/web/features/projectlist"
@@ -187,6 +188,10 @@ func main() {
 	// preview + bundle asset streams / six management routes 403 in this
 	// profile — no user carries template admin rights).
 	app.RegisterFeature(templates.Feature(app))
+
+	// P6.14 surface: notifications preferences (global + per-project GET/POST,
+	// /user/notification-preferences 301s, /user/send-test-email).
+	app.RegisterFeature(notifications.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

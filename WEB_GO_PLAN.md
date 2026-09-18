@@ -2685,6 +2685,78 @@ the 2026-09-18 live audit) and
 Node web junk-ification, frontend/** re-org, public/locales
 relocation, frontend/** README tour).
 
+**P6.14 — notifications module (DONE, GATE 5/5 GREEN, 2026-09-18):**
+Go package `go/services/web/features/notifications/` (notifications.go
+routes/handlers/normalizers, notifications_test.go unit pins) implements
+all 7 live routes of `services/web/modules/notifications`
+(NotificationsPreferencesRouter.mjs / Controller / Handler /
+PreferenceNormalizer.mjs):
+`GET /notifications/preferences` (200 normalized globals — muteAll,
+delay (int|null — out-of-range/wrong-type stored values normalize to null),
+12 preference keys; missing keys default true, stored null → false),
+`POST /notifications/preferences` (zod shape mirrored verbatim: mute
+required bool — undefined/string/null/number/array/type words pinned;
+delay optional int 1..10080 nullable — string/number/integer/range words
+pinned; the 400 envelope's field path is DOUBLE-escaped in the raw body —
+a Node fromZodError escape artifact, `at \"body.x\"` — mirrored; invalid-
+JSON / JSON-string / JSON-null bodies → 400 EMPTY {}; JSON-array → 400
+`expected object, received array at \"body\"`; 200 echo =
+`{"muteAllNotifications":<b>}` + delay key only when present in the input;
+$set {mute, delay|null, 12 default keys} upserted on
+{user_id, project_id: null}),
+`GET /notifications/preferences/project/:projectId` (member → 200
+{12 keys resolved projectDoc ?? globalDoc ?? default(true)} +
+muteAllNotifications APPENDED LAST — pinned order),
+`POST …/project/:projectId` (member → 200 body exactly `null`; $set 12
+normalized keys upserted), non-member → 403 restricted page **with the
+layout-default title** (Node Errors.ForbiddenError →
+ErrorController.forbidden renders user/restricted with NO title local —
+new `views.Restricted403AppTitle`, unlike the AuthorizationMiddleware
+title-'Restricted' family the track-changes gate pins), ghost → 404
+page, bad hex → 500 page (new ObjectId CastError), all BOTH accepts,
+`GET|POST /user/notification-preferences` → 301
+/hub#/mysettings.email (express redirect Accept matrix),
+`POST /user/send-test-email` → 200 `{"message":"Email Sent"}` + one test
+mail to the session user's email (subject "A Test Email from OlliTeX";
+delivery verified in the local sink on both stacks).
+
+Parity traps resolved during this unit (all pinned by the 52-pin gate
+`web-go-p614-flip.test.e2e.ts` + the 40-row live A/B matrix + the 5-row
+type-word battery):
+(1) the core express.json parity block only checked the FIRST byte — an
+object-shaped-but-invalid body (`{bad`) slipped through to the csrf 403
+while Node 400s at parse time (body-parser precedes csrf): core app.go now
+fully parses `{`/`[` roots before csrf (pinned live: anonymous-ish POST
+`{bad` → 400 {} on Node; Go mirrored);
+(2) the 403 restricted page has TWO Node title variants —
+AuthorizationMiddleware.restricted (title 'Restricted') vs
+ErrorController.forbidden (layout default, appName only): the
+notifications family uses the latter — `views.Restricted403AppTitle`
+(derived by Replacer from the pinned restrictedHTML skeleton);
+(3) per-user page slots — Node renders the Admin navbar dropdown and
+`ExposedSettings.canManageTemplatesMenu` on EVERY page render (incl. the
+error pages): ntfPageData now fills NAVADMIN + CANMGTPL from the session
+(admin 403 page parity verified);
+(4) zod 400 error messages ship with DOUBLE-escaped field-path quotes in
+the raw body — ntfValErr mirrors the escaping (byte-pinned A/B);
+(5) the 12-key normalization subtleties — missing key → default true,
+present-but-null → Boolean(null)=false (both pinned by unit tests + the
+leg battery). e2e anchors: fixture project
+`6aa4ba9c73ef0e5094f4ce33` (e2e-user owned); nginx flips left clean (0);
+`go build` + `go vet` + `go test ./go/services/web/...` clean; `bin/web`
+redeployed, :4000 and :4010 /status 200.
+
+Regression after P6.14 (flip-gate sweep, cumulative 12-conf):
+**P6.5 5/5, P6.6 5/5, P6.7 5/5, P6.8 5/5, P6.9 5/5, P6.10 5/5,
+P6.11 5/5, P6.12 5/5, P6.13 5/5, P3c/P3d/P3e 3/3, P4d 3/3, P5.1b 3/3,
+P5.2b 3/3, P4.13b 3/3, smoke 1/1, a5smoke 1/1, legacy-notification-prefs
+UI 7/7, template UI specs 37/37** — nginx left clean afterward.
+
+**Next**: the remaining residual live P6 modules (languagetool, typst,
+tex-autoformatter, git-bridge, instance-stats, page-shells,
+user-activate, launchpad — per the 2026-09-18 live audit) and **P7**
+(owner directive).
+
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **project

@@ -274,6 +274,27 @@ func Restricted403(w http.ResponseWriter, d PageData) {
 	StatusPage(w, d, 403, restrictedHTML)
 }
 
+// restrictedDefaultTitleHTML — the SAME restricted page rendered by Node's
+// ErrorController.forbidden (Errors.ForbiddenError — e.g. the P6.14
+// notifications project-prefs non-member 403): res.render('user/restricted')
+// with NO title local → the layout default title (appName only), unlike the
+// AuthorizationMiddleware.restricted ({ title: 'restricted' }) variant that
+// Restricted403 above mirrors. Pinned live 2026-09-18 (A/B battery).
+var restrictedDefaultTitleHTML = strings.NewReplacer(
+	`<title translate="no">Restricted - OlliTeX, Online LaTeX Editor</title>`,
+	`<title translate="no">OlliTeX, Online LaTeX Editor</title>`,
+	`<meta name="twitter:title" content="Restricted">`,
+	`<meta name="twitter:title" content="OlliTeX, Online LaTeX Editor">`,
+	`<meta name="og:title" content="Restricted">`,
+	`<meta name="og:title" content="OlliTeX, Online LaTeX Editor">`,
+).Replace(restrictedHTML)
+
+// Restricted403AppTitle — the ErrorController.forbidden family (403 +
+// restricted view, layout-default title — P6.14 notifications).
+func Restricted403AppTitle(w http.ResponseWriter, d PageData) {
+	StatusPage(w, d, 403, restrictedDefaultTitleHTML)
+}
+
 // LoginPage / RegisterPage / LogoutConfirmation / Restricted / NotFound.
 func LoginPage(w http.ResponseWriter, d PageData) { d.CSP = cspReact(d.Nonce); Page(w, d, loginHTML) }
 
