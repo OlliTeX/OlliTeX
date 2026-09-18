@@ -2526,6 +2526,51 @@ after the gate; dropbox DB clean (0 docs, all case-variants).
 **Next**: github-sync, then the residual P6 modules and **P7**
 (union flips, Node web retirement, final sweep).
 
+**P6.11 — github-sync module (DONE, GATE 5/5 GREEN, routing-only unit,
+2026-09-17):** `server-ce/nginx/flips/web-p611.conf` (15 locations) flips
+the full declared 16-route surface — user `github-sync/{status,orgs,repos,
+oauth2,oauth2/callback,unlink}`, `git-servers` (GET|POST),
+`git-servers/:id` (DELETE), `git-servers/test` (POST), `git-pat/link`
+(POST), project `new/github-sync` (POST) and `:id/github-sync/{state,
+export,merge/overview,merge,unlink}` — to the Go web (4010) with method
+guards; wrong method falls through to Node.
+
+**No Go package was required — and that is the finding.** The github-sync
+module loads on Node only when `GITHUB_SYNC_ENABLED`/`GIT_SYNC_ENABLED`
+is `true` (`services/web/modules/github-sync/index.mjs` gate); that env is
+unset in the e2e deployment, `db.githubSyncUserCredentials`
+/`db.githubSyncProjectStates` hold **0 docs**, and every declared route
+was live-verified to answer **404** on Node. Live cross-stack
+verification then showed the Go core already reproduces that whole chain
+byte-for-byte: member mutation w/o csrf token → 403 text/plain
+"Forbidden" (csrf chain, pre-route — matches Node's router-mounted csurf);
+member w/ valid token → 404 express "Cannot <METHOD> <path>" page for
+non-GET and the 404 OlliTES "Page Not Found" view for GET/HEAD; anon
+GET+accept-json → 401 "Unauthorized", anon GET bare → 302 /login, anon
+non-GET → 403. The gate (4-leg, 51 pins, cumulative 9-conf flipped
+P6.4a…P6.11) proved Node baseline = Go answer = Node re-baseline on every
+pin including the express-404 template bytes exact, the csrf-403 class,
+the 404-page class, the 401/302/403 anon chain, and the nginx
+fall-through guards. The flip is future-safe: after P7 Node retirement
+these paths are answered by Go with the identical bodies whether or not
+a github-sync Go feature is ever added (module-enabled deployments are
+out of this stack's profile — if it ever ships here, the Go feature is
+the follow-up, with the `@overleaf` AccessTokenEncryptor V3 cipher,
+camelCase collections, and real-ObjectId userId model already
+live-captured for that port). DB anchors 0/0 before and after; nginx
+flips left clean (0); `bin/web` == container (3ba42621…, unchanged);
+`go build ./...` + `go vet` clean.
+
+Regression after P6.11 (flip-gate sweep): **P6.5 5/5, P6.7 5/5, P6.8
+5/5, P6.9 5/5, P6.10 5/5, smoke + a5smoke green** — each on the
+respective cumulative flip, nginx left clean afterward.
+
+**Next**: the residual P6 modules (admin-tools site/user surfaces, llm
+remnants if any, template-gallery, typst, python-runner, languagetool,
+notifications module, ce-ui, page-shells, registration-page, diagram,
+latex-editor, toast-image — per `modules/*/index.mjs` inventory) and
+**P7** (union flips, Node web retirement, final sweep).
+
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **project
@@ -2534,7 +2579,7 @@ bib-editor (10.2k), github-sync (6.2k — client of the **Go** githubinterface),
 webdav (4.5k — client of the **Go** webdavinterface), zotero (2.5k), mendeley (1.3k), orcid-picker (1.1k),
 typst (1.3k), python-runner, languagetool (2k), notifications module (1.7k —
 preferences over the Go notifications service), diagram, latex-editor,
-webdav, github-sync, ce-ui, page-shells, server-ce-scripts,
+webdav, ce-ui, page-shells, server-ce-scripts,
 registration-page, saml/oidc (with P2), toast-image, …
 (Exact set = M0 output from `modules/*/index.mjs` + `SaaSModule`/`CEUI`
 registries.)
