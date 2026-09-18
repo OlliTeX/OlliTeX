@@ -591,3 +591,17 @@ func lEnv(name string) string {
 }
 
 var modelRefRe = regexp.MustCompile(`^[A-Za-z0-9._\-/]+(:[A-Za-z0-9._\-/]+){0,2}$`)
+
+// NodeJSONRoundTrip — the Node `res.json(JSON.parse(body))` semantics for
+// proxied payloads (P6.15 languagetool): parse into the ordered/number model
+// (numbers become float64 doubles exactly like V8 does for these payloads)
+// and serialize compactly (1.0 → 1, key order preserved). Non-JSON input
+// (bad JSON) returns the input unchanged so callers keep their error path.
+func NodeJSONRoundTrip(b []byte) []byte {
+	s := strings.TrimSpace(string(b))
+	v, err := ojsonParse(s)
+	if err != nil {
+		return b
+	}
+	return []byte(jsonWrite(v))
+}

@@ -2752,10 +2752,63 @@ P6.11 5/5, P6.12 5/5, P6.13 5/5, P3c/P3d/P3e 3/3, P4d 3/3, P5.1b 3/3,
 P5.2b 3/3, P4.13b 3/3, smoke 1/1, a5smoke 1/1, legacy-notification-prefs
 UI 7/7, template UI specs 37/37** — nginx left clean afterward.
 
-**Next**: the remaining residual live P6 modules (languagetool, typst,
-tex-autoformatter, git-bridge, instance-stats, page-shells,
-user-activate, launchpad — per the 2026-09-18 live audit) and **P7**
-(owner directive).
+**Next**: the remaining residual live P6 modules (typst,
+tex-autoformatter, git-bridge, page-shells, user-activate, launchpad — per
+the 2026-09-18 live audit) and **P7** (owner directive).
+
+**P6.15 — languagetool module (DONE, GATE 5/5 GREEN, 2026-09-18):**
+Go package `go/services/web/features/languagetool/` (languagetool.go +
+languagetool_test.go: ltLevel pin battery incl. `picky:"true"`→default —
+Node `picky === true` is a strict compare; ltResolve fallback ladder) +
+`llmsettings.NodeJSONRoundTrip` (exported from the llmsettings ojson
+model — Node `res.json(JSON.parse(body))` semantics: ordered keys, doubles
+formatted JS-style `1.0`→`1`) implements all 3 live routes of
+`services/web/modules/languagetool` (LanguageToolRouter.mjs /
+LanguageToolController.mjs / adminConfig.mjs). The e2e stack ships the
+LanguageTool server (`ol-e2e-languagetool-1`, env
+`LANGUAGE_TOOL_URL=http://languagetool:8010`; the LLM admin settings JSON
+`languageToolUrl` is empty → env fallback wins):
+
+- `GET /languagetool/languages` (requireLogin) → 200 the LT /v2/languages
+  array. **Node res.json(parsed) round-trips numbers (`"rate":1.0` →
+  `"rate":1`)** while key order is preserved — Go mirrors via
+  NodeJSONRoundTrip (first Naive raw-stream attempt diffed exactly on
+  `rate:1.0`; fixed + byte-pinned A/B).
+- `POST /languagetool/check` (requireLogin): body {language='auto',
+  text?, data?, picky?}; {} / no-body → 400
+  `{"error":"text or data is required"}`; `{bad` → 400 `{}` (express.json
+  precedes csrf — the P6.14 core full-parse); csrf missing → 403;
+  valid → 200 LT /v2/check verbatim — form params in Node URLSearchParams
+  insertion order (language, data|text, level, disabledRules; 100 KB
+  slice; data object JSON-stringified; the 5 LaTeX false-positive rules
+  pinned), level = picky true/false strict, else env LANGUAGE_TOOL_LEVEL,
+  else 'picky'; **LT !ok/timeout/network error → 200 `{"matches":[]}`**
+  (bad language pinned); linter stays silent on upstream trouble.
+- `POST /admin/languagetool/check` (site admin — core.RequireSiteAdmin
+  restrictedBounce: non-member → 302 /restricted?from=%2Fadmin%2Flanguage-
+tool%2Fcheck BOTH accepts): body.url || resolved url; unreachable url →
+  500 `{"success":false,"error":"Connection attempt failed"}`; reachable →
+  200 `{"success":true,"message":"LanguageTool reachable","languageCount":60}`
+  hand-built in the Node key order; LT !ok → 200
+  `{"success":false,"error":"LanguageTool server responded with status N"}`
+  (live-unreachable in the stack; mirrored from the Node source).
+
+Parity traps resolved: (1) the Node module re-exports the LLM admin
+settings file reader (languagetool index.mjs imports LLMAdminController)
+— Go mirrors the same file + the two LT-specific fields per request;
+(2) `http.NewRequest` in Go takes NO context argument (the first deploy
+failed to compile — `req.WithContext(ctx)` instead); (3) the Node LT-
+proxy number round-trip (above). nginx flips left clean (0); `go build`
++ `go vet` + `go test ./go/services/web/...` clean; `bin/web`
+redeployed, :4000/:4010 /status 200.
+
+Regression after P6.15 (flip-gate sweep, cumulative 13-conf):
+**P6.5–P6.14 all 5/5 (10 gates), smoke 1/1, a5smoke 1/1, grammar e2e
+1/1** — nginx left clean afterward.
+
+**Next**: the remaining residual live P6 modules (typst, tex-autoformatter,
+git-bridge, page-shells, user-activate, launchpad — per the 2026-09-18
+live audit) and **P7** (owner directive).
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already

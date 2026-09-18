@@ -35,6 +35,7 @@ import (
 	"ollitex/go/services/web/features/library"
 	"ollitex/go/services/web/features/llmsettings"
 	"ollitex/go/services/web/features/mendeley"
+	"ollitex/go/services/web/features/languagetool"
 	"ollitex/go/services/web/features/notifications"
 	"ollitex/go/services/web/features/orcidpicker"
 	"ollitex/go/services/web/features/passwordreset"
@@ -192,6 +193,10 @@ func main() {
 	// P6.14 surface: notifications preferences (global + per-project GET/POST,
 	// /user/notification-preferences 301s, /user/send-test-email).
 	app.RegisterFeature(notifications.Feature(app))
+
+	// P6.15 surface: LanguageTool proxy (languages, check, admin connection
+	// check).
+	app.RegisterFeature(languagetool.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))
