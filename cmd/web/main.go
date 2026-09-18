@@ -45,6 +45,7 @@ import (
 	"ollitex/go/services/web/features/status"
 	"ollitex/go/services/web/features/systemmessages"
 	"ollitex/go/services/web/features/tokenaccess"
+	"ollitex/go/services/web/features/trackchanges"
 	"ollitex/go/services/web/features/userpages"
 	"ollitex/go/services/web/features/webdav"
 	"ollitex/go/services/web/features/zotero"
@@ -175,6 +176,11 @@ func main() {
 	// DELETE state, POST /project/new/dropbox) — unlinked sandbox pins
 	// (DROPBOX_ENABLED=true in the e2e env; authz via the shared P4 chain).
 	app.RegisterFeature(dropbox.Feature(app))
+
+	// P6.12 surface: track-changes module (11 routes under /project/:id/...
+	// — track_changes state, accept-changes, ranges, changes/users, threads,
+	// comment send/edit/delete, thread resolve/reopen/delete)
+	app.RegisterFeature(trackchanges.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

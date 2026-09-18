@@ -2565,11 +2565,63 @@ Regression after P6.11 (flip-gate sweep): **P6.5 5/5, P6.7 5/5, P6.8
 5/5, P6.9 5/5, P6.10 5/5, smoke + a5smoke green** — each on the
 respective cumulative flip, nginx left clean afterward.
 
-**Next**: the residual P6 modules (admin-tools site/user surfaces, llm
-remnants if any, template-gallery, typst, python-runner, languagetool,
-notifications module, ce-ui, page-shells, registration-page, diagram,
-latex-editor, toast-image — per `modules/*/index.mjs` inventory) and
-**P7** (union flips, Node web retirement, final sweep).
+**P6.12 — track-changes module (DONE, GATE 5/5 GREEN, 2026-09-18):**
+Go package `go/services/web/features/trackchanges/` (trackchanges.go,
+plumbing.go, downstream.go, handlers.go, trackchanges_test.go) implements
+all 11 live routes of `services/web/modules/track-changes`:
+`POST track_changes` (state machine `{on,on_for,on_for_guests}` with
+Node-exact validation messages, `__guests__` storage form, on=true
+dominates), `POST doc/:id/changes/accept`, `GET ranges`,
+`GET changes/users`, `GET threads` (user-injected serialization with
+Node-exact key order and user-presence semantics: user object present
+only when the user exists — never null), `POST thread/:id/messages`
+(auto-creating room+message via the shared chat service → 204 +
+`new-comment` emit with the message+user object),
+`POST thread/:id/messages/:m/edit` and
+`DELETE thread/:id/messages/:m` (Node oracle: pre-GET the message →
+404-downstream = rendered 500 page; non-author → 403 restricted view;
+delete uses the chat USER-SCOPED endpoint), `POST|DELETE
+…/resolve|reopen|delete-thread` (chat call THEN docstore call, both
+must succeed, Node-exact downstream bodies `user_id`/`userId` — a
+failure at either hop = 500 page). `server-ce/nginx/flips/web-p612.conf`
+(11 regex locations with method guards) flips them to Go on top of the
+cumulative 10-conf set.
+
+Parity traps resolved during this unit (all pinned by the 52-pin gate):
+(1) `tcSerializeThread`/send-emit anonymous structs were missing json
+tags on `id`/`timestamp`/`room_id`/`user_id` — Go default upper-case
+marshalling broke the threads bodies and cascaded into 404 pre-GETs;
+(2) the gate's own `m_edit` pin was missing the `/edit` suffix — both
+stacks then "matched" on a 404 "Cannot POST", which is precisely why
+the pin must hit the real route; (3) Node's track-changes rate limiters
+run as middleware AFTER authz and are a NO-OP in this stack —
+`OVERLEAF_DISABLE_RATE_LIMITS=true` → `Settings.disableRateLimits` →
+`consume()` fakes success — so Go registers NO limiter (editorpages
+precedent: parity for this stack; the future-enabled profile must also
+count only authz-passing requests); (4) the gate's `leg1` baseline can
+vanish between Playwright tests — it is now anchored to
+`/tmp/web-go-p612-leg1.json` and loaded by the deterministic re-baseline
++ pin-sanity legs; (5) method-guard fall-through oracle: GET → OlliTeX
+404 notFound page, other methods → express "Cannot <METHOD>" (both
+stacks, pinned); (6) ghost-thread sends auto-create the room in the SHARED
+go-chat service → 204 on both stacks (the ghost edit/delete/resolve/
+reopen/deltask pins stay 500 on both — the pre-GET/docstore hops fail
+first). e2e anchors: gate project `tc-p612-gate`, other-user project
+`webdav-p69-other`; DB rooms/messages 0/0 and `track_changes:false`
+before and after; nginx flips left clean (0); `go build ./...` +
+`go vet` clean; `bin/web` redeployed (md5 a3b25e0c…, /status 200).
+
+Regression after P6.12 (flip-gate sweep on the cumulative 10-conf):
+**P6.5 5/5, P6.6 5/5, P6.7 5/5, P6.8 5/5, P6.9 5/5, P6.10 5/5,
+P6.11 5/5, smoke 1/1, a5smoke 1/1** — nginx left clean afterward.
+
+**Next**: the remaining residual live P6 modules
+(notifications prefs, template-gallery, languagetool, typst,
+tex-autoformatter, git-bridge, instance-stats, user-activate, page-shells,
+launchpad — per the 2026-09-18 live audit) and
+**P7** (owner directive: go/** README tour, permanent Go web cutover,
+Node web junk-ification, frontend/** re-org, public/locales
+relocation, frontend/** README tour).
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
