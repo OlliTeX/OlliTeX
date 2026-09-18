@@ -54,9 +54,22 @@ const (
 	slotRegSU    = "\x01REGSU\x02"    // navbar sessionUser fragment: `` or `,&quot;sessionUser&quot;:{&quot;email&quot;:&quot;…&quot;}`
 	// P6.5 library pages (/library, /library/trashed):
 	slotLibUsers = "\x01LIBUSERS\x02" // ol-userSettings content JSON (htmlAttrEsc'd at finalize)
+	// P6.13 slot: ExposedSettings.canManageTemplatesMenu is PER-USER on
+	// Node (ExpressLocals re-computes it per request); the captured
+	// skeleton carried the capture user's `false`, so pages rendered
+	// for a different-privilege user (e.g. admin 404) diverged.
+	slotCanMgtTpl = "\x01CANMGTPL\x02"
+	// P6.13 slot: admin navbar branch (Node renders the Admin dropdown
+	// for site admins on EVERY page, including 404/403). Empty for
+	// non-admins; the page skeleton otherwise matches the user nav.
+	slotNavAdmin = "\x01NAVADMIN\x02"
 	// origin captured from the e2e fixtures (rewritten per request).
 	capturedOrigin = "http://127.0.0.1:7420"
 )
+
+// AdminNavFragment: the exact Node admin-nav <li> (captured from the Node
+// 404 page render for a site admin; identical across pages).
+const AdminNavFragment = `<li class="dropdown subdued" role="none"><button class="dropdown-toggle" aria-haspopup="true" aria-expanded="false" data-bs-toggle="dropdown" role="menuitem" event-tracking="menu-expand" event-tracking-mb="true" event-tracking-trigger="click" event-segmentation="{&quot;item&quot;:&quot;admin&quot;,&quot;location&quot;:&quot;top-menu&quot;}">Admin</button><ul class="dropdown-menu dropdown-menu-end" role="menu"><li role="none"><a class="dropdown-item" role="menuitem" href="/admin">Manage Site</a></li><li role="none"><a class="dropdown-item" role="menuitem" href="/admin/user">Manage Users</a></li><li role="none"><a class="dropdown-item" role="menuitem" href="/admin/project">Project/Object Lookup</a></li><li role="none"><a class="dropdown-item" role="menuitem" href="/admin/llm/settings">LLM Settings</a></li></ul></li>`
 
 var nonceEnc = base64.StdEncoding
 
@@ -98,6 +111,8 @@ type PageData struct {
 	SessionsCurrentRow           string // sessions page current <tr> (IP + moment date)
 	SessionsOtherRows            string // other sessions <tr>s (may be empty)
 	LibUsersJSON                 string // P6.5: ol-userSettings JSON (editorpages.BuildUserSettings)
+	CanManageTemplateMenu        bool   // P6.13: ExposedSettings.canManageTemplatesMenu (per-user)
+	NavAdmin                     string // P6.13: admin navbar fragment (site admins only)
 }
 
 func (p PageData) finalize(html string) string {
@@ -136,6 +151,12 @@ func (p PageData) finalize(html string) string {
 	out = strings.ReplaceAll(out, slot33CurrRow, p.SessionsCurrentRow)
 	out = strings.ReplaceAll(out, slot33Rows, p.SessionsOtherRows)
 	out = strings.ReplaceAll(out, slotLibUsers, htmlAttrEsc(p.LibUsersJSON))
+	if p.CanManageTemplateMenu {
+		out = strings.ReplaceAll(out, slotCanMgtTpl, "true")
+	} else {
+		out = strings.ReplaceAll(out, slotCanMgtTpl, "false")
+	}
+	out = strings.ReplaceAll(out, slotNavAdmin, p.NavAdmin)
 	// P3.4 register page (anon skeleton; fills on a logged-in session):
 	out = strings.ReplaceAll(out, slotRegUsers, htmlAttrEsc(p.UserEmail))
 	if p.UserID == "" {

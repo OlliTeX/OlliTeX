@@ -44,6 +44,7 @@ import (
 	"ollitex/go/services/web/features/staticpages"
 	"ollitex/go/services/web/features/status"
 	"ollitex/go/services/web/features/systemmessages"
+	"ollitex/go/services/web/features/templates"
 	"ollitex/go/services/web/features/tokenaccess"
 	"ollitex/go/services/web/features/trackchanges"
 	"ollitex/go/services/web/features/userpages"
@@ -182,6 +183,11 @@ func main() {
 	// comment send/edit/delete, thread resolve/reopen/delete)
 	app.RegisterFeature(trackchanges.Feature(app))
 
+	// P6.13 surface: template gallery (redirects / 3 public JSON routes /
+	// preview + bundle asset streams / six management routes 403 in this
+	// profile — no user carries template admin rights).
+	app.RegisterFeature(templates.Feature(app))
+
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))
 
@@ -223,8 +229,12 @@ func main() {
 		// The skeleton carries the slash ("7420/<path>"); trim our leading
 		// slash so the render is "7420/zzz-..." and not "7420//zzz-...".
 		pth := strings.TrimPrefix(cxt.Req.URL.Path, "/")
-		views.NotFoundPage(res.W, views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin, Path: pth, UserEmail: pe, UserID: uid})
+				views.NotFoundPage(res.W, views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin, Path: pth, UserEmail: pe, UserID: uid, CanManageTemplateMenu: templates.SessionMenuGrant(cxt.Sess), NavAdmin: tplNavAdmin(cxt.Sess)})
 	})
+
+	// web profile: rendered 403 page (general/restricted) — the global
+	// auth-chain renders it for anonymous non-GET on restricted routes;
+	// the templates feature renders it for logged-in non-privileged mgmt.
 
 	// web profile: rendered 500 page (general/500) — the ServerAdmin
 	// leaf routes error into it (pinned: nonce CSP + Permissions-Policy
@@ -265,4 +275,14 @@ func main() {
 	}
 	// graceful shutdown handled above; reaching here means ListenAndServe
 	// returned cleanly after Shutdown.
+}
+
+// tplNavAdmin: admin navbar fragment for per-request page renders (the
+// generic 404/500 skeletons are captured from a non-admin render and
+// carry the slot empty).
+func tplNavAdmin(sess *core.Session) string {
+	if templates.SessionIsAdmin(sess) {
+		return views.AdminNavFragment
+	}
+	return ""
 }

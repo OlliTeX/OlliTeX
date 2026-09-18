@@ -2615,10 +2615,72 @@ Regression after P6.12 (flip-gate sweep on the cumulative 10-conf):
 **P6.5 5/5, P6.6 5/5, P6.7 5/5, P6.8 5/5, P6.9 5/5, P6.10 5/5,
 P6.11 5/5, smoke 1/1, a5smoke 1/1** — nginx left clean afterward.
 
+**P6.13 — template-gallery module (DONE, GATE 5/5 GREEN, 2026-09-18):**
+Go package `go/services/web/features/templates/` (templates.go routes,
+handlers.go public reads + page/error plumbing, mgmt.go the full admin
+flows, sanitize.go cleanHtml parity, md.go markdown renderer,
+templates_test.go unit pins) implements all 16 live routes of
+`services/web/modules/template-gallery`:
+`GET /api/template` (key/val single-item lookup; unsupported key → null),
+`GET /api/template/categories`, `GET /api/templates`
+(totalSize+templates[] with Node-exact sort/fallback: `by` ∉
+{lastUpdated,name} or `order` ∉ {asc,desc} or repeated key → rendered
+500 page; empty values fall back to lastUpdated/desc),
+`GET /api/templates/admin-list` (authz ladder → 403 restricted for
+non-privileged), `POST /template/new/:id` (project ghost → 400),
+`POST /template/bundle/import` (400 on empty body),
+`POST /template/bundle/import-url` (400 empty / **422 SSRF on blocked
+CIDRs incl. 127.0.0.0/8** / 422 bad scheme), `POST /template/:id/edit`
+(200 `{lastUpdated}` echo; ghost/bad-hex → 500), `DELETE /template/:id/delete`
+(200; filestore zip+pdf delete fire-and-forget), `GET /template/:id` /
+`/templates` / `/templates/` / `/templates/manage` / `/templates/:category`
+(legacy **301** hub leaves), `GET /template/:id/bundle` (200 zip via
+filestore proxy; ghost → 500; bad-hex → 500
+`Cast to ObjectId failed for value "xyz"…` — the value must be quoted
+inside the message, Node-exact), `GET /template/:id/preview`
+(unavailable → rendered 404 page).
+
+Parity traps resolved during this unit (all pinned by the 48-pin gate
+`web-go-p613-flip.test.e2e.ts` + live A/B matrix):
+(1) `bson:"admin"` tag on the login userDoc read the WRONG field — the
+Node user doc stores `isAdmin`; fixed, session passport users now carry
+`isAdmin:true` for site admins; (2) the generic 404/403 page skeletons are
+captured once and render for EVERY user — but Node recomputes
+`ExposedSettings.canManageTemplatesMenu` **per request**
+(ExpressLocals → TemplateAuthorizationHelper) AND renders the **Admin
+navbar dropdown** for site admins on every page: both became per-render
+slots (`\x01CANMGTPL\x02`, `\x01NAVADMIN\x02` + `views.AdminNavFragment`,
+filled from the session user) — admin 404/403 and user 404/403 pages are
+now byte-identical to Node (difflib ratio 1.0 verified);
+(3) the 404 skeleton's `alternate` link is written as
+(`7420/<path>`) — callers must pass the TRIMMED path (pageBase
+convention); templates' `tplPageData` now trims;
+(4) `tplErr500` called `WriteHeader(500)` BEFORE `Error500Page` — that
+finalized headers and silently dropped ETag/CSP/PP from every rendered
+500 (Node's 500 page is weak-ETagged); removed the early WriteHeader;
+(5) mongoose `Cast to ObjectId` messages QUOTE the value inside the
+message text (`value "xyz"`) — replicated exactly (nodeJSONString escapes);
+(6) the bundle zip is re-compressed per stack — the gate pins status +
+content-type + content-disposition prefix, and entry-wise parity
+(template.json JSON-identical, source.zip identical, output.pdf
+byte-identical) was verified out-of-band; the gate also has to normalize
+the `version` counter (the no-op admin edit bumps it +1 per leg on BOTH
+stacks); (7) Node CRASHES on invalid-base64 import (unhandled rejection)
+— a pinned Node bug, deliberately absent from the Node leg; Go returns
+422 without crashing. e2e anchors: fixture template
+`6aa4b8d673ef0e5094f4cc2b` (Parity Fixture Template); nginx flips left
+clean (0); `go build ./...` + `go vet` + `go test ./go/services/web/...`
+clean; `bin/web` redeployed, /status 200.
+
+Regression after P6.13 (flip-gate sweep on the cumulative 11-conf):
+**P6.5 5/5, P6.6 5/5, P6.7 5/5, P6.8 5/5, P6.9 5/5, P6.10 5/5,
+P6.11 5/5, P6.12 5/5, smoke 1/1, a5smoke 1/1, template UI specs
+30/30** — nginx left clean afterward.
+
 **Next**: the remaining residual live P6 modules
-(notifications prefs, template-gallery, languagetool, typst,
-tex-autoformatter, git-bridge, instance-stats, user-activate, page-shells,
-launchpad — per the 2026-09-18 live audit) and
+(notifications prefs, languagetool, typst, tex-autoformatter,
+git-bridge, instance-stats, user-activate, page-shells, launchpad — per
+the 2026-09-18 live audit) and
 **P7** (owner directive: go/** README tour, permanent Go web cutover,
 Node web junk-ification, frontend/** re-org, public/locales
 relocation, frontend/** README tour).
