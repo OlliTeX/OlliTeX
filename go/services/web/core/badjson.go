@@ -24,6 +24,20 @@ func badBody400(a *App, r *http.Request, res *Res) {
 	_, _ = res.W.Write(badJSONPage)
 }
 
+// badBody413 — Node bodyParser entity.too.large (body over the 12 MiB
+// max_json_request_size) — pinned P6.17: 413 with the SAME content
+// negotiation as the 400 bad-JSON (JSON accept -> "{}"; else the 705B
+// error page), and the same BareWrite header set (X-Powered-By etc.).
+func badBody413(a *App, r *http.Request, res *Res) {
+	if a != nil && a.acceptsJSON(r) {
+		res.BareWrite(413, []byte("{}"))
+		return
+	}
+	res.W.Header().Set("Content-Type", "text/html; charset=utf-8")
+	res.W.WriteHeader(413)
+	_, _ = res.W.Write(badJSONPage)
+}
+
 // BadJSON400 — exported for features that parse strict JSON bodies after the
 // core pass (the core pre-handler already answers for POST/PUT/PATCH/DELETE
 // JSON bodies on web-profile routes; this is belt-and-braces parity).

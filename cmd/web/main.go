@@ -48,6 +48,7 @@ import (
 	"ollitex/go/services/web/features/systemmessages"
 	"ollitex/go/services/web/features/templates"
 	"ollitex/go/services/web/features/tokenaccess"
+	"ollitex/go/services/web/features/texfmt"
 	"ollitex/go/services/web/features/trackchanges"
 	"ollitex/go/services/web/features/userpages"
 	"ollitex/go/services/web/features/webdav"
@@ -197,6 +198,10 @@ func main() {
 	// P6.15 surface: LanguageTool proxy (languages, check, admin connection
 	// check).
 	app.RegisterFeature(languagetool.Feature(app))
+
+	// P6.17 surface: tex-autoformatter module (POST /api/format-tex —
+	// tex-fmt spawn or the bibtex normalizer for .bib filenames).
+	app.RegisterFeature(texfmt.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

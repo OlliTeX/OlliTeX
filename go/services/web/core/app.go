@@ -180,32 +180,40 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 			(r.Method == http.MethodPost || r.Method == http.MethodPut ||
 				r.Method == http.MethodPatch || r.Method == http.MethodDelete) {
 			if r.ContentLength > 0 || r.ContentLength < 0 {
-				raw, rerr := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
-				if rerr == nil {
-					r.Body = io.NopCloser(bytes.NewReader(raw))
-					r.ContentLength = int64(len(raw))
-					trimmed := bytes.TrimSpace(raw)
-					if len(trimmed) > 0 && trimmed[0] != '{' && trimmed[0] != '[' {
-						// Scalar-root / unparseable body (P3.3, refined P6.4a):
-						// Node 400 with a CONTENT-NEGOTIATED body — JSON accept
-						// -> "{}"; html accept (or no Accept header, "*/*") ->
-						// the 705B error page (pinned: POST notjson with no
-						// Accept -> 400 page; accept: application/json -> 400 {};
-						// scalar 123/"str"/true follow the same negotiation).
+				raw, rerr := io.ReadAll(http.MaxBytesReader(w, r.Body, 12*1024*1024))
+				if rerr != nil {
+					// P6.17: Node bodyParser.json({limit: max_json_request_size})
+					// — 12 MiB default (services/web settings.defaults). A body
+					// over the limit → entity.too.large → express error → 413,
+					// content-negotiated exactly like the 400 bad-JSON (JSON
+					// accept -> "{}"; else the 705-byte page), BEFORE the csrf
+					// 403. (Pinned live P6.17: 12 MB+1 body → Node 413 {}.)
+					badBody413(a, r, res)
+					return
+				}
+				r.Body = io.NopCloser(bytes.NewReader(raw))
+				r.ContentLength = int64(len(raw))
+				trimmed := bytes.TrimSpace(raw)
+				if len(trimmed) > 0 && trimmed[0] != '{' && trimmed[0] != '[' {
+					// Scalar-root / unparseable body (P3.3, refined P6.4a):
+					// Node 400 with a CONTENT-NEGOTIATED body — JSON accept
+					// -> "{}"; html accept (or no Accept header, "*/*") ->
+					// the 705B error page (pinned: POST notjson with no
+					// Accept -> 400 page; accept: application/json -> 400 {};
+					// scalar 123/"str"/true follow the same negotiation).
+					badBody400(a, r, res)
+					return
+				}
+				if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') {
+					// P6.14: express.json PARSES the whole root — an
+					// object/array-shaped body that is NOT valid JSON
+					// ({bad / [1,) also 400s BEFORE the csrf 403 (pinned
+					// live on the Node leg: POST {bad without csrf -> 400 {},
+					// not 403). Valid object/array roots pass here.
+					var probe any
+					if perr := json.Unmarshal(trimmed, &probe); perr != nil {
 						badBody400(a, r, res)
 						return
-					}
-					if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') {
-						// P6.14: express.json PARSES the whole root — an
-						// object/array-shaped body that is NOT valid JSON
-						// ({bad / [1,) also 400s BEFORE the csrf 403 (pinned
-						// live on the Node leg: POST {bad without csrf -> 400 {},
-						// not 403). Valid object/array roots pass here.
-						var probe any
-						if perr := json.Unmarshal(trimmed, &probe); perr != nil {
-							badBody400(a, r, res)
-							return
-						}
 					}
 				}
 			}
@@ -222,8 +230,8 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 				// registered BEFORE helmet (line ~322), so the csrf 403
 				// response carries NONE of the web-baseline headers (pinned
 				// P0: no nosniff; P3.1: no helmet set on the 403). Node sends
-			// it via res.sendStatus → X-Powered-By: Express present (pinned
-			// P3.2 on DELETE /status 403).
+				// it via res.sendStatus → X-Powered-By: Express present (pinned
+				// P3.2 on DELETE /status 403).
 				a.sessionBeforeHandler(cxt, w, rw)
 				res.W.Header().Set("X-Powered-By", "Express")
 				res.SendStatus(403)

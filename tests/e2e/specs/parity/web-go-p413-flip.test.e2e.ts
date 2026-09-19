@@ -206,11 +206,23 @@ function runLeg(base: string, A: string, DA: string): Record<string, Record<stri
 // ---- flip plumbing (self-contained; stripped afterwards) ----------------------
 function flipConf(conf: string, mode: 'apply' | 'strip') {
   // node-driven vhost splice: no sed/shell quoting involved
+  // Self-contained: apply installs the conf from the host flip dir into the
+  // container staging dir first (a standalone run has no prior gate that
+  // populated /usr/local/share/overleaf-flips — the original drop-the-cp-in
+  // apply made this test depend on sibling gates in the same batch).
+  if (mode === 'apply') {
+    dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips')
+    execFileSync('docker', ['cp', `${process.cwd()}/../../server-ce/nginx/flips/${conf}`, `${overleafC}:/usr/local/share/overleaf-flips/${conf}`], { timeout: 30000 })
+  }
   const nodeScript = mode === 'apply'
     ? 'const fs=require("fs");const v=process.argv[1],conf=process.argv[2];const inc="  include /etc/nginx/overleaf-flips/"+conf+";"+String.fromCharCode(10,10);let s=fs.readFileSync(v,"utf8");const L=s.split(String.fromCharCode(10));const i=L.findIndex(x=>x.trim()==="location / {");if(i<0)throw new Error("location / not found");if(!L.some(x=>x.includes("/"+conf)))L.splice(i,0,inc);fs.writeFileSync(v,L.join(String.fromCharCode(10)));"ok"'
     : 'const fs=require("fs");const v=process.argv[1],conf=process.argv[2];let s=fs.readFileSync(v,"utf8");const L=s.split(String.fromCharCode(10)).filter(x=>!x.includes("overleaf-flips/"+conf));fs.writeFileSync(v,L.join(String.fromCharCode(10)));"ok"'
   try {
-    const out = dexe(overleafC, `mkdir -p /etc/nginx/overleaf-flips && cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf} && node -e '${nodeScript.replace(/'/g, "\'")}' /etc/nginx/sites-enabled/overleaf.conf ${conf}`.replace(`cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf} &&`, mode === 'strip' ? `true &&` : ''), true)
+    // apply: the conf is installed to the container staging dir by the
+    // pre-step above (docker cp from the host flip dir), so the cp into
+    // /etc/nginx/overleaf-flips MUST run here. strip: no cp, just unsplice.
+    const cpStep = mode === 'apply' ? `cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf} && ` : ''
+    const out = dexe(overleafC, `mkdir -p /etc/nginx/overleaf-flips && ${cpStep}node -e '${nodeScript.replace(/'/g, "\'")}' /etc/nginx/sites-enabled/overleaf.conf ${conf}`, true)
     // reload with retry (rapid successive reloads can race the master)
     let rc = 1
     for (let t = 1; t <= 3; t++) {

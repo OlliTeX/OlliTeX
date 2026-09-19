@@ -2876,9 +2876,81 @@ UCASE ids on both sides** (previously the flip leg diffed on the hex
 case only — the gate's normalization masked it; the A/B raw pins expose
 it).
 
-**Next**: the remaining residual live P6 modules (tex-autoformatter,
-git-bridge, page-shells, user-activate, launchpad — per the 2026-09-18
-live audit) and **P7** (owner directive).
+**P6.17 — tex-autoformatter (DONE, GATE 5/5 GREEN, 2026-09-19):**
+`services/web/modules/tex-autoformatter` (TexAutoformatterController.mjs
+— 1 route, `POST /api/format-tex`, requireLogin) is pure formatting,
+stateless. Node: `{content: string, filename?: string}` → content
+length (UTF-16 units) > 5 MiB → 400 `{"error":"content too large"}`;
+`.bib` (last dot-ext, case-insensitive; no filename → tex path) →
+**bibtex-tidy@1.15.1** (PnP zip — not importable) reimplemented in Go
+as `go/services/web/features/texfmt/bibtex.go` (1019 lines): the full
+parser (top-level block/text nodes with whitespacePrefix; entry/
+string/preamble/comment; `{`/`(` delimiters; `#`-joined values;
+braced/math/command values; BOM), the exact transform pipeline
+(preferCurly month-exception, preferNumeric `^[1-9][0-9]*$`,
+trailingCommas, removeEmptyFields, sortFields, stripEnclosingBraces
+via a Latex-AST round-trip where quotes are NOT escaped — a JSON
+display artifact, verified on raw bytes), then the reset-whitespace →
+blank-lines → join(prefix+content)+trimEnd+`\n` render (commentLike =
+text | @comment only), plus a Node-generated escape table
+(`escape_table.go`) — all pinned by a **147-case corpus** from the
+live Node library (`/tmp/gotidy_corpus.json`; `texfmt_test.go` —
+byte-identical output or throw for throw-cases). Everything else goes
+to `tex-fmt --stdin` (same binary, same container — `RunTexFmt`,
+10 s timeout). 500 = `{"error":"Formatting failed"}` (Node's catch).
+The 200 JSON is written with an EscapeHTML(false) encoder — Node
+JSON.stringify does not HTML-escape (`&` stayed `&` on the wire;
+default `json.Marshal` `\u0026` broke the A/B r3-esc-mixed row).
+
+**Core parity fix (landed with P6.17):** the core JSON body cap was 1
+MiB but Node `bodyParser.json({limit: max_json_request_size})` is
+**12 MiB** — a 5 MiB+1 body (Node parses it, then the controller's 5
+MB guard 400s it) reached the Go handler with a partially-consumed
+body and the wrong 400 `content must be a string`. The cap is now 12
+MiB and over-limit → `badBody413` (bare-JSON accept → 413 `{}`;
+html/`*/*` → the same 705 B page — pinned on Node: bodyParser
+entity.too.large, negotiated body, X-Powered-By). 12 MiB+1 body →
+413 `{}` on both, HTML page on both.
+
+**P6.16 residue repaired:** the P6.16 gate was green against the WORK
+TREE — committed HEAD `ee034c6e7e` does not compile (`clone.go`/
+`newzip.go` still call the pre-compiler `crInsertProject`; verified
+with a clean `git worktree add` build). This commit closes the loop
+(compiler arg at the call sites, `/project/new/typst` in `crRouted`,
+`oidHex` accepting 24-hex string ids — Node's `overleaf.history.id`
+stores plain hex strings) and the committed tree builds again.
+
+Parity traps resolved: (1) the ad-hoc A/B "nocsrf → 400" was a
+stale-session artifact — direct A/B gives no-token → **403**
+`Forbidden` on both (pinned); (2) Node express.json accepts
+object/array roots (→ the handler's 400 content-check) but SCALAR
+roots (`42`/`"hi"`/`null`/`true`/unparseable) → 400 `{}` — both match
+the Go core full-parse pass (all 7 body-edge rows A/B identical);
+(3) `activationLink` in the admin user surface is a LIVE
+`use:'password'` token row in db.tokens (not a user field) — sweep
+residue left one (expired 08:34), flipping the p63a pin; it
+self-heals; (4) the p413 gate's `flipConf.apply` `.replace()` DROPPED
+the cp into /etc/nginx/overleaf-flips in BOTH modes — the nginx-bound
+test only passed while a sibling gate had pre-staged the conf. apply
+now docker-cps from the host flip dir first and always cp's
+staging→/etc/nginx; green standalone.
+
+nginx flipped **web-p617.conf** (POST exact-path, method guard,
+fall-through to Node) left clean (0); `go build ./...` + `go vet
+./go/...` + `go test ./go/...` clean; **155/155** A/B (149 corpus +
+2 tex-fmt + 6 contract rows) status+content-type+byte-identical.
+
+Regression after P6.17 (FULL prior flip-gate sweep, 51 gates +
+smoke): **177 passed, 3 failed (1.2h)** — all three environment/gate
+bugs, no parity diff in any leg: p3c leg2 login **429** (Node login
+limiter under back-to-back gates — limiter flush → p3c 5/5), p63a pin
+sanity `activationLink` (expired-token residue — FLAKY→pass), p413
+nginx-bound (real pre-existing gate bug — repaired — 5/5
+standalone). P6.16 5/5 + smoke/a5smoke green; nginx left clean.
+
+**Next**: the remaining residual live P6 modules (git-bridge,
+page-shells, user-activate, launchpad — per the 2026-09-18 live
+audit) and **P7** (owner directive).
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already

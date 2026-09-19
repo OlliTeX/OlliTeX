@@ -974,7 +974,7 @@ func newzipHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			u = crOwnerUser{spellCheckLanguage: "en"}
 		}
 		crInsertProject(a, cxt, pj, rootID, nil, uniqueName, uid,
-			u.spellCheckLanguage, bson.A{}, bson.A{}, 0)
+			u.spellCheckLanguage, "pdflatex", bson.A{}, bson.A{}, 0)
 		crInitHistory(cxt, pj.Hex())
 
 		cleanup := func() {
