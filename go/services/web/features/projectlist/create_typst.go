@@ -248,7 +248,7 @@ func newTypstProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		pid := crCreateTypstProject(a, cxt, name, uid, u, tmpl)
 
-		b, _ := json.Marshal(crOut{
+		b := core.JSON(crOut{
 			ProjectID: pid.Hex(),
 			OwnerRef:  uid,
 			Owner: crOwner{

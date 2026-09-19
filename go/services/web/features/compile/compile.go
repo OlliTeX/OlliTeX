@@ -586,8 +586,7 @@ type resp struct {
 }
 
 func writeJSON(res *core.Res, status int, body *resp) {
-	b, _ := json.Marshal(body)
-	res.JSON(status, b)
+	res.JSON(status, core.JSON(body))
 }
 
 // ---------------------------------------------------------------------------

@@ -42,7 +42,6 @@
 package projectlist
 
 import (
-	"encoding/json"
 
 	"ollitex/go/services/web/core"
 )
@@ -149,11 +148,7 @@ func handler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(500, []byte("internal error"))
 			return
 		}
-		b, jerr := json.Marshal(ProjectListResp{Projects: projects})
-		if jerr != nil {
-			res.JSON(500, []byte("internal error"))
-			return
-		}
+		b := core.JSON(ProjectListResp{Projects: projects})
 		res.JSON(200, b)
 	}
 }

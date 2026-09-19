@@ -38,6 +38,7 @@ import (
 	"ollitex/go/services/web/features/languagetool"
 	"ollitex/go/services/web/features/notifications"
 	"ollitex/go/services/web/features/orcidpicker"
+	"ollitex/go/services/web/features/pageshells"
 	"ollitex/go/services/web/features/passwordreset"
 	"ollitex/go/services/web/features/projectlist"
 	"ollitex/go/services/web/features/registrationpage"
@@ -202,6 +203,12 @@ func main() {
 	// P6.17 surface: tex-autoformatter module (POST /api/format-tex —
 	// tex-fmt spawn or the bibtex normalizer for .bib filenames).
 	app.RegisterFeature(texfmt.Feature(app))
+
+	// P6.18 surface: page-shells module — the legacy shell pages are
+	// removed (hubs are the settings surfaces): GET /user/mysettings →
+	// 301 /hub#/mysettings.account; GET /admin/panel → 301 /hub#/overview
+	// (site admin — non-admin bounces to /restricted?from=…).
+	app.RegisterFeature(pageshells.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

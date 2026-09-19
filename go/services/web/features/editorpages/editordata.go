@@ -435,7 +435,11 @@ func navbarJSON(siteURL, currentURL, email string, isAdmin bool) string {
 	sstr.WriteString(`,"canDisplayScriptLogMenu":false`)
 	sstr.WriteString(`,"suppressNavbarRight":false`)
 	sstr.WriteString(`,"suppressNavContentLinks":false`)
-	sstr.WriteString(`,"showSignUpLink":false`)
+	// showSignUpLink — Node: hasFeature('registration-page') =
+	// env OVERLEAF_ENABLE_REGISTRATION_PAGE ?? !(saml/ldap/oidc enable),
+	// pinned TRUE in this stack (live-captured 2026-09-19; re-pin on SSO
+	// state change).
+	sstr.WriteString(`,"showSignUpLink":true`)
 	sstr.WriteString(`,"currentUrl":"` + jesc(currentURL) + `"`)
 	sstr.WriteString(`,"sessionUser":{"email":"` + jesc(email) + `"`)
 	sstr.WriteString(`},"items":[{"text":"Library","url":"/library","class":"subdued","translatedText":"Library"},`)

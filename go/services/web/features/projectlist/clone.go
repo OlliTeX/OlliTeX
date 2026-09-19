@@ -403,7 +403,7 @@ func cloneProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 		}
 
-		out, _ := json.Marshal(cloneResp{
+		out := core.JSON(cloneResp{
 			Name:        pr.name,
 			LastUpdated: now,
 			ProjectID:   pid.Hex(),

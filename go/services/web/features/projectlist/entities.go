@@ -1,7 +1,6 @@
 package projectlist
 
 import (
-	"encoding/json"
 	"regexp"
 	"sort"
 	"strings"
@@ -103,11 +102,7 @@ func entitiesHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		for _, e := range ents {
 			out = append(out, entOut{Path: e.path, Type: e.typ})
 		}
-		b, jerr := json.Marshal(entResp{ProjectID: param, Entities: out})
-		if jerr != nil {
-			res.JSON(500, []byte("internal error"))
-			return
-		}
+		b := core.JSON(entResp{ProjectID: param, Entities: out})
 		res.JSON(200, b)
 	}
 }

@@ -479,7 +479,7 @@ func inviteCreateHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 			res.JSON(500, []byte("internal error"))
 			return
 		}
-		b, _ := json.Marshal(invResp{Invite: &invOut{ID: hexid, Email: es, Privileges: ps}})
+		b := core.JSON(invResp{Invite: &invOut{ID: hexid, Email: es, Privileges: ps}})
 		res.JSON(200, b)
 	}
 }
@@ -526,11 +526,7 @@ func inviteListHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 		if list == nil {
 			list = []invOut{}
 		}
-		b, jerr := json.Marshal(invListResp{Invites: list})
-		if jerr != nil {
-			res.JSON(500, []byte("internal error"))
-			return
-		}
+		b := core.JSON(invListResp{Invites: list})
 		res.JSON(200, b)
 	}
 }

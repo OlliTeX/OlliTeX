@@ -2948,9 +2948,85 @@ sanity `activationLink` (expired-token residue — FLAKY→pass), p413
 nginx-bound (real pre-existing gate bug — repaired — 5/5
 standalone). P6.16 5/5 + smoke/a5smoke green; nginx left clean.
 
+**P6.18 — page-shells (DONE, GATE 5/5 GREEN, 2026-09-19):**
+`services/web/modules/page-shells` (PageShellsRouter.mjs +
+MySettingsShellController.mjs — 2 shell routes, both pure redirects,
+no Node-specific state): GET /user/mysettings (requireLogin → 301
+`/hub#/mysettings.account`) and GET /admin/panel
+(ensureUserIsSiteAdmin → site-admin 301 `/hub#/overview`; non-admin
+302 `/restricted?from=%2Fadmin%2Fpanel`; anonymous 302 /login). Go:
+`go/services/web/features/pageshells/pageshells.go` (2 routes, ~50
+lines) reusing the P1 login gate, P3.1 `RequireSiteAdmin` (whose
+deny 302 builds the SAME `from` param), and the P6.14-pinned
+`res.Redirect` Accept negotiation (html → `<p>…</p>` text/html
+title-less 301 body; text/`*/*` → plain `text/plain`; json/form →
+**empty body with NO Content-Type header** — Express does not attach
+one to a 301 with empty body) plus Vary: Accept. 24/24 canonical A/B
+rows byte-identical (anon/login, ms text/html/json/form/plain, pan
+site-admin, pan non-admin, restricted from, OPTIONS).
+
+**Core parity fixes landed with P6.18:** (1) `response.go` `Redirect`
+now uses `Header().Del("Content-Type")` for the empty-body case —
+`Set(ct, "")` made net/http write an empty `Content-Type:` header on
+the wire while Node omits the header entirely (the P6.14/6.5 gates
+passed only because their normalization masked `''`); (2) **express
+auto-OPTIONS** implemented in the Go core fallback (`app.go`
+`serveOptionsAuto`): 200 + `Allow: GET,HEAD[,<route methods>]` +
+body = the Allow string + `text/html; charset=utf-8` +
+`ETag W/"<hex-len>-<sha1-base64>"`, X-Powered-By only on NoSession
+paths — express's auto-OPTIONS middleware answered every OPTIONS on a
+route with one; the login/CSRF chain runs BEFORE it (anonymous
+OPTIONS on a gated path → 302 /login; on a NoLogin path → 200 Allow);
+(3) `pathHasNoLogin` exempts NoLogin/NoSession route paths from the
+fallback login bounce (Node requireGlobalLogin's NoLogin whitelist
+applies to all methods incl. OPTIONS).
+
+**Global parity fixes found by the P6.18 regression sweep and
+repaired (not gate-local):** (a) **`core.JSON(v)` helper (badjson.go)**
+— Go's default `json.Marshal` HTML-escapes `<`/`>`/`&` to
+`\u003c/\u003e/\u0026`; Node `JSON.stringify` never does (pinned on the
+'Pin&A B<T>' fixture: Go `\u0026A B\u003cT\u003e` vs Node `&A B<T>` — broke
+the P4.1 project-list etag/body parity). All response-producing
+`json.Marshal` sites converted to `core.JSON`: projectlist
+(list/invite/entities/clone/create/create_typst), instancestats
+alert-config, userpages sessions, compile writeJSON. (b)
+**showSignUpLink state drift (NOT code):** every shell page's navbar
+meta carries `showSignUpLink = hasFeature('registration-page')` = env
+`OVERLEAF_ENABLE_REGISTRATION_PAGE` (unset) ??
+`!(saml||ldap||oidc)`. The stack's saml.enabled=true → Node TRUE,
+while the Go constants were captured pre-SSO as FALSE. Flipped
+TRUE in the 4 views constants files + hub.go + editordata.go +
+5 testdata fixtures (provenance comment inline; re-pin on SSO state
+change). login/register/passwordReset/settings/hub surfaces A/B
+EQUAL after flip.
+
+nginx flipped **web-p618.conf** (2 EXACT-match locations,
+`location = /user/mysettings` + `= /admin/panel`, no method guard —
+Go core chain reproduces the 403/200-Allow for other methods,
+A/B-verified) → variants (case/trailing-slash/double-slash/subpaths)
+fall through to Node → parity by construction (express's
+case-insensitive + slash-tolerant matching would otherwise 404 in
+Go's exact-match router). 5/5 gate (27-row battery: anon, ms,
+pan-admin/non, 4 variants, OPTIONS, restricted-from) in 41.6 s.
+
+Regression after P6.18 (FULL specs/parity dir, 433 tests):
+**415 passed, 12 failed, 4 flaky (53.6 m)** — the 12 failures are
+all environment/state artifacts, zero parity diffs: hub-admin-projects
+(7) + legacy-project (1) = DB-residue UI flakes (admin project table
+position-dependent selectors under 675 accumulated gate-residue
+projects; green standalone on a quiesced DB — the spec's
+trash/delete/purge/transfer/invite chain mutates shared e2e-user
+projects whose async Node workers (trash/purge/transfer queues)
+complete mid-sweep); p1-auth leg2 + p3c leg2 = login 429 under the
+sweep-wide login storm (standalone green after limiter flush); p613
+leg2/leg3 = template list state mutation (standalone 5/5); p3d leg1
++ p413 + p63a pin-sanity = same residue/429 family (all 4 recovered
+on retry). `go build ./...` + `go vet ./go/...` + `go test
+./go/...` clean; nginx left clean (0 dangling flip includes).
+
 **Next**: the remaining residual live P6 modules (git-bridge,
-page-shells, user-activate, launchpad — per the 2026-09-18 live
-audit) and **P7** (owner directive).
+user-activate, launchpad — per the 2026-09-18 live audit) and
+**P7** (owner directive).
 
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
 -flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already

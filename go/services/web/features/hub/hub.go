@@ -163,7 +163,11 @@ func hubNavbar(email string, isAdmin bool) string {
 		`,"canDisplayScriptLogMenu":false` +
 		`,"suppressNavbarRight":false` +
 		`,"suppressNavContentLinks":true` +
-		`,"showSignUpLink":false` +
+		// showSignUpLink — Node: hasFeature('registration-page') =
+	// env OVERLEAF_ENABLE_REGISTRATION_PAGE ?? !(saml/ldap/oidc enable),
+	// pinned TRUE in this stack (live-captured 2026-09-19; re-pin on SSO
+	// state change).
+	`,"showSignUpLink":true` +
 		`,"currentUrl":"/hub"` +
 		`,"sessionUser":{"email":"` + jsString(email)[1:len(jsString(email))-1] + `"` +
 		`},"items":` +

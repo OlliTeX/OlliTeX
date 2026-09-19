@@ -1,8 +1,25 @@
 package core
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 )
+
+// JSON marshals `v` for JSON responses. Parity note: Go's default
+// encoding/json HTML-escapes '<', '>' and '&' to \u003c/\u003e/\u0026, which
+// Node's JSON.stringify never does (byte-parity breaks on project names
+// like 'Pin&A B<T>' — pinned 2026-09-19 via the P4.1 sweep). SetEscapeHTML
+// (false) matches Node; the trailing Encoder newline is trimmed.
+func JSON(v any) []byte {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return []byte(`{}`)
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n"))
+}
 
 // badBody400 — Node express.json+HttpErrorHandler behavior for a scalar-root
 // or unparseable JSON body (P3.3 pin "{}" for JSON accept; P6.4a pin: the

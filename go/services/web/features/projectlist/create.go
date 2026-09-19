@@ -351,7 +351,7 @@ func newProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			pid = crCreateBasicProject(a, cxt, name, uid, u)
 		}
 
-		b, _ := json.Marshal(crOut{
+		b := core.JSON(crOut{
 			ProjectID: pid.Hex(),
 			OwnerRef:  uid,
 			Owner: crOwner{

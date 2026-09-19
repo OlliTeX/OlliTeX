@@ -179,8 +179,10 @@ func (r *Res) Redirect(req *http.Request, code int, url string) {
 	if ct != "" {
 		r.W.Header().Set("Content-Type", ct)
 	} else {
-		// suppress net/http content sniffing for the empty-body case
-		r.W.Header().Set("Content-Type", "")
+		// suppress net/http content sniffing AND the empty-value header
+		// (Node express sends NO Content-Type header at all when the body
+		// is empty — pinned P6.18 A/B: header-absent, not empty-valued).
+		r.W.Header().Del("Content-Type")
 	}
 	r.W.Header().Set("Vary", "Accept")
 	r.W.Header().Set("Content-Length", fmt.Sprint(len(body)))

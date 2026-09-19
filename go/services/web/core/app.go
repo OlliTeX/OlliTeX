@@ -2,7 +2,10 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -294,8 +297,26 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 
 	// fallback
 	if a.Cfg.Profile == "web" {
-		if !a.Cfg.AllowPublicAccess && !cxt.Sess.IsLoggedIn() {
+		// Node requireGlobalLogin: the NoLogin/NoSession whitelist applies to
+		// EVERY method — anonymous OPTIONS /status → 200 Allow, anonymous
+		// OPTIONS /zzz-nope → 302 (pinned P6.18).
+		gated := !a.Cfg.AllowPublicAccess && !cxt.Sess.IsLoggedIn()
+		if gated && a.pathHasNoLogin(r.URL.Path) {
+			gated = false
+		}
+		if gated {
 			a.globalLoginBounce(cxt, res, r)
+			a.maybeSaveSession(cxt, w, rw)
+			return
+		}
+		// express Router auto-OPTIONS (pinned P6.18): once past the gate,
+		// an OPTIONS request with no method route gets 200 +
+		// Allow:"GET,HEAD[,<route methods>]" (registration order, GET,HEAD
+		// ALWAYS first — even on POST-only paths like /api/format-tex →
+		// "GET,HEAD,POST"; unknown paths → bare "GET,HEAD") + the SAME
+		// string as body + text/html + weak sha1 etag + NO X-Powered-By.
+		if r.Method == "OPTIONS" {
+			a.serveOptionsAuto(res, r)
 			a.maybeSaveSession(cxt, w, rw)
 			return
 		}
@@ -319,6 +340,73 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 		pbhttp.ExpressNotFound(rw, r)
 	}
 	a.maybeSaveSession(cxt, w, rw)
+}
+
+// pathHasNoLogin reports whether at least one route registered on the
+// exact path carries the NoLogin/NoSession marker (Node's
+// requireGlobalLogin whitelist — method-independent, pinned P6.18).
+func (a *App) pathHasNoLogin(p string) bool {
+	for _, f := range a.feats {
+		for i := range f.Routes {
+			if f.Routes[i].Path == p && (f.Routes[i].NoLogin || f.Routes[i].NoSession) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// serveOptionsAuto — express Router auto-OPTIONS response (pinned P6.18):
+//
+//	200, Allow: "GET,HEAD" + the path's non-GET/HEAD route methods in
+//	registration order (e.g. /api/format-tex → "GET,HEAD,POST"; unknown
+//	path → "GET,HEAD"), body = the same string, text/html; charset=utf-8,
+//	weak sha1 etag (the `etag` package: sha1 digest base64), NO
+//	X-Powered-By (res.send-style path, not res.sendStatus).
+func (a *App) serveOptionsAuto(res *Res, r *http.Request) {
+	ms := []string{"GET", "HEAD"}
+	seen := map[string]bool{"GET": true, "HEAD": true}
+	for _, f := range a.feats {
+		for i := range f.Routes {
+			if f.Routes[i].Path != r.URL.Path {
+				continue
+			}
+			m := f.Routes[i].Method
+			if !seen[m] {
+				seen[m] = true
+				ms = append(ms, m)
+			}
+		}
+	}
+	allow := strings.Join(ms, ",")
+	sum := sha1.Sum([]byte(allow))
+	// express `etag` package: W/"<hex-len>-<sha1 base64 NO padding>" —
+	// pinned P6.18 (13 → W/"d-…", 8 → W/"8-…", no trailing '=').
+	etagBody := base64.StdEncoding.EncodeToString(sum[:])
+	for strings.HasSuffix(etagBody, "=") {
+		etagBody = strings.TrimSuffix(etagBody, "=")
+	}
+	// Node attaches X-Powered-By: Express on the auto-OPTIONS response for
+	// NoSession (publicApi-style) paths (/status, /health_check/*) but not
+	// on sessionful ones (/login, /api/format-tex) — pinned P6.18.
+	public := false
+	for _, f := range a.feats {
+		for i := range f.Routes {
+			if f.Routes[i].Path == r.URL.Path && f.Routes[i].NoSession {
+				public = true
+			}
+		}
+	}
+	h := res.W.Header()
+	if public {
+		h.Set("X-Powered-By", "Express")
+	}
+	h.Set("Allow", allow)
+	h.Set("ETag", fmt.Sprintf(`W/"%x-%s"`, len(allow), etagBody))
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Content-Length", strconv.Itoa(len(allow)))
+	res.W.WriteHeader(200)
+	_, _ = res.W.Write([]byte(allow))
 }
 
 func (a *App) serve500(cxt *Cxt, res *Res, err error) {
