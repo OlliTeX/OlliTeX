@@ -1,7 +1,7 @@
 # WEB_GO_PLAN — 1:1 drop-in Go replacement of the `services/web` backend
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
-all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15).
+all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green**; **P4.12a file proxy (`GET|HEAD /Project/:id/file/:File_id`) ✔ 3/3 x3 (history-v1→Go-filestore blob chain, no-CT/chunked 200 pin, HEAD-404 fork quirk, guest/VA/authz battery) — ALSO FIXED the baked-in-capture-user bug in `restrictedHTML` (Go 403-restricted pages now render the requesting user; a P2-page variant of the same bug is deferred to a view-audit unit)**; **P4.12b doc download (`GET|HEAD /Project/:id/doc/:Doc_id/download`) ✔ 3/3 x3 (DU fromVersion=-1 lines, CD attachment, HEAD-200 asymmetry, sendStatus-404 pin) — 45-test P4 regression green** (2026-09-15). **P4.12c private API doc trio (GET|POST doc + changes/reject) ✔ 3/3 x3 (basic-auth surface, XPB+CSP pin, `NoSession` route option, 204 ETag quirk) — 47-test P4 regression green**; **P4.13a project upload (`POST /Project/:id/upload`) ✔ 3/3 x3 (thin-client upsert engine: docstore/v1H/DU call order, file↔doc swaps, cross-type 200+422/400/403/404/500 contract, `owner_ref`/docstore-seed env pins, `entCanWrite` collabRefs + 500-mailto parity fixes) — 65-test cross-regression green**; **P4.13b new-project zip upload (`POST /project/new/upload`) ✔ 3/3 x3 (FileSystemImportManager replica: zip-skip→topLevel-dir strip, FileTypeManager byte-level parity incl. utf16le-BOM + latin1 fallback + non-BMP→file + 3MiB decode gate, rootDoc priority pin, enforce-mode VA byte-pins, blocked-name `toString` → 500 + `zip-import-failure` deleter, multer `LIMIT_UNEXPECTED_FILE` HTML page, 22-case response+mongo+DU+docstore state battery) — FULL P4 regression green (36 p4* + 23 p411–p413b + P2/P3 sweep)** (2026-09-15). **P4.13b ALSO FIXED the P4.1 list owner+collaborator dedup bug (user who is owner AND invited-collaborator listed twice by Go; Node dedups best-access — latent, exposed by p4col-gate leftover projects) and hardened p413a/p413b/p413 flip harnesses against stale-include cascade failures.** **ALL OF P4 COMPLETE (2026-09-15): project list + entities + members + access-requests + rename + flags + create(+example) + delete/restore + clone + collaborators + invites + editor entity create/delete + file proxy + doc download + private doc trio + project upload + zip upload.**
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -1285,6 +1285,254 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
   (3 legs, ~40 cases, 6-mail assertion, sink-token recovery).
 - full `web-go P4` regression green after P4.10b (36 passed 3.6m).
 
+#### P4.11a — editor entity creation: `POST /project/:id/doc` + `POST /project/:id/folder` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+- Node oracle (probe 4, live-pinned 2026-09-15): addDoc 200
+  `{"name","_id"}` (trimmed name); doc store `POST
+  {docstore}/project/:pid/doc/:did` fired on every doc path that passes
+  `isCleanFilename` (blocked/dup 400s included); entity-count > 2000 →
+  i18n JSON; path > 1024 → 400 `path too long`; top-level blocked JS
+  property names (`toString`, `constructor`, … 14 words) → 400 `blocked
+  element name` (docs/files only, folders + subfolders exempt); duplicate →
+  400 `file already exists` (checked after the docstore call, matching
+  Node's `_putElement` order); bad/ghost parent → 404 page; non-member →
+  403 `{"message":"restricted"}`; anon + valid-CSRF → 401 `Unauthorized`;
+  PUT/GET method mismatch → Node 404 (flip method-guard proxies to Node);
+  strict body VA (`name:null` → `expected string, received null at
+  "body.name"`, extra key → `Unrecognized key at "body"`, `name:42` →
+  `expected string, received number`), raw name ≥ 150 chars → 400
+  text/plain `Bad Request`.
+- **Folder error shape diverges from doc** (pinned): invalid folder names
+  (`'   '`, `'../escape'`, `'a*b'`) → 400 `application/json`
+  `"Invalid File Name"` (i18n `invalid_file_name`); invalid **doc** names
+  → 400 text/plain `invalid element name`.
+- Go: `projectlist/entadd.go` (SafePath BADCHAR/BADFILE replica —
+  `[/\\*\x00-\x1F\x7F\x80-\x9F]`, `^.$|^..$|edge-space` — RE2-safe,
+  blocked-word table, full-tree parser tolerant of `primitive.M/A` driver
+  shapes, parent-folder resolver, docstore client, `_putElement` check
+  order, single `findOneAndUpdate` $push/$inc/$set write with
+  `rootFolder.N` filter → MatchedCount 0 → Node's 500), routes registered
+  in `projectlist.go`, flip `web-p411a.conf` (POST-only; other verbs proxy
+  to Node — no in-`if` `proxy_set_header`), gate
+  `web-go-p411a-flip.test.e2e.ts` (3 legs, ~35 cases, state anchor:
+  rootFolder tree names + version + lastUpdatedBy).
+- 404/500 page PATH slot: skel renders `origin + "/" + PATH` — pass the
+  request path **without** the leading slash (`TrimPrefix`) or the
+  alternate-`href` grows one byte vs Node (caught by the gate).
+- Full `web-go P4` regression green after P4.11a (39 passed 3.8m).
+
+#### P4.11b — editor entity DELETION: `DELETE /project/:id/{doc,file,folder}/:entity_id` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+- Node oracle (live-pinned 2026-09-15): auth (anon → 401 sendStatus; anon +
+  **invalid** CSRF → core 403 `Forbidden`; non-member → 403
+  `{"message":"restricted"}`) → zz.objectId(params) → 404 **JSON** VA
+  `{"error":"Validation error: Invalid Mongo ObjectId at \"params.
+  <Project_id|entity_id>\"","statusCode":404}` (params level = 404, not 400)
+  → `flushProjectToMongo` (document-updater dead in this stack; failures
+  tolerated — deletes still 204) → **root-folder guard** → 422 text/plain
+  `cannot delete root folder` (requires `rootFolder[0]._id` present — a
+  malformed project without the id 500s on Node's `.toString()`; real
+  projects always have the id) → `findElement` (missing or wrong type →
+  404 page) → `findOneAndUpdate({_id}: {$pull: {<parentArrayPath>: {_id}},
+  $inc: {version:1}, $set: {lastUpdated, lastUpdatedBy}, [$unset
+  rootDoc_id]})` (MatchedCount 0 → Node 500) → **_cleanUpEntity**: per doc
+  in the deleted subtree → docstore `PATCH {docstore}/project/:pid/doc/:did
+  {deleted:true, deletedAt, name}`; **docstore 404 (doc not there) →
+  NotFoundError → HTTP 404 page AFTER the tree write already committed**
+  (pinned via seeded doc without docstore entry: state mutated + 404)
+  → 204 No Content (no body, no content-type).
+- Subtle pins: root-doc deletion **unsets `rootDoc_id`** (same write via
+  `$unset`); deleting a folder cleans every doc in its subtree (docstore
+  PATCH each); `findElement` order = element arrays before recursive
+  folders, folders in index order; doc→docs, file→fileRefs, folder→folders;
+  PUT to a DELETE route → flip method-guard → Node express default 404 page
+  (`Cannot PUT ...`).
+- Go: `projectlist/delent.go` (handler mirrors the Node order exactly, reuses
+  P4.11a tree parser + `entCanWrite` + `loadProjectFull` + `fireHTTP` +
+  `cduBase`; new: `delFind` mirror of `findElement`, `delSubtreeDocs`,
+  `entPatchDoc` docstore client, 404-VA `delParamVA`); routes registered in
+  `projectlist.go` with `([^/]+)` segment patterns (the core router would
+  404 non-hex paths before the handler ever ran — Node's Express passes
+  them through for the VA response); flip `web-p411b.conf` (DELETE-only
+  guards); gate `web-go-p411b-flip.test.e2e.ts` (3 legs, 20-case stateful
+  battery + state anchor: flat tree names + version + lastUpdatedBy +
+  rootDoc presence + docstore row count per project).
+- Driver quirk (cost a gate failure): `UpdateOne(ctx, filter, bson.A{...})`
+  is treated as an **aggregation pipeline** ("Unrecognized pipeline stage
+  name: '$pull'") — pass a top-level `bson.D` document for operator
+  updates; conditional append is `primitive.E`.
+- Seeded docs need **real docstore entries** (POST the Go docstore API, as
+  Node's addDoc does) — deleting a doc without an entry is a distinct
+  Node 404-after-write case (covered by `delOrphan`).
+- Full `web-go P4` regression green after P4.11b (42 passed 4.2m).
+
+#### P4.12a — file proxy: `GET|HEAD /Project/:Project_id/file/:File_id` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+- Go: `features/projectlist/fileproxy.go` (`fileProxyHandler`, `fproxyFindFile`,
+  `fproxyHistoryID`) + route in `projectlist.go` + flip
+  `server-ce/nginx/flips/web-p412.conf` (GET|HEAD → Go; other verbs → Node;
+  case-sensitive `/Project/…` vs lowercase editor `/project/…`).
+- Chain: web → **history-v1 (Node, 127.0.0.1:3100)** `GET /api/projects/{hid}/blobs/{hash}`
+  (basic auth `staging:$V1_HISTORY_PASSWORD`; hash = 40-hex sha1)
+  → **Go filestore** read-only (local-FS backend
+  `/var/lib/overleaf/data/history/overleaf-project-blobs/<fmt(hid)>/<h[:2]>/<h[2:]>`,
+  `fseProjectKeyFormat` = pad-9 reverse 3/3/rest).
+  `overleaf.history.id` has a UNIQUE index (one history id per project).
+- Pinned Node oracle (gate battery, 12 cases): 200 member (CD
+  `attachment; filename="<name>"`, `Cache-Control: private, max-age=3600`,
+  **no Content-Type**, **chunked no-Content-Length**, body=blob); HEAD →
+  **404 empty** (history-v1 registers NO HEAD blob route in this fork —
+  quirk replicated); ghost file → 404 empty; ghost project → 404 app page;
+  bad oid → 404 JSON VA (`params.Project_id` / `params.File_id`,
+  statusCode 404); non-member → 403 (`{"message":"restricted"}` accept-json /
+  restricted page accept-html — page now renders the REQUESTER's email + id,
+  see fix below); anonymous → 401 `Unauthorized` (accept json) / 302 /login
+  (else); non-GET verbs → Node CSRF 403 `Forbidden` (even anonymous — flip
+  guard keeps them on Node, P4.11b-delPutMismatch precedent).
+- **Views bug fixed here (pre-existing):** `restrictedHTML` in
+  `go/services/web/views/pages_data.go` was captured with the capture user
+  BAKED IN (literal `ol-usersEmail` + `ol-user_id` + account-menu email,
+  plus 3 baked-in `_csrf` hidden values) — any requester other than the
+  capture user saw the wrong identity on EVERY Go 403-restricted page.
+  Now slotted (`\x01OLUSERS\x02` / `\x01OLUID\x02` / `\x01CSRF\x02`); the
+  non-member-with-different-user battery case pins it.
+- **Latent (deferred to a view-audit unit):** `pages_data_p2.go` (login /
+  register / token pages) still bakes the capture user into `ol-user` JSON
+  meta + `sessionUser` fragments — hidden in all prior gates because the
+  capture user == the only test user.
+- Gate tolerated deltas (documented in the spec): Node omits Content-Type
+  vs Go's net/http text sniff (browser fallback identical) — CT_NORMALIZED
+  set; Node forwards no Content-Length and Go now omits it too → both chunked.
+- Full `web-go P4` regression green after P4.12a (42 tests; leg-1 flakies
+  self-heal on retry as in prior runs).
+
+#### P4.12b — document download: `GET|HEAD /Project/:Project_id/doc/:Doc_id/download` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+- Go: `features/projectlist/docdl.go` (`docDownloadHandler`, `docdlFindDoc`
+  — findElement-ordered raw-tree walk for type doc) + route in
+  `projectlist.go` + second `location` in `server-ce/nginx/flips/web-p412.conf`
+  (same GET|HEAD→Go / other-verbs→Node guard).
+- Chain: web → **document-updater (Node, 127.0.0.1:3003)**
+  `GET /project/{pid}/doc/{did}?fromVersion=-1` → `{lines, …}` → web renders
+  `lines.join('\n')` as `text/plain; charset=utf-8` with
+  `Content-Disposition: attachment; filename="<doc.name>"`.
+- Pinned Node oracle (13-case battery): 200 as above (weak ETag on both);
+  **HEAD 200 same headers, no body** (express auto HEAD — contrast the file
+  proxy's HEAD-404 history-v1 quirk); ghost doc (valid project) → **404
+  text/plain 'Not Found'** (sendStatus); ghost project → 404 app page; bad oid
+  → 404 JSON VA (`params.Doc_id`/`params.Project_id`; enforce-log enforces
+  logOnly schemas); non-member → 403 JSON / restricted page (page renders the
+  REQUESTER — exercises the P4.12a restrictedHTML fix); anonymous → 401/302;
+  non-GET → Node CSRF 403 'Forbidden' (flip guard).
+- **Unpinned rare edge (documented, not in battery):** doc in tree with no
+  DU/docstore backing → DU 404 → Node 500 'Internal Server Error'
+  (non-NotFoundError path); Go mirrors with 500.
+- Gate seed note: a docstore POST right after a project re-seed can transiently
+  miss once (stack settling) — the seed retries 4x/1s and logs code+body;
+  without the retry the gate flakes.
+- Full P4 regression green after P4.12b (45 flip tests; the same two leg-1
+  flakies self-heal on retry as in prior runs).
+
+#### P4.12c — private API doc trio: `GET|POST /project/:Project_id/doc/:doc_id` (+ `?plain=1`) + `POST /project/:Project_id/doc/:doc_id/changes/reject` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+
+`services/web/app/src/Features/Documents/DocumentController.mjs` +
+`DocumentRouter.mjs` (privateApiRouter basic-auth surface, no session, no CSRF):
+
+- **Go**: `features/projectlist/docapi.go`
+  - basic auth gate first (Node order) → 401 `WWW-Authenticate: OverleafLogin`,
+    `text/plain "Unauthorized"` + ETag, **no** `nosniff` (errorController 401
+    path), XPB+CSP kept.
+  - `GET` → docstore GET + chat resolved-thread-ids → pinned key-order JSON
+    (`lines,version,ranges,pathname,projectHistoryType,historyRangesSupport,otMigrationStage,
+    [projectHistoryId],resolvedCommentIds`) — `otMigrationStage:0` literal pinned
+    (Node never omits); `?plain=1` → `text/plain` lines **+ `nosniff` (helmet on
+    `res.send`)**; ghost project/doc → 404 `Not Found`; bad-oid → 404 zod-VA JSON.
+  - `POST` (setDoc) → zod VA **params-first + exact messages** → docstore POST
+    (Node's own path is docstore-direct via ProjectEntityUpdateHandler — no DU) →
+    `{"rev":N[, "modified":true]}`.
+  - `POST .../changes/reject` → 204 + `ETag: W/"a-bAsFyilMr4Ra1hIU5PyoyFRunpI"`
+    (Node `res.status(204).send("No Content")` ETags the stripped body — replicated
+    verbatim).
+  - `NoSession` route option in `core/app.go` route struct (skips session+CSRF,
+    mirrors Node's privateApiRouter); XPB per-response (Go core otherwise omits it).
+- `runit/web-go-overleaf/run` exports `WEB_API_USER`/`WEB_API_PASSWORD` read from
+  `/etc/overleaf/settings.js` (container node one-liner; NUL-free `:`-delimited
+  parse).
+- **flip**: `web-p413.conf` (reject POST → Go) + `web-p411b.conf` extended to
+  `DELETE|GET|POST` for the doc pair (Node web profile has none of these routes →
+  flip retargets 7420 to the API contract).
+- **gate** `specs/parity/web-go-p413-flip.test.e2e.ts`: 19-case battery
+  (reset/get-plain/no-auth×2/wrong-cred/bad×2/ghost×2/no-auth-POST/VA×5/setDoc/
+  setDoc-noop/reject), Node :3000 oracle vs Go :4010 + Node baseline re-capture
+  (3-leg), state-dependent `modified`/rev shape-compared + etag-exempted; plus a
+  live-flip nginx acceptance leg (apply both confs → 7420 401/200/POST-200/204/
+  unflipped-PUT-403 → strip, with reload race-retry and post-reload fetch retry).
+  5/5 ×3 consecutive green; **47-test P4 regression green**; go build/vet/test green.
+- Gate-plumbing lessons (reusable): flip vhost splice is node-driven (no sed/shell
+  quoting), reload has a 3× retry, and nginx-assert fetches retry across the
+  reload window (dropped sockets); `runLeg` fails loud when a leg's write-cases are
+  unstable instead of returning a broken map.
+
+
+#### P4.13a — project upload: `POST /Project/:Project_id/upload` — **✅ GATE 3/3 GREEN x3 runs (2026-09-15)**
+
+`UploadsRouter.mjs` + `ProjectUploadController.uploadFile` + `FileSystemImportManager` (addDoc/addFile) +
+`ProjectEntityUpdateHandler.upsertDoc/upsertFile` + `DocumentUpdaterHandler.updateProjectStructure`
+— the file↔doc swap engine. Thin-client surface: docstore :3016 (doc create/set),
+v1-history :3100 (blob PUT), DU :3003 (setDocument + structure ops) — all shared with Node.
+
+- **Go**: `go/services/web/features/projectlist/upload.go` (self-contained unit:
+  `upTarget` tree resolution, `upClassify` extension→content text/binary split
+  mirroring FileTypeManager, `upDoDoc`/`upDoFile`, `upDocstorePut`, `upDUSetDoc`,
+  `upUpdateStructure`, `upPutBlob`, `upSwap*`, `upPush*`, `upReplaceFile`).
+  Request order pinned from Node: csrf(global) → Project_id VA (404 JSON) →
+  folder_id PRESENT-validated (400 objectId; absent legal → root) → multer single
+  `qqfile` (no file → 400 invalid_upload_request; wrong field name → 500 HTML
+  page) → name length (422 invalid_filename) → project + `entCanWrite`
+  (403 `restricted` / `{"message":"restricted"}` accept-dependent) → SafePath
+  (422) → folder lookup (422 folder_not_found) → upsert.
+  - doc new: docstore POST → `$push docs {name,_id}` → DU add-doc.
+  - doc re-upload: DU setDocument only (DU flushes docstore + project).
+  - file new/upsert: v1H blob PUT (git-blob-SHA1) before the mongo write;
+    upsert = `$set fileRefs.idx.{_id,hash,linkedFileData:null,created}` +
+    `$inc version` + `$inc fileRefs.idx.rev` + DU [rename-file, add-file].
+  - file↔doc swaps: `$pull` one side, `$push` the other, DU [rename-*, add-*].
+- **Bug fixes found by this unit** (both latent, pre-existing):
+  (a) `entCanWrite` only read `collab_refs` + `owner_ref` — Node's real field is
+    `collaberator_refs` (typo included); Go now accepts both + `owner` fallback;
+  (b) `views.Error500Page` rendered an empty `mailto:` — now honors
+    `OVERLEAF_ADMIN_EMAIL` with the CE default `placeholder@example.com`
+    (Node `settings.adminEmail` parity).
+- **Seed/gate environment pin** (cost a long debug arc): a mongo-direct seeded
+  project MUST carry `owner_ref` + the `collab*_refs` family (Node
+  `CollaboratorsGetter.getProjectAccess` 500s on missing `owner_ref`) and
+  `main.tex` MUST be registered in the docstore (loopback :3016 — from inside
+  the overleaf container) or every DU `setDoc`/structure call 404s → Node's
+  catch-all `422 {"success":false}` / `500`.
+- **Contract** (fresh-session oracles, 2026-09-15): 200 doc / file+hash;
+  400 `invalid_upload_request`; 400 oid-VA for present-empty + malformed
+  `folder_id` (absent legal); malformed `Project_id` → 404; ghost project →
+  404 HTML Page-Not-Found; 403 `restricted` JSON (non-member, accept:json);
+  403 `Forbidden` text (anon, CSRF-first); 422 `invalid_filename` /
+  `folder_not_found`; 500 generic page with admin mail (wrong field name =
+  multer `LIMIT_UNEXPECTED_FILE`).
+- **flip**: `server-ce/nginx/flips/web-p413a.conf` (POST-only → Go; other
+  verbs fall back to Node).
+- **gate**: `specs/parity/web-go-p413a-flip.test.e2e.ts` — 17-case battery
+  (6 write legs incl. both cross-type swaps + 8 error legs + 3 auth legs),
+  3-leg Node→Go→Node with re-seed per leg + normalized state dump (tree flat
+  + version + lastUpdatedBy); multipart via browser fetch FormData with the
+  csrf token in the `x-csrf-token` header (both stacks accept it; avoids the
+  Go `FormValue` body-consumption path). normBody must cover the logout-form
+  `_csrf` hidden input (the Page Not Found page embeds it) — the one diff
+  found in the first leg-2 run. **3× consecutive gate green**; full P4
+  regression (p4a–p4g, p4hb, p411a/b, p412a/b, p412c trio, p4clone/col/del/
+  inv, p3x, p0/p1/p2) green (p4f/p3c leg-baseline flakes are pre-existing
+  wall-clock/session tails, green on solo re-runs); `go build/vet/test
+  ./go/... ./cmd/...` green.
+- **Deferred to P5**: socket emits on successful upload
+  (`reciveNewDoc` / `removeEntity` / `convertFileToDoc` / `convertDocToFile`)
+  and the `project-upload`/`file-upload` rate-limit counters (the gate stays
+  under the 20pts/60s budget; Go enforcement is optional until the editor
+  surface lands).
+
+
 1. **Docstore** (436) + **FileStore** (422) + **Documents** (304) +
    **LinkedFiles** (1,537) + **Uploads** (1,637) — *thin clients of the Go
    docstore/filestore services already in production*: highest value/effort
@@ -1304,6 +1552,28 @@ access suffices (ensureUserCanReadProject); non-admins get the plain copy
 
 ### P5 — editor & compile (highest coordination cost, deliberately last among core)
 
+> **Status (2026-09-15): P5.1a editor page + P5.1b editor detach shell ✔ BOTH GATES 3/3 GREEN (Node baseline → Go parity → Node re-baseline) + P4 project-list regression 3/3 + go build/vet/test green. The whole editor PAGE surface (main + detacher + detached) is now Go.**
+> Route `GET /editor/:id` + legacy `GET /Project/:id` (owner) byte-parity on the 35 kB editor
+> bootstrap shell (68 `<meta name="ol-…">` slots + per-request CSP nonce + title +
+> ol-navbar.currentUrl), **and `/editor|/Project/:id/detacher` + `/detached`** (the
+> `ide-detached` chrome: `/stylesheets/ide-detached-*.css`, `<main id="pdf-preview-detached-root">`,
+> `ol-detachRole` detacher|detached, full-path currentUrl). Go: `go/services/web/views` (slot
+> renderer `EditorPage` selects `editorTemplate` vs the new generated `detachedTemplate`;
+> `__PROJNAME__`/`__TITLE__`/`__NONCE__`/`__ORIGIN__`/`__CURRENTURL__` placeholders, all slot +
+> title/name values html-escaped to match pug) + `go/services/web/features/editorpages` (one
+> handler for all 6 routes via detachRole; user/project loads, `serializeUser`/`buildUserSettings`/
+> `ol-navbar`/pinned config JSON, response envelope, 404/302/403 envelope parity) + unit tests
+> `views/editor_test.go`; flips `web-p51a.conf` (main) + `web-p51b.conf` (all 6); gates
+> `web-go-p51a-flip` + `web-go-p51b-flip`.
+> Findings pinned: editor CSP adds `img-src 'self' data: blob:`; `<title>` =
+> `<projectName> - OlliTeX, Online LaTeX Editor`; twitter/og:title + `ol-projectName` render the
+> **real project name** (was a latent P5.1a bug — `WebGo-Ren-N` fixture was baked into the template;
+> fixed with a `__PROJNAME__` placeholder in both templates); `ol-otMigrationStage` content=0; dates
+> decode as `primitive.DateTime` (ms epoch) → ISO-8601 UTC; csrf rotates per render (gate normalizes);
+> the detach pages do NOT add `id="ol-detach-role"` (that attr is only on the main shell — the P3e
+> oracle was stale, Node truth = main-only, byte-verified in Node). **P5.1 done. Next: P5.2 (editor
+> real-time / DocumentUpdater / OT / compile control plane).**
+
 Editor (1,418: `/Editor/:id` open + OT plumbing to real-time),
 DocumentUpdater (600 — client of the document-updater service),
 Compile (4,380 — ClsiManager ↔ clsi service: compile triggers, logs, output
@@ -1312,28 +1582,1487 @@ plane**).
 **P5 gate**: full open → edit (shared session with a Node-open second client) →
 compile → PDF render journey, plus disconnect/storm soak.
 
+**P5.2 — compile control plane (KICKOFF, scoped 2026-09-15; oracle captured):**
+The compile *engine* stays the Node `clsi` / `clsi_typst` services (alive, `clsi` on
+`:3013`). We port the **web control plane** (Go) that sits between the browser and
+clsi. Routes (all owner-gated, per-`Project_id`):
+- `POST /Project/:id/compile` → `CompileController.compile` (parse body/query;
+  `CompileManager.compile`: recently-compiled redis check, auto-compile limits,
+  `ensureRootDocumentIsValid`, project+limits, then `ClsiManager.sendRequest`).
+  **clsi contract** (Node `ClsiManager._buildRequest` → `_finaliseRequest`): POST
+  `{compile:{options:{buildId,editorId,compiler,timeout,imageName,draft,stopOn
+  OnFirstError,check,compileGroup,populateClsiCache,enablePdfCaching,flags,metrics
+  Method,metricsPath,…},baseHistoryVersion,rawSnapshot,rawChangeOperations,resources:
+  [{path,content}]‖[{path,url:<filestore blob>,modified}]}}` to `Settings.apis.clsi.url`
+  (= `http://clsi:3013`) at `/project/:pid/user/:uid/compile?compileBackendClass=…&
+  compileGroup=…`; typst → `:3014`. `resources` docs = `doc.lines.join('\n')` from the
+  **Go** docstore + files from **Go** filestore (both already ported). Web re-shapes clsi's
+  response into `res.json`.
+- `POST /Project/:id/compile/stop` → `CompileManager.stopCompile` → clsi `/compile/stop`; 200.
+- `GET /Project/:id/output/cached/output.overleaf.json` → `ClsiCacheController.getLatest
+  BuildFromCache` (clsi-cache; 404 when not populated — the e2e default).
+- `GET /download/project/:id/build/:build_id/output/output.pdf` → `CompileController
+  .downloadPdf`; `GET /download/project/:id/build/:editorBuildId/output/cached/:filename`
+  → `ClsiCacheController.downloadFromCache` (path-allowed filter).
+
+**Oracle (Node, success compile of a basic project):** `POST …/compile?check=validate&
+draft=true` → **200** `application/json`: `{"status":"success","outputFiles":[ output.aux,
+out.fdb_latexmk, output.fls, output.log, output.pdf(+size,createdAt,ranges), out.stdout,
+out.synctex.gz ] (each `{path,url,type,build}`), "outputFilesArchive":{"path":"output
+.zip",url,type:"zip"}, "compileGroup":"standard","compiler":"pdflatex","stats":{isInitial
+Compile,latex-runs,pdf-size,…},"timings":{sync,compile,output,compileE2E,…},"outputUrl
+Prefix":""}`. Absent (undefined → omitted): `buildId,clsiServerId,clsiCacheShard,
+validationProblems,pdfDownloadDomain,pdfCachingMinChunkSize`. The `outputFiles[].url` +
+`.build` carry clsi's **random per-compile buildId**; `createdAt` is a timestamp; `output
+Files[].url` point at **clsi's** output nginx (`/project/:pid/user/:uid/build/:build/output/
+:file`), not the web host.
+
+**P5.2 parity gate design (≠ the P4/P5.1 byte-diff gate):** a raw body diff is NOT valid
+because clsi's `buildId`, `createdAt`, `stats.*`, `timings.*` are non-deterministic per
+compile. The gate must compare the **structured contract** — `status`, `compileGroup`,
+`compiler`, `outputFiles` **set of `{path,type}`** + presence of `output.pdf`/`outputFiles
+Archive`, header `content-type` — and **normalize** `build`(id), `createdAt`, `size`?,
+`stats`, `timings` (assert shape, not values). Node baseline → Go parity → Node re-baseline,
+flushing the `clsi_recently_compiled` redis check between legs (else Go leg gets `too-
+recently-compiled`). **Go impl**: new `go/services/web/features/compile` (compile trigger
++ stop + cache/pdf read via the existing Go docstore/filestore + a small clsi HTTP client);
+recently-compiled + compile-limits (user settings) + root-doc validation reuse Go core redis
++ sitesettings. Split likely: P5.2a trigger+stop, P5.2b output/PDF/cache read. (Larger
+edge modes — history/incremental/png2pdf/clsi-cache — are separate, lower priority.)
+
+**P5.2a — compile trigger + stop (DONE, GATE 3/3 GREEN, 2026-09-16):**
+`go/services/web/features/compile/compile.go` ports the web control plane:
+- `POST /project/:id/compile` (case-insensitive, like Express) → auth (404 invalid-id
+  JSON / 404 absent-id HTML / 403 non-member JSON-or-HTML), read-access check,
+  recently-compiled Redis guard (`SETNXEXReply`), clsi POST (free backend, project's
+  clsiGroup), 30s timeout, and the **exact Node response reshape** (status, outputFiles
+  with pathname-only URLs + build + pdf ranges/size, outputFilesArchive, compileGroup
+  (default `standard`), compiler, clsiServerId/clsiCacheShard, validationProblems,
+  stats, timings, outputUrlPrefix — present-empty-string passed through). 504 on
+  timeout/failure with `validationProblems: [{type: "compilationFailed"}]`.
+- `POST /project/:id/compile/stop` → clsi stop + `200 text/plain OK` (Node
+  `res.sendStatus(200)`), never errors (clsi resolves even when nothing compiles).
+- `core/redis.go` gained `SETNXEXReply` to distinguish "key already existed"
+  (recently-compiled) from "set now" on the `SET key true EX 1 NX` guard.
+- Flip: `server-ce/nginx/flips/web-p52a.conf` (POST-only, both routes → :4010).
+- Gate: `web-go-p52a-flip.test.e2e.ts` (3-leg, deterministic offline). Not a byte-diff —
+  it normalizes buildId/createdAt/size/nonce/csrf/hex-ids; compares status/CT/length/
+  body-shape. Covers: success (with real clsi PDF, output.pdf + output.zip archive),
+  PAIR (success + too-recently-compiled from a concurrent second compile), stop,
+  non-member 403 (JSON + accept-dependent HTML), anonymous Forbidden, invalid-mongo-ObjectId
+  404 JSON, absent-id 404 HTML. Node baseline ↔ Go ↔ Node re-baseline all pass.
+- `go build`/`go vet` clean; unit tests `features/compile` + `core` pass.
+
+**P5.2b — compile output read (DONE, GATE 3/3 GREEN, 2026-09-16):**
+`go/services/web/features/compile/download.go` + routes in `compile.go Feature()`: `GET /download/project/:pid/build/:build_id/output/output.pdf` — authz (P4 preflight), param/query validation (404 JSON "Invalid buildId…" / 400 JSON editorId), sets `application/pdf` + `inline|attachment; filename="<safeProjectName>.pdf"` (Node `safeProjectName` = name minus `\p{L}\p{Nd}` → `_`), streams from clsi downloadHost (127.0.0.1:8080 here) forwarding ONLY Content-Length + Content-Type (+ `X-Accel-Buffering: no`), bare 404 (CT/CD kept) on upstream 404 — all pinned against the live Node oracle. `GET /project/:pid/output/cached/output.overleaf.json` → `SendStatus(404)` "Not Found". `GET /download/project/:pid/build/:editorBuildId/output/cached/:file` → editorId-buildId + filename allow-list validation, then bare 404 (Node `status(404).end()`, no CT) — the clsi-cache service is DISABLED in this stack (`CLSI_CACHE_INSTANCES=[]`), so the 404 shapes ARE the Node contract (enabled-clsi-cache behavior = documented out of scope). Unit: `safeProjectName` (CJK/Hebrew/digits parity), buildId regexes, cache allow-list. Flip `web-p52b.conf` (3 locations → :4010). Gate `web-go-p52b-flip.test.e2e.ts`: Node baseline → Go → Node re-baseline over pdf_inline/popup/badbid/missing, cached_json/file/badfile/badbid, auth403 (non-member fixture), anon, anon_json; PDF bodies compared after normalizing per-compile volatile fields (pdfTeX `D:…Z` + `/ID [...]` — two real compiles verified byte-identical after the two normalizations). Root-cause fixes were gate-side only (`x-csrf-token` body extraction; the two normalizations).
+
+**Regression sweep 2026-09-16 (all green):** P5.2a 3/3, P5.1a 3/3, P5.1b 3/3, P4.13b 3/3, P4.1 27 passed; `go build/vet/test ./go/... ./cmd/...` green; gofmt clean on P5.2b files (flagged files pre-existing).
+
 ### P6 — modules (41 total; each a self-contained flip, roughly in this order)
 
+**P6.1 — ollitex-hub (DONE, GATE 3/3 + SANITY GREEN, 2026-09-16):**
+`go/services/web/features/hub/hub.go` (+ `hub_test.go`) registered in
+`cmd/web/main.go`: the `/hub`, `/hub/admin`, `/hub/workspace` pages
+(`views/hub_template.go` + `views/pageslots.go` shared slot renderer with the
+P5.1a editor page; hub locals: per-user `ol-ExposedSettings`
+(canManageTemplatesMenu flip for admin), hub `ol-navbar` (customLogo +
+Library/Templates items, admin canDisplayAdminMenu/
+canDisplayProjectUrlLookup flip), `ol-hub-theme` page slot (stored theme JSON
+or `null`), `ol-user` (hydrated-ace parity — see below), `ol-userSettings`
+(shared `editorpages.BuildUserSettings` with mongoose-default semantics), hub
+`ol-footer` (`showThinFooter:false` override via `editorpages.HubFooterJSON`)).
+Theme API: `GET/PUT/DELETE /api/hub-theme` (CSRF-gated, PUT validates light
++ dark against the Node `validateMode` contract — 8 hex colors,
+fontFamily ≤300 chars, fontSize 12–22, radius 2–24 — errors
+`400 {"error":"<where>: ..."}`; malformed JSON → `400 {}`;
+`urlencoded` nested-body parity; upsert `hubthemes` doc `documentId:
+"default"` stored as an ORDERED canonical-key-order doc so Node's lean GET
+byte-match survives round-trips), `GET /api/hub/health` (admin; instance
++ featureGates pins from `server-ce/config/settings.js` + env, volatiles
+generatedAt/uptimeSec/platform/pid/mongo normalized by the gate),
+`GET /api/hub/notes` (RELEASE_NOTES.md bytes or `400/404`-free
+`{"error":"release notes not available"}`).
+
+**Parity bugs found by the gate and fixed** (each was a real divergence):
+1. `saveTheme` was missing the upsert flag — PUT on a cleared doc no-oped;
+   now `options.Update().SetUpsert(true)` (driver v1 API).
+2. Mongo driver v1.17 decodes a struct field typed `any` to `bson.D`, not
+   `map[string]any` — `modeFromStored` type-asserted the map and fell to
+   null; `themeDoc` now declares `Light/Dark bson.D` and serializes it
+   order-preserving (`bsonDJSON`, anyJSON extended with int32/bson.D).
+3. Go map `$set` randomized the stored light/dark key order; `orderedMode`
+   now stores canonical order (Node's validated-object order) so the
+   lean GET bytes match Node exactly (492 B canonical put/get pin).
+4. `ol-user.ace`: Node stringifies the hydrated mongoose doc. Rich stored
+   ace (admin, p34-happy) = stored-order verbatim; sparse stored ace
+   (e2e-user fixture: `{customKeybindings:{}}`) hydrates to the canonical
+   defaults shape (ref providers first — zotero/mendeley/papers — then the
+   field block, customKeybindings last). `serializeHubUser` implements both
+   paths (rich = `bsonToJSON` stored order; sparse =
+   `sparseAceJSON` + `aceProviderJSON` with the
+   `{enabled:true,disablePersonalLibrary:false,groups:[]}` defaults).
+5. `BuildUserSettings` (shared editor+hub): restored the mongoose schema-default
+   fill-in (mode/theme/fontSize/autoComplete/… with `syntaxValidation`
+   omitted when absent, `overallTheme` derived via the 2026-03-02
+   signUpDate cutoff when absent, ref-provider blocks rebuilt in
+   UserSettingsHelper order), fixing the P5.1a/P5.1b `ol-userSettings`
+   drift while keeping both editor gates green.
+6. Flip verification hardened: gate now asserts the exact include count
+   (`grep -c` = 0/1) after flip/strip, nginx-t passes, and the leg-2
+   routing leg is checked against a live-502 canary — a silent flip
+   no-op (Node-vs-Node) can no longer false-green.
+
+Gate `web-go-p61-hub-flip.test.e2e.ts` (3 legs + canonical put/get pin):
+login flows, both CSRF 403s, both admin-gate 302
+`/restricted?from=` bounces (member `Accept: application/json` → JSON 403;
+HTML → 302), theme validation 400 battery (light/dark × 12 field shapes,
+array-body, urlencoded, empty-body, malformed-JSON 400 {}), put/get
+canonical, clear + null get, both health JSON (volatile-normalized) +
+featureGates byte-pin, notes 1913 B byte-pin (md5
+`7468d83a9a1a5ccc1b48c951f6a2fd04`), page bytes for user/admin ×
+default/theme, workspace redirect. **All legs green.**
+Regression sweep after P6.1: P5.1a 3/3, P5.1b 3/3, P5.2a 3/3, P5.2b 3/3,
+P4.13b 3/3, P4.1 3/3, hub-endpoint-contract 2/2 — 23 e2e legs + contract
+battery, zero failures.
+
+**P6.2 — admin-tools project surface (DONE, GATE 4/4 GREEN, 2026-09-16):**
+`go/services/web/features/projectlist/admin.go` + `flips/web-p62.conf`,
+registered as `projectlist.AdminFeature` (distinct feature so the
+`/project/*` cores stay untouched). Node oracle pins captured live from
+the running Node (37 pins, `/tmp/p62_oracle.json` + log-verified BSONError
+root cause). Surface: `GET /admin/user`/`/admin/project` (301 →
+`/hub#/site.general.*`), `GET /admin/active-projects` (RT `/clients`
+projection, Basic auth `WEB_API_USER`), `POST /admin/user/:userId/projects`
+(`null` = all users; active + deletedProjects merge, Node
+`_formatProjectInfo` field order, undefined-omitted / explicit-null
+`lastUpdatedBy:null`, `_matchesFilters`, title `localeCompare`-style
+ascending with `\uffff` null-name slot, lodash-orderBy "missing last"
+for lastUpdated/deletedAt, 500 reproduction pins: bad `owner_ref` hex
+(`new ObjectId` BSONError) + non-ObjectID `trashed` elements +
+bad-sort OError), `POST trash|untrash` (`resolveProjectUserId` body-user
+with owner fallback, 200 OK), `DELETE /admin/project/:id` (soft delete —
+full P4 `deleteProjectExec` side-effect chain under the admin gate;
+admin `deleterData` = Node admin options exactly: **no**
+`deleterIpAddress`, **no** `deletedReason` — `deleteProjectExec` gained a
+`reason` param, P4 caller still passes `"user"`, zip-import unchanged),
+`POST undelete` (restore under the admin gate: same-`_id` re-insert,
+owner from body, name = `generateUniqueName` ("p62-sacrifice (Restored)"
+full-string pin), `deletedDocs` reset + docstore `deleteDoc` fires,
+deprecated record delete, untrash), `DELETE purge`
+(`expireDeletedProject` states: active → stale-record cleanup 200;
+record-missing → 404; already-redacted → 200; otherwise docstore
+`destroy` + history delete + (v1-history when `overleaf.history.id`
+present) + chat destroy + audit-log purge + PII redaction),
+`GET members` (`{owner, members}` admin wrapper shape over the P4
+`invitedMemberRows` core), and the P4 collaborator cores re-mounted under
+the admin gate (site-admin, no per-project ownership check — Node mounts
+the **same** controllers under `ensureUserIsSiteAdmin` only):
+invites list/create/revoke/resend, `PUT users/:uid`, `DELETE users/:uid`
+(204). Gates split by Node behavior: non-parseReq controllers
+(members/delete/undelete/trash/purge) → malformed `:id` = 500 HTML page;
+parseReq controllers → malformed `:id` = 404 `Invalid Mongo ObjectId at
+\"params.Project_id\"` (the P4 member-surface gate shape).
+
+**Parity bugs found by the gate/audit and fixed:**
+1. `deletedReason` was hard-coded `"user"` in the shared
+   `deleteProjectExec`; Node admin delete omits it (admin options =
+   `{deleterUser}` only). Parameterized `reason` (P4/zip unchanged,
+   admin passes `""`).
+2. Deleted-list rows read `deleterData` from the **project subdoc**;
+   Node reads it from the `deletedProjects` record (and its projection
+   selects exactly `deleterData.deletedAt/deleterId`). Moved the read to
+   the record; non-Date `deletedAt` now 500s like Node's `toISOString`
+   TypeError.
+3. `lastUpdatedBy` explicit-`null` (61 stored docs) was dropped;
+   Node emits `"lastUpdatedBy":null`. `lubNil` added; `name`/`nameNil`
+   and `owner:null` distinctions match Node's JSON semantics.
+4. The all-users list 500 (known bad fixture row "P52b NotMine",
+   `owner_ref` = 22-char string) now reproduces: `isTrashed` semantics
+   tightened (non-array `trashed`, non-ObjectID element, bad-owner hex
+   all 500 exactly when Node throws), verified against the Node log's
+   BSONError stack.
+5. Gate harness: the sacrificial project id is re-minted per leg —
+   `from=` redirect URLs (loc + body) and the create/delete rows are
+   normalized; pin-sanity asserts the oracle's full 400-message strings
+   via `JSON.parse` (escaped-quote `toContain` was byte-matching the
+   wrong shape and flake-skip-masked itself).
+
+Gate `web-go-p62-admin-flip.test.e2e.ts` (3 legs + oracle-anchor sanity):
+legacy 301 + member 302 + anon 302 matrix, sacrifice create, members
+before/after (184 B owner-only shape), admin-list 500 ×2 (pre/post
+soft-delete), owner-scoped **120 KB full title-sorted listing byte-diff**,
+bad-sort 500, trash/untrash 200s, invite 400 (267 B exact), put-user 400
+(187 B exact), del-user 204, sharing-link 404 + 400 (261 B exact),
+soft-delete 79 B `{deletedAt,deleterId}`, undelete 35 B name pin,
+soft-delete #2, purge + purge-again 200s, member 302/403-CSRF/no-
+token matrix, anon 302/403, badpid 500s, active-projects `[]` ×3 authz
+rows. **All 4 tests green (no flaky).**
+Regression sweep after P6.2: P6.1 4/4, P4.del 3/3, P4.col 3/3, P4.inv
+3/3, `go build ./...` + `go vet` + full `go test ./go/...` green. The
+sharing-link **create** success path (token AES-256-CTR/HKDF-SHA512,
+`2026.3-v3` label, `OVERLEAF_INVITE_TOKEN_SECRET`) is implemented
+(`atEncrypt`/`atDecrypt`) but is **not gate-pinned** (oracle pins only the
+404/400 rows); flagged for a future invite-token e2e. Admin audit-log
+entries (`sharing-link-created/updated`) are Node state side-effects not
+visible to any gated contract — deferred with the pin set.
+
+**P6.3a — admin-tools user surface, reads (DONE, GATE 4/4 GREEN, 2026-09-16):**
+`go/services/web/features/adminusers/` (new feature, registered in
+`cmd/web/main.go`) + `flips/web-p63a.conf`. Node oracle pins live-captured
+(37 pins, `/tmp/p63a_node.json`). Surface: `POST /admin/users`
+(admin user list) + `GET /admin/user/:userId/info`. The hub's live
+`#/site.general.users.*` table backend (the P3.5 owner decision excluded
+only the `/user/activate` page + the mutation surface — this is the read
+half of the same module).
+
+**Parity gotchas found by the oracle (each now pinned in the gate):**
+1. `page.{size,no}` is a **Node no-op** — `_sortAndPaginate` never slices;
+every pin returns the full filtered list (totalSize = filtered count).
+2. `sort.by === 'name'` ignores `sort.order` **entirely** (pinned:
+   `name_asc` and `name_desc` bodies byte-identical); comparator =
+   `(lastName,firstName,email)` with missing → `\uffff`,
+   case-insensitive (localeCompare sensitivity:'base' on this ASCII data),
+   stable.
+3. Non-name sorts = lodash `orderBy`: undefined values **first in desc /
+   last in asc** (pinned sequences: no-lastActive users lead the
+   lastActive-desc list in natural order; the two no-signUpDate users trail
+   signUpDate-asc and lead signUpDate-desc), stable on ties; string keys
+   lowercased; `bad by` / `bad order` → OError → 681 B 500 page.
+4. **search short-circuit quirk**: Node's exclusion clause is
+   `email -1 && first?.indexOf -1 && last?.indexOf -1`; a MISSING name
+   makes that operand `undefined` (≠ -1) so the row CANNOT be excluded —
+   pinned: the 28 no-lastName users pass ANY search (`f_search_none`
+   = exactly those 28); a NULL name would TypeError → 500; email always
+   required (`.email.toLowerCase()`).
+5. `f_saml` (and other unavailable auth-method filters) are inert because
+   the filter loop iterates `availableAuthMethods` = `['local']` only
+   (EXTERNAL_AUTH unset) — pinned: `f_saml` returns all 50.
+6. Row JSON = Node `JSON.stringify` presence semantics: missing
+   `last_name`/`isAdmin`/`signUpDate`/`lastActive`/`lastLoggedIn`/`loginCount`
+   **drop** the key (real data: 28 missing lastName, 1 missing isAdmin,
+   2 missing signUpDate, 47 missing lastActive); `canManageTemplates`,
+   `inactive`, `deleted`, `authMethods`, `allow*` always present;
+   `suspended`/`deletedAt` conditional; dates ISO-ms UTC. Hand-built
+   ordered emission (Go maps would alphabetise).
+7. body-shape pins: non-matching content types (text/plain, no CT) leave
+   `req.body` `{}` in Node → **200 full list** (not 4xx); JSON **array**
+   body destructures to no filters → 200; malformed JSON → `400 {}`;
+   urlencoded `filters[admin]=true` → qs nesting + string truthiness.
+8. `info`: `activationLink` from the first live password token
+   (use/password, data.user_id, expiresAt > now, no usedAt,
+   peekCount < MAX_PEEKS=4) else `null` (pinned nulls); ghost + bad id
+   both → `200 {…false}` (Node swallows the cast error).
+
+Gate `web-go-p63a-flip.test.e2e.ts` (3 legs + oracle anchors, **4/4 green
+FIRST RUN, no flaky**) over the full authz matrix (anon 403/'Forbidden'/
+302, member 302/empty-CT html-vs-json, 403 no-token), 10 filter pins,
+9 sort pins (incl. both 500s), 5 body-shape pins, 6 info pins, 15.6 KB
+full-list byte-diff.
+Regression sweep after P6.3a: P6.2 4/4, P3.6 (site-settings) 3/3, P6.1 4/4,
+`go build ./...` + `go vet` + full `go test ./go/...` green.
+
+**P6.3b — admin-tools user surface, mutations (DONE, GATE 4/4 STABLE, 2026-09-16):**
+`features/adminusers/mutations.go` (create / update / delete / restore /
+purge / send-activation) + `registrationpage.NewUserDoc()` export (42-key
+shape + `thirdPartyIdentifiers: []` + dynamic keys = 49, Node-parity)
++ `features/projectlist/userdelete.go` (`DeleteOwnedProjects`
+reason `account-deletion` / `RestoreOwnedDeletedProjects`)
++ `flips/web-p63b.conf` (6 method-guarded locations) + gate
+`web-go-p63b-flip.test.e2e.ts` (3 legs + live side-effect fx probes:
+doc shape, audit entries, `tokens` collection counts, `deletedUsers`
+record lifecycle, mail sink anchors; oracle anchors from 29 live pins,
+`/tmp/p63b_node.json`, plus fail-fast guards that reject the vacuous
+403-vs-403 diff if leg-1's `a_create_local` isn't 200).
+
+Parity gotchas each pinned in the gate:
+1. **mongo-driver-v1**: nested doc → `interface{}` decodes to
+unordered `primitive.M` — the deleted-user record / restore snapshot /
+purge readbacks decode into explicit `primitive.D` struct fields
+(`delRec63b`) to preserve byte order and fix the `deletedAt:null`
+decode bug.
+2. **token collection is `tokens`**, not `oneTimeTokens` (Go core was
+already right; the gate's fx probes + cleanup now use it; query with
+dotted `'data.email'` — exact-subdoc matches never hit
+`{user_id,email}`).
+3. **mongo exact-subdoc match trap**: `{data:{email}}` / `{user:{email}}`
+only match docs whose subdoc is EXACTLY that shape — the gate battery
+and cleanups had two of these (tokens + deletedUsers probes) silently
+returning 0/false on both legs — parity passed VACUOUSLY and only
+the oracle anchors exposed it.
+4. **purge semantics = Node `expireDeletedUser`**: the record is KEPT,
+`user` + `deleterData.deleterIpAddress` are redacted (unset), matched by
+`deleterData.deletedUserId` (the user snapshot is gone — the fx probe
+switches to that key post-purge); `b_purge_after_restore` → 422 is
+correct Node behaviour (findOne null → TypeError →
+"Something went wrong. The user is already deleted?").
+5. update key order = Node `Object.entries(body)` order with
+firstName/lastName ↔ first_name/last_name rename; `canManageTemplates`
+after the loop (site-admin → 409 implicit-role message);
+`email` path first; hand-built ordered JSON everywhere (Go maps would
+alphabetise).
+6. audit entries: add-email / change-primary-email /
+remove-email / delete-account with `initiatorId` = admin ObjectId,
+explicit `timestamp`; `thirdPartyIdentifiers: []` + random 16-char
+`referal_id` on create (49 keys).
+7. mail: registered ("Activate your OlliTeX Account") +
+security notes (hardcoded "Overleaf", NOT appName); count + recipient
++ subject pinned, bodies not byte-pinned; deferred: `toUserId`
+ownership transfer (Node delete supports it; documented),
+`InstitutionsAPI` / `subscribeToNewsletter` / `AnalyticsManager`
+(CE no-ops).
+
+**Regression-driven fixes folded into this unit's commit:**
+- **P6.1 flake root-caused + fixed**: Go hub `serializeHubUser` raw-stored
+branch was wrong against Node's mongoose hydration (Node renders the
+HYDRATED subdoc in canonical order — zotero/mendeley/papers pinned
+FIRST, then schema order, stored-??-default values, no-default paths
+omitted when absent; a stored provider subdoc keeps its own key order).
+Rewritten to the pinned canonical rule + `TestSerializeHubUserAceOrder`
+unit test; a provider-duplication bug in the first rewrite (extras pass
+re-appended stored providers) was caught by measuring page bytes
+(16528 vs Node's 16199) and unit-tested. Live parity: admin 16199 B /
+member 601-char ace, byte-identical both legs.
+- **p63a `f_search_none` anchor corrected**: it had anchored
+`totalSize > 0` for a nonsense search, which only ever matched because
+a phantom fixture user existed at that moment (it is gone; live Node
+returns 0 — the "no-lastName pass any search" theory was a misread).
+Anchored now to Node truth: nonsense search → 0, case-folded
+`E2E-ADMIN` → ≥1.
+
+Regression after P6.3b: **19/19 green, zero flaky** (P3.6, P6.1, P6.2,
+P6.3a, P6.3b; P6.1 separately 3× consecutive green),
+`go build ./...` + `go vet ./...` + `go test ./go/services/web/...`
+all green; fixture residue swept (users / deletedUsers / tokens / audit).
+
+**P6.4a — OlliTeX llm module, deterministic settings surface (DONE, GATE 5/5 STABLE ×2, 2026-09-16):**
+`features/llmsettings/` (8 files) + `core/badjson.go` (content-negotiated
+400 body) — the local-state slice of `services/web/modules/llm`:
+- **BYO provider rows**: GET/POST `/user/llm-providers` (dedupe models,
+  limit 10, SSRF guard, encrypted `apiKey` at rest), POST `/:id` (partial
+  merge `??`/`!==undefined` semantics, clearApiKey, legacy-row id adoption),
+  POST `/:id/delete`, POST `/check` + `/scan` (candidate-type retry loop
+  `[requested, ...others]`, LAST error wins, `auth`→401, `err.status||500`;
+  check adds `duration`; row-based check on a `.test` TLD = deterministic
+  NXDOMAIN for both stacks).
+- **Selected model**: GET/POST `/user/llm/selected-model` (ref regex
+  `^[A-Za-z0-9._\-/]+(:[A-Za-z0-9._\-/]+){0,2}$`, ≤500, `u:...` BYO refs;
+  bad-request/bad-ref/too-long pins).
+- **Compliance rubrics**: GET/POST `/user/llm-compliance` (sanitize: name
+  required (nameless dropped), id≤40/name≤200/guidelines≤20000/
+  scanPatterns≤4000, cap 50, per-line `LABEL :: regex` compile check;
+  `inherited` from admin file when user has none).
+- **Grammar prefs**: GET/POST `/user/llm-settings/grammar` (mode enum
+  validate, `llmModel` ref validate, language ≤64, blockedRules
+  trim/dedupe/cap 200, availability matrix + degrade-to-feasible,
+  effectiveMode/degraded in the save response).
+- **Usage**: GET `/user/llm-usage` + `/admin/llm/usage` (days clamp
+  1..365, `Number(days)||30`, contiguous byDay zeros, byAction top-12 /
+  byModel top-8 by totalTokens desc, `userId` filter site-vs-user scope).
+- **Admin file surface**: GET `/admin/llm/settings/json` (25-key
+  order-preserved display build + env fallbacks + decrypted flags),
+  POST `/admin/llm/settings` (Node merge: existing key order preserved,
+  explicit keys in code order, `llmApiKey` last (encrypted or cleared),
+  atomic tmp+rename chmod 600, `JSON.stringify(data,null,2)` byte parity),
+  POST `/admin/llm/settings/check` + `/admin/llm/models` (single attempt,
+  404 model-not-in-list, `LLM connection failed`/`Model scan failed`
+  shapes), GET `/admin/llm/usage`.
+- **Redirects + anon/denial matrix**: `/user/llm-settings` 301
+  `/hub#/mysettings.llm.general`, `/admin/llm/settings` 301
+  `/hub#/site.llm.instance`, anon 302 `/login`, member 302
+  `/restricted?from=...` (core chain).
+- **crypto parity**: scrypt(N=16384,r=8,p=1, salt
+  `overleaf-lab-llm-key-v1`) + AES-256-GCM `enc:v1:<iv>:<tag>:<ct>`
+  (base64) — pinned BOTH directions: Node-decrypts-Go and
+  Go-decrypts-Node cross-language regression test with real blobs
+  (`TestCrossLangCrypto`), roundtrip + no-secret plaintext passthrough +
+  garbage-to-empty tests.
+- **bad JSON 400 negotiation** (core): `accept: application/json` → 400
+  `{}`; otherwise → 400 705 B HTML page (byte-pinned `mailto:undefined`
+  page in `core/badjson.go`) — content-type AND body pinned in the gate
+  for both accepts.
+
+Parity gotchas each pinned in the gate:
+1. **`blockedURL` message** = Node's `fail(detail)` full string
+   `Blocked LLM base URL (<detail>). Point the provider at a reachable
+   public or LAN LLM endpoint.` — with the Node detail vocabulary
+   (loopback/local name, loopback range, cloud metadata / link-local
+   range, blocked IPv6 range, unspecified range, invalid URL, only
+   http(s)) and Node's check ORDER (scheme → host → names → IPv6 → IPv4);
+   10/192.168 private ranges are ALLOWED (Node is deliberately narrower).
+2. **row-based /check URL**: the retry loop's LAST error wins — for a
+   non-anthropic requested type the last candidate is anthropic, so the
+   surfaced URL is `<base>/v1/models` (the `/v1` is anthropic-only in
+   Node's `listModels`); `u_check_ssrfrow` pins exactly that.
+3. **update responses carry epoch-zero `createdAt`** (Node builds the
+   response from schema-stripped data) while the ADD response carries a
+   fresh ISO — both pinned.
+4. **`an_save_bad`** = `Invalid input: expected number, received string`
+   with the `{ok,error,errors[]}` envelope (zod-parallel in
+   `validateAdminSettings`).
+5. admin FILE write: Node `JSON.stringify(data, null, 2)` — no trailing
+   newline, 2-space, order-preserved (gate compares the file bytes with
+   only the `enc:v1` blobs normalized).
+6. **flaky root-caused + fixed (nginx reload race)**: the first request
+   after `nginx -s reload` can hit a killed worker (`SocketError: other
+   side closed`) — the gate now runs a two-good-response stabilize on the
+   flipped route after every flip, plus 5-attempt socket retry on the
+   call() helper.
+7. **`/dev/csrf` returns the raw token text** (not JSON) on both stacks —
+   the gate reads it as text.
+
+Deliberately OUT (P6.4b): the project-scoped live-LLM surface
+(`/project/:id/llm/{chat,completion,models,features,source-context,
+prompts,compile-fix,grammar,generate,compliance/*}`) — depends on real
+provider calls + token budgets + `recordUsage` semantics; the routes
+stay on Node (flip conf does not claim them).
+
+Gating: `flips/web-p64a.conf` (17 method-guarded locations) + gate
+`web-go-p64a-flip.test.e2e.ts` (leg 1 Node baseline 58 pins, leg 2 flip
+ON identical battery + FX (user doc LLM fields, admin FILE bytes,
+llmusages counts), leg 3 Node re-baseline, zero-diff both directions,
+pin-sanity anchors on the Node baseline: 201 add, 400 invalid update,
+400 blocked-url check, 705 B bad-JSON HTML + 2 B `{}` json-accept,
+400 bad-ref, 400 bad-grammar-mode, 200/400 admin save, 400/500 admin
+check shapes, 302 member denial, both 301s, admin usage 200; flip
+stripped + state (user LLM fields + admin file) restored in afterAll).
+Gate **5/5 green twice** (45.8 s / 46.0 s). Cross-language crypto
+pinned (Node `NODEDEC=cross-check` on the Go blob).
+
+Regression after P6.4a: **P6.4a 5/5 ×2, P6.3b 4/4, P6.3a 4/4, P6.2
+4/4, P6.1 4/4, smoke + a5smoke 2/2 all green**; `go build` + `go vet`
++ `go test ./go/services/web/...` green (incl. 9 new llmsettings unit
+tests).
+
+**P6.4b — OlliTeX llm module, project-scoped live-LLM surface (DONE, GATE 5/5 GREEN, 2026-09-16):**
+`features/llmsettings/` extended with `project.go` (13 handlers +
+`allDocs`/`pickDoc`/`llmCall`), `compliance.go` (rubrics + job lifecycle
+with a single-flight queue mirroring Node's `processQueue`),
+`err500page.go` (Node's 681 B admin-save 500 HTML replica), `admin.go`
+(save-missing-`systemPrompt` → write-then-500 mirror), `feature.go`
+(17 project-scoped regex routes + `asMap`/`asAnySlice` hardening),
+`handlers_user.go` (`orderedRowOf` → `bson.D`). Node sources pinned:
+`LLMChatController.mjs`, `LLMComplianceController.mjs`, `LLMModelRef.mjs`,
+`LLMBudget.mjs`, `models/LLMReviewJob.mjs` (oracles
+`/tmp/p64b_oracle.mjs` → `/tmp/p64b_node.json`, `/tmp/p64b_job.mjs`).
+- **Routes (Node `LLMRouter.mjs` order)**: `POST
+  /project/:id/llm/{chat,completion,compile-fix,grammar,generate}`; `GET
+  /project/:id/llm/{models,features,source-context,prompts}`; compliance
+  `GET rubrics`, `POST start`, `GET status/:jobId`, `POST cancel/:jobId`
+  — all `ensureUserCanReadProject` (member-not-participant → JSON 403 /
+  HTML 302 `/restricted`, missing project → 404 HTML, anon → 302/403 core
+  chain).
+- **Lane resolution** (`LLMModelRef`): admin pool first (settings file:
+  `llmApiUrl`+`llmApiKey`+`allowedModels`), else user BYO rows (stored
+  encrypted, decrypted per request), `u:<row>:<model>` refs select rows
+  (`u:<8hex>:` prefix — gate normalizes the id). No lane → `403
+  {"ok":false,"error":"llm-disabled","message":"LLM service is not
+  configured"}` (chat/completion/generate); grammar adds the LT lane.
+- **Live parity seam = dead host**: `https://dead-llm.e2e.test/v1/`
+  (ENOTFOUND, offline-deterministic). Node shapes pinned: 2-attempt
+  routes → `LLM request failed: Failed after 2 attempts. Last error:
+  Cannot connect to API: getaddrinfo ENOTFOUND <host> (model: <m>)`;
+  compile-fix (1 attempt) → `Cannot connect to API: … (model: gpt-dead)`.
+  Go `llmCall` replicates attempt counts + `innerCause` extraction; gate
+  normalizes both stacks' network phrasing to `NETERR`.
+- **Compliance job lifecycle**: `start` → `running`(or `queued`
+  `position:1` when a prior job is still in flight — Node queue is
+  single-flight; Go mirrors with a per-start goroutine + in-flight gate);
+  status poll; `cancel` unknown-job → `200 {"ok":true}`; job doc in
+  `llmreviewjobs` (22-field Node mongoose shape; `documentTokensEstimate`
+  differs across stacks — Node counts UTF-16 units, Go bytes → gate
+  normalizes `EST`). Node-local quirk pinned: `chatObject` is broken in
+  this checkout (`schema is not a function`) so reviews end `done` with
+  `items[].status: "na"`+that evidence — Go reproduces the terminal
+  shape.
+- **Real bugs found + fixed by this gate** (all three were in committed
+  P6.4a code, exposed only now by cross-stack write/read):
+  1. **`primitive.A` named type**: Mongo driver v1 decodes `map[string]any`
+     values as `primitive.A` — `.([]any)` assertions FAILED silently, so
+     `allDocs`/`loadProjectDoc` saw zero docs (source-context `not_found`
+     on a real file). Hardened `asAnySlice()` with `case primitive.A`
+     (+ `asMap()` with `primitive.M`, `obj`). Rule: NEVER `.([]any)` a
+     driver-decoded `any`; always go through `asAnySlice`.
+  2. **ojson `obj`/`kv` Mongo corruption**: `kv{k,v}` fields are UNEXPORTED
+     → the BSON encoder writes `{}` per entry — BYO add stored
+     `llmProviders: [[{},{}×9]]`, compliance save echoed `rubrics: []`
+     (`asMap` dropped `obj` entries). Fix: `orderedRowOf` returns
+     `bson.D`; `saveUserCompliance` stores `bson.D` in Mongo, keeps the
+     ojson `obj` only for the HTTP response. Rule: **never pass ojson
+     `obj` values to the driver**; Mongo=`bson.D`, HTTP=`obj`.
+  3. **Node admin-save 500 contract**: missing `systemPrompt` string →
+     file IS written, then 500 + 681 B HTML — Go mirrors (write, then
+     `err500page`).
+- **Flip conf** `server-ce/nginx/flips/web-p64b.conf`: 2 method-guarded
+  regex locations (GET-set / POST-set). **Nginx config cannot use `{N}`
+  quantifiers** (config parser takes `{` as a block opener; `\{N\}` also
+  fails) — the 24-hex OID class is repeated explicitly.
+- **Gate** `tests/e2e/specs/parity/web-go-p64b-flip.test.e2e.ts` (3 legs +
+  pin-sanity, **5/5 green**): leg 1 Node baseline (no flips), leg 2 Go
+  parity with **CUMULATIVE flips (web-p64a + web-p64b)** — deliberate, so
+  the battery's BYO/compliance writes exercise the Go P6.4a write/read
+  paths (which is what exposed bugs 1–2), leg 3 Node re-baseline, zero-diff
+  both directions. Battery: authz 9, models 8 (BYO row lifecycle through
+  P6.4a Go routes), features 3, source-context 16, prompts 3, chat 6,
+  completion 2, compile-fix 5, grammar 3, generate 3, compliance 10, job
+  lifecycle 4 ≈ 70 pins + FX (budget before/after, `llmreviewjobs` docs,
+  user LLM profile, admin FILE bytes, `llmusages`). Normalized volatiles
+  (known list): `enc:v1`→ENC, provider `id`→PID, `u:PID:`, `jobId`→JOB,
+  timestamps→TS, `documentTokensEstimate`→EST, network phrasing→NETERR,
+  HTML `nonce=`→NONCE, `ol-csrfToken` meta→CSRF, `_csrf` hidden input→CSRF
+  (both stacks render per-request CSRF/nonce tokens on HTML pages), and
+  job-doc `_id` ObjectIDs→OID (stacks generate independent OIDs).
+  Determinism: dead-host ENOTFOUND, budget reset, `llmreviewjobs` dropped,
+  admin file restored (owner `www-data:www-data` mode 600), flip stripped
+  in afterAll. Gate time ≈ 5.5 min (dead-host retry windows dominate).
+
+Regression after P6.4b: **P6.4a 13/13, P6.3b, P6.3a, P6.2, P6.1, smoke
+all green**; `go build ./...` + `go vet` + `go test ./go/services/web/...`
+green.
+
+**P6.5 — bib-editor library module: My References (DONE, GATE 5/5 GREEN, 2026-09-17):**
+New package `go/services/web/features/library/` (6 files + `nfdbase.go`) +
+`views/pages_data_p65.go`. Node sources pinned: `modules/bib-editor/app/src/*`
+(`LibraryController.mjs`, `LibraryManager.mjs`, `BibTypes.mjs`,
+`LibrarySearch.mjs`, `LibrarySerializer.mjs`, `LibraryRoutes.mjs`),
+`Features/Project/UserSettingsHelper.mjs` (legacy page settings shape),
+`modules/bib-editor/app/views/library/library.pug` (oracles
+`/tmp/p65_oracle.mjs` → `/tmp/p65_node.json` 57 pins, direct smoke
+`/tmp/p65_gosmoke.mjs` → `SMOKE-ALL-OK`).
+- **Routes (Node `LibraryRoutes.mjs` order)**: `GET /library`, `GET
+  /library/trashed` (pages; legacy `UserSettingsHelper.buildUserSettings`
+  into `ol-userSettings` — raw ace values, undefined keys dropped,
+  `theme` cutoff 2026-03-02T12:00Z — NOT the editor's ACE-defaulted shape);
+  `POST /library/references` (create, validate-BEFORE-insert, first failing
+  reason wins, 400 `VALIDATION_MESSAGES[reason]`); `GET /library/references`
+  (list: `limit` NaN/0→50 clamp 1–200, `trashed` ∈ {true,1,yes}, `search`
+  + `cursor` single-string only, `nextCursor` = last `_id` when hasMore,
+  entries `toApiEntry` order `key,type,fields,_id,occurrenceIndex,
+  updatedAt,createdAt`); `POST .../match` (dedup+trim, active-only);
+  `GET .../count` (no purge, trashed/search aware); `GET .../download`
+  (`library.bib`, `text/plain; charset=utf-8`, cap 200; inclusion by default,
+  `mode=exclusion` inverts; ids/search/searchless precedence); `GET
+  .../citation-key-suggestions` (root = base lowercase non-alnum stripped
+  cap 64; taken = extraKeys ∪ active keys; root + `b..z` (no `a`) + `2..999`,
+  first 10); `POST .../delete` (branch order: purge → ids (bad ids → 200
+  `deletedCount:0`) → search (no tokens → 200 `0`) → 400
+  nothing-to-delete; soft by default, `permanent` honors
+  `OVERLEAF_BIB_LIBRARY_TRASH_RETENTION_DAYS`=30 purge); `POST .../restore`;
+  `PATCH .../:key` (declared LAST — only real keys reach it; rename-conflict
+  409 curly-quote message + `duplicateKey`; `key ?? origKey`, `type ?? ''`,
+  occurrenceIndex always 0).
+- **Bug class found+fixed in-gate**: Mongo driver v1 decodes
+  `map[string]any` array values as `primitive.A` and dates as
+  `primitive.DateTime` — `fields: []`/`updatedAt: null` came back broken
+  until `asAnySlice`/`tsOf` hardening (reconfirms the P6.4b rule).
+- **NFD search without `x/text`**: the module cache has no
+  `golang.org/x/text/normalize` (checked v0.17/v0.40) → `nfdbase.go` is a
+  13,785-row per-rune table (code points 0x80–0x10FFF) generated by running
+  Node's exact pipeline (`toLowerCase → NFD → strip \p{Mn} → fold
+  {æ→ae,œ→oe,ø→o,ß→ss,ł→l,đ→d,ð→d,þ→th,ŋ→ng}`) via
+  `/tmp/p65_nfdbase.mjs`; char-wise independence holds so Go =
+  `strings.ToLower` + per-rune lookup = Node `normalizeSearchText`.
+- **Serialize**: depth-tracking `}` escaper (`\}` only at depth 0),
+  `@type{key,\n  name = {val}\n}` entries joined by exactly one blank line,
+  trailing newline — byte-pinned by `b_dl_*`.
+- **Flip conf** `server-ce/nginx/flips/web-p65.conf`: exact-match pages
+  (GET-guard), GET/POST verb-set regexes (wrong verb falls to Node → Node
+  405/404 parity), literal-verb locations pinned to Node so `PATCH /:key`
+  never sees fake keys, `~ ^/library/references/([^/]+)$` (PATCH-guard).
+- **Gate** `tests/e2e/specs/parity/web-go-p65-flip.test.e2e.ts` (3 legs +
+  pin-sanity, **5/5 green**): cumulative flips (p64a+p64b+p65), 60 pins
+  incl. state end-anchors; `libraryreferences` wiped between legs AND
+  after; **redis rate-limit keys flushed each leg** (`ol-e2e-redis-1`
+  `redis-cli del rate-limit:bib-library*`) — Node and Go share the exact
+  key namespace (`rate-limit:<name>:<ip>`), unflushed cross-leg
+  accumulation would 429 the second leg. Gate time ≈ 40s.
+
+Regression after P6.5: **P6.4b 5/5, P6.4a 5/5, P6.3b, P6.3a, P6.2,
+P6.1, smoke all green**; `go build ./...` + `go vet` +
+`go test ./go/services/web/...` green.
+
+**P6.6 — zotero reference-provider module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+New package `go/services/web/features/zotero/` (5 files: `zotero.go` routes+
+handlers, `enabled.go` site-setting gate, `creds.go` user-credential store +
+cipher bridge, `client.go` zotero.org API client, `oauth.go` zotero OAuth
+helper) + `core.Res.HTML` + `sitesettings.EncryptRaw/DecryptRaw`. Node sources
+pinned: `modules/zotero/app/src/{ZoteroRouter,ZoteroController,ZoteroSection,
+TokenManager,ZoteroApiClient,ZoteroOAuth,AccessTokenEncryptorHelper}.mjs`,
+`Features/SiteSettings/SiteSettingsManager.mjs`,
+`libraries/access-token-encryptor/lib/js/AccessTokenEncryptor.js`; oracle
+`/tmp/z_full.mjs` (disabled + enabled pin sets), direct smokes
+`/tmp/p66_gosmoke.mjs` + `/tmp/p66_gosmokeB.mjs` → `SMOKE-ALL-OK`.
+- **Routes (Node `ZoteroRouter.mjs` order, all `requireLogin`)**:
+  `GET /user/zotero/groups` (enabled-gated), `DELETE /user/zotero` (unlink
+  no-op when unlinked), `GET /user/zotero/status` (→ `false` unlinked, NO
+  enabled gate), `GET /user/zotero/oauth` (enabled-gated; starts RFC5849
+  three-legged dance — in the sandbox the zotero.org request-token call
+  fails fast → deterministic `400 {"message":"Failed to start Zotero
+  authorization"}` on BOTH stacks), `GET /user/zotero/oauth/callback`
+  (`MissingToken` → 403 `{"message":"Invalid OAuth token"}` before any
+  network), `GET /user/zotero/picker/{libraries,collections,items,bibtex}`
+  (enabled-gated; not-linked: groups → `200 null`, pickers → 409
+  `zotero_not_linked`, bibtex no-keys → 400 `no items selected` checked
+  BEFORE the linked-check).
+- **Enabled merge**: `site_settings.global.zotero.enabled` stored-wins over
+  seed `bool(OVERLEAF_ZOTERO) ?? ENABLED_LINKED_FILE_TYPES ⊇ zotero` (both
+  unset in e2e → seed false; lookup failure → ALLOW with warn; `false` →
+  403 `text/html` `Zotero is disabled on this site`). Anonymous
+  behavior is gated before the enabled check (401 json / 302 html /
+  403 non-GET, P1-pinned).
+- **Root-caused during instrumentation** (the "zotero never enables"
+  artifact): the web app's site-settings collection is **`site_settings`
+  (snake_case)** — `mongodb.mjs:117` `internalDb.collection('site_settings')` —
+  NOT `siteSettings`. Earlier writes to `db.siteSettings` created a stray
+  collection nobody reads (dropped). Both stacks now read the same
+  document; `enabled=true` flips every gated route 403 → its enabled
+  behavior in < 1 s (Node 5 s section cache is cleared by the gate's
+  `sv restart web-overleaf` between phases).
+- **Cipher interop**: zotero user creds = `user.refProviders.zotero
+  .apiKeyEncrypted` = `AccessTokenEncryptor.encryptJson({apiKey,
+  zoteroUserId})` — the **raw JSON-object payload form** (no `ss::` prefix),
+  NOT the `ss::` string form used for `site_settings` secrets. Added
+  `EncryptRaw/DecryptRaw` to `features/sitesettings/cipher.go` (same
+  HKDF-SHA512 + AES-CTR `OL_CEP-v3` scheme); zotero `clientSecret` stays on
+  `DecryptText/EncryptText` via `resolveZoteroClientSecret`.
+- **Gate gotchas (both fixed, pinned in the spec)**: (a) in-container
+  probes must hit `127.0.0.1:4000` for Node (7420 is host-mapped only,
+  unreachable in-container); (b) `execFileSync` with `stdio:'ignore'
+  ` discards stdout AND `capture=true` throws on curl exit≠0 — the wait
+  probes now read `e.stdout` from the throw (a latent P6.5 `waitGo`
+  bug, harmless there because Go was already up); (c) `mongosh print(
+  JSON.stringify(undefined))` writes NOTHING — state probes pin unset as
+  `null` via `?? null`. No rate limiter on this surface → no redis flush.
+- **Flip conf** `server-ce/nginx/flips/web-p66.conf`: 9 exact-match
+  `location =` blocks with the P6.5-proven method-guard idiom (non-matching
+  verb falls through to Node → Node 405 parity).
+- **Gate** `tests/e2e/specs/parity/web-go-p66-flip.test.e2e.ts` (4 legs +
+  pin-sanity, **5/5 green, 1.8 min**): cumulative flips (p64a+p64b+p65+p66);
+  34 pins per leg across BOTH phases (A disabled → `sv restart web-overleaf`
+  → B enabled → restore `null`); exact status/CT(MIME)/body/loc — zotero
+  bodies are exact constants, no normalization. Pin anchors: disabled
+  picker 403 `text/html`, status `200 false`, unlink `200 OK`, callback
+  `403 {"message":"Invalid OAuth token"}`; enabled groups `200 null`,
+  pickers `409 zotero_not_linked`, bibtex no-keys `400`, oauth `400`;
+  anon 401/302→`/login`/403 both phases.
+
+Regression after P6.6 (full flip-gate sweep, all re-run this round):
+**P0 6/6, P1 3/3, P2 3/3, P3.3a, P3.3b, P3.4, P3.6, P4.1–P4.13b
+(all 19 P4 gates incl. P4.13), P5.1a/b, P5.2a/b, P6.1, P6.2, P6.3a, P6.3b,
+P6.4a, P6.4b 5/5, P6.5 5/5, smoke, a5smoke — all green** (two sweep
+artifacts root-caused, neither a parity drift: P3.3 leg-2 login **429**
+from P2's login burst on the shared redis rate-limit key → green after
+flush; P6.3a pin-anchor tripped by live `tokens` docs left by the P2
+password-reset battery → green after marking them used — P6.3a legs
+Node≡Go passed throughout). `go build ./...` + `go vet` +
+`go test ./go/services/web/...` green; deployed `bin/web` md5-matched.
+
+**Next**: remaining P6 module surfaces in the list below (each =
+oracle → Go → flip conf → 3-leg gate → regressions → commit).
+
+**P6.7 — orcid-picker reference-provider module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+`go/services/web/features/orcidpicker/` (4 files: `orcidpicker.go` routes,
+`client.go` fetch/search, `works.go` works+bibtex, `jstricks.go`
+Node-faithful string/number helpers, `ssrf.go` guard) registered in
+`cmd/web/main.go`. Three login-gated GETs (all the surface — the module has
+no state or writes):
+
+- `GET /orcid-picker/search?q=` — ORCID `expanded-search` (`rows=20`),
+  fielded `given-names:` / `family-name:` solr query when 2+ words,
+  results `{orcid-id, given-names, family-names, institution-name}`
+  re-mapped with the Node `||`/`?.` semantics and key order
+  `orcid, givenNames, familyNames, institutionNames`.
+- `GET /orcid-picker/works?orcid=` — per-group **first** work-summary,
+  `title.year?.value`/`year`/`type`/`put-code` (key **dropped** from JSON
+  when absent, as in Node), DOI from the first `external-id` with
+  `external-id-type==='doi'` and a truthy value, **stable year-descending
+  sort** (Node `parseInt || 0` comparator).
+- `GET /orcid-picker/fetch-bib?orcid=&putCode=` — 1) embedded
+  `citation` when `citation-type==='bibtex'` and value `.trim()` starts
+  with `@`; else 2) DOI content-negotiation via `doi.org` (accept
+  `application/x-bibtex, text/x-bibtex, text/bibliography; style=bibtex`,
+  only when the DOI matches `^10\.\d{4,9}/\S+$`), failure there is a
+  warn-and-fallthrough, never a 502; else 3) the exact Node template
+  `@<type>{<surname><year|nd>,…}` from the work record.
+
+Faithful `safeFetch`: per-hop SSRF check (exact port of
+`isPrivateAddress`: 0/8, 10/8, 127/8, 100.64/10, 169.254/16, 172.16/12,
+192.168/16, 198.18/15, ≥224/3, IPv4-mapped IPv6, `::`, `::1`, `fe80::/10`,
+`fc00::/7`, `fec0:`, `ff00::`), 10 s per-hop timeout (abort →
+"The operation was aborted"), manual redirect following ≤5 with relative
+Location resolution, 2 MB size cap, non-2xx →
+`Upstream API responded with <status>` — these strings are the exact
+undici/Node/V8 texts the 502 bodies carry. `encodeURIComponent`/
+`encodeURI`/`JSON.stringify` escape sets reproduced per-rune (no
+`x/text/normalize` dependency).
+
+Gate (pinned 2026-09-17): anon `401 Unauthorized` / bare-GET `302 → /login`
+/ non-GET `403 Forbidden`; the 400 battery byte-exact on both stacks
+(8 message pins incl. `putCode=Infinity` → 400 via `Number.isFinite`);
+`search "Alan Turing"` → `200 {"results":[]}` (zero registry match —
+deterministic in the sandbox); `works`/`fetch-bib` never-registered ORCID
+→ `502 {"error":"Upstream API responded with 404"}`; live pins compared
+leg-vs-leg: `search "Turing"` (2812 B), `works 0000-0002-0185-5110`
+(2414 B, 15 works year-desc), `fetch-bib …/17643012` (246 B, ORCID-embedded
+BibTeX) — all **byte-identical Node ≡ Go** in the direct dual-stack
+capture and in gate legs 2/3.
+
+Gotchas hit this unit: `safeFetch` initially drained the body **before**
+the status branch (empty 2xx text → JSON parse 502) — drain only on
+redirect/non-2xx/oversize; empty-array JSON (`{"results":}`) — wrap the
+joined items in `[…];` Go `sort` comparator **inverted** vs Node
+`yb-ya` (ascending came out) — `less(i,j) = year(i) > year(j)`;
+Node keeps the `orcid` key when the upstream value is `null`
+(`"orcid":null`, not a dropped key).
+
+Regression after P6.7 (full flip-gate sweep, all re-run this round):
+**P0 6/6, P1 3/3, P2 3/3, P3.3a…P3.6 (P3.3 legs Node≡Go; one in-sweep
+leg-2 flake green on standalone re-run), P4.a–g/inv (all re-run green
+after one Node-baseline rename flake), P5.1a/b, P5.2a/b, P6.1, P6.2,
+P6.3a (pin-anchor flaky-green), P6.3b, P6.4a, P6.4b, P6.5, P6.6, smoke,
+a5smoke — all green**; `go build ./...` + `go vet` +
+`go test ./go/services/web/core/... ./go/services/web/features/...` green;
+deployed `bin/web` md5 `cbe86e50…` matches the container copy.
+
+**P6.8 — mendeley reference-provider module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+`go/services/web/features/mendeley/` (4 files: `mendeley.go` routes,
+`settings.go` section resolution, `client.go` OAuth/API/creds, `cipher.go`
+per-provider cipher) + `sitesettings.OpenProvider(label, password)`
+(the shared V3 cipher primitives are already byte-compatible; only the key
+scope differs per provider). Five routes (Node registration order):
+
+- `GET /user/mendeley/status` — `{"configured":c,"connected":c}` (key
+  order pinned). `configured = section.enabled && clientId && clientSecret`
+  (stored site_settings `mendeley` section wins over the MENDELEY_* env
+  seed; `enabled` defaults TRUE when unset — unlike zotero's ENABLED_LINKED
+  FILE_TYPES seed). `connected` is only resolved when configured
+  (`user.refProviders.mendeley.encrypted` present + decryptable).
+- `GET /mendeley/groups` — unconfigured → `403
+  {"error":"not_configured","message":"mendeley_groups_relink"}`;
+  forbidden/expired/not-linked → `403 {"error":"forbidden",…}`; other →
+  `500 {"error":"internal","message":"mendeley_groups_loading_error"}`;
+  success → `{"groups":[{"id":String(id),"name":name||`Group ${id}`}…]}`.
+  (Live path: GET api.mendeley.com/groups?type=all — Bearer + refresh
+  before expiry; not exercisable in the sandbox without a linked account.)
+- `GET /user/mendeley/oauth` — 16-byte random `state` stored in the
+  session, then `302 https://api.mendeley.com/oauth/authorize?client_id=…
+  &redirect_uri=…&response_type=code&scope=all&state=…` (URLSearchParams
+  order); UNCONFIGURED → `_ensureConfigured` throws → catch →
+  `302 /hub#mysettings.references` (the state store then redirect shape is
+  mirrored on both stacks).
+- `GET /user/mendeley/oauth/callback` — state verified + consumed from
+  the session; code→token exchange (`POST /oauth/token` with Basic
+  client-id/secret, 400/401 → Forbidden class) + `storeCredentials`
+  (per-provider cipher) — every terminal path is the same
+  `302 /hub#mysettings.references`.
+- `POST /mendeley/unlink` — `$unset refProviders.mendeley` (no-op when
+  unlinked) → `200 text/plain OK`.
+
+Cipher scope — the mendeley key is per-provider (Node
+`createAccessTokenEncryptor('mendeley')`): `MENDELEY_CIPHER_PASSWORD` env
+or the auto-created key file `/var/lib/overleaf/data/.mendeley-cipher-key`
+(32 random bytes base64, mode 0600), label `MENDELEY_CIPHER_LABEL ||
+'2024.1-v3'` — a different password+label from zotero's OL_CEP-v3 key, so
+a mendeley token is NOT decryptable with zotero's key (Go matches).
+
+Gate (pinned 2026-09-17, the e2e instance is mendeley-UNCONFIGURED + user
+UNLINKED → zero api.mendeley.com traffic on the gate paths): anon
+`401/302/403` chain; member `status 200 {"configured":false,"connected":false}`,
+`groups 403 not_configured`, `oauth 302 /hub#mysettings.references`,
+`callback 302 /hub#mysettings.references`, `unlink 200 OK` — all
+byte-identical Node ≡ Go (direct dual-stack capture + gate legs 2/3), DB
+anchors `site_settings.mendeley == null` + `refProviders == {}` unchanged
+across the 4 legs; cumulative 6-conf flip incl. P6.4a…P6.8.
+
+Regression after P6.8 (full flip-gate sweep, all re-run this round):
+**P0 6/6, P1 3/3, P2 3/3, P3.3a–P3.6 (P3.3 leg-2 in-sweep flake — the
+standing sweep artifact — green on standalone re-run), P4.a–g/inv,
+P5.1a/b, P5.2a/b, P6.1, P6.2, P6.3a (pin-anchor flaky-green), P6.3b,
+P6.4a, P6.4b, P6.5, P6.6, P6.7, smoke, a5smoke — all green**;
+`go build ./...` + `go vet` + `go test` green; deployed `bin/web`
+md5 `f7493953…` matches the container copy.
+
+**P6.9 — webdav module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+`go/services/web/features/webdav/` (8 files: `webdav.go` routes/handlers,
+`cipher.go` V3 token encryptor bridge, `creds.go` credential+state storage,
+`states.go` sync-state queries/serializers, `client.go` raw WebDAV HTTP
+client (PROPFIND/GET/PUT/MKCOL/DELETE, 2-attempt retry), `helpers.go`,
+`sync.go` best-effort live sync surface, `webdav_test.go`) — 13 routes:
+`GET /user/webdav/status`, `POST /user/webdav/connect`,
+`POST /user/webdav/disconnect`, `GET|DELETE /project/:id/webdav/state`,
+`GET /project/:id/webdav/files`, `POST …/link|pull|push`,
+`POST …/conflict/resolve`, `GET …/project-name`, `POST /project/new/webdav`.
+
+Storage (live-Node-verified, the traps that cost the round):
+- **Collections are the mongoose pluralizations — all lowercase**:
+  `webdavusercredentials`, `webdavsyncprojectstates` (NOT the camelCase
+  model names; `db.getCollectionNames` is the authority).
+- **`userId` / `ownerId` are stored as HEX STRINGS** (`req.user._id` arrives
+  stringified in the running Node) — Go stores/queries strings so Node and
+  Go interoperate on the same docs (verified both directions: Node-write→Go
+  -read and Go-write→Node-read, byte-identical status; both stacks delete
+  each other's docs on disconnect).
+- Save = `findOneAndUpdate({userId}, {$set:{credentials}}, {upsert:true})`
+  (Go needed `options.Update().SetUpsert(true)` — silent no-op without it).
+- Disconnect scope (H6): delete state docs `ownerId === uid` first, then the
+  credential doc.
+
+Cipher: same shared AccessTokenEncryptor V3 as zotero/mendeley (site/
+settings `OpenProvider`); webdav label `OL_WEBDAV-v3`, key =
+`WEBDAV_TOKEN_CIPHER_PASSWORD` or the auto-created
+`/var/lib/overleaf/data/.webdav-token-cipher.json` `{cipherLabel,
+cipherPasswords}`. Go enforces the label prefix on decrypt (Node selects
+the scheme by the token label); corrupted/rotated tokens degrade on status
+to `200 {"connected":false,"error":"stored-credentials-invalid"}` (Node
+router catch branch — live-gated; no-doc case stays plain
+`{"connected":false}`).
+
+Gate (`specs/parity/web-go-p69-flip.test.e2e.ts`, 4-leg + pin sanity,
+cumulative 7-conf flipped P6.4a…P6.9, e2e instance webdav-linkless,
+WEBDAV_ENABLED=true so the module loads on both stacks): anon 401/302/403
+chain; member unlinked battery (status/state/files/link/pull 409/push 500/
+conflict 400-400-404/unlink 404/project-name/new-webdav 400-500); bad-oid
+zod 404 `params.project_id`; ghost 404 HTML page (nonce+csrf normalized,
+P3c suite); other-user 403 restricted; connect cycle
+(full→status pinned → empty→status → baseUrl-only → link-incomplete 400 →
+corrupt→status error-key → disconnect→status); DB anchors
+`webdavusercredentials` 0→1→0 + `webdavsyncprojectstates` 0 —
+**5/5 GREEN on the canonical `bin/web`** (the P2/P3x gates self-deploy
+`bin/web`, so the artifact and the container copy are the same file —
+md5 `83bed65f…`).
+
+Scope note (recorded): the raw WebDAV client primitives + link/unlink
+lifecycle are implemented; the deep sync engine (poll diff-walk, un-mirror,
+full conflict resolution engine, import-into-new-project) is a documented
+best-effort surface — not byte-ported and not sandbox-exercisable (no live
+WebDAV endpoint; e2e user unlinked), so only the offline-deterministic
+route surface is byte-pinned. `POST /project/new/webdav` with a live remote
+will 500 on the first PROPFIND the same way Node does in the sandbox (`
+{"error":"WebDAV is not connected"}` unlinked / network-error linked).
+
+Regression after P6.9 (full flip-gate sweep, cumulative 7-conf where the
+gate takes it): **P0 6/6, P1, P2, P3a–P3e (P3c re-confirmed on the final
+bin/web), P4a–g/inv/hb, P4.11a/b, P4.12a/b, P4.13/4.13a/4.13b (P4.13
+nginx-bound re-run green standalone — batch-state artifact: a failed apply
+had left orphan flipped-include in overleaf.conf; clean re-run + the
+self-deploying gates confirm the final binary), P5.1a/b, P5.2a/b, P6.1,
+P6.2, P6.3a (pin-anchor flaky-green, standing sweep artifact), P6.3b,
+P6.4a, P6.4b, P6.5, P6.6, P6.7, P6.8, smoke, a5smoke — all green**;
+`go build ./...` + `go vet` + `go test ./go/services/web/...` green;
+`bin/web` (repo artifact) == container `/usr/local/bin/go-services/web`
+(83bed65f…);
+nginx flips left clean (0) after the sweep; webdav DB clean (0 docs in all
+four case-variants of the two collections).
+
+**P6.10 — dropbox module (DONE, GATE 5/5 GREEN, 2026-09-17):**
+`go/services/web/features/dropbox/` (7 files: `dropbox.go` routes/shared
+plumbing (authz chain + body helpers), `handlers.go` the 11 route bodies,
+`cipher.go` AES-256-GCM token cipher (DropboxCredentials.mjs port),
+`store.go` credential+state storage, `oauth.go` app-keys/state/authorize-
+URL, `helpers.go` (text responses + path normalization + state
+serializer), `dropbox_test.go`) — routes: `GET /user/dropbox/status`,
+`POST /user/dropbox/connect|disconnect`, `GET /user/dropbox/oauth2`,
+`GET /user/dropbox/oauth/callback`, `GET|DELETE /project/:id/dropbox/state`,
+`POST …/link|pull|push`, `GET …/files`, `POST /project/new/dropbox`.
+
+Storage (same live-verified traps as P6.9): all-lowercase collections
+`dropboxusercredentials` / `dropboxsyncprojectstates`; **userId stored as
+HEX STRING** (upsert on connect, deleteOne on disconnect, state docs
+scopped by `{path, ownerId}` on disconnect).
+
+Cipher (differs from the webdav/zotero/mendeley V3 family — Dropbox has
+its own): **AES-256-GCM**, token = `base64(iv12 ‖ ct ‖ tag16)`; key =
+`sha256('overleaf-dropbox-credentials-v2|' + WEBDAV_TOKEN_CIPHER_PASSWORD)`
+(SECRET_TOKEN fallback with the `-secret-token-fallback` purpose); legacy
+decrypt candidates = the 32-char `overleaf-dropbox-credentials-v2|`
+prefix + `NODE_ENV` raw keys (String `padEnd(32,'x').slice(0,32)`
+semantics). Node's `decipher.update(embedded, 'base64')` is an IDENTITY
+(`buf.toString('base64')` re-encoded) — so plain GCM is the faithful port
+and **tokens round-trip cross-stack**: verified both directions live
+(Node-encrypt→Go-decrypt and Go-encrypt→Node-decrypt under the same key).
+Sandbox parity pins (no cipher env at all): connect with a token →
+500 `No encryption secret available for Dropbox credentials (set
+WEBDAV_TOKEN_CIPHER_PASSWORD or SECRET_TOKEN)`; injected garbage token →
+link 500 `Token decryption failed` (handler-wrapped) vs new/dropbox 500
+`Decryption failed. Invalid token or encryption key.` (raw
+`err.message` passthrough — the two handlers catch differently, mirrored
+exactly).
+
+Gate (`specs/parity/web-go-p610-flip.test.e2e.ts`, 4-leg + pin sanity,
+cumulative 8-conf flipped P6.4a…P6.10, e2e instance dropbox-unlinked,
+DROPBOX_ENABLED=true): anon 401/302/403 chain incl. oauth2/callback;
+member unlinked battery (status
+`{connected:false}` / oauth2 503 text/html `Dropbox OAuth is not
+configured` / callback 400 text/html `Invalid Dropbox OAuth state` /
+connect-missing 400 / connect-sl 500-no-secret / unlink 200 /
+state `{connected:false}` / link 409 / pull-push-files 409 / new 400+409 /
+disconnect `{success:true,unlinkedProjects:"/"}`); **state GET is
+login-only in Node (no authz/no zod): bad-oid and ghost both 200
+`{connected:false}`, other-user 200** — while link/pull go the shared P4
+chain (bad-oid zod 404 `params.project_id`, ghost 404 HTML page, other
+403 restricted); garbage-credential cycle
+(status `{connected:true,path:"/",projects:[],lastSyncAt:null,
+lastSyncError:null}` → link/new decrypt 500s → pull 409 → disconnect
+clean → status false); DB anchors `dropboxusercredentials` 0→0 +
+`dropboxsyncprojectstates` 0 — **5/5 GREEN on the canonical `bin/web`**
+(md5 `3ba42621…`, deployed to the container, runit-restarted).
+
+Scope note (recorded): the Dropbox API client lives in the **Go
+dropboxinterface** service (P-service cutover) — this unit ports the
+route/offline-deterministic surface only; live network paths
+(`checkConnection`, import/export mirror, file listing) are pinned to
+their pre-network gates and would hit the same 500 shape as Node in the
+sandbox (no account, no app keys, no network). The `oauth2` 302 target
+and `oauth/callback` state exchange are live-only (app keys unset → both
+stacks answer at the 503/400 gates first).
+
+Regression after P6.10 (flip-gate sweep on the cumulative 8-conf): **P6.5,
+P6.7, P6.8, P6.9 gates all 5/5 GREEN (each re-deploys the canonical
+`bin/web` and re-verifies its own surface on top of the P6.10 flip),
+smoke + a5smoke green**; `go build ./...` + `go vet` + `go test
+./go/services/web/...` green; `bin/web` == container
+`/usr/local/bin/go-services/web` (3ba42621…); nginx flips left clean (0)
+after the gate; dropbox DB clean (0 docs, all case-variants).
+
+**Next**: github-sync, then the residual P6 modules and **P7**
+(union flips, Node web retirement, final sweep).
+
+**P6.11 — github-sync module (DONE, GATE 5/5 GREEN, routing-only unit,
+2026-09-17):** `server-ce/nginx/flips/web-p611.conf` (15 locations) flips
+the full declared 16-route surface — user `github-sync/{status,orgs,repos,
+oauth2,oauth2/callback,unlink}`, `git-servers` (GET|POST),
+`git-servers/:id` (DELETE), `git-servers/test` (POST), `git-pat/link`
+(POST), project `new/github-sync` (POST) and `:id/github-sync/{state,
+export,merge/overview,merge,unlink}` — to the Go web (4010) with method
+guards; wrong method falls through to Node.
+
+**No Go package was required — and that is the finding.** The github-sync
+module loads on Node only when `GITHUB_SYNC_ENABLED`/`GIT_SYNC_ENABLED`
+is `true` (`services/web/modules/github-sync/index.mjs` gate); that env is
+unset in the e2e deployment, `db.githubSyncUserCredentials`
+/`db.githubSyncProjectStates` hold **0 docs**, and every declared route
+was live-verified to answer **404** on Node. Live cross-stack
+verification then showed the Go core already reproduces that whole chain
+byte-for-byte: member mutation w/o csrf token → 403 text/plain
+"Forbidden" (csrf chain, pre-route — matches Node's router-mounted csurf);
+member w/ valid token → 404 express "Cannot <METHOD> <path>" page for
+non-GET and the 404 OlliTES "Page Not Found" view for GET/HEAD; anon
+GET+accept-json → 401 "Unauthorized", anon GET bare → 302 /login, anon
+non-GET → 403. The gate (4-leg, 51 pins, cumulative 9-conf flipped
+P6.4a…P6.11) proved Node baseline = Go answer = Node re-baseline on every
+pin including the express-404 template bytes exact, the csrf-403 class,
+the 404-page class, the 401/302/403 anon chain, and the nginx
+fall-through guards. The flip is future-safe: after P7 Node retirement
+these paths are answered by Go with the identical bodies whether or not
+a github-sync Go feature is ever added (module-enabled deployments are
+out of this stack's profile — if it ever ships here, the Go feature is
+the follow-up, with the `@overleaf` AccessTokenEncryptor V3 cipher,
+camelCase collections, and real-ObjectId userId model already
+live-captured for that port). DB anchors 0/0 before and after; nginx
+flips left clean (0); `bin/web` == container (3ba42621…, unchanged);
+`go build ./...` + `go vet` clean.
+
+Regression after P6.11 (flip-gate sweep): **P6.5 5/5, P6.7 5/5, P6.8
+5/5, P6.9 5/5, P6.10 5/5, smoke + a5smoke green** — each on the
+respective cumulative flip, nginx left clean afterward.
+
+**P6.12 — track-changes module (DONE, GATE 5/5 GREEN, 2026-09-18):**
+Go package `go/services/web/features/trackchanges/` (trackchanges.go,
+plumbing.go, downstream.go, handlers.go, trackchanges_test.go) implements
+all 11 live routes of `services/web/modules/track-changes`:
+`POST track_changes` (state machine `{on,on_for,on_for_guests}` with
+Node-exact validation messages, `__guests__` storage form, on=true
+dominates), `POST doc/:id/changes/accept`, `GET ranges`,
+`GET changes/users`, `GET threads` (user-injected serialization with
+Node-exact key order and user-presence semantics: user object present
+only when the user exists — never null), `POST thread/:id/messages`
+(auto-creating room+message via the shared chat service → 204 +
+`new-comment` emit with the message+user object),
+`POST thread/:id/messages/:m/edit` and
+`DELETE thread/:id/messages/:m` (Node oracle: pre-GET the message →
+404-downstream = rendered 500 page; non-author → 403 restricted view;
+delete uses the chat USER-SCOPED endpoint), `POST|DELETE
+…/resolve|reopen|delete-thread` (chat call THEN docstore call, both
+must succeed, Node-exact downstream bodies `user_id`/`userId` — a
+failure at either hop = 500 page). `server-ce/nginx/flips/web-p612.conf`
+(11 regex locations with method guards) flips them to Go on top of the
+cumulative 10-conf set.
+
+Parity traps resolved during this unit (all pinned by the 52-pin gate):
+(1) `tcSerializeThread`/send-emit anonymous structs were missing json
+tags on `id`/`timestamp`/`room_id`/`user_id` — Go default upper-case
+marshalling broke the threads bodies and cascaded into 404 pre-GETs;
+(2) the gate's own `m_edit` pin was missing the `/edit` suffix — both
+stacks then "matched" on a 404 "Cannot POST", which is precisely why
+the pin must hit the real route; (3) Node's track-changes rate limiters
+run as middleware AFTER authz and are a NO-OP in this stack —
+`OVERLEAF_DISABLE_RATE_LIMITS=true` → `Settings.disableRateLimits` →
+`consume()` fakes success — so Go registers NO limiter (editorpages
+precedent: parity for this stack; the future-enabled profile must also
+count only authz-passing requests); (4) the gate's `leg1` baseline can
+vanish between Playwright tests — it is now anchored to
+`/tmp/web-go-p612-leg1.json` and loaded by the deterministic re-baseline
++ pin-sanity legs; (5) method-guard fall-through oracle: GET → OlliTeX
+404 notFound page, other methods → express "Cannot <METHOD>" (both
+stacks, pinned); (6) ghost-thread sends auto-create the room in the SHARED
+go-chat service → 204 on both stacks (the ghost edit/delete/resolve/
+reopen/deltask pins stay 500 on both — the pre-GET/docstore hops fail
+first). e2e anchors: gate project `tc-p612-gate`, other-user project
+`webdav-p69-other`; DB rooms/messages 0/0 and `track_changes:false`
+before and after; nginx flips left clean (0); `go build ./...` +
+`go vet` clean; `bin/web` redeployed (md5 a3b25e0c…, /status 200).
+
+Regression after P6.12 (flip-gate sweep on the cumulative 10-conf):
+**P6.5 5/5, P6.6 5/5, P6.7 5/5, P6.8 5/5, P6.9 5/5, P6.10 5/5,
+P6.11 5/5, smoke 1/1, a5smoke 1/1** — nginx left clean afterward.
+
+**P6.13 — template-gallery module (DONE, GATE 5/5 GREEN, 2026-09-18):**
+Go package `go/services/web/features/templates/` (templates.go routes,
+handlers.go public reads + page/error plumbing, mgmt.go the full admin
+flows, sanitize.go cleanHtml parity, md.go markdown renderer,
+templates_test.go unit pins) implements all 16 live routes of
+`services/web/modules/template-gallery`:
+`GET /api/template` (key/val single-item lookup; unsupported key → null),
+`GET /api/template/categories`, `GET /api/templates`
+(totalSize+templates[] with Node-exact sort/fallback: `by` ∉
+{lastUpdated,name} or `order` ∉ {asc,desc} or repeated key → rendered
+500 page; empty values fall back to lastUpdated/desc),
+`GET /api/templates/admin-list` (authz ladder → 403 restricted for
+non-privileged), `POST /template/new/:id` (project ghost → 400),
+`POST /template/bundle/import` (400 on empty body),
+`POST /template/bundle/import-url` (400 empty / **422 SSRF on blocked
+CIDRs incl. 127.0.0.0/8** / 422 bad scheme), `POST /template/:id/edit`
+(200 `{lastUpdated}` echo; ghost/bad-hex → 500), `DELETE /template/:id/delete`
+(200; filestore zip+pdf delete fire-and-forget), `GET /template/:id` /
+`/templates` / `/templates/` / `/templates/manage` / `/templates/:category`
+(legacy **301** hub leaves), `GET /template/:id/bundle` (200 zip via
+filestore proxy; ghost → 500; bad-hex → 500
+`Cast to ObjectId failed for value "xyz"…` — the value must be quoted
+inside the message, Node-exact), `GET /template/:id/preview`
+(unavailable → rendered 404 page).
+
+Parity traps resolved during this unit (all pinned by the 48-pin gate
+`web-go-p613-flip.test.e2e.ts` + live A/B matrix):
+(1) `bson:"admin"` tag on the login userDoc read the WRONG field — the
+Node user doc stores `isAdmin`; fixed, session passport users now carry
+`isAdmin:true` for site admins; (2) the generic 404/403 page skeletons are
+captured once and render for EVERY user — but Node recomputes
+`ExposedSettings.canManageTemplatesMenu` **per request**
+(ExpressLocals → TemplateAuthorizationHelper) AND renders the **Admin
+navbar dropdown** for site admins on every page: both became per-render
+slots (`\x01CANMGTPL\x02`, `\x01NAVADMIN\x02` + `views.AdminNavFragment`,
+filled from the session user) — admin 404/403 and user 404/403 pages are
+now byte-identical to Node (difflib ratio 1.0 verified);
+(3) the 404 skeleton's `alternate` link is written as
+(`7420/<path>`) — callers must pass the TRIMMED path (pageBase
+convention); templates' `tplPageData` now trims;
+(4) `tplErr500` called `WriteHeader(500)` BEFORE `Error500Page` — that
+finalized headers and silently dropped ETag/CSP/PP from every rendered
+500 (Node's 500 page is weak-ETagged); removed the early WriteHeader;
+(5) mongoose `Cast to ObjectId` messages QUOTE the value inside the
+message text (`value "xyz"`) — replicated exactly (nodeJSONString escapes);
+(6) the bundle zip is re-compressed per stack — the gate pins status +
+content-type + content-disposition prefix, and entry-wise parity
+(template.json JSON-identical, source.zip identical, output.pdf
+byte-identical) was verified out-of-band; the gate also has to normalize
+the `version` counter (the no-op admin edit bumps it +1 per leg on BOTH
+stacks); (7) Node CRASHES on invalid-base64 import (unhandled rejection)
+— a pinned Node bug, deliberately absent from the Node leg; Go returns
+422 without crashing. e2e anchors: fixture template
+`6aa4b8d673ef0e5094f4cc2b` (Parity Fixture Template); nginx flips left
+clean (0); `go build ./...` + `go vet` + `go test ./go/services/web/...`
+clean; `bin/web` redeployed, /status 200.
+
+Regression after P6.13 (flip-gate sweep on the cumulative 11-conf):
+**P6.5 5/5, P6.6 5/5, P6.7 5/5, P6.8 5/5, P6.9 5/5, P6.10 5/5,
+P6.11 5/5, P6.12 5/5, smoke 1/1, a5smoke 1/1, template UI specs
+30/30** — nginx left clean afterward.
+
+**Next**: the remaining residual live P6 modules
+(notifications prefs, languagetool, typst, tex-autoformatter,
+git-bridge, instance-stats, user-activate, page-shells, launchpad — per
+the 2026-09-18 live audit) and
+**P7** (owner directive: go/** README tour, permanent Go web cutover,
+Node web junk-ification, frontend/** re-org, public/locales
+relocation, frontend/** README tour).
+
+**P6.14 — notifications module (DONE, GATE 5/5 GREEN, 2026-09-18):**
+Go package `go/services/web/features/notifications/` (notifications.go
+routes/handlers/normalizers, notifications_test.go unit pins) implements
+all 7 live routes of `services/web/modules/notifications`
+(NotificationsPreferencesRouter.mjs / Controller / Handler /
+PreferenceNormalizer.mjs):
+`GET /notifications/preferences` (200 normalized globals — muteAll,
+delay (int|null — out-of-range/wrong-type stored values normalize to null),
+12 preference keys; missing keys default true, stored null → false),
+`POST /notifications/preferences` (zod shape mirrored verbatim: mute
+required bool — undefined/string/null/number/array/type words pinned;
+delay optional int 1..10080 nullable — string/number/integer/range words
+pinned; the 400 envelope's field path is DOUBLE-escaped in the raw body —
+a Node fromZodError escape artifact, `at \"body.x\"` — mirrored; invalid-
+JSON / JSON-string / JSON-null bodies → 400 EMPTY {}; JSON-array → 400
+`expected object, received array at \"body\"`; 200 echo =
+`{"muteAllNotifications":<b>}` + delay key only when present in the input;
+$set {mute, delay|null, 12 default keys} upserted on
+{user_id, project_id: null}),
+`GET /notifications/preferences/project/:projectId` (member → 200
+{12 keys resolved projectDoc ?? globalDoc ?? default(true)} +
+muteAllNotifications APPENDED LAST — pinned order),
+`POST …/project/:projectId` (member → 200 body exactly `null`; $set 12
+normalized keys upserted), non-member → 403 restricted page **with the
+layout-default title** (Node Errors.ForbiddenError →
+ErrorController.forbidden renders user/restricted with NO title local —
+new `views.Restricted403AppTitle`, unlike the AuthorizationMiddleware
+title-'Restricted' family the track-changes gate pins), ghost → 404
+page, bad hex → 500 page (new ObjectId CastError), all BOTH accepts,
+`GET|POST /user/notification-preferences` → 301
+/hub#/mysettings.email (express redirect Accept matrix),
+`POST /user/send-test-email` → 200 `{"message":"Email Sent"}` + one test
+mail to the session user's email (subject "A Test Email from OlliTeX";
+delivery verified in the local sink on both stacks).
+
+Parity traps resolved during this unit (all pinned by the 52-pin gate
+`web-go-p614-flip.test.e2e.ts` + the 40-row live A/B matrix + the 5-row
+type-word battery):
+(1) the core express.json parity block only checked the FIRST byte — an
+object-shaped-but-invalid body (`{bad`) slipped through to the csrf 403
+while Node 400s at parse time (body-parser precedes csrf): core app.go now
+fully parses `{`/`[` roots before csrf (pinned live: anonymous-ish POST
+`{bad` → 400 {} on Node; Go mirrored);
+(2) the 403 restricted page has TWO Node title variants —
+AuthorizationMiddleware.restricted (title 'Restricted') vs
+ErrorController.forbidden (layout default, appName only): the
+notifications family uses the latter — `views.Restricted403AppTitle`
+(derived by Replacer from the pinned restrictedHTML skeleton);
+(3) per-user page slots — Node renders the Admin navbar dropdown and
+`ExposedSettings.canManageTemplatesMenu` on EVERY page render (incl. the
+error pages): ntfPageData now fills NAVADMIN + CANMGTPL from the session
+(admin 403 page parity verified);
+(4) zod 400 error messages ship with DOUBLE-escaped field-path quotes in
+the raw body — ntfValErr mirrors the escaping (byte-pinned A/B);
+(5) the 12-key normalization subtleties — missing key → default true,
+present-but-null → Boolean(null)=false (both pinned by unit tests + the
+leg battery). e2e anchors: fixture project
+`6aa4ba9c73ef0e5094f4ce33` (e2e-user owned); nginx flips left clean (0);
+`go build` + `go vet` + `go test ./go/services/web/...` clean; `bin/web`
+redeployed, :4000 and :4010 /status 200.
+
+Regression after P6.14 (flip-gate sweep, cumulative 12-conf):
+**P6.5 5/5, P6.6 5/5, P6.7 5/5, P6.8 5/5, P6.9 5/5, P6.10 5/5,
+P6.11 5/5, P6.12 5/5, P6.13 5/5, P3c/P3d/P3e 3/3, P4d 3/3, P5.1b 3/3,
+P5.2b 3/3, P4.13b 3/3, smoke 1/1, a5smoke 1/1, legacy-notification-prefs
+UI 7/7, template UI specs 37/37** — nginx left clean afterward.
+
+**Next**: the remaining residual live P6 modules (typst,
+tex-autoformatter, git-bridge, page-shells, user-activate, launchpad — per
+the 2026-09-18 live audit) and **P7** (owner directive).
+
+**P6.15 — languagetool module (DONE, GATE 5/5 GREEN, 2026-09-18):**
+Go package `go/services/web/features/languagetool/` (languagetool.go +
+languagetool_test.go: ltLevel pin battery incl. `picky:"true"`→default —
+Node `picky === true` is a strict compare; ltResolve fallback ladder) +
+`llmsettings.NodeJSONRoundTrip` (exported from the llmsettings ojson
+model — Node `res.json(JSON.parse(body))` semantics: ordered keys, doubles
+formatted JS-style `1.0`→`1`) implements all 3 live routes of
+`services/web/modules/languagetool` (LanguageToolRouter.mjs /
+LanguageToolController.mjs / adminConfig.mjs). The e2e stack ships the
+LanguageTool server (`ol-e2e-languagetool-1`, env
+`LANGUAGE_TOOL_URL=http://languagetool:8010`; the LLM admin settings JSON
+`languageToolUrl` is empty → env fallback wins):
+
+- `GET /languagetool/languages` (requireLogin) → 200 the LT /v2/languages
+  array. **Node res.json(parsed) round-trips numbers (`"rate":1.0` →
+  `"rate":1`)** while key order is preserved — Go mirrors via
+  NodeJSONRoundTrip (first Naive raw-stream attempt diffed exactly on
+  `rate:1.0`; fixed + byte-pinned A/B).
+- `POST /languagetool/check` (requireLogin): body {language='auto',
+  text?, data?, picky?}; {} / no-body → 400
+  `{"error":"text or data is required"}`; `{bad` → 400 `{}` (express.json
+  precedes csrf — the P6.14 core full-parse); csrf missing → 403;
+  valid → 200 LT /v2/check verbatim — form params in Node URLSearchParams
+  insertion order (language, data|text, level, disabledRules; 100 KB
+  slice; data object JSON-stringified; the 5 LaTeX false-positive rules
+  pinned), level = picky true/false strict, else env LANGUAGE_TOOL_LEVEL,
+  else 'picky'; **LT !ok/timeout/network error → 200 `{"matches":[]}`**
+  (bad language pinned); linter stays silent on upstream trouble.
+- `POST /admin/languagetool/check` (site admin — core.RequireSiteAdmin
+  restrictedBounce: non-member → 302 /restricted?from=%2Fadmin%2Flanguage-
+tool%2Fcheck BOTH accepts): body.url || resolved url; unreachable url →
+  500 `{"success":false,"error":"Connection attempt failed"}`; reachable →
+  200 `{"success":true,"message":"LanguageTool reachable","languageCount":60}`
+  hand-built in the Node key order; LT !ok → 200
+  `{"success":false,"error":"LanguageTool server responded with status N"}`
+  (live-unreachable in the stack; mirrored from the Node source).
+
+Parity traps resolved: (1) the Node module re-exports the LLM admin
+settings file reader (languagetool index.mjs imports LLMAdminController)
+— Go mirrors the same file + the two LT-specific fields per request;
+(2) `http.NewRequest` in Go takes NO context argument (the first deploy
+failed to compile — `req.WithContext(ctx)` instead); (3) the Node LT-
+proxy number round-trip (above). nginx flips left clean (0); `go build`
++ `go vet` + `go test ./go/services/web/...` clean; `bin/web`
+redeployed, :4000/:4010 /status 200.
+
+Regression after P6.15 (flip-gate sweep, cumulative 13-conf):
+**P6.5–P6.14 all 5/5 (10 gates), smoke 1/1, a5smoke 1/1, grammar e2e
+1/1** — nginx left clean afterward.
+
+**P6.16 — typst new-project creation (DONE, GATE 5/5 GREEN, 2026-09-18):**
+`services/web/modules/typst` is UI-first (TypstRouter.mjs) but its two
+live API routes — `POST /project/new/typst` (TypstRouter: zod
+{projectName string, template ≤50} → createProject → **insertProject**
+**compiler:'typst'** → seed `main.typ` + `main.pdf`, redirect to the
+editor URL) and `GET /project/new/typst` (TypstController:
+example-basic + example-article example sets, i18n labels, 200 JSON) —
+are implemented in Go at projectlist as the P4 `POST /project/new` +
+P6.13 `POST /project/new/example` pattern (create.go):
+`crTypstBody` (zod parity: both fields string — `projectName` ≤100 via
+insertProject, `template` ≤50; the P4.11a bare/primitive 400 `{}` shape;
+**zod multi-error concatenation in schema order** — Node
+`zodError.details` joined by `'; '` — pinned A/B live, e.g.
+`Invalid input: expected string, received number at "body.projectName";
+Too big: expected string to have <=50 characters at "body.template"`)
++ `crCreateTypstProject` (insertProject compiler:"typst" — the ONLY
+diff to the TeX basic path — + `main.typ` `## Hello, Typst!` + 8 B
+`main.pdf` via the shared `crSeedBasicFiles` extracted from
+create_example.go; response = `res.redirect(302, '/project/<obj>/')` —
+Node's `Location: /project/<objId>/` (no trailing slash on the id;
+redirect() appends the slash; **not** the editor URL — the Node editor-
+URL redirect is a client-side navigation; pinned A/B), anonymous → 302
+login redirect parity, `res.code(200)` = raw 200 header) +
+`crTypstExamples` (Node key order: name/compiler/files; the two
+code-gated labels `typstRouterNewArticleBasic`/`...Example` — the live
+CE strings — as Node's missing-key fallback; example-basic =
+main.typ+main.pdf only, example-article = cover.typ+main.typ+typst-
+foundation.typ+10 files) + routes in `crRouted` (`/project/new/typst`
+GET/POST both requireLogin → restrictedBounce 302) — the module's
+remaining live code (compile templates built at startup,
+TypstNewProjectModal UI, `typstAvailable` = `typst` in
+featureList — the Go editorpage/exposed-settings already expose it).
+
+Parity traps resolved: (1) **the `insertProject` ObjectId hex was being
+lowercased** (`oidHex` → `hex.EncodeToString` = lowercase) while Node
+`project._id.toString()` produces **uppercase** — the redirect
+Location diffed 40 hex chars on the p412a A/B
+(`.../268946364F64674D64B83A6C` vs `...b83a6c`); `oidHex` now uppercases
+— the fix also corrects the p4.14 admin hex pins and the Go-created
+`projectHistoryId` (p3b); (2) **`go/services/` was not a module root**
+(only `go/test` had a go.mod) — the per-service `go build ./...` from a
+clean module dir is the sanctioned flow (the earlier flat
+`go build ./go/services/web` failed on the `overleaf/web/...` import
+paths — expected, not a regression); (3) P6.14/P6.15 gates are NOT
+self-deploying (they expect a fresh `bin/web` + shadow restart — the
+P4/P5 gates do `docker cp bin/web` in beforeAll; P6.14/P6.15/P6.16 rely
+on manual deploy) — after any Go change: build `bin/web`, deploy,
+`sv restart web-go-overleaf`; (4) the P6.16 battery's
+`v_both_bad` body had a JS string-construction bug in the gate itself
+(`'"x"'.repeat(60)` = the 3-char literal `"x"` repeated, not 60 x's —
+produced malformed JSON, 400 `{}` on BOTH sides; fixed to
+`'"' + 'x'.repeat(51) + '"'`).
+
+nginx flipped **web-p616.conf** (GET+POST exact-path, requireLogin 302
+bounce parity, **method parity — Node express dispatches GET/DELETE on
+typst-router-mounted POST paths but the P6.16 contract is GET/POST;
+non-GET/POST falls through to Node verbatim** rather than 404-JSON — the
+p413b/p411b fall-through precedent for unmounted verbs) left clean (0);
+`go build` + `go vet` + `go test ./go/...` clean (31 pkgs);
+`go/services/web/features/projectlist/create_typst_test.go` byte-pins
+the zod error shapes (single + multi, in schema order).
+
+Regression after P6.16 (flip-gate sweep, cumulative 14-conf):
+**p412a 3/3, p3b 3/3, p413 5/5, p4del 3/3, p4col 3/3, p413b 3/3,
+p612 5/5, p613 5/5, p614 5/5, p615 5/5, smoke 1/1, a5smoke 1/1, grammar
+e2e 1/1** — nginx left clean afterward. **p412a and p3b now green with
+UCASE ids on both sides** (previously the flip leg diffed on the hex
+case only — the gate's normalization masked it; the A/B raw pins expose
+it).
+
+**P6.17 — tex-autoformatter (DONE, GATE 5/5 GREEN, 2026-09-19):**
+`services/web/modules/tex-autoformatter` (TexAutoformatterController.mjs
+— 1 route, `POST /api/format-tex`, requireLogin) is pure formatting,
+stateless. Node: `{content: string, filename?: string}` → content
+length (UTF-16 units) > 5 MiB → 400 `{"error":"content too large"}`;
+`.bib` (last dot-ext, case-insensitive; no filename → tex path) →
+**bibtex-tidy@1.15.1** (PnP zip — not importable) reimplemented in Go
+as `go/services/web/features/texfmt/bibtex.go` (1019 lines): the full
+parser (top-level block/text nodes with whitespacePrefix; entry/
+string/preamble/comment; `{`/`(` delimiters; `#`-joined values;
+braced/math/command values; BOM), the exact transform pipeline
+(preferCurly month-exception, preferNumeric `^[1-9][0-9]*$`,
+trailingCommas, removeEmptyFields, sortFields, stripEnclosingBraces
+via a Latex-AST round-trip where quotes are NOT escaped — a JSON
+display artifact, verified on raw bytes), then the reset-whitespace →
+blank-lines → join(prefix+content)+trimEnd+`\n` render (commentLike =
+text | @comment only), plus a Node-generated escape table
+(`escape_table.go`) — all pinned by a **147-case corpus** from the
+live Node library (`/tmp/gotidy_corpus.json`; `texfmt_test.go` —
+byte-identical output or throw for throw-cases). Everything else goes
+to `tex-fmt --stdin` (same binary, same container — `RunTexFmt`,
+10 s timeout). 500 = `{"error":"Formatting failed"}` (Node's catch).
+The 200 JSON is written with an EscapeHTML(false) encoder — Node
+JSON.stringify does not HTML-escape (`&` stayed `&` on the wire;
+default `json.Marshal` `\u0026` broke the A/B r3-esc-mixed row).
+
+**Core parity fix (landed with P6.17):** the core JSON body cap was 1
+MiB but Node `bodyParser.json({limit: max_json_request_size})` is
+**12 MiB** — a 5 MiB+1 body (Node parses it, then the controller's 5
+MB guard 400s it) reached the Go handler with a partially-consumed
+body and the wrong 400 `content must be a string`. The cap is now 12
+MiB and over-limit → `badBody413` (bare-JSON accept → 413 `{}`;
+html/`*/*` → the same 705 B page — pinned on Node: bodyParser
+entity.too.large, negotiated body, X-Powered-By). 12 MiB+1 body →
+413 `{}` on both, HTML page on both.
+
+**P6.16 residue repaired:** the P6.16 gate was green against the WORK
+TREE — committed HEAD `ee034c6e7e` does not compile (`clone.go`/
+`newzip.go` still call the pre-compiler `crInsertProject`; verified
+with a clean `git worktree add` build). This commit closes the loop
+(compiler arg at the call sites, `/project/new/typst` in `crRouted`,
+`oidHex` accepting 24-hex string ids — Node's `overleaf.history.id`
+stores plain hex strings) and the committed tree builds again.
+
+Parity traps resolved: (1) the ad-hoc A/B "nocsrf → 400" was a
+stale-session artifact — direct A/B gives no-token → **403**
+`Forbidden` on both (pinned); (2) Node express.json accepts
+object/array roots (→ the handler's 400 content-check) but SCALAR
+roots (`42`/`"hi"`/`null`/`true`/unparseable) → 400 `{}` — both match
+the Go core full-parse pass (all 7 body-edge rows A/B identical);
+(3) `activationLink` in the admin user surface is a LIVE
+`use:'password'` token row in db.tokens (not a user field) — sweep
+residue left one (expired 08:34), flipping the p63a pin; it
+self-heals; (4) the p413 gate's `flipConf.apply` `.replace()` DROPPED
+the cp into /etc/nginx/overleaf-flips in BOTH modes — the nginx-bound
+test only passed while a sibling gate had pre-staged the conf. apply
+now docker-cps from the host flip dir first and always cp's
+staging→/etc/nginx; green standalone.
+
+nginx flipped **web-p617.conf** (POST exact-path, method guard,
+fall-through to Node) left clean (0); `go build ./...` + `go vet
+./go/...` + `go test ./go/...` clean; **155/155** A/B (149 corpus +
+2 tex-fmt + 6 contract rows) status+content-type+byte-identical.
+
+Regression after P6.17 (FULL prior flip-gate sweep, 51 gates +
+smoke): **177 passed, 3 failed (1.2h)** — all three environment/gate
+bugs, no parity diff in any leg: p3c leg2 login **429** (Node login
+limiter under back-to-back gates — limiter flush → p3c 5/5), p63a pin
+sanity `activationLink` (expired-token residue — FLAKY→pass), p413
+nginx-bound (real pre-existing gate bug — repaired — 5/5
+standalone). P6.16 5/5 + smoke/a5smoke green; nginx left clean.
+
+**P6.18 — page-shells (DONE, GATE 5/5 GREEN, 2026-09-19):**
+`services/web/modules/page-shells` (PageShellsRouter.mjs +
+MySettingsShellController.mjs — 2 shell routes, both pure redirects,
+no Node-specific state): GET /user/mysettings (requireLogin → 301
+`/hub#/mysettings.account`) and GET /admin/panel
+(ensureUserIsSiteAdmin → site-admin 301 `/hub#/overview`; non-admin
+302 `/restricted?from=%2Fadmin%2Fpanel`; anonymous 302 /login). Go:
+`go/services/web/features/pageshells/pageshells.go` (2 routes, ~50
+lines) reusing the P1 login gate, P3.1 `RequireSiteAdmin` (whose
+deny 302 builds the SAME `from` param), and the P6.14-pinned
+`res.Redirect` Accept negotiation (html → `<p>…</p>` text/html
+title-less 301 body; text/`*/*` → plain `text/plain`; json/form →
+**empty body with NO Content-Type header** — Express does not attach
+one to a 301 with empty body) plus Vary: Accept. 24/24 canonical A/B
+rows byte-identical (anon/login, ms text/html/json/form/plain, pan
+site-admin, pan non-admin, restricted from, OPTIONS).
+
+**Core parity fixes landed with P6.18:** (1) `response.go` `Redirect`
+now uses `Header().Del("Content-Type")` for the empty-body case —
+`Set(ct, "")` made net/http write an empty `Content-Type:` header on
+the wire while Node omits the header entirely (the P6.14/6.5 gates
+passed only because their normalization masked `''`); (2) **express
+auto-OPTIONS** implemented in the Go core fallback (`app.go`
+`serveOptionsAuto`): 200 + `Allow: GET,HEAD[,<route methods>]` +
+body = the Allow string + `text/html; charset=utf-8` +
+`ETag W/"<hex-len>-<sha1-base64>"`, X-Powered-By only on NoSession
+paths — express's auto-OPTIONS middleware answered every OPTIONS on a
+route with one; the login/CSRF chain runs BEFORE it (anonymous
+OPTIONS on a gated path → 302 /login; on a NoLogin path → 200 Allow);
+(3) `pathHasNoLogin` exempts NoLogin/NoSession route paths from the
+fallback login bounce (Node requireGlobalLogin's NoLogin whitelist
+applies to all methods incl. OPTIONS).
+
+**Global parity fixes found by the P6.18 regression sweep and
+repaired (not gate-local):** (a) **`core.JSON(v)` helper (badjson.go)**
+— Go's default `json.Marshal` HTML-escapes `<`/`>`/`&` to
+`\u003c/\u003e/\u0026`; Node `JSON.stringify` never does (pinned on the
+'Pin&A B<T>' fixture: Go `\u0026A B\u003cT\u003e` vs Node `&A B<T>` — broke
+the P4.1 project-list etag/body parity). All response-producing
+`json.Marshal` sites converted to `core.JSON`: projectlist
+(list/invite/entities/clone/create/create_typst), instancestats
+alert-config, userpages sessions, compile writeJSON. (b)
+**showSignUpLink state drift (NOT code):** every shell page's navbar
+meta carries `showSignUpLink = hasFeature('registration-page')` = env
+`OVERLEAF_ENABLE_REGISTRATION_PAGE` (unset) ??
+`!(saml||ldap||oidc)`. The stack's saml.enabled=true → Node TRUE,
+while the Go constants were captured pre-SSO as FALSE. Flipped
+TRUE in the 4 views constants files + hub.go + editordata.go +
+5 testdata fixtures (provenance comment inline; re-pin on SSO state
+change). login/register/passwordReset/settings/hub surfaces A/B
+EQUAL after flip.
+
+nginx flipped **web-p618.conf** (2 EXACT-match locations,
+`location = /user/mysettings` + `= /admin/panel`, no method guard —
+Go core chain reproduces the 403/200-Allow for other methods,
+A/B-verified) → variants (case/trailing-slash/double-slash/subpaths)
+fall through to Node → parity by construction (express's
+case-insensitive + slash-tolerant matching would otherwise 404 in
+Go's exact-match router). 5/5 gate (27-row battery: anon, ms,
+pan-admin/non, 4 variants, OPTIONS, restricted-from) in 41.6 s.
+
+Regression after P6.18 (FULL specs/parity dir, 433 tests):
+**415 passed, 12 failed, 4 flaky (53.6 m)** — the 12 failures are
+all environment/state artifacts, zero parity diffs: hub-admin-projects
+(7) + legacy-project (1) = DB-residue UI flakes (admin project table
+position-dependent selectors under 675 accumulated gate-residue
+projects; green standalone on a quiesced DB — the spec's
+trash/delete/purge/transfer/invite chain mutates shared e2e-user
+projects whose async Node workers (trash/purge/transfer queues)
+complete mid-sweep); p1-auth leg2 + p3c leg2 = login 429 under the
+sweep-wide login storm (standalone green after limiter flush); p613
+leg2/leg3 = template list state mutation (standalone 5/5); p3d leg1
++ p413 + p63a pin-sanity = same residue/429 family (all 4 recovered
+on retry). `go build ./...` + `go vet ./go/...` + `go test
+./go/...` clean; nginx left clean (0 dangling flip includes).
+
+**Next**: the remaining residual live P6 modules (git-bridge,
+user-activate, launchpad — per the 2026-09-18 live audit) and
+**P7** (owner directive).
+
 ollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
--flipped P3/P4 endpoints + its own HubController), admin-tools (15k — lands
-after P3), llm (14.4k — external-provider client + rate limits + BYO-key crypto),
+-flipped P3/P4 endpoints + its own HubController), admin-tools **projectollitex-hub (19.9k — the workspace/admin surfaces; mostly proxies of already
+-flipped P3/P4 endpoints + its own HubController), admin-tools **project
+surface DONE (P6.2)** (remaining: site/user surfaces), llm (14.4k — external-provider client + rate limits + BYO-key crypto),
 bib-editor (10.2k), github-sync (6.2k — client of the **Go** githubinterface),
-webdav (4.5k — client of the **Go** webdavinterface), dropbox (2.7k — client of
-the Go dropboxinterface), zotero (2.5k), mendeley (1.3k), orcid-picker (1.1k),
+webdav (4.5k — client of the **Go** webdavinterface), zotero (2.5k), mendeley (1.3k), orcid-picker (1.1k),
 typst (1.3k), python-runner, languagetool (2k), notifications module (1.7k —
 preferences over the Go notifications service), diagram, latex-editor,
-webdav, github-sync, ce-ui, page-shells, server-ce-scripts,
+webdav, ce-ui, page-shells, server-ce-scripts,
 registration-page, saml/oidc (with P2), toast-image, …
 (Exact set = M0 output from `modules/*/index.mjs` + `SaaSModule`/`CEUI`
 registries.)
 
-### P7 — Node retirement
+### P7 — (owner directive 2026-09-18, replaces the old Node-retirement P7)
 
-With all prefixes flipped and ≥ 24 h soak each: point both runit services at
-`bin/web` (exactly what Phase D did for the nine services), delete
-`services/web` (keep `public/` bundle, `locales/`, template project files,
-`test/` → re-homed), prune `package.json`/`services.js`/compose like Phase D,
-rebuild image, cycle both live stacks, full e2e suite green, commit record.
+1. Visit all `go/` sub-folders and describe their content and functionality in README.md files (placed in the corresponding sub-folders) such that LLMs and humans can use them to orient themselves and understand what the corresponding code does.
+2. Permanently switch to the web go backend (point both runit services at `bin/web`, exactly what Phase D did for the nine services), rebuild the image, cycle both live stacks, full e2e suite green (as far as the credentials for the external services allow), commit record.
+3. Fix errors that might occur during 2.
+4. Move the old node.js backend files into a junk folder. Use this as opportunity to check that everything was really converted (i.e. move only stuff that has a representation in the new go version). Owner deletes the junk folder later.
+5. Re-organize the frontend files `services/web` into `frontend/`. Follow a structure that mirrors `go/` allowing LLMs/humans to find the connected data more easily. Move the unused SaaS files and the old files for pages that have been already replaced by the new mantine structure plus the old editor page into a junk folder. Expectation: only the old project editor is the last non-mantine page. If this is not the case, convert the page to mantine.
+6. Relocate `services/web/public` to `public/` and `services/web/locales` to `locales/` (repo root).
+7. Visit all `frontend/` sub-folders and describe their content and functionality in README.md files (placed in the corresponding sub-folders) such that LLMs and humans can use them to orient themselves and understand what the corresponding code does.
+
+**Execution precondition (folded into 2/4):** flip the residual live
+P6 module routes first (so nothing is lost at Node retirement). Live
+audit 2026-09-18 of `services/web/modules/*/` route tables found residual
+route owners: track-changes (11 routes), notifications (prefs API +
+pages), languagetool (3), template-gallery (14), git-bridge (3 +
+oauth/token/info), tex-autoformatter (/api/format-tex), typst
+(/project/new/typst), instance-stats (admin api), page-shells
+(/user/mysettings, /admin/panel), launchpad (/launchpad),
+user-activate (/user/activate), admin-tools site surface
+(/admin/site-settings/*, /admin/site) — minus whatever the existing
+P0…P6 flip confs already cover (audit per-location against the flip
+set before converting).
 
 ---
 

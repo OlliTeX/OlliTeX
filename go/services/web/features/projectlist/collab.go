@@ -89,6 +89,11 @@ func colNotCollaborator(target, project string) []byte {
 
 // gateAdmin: login -> malformed Project_id (404 JSON) -> project load
 // (404 HTML general/404) -> owner-or-site-admin (403 JSON restricted).
+// aGate — the project-route authorization gate signature (login check +
+// project load + permission) parameterizing the P4 handlers so the P6.2
+// admin surface can reuse the exact cores under RequireSiteAdmin.
+type aGate func(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, bool)
+
 func gateAdmin(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, bool) {
 	uid := gatedLogin(cxt, res)
 	if uid == "" {
@@ -555,9 +560,9 @@ func leaveHandler(a *core.App) func(*core.Cxt, *core.Res) {
 }
 
 // PUT /project/:id/users/:uid — admin; setLevel; 204 / 404 JSON "not found".
-func setUserLevelHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func setUserLevelHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		_, doc, ok := gateAdmin(a, cxt, res)
+		_, doc, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}
@@ -594,9 +599,9 @@ func setUserLevelHandler(a *core.App) func(*core.Cxt, *core.Res) {
 }
 
 // DELETE /project/:id/users/:uid — admin; $pull; 204 (unknown user no-op).
-func removeUserHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func removeUserHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		_, doc, ok := gateAdmin(a, cxt, res)
+		_, doc, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}

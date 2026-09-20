@@ -29,7 +29,7 @@ import (
 // each other's secrets interchangeably.
 
 type cipher struct {
-	label   string
+	label    string
 	password []byte
 }
 
@@ -187,6 +187,79 @@ func (c *cipher) encryptText(plain string) (string, error) {
 	return "ss::" + tok, nil
 }
 
+// encryptRaw mirrors Node AccessTokenScheme.encryptJson: it encrypts the RAW
+// plaintext bytes (NO JSON-string quoting) and returns `label:salt:ct:iv`
+// (NO ss:: prefix). The caller passes the exact plaintext — for the zotero
+// / mendeley TokenManager credentials that plaintext is
+// JSON.stringify({apiKey, zoteroUserId}), an object, not a string.
+func (c *cipher) encryptRaw(plain string) (string, error) {
+	if plain == "" {
+		return "", nil
+	}
+	salt := make([]byte, cipherSaltLen)
+	if _, err := rand.Read(salt); err != nil {
+		return "", err
+	}
+	iv := make([]byte, cipherIVLen)
+	if _, err := rand.Read(iv); err != nil {
+		return "", err
+	}
+	key, err := c.key(salt)
+	if err != nil {
+		return "", err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	stream := cipherx.NewCTR(block, iv)
+	ct := make([]byte, len(plain))
+	stream.XORKeyStream(ct, []byte(plain))
+	return c.label + ":" + hex.EncodeToString(salt) + ":" +
+		base64.StdEncoding.EncodeToString(ct) + ":" + hex.EncodeToString(iv), nil
+}
+
+// decryptRaw — raw inverse of encryptRaw: strips an optional ss:: prefix,
+// returns the decrypted plaintext bytes unchanged (NO final JSON-string
+// unwrap, unlike decryptText which expects a JSON-quoted string). The caller
+// JSON-parses the result (for credentials: an object).
+func (c *cipher) decryptRaw(tok string) (string, bool) {
+	if tok == "" {
+		return "", false
+	}
+	if strings.HasPrefix(tok, "ss::") {
+		tok = tok[len("ss::"):]
+	}
+	parts := strings.SplitN(tok, ":", 4)
+	if len(parts) != 4 {
+		return "", false
+	}
+	salt, err := hex.DecodeString(parts[1])
+	if err != nil {
+		return "", false
+	}
+	ct, err := base64.StdEncoding.DecodeString(parts[2])
+	if err != nil {
+		return "", false
+	}
+	iv, err := hex.DecodeString(parts[3])
+	if err != nil {
+		return "", false
+	}
+	key, err := c.key(salt)
+	if err != nil {
+		return "", false
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", false
+	}
+	stream := cipherx.NewCTR(block, iv)
+	plain := make([]byte, len(ct))
+	stream.XORKeyStream(plain, ct)
+	return string(plain), true
+}
+
 // decryptText — "ss::" prefix optional; returns (value, ok).
 func (c *cipher) decryptText(tok string) (string, bool) {
 	if tok == "" {
@@ -205,6 +278,21 @@ func (c *cipher) decryptText(tok string) (string, bool) {
 // as loadCipher).
 func Open() (*cipher, error) { return loadCipher() }
 
+// OpenProvider builds a cipher with an explicit label + password. Each
+// reference provider keeps its own key (the Node per-provider helpers:
+// MENDELEY_CIPHER_PASSWORD / .mendeley-cipher-key, zotero's
+// ZOTERO_TOKEN_CIPHER_PASSWORD / .token-cipher.json, …) so a token written
+// by one provider's key is never readable with another's.
+func OpenProvider(label string, password []byte) *cipher {
+	return &cipher{label: label, password: password}
+}
+
 func (c *cipher) DecryptText(tok string) (string, bool) { return c.decryptText(tok) }
 
 func (c *cipher) EncryptText(plain string) (string, error) { return c.encryptText(plain) }
+
+// Raw-payload bridge (P6.6 zotero/mendeley TokenManager credentials, whose
+// plaintext is a JSON *object*, not a JSON-quoted string):
+func (c *cipher) EncryptRaw(plain string) (string, error) { return c.encryptRaw(plain) }
+
+func (c *cipher) DecryptRaw(tok string) (string, bool) { return c.decryptRaw(tok) }

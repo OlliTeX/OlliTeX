@@ -189,7 +189,7 @@ func getSessionList(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 		cur := currentUserEntry(cxt.Sess)
-		body, _ := json.Marshal(map[string]any{
+		body := core.JSON(map[string]any{
 			"currentSession": map[string]string{
 				"ip_address":      cur.IPAddress,
 				"session_created": cur.SessionCreated,

@@ -400,9 +400,9 @@ func invSendMail(a *core.App, to, senderMail, name, ownerMail, url, site string)
 
 // ==================== POST /project/:id/invite ====================
 
-func inviteCreateHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func inviteCreateHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		uid, doc, ok := gateAdmin(a, cxt, res)
+		uid, doc, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}
@@ -479,16 +479,16 @@ func inviteCreateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(500, []byte("internal error"))
 			return
 		}
-		b, _ := json.Marshal(invResp{Invite: &invOut{ID: hexid, Email: es, Privileges: ps}})
+		b := core.JSON(invResp{Invite: &invOut{ID: hexid, Email: es, Privileges: ps}})
 		res.JSON(200, b)
 	}
 }
 
 // ==================== GET /project/:id/invites ====================
 
-func inviteListHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func inviteListHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		_, doc, ok := gateAdmin(a, cxt, res)
+		_, doc, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}
@@ -526,20 +526,16 @@ func inviteListHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		if list == nil {
 			list = []invOut{}
 		}
-		b, jerr := json.Marshal(invListResp{Invites: list})
-		if jerr != nil {
-			res.JSON(500, []byte("internal error"))
-			return
-		}
+		b := core.JSON(invListResp{Invites: list})
 		res.JSON(200, b)
 	}
 }
 
 // ==================== DELETE /project/:id/invite/:invite_id ====================
 
-func inviteRevokeHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func inviteRevokeHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		_, _, ok := gateAdmin(a, cxt, res)
+		_, _, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}
@@ -555,9 +551,9 @@ func inviteRevokeHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 // ==================== POST /project/:id/invite/:invite_id/resend ====================
 
-func inviteResendHandler(a *core.App) func(*core.Cxt, *core.Res) {
+func inviteResendHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
-		uid, doc, ok := gateAdmin(a, cxt, res)
+		uid, doc, ok := gate(a, cxt, res)
 		if !ok {
 			return
 		}

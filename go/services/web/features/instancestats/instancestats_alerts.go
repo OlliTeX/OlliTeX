@@ -2,7 +2,6 @@ package instancestats
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"ollitex/go/services/web/core"
@@ -36,7 +35,7 @@ func getAlertConfig(a *core.App) func(*core.Cxt, *core.Res) {
 		if len(emails) > 0 {
 			first = emails[0]
 		}
-		body, _ := json.Marshal(struct {
+		body := core.JSON(struct {
 			AlertEmails        []string `json:"alertEmails"`
 			AlertEmail         string   `json:"alertEmail"`
 			DiskWarningPercent float64  `json:"diskWarningPercent"`
@@ -139,7 +138,7 @@ func saveAlertConfig(a *core.App) func(*core.Cxt, *core.Res) {
 		body := parseJSONBody(cxt.Req)
 		parsed, msg := parseAlertConfigBody(body)
 		if msg != "" {
-			b, _ := json.Marshal(map[string]string{"message": msg})
+			b := core.JSON(map[string]string{"message": msg})
 			res.JSON(400, b)
 			return
 		}
@@ -198,7 +197,7 @@ func sendTestAlert(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 		}
 		emails, errStr := normalizeEmails(nbody)
 		if errStr != "" {
-			b, _ := json.Marshal(map[string]string{"message": errStr})
+			b := core.JSON(map[string]string{"message": errStr})
 			res.JSON(400, b)
 			return
 		}
@@ -218,7 +217,7 @@ func sendTestAlert(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 				}
 			}
 		}
-		b, _ := json.Marshal(map[string]any{"ok": true, "sentTo": emails})
+		b := core.JSON(map[string]any{"ok": true, "sentTo": emails})
 		res.JSON(200, b)
 	}
 }

@@ -45,3 +45,6 @@ tests/e2e/parity/reference/
 /ext_explain.md
 # Go service build output (make go-build)
 /bin/
+
+# local Go web build artifact (container /usr/local/bin/go-services/web is canonical)
+/web

@@ -15,6 +15,7 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"ollitex/go/services/web/core"
@@ -51,9 +52,24 @@ const (
 	slotRegUsers = "\x01REGUSERS\x02" // ol-usersEmail content
 	slotRegUID   = "\x01REGUID\x02"   // ol-user_id: `` or ` content="…"`
 	slotRegSU    = "\x01REGSU\x02"    // navbar sessionUser fragment: `` or `,&quot;sessionUser&quot;:{&quot;email&quot;:&quot;…&quot;}`
+	// P6.5 library pages (/library, /library/trashed):
+	slotLibUsers = "\x01LIBUSERS\x02" // ol-userSettings content JSON (htmlAttrEsc'd at finalize)
+	// P6.13 slot: ExposedSettings.canManageTemplatesMenu is PER-USER on
+	// Node (ExpressLocals re-computes it per request); the captured
+	// skeleton carried the capture user's `false`, so pages rendered
+	// for a different-privilege user (e.g. admin 404) diverged.
+	slotCanMgtTpl = "\x01CANMGTPL\x02"
+	// P6.13 slot: admin navbar branch (Node renders the Admin dropdown
+	// for site admins on EVERY page, including 404/403). Empty for
+	// non-admins; the page skeleton otherwise matches the user nav.
+	slotNavAdmin = "\x01NAVADMIN\x02"
 	// origin captured from the e2e fixtures (rewritten per request).
 	capturedOrigin = "http://127.0.0.1:7420"
 )
+
+// AdminNavFragment: the exact Node admin-nav <li> (captured from the Node
+// 404 page render for a site admin; identical across pages).
+const AdminNavFragment = `<li class="dropdown subdued" role="none"><button class="dropdown-toggle" aria-haspopup="true" aria-expanded="false" data-bs-toggle="dropdown" role="menuitem" event-tracking="menu-expand" event-tracking-mb="true" event-tracking-trigger="click" event-segmentation="{&quot;item&quot;:&quot;admin&quot;,&quot;location&quot;:&quot;top-menu&quot;}">Admin</button><ul class="dropdown-menu dropdown-menu-end" role="menu"><li role="none"><a class="dropdown-item" role="menuitem" href="/admin">Manage Site</a></li><li role="none"><a class="dropdown-item" role="menuitem" href="/admin/user">Manage Users</a></li><li role="none"><a class="dropdown-item" role="menuitem" href="/admin/project">Project/Object Lookup</a></li><li role="none"><a class="dropdown-item" role="menuitem" href="/admin/llm/settings">LLM Settings</a></li></ul></li>`
 
 var nonceEnc = base64.StdEncoding
 
@@ -94,6 +110,9 @@ type PageData struct {
 	ReferenceLinkingErrorMessage string
 	SessionsCurrentRow           string // sessions page current <tr> (IP + moment date)
 	SessionsOtherRows            string // other sessions <tr>s (may be empty)
+	LibUsersJSON                 string // P6.5: ol-userSettings JSON (editorpages.BuildUserSettings)
+	CanManageTemplateMenu        bool   // P6.13: ExposedSettings.canManageTemplatesMenu (per-user)
+	NavAdmin                     string // P6.13: admin navbar fragment (site admins only)
 }
 
 func (p PageData) finalize(html string) string {
@@ -131,6 +150,13 @@ func (p PageData) finalize(html string) string {
 	out = strings.ReplaceAll(out, slot33RefErr, metaContentAttr(p.ReferenceLinkingErrorMessage))
 	out = strings.ReplaceAll(out, slot33CurrRow, p.SessionsCurrentRow)
 	out = strings.ReplaceAll(out, slot33Rows, p.SessionsOtherRows)
+	out = strings.ReplaceAll(out, slotLibUsers, htmlAttrEsc(p.LibUsersJSON))
+	if p.CanManageTemplateMenu {
+		out = strings.ReplaceAll(out, slotCanMgtTpl, "true")
+	} else {
+		out = strings.ReplaceAll(out, slotCanMgtTpl, "false")
+	}
+	out = strings.ReplaceAll(out, slotNavAdmin, p.NavAdmin)
 	// P3.4 register page (anon skeleton; fills on a logged-in session):
 	out = strings.ReplaceAll(out, slotRegUsers, htmlAttrEsc(p.UserEmail))
 	if p.UserID == "" {
@@ -248,6 +274,27 @@ func Restricted403(w http.ResponseWriter, d PageData) {
 	StatusPage(w, d, 403, restrictedHTML)
 }
 
+// restrictedDefaultTitleHTML — the SAME restricted page rendered by Node's
+// ErrorController.forbidden (Errors.ForbiddenError — e.g. the P6.14
+// notifications project-prefs non-member 403): res.render('user/restricted')
+// with NO title local → the layout default title (appName only), unlike the
+// AuthorizationMiddleware.restricted ({ title: 'restricted' }) variant that
+// Restricted403 above mirrors. Pinned live 2026-09-18 (A/B battery).
+var restrictedDefaultTitleHTML = strings.NewReplacer(
+	`<title translate="no">Restricted - OlliTeX, Online LaTeX Editor</title>`,
+	`<title translate="no">OlliTeX, Online LaTeX Editor</title>`,
+	`<meta name="twitter:title" content="Restricted">`,
+	`<meta name="twitter:title" content="OlliTeX, Online LaTeX Editor">`,
+	`<meta name="og:title" content="Restricted">`,
+	`<meta name="og:title" content="OlliTeX, Online LaTeX Editor">`,
+).Replace(restrictedHTML)
+
+// Restricted403AppTitle — the ErrorController.forbidden family (403 +
+// restricted view, layout-default title — P6.14 notifications).
+func Restricted403AppTitle(w http.ResponseWriter, d PageData) {
+	StatusPage(w, d, 403, restrictedDefaultTitleHTML)
+}
+
 // LoginPage / RegisterPage / LogoutConfirmation / Restricted / NotFound.
 func LoginPage(w http.ResponseWriter, d PageData) { d.CSP = cspReact(d.Nonce); Page(w, d, loginHTML) }
 
@@ -255,6 +302,19 @@ func LoginPage(w http.ResponseWriter, d PageData) { d.CSP = cspReact(d.Nonce); P
 func SettingsPage(w http.ResponseWriter, d PageData) {
 	d.CSP = cspReact(d.Nonce)
 	Page(w, d, settingsHTML)
+}
+
+// LibraryView — GET /library (trash=false) + /library/trashed (true):
+// React shell (bib-editor entrypoint), pinned P6.5 (57-pin oracle
+// /tmp/p65_node.json). The two bodies differ only in ol-libraryView +
+// the navbar/alternate URL.
+func LibraryView(w http.ResponseWriter, d PageData, trash bool) {
+	d.CSP = cspReact(d.Nonce)
+	if trash {
+		Page(w, d, libraryTrashHTML)
+		return
+	}
+	Page(w, d, libraryHTML)
 }
 
 // SessionsPage — GET /user/sessions (layout-website-redesign — the same
@@ -277,6 +337,15 @@ const error500HTML = `<!DOCTYPE html><html lang="en"><head><title>Something went
 <a href="mailto:__ADMINEMAIL__" target="_blank">__ADMINEMAIL__</a>.<p class="error-actions"><a class="error-btn" href="/">Home</a></p></div></div></div></main></body></html>`
 
 func Error500Page(w http.ResponseWriter, d PageData) {
+	if d.AdminEmail == "" {
+		// services/web settings: adminEmail = env OVERLEAF_ADMIN_EMAIL with the
+		// CE default fallback (views/general/500.pug / settings.js).
+		if v := os.Getenv("OVERLEAF_ADMIN_EMAIL"); v != "" {
+			d.AdminEmail = v
+		} else {
+			d.AdminEmail = "placeholder@example.com"
+		}
+	}
 	d.CSP = cspReact(d.Nonce)
 	body := strings.ReplaceAll(error500HTML, "__ADMINEMAIL__", d.AdminEmail)
 	csp := d.CSP

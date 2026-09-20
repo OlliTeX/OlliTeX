@@ -2,6 +2,10 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -179,13 +183,39 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 			(r.Method == http.MethodPost || r.Method == http.MethodPut ||
 				r.Method == http.MethodPatch || r.Method == http.MethodDelete) {
 			if r.ContentLength > 0 || r.ContentLength < 0 {
-				raw, rerr := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
-				if rerr == nil {
-					r.Body = io.NopCloser(bytes.NewReader(raw))
-					r.ContentLength = int64(len(raw))
-					trimmed := bytes.TrimSpace(raw)
-					if len(trimmed) > 0 && trimmed[0] != '{' && trimmed[0] != '[' {
-						res.BareWrite(400, []byte("{}"))
+				raw, rerr := io.ReadAll(http.MaxBytesReader(w, r.Body, 12*1024*1024))
+				if rerr != nil {
+					// P6.17: Node bodyParser.json({limit: max_json_request_size})
+					// — 12 MiB default (services/web settings.defaults). A body
+					// over the limit → entity.too.large → express error → 413,
+					// content-negotiated exactly like the 400 bad-JSON (JSON
+					// accept -> "{}"; else the 705-byte page), BEFORE the csrf
+					// 403. (Pinned live P6.17: 12 MB+1 body → Node 413 {}.)
+					badBody413(a, r, res)
+					return
+				}
+				r.Body = io.NopCloser(bytes.NewReader(raw))
+				r.ContentLength = int64(len(raw))
+				trimmed := bytes.TrimSpace(raw)
+				if len(trimmed) > 0 && trimmed[0] != '{' && trimmed[0] != '[' {
+					// Scalar-root / unparseable body (P3.3, refined P6.4a):
+					// Node 400 with a CONTENT-NEGOTIATED body — JSON accept
+					// -> "{}"; html accept (or no Accept header, "*/*") ->
+					// the 705B error page (pinned: POST notjson with no
+					// Accept -> 400 page; accept: application/json -> 400 {};
+					// scalar 123/"str"/true follow the same negotiation).
+					badBody400(a, r, res)
+					return
+				}
+				if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') {
+					// P6.14: express.json PARSES the whole root — an
+					// object/array-shaped body that is NOT valid JSON
+					// ({bad / [1,) also 400s BEFORE the csrf 403 (pinned
+					// live on the Node leg: POST {bad without csrf -> 400 {},
+					// not 403). Valid object/array roots pass here.
+					var probe any
+					if perr := json.Unmarshal(trimmed, &probe); perr != nil {
+						badBody400(a, r, res)
 						return
 					}
 				}
@@ -203,8 +233,8 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 				// registered BEFORE helmet (line ~322), so the csrf 403
 				// response carries NONE of the web-baseline headers (pinned
 				// P0: no nosniff; P3.1: no helmet set on the 403). Node sends
-			// it via res.sendStatus → X-Powered-By: Express present (pinned
-			// P3.2 on DELETE /status 403).
+				// it via res.sendStatus → X-Powered-By: Express present (pinned
+				// P3.2 on DELETE /status 403).
 				a.sessionBeforeHandler(cxt, w, rw)
 				res.W.Header().Set("X-Powered-By", "Express")
 				res.SendStatus(403)
@@ -237,6 +267,19 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 			}
 			if rt.Path == r.URL.Path || (rt.Pattern != nil && rt.Pattern.MatchString(r.URL.Path)) {
 				if rt.NoSession {
+					if rt.Pattern != nil {
+						if m := rt.Pattern.FindStringSubmatch(r.URL.Path); m != nil {
+							cxt.Params = map[string]string{}
+							names := rt.Pattern.SubexpNames()
+							for i := 1; i < len(m) && i < len(names); i++ {
+								k := names[i]
+								if k == "" {
+									k = strconv.Itoa(i)
+								}
+								cxt.Params[k] = m[i]
+							}
+						}
+					}
 					rt.Handler(cxt, res)
 					return
 				}
@@ -267,8 +310,26 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 
 	// fallback
 	if a.Cfg.Profile == "web" {
-		if !a.Cfg.AllowPublicAccess && !cxt.Sess.IsLoggedIn() {
+		// Node requireGlobalLogin: the NoLogin/NoSession whitelist applies to
+		// EVERY method — anonymous OPTIONS /status → 200 Allow, anonymous
+		// OPTIONS /zzz-nope → 302 (pinned P6.18).
+		gated := !a.Cfg.AllowPublicAccess && !cxt.Sess.IsLoggedIn()
+		if gated && a.pathHasNoLogin(r.URL.Path) {
+			gated = false
+		}
+		if gated {
 			a.globalLoginBounce(cxt, res, r)
+			a.maybeSaveSession(cxt, w, rw)
+			return
+		}
+		// express Router auto-OPTIONS (pinned P6.18): once past the gate,
+		// an OPTIONS request with no method route gets 200 +
+		// Allow:"GET,HEAD[,<route methods>]" (registration order, GET,HEAD
+		// ALWAYS first — even on POST-only paths like /api/format-tex →
+		// "GET,HEAD,POST"; unknown paths → bare "GET,HEAD") + the SAME
+		// string as body + text/html + weak sha1 etag + NO X-Powered-By.
+		if r.Method == "OPTIONS" {
+			a.serveOptionsAuto(res, r)
 			a.maybeSaveSession(cxt, w, rw)
 			return
 		}
@@ -292,6 +353,73 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 		pbhttp.ExpressNotFound(rw, r)
 	}
 	a.maybeSaveSession(cxt, w, rw)
+}
+
+// pathHasNoLogin reports whether at least one route registered on the
+// exact path carries the NoLogin/NoSession marker (Node's
+// requireGlobalLogin whitelist — method-independent, pinned P6.18).
+func (a *App) pathHasNoLogin(p string) bool {
+	for _, f := range a.feats {
+		for i := range f.Routes {
+			if f.Routes[i].Path == p && (f.Routes[i].NoLogin || f.Routes[i].NoSession) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// serveOptionsAuto — express Router auto-OPTIONS response (pinned P6.18):
+//
+//	200, Allow: "GET,HEAD" + the path's non-GET/HEAD route methods in
+//	registration order (e.g. /api/format-tex → "GET,HEAD,POST"; unknown
+//	path → "GET,HEAD"), body = the same string, text/html; charset=utf-8,
+//	weak sha1 etag (the `etag` package: sha1 digest base64), NO
+//	X-Powered-By (res.send-style path, not res.sendStatus).
+func (a *App) serveOptionsAuto(res *Res, r *http.Request) {
+	ms := []string{"GET", "HEAD"}
+	seen := map[string]bool{"GET": true, "HEAD": true}
+	for _, f := range a.feats {
+		for i := range f.Routes {
+			if f.Routes[i].Path != r.URL.Path {
+				continue
+			}
+			m := f.Routes[i].Method
+			if !seen[m] {
+				seen[m] = true
+				ms = append(ms, m)
+			}
+		}
+	}
+	allow := strings.Join(ms, ",")
+	sum := sha1.Sum([]byte(allow))
+	// express `etag` package: W/"<hex-len>-<sha1 base64 NO padding>" —
+	// pinned P6.18 (13 → W/"d-…", 8 → W/"8-…", no trailing '=').
+	etagBody := base64.StdEncoding.EncodeToString(sum[:])
+	for strings.HasSuffix(etagBody, "=") {
+		etagBody = strings.TrimSuffix(etagBody, "=")
+	}
+	// Node attaches X-Powered-By: Express on the auto-OPTIONS response for
+	// NoSession (publicApi-style) paths (/status, /health_check/*) but not
+	// on sessionful ones (/login, /api/format-tex) — pinned P6.18.
+	public := false
+	for _, f := range a.feats {
+		for i := range f.Routes {
+			if f.Routes[i].Path == r.URL.Path && f.Routes[i].NoSession {
+				public = true
+			}
+		}
+	}
+	h := res.W.Header()
+	if public {
+		h.Set("X-Powered-By", "Express")
+	}
+	h.Set("Allow", allow)
+	h.Set("ETag", fmt.Sprintf(`W/"%x-%s"`, len(allow), etagBody))
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Content-Length", strconv.Itoa(len(allow)))
+	res.W.WriteHeader(200)
+	_, _ = res.W.Write([]byte(allow))
 }
 
 func (a *App) serve500(cxt *Cxt, res *Res, err error) {

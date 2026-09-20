@@ -42,7 +42,6 @@
 package projectlist
 
 import (
-	"encoding/json"
 
 	"ollitex/go/services/web/core"
 )
@@ -60,6 +59,8 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: arPat, Handler: accessRequestsHandler(a)},
 			{Method: "POST", Pattern: renPat, Handler: renameHandler(a)},
 			{Method: "POST", Path: "/project/new", Handler: newProjectHandler(a)},
+		// P6.16 typst module (web-p616 flip) — Node TypstRouter route order
+		{Method: "POST", Path: "/project/new/typst", Handler: newTypstProjectHandler(a)},
 			{Method: "POST", Pattern: archPat, Handler: flagHandler(a, opArchive)},
 			{Method: "DELETE", Pattern: archPat, Handler: flagHandler(a, opUnarchive)},
 			{Method: "POST", Pattern: trashPat, Handler: flagHandler(a, opTrash)},
@@ -70,16 +71,16 @@ func Feature(a *core.App) core.Feature {
 			// P4.10a collaborators (web-p4col flip)
 			{Method: "POST", Pattern: leavePat, Handler: leaveHandler(a)},
 			{Method: "POST", Pattern: reqAccPat, Handler: requestAccessHandler(a)},
-			{Method: "PUT", Pattern: userPat, Handler: setUserLevelHandler(a)},
-			{Method: "DELETE", Pattern: userPat, Handler: removeUserHandler(a)},
+			{Method: "PUT", Pattern: userPat, Handler: setUserLevelHandler(a, gateAdmin)},
+			{Method: "DELETE", Pattern: userPat, Handler: removeUserHandler(a, gateAdmin)},
 			{Method: "DELETE", Pattern: accDeclPat, Handler: declineReqHandler(a)},
 			{Method: "POST", Pattern: accGrantPat, Handler: grantReqHandler(a)},
 			{Method: "POST", Pattern: xferPat, Handler: transferOwnerHandler(a)},
 			// P4.10b invites + sharing links (web-p4inv flip; Node route order)
-			{Method: "POST", Pattern: invCreatePat, Handler: inviteCreateHandler(a)},
-			{Method: "GET", Pattern: invListPat, Handler: inviteListHandler(a)},
-			{Method: "DELETE", Pattern: invRevokePat, Handler: inviteRevokeHandler(a)},
-			{Method: "POST", Pattern: invResendPat, Handler: inviteResendHandler(a)},
+			{Method: "POST", Pattern: invCreatePat, Handler: inviteCreateHandler(a, gateAdmin)},
+			{Method: "GET", Pattern: invListPat, Handler: inviteListHandler(a, gateAdmin)},
+			{Method: "DELETE", Pattern: invRevokePat, Handler: inviteRevokeHandler(a, gateAdmin)},
+			{Method: "POST", Pattern: invResendPat, Handler: inviteResendHandler(a, gateAdmin)},
 			{Method: "POST", Pattern: invAcceptPat, Handler: inviteAcceptHandler(a), NoLogin: true},
 			{Method: "GET", Pattern: invViewTokPat, Handler: inviteViewHandler(a), NoLogin: true},
 			{Method: "GET", Pattern: invTokensPat, Handler: tokensHandler(a)},
@@ -88,6 +89,27 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: invSharePat, Handler: splitForbiddenHandler(a, false), NoLogin: true},
 			{Method: "POST", Pattern: invSharePat, Handler: splitForbiddenHandler(a, true), NoLogin: true},
 			{Method: "POST", Pattern: invShareValPat, Handler: splitForbiddenHandler(a, false), NoLogin: true},
+			// P4.11a editor entity creation (web-p411a flip)
+			{Method: "POST", Pattern: entDocPat, Handler: addEntityHandler(a, "doc")},
+			{Method: "POST", Pattern: entFolderPat, Handler: addEntityHandler(a, "folder")},
+			// P4.11b editor entity deletion (web-p411b flip)
+			{Method: "DELETE", Pattern: delDocPat, Handler: delEntityHandler(a, "doc")},
+			{Method: "DELETE", Pattern: delFilePat, Handler: delEntityHandler(a, "file")},
+			{Method: "DELETE", Pattern: delFolderPat, Handler: delEntityHandler(a, "folder")},
+			// P4.12a file proxy (web-p412 flip)
+			{Method: "GET", Pattern: fproxyPat, Handler: fileProxyHandler(a)},
+			// P4.12b document download (web-p412 flip)
+			{Method: "GET", Pattern: docdlPat, Handler: docDownloadHandler(a)},
+			// P4.13a file upload (POST /Project/:id/upload — capital P, pinned;
+			// session+csrf applied by core — matches Node's csrf'd route)
+			{Method: "POST", Pattern: upPat, Handler: uploadHandler(a)},
+			// P4.13b new-project zip upload (POST /project/new/upload — session+csrf)
+			{Method: "POST", Pattern: nzipPat, Handler: newzipHandler(a)},
+			// P4.12c private API doc trio (web-p413 flip; basic auth in handler;
+			// NoSession = Node's privateApiRouter carries no session/csrf)
+			{Method: "GET", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiGetHandler(a))},
+			{Method: "POST", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiPostHandler(a))},
+			{Method: "POST", Pattern: docapiRejPat, NoSession: true, Handler: apiXPB(docapiRejectHandler(a))},
 		},
 	}
 }
@@ -126,11 +148,7 @@ func handler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(500, []byte("internal error"))
 			return
 		}
-		b, jerr := json.Marshal(ProjectListResp{Projects: projects})
-		if jerr != nil {
-			res.JSON(500, []byte("internal error"))
-			return
-		}
+		b := core.JSON(ProjectListResp{Projects: projects})
 		res.JSON(200, b)
 	}
 }
@@ -144,8 +162,11 @@ func buildList(a *core.App, cxt *core.Cxt, uid string) ([]ProjectItem, error) {
 
 	var formatted []view
 	seen := map[string]bool{}
-	add := func(v view, dedup bool) {
-		if dedup && seen[v.id] {
+	add := func(v view, _ bool) {
+		// Node dedups across ALL buckets in order (owned first → best access
+		// wins when the user is e.g. owner AND collaborator on the same
+		// project — p4col-gate leftovers expose the double entry).
+		if seen[v.id] {
 			return
 		}
 		seen[v.id] = true

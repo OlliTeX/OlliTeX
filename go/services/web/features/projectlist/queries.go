@@ -143,6 +143,17 @@ func oidHex(v any) string {
 	if ok {
 		return oid.Hex()
 	}
+	// Real projects store ids as plain hex strings in several places
+	// (overleaf.history.id for Node/Go-created projects) — accept those.
+	if hex, ok := v.(string); ok && len(hex) == 24 {
+		for i := 0; i < 24; i++ {
+			c := hex[i]
+			if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
+				return ""
+			}
+		}
+		return hex
+	}
 	return ""
 }
 

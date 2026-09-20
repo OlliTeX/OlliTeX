@@ -56,7 +56,7 @@ type userDoc struct {
 	MustReconfirm  *bool    `bson:"must_reconfirm"`
 	LabsProgram    *bool    `bson:"labsProgram"`
 	ExternalAuth   *bool    `bson:"externalAuth"`
-	Admin          *bool    `bson:"admin"`
+	Admin          *bool    `bson:"isAdmin"` // Node users.isAdmin
 	AdminRoles     []string `bson:"adminRoles"`
 	OverleafID     *string  `bson:"overleaf.id"`
 	AlphaProgram   *bool    `bson:"alphaProgram"`
