@@ -1,0 +1,205 @@
+[
+  {
+    "detail": {
+      "latexmk-rule-times": [
+        {
+          "rule": "pdflatex",
+          "time_ms": 1234
+        },
+        {
+          "rule": "bibtex",
+          "time_ms": 500
+        },
+        {
+          "rule": "pdflatex",
+          "time_ms": 2345
+        }
+      ],
+      "latexmk-rule-signature": "pdflatex,bibtex,pdflatex",
+      "latexmk-time": {
+        "total": 6012,
+        "invoked": 5500,
+        "other": 512
+      },
+      "latexmk-clock-time": 7012,
+      "latexmk-rules-run": 4,
+      "latexmk-png-slow": [
+        "img1.png",
+        "img2.png"
+      ],
+      "latexmk-img-times": [
+        {
+          "type": "PNG-fast-copy",
+          "count": 1,
+          "time_ms": 12
+        },
+        {
+          "type": "JPG",
+          "count": 1,
+          "time_ms": 3
+        },
+        {
+          "type": "JBIG2",
+          "count": 1,
+          "time_ms": 9
+        },
+        {
+          "type": "PNG-png2pdf",
+          "count": 1,
+          "time_ms": 4
+        },
+        {
+          "type": "PNG",
+          "count": 1,
+          "time_ms": 1
+        },
+        {
+          "type": "PNG-gamma",
+          "count": 1,
+          "time_ms": 2
+        }
+      ]
+    },
+    "top": {
+      "include-image-all": 6,
+      "include-image-optimised": 1
+    },
+    "timings": {
+      "include-image-optimised": 4,
+      "include-image-all": 31
+    }
+  },
+  {
+    "detail": {
+      "latexmk-rule-times": [
+        {
+          "rule": "pdflatex",
+          "time_ms": 500
+        },
+        {
+          "rule": "bibtex",
+          "time_ms": 250
+        }
+      ],
+      "latexmk-rule-signature": "pdflatex,bibtex",
+      "latexmk-time": {
+        "total": 3001
+      },
+      "latexmk-rules-run": 2,
+      "latexmk-img-times": [
+        {
+          "type": "PNG-fast-copy",
+          "count": 1,
+          "time_ms": 5
+        }
+      ]
+    },
+    "top": {
+      "include-image-all": 1,
+      "include-image-optimised": 0
+    },
+    "timings": {
+      "include-image-optimised": 0,
+      "include-image-all": 5
+    }
+  },
+  {
+    "detail": {
+      "latexmk-rule-times": [],
+      "latexmk-img-times": []
+    },
+    "top": {
+      "include-image-all": 0,
+      "include-image-optimised": 0
+    },
+    "timings": {
+      "include-image-optimised": 0,
+      "include-image-all": 0
+    }
+  },
+  {
+    "detail": {
+      "latexmk-rule-times": [],
+      "latexmk-time": {
+        "total": 1000,
+        "invoked": 1000,
+        "other": 0
+      },
+      "latexmk-clock-time": 1111,
+      "latexmk-rules-run": 1,
+      "latexmk-png-slow": [
+        "p.png"
+      ],
+      "latexmk-img-times": [
+        {
+          "type": "PNG-png2pdf",
+          "count": 1,
+          "time_ms": 4
+        }
+      ]
+    },
+    "top": {
+      "include-image-all": 1,
+      "include-image-optimised": 1
+    },
+    "timings": {
+      "include-image-optimised": 4,
+      "include-image-all": 4
+    }
+  },
+  {
+    "detail": {
+      "latexmk-rule-times": [],
+      "latexmk-img-times": [
+        {
+          "type": "PNG",
+          "count": 1,
+          "time_ms": 8
+        }
+      ]
+    },
+    "top": {
+      "include-image-all": 1,
+      "include-image-optimised": 0
+    },
+    "timings": {
+      "include-image-optimised": 0,
+      "include-image-all": 8
+    }
+  },
+  {
+    "detail": {
+      "latexmk-rule-times": [],
+      "latexmk-img-times": []
+    },
+    "top": {
+      "include-image-all": 0,
+      "include-image-optimised": 0
+    },
+    "timings": {
+      "include-image-optimised": 0,
+      "include-image-all": 0
+    }
+  },
+  {
+    "detail": {
+      "latexmk-rule-times": [],
+      "latexmk-clock-time": 5000,
+      "latexmk-img-times": [
+        {
+          "type": "JPG",
+          "count": 1,
+          "time_ms": 1
+        }
+      ]
+    },
+    "top": {
+      "include-image-all": 1,
+      "include-image-optimised": 0
+    },
+    "timings": {
+      "include-image-optimised": 0,
+      "include-image-all": 1
+    }
+  }
+]

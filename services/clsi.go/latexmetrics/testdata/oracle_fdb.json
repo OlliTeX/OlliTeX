@@ -1,0 +1,82 @@
+[
+  {
+    "fdb-file-types": {
+      "total": {
+        "systemFileCount": 2,
+        "systemFileSize": 62345,
+        "imageFileCount": 1,
+        "imageFileSize": 999,
+        "textFileCount": 2,
+        "textFileSize": 6702,
+        "fontFileCount": 0,
+        "fontFileSize": 0,
+        "otherFileCount": 1,
+        "otherFileSize": 10
+      },
+      "system": [
+        {
+          "ext": "ttf",
+          "count": 1,
+          "size": 50000
+        },
+        {
+          "ext": "cls",
+          "count": 1,
+          "size": 12345
+        }
+      ],
+      "user": [
+        {
+          "ext": "tex",
+          "count": 1,
+          "size": 6147
+        },
+        {
+          "ext": "png",
+          "count": 1,
+          "size": 999
+        },
+        {
+          "ext": "bib",
+          "count": 1,
+          "size": 555
+        },
+        {
+          "ext": "other",
+          "count": 1,
+          "size": 10
+        }
+      ]
+    },
+    "fdb-dependencies": [
+      "beamer.cls"
+    ]
+  },
+  {
+    "fdb-file-types": {
+      "total": {
+        "systemFileCount": 2,
+        "systemFileSize": 1100,
+        "imageFileCount": 0,
+        "imageFileSize": 0,
+        "textFileCount": 0,
+        "textFileSize": 0,
+        "fontFileCount": 0,
+        "fontFileSize": 0,
+        "otherFileCount": 0,
+        "otherFileSize": 0
+      },
+      "system": [
+        {
+          "ext": "sty",
+          "count": 2,
+          "size": 1100
+        }
+      ],
+      "user": []
+    },
+    "fdb-dependencies": [
+      "minted.sty"
+    ]
+  }
+]

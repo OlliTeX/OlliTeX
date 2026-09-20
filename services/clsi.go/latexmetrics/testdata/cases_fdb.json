@@ -1,0 +1,4 @@
+[
+  "// main\nFILELIST\n\"main.tex\" 1760016467 6147 9da336eb1132ecb1d61cd1f5a70cfa62 \"\"\n\"/texlive/texmf-dist/tex/latex/beamer/beamer.cls\" 1 12345 abcdef123 \"\"\n\"figures/logo.png\" 2 999 def000 \"\"\n\"refs.bib\" 3 555 aaa \"\"\n\"/usr/share/texmf/fonts/opentype/DejaVuSans.ttf\" 4 50000 bbb \"\"\n\"main.tex\" 1760016467 6147 9da336eb1132ecb1d61cd1f5a70cfa62 \"\"\n\"noextfile\" 5 10 ccc \"\"\n",
+  "// system only\n\"/usr/lib/tex.sty\" 1 100 abc \"\"\n\"/usr/share/minted.sty\" 9 1000 ddd \"\"\n"
+]
