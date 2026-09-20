@@ -267,6 +267,19 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 			}
 			if rt.Path == r.URL.Path || (rt.Pattern != nil && rt.Pattern.MatchString(r.URL.Path)) {
 				if rt.NoSession {
+					if rt.Pattern != nil {
+						if m := rt.Pattern.FindStringSubmatch(r.URL.Path); m != nil {
+							cxt.Params = map[string]string{}
+							names := rt.Pattern.SubexpNames()
+							for i := 1; i < len(m) && i < len(names); i++ {
+								k := names[i]
+								if k == "" {
+									k = strconv.Itoa(i)
+								}
+								cxt.Params[k] = m[i]
+							}
+						}
+					}
 					rt.Handler(cxt, res)
 					return
 				}

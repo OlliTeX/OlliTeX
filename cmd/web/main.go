@@ -32,6 +32,7 @@ import (
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/hub"
 	"ollitex/go/services/web/features/instancestats"
+	"ollitex/go/services/web/features/gitbridge"
 	"ollitex/go/services/web/features/library"
 	"ollitex/go/services/web/features/llmsettings"
 	"ollitex/go/services/web/features/mendeley"
@@ -209,6 +210,11 @@ func main() {
 	// 301 /hub#/mysettings.account; GET /admin/panel → 301 /hub#/overview
 	// (site admin — non-admin bounces to /restricted?from=…).
 	app.RegisterFeature(pageshells.Feature(app))
+
+	// P6.19 surface: git-bridge web module — PAT endpoints
+	// (/git-bridge/personal-access-tokens*), /oauth/token/info, and the
+	// bridge-called API (GET/POST /api/v0/docs/:p[/snapshots...]).
+	app.RegisterFeature(gitbridge.Feature(app))
 
 	// P5.1a surface: editor page (GET /editor/:id + /Project/:id).
 	app.RegisterFeature(editorpages.Feature(app))

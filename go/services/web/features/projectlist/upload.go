@@ -318,9 +318,9 @@ func upPutBlob(historyID, hash string, data []byte) bool {
 	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }
 
-func upDUSetDoc(pj, docID string, lines []string, uid string, track bool) bool {
+func upDUSetDoc(pj, docID string, lines []string, uid string, track bool, source string) bool {
 	body, _ := json.Marshal(map[string]any{
-		"lines": lines, "source": "upload", "user_id": uid, "trackChanges": track,
+		"lines": lines, "source": source, "user_id": uid, "trackChanges": track,
 	})
 	resp, err := upHTTP.Post(upDUBase()+"/project/"+pj+"/doc/"+docID, "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -436,7 +436,7 @@ func upJSONArray(a bson.A) []map[string]any {
 	return out
 }
 
-func upUpdateStructure(pj, uid string, version int64, historyID string, updates bson.A) bool {
+func upUpdateStructure(pj, uid string, version int64, historyID string, updates bson.A, source string) bool {
 	if len(updates) < 1 {
 		return true
 	}
@@ -445,7 +445,7 @@ func upUpdateStructure(pj, uid string, version int64, historyID string, updates 
 		"userId":           uid,
 		"version":          version,
 		"projectHistoryId": historyID,
-		"source":           "upload",
+		"source":           source,
 	})
 	resp, err := upHTTP.Post(upDUBase()+"/project/"+pj, "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -932,21 +932,21 @@ func uploadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 		kind, lines := upClassify(data, name, tgt.existingDoc != nil)
 		if kind == "doc" {
-			upDoDoc(a, cxt, res, fail500, pj, tgt, name, lines, uid, *doc, upTrackChanges(entFld(*doc, "track_changes"), uid))
+			upDoDoc(a, cxt, res, fail500, pj, tgt, name, lines, uid, *doc, upTrackChanges(entFld(*doc, "track_changes"), uid), "upload")
 			return
 		}
-		upDoFile(a, cxt, res, fail500, pj, tgt, name, data, uid, *doc)
+		upDoFile(a, cxt, res, fail500, pj, tgt, name, data, uid, *doc, "upload")
 	}
 }
 
 // ---------- branches (inline order pinned in Node upsertDoc/upsertFile) ---------
 
-func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj string, tgt *upTarget, name string, lines []string, uid string, doc primitive.D, track bool) {
+func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj string, tgt *upTarget, name string, lines []string, uid string, doc primitive.D, track bool, source string) {
 	now := time.Now()
 	uidl := strings.ToLower(uid)
 	if tgt.existingDoc != nil {
 		// doc re-upload: DU setDocument (DU flushes docstore + project).
-		if !upDUSetDoc(pj, tgt.existingDoc.idHex, lines, uidl, track) {
+		if !upDUSetDoc(pj, tgt.existingDoc.idHex, lines, uidl, track, source) {
 			fail500()
 			return
 		}
@@ -970,7 +970,7 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 			upDelOp("file", tgt.existingFile.idHex, path),
 			upAddOpDoc(newDocID.Hex(), path, strings.Join(lines, "\n"), upRangsup(doc)),
 		}
-		if !upUpdateStructure(pj, uidl, upVersion(doc)+1, upHistoryID(doc), updates) {
+		if !upUpdateStructure(pj, uidl, upVersion(doc)+1, upHistoryID(doc), updates, source) {
 			fail500()
 			return
 		}
@@ -992,14 +992,14 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 	updates := bson.A{
 		upAddOpDoc(newDocID.Hex(), path, strings.Join(lines, "\n"), upRangsup(doc)),
 	}
-	if !upUpdateStructure(pj, uidl, upVersion(doc)+1, upHistoryID(doc), updates) {
+	if !upUpdateStructure(pj, uidl, upVersion(doc)+1, upHistoryID(doc), updates, source) {
 		fail500()
 		return
 	}
 	res.JSON(200, upJSONDoc(newDocID.Hex()))
 }
 
-func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj string, tgt *upTarget, name string, data []byte, uid string, doc primitive.D) {
+func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj string, tgt *upTarget, name string, data []byte, uid string, doc primitive.D, source string) {
 	now := time.Now()
 	uidl := strings.ToLower(uid)
 	hash := upGitBlobHash(data)
@@ -1024,7 +1024,7 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 			upDelOp("file", tgt.existingFile.idHex, path),
 			upAddOpFile(newFileID.Hex(), path, hash, upRangsup(doc)),
 		}
-		if !upUpdateStructure(pj, uidl, upVersion(doc)+1, hist, updates) {
+		if !upUpdateStructure(pj, uidl, upVersion(doc)+1, hist, updates, source) {
 			fail500()
 			return
 		}
@@ -1051,7 +1051,7 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 			upDelOp("doc", tgt.existingDoc.idHex, path),
 			upAddOpFile(newFileID.Hex(), path, hash, upRangsup(doc)),
 		}
-		if !upUpdateStructure(pj, uidl, upVersion(doc)+1, hist, updates) {
+		if !upUpdateStructure(pj, uidl, upVersion(doc)+1, hist, updates, source) {
 			fail500()
 			return
 		}
@@ -1068,7 +1068,7 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 	updates := bson.A{
 		upAddOpFile(newFileID.Hex(), path, hash, upRangsup(doc)),
 	}
-	if !upUpdateStructure(pj, uidl, upVersion(doc)+1, hist, updates) {
+	if !upUpdateStructure(pj, uidl, upVersion(doc)+1, hist, updates, source) {
 		fail500()
 		return
 	}
