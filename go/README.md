@@ -17,6 +17,10 @@ services, and any one of them can be swapped back.
 
 ```
 go/
+├── libraries/        # 1:1 Go ports of the shared Node `libraries/*` (the reusable building blocks):
+│   │                 #   oerror accesstoken streamutils settings validtools rangestracker fetchutils
+│   │                 #   ologger ometrics otc persistors rediswrapper mongoutils mongowrapper notifprefs
+│   │                 #   (each has its own README.md — see go/libraries/HANDOFF.md for the port plan)
 ├── mongoh/           # shared: Mongo connection lifecycle for the DB-backed services
 ├── pbhttp/           # shared: express.json body-limit semantics + shared HTTP bits
 ├── s3x/              # shared: zero-dep S3 (path-style) client for SeaweedFS — the s3 persistor backend
@@ -50,6 +54,36 @@ for its in-tree S3 support).
 | `go/mongoh` | Derives the Mongo connection string (`MONGO_CONNECTION_STRING` / `MONGO_HOST` / `127.0.0.1`, database from the URI path, default `sharelatex`) and owns the connect/close lifecycle — exactly how the Node services build `settings.mongo.url`. It deliberately does **not** wrap CRUD: each service issues its own 1:1 queries so the semantics stay visible and checkable against the Node original. |
 | `go/pbhttp` | `LimitBodyWith` reproduces `express.json({ limit })`: bound the body to N bytes, and on overflow return the **caller-chosen** status + text, because the Node services disagree (some 413 "request entity too large", some 500 "Oops, something went wrong"). Per-service parity instead of one-size-fits-all. |
 | `go/s3x` | Minimal dependency-free S3 (path-style) client for SeaweedFS's S3 gateway — the transport behind the **s3 persistor backends** of filestore (`s3store.go`) and docstore (`s3archiver.go`). Put/Head/Get/Delete/List(paged)/CreateBucket; anonymous by default; keeps keys **verbatim** (Node `S3Persistor` semantics); translates the internal hex-md5 convention to the base64 `Content-MD5` wire format SeaweedFS enforces. Conversion for moving data between the flat-fs and s3 layouts lives in `cmd/seaweed-migrate`. |
+
+## Shared libraries (`go/libraries`)
+The 1:1 Go ports of Overleaf's shared Node `libraries/*` — the reusable building
+blocks every service is written against. **Each module has its own `README.md`**
+(purpose, API, seams, coverage); the port plan + per-library decisions live in
+`go/libraries/HANDOFF.md`. Dependency-light: standard library + only the cross-
+library ports they genuinely need (e.g. `otc` → `oerror`).
+
+| Package | Node origin | One-line purpose |
+| --- | --- | --- |
+| `oerror` | `@overleaf/o-error` | typed errors + `info`/`cause`/`tag` (the shared error shape) |
+| `validtools` | `@overleaf/validation-tools` (zod) | schema validation + issue lists + `handleValidationError` |
+| `settings` | `@overleaf/settings` | per-process config/defaults discovery + deep `merge` |
+| `streamutils` | `@overleaf/stream-utils` | size-limit/timeout/metered/incremental body streams |
+| `fetchutils` | `@overleaf/fetch-utils` | `fetch*` HTTP helpers + connect-timeout/retry agent |
+| `accesstoken` | `@overleaf/access-token-encryptor` | AES-256-CTR + HKDF access-token encryption (v3) |
+| `rangestracker` | `ranges-tracker` | comment/tracked-change range tracking + dirty state |
+| `otc` | `overleaf-editor-core` | the OT engine: text ops, file tree, operations, rebase |
+| `persistors` | `object-persistor` | object storage (FS/S3/GCS) + per-project-encrypted + migration |
+| `rediswrapper` | `@overleaf/redis-wrapper` | ioredis wrapper + lockers + health check |
+| `mongowrapper` | `@overleaf/mongoose-wrapper` | mongoose façade (connect/model/Schema/indexes) |
+| `mongoutils` | `@overleaf/mongo-utils` | ObjectId-time batched updates + test-DB guards |
+| `ologger` | `@overleaf/logger` | bunyan-compatible logger + serializers + level checkers |
+| `ometrics` | `@overleaf/metrics` | Prometheus-format registry + platform monitors |
+| `notifprefs` | `@overleaf/notification-preferences` | the notification-preferences contract (12 keys + global) |
+
+> **State (owner):** the services under `go/services` still implement some of
+> this logic inline. Plan (in progress) is to switch them to import these
+> `go/libraries` packages so the shared logic is maintained in one place and
+> the libraries' test coverage is exercised by the services' suites.
 
 ## Per-service invariants (1:1 doctrine)
 
