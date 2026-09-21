@@ -210,9 +210,10 @@ func TestIncrementalResponseTimeoutAborts(t *testing.T) {
 	res := newFakeRes()
 	ir := NewIncrementalResponse(res, 30*time.Millisecond, "mylabel", map[string]any{"projectId": 42}, logs)
 	defer ir.End()
-	// Wait for the abort warning to land (the cancel fires first; the
-	// warning after — waiting on the log directly avoids the race).
-	waitUntil(func() bool { return logs.warningCount() >= 1 }, 200*time.Millisecond, t)
+	// Node order (stream-utils index.js: warn → update → abort signal):
+	// the written update is the LAST observable of the three, so gating on
+	// it also guarantees the warning (wait-for-warn is the racy direction).
+	waitUntil(func() bool { return res.written() != "" }, 500*time.Millisecond, t)
 	// Pin: the abort pushed the exact update line.
 	if got := res.written(); got != "error: mylabel: aborting after 30ms\n" {
 		t.Fatalf("abort update %q", got)
