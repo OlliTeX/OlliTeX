@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707
 	github.com/mattn/go-sqlite3 v1.14.52
+	github.com/sergi/go-diff v1.4.0
 	github.com/wneessen/go-mail v0.8.1
 	go.mongodb.org/mongo-driver v1.17.10
 	golang.org/x/crypto v0.54.0

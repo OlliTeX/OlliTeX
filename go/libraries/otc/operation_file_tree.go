@@ -9,6 +9,9 @@ type Operation interface {
 	ToRaw() map[string]any
 	IsNoOp() bool
 	FindBlobHashes(hashes map[string]bool)
+	// LoadFiles loads any File objects referenced by the operation
+	// (Node: `Operation.loadFiles`, base no-op; AddFileOperation loads its file).
+	LoadFiles(ctx context.Context, kind string, bs BlobStore) error
 	Store(bs BlobStore) (map[string]any, error)
 	ApplyTo(s *Snapshot) error
 	CanBeComposedWithForUndo(other Operation) bool
@@ -22,9 +25,10 @@ var OperationNoOp = &NoOperation{}
 // NoOperation mirrors no_operation.js.
 type NoOperation struct{}
 
-func (*NoOperation) ToRaw() map[string]any          { return map[string]any{} }
-func (*NoOperation) IsNoOp() bool                   { return true }
-func (*NoOperation) FindBlobHashes(map[string]bool) {}
+func (*NoOperation) ToRaw() map[string]any                              { return map[string]any{} }
+func (*NoOperation) IsNoOp() bool                                       { return true }
+func (*NoOperation) FindBlobHashes(map[string]bool)                     {}
+func (*NoOperation) LoadFiles(context.Context, string, BlobStore) error { return nil }
 func (*NoOperation) Store(BlobStore) (map[string]any, error) {
 	return map[string]any{}, nil
 }
@@ -78,6 +82,10 @@ func (a *AddFileOperation) FindBlobHashes(h map[string]bool) {
 		h[*r] = true
 	}
 }
+func (a *AddFileOperation) LoadFiles(ctx context.Context, kind string, bs BlobStore) error {
+	_, err := a.File.Load(ctx, kind, bs)
+	return err
+}
 func (a *AddFileOperation) Store(bs BlobStore) (map[string]any, error) {
 	rawFile, err := a.File.Store(context.Background(), bs)
 	if err != nil {
@@ -108,8 +116,9 @@ type MoveFileOperation struct {
 func (m *MoveFileOperation) ToRaw() map[string]any {
 	return map[string]any{"pathname": m.Pathname, "newPathname": m.NewPathname}
 }
-func (m *MoveFileOperation) IsNoOp() bool                   { return false }
-func (m *MoveFileOperation) FindBlobHashes(map[string]bool) {}
+func (m *MoveFileOperation) IsNoOp() bool                                       { return false }
+func (m *MoveFileOperation) FindBlobHashes(map[string]bool)                     {}
+func (m *MoveFileOperation) LoadFiles(context.Context, string, BlobStore) error { return nil }
 func (m *MoveFileOperation) Store(BlobStore) (map[string]any, error) {
 	return m.ToRaw(), nil
 }
@@ -149,8 +158,9 @@ func EditFileOperationFromRaw(raw map[string]any) (*EditFileOperation, error) {
 	}
 	return &EditFileOperation{Pathname: pathname, Operation: op}, nil
 }
-func (e *EditFileOperation) IsNoOp() bool                   { return false }
-func (e *EditFileOperation) FindBlobHashes(map[string]bool) {}
+func (e *EditFileOperation) IsNoOp() bool                                       { return false }
+func (e *EditFileOperation) FindBlobHashes(map[string]bool)                     {}
+func (e *EditFileOperation) LoadFiles(context.Context, string, BlobStore) error { return nil }
 func (e *EditFileOperation) Store(BlobStore) (map[string]any, error) {
 	return e.ToRaw(), nil
 }
@@ -209,8 +219,9 @@ func NewSetFileMetadataOperation(pathname string, metadata map[string]any) (*Set
 func (s *SetFileMetadataOperation) ToRaw() map[string]any {
 	return map[string]any{"pathname": s.Pathname, "metadata": deepClone(s.Metadata)}
 }
-func (s *SetFileMetadataOperation) IsNoOp() bool                   { return false }
-func (s *SetFileMetadataOperation) FindBlobHashes(map[string]bool) {}
+func (s *SetFileMetadataOperation) IsNoOp() bool                                       { return false }
+func (s *SetFileMetadataOperation) FindBlobHashes(map[string]bool)                     {}
+func (s *SetFileMetadataOperation) LoadFiles(context.Context, string, BlobStore) error { return nil }
 func (s *SetFileMetadataOperation) Store(BlobStore) (map[string]any, error) {
 	return s.ToRaw(), nil
 }

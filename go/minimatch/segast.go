@@ -20,7 +20,7 @@ var adoptionGo = map[int8][]int8{
 	'+': {'+', '@'},
 }
 
-// nested extglobs adopted in WITH an extra '' blank arm appended.
+// nested extglobs adopted in WITH an extra ” blank arm appended.
 var adoptionWithSpaceGo = map[int8][]int8{
 	'!': {'?'},
 	'@': {'?'},
@@ -632,8 +632,10 @@ func (a *mmAST) partsToRegExp(dot bool) string {
 }
 
 // mmGuardStart computes the guard start for a flat-portion root:
-//   (dot || preEscapes) + aps(src[0]) ? startNoTraversal :
-//   !dot && !allowDot + aps(src[0]) ? startNoDot : ""
+//
+//	(dot || preEscapes) + aps(src[0]) ? startNoTraversal :
+//	!dot && !allowDot + aps(src[0]) ? startNoDot : ""
+//
 // src[2]/src[4] for the \./ (and \(.) probes via JS charAt == "".
 func mmGuardStart(dot bool, src string, allowDot *bool) string {
 	c0 := int8(0)

@@ -18,10 +18,35 @@ every call — pinned by the Node suite.
 ## The API
 | Symbol | Purpose |
 | --- | --- |
-| `type Config struct{ CipherLabel string; CipherPasswords map[string]string; PasswordOrder []string }` | mirrors Node's `{ cipherLabel, cipherPasswords: { <label>: <password> } }`; `PasswordOrder` reproduces Node's insertion-order iteration so multi-scheme validation failures are deterministic/Node-ordered |
+| `type Config struct{ CipherLabel string; CipherPasswords map[string]string; PasswordOrder []string; RelaxedLabels bool }` | mirrors Node's `{ cipherLabel, cipherPasswords: { <label>: <password> } }`; `PasswordOrder` reproduces Node's insertion-order iteration so multi-scheme validation failures are deterministic/Node-ordered; `RelaxedLabels` waives only the label-version gate (see below) |
 | `func New(cfg Config) (*Encryptor, error)` | build the encryptor, running every validation in Node's source order (empty label → colon in label → no `vNN` suffix → missing password → password too short (<16 UTF-16 units) → unknown version → unknown default label) |
 | `(*Encryptor).EncryptJson(v any) (string, error)` | marshal with the default scheme, fresh random salt+IV, return `label:saltHex:cipherB64:ivHex` |
 | `(*Encryptor).DecryptToJson(encrypted string) (any, error)` | split label, dispatch to the scheme, CTR-decrypt, `JSON.parse` (a bad token → `error decrypting token`) |
+
+### `Config.RelaxedLabels` — the web service's token ciphers reuse this crypto
+
+The Overleaf **web** service's per-provider token ciphers
+(`features/{sitesettings,webdav,mendeley}/cipher.go`) implement the **same
+V3 scheme** (HKDF-SHA512 + AES-256-CTR, the identical token layout) but treat
+the label as an opaque token prefix with **no version-suffix gate** — so an
+operator-configured label with multiple dash segments (e.g.
+`OL-CEP-2042-v3`) works in web, while the strict `AccessTokenEncryptor`
+constructor (Node line 108: `version = cipherLabel.split('-')[1]`) rejects it
+(`unknown version`).
+
+`RelaxedLabels: true` waives **only** that label-version gate — every other
+validation (non-empty, no colon, password present + `≥16` UTF-16 units) and the
+**same v3 crypto / wire format** are unchanged. This lets the web ciphers reuse
+this one implementation instead of re-implementing HKDF + AES-CTR inline
+(owner task (b): services reuse `go/libraries`). The strict Node-oracle path
+(default, `RelaxedLabels=false`) is byte-for-byte unchanged.
+
+> The web ciphers' **GCM** family (`features/{dropbox,llmsettings}` —
+> AES-256-GCM + sha256/scrypt key derivation) is a **different** scheme and is
+> intentionally **not** mapped onto this package.
+
+`accesstoken_relaxed_test.go` pins both modes (strict rejects a multi-dash
+label; relaxed accepts it; the crypto/wire format is identical in both).
 
 ## Conventions / gotchas
 - **The v3 scheme is the only implementable version** — `New` rejects any label

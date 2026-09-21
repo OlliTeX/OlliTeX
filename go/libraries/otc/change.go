@@ -1,6 +1,7 @@
 package otc
 
 import (
+	"context"
 	"regexp"
 	"time"
 )
@@ -168,6 +169,17 @@ func (c *Change) FindBlobHashes(hashes map[string]bool) {
 	for _, op := range c.Operations {
 		op.FindBlobHashes(hashes)
 	}
+}
+
+// LoadFiles loads any File objects referenced by the operations
+// (Node: `Change.loadFiles` — sequential `operation.loadFiles`).
+func (c *Change) LoadFiles(ctx context.Context, kind string, bs BlobStore) error {
+	for _, op := range c.Operations {
+		if err := op.LoadFiles(ctx, kind, bs); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // PushOperation appends an operation (Node: `pushOperation`).

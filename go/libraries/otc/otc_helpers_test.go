@@ -211,3 +211,6 @@ func assertPanicsWithValue(t *testing.T, want string, fn func()) {
 		t.Fatalf("expected panic message %q, got %q", want, msg)
 	}
 }
+
+// dummyNow returns a fixed timestamp for deterministic tests.
+func dummyNow() time.Time { return time.Date(2020, 5, 6, 7, 8, 9, 0, time.UTC) }

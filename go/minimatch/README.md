@@ -50,6 +50,32 @@ minimatch.CompileRe(src)         // closed-dialect RE engine (*reProg)
   multi-byte `[\p{...}]` use.
 - **`nocase`**: port applies byte-level case folding (documented; CLSI uses
   case-sensitive). `nocaseMagicOnly` handled.
+- **Level 0 unreachable** (`adjacentGlobstarOptimize`): upstream `optimizationLevel ?? 1`
+  yields 0 only when a caller explicitly passes `0`; the Go `Options.OptimizationLevel`
+  int can't distinguish "unset" (zero) from "explicit 0", so `optimizationLevel()` maps
+  0→1. Consequence: level 0 (adjacent-**globstar** merge only) is unreachable via the
+  public API in this port — `adjacentGlobstarOptimize` is dead code here (not covered;
+  not a bug).
+- **Level 2 is NOT level‑1‑identical for `.`/`..`/empty paths (faithful, not a bug):**
+  upstream `levelTwoFileOptimize` (file side) and `firstPhasePreProcess` (pattern side)
+  run only at level≥2 and strip/normalise `.`/`..`/empty segments, so e.g. Go
+  `Match("a/./b", "a/b", level2)=true` while `level1=false`. This matches upstream
+  `src/index.ts` (verified by reading the source); the oracle TSVs pin the default
+  level 1 only. Tests therefore assert level-2 == level-1/oracle only for CLEAN
+  inputs (no `.`, `..`, or empty segments).
+- **Level-2 `**/../` non-termination — FIXED:** `pre/**/../p1/p2/rest` (level 2)
+  previously did not terminate (a full `go test` run burned the 10m default
+  timeout on it). Root cause: in `firstPhasePreProcess`, the second `**/../`
+  branch was built as `make([]string, len(parts)+1)` and copied `parts[gs:]`,
+  which KEPT the adjacent `..` and re-pushed a pattern identical to the input, so
+  `didSomething` stayed `true` forever. Fix (mirrors upstream `src/index.ts`
+  `other = parts.slice(0); other[gs] = '**'`): build `other` at the SAME length as
+  the `**`-removed `parts` and set `other[gs] = "**"`, which OVERWRITES the `..`
+  (shifted onto index `gs` after the splice) — so the branch is
+  `pre/**/p1/p2/rest`, and the whole expansion terminates. Regression-pinned by
+  `coverage_test.go::TestLevel2DotNormalizationSmoke` (the `pre/**/../p1/p2/rest`
+  row now completes in microseconds). Upstream's own `**/..` *performance*
+  caveat (walking) does not apply to `match()`, which now terminates.
 
 ### Oracle coverage (acceptance gate; see HANDOFF.md)
 - `testoracle.tsv` 35,400 rows (RE-engine) GREEN
@@ -58,5 +84,13 @@ minimatch.CompileRe(src)         // closed-dialect RE engine (*reProg)
 - `segM.tsv` 27,360 + `segPortion.tsv` 9,924 (AST per-portion) GREEN
 - `full26.tsv` 3,400 + `diff26.tsv` 1,334 (differential, dot 0+1) GREEN
 - 30,000+ hand-written smoke/edge cases GREEN
+- `coverage_test.go` — public API surface (module `Match`, `MatchList`, `HasMagic`,
+  `MMBraceExpand`) + level-2 over the 7,854-row oracle (CLEAN-file assertions) +
+  level-2 `.`/`..` normalisation smoke (incl. the fixed `**/../` regression): GREEN.
+  **Total statement coverage: 86.2%** (meets the ≥ 85% gate). The remaining un-covered
+  statements are the documented level-0 branch (unreachable here) and the
+  level-1≠level-2 `.`/`..`/`""` normalisation differences (faithful to upstream; not
+  oracle-pinned in the level-1 TSVs — not force-covered). The former `**/../`
+  non-termination is FIXED and regression-pinned (see above).
 
 Run: `go test -cover ./go/minimatch/...`

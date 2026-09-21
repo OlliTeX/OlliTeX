@@ -6,7 +6,7 @@ func mmOpts(dot bool) *Options { return &Options{Dot: dot, Platform: "posix"} }
 
 func TestSmokeMM(t *testing.T) {
 	cases := []struct {
-		pat, f string
+		pat, f    string
 		dot, want bool
 	}{
 		{"a", "a", false, true},
