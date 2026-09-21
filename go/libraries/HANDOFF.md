@@ -13,20 +13,20 @@ repo root). Commit per package **green** (build+vet+gofmt+tests).
 
 ## STATUS (first line updates on any change)
 
-`STATUS: 2026-09-20 — LIB-01 oerror DONE (96.8%); LIB-02 SKIP (Node plumbing); LIB-03 streamutils DONE (97.8%→98.6%); LIB-04 validtools DONE (99.6%→98.9% with ArrayVal/UnionVal composites); LIB-05 settings DONE (98.6%); LIB-06 rangestracker DONE (97.0%, 13 oracle ports + 29 supplement/coverage tests); LIB-08 accesstoken WIP on disk (1 failing golden test — finish before commit); LIB-09 notifprefs on disk, tests green, HANDOFF not yet updated. Next: LIB-07 fetchutils.`
+`STATUS: 2026-09-21 — LIB-01 oerror DONE (96.8%); LIB-02 SKIP (Node plumbing); LIB-03 streamutils DONE (98.6%); LIB-04 validtools DONE (98.9% with ArrayVal/UnionVal composites); LIB-05 settings DONE (98.6%); LIB-06 rangestracker DONE (97.0%, 13 oracle ports + 29 supplement/coverage tests); LIB-07 fetchutils DONE (94.9%, 16 test fns: 56-case oracle port + agent/watchdog/edge); LIB-08 accesstoken WIP on disk (1 failing golden test — finish before commit); LIB-09 notifprefs DONE tests-green (69.2%). NOTE: L01/L03/L04/L05 were DONE-but-UNCOMMITTED and L09 not yet committed (owner flag 2026-09-21) — committed per-package below. Next: LIB-08 accesstoken (fix failing golden decrypt), then LIB-10 redis-wrapper → LIB-11 mongo → LIB-12 persistors → LIB-13 ologger → LIB-14 ometrics → LIB-15 otc → LIB-16 strict gate (≥85 overall).`
 
 
 | # | Package | Go pkg | Status | Coverage |
 |---|---------|--------|--------|----------|
 | 01 | o-error | oerror | ✅ | 96.8% |
 | 02 | promise-utils | — | SKIP (Node plumbing — see §Decisions) |
-| 03 | stream-utils | streamutils | ✅ | 97.8% |
-| 04 | validation-tools | validtools | ✅ | 99.6% |
+| 03 | stream-utils | streamutils | ✅ | 98.6% |
+| 04 | validation-tools | validtools | ✅ | 98.9% |
 | 05 | settings | settings | ✅ | 98.6% |
 | 06 | ranges-tracker | rangestracker | ✅ | 97.0% |
-| 07 | fetch-utils | fetchutils | ○ | — |
-| 08 | access-token-encryptor | accesstoken | ○ | — |
-| 09 | notification-preferences | notifprefs | ○ | — |
+| 07 | fetch-utils | fetchutils | ✅ | 94.9% |
+| 08 | access-token-encryptor | accesstoken | ◐ | — (1 failing golden) |
+| 09 | notification-preferences | notifprefs | ✅ | 69.2% |
 | 10 | redis-wrapper | rediswrapper | ○ | — |
 | 11 | mongoose-wrapper + mongo-utils | mongoutils (+wrapper) | ○ | — |
 | 12 | object-persistor | persistors | ○ | — |
@@ -107,9 +107,21 @@ Big package otc last; coordinates with ph-go `internal/opmodel` (see LIB-15 note
   convention, e.g. `OError` → `OError`); behaviour (messages, status codes, error
   shapes, edge cases) is byte-for-byte where deterministic. Non-Go-isms (dual stacks,
   `undefined` vs `nil`) get the narrowest faithful equivalent + test pin.
+- (LIB-07) **fetchutils = 1:1 port of `libraries/fetch-utils/index.ts`** (~450 LoC) into `go/libraries/fetchutils` (fetchutils.go core/errors/headers/watchdog/bodyPipe, agent.go Custom{Http,Https}Agent, variants.go fetchJson/fetchStream/fetchNothing/fetchRedirect/fetchString, +4 test files). NO new Go deps (stdlib net/http). Oracle: the 56-case `FetchUtils.test.js` ported (fetchJson/Headers/fetchStream/fetchNothing/RequestFailedError/fetchString/fetchRedirect) + the 10 agent cases (success, non-routable→ConnectTimeoutError→FetchError, retries-after-delay with ≥1500ms pin, no-stray-reconnect, https CA, untrusted→DEPTH_ZERO_SELF_SIGNED_CERT, https non-routable, bad CA PEM, non-positive connectTimeout) + over-timeout warn (120s seam made a var) + edge branches (FetchError surface, non-string header stringify, JSON-body marshal error, expired-cert→ERR_CERT_EXPIRED). Coverage 94.9%.
+  **Go-ism seams (narrowest faithful equivalent + test pin):**
+  (a) Node `AbortController`/`signal` → Go `context.Context` (cancel == abort); `errors.Is(..., context.Canceled)` NOT used because oerror deliberately does not Unwrap non-OError causes into the stack (pinned in oerror tests) — abort tests assert the transport `context canceled` text instead.
+  (b) Node agent (http.Agent with connect-timeout retry) → `*http.Client` + custom `DialContext`/`DialTLSContext` (DialTLSContext is REQUIRED: a DialContext that already did TLS would double-handshake and the server would answer plaintext → "server gave HTTP response to HTTPS client"). Retry loop = up to 3 attempts, per-attempt ctx timeout, retry interval, last-error-wins, timeout→ConnectTimeoutError.
+  (c) Node request-body `stream.destroyed` → a `bodyPipe` (io.Pipe + source-Closer tracking): destroy-on-error, destroy-before-transfer (source.Close unblocks the copy and aborts the request via CloseWithError — a clean EOF would only end the body, NOT abort), destroy-if-not-consumed after settle (raw early responder needed: the net/http test server drains the body before flushing early responses, which blocks on unbounded bodies — a Node/Go server-stack diverge, see §Divergences).
+  (d) `setLogger({warn})` 120s over-timeout warn → `SetLogger(WarnFunc)` + `RequestWarnTimeout` var (test-overridable) firing with `{url,method,overTimeoutMs,stack}` + the exact Node message "Fetch request did not complete within 120 seconds".
+  (e) node-fetch `FetchError` wrapping: connect timeout → FetchError"request to <url> failed, reason: connect timeout"; TLS trust failure → FetchError{Code: DEPTH_ZERO_SELF_SIGNED_CERT} (untrusted/self-signed) / ERR_CERT_EXPIRED. Mapped BEFORE the oerror.Tag wrap (Tag breaks the Unwrap chain for non-OError causes) and inside performRequest so the raw transport error chain is still visible. `errors.As` targets must be VALUE types for x509.CertificateInvalidError / x509.UnknownAuthorityError (they are value-receiver types held as values in the chain — pointer targets do NOT match).
+  (f) `parseHeaders` drops null-valued headers (Node stringifies `undefined` → dropped); non-string values stringified (bool/int/float). RequestFailedError = `request failed` message, body-in-info only for 400/409/413/422.
+  (g) fetchRedirect returns the RAW Location header (Node parity); the test server issues absolute Locations (Node's server resolves relative→absolute; Go's does not).
+  **TEST-ONLY infra pins (not shipped behaviour):** /hang handler blocks on `r.Context().Done()` (not `select{}`) with a 30s self-timeout so Server.Close can't hang; cleanup uses CloseClientConnections + non-blocking Close for live /hang conns (client abandoned mid-request); waitForRequest replaced by a path-polling waitUntilRequest (stale buffered tokens from earlier subtests caused a cancel-before-send race); rawEarlyResponder (raw TCP) mirrors express /json/ignore-request (responds without reading the body).
+- (owner 2026-09-21) **Commit bookkeeping**: L01 oerror / L03 streamutils / L04 validtools / L05 settings were DONE+green but LEFT UNCOMMITTED (owner flag: "some go/libraries are not committed yet"), and L09 notifprefs was green but uncommitted. Committed per-package (green) in this session: oerror 96.8%, streamutils 98.6%, validtools 98.9%, settings 98.6%, fetchutils 94.9%, notifprefs 69.2%. rangestracker (L06) was already committed (7bc883cd6e). accesstoken (L08) is RED (1 failing golden test) and intentionally NOT committed. All commits stage `go/libraries/<pkg>` + HANDOFF.md explicitly (no `git add -A`).
 
 ## KNOWN DIVERGENCES / RISKS (fill as they appear)
 
+- (LIB-07) fetchutils: (a) Go net/http **server** drains a request body before flushing an early response (express responds immediately) — so the "destroy request body if not consumed" oracle test uses a raw-TCP early responder, not the stdlib test server; client-side destroy semantics are 1:1 (bodyPipe); (b) abort (Node AbortController) → context cancellation; Go does not Unwrap non-OError causes into the oerror stack (pinned in oerror), so cancel is asserted via the transport error text; (c) x509 codes: Go `UnknownAuthorityError` (untrusted/self-signed) → Node `DEPTH_ZERO_SELF_SIGNED_CERT`; `CertificateInvalidError(Expired)` → `ERR_CERT_EXPIRED` — other reasons render the Go message (no Node code exists in scope); (d) Go 1.27 has no `SelfSigned` InvalidReason — self-signed-untrusted surfaces as `UnknownAuthorityError` (handled as above); (e) `errors.As` needs VALUE-type targets for x509 value-receiver error types (pointer targets miss them).
 - (LIB-06) rangestracker: (a) Node `comment.op.c === undefined` throws TypeError on `.length`; Go treats nil `C` as `""` (unreachable for schema-valid data — pinned); (b) `UnionVal` short-circuits at the first clean arm (Node zod evaluates all arms) — failure verdict and clean-arm value are identical, only the failing-issue detail group would differ; (c) `GetChanges`/`New` copy values at the boundary (Node hands out object refs) — live mutation parity is kept INTERNAL (elements + dirty state) so the observable flush-time reads match; (d) `sortChangesStable` uses `sort.SliceStable` (V8 `Array.sort` is stable since ES2019) — equal-key order preserved; (e) seed generation uses math/rand/v2 vs Node Math.random — both non-deterministic, byte-SHAPE 1:1 (18 hex seed, 6-hex increment, zero-padded).
 
 - (LIB-01) oerror: divergences (a)-(e) above — all exercised by tests; no silent behaviour change.
