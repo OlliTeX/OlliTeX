@@ -11,21 +11,21 @@ func TestStringFileDataMethods(t *testing.T) {
 		[]map[string]any{{"id": "c1", "ranges": []any{map[string]any{"pos": 4, "length": 5}}, "resolved": false}},
 		[]map[string]any{{"range": map[string]any{"pos": 4, "length": 5},
 			"tracking": map[string]any{"ts": "2023-01-01T00:00:00.000Z", "type": "delete", "userId": "u"}}})
-	if !f.IsEditable() {
+	if fe := f.IsEditable(); fe == nil || !*fe {
 		t.Fatal("should be editable")
 	}
-	if f.GetByteLength() != len("the quick brown fox") {
-		t.Fatalf("byte length = %d", f.GetByteLength())
+	if fb := f.GetByteLength(); fb == nil || *fb != int64(len("the quick brown fox")) {
+		t.Fatalf("byte length = %v", fb)
 	}
-	if f.GetStringLength() != 19 {
-		t.Fatalf("string length = %d", f.GetStringLength())
+	if fs := f.GetStringLength(); fs == nil || *fs != 19 {
+		t.Fatalf("string length = %v", fs)
 	}
-	if got := f.GetContent(false); got != "the quick brown fox" {
-		t.Fatalf("GetContent(false) = %q", got)
+	if gp := f.GetContent(false); gp == nil || *gp != "the quick brown fox" {
+		t.Fatalf("GetContent(false) = %v", gp)
 	}
 	// filterTrackedDeletes removes the tracked-deleted "quick" (pos 4 length 5)
-	if got := f.GetContent(true); got != "the  brown fox" {
-		t.Fatalf("GetContent(true) = %q", got)
+	if gp := f.GetContent(true); gp == nil || *gp != "the  brown fox" {
+		t.Fatalf("GetContent(true) = %v", gp)
 	}
 	lines := f.GetLines()
 	if len(lines) != 1 || lines[0] != "the  brown fox" {
@@ -35,7 +35,7 @@ func TestStringFileDataMethods(t *testing.T) {
 	if stats["nContent"] != 1 || stats["nComments"] != 1 || stats["nTrackedChanges"] != 1 {
 		t.Fatalf("ToStats = %v", stats)
 	}
-	if stats["commentsSize"] <= 0 || stats["trackedChangesSize"] <= 0 {
+	if stats["commentsSize"].(int) <= 0 || stats["trackedChangesSize"].(int) <= 0 {
 		t.Fatalf("ToStats sizes = %v", stats)
 	}
 }
