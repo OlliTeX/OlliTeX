@@ -42,6 +42,17 @@ type Config struct {
 	// random; pass the config file order to keep multi-scheme failure
 	// reporting deterministic and Node-ordered.
 	PasswordOrder []string
+	// RelaxedLabels, when true, waives the label-VERSION gate (the
+	// `cipherLabel.split('-')[1] == "v3"` check and the "must contain version
+	// suffix" requirement) but keeps every other validation and uses the SAME
+	// v3 crypto (HKDF-SHA512 + AES-256-CTR, `label:saltHex:ctB64:ivHex`).
+	// This exists so the Overleaf web service's per-provider token ciphers —
+	// which use the identical V3 scheme but multi-segment labels the shared
+	// `AccessTokenEncryptor` constructor would reject (e.g. `OL_CEP-v3`,
+	// `OL_WEBDAV-v3` → Node "unknown version 'CEP'/'WEBDAV'") — can reuse this
+	// one crypto implementation (owner task (b): reuse go/libraries from the
+	// services). Default false = the strict Node-oracle path (unchanged).
+	RelaxedLabels bool
 }
 
 // Encryptor mirrors `AccessTokenEncryptor`: one scheme per cipher label
@@ -69,6 +80,7 @@ type scheme struct {
 func New(cfg Config) (*Encryptor, error) {
 	e := &Encryptor{schemeByCipherLabel: map[string]*scheme{}}
 	order := labelsInOrder(cfg)
+	relaxed := cfg.RelaxedLabels
 	for _, label := range order {
 		if label == "" {
 			return nil, errors.New("cipherLabel cannot be empty")
@@ -82,7 +94,7 @@ func New(cfg Config) (*Encryptor, error) {
 		if len(parts) > 1 {
 			version = parts[1]
 		}
-		if version == "" {
+		if !relaxed && version == "" {
 			return nil, fmt.Errorf("cipherLabel must contain version suffix (e.g. 2042.1-v42), got %s", label)
 		}
 		password, present := cfg.CipherPasswords[label]
@@ -94,12 +106,17 @@ func New(cfg Config) (*Encryptor, error) {
 		if utf16Len(password) < 16 {
 			return nil, fmt.Errorf("cipherPasswords['%s'] is too short", label)
 		}
-		switch version {
-		case "v3":
-			e.schemeByCipherLabel[label] = &scheme{cipherLabel: label, cipherPassword: password}
-		default:
-			return nil, fmt.Errorf("unknown version '%s' for %s", version, label)
+		if !relaxed {
+			switch version {
+			case "v3":
+				// v3 (the only implemented scheme).
+			default:
+				return nil, fmt.Errorf("unknown version '%s' for %s", version, label)
+			}
 		}
+		// v3 crypto (HKDF-SHA512 + AES-256-CTR) is used in both modes; relaxed
+		// only waives the label gate, never the algorithm.
+		e.schemeByCipherLabel[label] = &scheme{cipherLabel: label, cipherPassword: password}
 	}
 	def, ok := e.schemeByCipherLabel[cfg.CipherLabel]
 	if !ok {
