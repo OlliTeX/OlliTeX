@@ -3,6 +3,7 @@ package otc
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"strings"
 	"testing"
@@ -163,5 +164,50 @@ func assertErrType[T any](t *testing.T, label string, err error) {
 	}
 	if !isErrType[T](err) {
 		t.Fatalf("%s: expected a %T error, got %T (%v)", label, err, err, err)
+	}
+}
+
+// assertPanics asserts fn panics (mirroring the Node `expect(...).to.throw()`
+// oracle). The recovered value is reported on failure.
+func assertPanics(t *testing.T, fn func()) {
+	t.Helper()
+	didPanic := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				didPanic = true
+			}
+		}()
+		fn()
+	}()
+	if !didPanic {
+		t.Fatalf("expected a panic, but fn did not panic")
+	}
+}
+
+// assertPanicsWithValue asserts fn panics and the recovered value has the
+// given Error() text (for typed errors like *typeError).
+func assertPanicsWithValue(t *testing.T, want string, fn func()) {
+	t.Helper()
+	didPanic := false
+	var msg string
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				didPanic = true
+				if e, ok := r.(error); ok {
+					msg = e.Error()
+				} else {
+					msg = fmt.Sprintf("%v", r)
+				}
+			}
+		}()
+		fn()
+	}()
+	if !didPanic {
+		t.Fatalf("expected a panic, but fn did not panic")
+	}
+	if msg != want {
+		t.Fatalf("expected panic message %q, got %q", want, msg)
 	}
 }
