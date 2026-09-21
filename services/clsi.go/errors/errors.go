@@ -61,6 +61,13 @@ func (e *OError) WithInfo(info map[string]any) *OError {
 	return e
 }
 
+// WithCause mirrors OError.prototype.withCause(err) — keeps Message, sets
+// the wrapped cause, returns self for chaining.
+func (e *OError) WithCause(cause error) *OError {
+	e.Cause = cause
+	return e
+}
+
 // Named OError subtypes (JS: export class X extends OError {}).
 
 type QueueLimitReachedError struct {
@@ -139,6 +146,7 @@ type ConversionError struct {
 	Cause      error
 	Stderr     string
 	ExitCode   int
+	Type       string
 	UserFacing bool
 }
 
@@ -154,6 +162,19 @@ func NewConversionError(message, stderr string, exitCode int) *ConversionError {
 		Info:       map[string]any{"exitCode": exitCode},
 		Stderr:     stderr,
 		ExitCode:   exitCode,
+		UserFacing: userFacingExitCodes[exitCode],
+	}
+}
+
+// NewConversionErrorT mirrors `new ConversionError(message, { type, exitCode,
+// stderr })` with an explicit `type` in the info (used by ConversionManager).
+func NewConversionErrorT(message, conversionType, stderr string, exitCode int) *ConversionError {
+	return &ConversionError{
+		Message:    message,
+		Info:       map[string]any{"exitCode": exitCode, "type": conversionType},
+		Stderr:     stderr,
+		ExitCode:   exitCode,
+		Type:       conversionType,
 		UserFacing: userFacingExitCodes[exitCode],
 	}
 }

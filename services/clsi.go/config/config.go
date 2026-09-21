@@ -53,6 +53,7 @@ func hostnameNoCtr() string {
 
 // ClsiCacheShard mirrors one element of CLSI_CACHE_INSTANCES.
 type ClsiCacheShard struct {
+	Shard    string `json:"shard"`
 	Zone     string `json:"zone"`
 	ReadOnly bool   `json:"readOnly"`
 	URL      string `json:"url"`
