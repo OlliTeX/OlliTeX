@@ -70,6 +70,7 @@ type Docker struct {
 	OptimiseInDocker         bool
 	ExpireProjectAfterIdleMs int
 	CheckProjectsIntervalMs  int
+	MaxContainerAge          int
 	CompileGroupConfig       map[string]map[string]interface{}
 	SeccompProfile           string
 	ApparmorProfile          string
@@ -324,6 +325,9 @@ func dockerFromEnv() (Docker, error) {
 	d.OptimiseInDocker = true
 	d.ExpireProjectAfterIdleMs = 24 * 60 * 60 * 1000
 	d.CheckProjectsIntervalMs = 10 * 60 * 1000
+	if n := parseIntOr("DOCKERRUNNER_MAX_CONTAINER_AGE", 0); n != 0 {
+		d.MaxContainerAge = n
+	}
 
 	// Node: Object.assign(defaultCompileGroupConfig, JSON.parse(env || '{}'))
 	// — env wins per key (top-level shallow), mirroring Object.assign.
