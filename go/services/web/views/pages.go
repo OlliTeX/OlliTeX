@@ -63,6 +63,9 @@ const (
 	// for site admins on EVERY page, including 404/403). Empty for
 	// non-admins; the page skeleton otherwise matches the user nav.
 	slotNavAdmin = "\x01NAVADMIN\x02"
+	// P6.20 launchpad slots (pages_data_p620.go):
+	slotLPUID   = "\x01LPUID\x02" // ol-user_id: `` or ` content="HEX"` (REGUID semantics)
+	slotLPAdmin = "\x01LPADM\x02" // ol-adminUserExists bare-content boolean (` content`/``)
 	// origin captured from the e2e fixtures (rewritten per request).
 	capturedOrigin = "http://127.0.0.1:7420"
 )
@@ -113,6 +116,7 @@ type PageData struct {
 	LibUsersJSON                 string // P6.5: ol-userSettings JSON (editorpages.BuildUserSettings)
 	CanManageTemplateMenu        bool   // P6.13: ExposedSettings.canManageTemplatesMenu (per-user)
 	NavAdmin                     string // P6.13: admin navbar fragment (site admins only)
+	LaunchpadAdminExists         bool   // P6.20: ol-adminUserExists bare-content boolean
 }
 
 func (p PageData) finalize(html string) string {
@@ -157,6 +161,13 @@ func (p PageData) finalize(html string) string {
 		out = strings.ReplaceAll(out, slotCanMgtTpl, "false")
 	}
 	out = strings.ReplaceAll(out, slotNavAdmin, p.NavAdmin)
+	// P6.20 launchpad slots:
+	if p.UserID == "" {
+		out = strings.ReplaceAll(out, slotLPUID, "")
+	} else {
+		out = strings.ReplaceAll(out, slotLPUID, ` content="`+htmlAttrEsc(p.UserID)+`"`)
+	}
+	out = strings.ReplaceAll(out, slotLPAdmin, boolAttr(p.LaunchpadAdminExists))
 	// P3.4 register page (anon skeleton; fills on a logged-in session):
 	out = strings.ReplaceAll(out, slotRegUsers, htmlAttrEsc(p.UserEmail))
 	if p.UserID == "" {
@@ -297,6 +308,27 @@ func Restricted403AppTitle(w http.ResponseWriter, d PageData) {
 
 // LoginPage / RegisterPage / LogoutConfirmation / Restricted / NotFound.
 func LoginPage(w http.ResponseWriter, d PageData) { d.CSP = cspReact(d.Nonce); Page(w, d, loginHTML) }
+
+// LaunchpadAdminPage / LaunchpadFreshPage — the P6.20 launchpad bakes
+// (pages_data_p620.go). CSP = cspReact (pinned live 2026-09-21 on the
+// 200 admin page: `script-src 'nonce-…' 'unsafe-inline' 'strict-dynamic'
+// https: 'report-sample'; object-src 'none'; base-uri 'none'`). The
+// admin page is only rendered for a site-admin session (Node
+// hasAdminAccess), so ExposedSettings.canManageTemplatesMenu = true and
+// ol-adminUserExists = true there; the fresh (anonymous, no-admin) page
+// renders the opposite per its capture.
+func LaunchpadAdminPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	d.CanManageTemplateMenu = true
+	d.LaunchpadAdminExists = true
+	Page(w, d, launchpadAdminHTML)
+}
+func LaunchpadFreshPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	d.CanManageTemplateMenu = false
+	d.LaunchpadAdminExists = false
+	Page(w, d, launchpadFreshHTML)
+}
 
 // SettingsPage — GET /user/settings (React layout: nonce CSP, pinned P3.3).
 func SettingsPage(w http.ResponseWriter, d PageData) {

@@ -2,6 +2,7 @@
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
 all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green**; **P4.12a file proxy (`GET|HEAD /Project/:id/file/:File_id`) ✔ 3/3 x3 (history-v1→Go-filestore blob chain, no-CT/chunked 200 pin, HEAD-404 fork quirk, guest/VA/authz battery) — ALSO FIXED the baked-in-capture-user bug in `restrictedHTML` (Go 403-restricted pages now render the requesting user; a P2-page variant of the same bug is deferred to a view-audit unit)**; **P4.12b doc download (`GET|HEAD /Project/:id/doc/:Doc_id/download`) ✔ 3/3 x3 (DU fromVersion=-1 lines, CD attachment, HEAD-200 asymmetry, sendStatus-404 pin) — 45-test P4 regression green** (2026-09-15). **P4.12c private API doc trio (GET|POST doc + changes/reject) ✔ 3/3 x3 (basic-auth surface, XPB+CSP pin, `NoSession` route option, 204 ETag quirk) — 47-test P4 regression green**; **P4.13a project upload (`POST /Project/:id/upload`) ✔ 3/3 x3 (thin-client upsert engine: docstore/v1H/DU call order, file↔doc swaps, cross-type 200+422/400/403/404/500 contract, `owner_ref`/docstore-seed env pins, `entCanWrite` collabRefs + 500-mailto parity fixes) — 65-test cross-regression green**; **P4.13b new-project zip upload (`POST /project/new/upload`) ✔ 3/3 x3 (FileSystemImportManager replica: zip-skip→topLevel-dir strip, FileTypeManager byte-level parity incl. utf16le-BOM + latin1 fallback + non-BMP→file + 3MiB decode gate, rootDoc priority pin, enforce-mode VA byte-pins, blocked-name `toString` → 500 + `zip-import-failure` deleter, multer `LIMIT_UNEXPECTED_FILE` HTML page, 22-case response+mongo+DU+docstore state battery) — FULL P4 regression green (36 p4* + 23 p411–p413b + P2/P3 sweep)** (2026-09-15). **P4.13b ALSO FIXED the P4.1 list owner+collaborator dedup bug (user who is owner AND invited-collaborator listed twice by Go; Node dedups best-access — latent, exposed by p4col-gate leftover projects) and hardened p413a/p413b/p413 flip harnesses against stale-include cascade failures.** **ALL OF P4 COMPLETE (2026-09-15): project list + entities + members + access-requests + rename + flags + create(+example) + delete/restore + clone + collaborators + invites + editor entity create/delete + file proxy + doc download + private doc trio + project upload + zip upload.**
+**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) is next.**
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -3075,6 +3076,51 @@ the **only** tail module with `app/src/Launchpad{Router,Controller}.mjs`.
 lands, **every** route-owning module under `services/web/modules/` has a Go-web
 representation except: (a) the 10 NO-OP modules (no routes — their frontend/ops
 files are handled by P7 step 5/7 frontend re-org + junk, not a route flip); (b) `user-activate` (SaaS skip); (c) the `authentication` saml/oidc/ldap handshakes (P2 family, inert, audited under step 4).
+
+### P6.20 — launchpad flip — **GATE GREEN (2026-09-21, 1.3m, 4-leg parity)**
+
+The last P6 tail flip (the only one). P6 is now complete: every route-owning
+module has a Go-web representation + flip conf.
+
+- **Oracle (Node, live stack, captured 2026-09-21):** fresh world (0 admins):
+  `GET /launchpad` → 200 fresh page (14596 B raw, `Etag: W/"3904-…"`, cspReact);
+  `POST register_admin` → 400 empty / 400 `password is too short` /
+  400 `password contains an invalid character` /
+  200 `{"redir":"/launchpad"}` then 403 `admin user already exists`, anon → 302 `/login`;
+  `register_saml_admin` → **403 `Forbidden`** (fork `authMethod()` = "ldap" — the
+  SSO `authentication/ldap` module loads in every web process and sets
+  `Settings.ldap` unconditionally; the 'saml'/'local' branches are unreachable);
+  `register_ldap_admin` → 200 `{"redir":"/launchpad","email":…}` (external doc:
+  `first_name`=full email, `last_name` "", **no hashedPassword**, `emails[0].confirmedAt`
+  number, `reversedHostname "tset.e2e"`). Default world (admin exists): GET → 302
+  `/login`; both registers → 403. Logged: admin GET → 200 admin page (16982 B raw,
+  `Etag: W/"4256-…"`); non-admin GET → 302 `/restricted`; `send_test_email`
+  no-email → 400 `{"message":"no email address supplied"}`; happy → 200
+  `{"message":"Email Sent"}` + sink `noreply@e2e.test → to | "A Test Email from OlliTeX"`;
+  non-admin email → 302 `/restricted?from=%2Flaunchpad%2Fsend_test_email`;
+  anon email → 302 `/login`. Local fresh doc = **45 keys** (mongoose baseline +
+  email/first_name(localpart)/isAdmin/holdingAccount:false/analyticsId/hashedPassword/
+  emails[0]{email,reversedHostname,createdAt,_id}; **no last_name key**). Raw
+  captures: `tools/capture-p620-raw/`.
+- **Bake:** `go/services/web/views/pages_data_p620.go` (2 const HTMLs + slots
+  `NONCE/CSRF/OLUSERS/LPUID/CANMGTPL/LPADM`); reverse-render verified byte-identical
+  (`launchpad: skeleton verified … 16960/14572 bytes`); `views/pages.go` renders
+  `LaunchpadAdminPage`/`LaunchpadFreshPage` (cspReact).
+- **Feature:** `go/services/web/features/launchpad/` — 5 routes (4 NoLogin per the
+  Node whitelist; `send_test_email` behind the global login gate), exact Node gate
+  order (pinned in code comments), validators = Node `validateEmail` /
+  `validatePassword` (strength options unset → min 8/max 72/char-sets +
+  contains-email + `stringSimilarity` multiset ratio > 0.7 with the Node
+  length-exemption), fresh-user creation = `registrationpage.NewUserDoc` baseline +
+  launchpad fields (fresh 45-key doc == live Node doc shape), 500 path =
+  `views.Error500Page`. Registered in `cmd/web/main.go`.
+- **Flip:** `server-ce/nginx/flips/web-p620.conf` (5 routes, method-guarded, Go
+  :4010, wrong-method → Node — same shape family as P6.9).
+- **Gate:** `tests/e2e/specs/parity/web-go-p620-flip.test.e2e.ts` — 4-leg
+  (strip → Node battery → cumulative flip → Go battery → strip → Node re-battery),
+  24 pins incl. both page bakes (body + weak-ETag length) and both user-doc shapes
+  (mongosh asserts), smtp-sink mail pin, fixture-integrity `finally`-style restore
+  (e2e-admin admin; gate users erased). **GREEN, zero diffs.**
 
 ### P7 — (owner directive 2026-09-18, replaces the old Node-retirement P7)
 

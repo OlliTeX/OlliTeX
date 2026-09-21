@@ -32,6 +32,7 @@ import (
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/hub"
 	"ollitex/go/services/web/features/instancestats"
+	"ollitex/go/services/web/features/launchpad"
 	"ollitex/go/services/web/features/gitbridge"
 	"ollitex/go/services/web/features/library"
 	"ollitex/go/services/web/features/llmsettings"
@@ -141,6 +142,11 @@ func main() {
 	app.RegisterFeature(instancestats.Feature(app))
 	app.RegisterFeature(userpages.Feature(app))
 	app.RegisterFeature(registrationpage.Feature(app))
+
+	// P6.20 surface: launchpad (first-admin bootstrap) — the last P6 flip.
+	// Oracle + bake pins in go/services/web/features/launchpad +
+	// go/services/web/views/pages_data_p620.go.
+	app.RegisterFeature(launchpad.Feature(app))
 
 	// P3.6 surface: Manage/Site SiteSettings leaf.
 	app.RegisterFeature(sitesettings.Feature(app))
