@@ -123,3 +123,9 @@ func (f *StringFileData) ToStats() map[string]int {
 	}
 	return stats
 }
+
+// Edit applies an EditOperation to this file data (Node: `edit`), i.e. the
+// op's apply. Returned error mirrors the op's `throw`.
+func (f *StringFileData) Edit(op EditOperation) error {
+	return op.Apply(f)
+}
