@@ -432,12 +432,20 @@ func (m *Minimatch) firstPhasePreProcess(globe0 [][]string) [][]string {
 					break
 				}
 				didSomething = true
+				// <pre>/**/../<p>... -> keep one branch WITHOUT ** (parts, set below)
+				// and push a second branch that KEEPS ** but DROPS the adjacent ..
+				// — mirroring upstream (`other = parts.slice(0); other[gs] = '**'`).
+				// After spliceRemove'ing ** at gs, the .. has shifted onto index gs,
+				// so overwriting other[gs]='**' drops the .. (upstream result for
+				// pre/**/../p1/p2/rest is {pre/../p1/p2/rest, pre/**/p1/p2/rest}).
+				// (The previous build allocated one EXTRA slot and copied parts[gs:],
+				// which kept the .. and re-pushed an identical pattern -> infinite
+				// loop; that is the `**/../` non-termination bug.)
 				parts = spliceRemove(parts, gs, 1)
 				globe[k] = parts
-				other := make([]string, len(parts)+1)
-				copy(other, parts[:gs])
+				other := make([]string, len(parts))
+				copy(other, parts)
 				other[gs] = "**"
-				copy(other[gs+1:], parts[gs:])
 				globe = append(globe, other)
 				break
 			}

@@ -63,13 +63,19 @@ minimatch.CompileRe(src)         // closed-dialect RE engine (*reProg)
   `src/index.ts` (verified by reading the source); the oracle TSVs pin the default
   level 1 only. Tests therefore assert level-2 == level-1/oracle only for CLEAN
   inputs (no `.`, `..`, or empty segments).
-- **Level-2 `**/..` non-termination (OPEN):** `pre/**/../p1/p2/rest` (level 2)
-  does not terminate in this build (a full `go test` run burns the 10m default
-  timeout on it). Upstream `src/index.ts` itself comments `**/..` is *brutal* for
-  walking performance — **flagged for the owner** as a suspected `**/../`
-  non-termination / extreme-slowdown bug in the level-2 globstar walk; omitted from
-  the smoke set so the suite stays green and fast. Every other `..`/`.` level-2 case
-  completes in microseconds (see `coverage_test.go::TestLevel2DotNormalizationSmoke`).
+- **Level-2 `**/../` non-termination — FIXED:** `pre/**/../p1/p2/rest` (level 2)
+  previously did not terminate (a full `go test` run burned the 10m default
+  timeout on it). Root cause: in `firstPhasePreProcess`, the second `**/../`
+  branch was built as `make([]string, len(parts)+1)` and copied `parts[gs:]`,
+  which KEPT the adjacent `..` and re-pushed a pattern identical to the input, so
+  `didSomething` stayed `true` forever. Fix (mirrors upstream `src/index.ts`
+  `other = parts.slice(0); other[gs] = '**'`): build `other` at the SAME length as
+  the `**`-removed `parts` and set `other[gs] = "**"`, which OVERWRITES the `..`
+  (shifted onto index `gs` after the splice) — so the branch is
+  `pre/**/p1/p2/rest`, and the whole expansion terminates. Regression-pinned by
+  `coverage_test.go::TestLevel2DotNormalizationSmoke` (the `pre/**/../p1/p2/rest`
+  row now completes in microseconds). Upstream's own `**/..` *performance*
+  caveat (walking) does not apply to `match()`, which now terminates.
 
 ### Oracle coverage (acceptance gate; see HANDOFF.md)
 - `testoracle.tsv` 35,400 rows (RE-engine) GREEN
@@ -80,9 +86,11 @@ minimatch.CompileRe(src)         // closed-dialect RE engine (*reProg)
 - 30,000+ hand-written smoke/edge cases GREEN
 - `coverage_test.go` — public API surface (module `Match`, `MatchList`, `HasMagic`,
   `MMBraceExpand`) + level-2 over the 7,854-row oracle (CLEAN-file assertions) +
-  level-2 `.`/`..` normalisation smoke: GREEN. **Total statement coverage: 85.7%**
-  (meets the ≥ 85% gate). The remaining un-covered statements are the documented
-  level-0 / level-2-`**/../`-pathological cases above (unreachable or intentionally
-  different from the level-1 oracle, or a flagged potential bug — not force-covered).
+  level-2 `.`/`..` normalisation smoke (incl. the fixed `**/../` regression): GREEN.
+  **Total statement coverage: 86.2%** (meets the ≥ 85% gate). The remaining un-covered
+  statements are the documented level-0 branch (unreachable here) and the
+  level-1≠level-2 `.`/`..`/`""` normalisation differences (faithful to upstream; not
+  oracle-pinned in the level-1 TSVs — not force-covered). The former `**/../`
+  non-termination is FIXED and regression-pinned (see above).
 
 Run: `go test -cover ./go/minimatch/...`

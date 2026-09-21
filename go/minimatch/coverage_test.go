@@ -236,12 +236,11 @@ func TestLevel2DotNormalizationSmoke(t *testing.T) {
 		// pattern-side ".." / "." (firstPhasePreProcess: indexOfStr/spliceReplace/spliceRemove)
 		{"a/**/../b", true, "a/b"},
 		{"x/y/../../z", true, "z"},
-		// NOTE: `pre/**/../p1/p2/rest` at level 2 does NOT terminate in the current
-		// build (run >300ms; a full `go test` run burned the 10m default timeout on
-		// it). Upstream src/index.ts warns `**/..` is *brutal* for walking
-		// performance — flagged for the owner as a suspected level-2 `**/../`
-		// non-termination/extreme-slowdown bug; omitted from the smoke set so the
-		// suite stays green and fast.
+		// Regression for the former `**/../` non-termination bug (fixed):
+		// firstPhasePreProcess must push the second `**/../` branch with the `..`
+		// DROPPED (other[gs]='**' overwrites it), not re-pushed identically.
+		// This row completes in microseconds and no longer hangs the suite.
+		{"pre/**/../p1/p2/rest", true, "p1/p2/rest"},
 		{"a/./b", true, "a/b"},
 		{"a/..", true, "a"},
 		{"../a", true, "a"},
