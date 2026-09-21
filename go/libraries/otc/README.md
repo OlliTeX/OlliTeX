@@ -61,6 +61,15 @@ OT error family implementing `oerror.InfoProvider` (see the C1/B4
 concurrent-edit surface mirrors the 42-test origin/snapshot/change/rebase +
 57-test operation/transform suites). **Coverage: 88.6%** (above the 85% gate).
 
+**KNOWN-RED oracle**: `TestSafePathnameOracle` (80,782 Node-generated rows,
+fixture `testdata/spfuzz2.json`) is intentionally red until the upstream
+`safe_pathname.go` is fixed. 28,634/80,782 rows expose three defect classes —
+U+FEFF whitespace, per-rune vs per-UTF-16-unit surrogate matching, and
+missing JS `.` line-terminator guards. Full evidence + fix spec:
+`go/libraries/HANDOFF_SAFE_PATHNAME.md`. Do not "fix" the test or the fixture;
+fix the implementation (reference impl: commit a8a67f3,
+`services/clsi.go/ot/safepathname.go`, deleted but recoverable via `git show`).
+
 ## Dependencies
 Standard library (`crypto/sha1`, `unicode/utf16`, `os`, `path`, `time`,
 `regexp`, `encoding/json`) + `ollitex/go/libraries/oerror`.
