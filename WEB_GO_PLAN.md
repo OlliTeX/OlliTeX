@@ -3041,6 +3041,41 @@ registration-page, saml/oidc (with P2), toast-image, …
 (Exact set = M0 output from `modules/*/index.mjs` + `SaaSModule`/`CEUI`
 registries.)
 
+### P6.TAIL — the "tail modules" audit (2026-09-21; goal P6→P7→Post-P7)
+
+A live audit of every `services/web/modules/*` directory settles the open "tail
+modules" list (python-runner, diagram, latex-editor, ce-ui, server-ce-scripts,
+saml/oidc tails, toast-image, launchpad, full-project-search, symbol-palette,
+reference-picker, sandboxed-compiles). A module needs a Go-web flip **only if it
+owns server-side routes** (`app/src/*Router*.mjs` under the module). Matrix:
+
+| module | owns routes? (`app/`?) | verdict |
+|---|---|---|
+| **launchpad** | **YES** — `LaunchpadRouter`: `GET /launchpad` + `POST /launchpad/register_admin` / `register_ldap_admin` / `register_saml_admin` / `send_test_email` | **→ P6.20 conversion (the ONLY real tail flip)** |
+| python-runner | no (frontend only: pyodide worker, output pane) | **NO-OP** (no routes) |
+| diagram | no (frontend only: visual editor) | **NO-OP** (no routes) |
+| latex-editor | no (frontend only: equation editor) | **NO-OP** (no routes) |
+| ce-ui | no (frontend only: styles + nav switcher) | **NO-OP** (no routes) |
+| toast-image | no (frontend only: image-editor UI) | **NO-OP** (no routes) |
+| full-project-search | no (frontend only: search UI + client utils) | **NO-OP** (no routes) |
+| symbol-palette | no (frontend only: in-editor symbol palette) | **NO-OP** (no routes) |
+| reference-picker | no (frontend only: reference-picker UI) | **NO-OP** (no routes) |
+| sandboxed-compiles | no (pure config seed: `env → Settings.allowedImageNames`) | **NO-OP** (no routes) |
+| server-ce-scripts | no (ops CLI scripts only: create-user / delete-user / migrate-*) | **NO-OP** (ops tooling, not a web route) |
+| user-activate | yes, but **P3.5 = SaaS, OUT OF SCOPE** by decision (2026-09-14) | documented skip |
+| authentication (saml/oidc/ldap) | yes, but **P2 auth family** (not a P6 tail); handshakes inert on this stack (`EXTERNAL_AUTH` unset; `f_saml` pinned all-50) | folds into P7 step-4 audit |
+
+**Evidence (verified 2026-09-21):** the 10 NO-OP modules all have **no `app/`
+directory** (`app/src=no app/routes=no-app`); their `index.mjs` either boots a
+frontend bundle or seeds settings. `sandboxed-compiles/index.mjs` is a pure
+env→`Settings` seeder. `server-ce-scripts` ships CLI scripts only. `launchpad` is
+the **only** tail module with `app/src/Launchpad{Router,Controller}.mjs`.
+
+**Consequence for P7 step-4 (Node backend → junk):** once **P6.20 (launchpad)**
+lands, **every** route-owning module under `services/web/modules/` has a Go-web
+representation except: (a) the 10 NO-OP modules (no routes — their frontend/ops
+files are handled by P7 step 5/7 frontend re-org + junk, not a route flip); (b) `user-activate` (SaaS skip); (c) the `authentication` saml/oidc/ldap handshakes (P2 family, inert, audited under step 4).
+
 ### P7 — (owner directive 2026-09-18, replaces the old Node-retirement P7)
 
 1. Visit all `go/` sub-folders and describe their content and functionality in README.md files (placed in the corresponding sub-folders) such that LLMs and humans can use them to orient themselves and understand what the corresponding code does.
