@@ -3124,6 +3124,13 @@ module has a Go-web representation + flip conf.
 
 ### P7 — (owner directive 2026-09-18, replaces the old Node-retirement P7)
 
+**Step 1 DONE (2026-09-21):** README.md in every `go/` sub-folder that ships
+code (85 READMEs total): the `go/` tree index, all 16 library packages,
+`go/s3x`, all 11 service roots + every `gitbridge/` sub-package, and the full
+`go/services/web` tree (`core/`, `contract/`, `features/` index + each feature
+package incl. `launchpad`, `views/`). Fixture dirs (`*/testdata`, the empty
+`persistors/loc`) are excluded (fixtures, not code).
+
 1. Visit all `go/` sub-folders and describe their content and functionality in README.md files (placed in the corresponding sub-folders) such that LLMs and humans can use them to orient themselves and understand what the corresponding code does.
 2. Permanently switch to the web go backend (point both runit services at `bin/web`, exactly what Phase D did for the nine services), rebuild the image, cycle both live stacks, full e2e suite green (as far as the credentials for the external services allow), commit record.
 3. Fix errors that might occur during 2.
