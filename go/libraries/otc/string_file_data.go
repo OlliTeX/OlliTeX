@@ -1,13 +1,18 @@
 package otc
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"unicode/utf8"
 )
 
-// StringFileData mirrors file_data/string_file_data.js (Phase A surface).
+// StringFileData mirrors file_data/string_file_data.js: fully-loaded string
+// content + comments + tracked changes. It satisfies the FileData interface
+// (embedding the base defaults for the methods it does not override: GetHash,
+// GetRangesHash, and ToLazy which is "not implemented" for eager data).
 type StringFileData struct {
+	fileDataDefaults
 	Content        string
 	Comments       *CommentList
 	TrackedChanges *TrackedChangeList
@@ -15,12 +20,12 @@ type StringFileData struct {
 
 // NewStringFileData builds from content + raw collections
 // (Node: `new StringFileData(content, rawComments, rawTrackedChanges)`).
-func NewStringFileData(content string, rawComments []map[string]any, rawTrackedChanges []map[string]any) (*StringFileData, error) {
+func NewStringFileData(content string, rawComments []map[string]any, rawTracked []map[string]any) (*StringFileData, error) {
 	comments, err := FromRawCommentList(rawComments)
 	if err != nil {
 		return nil, err
 	}
-	tracked, err := FromRawTrackedChangeList(rawTrackedChanges)
+	tracked, err := FromRawTrackedChangeList(rawTracked)
 	if err != nil {
 		return nil, err
 	}
@@ -52,18 +57,32 @@ func (f *StringFileData) ToRaw() map[string]any {
 	return raw
 }
 
-// IsEditable reports editability (Node: `isEditable`).
-func (f *StringFileData) IsEditable() bool { return true }
+// IsEditable is always true for eager string data (Node: `isEditable`).
+func (f *StringFileData) IsEditable() *bool {
+	t := true
+	return &t
+}
 
-// GetByteLength returns the UTF-8 byte length (Node: `getByteLength`).
-func (f *StringFileData) GetByteLength() int { return len(f.Content) }
+// GetByteLength returns the UTF-8 byte length (Node: `Buffer.byteLength`).
+func (f *StringFileData) GetByteLength() *int64 {
+	n := int64(len(f.Content))
+	return &n
+}
 
-// GetStringLength returns the string length (Node: `getStringLength`).
-func (f *StringFileData) GetStringLength() int { return utf8.RuneCountInString(f.Content) }
+// GetStringLength returns the UTF-16 code-unit length (Node: `content.length`).
+func (f *StringFileData) GetStringLength() *int64 {
+	n := int64(utf16Units(f.Content))
+	return &n
+}
 
 // GetContent returns the content, optionally filtering tracked deletions
 // (Node: `getContent`).
-func (f *StringFileData) GetContent(filterTrackedDeletes bool) string {
+func (f *StringFileData) GetContent(filterTrackedDeletes bool) *string {
+	out := f.contentString(filterTrackedDeletes)
+	return &out
+}
+
+func (f *StringFileData) contentString(filterTrackedDeletes bool) string {
 	if !filterTrackedDeletes {
 		return f.Content
 	}
@@ -97,12 +116,11 @@ func tpType(d any) (string, bool) {
 
 // GetLines splits the filtered content on newlines (Node: `getLines`).
 func (f *StringFileData) GetLines() []string {
-	return strings.Split(f.GetContent(true), "\n")
+	return strings.Split(f.contentString(true), "\n")
 }
 
 // ToStats returns size statistics (Node: `toStats`).
-func (f *StringFileData) ToStats() map[string]int {
-	stats := map[string]int{"nContent": 1, "contentSize": len(f.Content)}
+func (f *StringFileData) ToStats() map[string]any {
 	nComments := 0
 	if f.Comments != nil {
 		nComments = f.Comments.Len()
@@ -111,8 +129,14 @@ func (f *StringFileData) ToStats() map[string]int {
 	if f.TrackedChanges != nil {
 		nTracked = f.TrackedChanges.Len()
 	}
-	stats["nComments"] = nComments
-	stats["nTrackedChanges"] = nTracked
+	stats := map[string]any{
+		"nContent":           1,
+		"contentSize":        len(f.Content),
+		"nComments":          nComments,
+		"commentsSize":       0,
+		"nTrackedChanges":    nTracked,
+		"trackedChangesSize": 0,
+	}
 	if nComments > 0 {
 		b, _ := json.Marshal(f.Comments.ToRaw())
 		stats["commentsSize"] = len(b)
@@ -124,8 +148,55 @@ func (f *StringFileData) ToStats() map[string]int {
 	return stats
 }
 
-// Edit applies an EditOperation to this file data (Node: `edit`), i.e. the
-// op's apply. Returned error mirrors the op's `throw`.
+// GetComments returns the comment list (Node: `getComments`).
+func (f *StringFileData) GetComments() *CommentList { return f.Comments }
+
+// GetTrackedChanges returns the tracked-change list (Node: `getTrackedChanges`).
+func (f *StringFileData) GetTrackedChanges() *TrackedChangeList {
+	return f.TrackedChanges
+}
+
+// ToEager returns this data (it is already eager) (Node: `toEager`).
+func (f *StringFileData) ToEager(context.Context, BlobStore) (FileData, error) {
+	return f, nil
+}
+
+// Edit applies an edit operation in place (Node: `edit`).
 func (f *StringFileData) Edit(op EditOperation) error {
 	return op.Apply(f)
 }
+
+// ToHollow collapses to a HollowStringFileData of the same lengths
+// (Node: `toHollow`).
+func (f *StringFileData) ToHollow(context.Context, BlobStore) (FileData, error) {
+	byteLength := int64(len(f.Content))
+	stringLength := int64(utf16Units(f.Content))
+	return CreateHollow(byteLength, &stringLength), nil
+}
+
+// Store writes the content (and the ranges object when it has comments or
+// tracked changes) and returns {hash, rangesHash?} (Node: `store`).
+func (f *StringFileData) Store(ctx context.Context, bs BlobStore) (map[string]any, error) {
+	blob, err := bs.PutString(ctx, f.Content)
+	if err != nil {
+		return nil, err
+	}
+	hasRanges := (f.Comments != nil && f.Comments.Len() > 0) ||
+		(f.TrackedChanges != nil && f.TrackedChanges.Len() > 0)
+	if hasRanges {
+		ranges := map[string]any{
+			"comments":       f.GetComments().ToRaw(),
+			"trackedChanges": f.GetTrackedChanges().ToRaw(),
+		}
+		rangesBlob, err := bs.PutObject(ctx, ranges)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"hash": blob.Hash, "rangesHash": rangesBlob.Hash}, nil
+	}
+	return map[string]any{"hash": blob.Hash}, nil
+}
+
+// runeCountInString is re-exported so callers depending on the old rune-based
+// string length keep a stable helper.
+func runeCountInString(s string) int { return utf8.RuneCountInString(s) }

@@ -436,7 +436,7 @@ func TestTransformMultipleConverges(t *testing.T) {
 				t.Fatalf("edit: %v", err)
 			}
 		}
-		return file.GetContent(false)
+		return *file.GetContent(false)
 	}
 	if got := applySeq(append(asOrig, bs...)); got != "yxAB12" {
 		t.Fatalf("asOrig+bs = %q, want yxAB12", got)

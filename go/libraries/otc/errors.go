@@ -8,10 +8,27 @@ package otc
 // UnprocessableError is the OT base error (Node: `UnprocessableError extends OError`).
 type UnprocessableError struct {
 	Message string
+	// Info carries oerror tag metadata (set by tagErr) and is exposed through
+	// InfoProvider so oerror.GetFullInfo surfaces it (Node: OError.info/tags).
+	Info map[string]any
 }
 
 // Error implements error.
 func (e *UnprocessableError) Error() string { return e.Message }
+
+// OErrorInfo implements oerror.InfoProvider.
+func (e *UnprocessableError) OErrorInfo() map[string]any { return e.Info }
+
+// SetTagInfo merges oerror tag metadata in place (preserving the concrete OT
+// error type).
+func (e *UnprocessableError) SetTagInfo(info map[string]any) {
+	if e.Info == nil {
+		e.Info = make(map[string]any, len(info))
+	}
+	for k, v := range info {
+		e.Info[k] = v
+	}
+}
 
 // NewUnprocessableError builds an UnprocessableError.
 func NewUnprocessableError(message string) *UnprocessableError {

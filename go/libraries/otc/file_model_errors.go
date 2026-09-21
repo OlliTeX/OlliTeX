@@ -1,6 +1,10 @@
 package otc
 
-import "fmt"
+import (
+	"fmt"
+
+	oerror "ollitex/go/libraries/oerror"
+)
 
 // NotEditableError mirrors File.NotEditableError ("File is not editable").
 type NotEditableError struct{}
@@ -25,3 +29,18 @@ type genericOpError struct{ Msg string }
 func (e *genericOpError) Error() string { return e.Msg }
 
 func gop(msg string) error { return &genericOpError{Msg: msg} }
+
+// tagErr attaches oerror metadata to err in place, preserving the concrete OT
+// error type (Node's OError.tag tags in place, so the error still instancesApply
+// ApplyError/TooLongError and so the oracle can assert the type). Non-OT errors
+// fall back to oerror.Tag (wrap).
+func tagErr(err error, info map[string]any) error {
+	if err == nil {
+		return nil
+	}
+	if s, ok := err.(interface{ SetTagInfo(map[string]any) }); ok {
+		s.SetTagInfo(info)
+		return err
+	}
+	return oerror.Tag(err, "", info)
+}
