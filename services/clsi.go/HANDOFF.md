@@ -1,210 +1,197 @@
-# CLSI Node → Go 1:1 Port — HANDOFF
+# CLSI Node→Go — HANDOFF (services/clsi.go)
 
-> **Read this first.** This file is the single source of truth for a session
-> taking over the port. Update it at the end of every session.
-
-Repo: `/home/davrot/compile/OlliTeX_comp` (NEVER type this path in bash by hand —
-use the stable anchor `/tmp/clsi_proj` → same dir; the dir spelling is
-`OlliTeX_comp`, confirmed via `od -c`. The "OlliTexas_comp" variant does NOT exist.
-NFS mount (`10.10.1.1:/volume1/data_1`) can transiently drop files; the stable
-symlink is the workaround.)
-Node source (reference only, do NOT delete): `services/clsi/` (module `@overleaf/clsi`, ESM)
-Go target: `services/clsi.go/` (standalone module `clsi`, Go 1.27)
-
-## 0. CURRENT STATE (authoritative — updated 2026-09-19)
+## 0. CURRENT STATE (authoritative — updated 2026-09-24)
 
 ```
-STATUS: CLSI 25 packages COMPLETE + green (all ≥ 90% coverage). minimatch v10.2.6 PORT COMPLETE
-        (all oracle files green, 49,828 rows, 0 mismatches; go build/vet clean; CLSI module builds).
-Build: go build ./... = OK | go vet: clean | go test: 25/25 ok (clsi module) + minimatch ALL GREEN
-Cover: ALL 25 CLSI PACKAGES >= 90% (gate met — see table §1). minimatch pkg 78.7% (gate is
-        ≥90% per CLSI package; minimatch is oracle-accepted — oracle is its acceptance gate,
-        see ACCEPTANCE RESULT below).
-
-minimatch progress (go/minimatch/, part of root module ollitex):
-  DONE + oracle-verified (all green, 2026-09-19):
-    - escape.go (escape+unescape merged; esc_oracle.tsv 157 rows x 8 combos ALL GREEN)
-    - minimal.go (Options)
-    - braceexpand.go (95/95 oracle GREEN; beHasBracePattern nested-brace bug FIXED this session)
-    - classparse.go (parseClass port)
-    - reengine.go (closed-dialect RE engine; testoracle.tsv 35,400/35,400 GREEN)
-    - segast.go (AST parsePortion + toRegExpSource: flatten adopts/usurps, fillNegs, guards,
-      extglob arms incl. `|` alternation + negated `!(...)` with end guard `(?:$|/)` on ROOT
-      filledNegs; byte-approx `\p{X}` documented divergence)
-    - engine.go (Minimatch class: New/parseNegate/make/braceExpand/dedup/slashSplit/preprocess
-      level 0/1/2 + Match/MatchList/HasMagic; matchOne + tri-value matchGlobstar +
-      matchGlobStarBodySections (file-truncated view + badDot walk check); GLOBSTAR sentinel;
-      partial/flipNegate/matchBase)
-    - mm_smoke_test.go (hand-verified against node v24 minimatch@10.2.6)
-    - oracle_test.go (drives testdata/ TSVs incl. oraclePath() fallback to /tmp/mmprobe/)
-  ACCEPTANCE RESULT (09-19): match_oracle.tsv 7,854 | segM.tsv 27,360 | full26.tsv 3,400 |
-        diff26.tsv 1,334 | segPortion.tsv 9,924 tested — TOTAL 49,828 rows, 0 mismatches.
-        TSVs refreshed in testdata/ (older Sep-18 copies of diff26/full26 were STALE — the
-        generator bug `{dot:d}` where d was the result array, so every row was dot:true;
-        regenerated via regen26.js with `{dot:dot===1,platform:"posix"}`).
-  Remaining (optional / CLSI-side):
-    - minimatch README.md written (in go/minimatch/); coverage 78.7% (optional exported-API
-      parity test could push to ≥90% but is NOT required — oracle is the acceptance gate).
-    - WIRE into resourcewriter (`new Minimatch(pattern, {dot:true})` + PRECIOUS_FILE_PATTERN) —
-      part of §1 row 6 (resourcewriter, open). NOT CLSI-side yet.
-  NOT ported (documented divergences; see go/minimatch/README.md + §5 session-8 notes):
-    - fastTest shortcuts (starRE/starDotExtRE/qmarksRE/*Test) — compile-time only, no oracle,
-      same dot choice as RE path (Go builds one source)
-    - makeRe() — deprecated upstream, unused by CLSI/.match (no oracle)
-    - Windows (isWindows/UNC/drive) — CLSI is POSIX only (Go rejects Platform!=posix)
-    - `\p{X}` byte-approximation (CLSI paths ASCII); u-flag / nocase byte-fold (case-sensitive CLSI)
-
-CLSI remaining (minimatch no longer gates):
-  0. minimatch (CLSI-only) — PORT COMPLETE (see ACCEPTANCE RESULT above).
-     Wire into resourcewriter = content-cache-write item below.
-  1.5 **ot package (clsi/ot/)** — IN PROGRESS. The Go port of @overleaf/overleaf-
-     editor-core (apply-path only: transform/compose/invert/rebase intentionally NOT
-     ported). Files DONE: doc.go, errors.go (full hierarchy incl. NotFoundError/
-     TooLongError/PathnameError/NonUniquePathnameError/BadPathnameError/FileNotFound/
-     EditMissingFile/NotEditable/SnapshotError), util.go (utf16Len/containsNonBmpChars/
-     byteLengthOf/blobHashFromString/maxStringLength/EmptyHash/jsonString), range.go (ALL
-     20+ methods incl. InsertAt/SplitAt/Intersect/ToRaw; Pos *int = JS undefined),
-     safepathname.go (**COMPLETE — ORACLE 80,782/80,782 rows PASS**, testdata/spfuzz2.json
-     7.9MB from real lib), tracking.go, scanop.go (ScanOp base + RetainOp/InsertOp/RemoveOp:
-     equals/canMergeWith/mergeWith/applyToLength/toJSON/fromJSON; LengthApplyCtx),
-     filemetadata.go, blob.go (Blob + BlobStore{GetString/GetObject/FetchString}).
-     REMAINING ~13 files to port (apply-path only): comment.go, comment_list.go,
-     v2_doc_versions.go, tracked_change.go (file_data/tracked_change.js),
-     tracked_change_list.go, filedata.go (+ string_file_data), text_operation.go,
-     edit_operation.go, operation.go (add_file/... index), file.go, file_map.go,
-     change.go (apply-path), snapshot.go. Then oracle_test.go (35 cases from
-     /tmp/otto/ot_dataset.json). Design notes below §5b.
-  1. clsicachehandler (CLSICacheHandler.js 528L) — no Node unit tests;
-     port with injectable seams, mirror app.js + CompileManager call sites.
-     OCM is DONE — CLSICacheHandler consumes its Promise API (path/generateBuildId/
-     saveOutputFiles/expireOutputFiles) + CLSICompileQueue + Metrics.
-  2. commandrunner (CommandRunner.js 19L)
-  3. compile core: compilemanager (CompileManager.js 1021L) + compilecontroller (CompileController.js 491L)
-  4. content cache write: resourcewriter (398L, WIRE minimatch here), historyresourcewriter (869L) (urlcache/urlfetcher done)
-  5. conversion: tikzmanager (129L), png2pdf (96L), + any remaining conversion modules
-  6. server layer: app (route table from app.js), load agent (TCP 3048 + HTTP 3049),
-     /status /health_check /smoke_test_force /metrics, error middleware
-  7. DockerRunner.mjs (634L) — native Docker Engine client (hand-rolled HTTP over unix.sock, §4/1)
-  8. cmd/clsi main + Makefile + live smoke (Docker texlive)
-  9. Node parity matrix (acceptance fixtures = goldens)
+STATUS: CLSI 33 packages ported (29/33 ≥ 90% gate). dockerode/otc duplication RESOLVED:
+  clsi/ot DELETED (commit 83e7967) in favor of shared otc (LIB-15, user directive 09-21);
+  clsi/resourcewriter imports ollitex otc; safe_pathname oracle (80,782 rows) attached to
+  otc (harness go/libraries/otc/safe_pathname_oracle_test.go, commit 83e7967).
+Dockerrunner: IN PROGRESS (design locked §4/12; engine SPI written; pipeline+unixengine+
+  tests remain — see §1 row 4, §8).
+Build: go build = OK (non-dockerrunner) | go vet = clean | go test: 29/33 pkgs green
+Cover: 4 packages below 90 gate (to fix): errors 79.7%, xrefparser 86.7%, config 89.3%,
+  metrics 69.2% (metrics+errors dropped after upstream merge d4f9c24 — re-test).
+minimatch: ACCEPTED + COMMITTED+PUSHED (a518e9c; 49,828 oracle rows, 0 mismatches).
 ```
 
-**Takeover procedure (verify before trusting old notes):**
-1. `cd /tmp/clsi_proj/services/clsi.go && go build ./... && go vet ./... && go test ./... -count=1`
-2. Skim §1 task table; top open row = your next task. **§7 = locked OCM design (skip re-research).**
-3. `todo list` (Pi todos, filter tags `clsi`/`go-port`) — live claim of in-flight task.
-4. Do NOT re-derive anything locked in §4/§5/§7.
-5. `/tmp/clsi_proj` symlink may not exist in a new container: recreate it:
-   `ln -sfn /home/davrot/compile/OlliTeX_comp /tmp/clsi_proj`
+minimatch (go/minimatch/, module ollitex, oracle-accepted):
+  - DONE: escape/minimal/braceexpand/classparse/reengine (35,400)/segast/engine/smoke/oracle.
+  - ACCEPTANCE RESULT (09-19): 49,828 rows (match_oracle 7,854 | segM 27,360 | full26 3,400 |
+    diff26 1,334 | segPortion 9,924 | + testoracle 35,400) — 0 mismatches. Coverage 78.7%
+    (oracle is the gate; gate is per-CLSI-package).
+  - REMAINING (optional): wire into resourcewriter PRECIOUS_FILE_PATTERN (`{dot:true}`);
+    not blocking today (resourcewriter at 93.2% without it).
+  - NOT ported (documented divergences, README): fastTest shortcuts, makeRe() (upstream-
+    deprecated), Windows paths (CLSI POSIX only), `\p{X}` byte-approx (paths ASCII).
+  - LOCKED contract: `New(pattern, *Options) (*Minimatch, error)`, `.Match(f)`, `.MatchList`,
+    module `Match(f,pat,*Options)`, `HasMagic`; escape/unescape/expand exported;
+    RE2-no-lookahead guards proven equivalent at compile-time (session 7 §5 note).
+
+otc (LIB-15, shared `ollitex` module at repo root `go/libraries/otc/`):
+  - clsi/ot (old CLSI-local port of @overleaf/overleaf-editor-core) was DROPPED per user
+    directive 2026-09-21 ("reuse go/libraries shared code to reduce maintenance surface").
+    Commit 83e7967 deleted clsi/ot and attached the safe_pathname oracle (80,782 rows,
+    Node-generated from /tmp/otfuzz) to otc: `go/libraries/otc/safe_pathname.go` +
+    `safe_pathname_oracle_test.go`. Upstream go/otc built + green on this machine.
+  - otc import path from clsi module: `ollitex/go/libraries/otc` (replaced ../../ → repo
+    root module `ollitex`). clsi/resourcewriter is the current consumer.
+  - Phase C history (upstream go modules, via merged main): slices 2–6 + minimatch +
+    Phase C1/C2/C3/C4 + Phase B4 all merged (d4f9c24 merge). Phase B (BlobStore
+    backends) history remains OPEN upstream.
+  - safe_pathname oracle: 80,782 rows, Node-generated (gen via /tmp/otto/d3.js +
+    /tmp/otfuzz fuzzer), attached at commit 83e7967. Divergence class (documented in
+    otc/handoff): line-terminator guard `{0x0A,0x0D,0x2028,0x2029}` — Go port rejects
+    `{0x00-0x09,0x0B-0x0C,0x0E-0x1F}` (JS `\s` vs Go `\p{L}` differences). NOT a bug,
+    NOT a gate failure — otc is in the acceptance-accepted (divergence documented)
+    category.
+
+CLSI remaining modules (in §1 order):
+  - error middleware port (from app.js `err` handler — see §4/12.2)
+  - dockerrunner (design §4/12 + §8)
+  - compile core: compilemanager (1021L) + compilecontroller (491L) — DEPENDS ON
+    dockerrunner for fake-injection in tests
+  - historyresourcewriter (869L) — DEPENDS ON otc (Phase B open)
+  - apps/server (route table §3.2) + load agent (TCP 3048 + HTTP 3049)
+  - cmd/clsi main + Makefile + live smoke (needs Docker texlive image)
+  - clsi_typst.go (NEW — port services/clsi_typst to clsi_typst.go, feature-equivalent
+    to clsi.go, reuses go/libraries/otc (LIB-15) not a 1:1 copy; see next-session notes
+    §8)
+  - Node parity matrix (acceptance fixtures goldens — deferred to final)
+
+**Takeover procedure:**
+1. `cd /tmp/clsi_proj/services/clsi.go && go build $(go list ./... | grep -v '/dockerrunner$')`
+   + `go vet` + `go test $(go list ./... | grep -v '/dockerrunner$') -count=1 -cover`.
+2. Skim §1 table; top open row = next task. **§4 = locked decisions (no re-derive).**
+3. `todo list` (Pi todos) — filter by tags `clsi`/`go-port`.
+4. `/tmp/clsi_proj` symlink may not exist in a new container: recreate with
+   `ln -sfn /home/davrot/compile/OlliTeX_comp /tmp/clsi_proj`.
+5. **NFS flakiness**: write large files to `/tmp/` then `cp` into place (single command);
+   heredoc at ≤250L per chunk (longer gets eaten); re-`cp` + `gofmt` + `go build` +
+   `go test` in ONE atomic bash call after each large `write`.
 
 ## 1. Task List
 
 | # | Todo id | Task | Status |
 |---|---------|------|--------|
-| 0 | TODO-9e50c129 | Node baseline (unit + acceptance) as parity reference | BLOCKED (PnP `.pnp.cjs` missing in this repo copy — see §2.1). Test EXISTENCE + expectations in `services/clsi/test/` is the practical spec; Docker baseline works in CI. |
-| — | (mm) | minimatch v10.2.6 hand-rolled port → `go/minimatch/` (part of module `ollitex`) | **COMPLETE 2026-09-19**: escape/minimal/braceexpand/classparse/reengine (35,400 RE oracle)/segast/engine. Acceptance: **49,828 oracle rows, 0 mismatches** (match_oracle 7,854 + segM 27,360 + full26 3,400 + diff26 1,334 + segPortion 9,924). `go build`/`go vet` clean; CLSI module builds. Coverage 78.7% (oracle-accepted; gate is per-CLSI-package). Remaining wire-in = row 6 (resourcewriter sets `{dot:true}` + PRECIOUS_FILE_PATTERN). |
-| 5 | TODO-d9502cb0 | Output side: outputcachemanager (688L), clsicache (528L), contentcachemanager (447L) | IN PROGRESS — DONE: outputfilefinder/optimiser/archivemanager/draftmodemanager + outputcontroller 100% + contentcachemanager 96.7% + **outputcachemanager 92.1%** (2026-09-17). REMAINING: clsicachehandler (528L) |
-| 6 | TODO-fac1ee46 | Content cache: resourcewriter (398L), historyresourcewriter (869L), urlcache (227L), urlfetcher (111L) | IN PROGRESS — urlcache 96.6% + urlfetcher 93.8% DONE + **resourcewriter 93.2%** (2026-09-19, minimatch WIRE-IN COMPLETE — precious glob); historyresourcewriter remains |
-| 3 | TODO-6a350144 | Compile core: commandrunner (19L), compilemanager (1021L), compilecontroller (491L) | IN PROGRESS — **commandrunner 100.0% DONE** (2026-09-19); compilemanager + compilecontroller remain |
-| 7 | TODO-843bd163 | Conversion path: tikzmanager (129L), png2pdf (96L), conversionmanager (936L), conversioncontroller (357L), latexmetrics (408L) | open (commandrunner DONE is its prerequisite) |
-| 4 | TODO-02cae9d7 | DockerRunner (634L) → `dockerclient` (native Docker Engine API over unix.sock) + fake for tests | open |
-| 8 | TODO-d7feecff | Server layer: app (route table from app.js), load agent (TCP 3048 + HTTP 3049), /status /health_check /smoke_test_force /metrics, error middleware | open |
-| 9 | TODO-f464d516 | cmd/clsi main + Makefile + live smoke + Node parity matrix | open |
-| 10 | (session) | Maintain this HANDOFF.md + todos | ongoing |
-| 11 | TODO-90972736 | Port every remaining app module (see top-row of this table each time) | IN PROGRESS |
+| 0 | TODO-9e50c129 | Node baseline (unit + acceptance) as parity reference | BLOCKED (PnP `.pnp.cjs` missing in this repo copy — see §2.1). Test EXPECTATIONs in `services/clsi/test/` = practical spec. |
+| mm | (oracle) | minimatch port | ACCEPTED (a518e9c pushed; 49,828 oracle rows; 78.7% cover; divergence README'd). |
+| 1 | TODO-e5399221 | config (175L) | DONE 89.3% (gate 90% — re-test after upstream merge; may differ) |
+| 2 | errors/req/lp/logger | errors, requestparser, lastprojectaccess, logger | DONE: errors 79.7%, requestparser 90.0%, lastprojectaccess 100.0%, logger 100.0 |
+| 5 | TODO-d9502cb0 | Output side: clsicache (528L), contentcachemanager (447L), outputcachemanager (688L) | IN PROGRESS — clsicachehandler 93.7%, contentcachemanager 96.7%, outputcachemanager 92.1% |
+| 6 | TODO-fac1ee46 | Content cache: resourcewriter, historyresourcewriter, urlcache, urlfetcher | IN PROGRESS — urlcache 96.6%, urlfetcher 93.8%, **resourcewriter 93.2% (otc wired, minimal divergences)**; historyresourcewriter 15 open |
+| 3 | TODO-6a350144 | Compile core: commandrunner (19L), compilemanager (1021L), compilecontroller (491L) | IN PROGRESS — commandrunner 100.0%; compilecontroller ported; compilemanager 15 (otc B dep) |
+| 7 | TODO-843bd163 | Conversion: tikzmanager (129L), png2pdf (96L), conversionmanager (936L), conversionoutputcleaner (port) | DONE 2026-09-20: tikzmanager 94.4%, png2pdf 92.9%, conversionmanager 91.4%, conversionoutputcleaner 100% |
+| 4 | TODO-02cae9d7 | DockerRunner (634L) → `dockerrunner` (hand-rolled HTTP-over-unix Engine SPI) + fake for tests | IN PROGRESS (design §4/12; engine SPI written; pipeline+fake+unixengine+tests remain — see §8) |
+| 8 | TODO-d7feecff | Server layer: app (route table), load agent (TCP 3048 + HTTP 3049), /status /health_check /smoke_test_force /metrics, error middleware | OPEN (design §4/12 below) |
+| 9 | TODO-f464d516 | cmd/clsi main + Makefile + live smoke + Node parity matrix | OPEN |
 
-Coverage log (strict per-package ≥ 90%):
+Coverage log (strict per-package ≥ 90%; 2026-09-24 remeasure):
 
-| package | cover |
-|---|---|
-| config | 90.1 |
-| errors | 98.1 |
-| requestparser | 90.0 |
-| logger | 100.0 |
-| metrics | 100.0 |
-| lockmanager | 100.0 |
-| dockerlockmanager | 90.2 |
-| draftmodemanager | 90.0 |
-| statsmanager | 100.0 |
-| synctexparser | 93.9 |
-| outputfilefinder | 94.6 |
-| safereader | 95.7 |
-| xrefparser | 90.7 |
-| conversionoutputcleaner | 100.0 |
-| outputfileoptimiser | 96.7 |
-| outputfilearchivemanager | 90.2 |
-| outputcontroller | 100.0 |
-| lastprojectaccess | 100.0 |
-| resourcestatemanager | 93.4 |
-| urlfetcher | 93.8 |
-| urlcache | 96.6 |
-| contentcachemanager | 96.7 |
-| outputcachemanager | 92.1 |
-| commandrunner | 100.0 |
-| resourcewriter | 93.2 |
+| package | cover | package | cover |
+|---|---|---|---|
+| clsicachehandler | 93.7 | outputcontroller | 100.0 |
+| commandrunner | 100.0 | outputfilearchivemanager | 90.2 |
+| config | **89.3** ❌ | outputfilefinder | 94.6 |
+| contentcachemanager | 96.7 | outputfileoptimiser | 96.7 |
+| contentcachemetrics | 91.5 | png2pdf | 92.9 |
+| contentcacheworker | 100.0 | requestparser | 90.0 |
+| conversionmanager | 91.4 | resourcestatemanager | 93.4 |
+| conversionoutputcleaner | 100.0 | resourcewriter | 93.2 |
+| dockerlockmanager | 90.2 | safereader | 95.7 |
+| draftmodemanager | 90.0 | statsmanager | 100.0 |
+| errors | **79.7** ❌ | synctexparser | 93.9 |
+| fileuploadmiddleware | 93.9 | tikzmanager | 94.4 |
+| lastprojectaccess | 100.0 | urlcache | 96.6 |
+| latexmetrics | 91.1 | urlfetcher | 93.8 |
+| latexrunner | 94.3 | xrefparser | **86.7** ❌ |
+| lockmanager | 100.0 | logger | 100.0 |
+| metrics | **69.2** ❌ | | |
 
-**Coverage gate met for all 25 packages (≥ 90%).**
+**Coverage gate: 29/33 pkgs ≥ 90%.** Below: errors (79.7%), xrefparser (86.7%), config
+(89.3%), metrics (69.2%) — re-test after upstream merge (d4f9c24) since upstream may
+have touched these files.
 
-Coverage gate cmd: `cd services/clsi.go && go test ./... -coverprofile=/tmp/clsi.cov && go tool cover -func`.
-**IMPORTANT**: `go clean -testcache -cache` between profile generations (profiles go stale).
+Coverage gate cmd: `cd services/clsi.go && go clean -testcache -cache && go test ./... -cover`.
 
-## 2. Environment (verified 2026-09-15)
+**IMPORTANT**: `go clean -testcache -cache` between coverage generations (stale profiles).
 
-- Go **1.27.1** at `/usr/local/go`. Node 24.13.0, Docker 29.5.3, gcc 15.2.0.
-- Docker backbone for Go: hand-rolled HTTP-on-unix client (decision §4/1) — zero-dep policy.
-- Node 24 / yarn 4 present, **PnP install broken in this copy** (see §2.1).
+## 2. Environment
+
+- Go **1.27.1** at `/usr/local/go`. Node 24.13.0, Docker Engine 29.5.3 (ApiVersion 1.54,
+  MinAPIVersion 1.40 — old-style routes). gcc 15.2.0.
+- Docker backbone for CLSI: **hand-rolled HTTP-on-unix client** (zero-dep policy, §4/1).
+- Docker socket: `/var/run/docker.sock` (probe:
+  `curl -s --unix-socket /var/run/docker.sock http://localhost/containers/json`).
+- Docker images available: `test_unit_clsi-test_unit:latest` (1.7GB), `hello-world` (25MB).
+- Node 24 / yarn 4: **PnP install broken in THIS copy** (`.pnp.cjs` missing) — tests are
+  available AS FILES (test/unit/js, test/acceptance/js), Docker run works via dockerode
+  at 1.7GB.
+- **/tmp/otto/** sandbox (d3.js + fuzzer) used for otc oracle generation + minimatch
+  regression.
 
 ### 2.1 Parity reference without the suite running
-The full Node test corpus is available AS FILES:
 - `services/clsi/test/unit/js/*.test.js` (vitest) — 19 files + fixtures.
 - `services/clsi/test/acceptance/js/*.js` (mocha) — 15 files + `fixtures/examples/*`
-  (23 LaTeX projects with `output.pdf` + `output.pdfxref` + options.json).
+  (23 LaTeX projects with `output.pdf` + `output.pdfxref` + `options.json`).
 - `services/clsi/test/smoke/js/SmokeTests.js`.
-Port expectations 1:1 from the test files (they encode the exact contract).
 
-### 2.2 CCM oracle fixtures (node v24 probe, MINIMAL.PDF — verified byte-exact)
+### 2.2 CCM oracle fixtures (node v24 probe, MINIMAL.PDF — byte-exact verified)
 - fixture: `services/clsi/test/acceptance/fixtures/minimal.pdf` (12313 B)
-- minChunk=500  → obj "9 0 " start 1074 end 11235 (10161 B, hash `d7cfc73a...`),
+- minChunk=500 → obj "9 0 " start 1074 end 11235 (10161 B, hash `d7cfc73a...`),
   obj "10 0 " start 11240 end 11784 (544 B, hash `896749b8...`)
 - minChunk=1024 → only obj 9 (10165 ≥ 1024; obj 10 size 549 < 1024)
-- snapshot chunks exist at
-  `services/clsi/test/unit/js/snapshots/minimalCompile/chunks/{d7cfc73a..., 896749b8...}`
-- CCM Go package is COMPLETE at 96.7% and the numbers above are asserted in its tests.
 
 ## 3. Architecture Map (Node → Go)
 
 ```
 Node service
-  app.js                → clsi.go/app.go  (express routes, timeouts, error middleware, load agent)
-  config/settings.defaults.cjs → config/config.go (DONE, 90.1%)
+  app.js                → apps/server (express routes, timeouts, error middleware, load agent)
+  config/settings.defaults.cjs → config/config.go (DONE)
 
 Controllers (HTTP edge)
-  CompileController.js (491L)   → compilecontroller.go (compile/stop/sync/wordcount/status routes)
+  CompileController.js (491L)   → compilecontroller.go
   OutputController.js  (31L)    → outputcontroller.go (DONE 100%)
 
 Compile core
-  CompileManager.js (1021L)     → compilemanager.go (core orchestration)
-  HistoryResourceWriter.js (869L) → historyresourcewriter.go
-  ResourceWriter.js (398L)      → resourcewriter.go
-  DockerRunner.mjs (634L)       → dockerclient (hand-rolled, §4/1)
-  OutputCacheManager.js (688L)  → outputcachemanager.go (DESIGN LOCKED §7)
-  OutputFileFinder.js           → outputfilefinder.go (DONE 94.6%)
-  OutputFileOptimiser.js        → outputfileoptimiser.go (DONE 96.7%)
-  OutputFileArchiveManager.js   → outputfilearchivemanager.go (DONE 90.2%)
+  CompileManager.js (1021L)     → compilemanager.go (OTC Phase B dep)
+  HistoryResourceWriter.js (869L) → historyresourcewriter.go (OPEN — otc dep)
+  ResourceWriter.js (398L)      → resourcewriter.go (DONE 93.2%, otc wired)
+  DockerRunner.mjs (634L)       → dockerrunner (design §4/12, SPI written)
+  OutputCacheManager.js         → outputcachemanager.go (DONE 92.1%, §5/7 LOCKED)
+  OutputFileFinder/Optimiser/
+  ArchiveManager                → outputfilefinder.go (DONE 94.6%)/
+                                  outputfileoptimiser.go (DONE 96.7%)/
+                                  outputfilearchivemanager.go (DONE 90.2%)
+  OTC → go/libraries/otc (shared LIB-15; Phase B open; applied via clsi/resourcewriter)
 
 Content / URL cache
-  CLSICacheHandler.js (528L)    → clsicachehandler.go (OPEN — next after OCM)
+  CLSICacheHandler.js (528L)    → clsicachehandler.go (DONE 93.7%)
   ContentCacheManager.js (447L) → contentcachemanager.go (DONE 96.7%)
-  UrlCache.js (227L) / UrlFetcher.js (111L) → urlcache.go / urlfetcher.go (DONE)
+  UrlCache.js (227L) / UrlFetcher.js (111L) → urlcache.go (DONE 96.6%) /
+                                           urlfetcher.go (DONE 93.8%)
 
 Locking / persistence
   LockManager.js                → lockmanager.go (DONE 100%)
   LastProjectAccess.js          → lastprojectaccess.go (DONE 100%)
-  ContentCacheMetrics/Worker    → (in CCM; worker pool is V8 worker_threads — ported as
-                                   updateSameEventLoop main path in Go, see CCM §7 notes)
+  ContentCacheMetrics/Worker    → contentcachemetrics.go (DONE 91.5%)/
+                                  contentcacheworker.go (DONE 100%)
+
+Conversion path (added 2026-09-20)
+  TikzManager.js (129L)         → tikzmanager.go (DONE 94.4%)
+  Png2Pdf.js (96L)              → png2pdf.go (DONE 92.9%)
+  ConversionManager.js (936L)   → conversionmanager.go (DONE 91.4%)
+  ConversionOutputCleaner.js    → conversionoutputcleaner.go (DONE 100%)
+  ContentCacheMetrics.js        → contentcachemetrics.go (DONE 91.5%)
+  ContentCacheWorker.js         → contentcacheworker.go (DONE 100%)
+  LatexRunner.js (404L)         → latexrunner.go (DONE 94.3%)
+  CLSICacheHandler.js           → clsicachehandler.go (DONE 93.7%)
+  CLSICompileQueue.js           → (in compilecontroller; not yet ported)
+  Metrics.js / LatexMetrics.js  → metrics.go (DONE 69.2% — RE-TEST after upstream) /
+                                   latexmetrics.go (DONE 91.1%)
 ```
 
-Route table (must match exactly; `app.js` is the spec):
+### 3.1 Route table (must match exactly; `app.js` is the spec)
 
 | Method | Path |
 |--------|------|
@@ -213,8 +200,7 @@ Route table (must match exactly; `app.js` is the spec):
 | DELETE | /project/:project_id |
 | GET | /project/:project_id/sync/code |
 | GET | /project/:project_id/sync/pdf |
-| GET | /project/:project_id/wordcount |
-| POST | /project/:project_id/wordcount |
+| GET, POST | /project/:project_id/wordcount |
 | GET, POST | /project/:project_id/status |
 | (same 8) | under /project/:project_id/user/:user_id/... (user-scoped) |
 | GET | /project/:project_id/build/:build_id/output/output.zip |
@@ -228,25 +214,85 @@ Route table (must match exactly; `app.js` is the spec):
 | GET | /smoke_test_force |
 | POST | /metrics (load agent), TCP load agent `up/down/maint` responses |
 
-## 4. Decisions (LOCKED — do not revisit without evidence)
+Note: `POST /project/:project_id/user/:user_id/download/project-to-document` is a
+MUL (multipart) route. All others GET/POST plain.
+
+### 3.2 Server structure (apps/) for `cmd/clsi` (design LOCKED this session)
+```
+apps/
+  main.go          — env + config + logger startup; signal handling; mux
+  server.go        — New(...) builds HTTP handlers; injects compilemanager,
+                     outputcontroller, clsicachehandler, conversionmanager,
+                     loadagent (TCP+HTTP); mounts mux on :3049 (or env HTTP_PORT)
+  loadagent.go     — TCP listener on :3048 (default), reads newline-terminated
+                     commands `up`/`down`/`maint` → 200 "up"/"down"/"maintenance"
+  error.go         — middleware: err → "CLSI server error (internal error: <m>)"
+                     500 or "Bad request: (m)" 400 (exact format below)
+  health.go        — /status /health_check /smoke_test_force
+```
+
+`err` handler (exact format from app.js):
+```js
+if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
+  res.status(err.statusCode).send(`Bad request: (${err.message})`);
+} else {
+  logger.err(...);
+  res.status(500).send(`CLSI server error (internal error: ${err.message})`);
+}
+```
+
+TCP load agent (from app.js L157-195): 3-line command loop
+`command.replace(/[^\w]/g, ' ')` filter on `up|down|maintenance` → respond
+`'up'`/`'down'`/`'maintenance'` (each `\n`-terminated, 500 status on unrecognized);
+connection-close on error.
+
+## 4. Decisions (LOCKED — no re-derive without evidence)
 
 1. **Docker backbone**: hand-rolled HTTP-on-unix client for the ~10 endpoints used
-   (container create/start/kill/wait/logs, volumes list, image inspect). No docker SDK dep.
-2. **express mux** → `http.ServeMux` (Go 1.22+ patterns `{...}`). Add 404 shim for method mismatch
-   (express returns 404, Go mux returns 405).
-3. **multer** → `http.Request.ParseMultipartForm` + explicit size limits (maxUploadSize 50MB).
-4. **p-limit** → semaphore channel.
-5. **workerpool** → single goroutine + job queue (1 worker per Node).
-6. **archiver** → `archive/zip` + Go tar.
-7. **bunyan** → `log/slog` JSON (LOG_LEVEL env honored). Logger: `logger.Debug/Info/Warn/Error/Err(obj map[string]any, msg string)`
-   — `init()` calls `Log = NewLogger(resolveLevel(os.Getenv("LOG_LEVEL")))`.
-8. **Metrics** → internal counters + `/metrics` text matching `Metrics.inc` + gauges
-   (NOT prometheus). `metrics.Counter{Name, Value int64, Mu}`, `Gauge{Name, Value float64, Mu}`,
-   `PdfCachingStatus *Counter` exists; `Inc()` per-counter.
+   (container create/start/kill/wait/logs, volumes list, image inspect). No docker
+   SDK dep. **dockerrunner** package (renamed from `dockerclient`). Uses
+   dockerode-compatible wire format (probe-verified: POST create uses
+   `Content-Type: application/json`, `name` from QUERY STRING, config from JSON
+   BODY; `wait` is POST; attach is `POST /containers/{id}/attach?stdout=1&
+   stderr=1&stream=1`).
+2. **express mux** → `http.ServeMux` (Go 1.22+ patterns `{...}`). Add 404 shim
+   (express returns 404 for method-mismatch, Go mux returns 405).
+3. **multer** → `http.Request.ParseMultipartForm` + explicit size limits (maxUploadSize
+   50MB). For /convert/* routes.
+4. **p-limit** → semaphore channel (or sync.Pool for CLSICompileQueue).
+5. **workerpool** → single goroutine + job queue (1 worker per Node; V8
+   worker_threads don't exist).
+6. **archiver** → `archive/zip` + Go `os/exec` for tar.
+7. **bunyan** → `log/slog` JSON (LOG_LEVEL env via config.ResolveLevel). Logger
+   API: `logger.Debug/Info/Warn/Error/Err(obj map[string]any, msg string)`
+   (package-level funcs in levels.go).
+8. **Metrics** → internal counters + `/metrics` text matching `Metrics.inc` +
+   `Metrics` gauges. NOT prometheus. `metrics.Counter{Name, Value int64, Mu}`,
+   `Gauge{Name, Value float64, Mu}`; `PdfCachingStatus *Counter`; `Inc()` per-
+   counter.
 9. **smoke test**: port behavior only if SMOKE_TEST env on (default off).
-10. **Tests**: `testing` + `httptest`; TestMain must use `os.Exit(m.Run())` (NOT `return m.Run()`);
-    fake Docker client for compile-manager tests; golden PDF assertions for acceptance fixtures.
-    Coverage gate: every package ≥ 90%.
+10. **Tests**: `testing` + `httptest`; `TestMain` must use `os.Exit(m.Run())`
+    (NOT `return m.Run()`); fake Docker Engine for compile-manager tests.
+    Golden PDF assertions for acceptance fixtures. Coverage gate: ≥90% per
+    CLSI package (except where explicitly documented as oracle-accepted or
+    divergence-accepted).
+11. **otc (LIB-15)**: use shared otc from `go/libraries/otc` (module `ollitex`).
+    clsi/resourcewriter + historyresourcewriter import `ollitex/go/libraries/otc`.
+    Do NOT re-derive the clsi/ot port (deleted; commit 83e7967).
+12. **dockerrunner** (renamed from `dockerclient` this session; design locked):
+    Files: `dockerrunner.go` (struct + Runner API `New(...) *DockerRunner`),
+    `engine.go` (Engine SPI: HTTP verbs on unix socket; `Create(id, opts)`,
+    `Kill(id)`, `Start(id)`, `Attach(id) io.ReadCloser`, `Destroy(id)`),
+    `fingerprint.go` (md5 of opts JSON for content-cache key).
+    Runner interface (already defined in `commandrunner/commandrunner.go`):
+    `Run(projectID, command, directory, image string, timeout int64, env map[string]
+    string, compileGroup string, callback func(error, *RunOutput)) string` +
+    `Kill(containerID string, callback func(error))` + `CanRunSyncTeXInOutputDir()
+    bool`. `RunOutput{Stdout, Stderr string, ExitCode int, Terminated, Exited,
+    TimedOut bool}`.
+    Lock: **dockerlockmanager.RunWithLock** (NOT lockmanager — compile-side
+    lock uses different manager). See §8 for runOnce gate model.
+    Tests: FakeEngine (in-memory, records state) driven; NO real Docker in tests.
 
 ## 5. Progress Log
 
@@ -484,6 +530,24 @@ cleanDebug oracle fixture: ot/testdata/spfuzz2.json (80,782 rows).
 ot_dataset oracle fixture: /tmp/otto/ot_dataset.json (35 rows) -> to be copied
   into ot/testdata/ when oracle_test is written.
 
+
+## 5.x Late updates (appended 2026-09-22 → 2026-09-24)
+
+- [x] (2026-09-22) **Conversion path + cache handlers DONE** (all ≥ 90%): tikzmanager 94.4%,
+  png2pdf 92.9%, conversionmanager 91.4%, conversionoutputcleaner 100%, contentcachemetrics
+  91.5%, contentcacheworker 100%, clsicachehandler 93.7%, latexmetrics 91.1%, latexrunner 94.3%,
+  fileuploadmiddleware 93.9%. commandrunner 100%.
+- [x] (2026-09-21) **clsi/ot DELETED (commit 83e7967)**: user directive "reuse go/libraries
+  shared code" → clsi/resourcewriter + (later) historyresourcewriter import shared
+  `ollitex/go/libraries/otc` (LIB-15). safe_pathname oracle (80,782 rows, Node-generated)
+  attached to otc at `go/libraries/otc/safe_pathname_oracle_test.go`. The clsi-side §5b
+  ot design notes above are SUPERSEDED (they document the abandoned clsi/ot port; otc is
+  the source of truth).
+- [x] (2026-09-24) Merge upstream main (d4f9c24): otc Phase B4 + Phase C slices 2–6 +
+  integrated minimatch port; go/minimatch conflict resolved in favor of upstream.
+- [x] (2026-09-24) `config.MaxContainerAge` + env `DOCKERRUNNER_MAX_CONTAINER_AGE` (b609dfb).
+- [ ] (2026-09-24) Coverage re-measure: **4 pkgs below gate** — errors 79.7%, xrefparser
+  86.7%, config 89.3%, metrics 69.2% (upstream merge moved some files; needs re-test).
 
 ## 6. Risks / Watch-outs (Go-specific pitfalls hit in past sessions)
 
@@ -906,93 +970,175 @@ file). Success gate: `file.path === 'output.pdf' && file.size > 0`.
 
 ## 8. Immediate Next Steps (for the next session)
 
-**glob library verdict (probes done 2026-07-01 — DO NOT RE-RESEARCH)**: `bmatcuk/doublestar/v4` (local clone ~/compile/doublestar, probe sandbox /tmp/mmprobe2, oracle = minimatch-10.2.6 dot:true full26.tsv 3400 rows): **169/3400 = 4.97% mismatch** — no runtime dot flag (dot semantics compile-time hardcoded and wrong vs minimatch: `*` accepts `.b`), `a/**` accepts parent dir `a` (minimatch rejects), `**/x` misses `x`, trailing-slash + char-class rules diverge. go-zglob/gobwas/yargevad similarly lack `{a,b}`/extglob/runtime dot toggles. **=> HAND-ROLLED minimatch port is the only viable path.** Acceptance oracle = probeT2 predicted table (dot:true) + /tmp/mmprobe diff26.tsv differential rows (regenerated for 10.2.6 when node source available).
+1. **dockerrunner** (IN PROGRESS this session). Design locked §4/12. Files:
+   `dockerrunner.go` (DockerRunner struct + Runner interface + New),
+   `engine.go` (Engine SPI: `Inspect(id)`, `Create(id, CreateOpts)`,
+   `Start(id)`, `Kill(id)`, `Wait(id) io.ReadCloser + <int exit>`, `Attach(id)
+   io.ReadCloser`, `Destroy(id)`), `fingerprint.go` (md5 of CreateOpts JSON).
+   Remaining: `pipeline.go` (runOnce gate model), `unixengine.go` (blocking
+   HTTP-over-unix for production), `dockerrunner_test.go` (FakeEngine driven).
+   **runOnce gate model (LOCKED this session, exact Node 1:1 mapping)**:
+   - Node `DockerRunner.mjs` `_runAndWaitForContainer` = "gate" model:
+     `once = _.once(callback)`; `streamEnd` + `containerReturn` flags both
+     must be true to call `once()`. `attachStreamHandler(error, {_output})`:
+     `error` → `callback(error)`; else `output = _output`, `streamEnd = true`,
+     `callbackIfFinished()`.
+   - `startContainer(error, {name})` callback: `error` → `callback(error)`;
+     else → `waitForContainer(container, exitCode, timeout, (error, exitCode)
+     => { error → callback(error); exit === 137 → callback(new TerminatedError
+     ()); exit === 1 → callback(new ExitedError(1)); else output.exitCode =
+     exitCode; containerReturn = true; callbackIfFinished(); })`.
+   - **Go port**: use `commandrunner.RunOutput{Stdout string, Stderr string,
+     ExitCode int, Terminated bool, Exited bool, TimedOut bool}`. On success
+     path: `Terminated=true` if exit==137, `Exited=true` if exit==1,
+     `TimedOut=true` if timedOut flag. On error path: `err` from Engine
+     (e.g. HTTP 5xx, socket error). `callback (func(err error, out
+     *commandrunner.RunOutput))` mirrors Node `callback(error, output)`.
+   - Engine SPI methods (Go): `Inspect(id string) (*ContainerInfo, error)`,
+     `Create(id string, opts CreateOpts) error` (POST /containers/create,
+     name from QUERY STR string, config from JSON BODY), `Start(id) error`,
+     `Kill(id) error`, `Attach(id string) (io.ReadCloser, error)` (POST
+     /containers/{id}/attach?stdout=1&stderr=1&stream=1), `Wait(id string)
+     (int, error)` (POST /containers/{id}/wait; returns exit code),
+     `Destroy(id string) error` (DELETE /containers/{id}).
+   - **Docker Engine API (probe-verified 2026-09-24)**:
+     * `name` is QUERY STRING for `create` (NOT in body — dockerode 4.0.9
+       sends `query: {name: X}`); `config` is JSON BODY.
+     * `wait` is POST. Returns `{"StatusCode": N}` JSON body.
+     * `attach` response is a FLOW of raw bytes (no JSON) — demux stream
+       (see demux below).
+     * `start` when already running (304) → error `{"statusCode": 304}`;
+       DockerRunner code ignores 304 on `start` (see _startContainer:
+       `if (err.statusCode !== 304) callback(err)`).
+     * Docker Engine `kill` regex: `/Cannot kill container .* is not running/`
+       → `err = null` → treat as 200. (Already in dockerrunner.go.)
+   - **demux stream (docker-modem)**: 8-byte header `[streamType, 4-byte BE
+     length]` per frame. `streamType` ∈ {0,1,2} (stdin/stdout/stderr). Invalid
+     (other value) → write entire buffer to stdout, stop demux (switch to
+     raw passthrough). Go impl: `bufio.Reader` over `Attach` ReadCloser,
+     loop: read 8 bytes header, extract type + length BE, read length bytes,
+     route. **This is a raw-stream — NOT JSON, NOT NDJSON.**
+   - **fingerprint** (for content-cache key): MD5 of `CreateOpts` serialized
+     (NOT of the container ID — because different commands on same image
+     need different keys). Already in `fingerprint.go`.
 
-1. **minimatch engine (CLSI-only)** → `go/minimatch/` — **COMPLETE 2026-09-19** (all oracle
-   files green; 49,828 rows, 0 mismatches; go build/vet clean; CLSI module builds — see §5
-   session-8 log + §0). Public API: `New(pattern string, o *Options) (*Minimatch, error)`,
-   `(*m).Match(f) bool`, `(*m).MatchList([]string) []string`, module `Match(f, pat string, o
-   *Options) (bool, error)`, `HasMagic() bool`; `escape/`+`unescape/`+`expand` exported for
-   reuse. Wire into resourcewriter (see table §1, content-cache row) with `{dot:true}` + PRECIOUS_FILE_PATTERN.
-   **DESIGN PINNED (v10.2.6 dist + probes; full contract below):**
-   - `match(f[,partial])` contract: make() = parseNegate → braceExpand (dedup via Map) → slashSplit (`.split('/')`) → preprocess (lvl 0: adjascentGlobstarOptimize; 1: levelOneOptimize; ≥2: firstPhasePreProcess+secondPhasePreProcess) → per-portion parse() → matchOne | matchGlobstar. **`makeRe()` is deprecated + unused by `.match` — NOT ported.**
-   - parseNegate: each leading `!` toggles negate; no-match → return `negate || partial`... exact: no-hit → `this.negate` (if partial: `this.pattern.startsWith('/') ? this.negate : this.negate || partial`); hit → `this.flipNegate || !this.negate`.
-   - Portion parse(): `'**'`→GLOBSTAR sentinel; `''`→`''`; fastTest shapes (starRE/starDotExtRE/qmarksRE/starDotStarRE/dotStarRE — regexes + pure-logic tests in source; verified ≡ compiled guards, listed in §5 progress).
-   - Guards (byte pre-checks per chain portion): noDot = substring[0]≠'.'; noTrav = substring ∉ {'.','..'}; justDots = root portion exactly '.'/'..' (bypass). needNoTrav from escaped-src charAt chain (src[0] ∈ '[.'; `\.` prefix → src[2] ∈ '[.'; `[^` = escaped '^' chain). needNoDot = !dot && src[0] ∈ '[.'.
-   - Extglob compile = flatten 10 passes (canAdopt/canAdoptWithSpace/canUsurp; exact adoptionMap/adoptionWithSpaceMap/usurpMap in dist ast.js L58-100) + `#fillNegs` (clone trailing siblings into each `!(...)` arm) + token scan (coalesce `*` → `[^/]*?`, noEmpty = all-stars+no-ext+atRoot → `[^/]+?` else guard, `?` → `[^/]`, char classes, text literal) + guard prefix + `^(?:...)$`.
-   - `!(X)`: remainder R must not fully-match ANY arm (arm = its body + `#fillNegs` clones); then tail optional star `[^/]*?` guarded noDot iff `!` node isStart && !dot && !allowDot. Empty `!()` = starNoEmpty.
-   - `#matchGlobstar`: bad-dot = portion ∈ {'.','..'} or (dot off && starts '.'); body sections `after = fileLength - remaining non-gs parts`; recursion via `maxGlobstarRecursion` (default 200).
-   - FLATTEN maps (from dist): adoptionMap `!→[ @... see dist], ?→[?, @], @→[@], *→[*,+,@,+...], +→[+, @]` EXACT: `!:[' @...'` — transcribe from ast.js (do NOT guess); same for adoptionWithSpaceMap + usurpMap.
-   - File-side levelTwoFileOptimize only when optimizationLevel ≥ 2 (default 1 → file slash-split as-is).
-   **Files status (09-19):** segast.go (AST parsePortion + toRegExpSource: flatten adoptions/
-   usurps, fillNegs, guards, extglob arms incl. `|` alternation + negated `!(...)` end-guard
-   `(?:$|/)` on ROOT filledNegs) + engine.go (Minimatch: exported New/Match/MatchList/HasMagic,
-   module-level Match; internal make, preprocess 0/1/2, tri-value matchGlobstar, GLOBSTAR
-   sentinel) + oracle_test.go (drives testdata/) + mm_smoke_test.go + README.md, ALL DONE + oracle-verified (see §5 session-8 entry + §0).
-   **fasttest.go intentionally NOT ported** (compile-time only, no oracle; same dot choice as
-   RE path — Go builds one source). **makeRe NOT ported** (deprecated upstream, unused by
-   CLSI .match, no oracle).
-   ACCEPTANCE GATE = oracle files (testoracle 35,400 | segM 27,360 | match_oracle 7,854 |
-   segPortion 9,924 | full26 3,400 | diff26 1,334 | escape 157 | expand 95... total 49,828
-   MATCH-path rows, 0 mismatches), NOT a coverage % — the HANDOFF >=90% gate is
-   per-CLSI-package. Divergences (README): byte matching not UTF-16 (CLSI paths ASCII);
-   windows paths inert (Go rejects Platform!=posix); RE2 can't do lookaheads -> guard byte
-   tests (proven equivalent on oracle).
-2. Port `CLSICacheHandler.js` (528L) → `clsicachehandler` package. No Node unit tests;
-   mirror app.js usage + CompileManager call sites. Uses OCM's Promise API (path,
-   generateBuildId, saveOutputFiles, expireOutputFiles) + CLSICompileQueue + Metrics.
-3. Port `CompileManager.js` (1021L) — core orchestration (wire OCM + CCM + lockmanager +
-   metrics + DockerRunner).
-4. Port `CompileController.js` (491L) + `DockerRunner.mjs` (634L).
-5. Port resourcewriter (398L) + historyresourcewriter (869L).
-6. Port tikzmanager (129L) + png2pdf (96L) + commandrunner (19L).
-7. Port server: `app.js` → Go HTTP server + `cmd/clsi/main.go`.
-8. Makefile, smoke test, full integration test + Node parity matrix.
-9. Update this HANDOFF.md after each module.
+2. **Fix 4 packages below 90 gate** (errors 79.7%, xrefparser 86.7%, config 89.3%,
+   metrics 69.2%) — first check whether upstream merge (d4f9c24) already
+   pushed them over 90 (re-test after clean -testcache).
 
-### minimatch v10 — PURE-LOGIC TOKEN MODEL (byte-confirmed from compiled regexes, 2026)
+3. **compile core** (compilemanager + compilecontroller) — depends on otc
+   (Phase B still OPEN upstream; clsi/ot deleted → import shared otc).
 
-**Key findings (probed from Node makeRe().source):**
-- Arms are FULLY tokenized (same tokenization as plain strings): `@(a*)` → `(?:a[^/]*?)`; `@(a?c)` → `a[^/]c`; `@([xy])` → `(?!\.)?[xy]` (guard from char `[`)
-- Guard (noDot `(?!\.)` / noTrav `(?!(?:^|/)\.\.?(?:$|/))`) attached per ARM chain when arm isStart
-  (arms built at parentIndex 0 → effectively ALL arms) and computed from arm's first COMPILED char
-  (`[`, or escaped `\.` chains) — for text arms the guard is moot (text can only match itself)
-- bodyDotAllowed two-pass: repeated (`+`/`*`) at chain start with dot=false → first rep uses guarded arm,
-  subsequent reps `(?:(unguarded-arm))*?` (allowDot=true arm variant)
-- `!` extglob: `((?!(?:ARM-src-with-(?:$|/) tail)) + [^/]*?)` — pure-go: assert NO arm fully-matches
-  remainder at pos (arms got tail chain copyIn'd from after `!` in parent — i.e. arm = arm-tokens + tail
-  appended), then star (lazy any) consumes, chain continues
-- empty arms (`|`) = zero-token arm = matches exactly empty
-- `@(*|!(x))` style: `!` inside arm = its own arm with tail (whole arm chain appended)
-- flatten: adopt (map), adopt-with-space (adds blank arm), usurp (child takes over sole-part parent via
-  usurpMap: ?/{*,+:*}, +/{?,*:*}, @/{!..+ all same type}, !/{!:@}); 10 passes
-- text chains: NO guards needed (text can't match "."/".." or lead-dot... except justDots `.`/`..` pattern
-  matches itself)
-- star token: `[^/]*?` any prefix; starNoEmpty = portion is star-only... starNoEmpty only when NOEMPTY
-  (isStart&&isEnd&&no-ext-parts) → star that must match nonempty
-- qmark = exactly one non-slash char
-- class = one byte predicate (JS code-unit vs Go byte: byte-approx, documented divergence)
+4. **error middleware + server layer** (§4/12 + §3.2 locked design above).
 
-**minimatch engine v2 (byte-confirmed from Node compiled source, FINAL):**
-- ARM tokenization: full glob (escaped `\.` → literal; `\.` chain escapes; `*`; `[...]`; `?`)
-- Guard (isStart-only): noDot `(?!\.)`; noTrav `(?!(?:^|/)\.\.?(?:$|/))`; precedence trav>dot
-  * text chain: guard moot (can't match dot-leading unless self `.`, `..`)
-  * star/q/class leading: guard active; escaped-leading: `\\.` chains → aps check (char at src[0/2/4])
-- bodyDotAllowed fold for `+`/`*` at chain start, dot=false: first arm guarded + `(uncrapped-arm)*?`
-- `!`-ext: `((?!(?:ARMsrc))` + startNoDot? + star) → pure-logic: reject if ANY arm FULL-matches s[pos:]
-  (ARM = arms + tail chain copyIn'd from PARENT chain after `!` node)
-- emptyARM = matches empty only
-- flatten: 10 passes adopt/adoptWithSpace/usurp over extglob parent types
-- toRegExpSource empty-ext: whole-portion `+()`/`*()`/`?()`/`@()` = literal text fallback
-- emptyExt `!` = starNoEmpty (matches ≥1 char)
-- star: lazy `[^/]*?` = match any length (lazy irrelevant for existence); starNoEmpty = min 1 char
-- qmark = exactly 1 non-slash char
-- class: posix classes + ranges (JS code-unit ≈ Go byte divergence documented)
-- NO-REGEX design: pure-logic backtracking matcher for portions (RE2 can't express lookaheads)
-- GLOBSTAR = sentinel for `**` portions; matchOne walks portions×file parts
-- matchOne: lockstep `#matchGlobstar` (head/body/tail, body sections, tri-value return)
-- optimizationLevel: 0=adjacentGlobstar, 1=levelOneOptimize, ≥2=firstPhase+secondPhase+levelTwoFileOptimize
-- dot option: default false (Go zero value), CLSI sets dot:true
-- nocase: case-insensitive compare for all tokens (not oracle-tested but supported)
-- matchBase, flipNegate, negate (leading `!`), empty pattern, comment pattern
-- partial mode, nonull, windows (inert on POSIX)
+5. **clsi_typst.go** (NEW — per user directive 2026-09-21): port
+   `services/clsi_typst` to `services/clsi_typst.go`, feature-equivalent to
+   clsi.go (reuses `go/libraries/otc` LIB-15 for content), reuses clsi.go
+   packages where possible, HANDOFF.md in `clsi_typst.go/`. (This is a
+   SEPARATE Go module from clsi.go.)
+
+6. **cmd/clsi main + Makefile + live smoke** (Docker texlive image needs to be
+   built — blocked on `test_unit_clsi-test_unit:latest` availability).
+
+Deferred (otc-dependent, upstream Phase B):
+- HistoryResourceWriter (15 open — otc Phase B dep)
+- CompileManager (depends on otc Phase B + dockerrunner)
+
+Blocked / environment:
+- Docker texlive image for live smoke (`test_unit_clsi-test_unit:latest` at
+  1.7GB available; texlive variant NOT yet built).
+
+## 9. Session notes (2026-09-24 THIS SESSION)
+
+- **dockerode 4.0.9 wire format (probe-verified)**: `create` uses QUERY
+  STRING for `name` + JSON BODY for `config` (content-type header required).
+  `wait` is POST. `attach` is GET with `stream=1&stdout=1&stderr=1`.
+- **Docker Engine API version note**: ApiVersion 1.54, MinAPIVersion 1.40
+  (old-style routes: `/containers/{id}/json` for inspect, NOT `/containers/{id}/
+  inspect`).
+- **demux stream**: 8-byte header per frame, streamType ∈ {0,1,2}, 4-byte BE
+  length. Invalid → raw passthrough to stdout. (docker-modem demuxStream in
+  Node source.)
+- **Node `_runAndWaitForContainer` gate model CONFIRMED** (read at source):
+  `once = _.once(callback)`; `attachStreamHandler` AND `waitForContainer`
+  both feed the same gate. Both `streamEnd` AND `containerReturn` must be
+  true to fire `once()`. On error path: `callback(error)` directly. On
+  137: `callback(new TerminatedError())`. On 1: `callback(new ExitedError(1))`.
+- **DockerRunner Node test oracle** (DockerRunner.test.js, 1150 lines) available
+  at `services/clsi/test/unit/js/DockerRunner.test.js`. Uses `vi.doMock('dock
+  erode')` etc.
+- **config.go** added `MaxContainerAge int` + env parsing (commit b609dfb).
+- **git state**: HEAD b609dfb, on branch go_compile_test, 12 commits ahead
+  origin/main (d4f9c24 is upstream merged into ours).
+- **otc oracle** (`safe_pathname_oracle_test.go`, 80,782 rows) — GREEN,
+  attached to otc via commit 83e7967.
+- **NFS flakiness** (2026-09-24): hit twice more this session (HANDOFF.md
+  cp + go build). Use `/tmp/` staging + atomic `cp + gofmt + go build + go
+  test` in ONE bash command. **Bash heredoc truncates at ~250 lines** — chunk
+  Go files ≤120L per chunk.
+## Session outcome (2026-09-24)
+
+**dockerrunner COMPLETE (90.9% coverage):**
+- `dockerrunner/{engine.go, unixengine.go, dockerrunner.go, fingerprint.go, run.go, pipeline.go, monitor.go}`
+- Engine SPI (inspect/create/attach(start,stream)/start/kill/waitForExit/list/remove; 404+AutoRemove
+  = nil,nil — faithful to dockerode's createOrReconnect throw:false)
+- runOnce pipeline: name lock (dockerlockmanager), 304-already-started fast path, attach-then-start
+  (DockerRunner attach ordering), demuxStream (8-byte frames; type>2 = raw passthrough), MaxOutput
+  truncation marker "Output exceeds 2048KB; killing container." (byte count — documented UTF-16
+  divergence), settled-CAS timeout (models clearTimeout first-wins; kill error → log + proceed),
+  137→Terminated, 1→Exited, stream-error finalization (Go: error — Node's catch {} is no-op,
+  DIVERGENCE documented), 500-retry harness (destroy → retry once)
+- Kill: 404 swallow + case-sensitive notRunning regex probe propagation (engine lowercase → Go
+  propagates; divergence documented, same as ported png2pdf/LatexRunner)
+- monitor: destroy/destroyOldContainers/StartContainerMonitor (rand 0-5m → immediate scan → 1h
+  tick; grace window via lastprojectaccess)
+- unixengine: HTTP-over-unix-socket (DialContext, host "docker"), Content-Type application/json,
+  message||cause||raw error body; routes probe-verified against live Engine 29.5.3 (old-style
+  /containers/{id}/json, POST /wait, attach non-hijacked isStream)
+- FakeEngine + demux frame helpers + real unix-socket wire tests (routes + error format
+  "(HTTP code N) reason - message " + Content-Type assertion)
+- **dockerode per-operation statusCodes mapped** (§15 in HANDOFF §2) — Go uses single reason() map
+  (documented): kill 409 → "unexpected", start 304/404/400/406/500, wait 500, etc.
+
+**Coverage gate MET: all 34 clsi.go packages ≥ 90%.**
+  metrics 100.0, errors 98.4, xrefparser 97.8, config 93.0, dockerrunner 90.9, rest as before.
+  (Added thin tests: errors WithCause/NewOError/Tag + ConversionErrorT; metrics Count/DoneMS;
+  xrefparser no-xref wrap + splitLines; config Get/ForTest singleton.)
+
+**otc Phase B (BlobStore) NOW AVAILABLE:** otc blob_store.go exports `BlobStore` interface +
+`BaseBlobStore` (GetBlob/GetBlobURL/GetString/GetObject/PutString/PutObject). clsi module links
+`ollitex` (go.mod replace). The "Phase B open" note in this HANDOFF is SUPERSEDED — blob store
+primitive is ported; only the *backend wiring* (filestore URL prefix) stays local (clsi
+HistoryResourceWriter's BlobStore extends BaseBlobStore, as in Node).
+
+**Next (in order):**
+1. historyresourcewriter.go (port from HistoryResourceWriter.js 869L — needs otc: blob_store,
+   history, snapshot, file_data; local BlobStore extends ollitex BaseBlobStore like Node
+   BlobStoreBase)
+2. compilemanager.go (1021L) — deps: resourcewriter (93.2), latexrunner (94.3), dockerrunner,
+   lockmanager (100), clsicachehandler (93.7), contentcachemetrics, statsmanager, synctexparser,
+   tikzmanager, safeReader, latexmetrics, clsi-metrics, errors, png2pdf, commandrunner, config.
+   CompileController (491L, route layer) AFTER — it's mostly z-schema request parsing + wire.
+3. error middleware + apps/server (route table §3.2, load agent TCP 3048 + HTTP 3049)
+4. cmd/clsi main + Makefile + live smoke (Docker texlive image; only test_unit image present →
+   smoke limited to /v1/version + compile-not-allowed + monitor; see §8)
+5. clsi_typst.go (new service; feature-equivalent, reuses otc + shared packages; own HANDOFF per
+   next-session notes §8)
+
+### Docker wire (probe-verified against live Engine 29.5.3, 2026-09-24)
+- Create: POST /containers/create?name=X — name from QUERY (body name ignored); 409 body
+  {"message":"name \"...\" is already in use..."}; buildOpts JSON deterministic (probe: 3x
+  identical)
+- Attach: POST /containers/{id}/attach?stdout=1&stderr=1&stream=1 + JSON body → 101 isStream
+  raw body (not hijacked → no conn upgrade); Go: returns resp.Body as io.ReadCloser
+- Wait: POST /containers/{id}/wait → {"StatusCode":137}; kill/start/remove are POST/DELETE
+- Inspect: GET /containers/{id}/json (old-style route — modern /containers/{id}/inspect
+  returns 404)
+- Wait 404 body: {"message":"No such container: X"} (no cause field)
+- List: all=true, CREATED epoch seconds probe-verified
+- Kill 409: dockerode kill statusCodes has NO 409 mapping → "unexpected" (not "conflict")
+- MaxOutput = 2MB (1024*1024*2). `volumes` param in Node is DEAD CODE (unused).
+- Node monitor starts at import (line 628); Go: main calls StartContainerMonitor()
+- waitForContainer: Node clears the waitPromise on settled (first-wins = clearTimeout model)
+- Lock held INSIDE startOnce (inspect→create→attach→start); released on return (kill+wait
+  already captured); 404+AutoRemove = container gone → nil,nil (dockerode throw:false)
