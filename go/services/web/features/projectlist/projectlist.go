@@ -95,6 +95,8 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: arPat, Handler: accessRequestsHandler(a)},
 			{Method: "POST", Pattern: renPat, Handler: renameHandler(a)},
 			{Method: "POST", Path: "/project/new", Handler: newProjectHandler(a)},
+			// U1 (P7): the JSON project list (Node: /project/new → /api/project order)
+			{Method: "POST", Path: "/api/project", Handler: apProjectHandler(a)},
 			// P6.16 typst module (web-p616 flip) — Node TypstRouter route order
 			{Method: "POST", Path: "/project/new/typst", Handler: newTypstProjectHandler(a)},
 			{Method: "POST", Pattern: archPat, Handler: flagHandler(a, opArchive)},

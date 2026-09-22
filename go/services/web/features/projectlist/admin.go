@@ -21,13 +21,14 @@
 //	POST   /admin/project/:Project_id/sharing-link
 //
 // Gate splits (pinned):
-//	- non-parseReq controllers (members, delete, undelete, trash, untrash,
-//	  purge): malformed :Project_id -> 500 HTML page (Node `new ObjectId`
-//	  BSONError) -> aGate500.
-//	- parseReq controllers (invite/put/del user, revoke, resend, sharing-link):
-//	  malformed :Project_id -> 404 {"error":"...Invalid Mongo ObjectId at
-//	  \"params.Project_id\"","statusCode":404} -> aGateParam (the P4-core
-//	  member-surface gate shape, pinned in P4).
+//   - non-parseReq controllers (members, delete, undelete, trash, untrash,
+//     purge): malformed :Project_id -> 500 HTML page (Node `new ObjectId`
+//     BSONError) -> aGate500.
+//   - parseReq controllers (invite/put/del user, revoke, resend, sharing-link):
+//     malformed :Project_id -> 404 {"error":"...Invalid Mongo ObjectId at
+//     \"params.Project_id\"","statusCode":404} -> aGateParam (the P4-core
+//     member-surface gate shape, pinned in P4).
+//
 // Login + site-admin run first on every route (302 /login for anon via the
 // core global gate; 302 /restricted?from=... via RequireSiteAdmin). CSRF:
 // token-less non-GET -> 403 (core chain, before authz).
@@ -35,7 +36,6 @@ package projectlist
 
 import (
 	"bytes"
-	"golang.org/x/crypto/hkdf"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -45,6 +45,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/crypto/hkdf"
 	"io"
 	"net/http"
 	"os"
@@ -53,10 +54,10 @@ import (
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
-	"go.mongodb.org/mongo-driver/bson"
-		"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ---------- gates ----------
@@ -175,22 +176,22 @@ func appendUnknown(segs []string, keyOrder []string, allowed ...string) []string
 // ---------- patterns ----------
 
 var (
-	adUserRedirPat   = regexp.MustCompile(`^/admin/user$`)
-	adProjectRedPat  = regexp.MustCompile(`^/admin/project$`)
-	activeProjsPat   = regexp.MustCompile(`^/admin/active-projects$`)
-	adUserListPat    = regexp.MustCompile(`^/admin/user/([^/]+)/projects$`)
-	adTrashPat       = regexp.MustCompile(`^/admin/project/([^/]+)/trash$`)
-	adUntrashPat     = regexp.MustCompile(`^/admin/project/([^/]+)/untrash$`)
-	adPurgePat       = regexp.MustCompile(`^/admin/project/([^/]+)/purge$`)
-	adUndeletePat    = regexp.MustCompile(`^/admin/project/([^/]+)/undelete$`)
-	adDeletePat      = regexp.MustCompile(`^/admin/project/([^/]+)$`)
-	adMembersPat     = regexp.MustCompile(`^/admin/project/([^/]+)/members$`)
-	adInvitePat      = regexp.MustCompile(`^/admin/project/([^/]+)/invite$`)
-	adInvitesPat     = regexp.MustCompile(`^/admin/project/([^/]+)/invites$`)
-	adUsersPat       = regexp.MustCompile(`^/admin/project/([^/]+)/users/([^/]+)$`)
-	adInvRevokePat   = regexp.MustCompile(`^/admin/project/([^/]+)/invite/([0-9a-fA-F]{24})$`)
-	adInvResendPat   = regexp.MustCompile(`^/admin/project/([^/]+)/invite/([0-9a-fA-F]{24})/resend$`)
-	adShareLinkPat   = regexp.MustCompile(`^/admin/project/([^/]+)/sharing-link$`)
+	adUserRedirPat  = regexp.MustCompile(`^/admin/user$`)
+	adProjectRedPat = regexp.MustCompile(`^/admin/project$`)
+	activeProjsPat  = regexp.MustCompile(`^/admin/active-projects$`)
+	adUserListPat   = regexp.MustCompile(`^/admin/user/([^/]+)/projects$`)
+	adTrashPat      = regexp.MustCompile(`^/admin/project/([^/]+)/trash$`)
+	adUntrashPat    = regexp.MustCompile(`^/admin/project/([^/]+)/untrash$`)
+	adPurgePat      = regexp.MustCompile(`^/admin/project/([^/]+)/purge$`)
+	adUndeletePat   = regexp.MustCompile(`^/admin/project/([^/]+)/undelete$`)
+	adDeletePat     = regexp.MustCompile(`^/admin/project/([^/]+)$`)
+	adMembersPat    = regexp.MustCompile(`^/admin/project/([^/]+)/members$`)
+	adInvitePat     = regexp.MustCompile(`^/admin/project/([^/]+)/invite$`)
+	adInvitesPat    = regexp.MustCompile(`^/admin/project/([^/]+)/invites$`)
+	adUsersPat      = regexp.MustCompile(`^/admin/project/([^/]+)/users/([^/]+)$`)
+	adInvRevokePat  = regexp.MustCompile(`^/admin/project/([^/]+)/invite/([0-9a-fA-F]{24})$`)
+	adInvResendPat  = regexp.MustCompile(`^/admin/project/([^/]+)/invite/([0-9a-fA-F]{24})/resend$`)
+	adShareLinkPat  = regexp.MustCompile(`^/admin/project/([^/]+)/sharing-link$`)
 )
 
 // ---------- legacy redirects ----------
@@ -611,9 +612,9 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 
 		yearAgo := time.Now().AddDate(-1, 0, 0)
 		type row struct {
-			id, name, owner, lu, lub, dat, did string
+			id, name, owner, lu, lub, dat, did                                                   string
 			nameHas, nameNil, ownerHas, ownerNull, luHas, lubHas, lubNil, datHas, didHas, delHas bool
-			inactive, trashed bool
+			inactive, trashed                                                                    bool
 		}
 		mkRow := func(p any, out func(row)) bool {
 			// returns false -> caller 500s.
@@ -652,8 +653,8 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 				if o, isO := v.(primitive.ObjectID); isO {
 					r.lub, r.lubHas = o.Hex(), true
 				}
-				} else if v == nil {
-					r.lubNil = true // explicit null -> "lastUpdatedBy":null
+			} else if v == nil {
+				r.lubNil = true // explicit null -> "lastUpdatedBy":null
 			}
 			if v, okm := dg(doc, "lastOpened"); okm && v != nil {
 				if t, okT := asTime(v); okT {

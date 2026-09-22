@@ -33,8 +33,8 @@ func gctx(ctx context.Context) *core.Cxt {
 
 type sinkW struct{}
 
-func (s *sinkW) Header() http.Header        { return http.Header{} }
-func (s *sinkW) WriteHeader(int)            {}
+func (s *sinkW) Header() http.Header         { return http.Header{} }
+func (s *sinkW) WriteHeader(int)             {}
 func (s *sinkW) Write(p []byte) (int, error) { return len(p), nil }
 
 // GBWriteBytes writes `data` into project pj at (folder=root, relDir chain,

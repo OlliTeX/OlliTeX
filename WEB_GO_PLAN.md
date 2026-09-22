@@ -2,7 +2,7 @@
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
 all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green**; **P4.12a file proxy (`GET|HEAD /Project/:id/file/:File_id`) ✔ 3/3 x3 (history-v1→Go-filestore blob chain, no-CT/chunked 200 pin, HEAD-404 fork quirk, guest/VA/authz battery) — ALSO FIXED the baked-in-capture-user bug in `restrictedHTML` (Go 403-restricted pages now render the requesting user; a P2-page variant of the same bug is deferred to a view-audit unit)**; **P4.12b doc download (`GET|HEAD /Project/:id/doc/:Doc_id/download`) ✔ 3/3 x3 (DU fromVersion=-1 lines, CD attachment, HEAD-200 asymmetry, sendStatus-404 pin) — 45-test P4 regression green** (2026-09-15). **P4.12c private API doc trio (GET|POST doc + changes/reject) ✔ 3/3 x3 (basic-auth surface, XPB+CSP pin, `NoSession` route option, 204 ETag quirk) — 47-test P4 regression green**; **P4.13a project upload (`POST /Project/:id/upload`) ✔ 3/3 x3 (thin-client upsert engine: docstore/v1H/DU call order, file↔doc swaps, cross-type 200+422/400/403/404/500 contract, `owner_ref`/docstore-seed env pins, `entCanWrite` collabRefs + 500-mailto parity fixes) — 65-test cross-regression green**; **P4.13b new-project zip upload (`POST /project/new/upload`) ✔ 3/3 x3 (FileSystemImportManager replica: zip-skip→topLevel-dir strip, FileTypeManager byte-level parity incl. utf16le-BOM + latin1 fallback + non-BMP→file + 3MiB decode gate, rootDoc priority pin, enforce-mode VA byte-pins, blocked-name `toString` → 500 + `zip-import-failure` deleter, multer `LIMIT_UNEXPECTED_FILE` HTML page, 22-case response+mongo+DU+docstore state battery) — FULL P4 regression green (36 p4* + 23 p411–p413b + P2/P3 sweep)** (2026-09-15). **P4.13b ALSO FIXED the P4.1 list owner+collaborator dedup bug (user who is owner AND invited-collaborator listed twice by Go; Node dedups best-access — latent, exposed by p4col-gate leftover projects) and hardened p413a/p413b/p413 flip harnesses against stale-include cascade failures.** **ALL OF P4 COMPLETE (2026-09-15): project list + entities + members + access-requests + rename + flags + create(+example) + delete/restore + clone + collaborators + invites + editor entity create/delete + file proxy + doc download + private doc trio + project upload + zip upload.**
-**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) is next.**
+**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) IN PROGRESS — step 1 ✔ (85 READMEs), step 2 attempted + root-caused (missing main-app families — see P7 section), step 3 slice 1 ✔ (legacy dashboard redirects), step 3 slice 2 = U1 ✔ (POST /api/project + entire tags family, parity gate GREEN, dual-port Node==Go==Node) — U2..U9 remaining, then the hard cutover re-attempt.**
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -3150,7 +3150,7 @@ container /etc/service run scripts back to Node. **Step 2 re-attempt
 precondition: the missing families below are ported + gated + flipped first**
 (step 3 = that porting work).
 
-**Step 3 slice 1 DONE (2026-09-22):** legacy project-dashboard redirects
+*Step 3 slice 1 DONE (2026-09-22):** legacy project-dashboard redirects
 (`GET /project|/owned|/shared|/archived|/trashed|/untagged|/tags/:tag` →
 301 hub targets; Node `projectDashboardRedirects`, owner queue 7 2026-09-10)
 ported to `features/projectlist` — byte-verified against the live Node
@@ -3158,12 +3158,55 @@ oracle (301 + Location + `Moved Permanently. Redirecting to …`; anonymous
 302 /login), unit-pinned (`dashredirect_test.go`) + contract spec
 `specs/legacy-dashboard-redirects.test.e2e.ts` (backend-agnostic, durable).
 
-**Known Go-web missing families (cutover evidence, 2026-09-22):**
-`projectlist: POST /api/project` (hub project-list JSON —
-ProjectListController.getProjectsJson) · **tags family (entire package)**
-· `GET /project/:id` (+ `GET /project/:id/doc/:id` state reads) · hub shell
-`GET /hub/` (trailing-slash parity) · `GET /admin` (+`/admin-hub`?, `/home`)
-· per-project LLM reads (`llm/models`, `llm/compile-fix`,
+**Step 3 slice 2 done (U1, 2026-09-22): `POST /api/project` + the entire tags
+family — oracle-pinned → Go feature → PARITY GATE GREEN.**
+- Oracle captured live from Node (in-container, post-login CSRF re-fetch
+  discipline): 43-case battery + edges + the full VA wire (byte-exact
+  messages incl. unknown-key ordering + the double-backslash color-pattern
+  text; the `enforce-log` fallback is log-only on the wire → Go enforces the
+  primary schema and emits Node-exact error text).
+- Go: `features/tags` (new package: GET/POST /tag, rename, edit, delete,
+  project(s) add/remove, `GET /user/:userId/tag` → 404 page) +
+  `features/projectlist/apiproject.go` (filters/sort/page semantics, token
+  dedup, archived>trashed, readOnly-nulls, stable lastUpdated sort with the
+  mongoose lazy `default:()=>new Date()` fill modeled as
+  `apFillDefaults` before sort — unit-pinned `TestAPFillDefaults`).
+- Parity gate `specs/parity/web-go-u1-parity.test.e2e.ts` (3-leg Node==Go==
+  Node battery, in-container dual-port :4000 vs :4010 — same mongo/redis,
+  same network vantage; per-leg limiter reset via redis DEL; per-run unique
+  tag names; `lastUpdated` fill-normalized as a set; ETag shape-pinned).
+- The dual-port design also surfaced + fixed real divergences the earlier
+  flip-vhost approach could not (different create/dup state per leg was
+  invisible there): Go limiter points were 10 where Node wires 30 for
+  rename/add/remove-tag (Node router.mjs: all 30/60); `remove-projects-`
+  **`from`**-tag is Node's limiter name; VA color-pattern message carries
+  double backslashes; **`canManageTemplatesMenu` must run the full
+  `hasTemplateAdminAccess` ladder (session isAdmin → env → DB user
+  isAdmin → flags → site section) on every page render** (the session-only
+  grant was wrong: CE sessions carry no `isAdmin`; Node reads the DB user),
+  exported as `templates.MenuGrant` and wired into all Go page data
+  (404/500/403 pages, tags privTag 404, templates pages, notifications
+  pages) via `core.Cxt.A` (added) so no call site needs the App thread;
+  `pageBase` in tags now also renders the admin nav fragment for session
+  admins (Node ExpressLocals does both on every page).
+- **Environment note (parked, documented):** in this e2e container an
+  unidentified vhost rewriter removes nginx-injected flips mid-test (worked
+  standalone, worked in 17 prior gates; forensics exhausted — no process,
+  no script, no cron found; inotify churn suggests a rename-based writer
+  ~1-2s cadence). The flip path itself is proven (P0–P6.20 gates + cutover
+  day-1 audit will re-prove it under the real runit switch); U1 parity is
+  therefore pinned by the dual-port gate, which exercises the identical
+  route surface.
+- Also fixed along the way: csrf must be sent on bodyless mutations on both
+  stacks (Node 403 `invalid csrf token` otherwise — the battery now always
+  attaches it); `core.Cxt` gained `A *App`; `gofmt` drift in touched files
+  normalized.
+
+**Known Go-web missing families (cutover evidence, 2026-09-22):** ~~`POST
+/api/project`~~ ✅ U1 · ~~tags family~~ ✅ U1 · `GET /project/:id` (+
+`GET /project/:id/doc/:id` state reads) · hub shell `GET /hub/`
+(trailing-slash parity) · `GET /admin` (+`/admin-hub`?, `/home`) ·
+per-project LLM reads (`llm/models`, `llm/compile-fix`,
 `llm/source-context`) · github-sync (`state`, `merge`, `new/github-sync`,
 `/user/github-sync/status`) · git integration (`/user/git-servers`,
 `/user/git-pat/link`) · track-changes/threads/sharing-updates reads ·

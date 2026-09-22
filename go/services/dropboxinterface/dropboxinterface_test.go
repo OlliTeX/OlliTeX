@@ -549,19 +549,19 @@ func TestDB_GateOrder(t *testing.T) {
 	defer srv.Close()
 
 	getDb := func(url string, header map[string]string) (int, string) {
-	t.Helper()
-	req, _ := http.NewRequest("GET", url, nil)
-	for k, v := range header {
-		req.Header.Set(k, v)
+		t.Helper()
+		req, _ := http.NewRequest("GET", url, nil)
+		for k, v := range header {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	return resp.StatusCode, string(b)
-}
 
 	code, body := getDb(srv.URL+"/health", nil)
 	if code != 200 || !strings.Contains(body, "dropboxinterface") {

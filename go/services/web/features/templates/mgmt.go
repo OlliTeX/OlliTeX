@@ -418,9 +418,12 @@ func tplBody(req *http.Request, res *core.Res) *tplObj {
 // session/DB isAdmin | OVERLEAF_TEMPLATES_USER_ID | flags.canManageTemplates
 // | section.allUsersCanManageTemplates (stored; the seed is false).
 func tplPrivileged(ctx context.Context, a *core.App, cxt *core.Cxt) bool {
-	if a == nil || cxt == nil || cxt.Sess == nil {
+	if cxt == nil || cxt.Sess == nil {
 		return false
 	}
+	// Session-level steps first (Node: hasAdminAccess(user) + the legacy
+	// user_id check run before any DB access — they must grant even when no
+	// app/DB handle is available).
 	if raw, ok := cxt.Sess.GetRaw("user"); ok && len(raw) > 0 {
 		var u struct {
 			IsAdmin bool `json:"isAdmin"`
@@ -435,7 +438,7 @@ func tplPrivileged(ctx context.Context, a *core.App, cxt *core.Cxt) bool {
 			return true
 		}
 	}
-	if uidHex == "" || !tplHex24.MatchString(uidHex) || a.Mongo == nil {
+	if uidHex == "" || !tplHex24.MatchString(uidHex) || a == nil || a.Mongo == nil {
 		return false
 	}
 	oid, err := primitive.ObjectIDFromHex(strings.ToLower(uidHex))

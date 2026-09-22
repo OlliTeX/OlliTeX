@@ -117,6 +117,11 @@ type docRef struct {
 	name     string
 	archived []string
 	trashed  []string
+	// U1 (POST /api/project) extras (all optional fields — zero = absent):
+	lastUpdated      time.Time
+	hasLastUpdated   bool
+	lastUpdatedByHex string // lastUpdatedBy as hex ("" = null/absent)
+	ownerRefHex      string // owner_ref as hex ("" = absent)
 }
 
 // ---------- primitive.D field readers ----------
@@ -172,10 +177,22 @@ func asOIDList(v any) []string {
 }
 
 func docRefFrom(d primitive.D) docRef {
-	return docRef{
+	r := docRef{
 		id:       oidHex(dget(d, "_id")),
 		name:     asStr(dget(d, "name")),
 		archived: asOIDList(dget(d, "archived")),
 		trashed:  asOIDList(dget(d, "trashed")),
 	}
+	// The driver surfaces BSON dates as primitive.DateTime (int64 ms) when
+	// decoding into a generic document — accept both forms (Node renders
+	// either as an ISO millisecond string).
+	switch v := dget(d, "lastUpdated").(type) {
+	case primitive.DateTime:
+		r.lastUpdated, r.hasLastUpdated = time.UnixMilli(int64(v)), true
+	case time.Time:
+		r.lastUpdated, r.hasLastUpdated = v, true
+	}
+	r.lastUpdatedByHex = oidHex(dget(d, "lastUpdatedBy"))
+	r.ownerRefHex = oidHex(dget(d, "owner_ref"))
+	return r
 }

@@ -54,6 +54,7 @@ type Feature struct {
 type Cxt struct {
 	Req     *http.Request
 	Sess    *Session
+	A       *App              // the running app (DB ladder access for page data)
 	SiteURL string            // configured site URL (views' origin + siteUrl)
 	Params  map[string]string // route params (P2a pattern routes)
 }
@@ -149,7 +150,7 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 	}
 
 	res := &Res{W: w}
-	cxt := &Cxt{Req: r, SiteURL: a.Cfg.SiteURL}
+	cxt := &Cxt{Req: r, A: a, SiteURL: a.Cfg.SiteURL}
 
 	// static (web profile; nginx usually answers first, but the app must
 	// be identical when it sees the request — serveStaticWrapper).

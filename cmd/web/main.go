@@ -29,15 +29,15 @@ import (
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/dropbox"
 	"ollitex/go/services/web/features/editorpages"
+	"ollitex/go/services/web/features/gitbridge"
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/hub"
 	"ollitex/go/services/web/features/instancestats"
+	"ollitex/go/services/web/features/languagetool"
 	"ollitex/go/services/web/features/launchpad"
-	"ollitex/go/services/web/features/gitbridge"
 	"ollitex/go/services/web/features/library"
 	"ollitex/go/services/web/features/llmsettings"
 	"ollitex/go/services/web/features/mendeley"
-	"ollitex/go/services/web/features/languagetool"
 	"ollitex/go/services/web/features/notifications"
 	"ollitex/go/services/web/features/orcidpicker"
 	"ollitex/go/services/web/features/pageshells"
@@ -49,9 +49,10 @@ import (
 	"ollitex/go/services/web/features/staticpages"
 	"ollitex/go/services/web/features/status"
 	"ollitex/go/services/web/features/systemmessages"
+	"ollitex/go/services/web/features/tags"
 	"ollitex/go/services/web/features/templates"
-	"ollitex/go/services/web/features/tokenaccess"
 	"ollitex/go/services/web/features/texfmt"
+	"ollitex/go/services/web/features/tokenaccess"
 	"ollitex/go/services/web/features/trackchanges"
 	"ollitex/go/services/web/features/userpages"
 	"ollitex/go/services/web/features/webdav"
@@ -233,6 +234,10 @@ func main() {
 	// redirects, /api/hub-theme theme API, /api/hub/health, /api/hub/notes).
 	app.RegisterFeature(hub.Feature(app))
 
+	// P7 completion U1: project-tag surface (GET/POST /tag, tag member ops,
+	// tags VA/limiters pinned against the live Node oracle).
+	app.RegisterFeature(tags.Feature(app))
+
 	// web profile: unknown-route 404 view (general/404) — Node
 	// webRouter.get('*', ErrorController.notFound).
 	app.SetRender404(func(cxt *core.Cxt, res *core.Res) {
@@ -263,7 +268,7 @@ func main() {
 		// The skeleton carries the slash ("7420/<path>"); trim our leading
 		// slash so the render is "7420/zzz-..." and not "7420//zzz-...".
 		pth := strings.TrimPrefix(cxt.Req.URL.Path, "/")
-				views.NotFoundPage(res.W, views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin, Path: pth, UserEmail: pe, UserID: uid, CanManageTemplateMenu: templates.SessionMenuGrant(cxt.Sess), NavAdmin: tplNavAdmin(cxt.Sess)})
+		views.NotFoundPage(res.W, views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin, Path: pth, UserEmail: pe, UserID: uid, CanManageTemplateMenu: templates.MenuGrant(cxt.Req.Context(), cxt), NavAdmin: tplNavAdmin(cxt.Sess)})
 	})
 
 	// web profile: rendered 403 page (general/restricted) — the global

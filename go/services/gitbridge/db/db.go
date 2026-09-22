@@ -216,7 +216,7 @@ func (s *SqliteDBStore) createTables(heapLimitBytes int) error {
 			"  `version_id` INT NOT NULL DEFAULT 0,\n" +
 			"  `body` text NOT NULL DEFAULT '',\n" +
 			"  PRIMARY KEY (`project`)\n" +
-		")",
+			")",
 	); err != nil {
 		return fmt.Errorf("db: create postback_store: %w", err)
 	}
@@ -367,7 +367,7 @@ func (s *SqliteDBStore) GetPathForURLInProject(projectName, url string) (string,
 // postback payload (for error reconstruction on the waiter side).
 func (s *SqliteDBStore) PostbackPut(project, key, status string, versionID int, body string) {
 	_, err := s.db.Exec(
-		"INSERT INTO `postback_store` (`project`,`key`,`status`,`version_id`,`body`) VALUES (?,?,?,?,?) " +
+		"INSERT INTO `postback_store` (`project`,`key`,`status`,`version_id`,`body`) VALUES (?,?,?,?,?) "+
 			"ON CONFLICT(`project`) DO UPDATE SET `key`=excluded.`key`, `status`=excluded.`status`, `version_id`=excluded.`version_id`, `body`=excluded.`body`",
 		project, key, status, versionID, body)
 	if err != nil {
