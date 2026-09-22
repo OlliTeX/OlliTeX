@@ -42,9 +42,36 @@
 package projectlist
 
 import (
+	"regexp"
 
 	"ollitex/go/services/web/core"
 )
+
+// ---------- legacy project-dashboard redirects (P7 cutover gap) ----------
+//
+// Node source (oracle): services/web/app/src/router.mjs
+// projectDashboardRedirects (owner queue 7, 2026-09-10): the legacy
+// project-list pages are REMOVED — every dashboard state renders in the hub
+// (/hub#/projects.*). The routes 301 so bookmarks and SSO deep links land in
+// the hub. Project APIs (POST /project/new*, POST /api/project,
+// /user/projects, /project/:id/entities) are untouched; editor deep links
+// (/editor/:id, legacy /Project/:id) stay.
+//
+// Node oracle (captured 2026-09-22 on the e2e stack, Node v22.21.1):
+//
+//	authed:     301 + Location + text/plain "Moved Permanently. Redirecting to <target>"
+//	anonymous: 302 /login (requireLogin bounce; exact Express body)
+//
+// NOTE the literal `/project/tags/:tag` target — Node itself 301s every tag
+// to the SAME hub route `/hub#/projects.tags.tags` (Node's static string); we
+// pin that 1:1 rather than "fixing" it.
+var dashTagPat = regexp.MustCompile(`^/project/tags/[^/]+$`)
+
+func dashRedir(loc string) func(*core.Cxt, *core.Res) {
+	return func(cxt *core.Cxt, res *core.Res) {
+		res.Redirect(cxt.Req, 301, loc)
+	}
+}
 
 // Feature registers the project-list route. `NoLogin` is left false so the
 // global login gate bounces anonymous requests exactly like Node's
@@ -53,14 +80,23 @@ func Feature(a *core.App) core.Feature {
 	return core.Feature{
 		Name: "projectlist",
 		Routes: []core.Route{
+			// Node registers projectDashboardRedirects BEFORE the other
+			// /project routes — keep that order (first match wins).
+			{Method: "GET", Path: "/project", Handler: dashRedir("/hub#/projects.all")},
+			{Method: "GET", Path: "/project/owned", Handler: dashRedir("/hub#/projects.owned")},
+			{Method: "GET", Path: "/project/shared", Handler: dashRedir("/hub#/projects.shared")},
+			{Method: "GET", Path: "/project/archived", Handler: dashRedir("/hub#/projects.archived")},
+			{Method: "GET", Path: "/project/trashed", Handler: dashRedir("/hub#/projects.trashed")},
+			{Method: "GET", Path: "/project/untagged", Handler: dashRedir("/hub#/projects.all")},
+			{Method: "GET", Pattern: dashTagPat, Handler: dashRedir("/hub#/projects.tags.tags")},
 			{Method: "GET", Path: "/user/projects", Handler: handler(a)},
 			{Method: "GET", Pattern: entPat, Handler: entitiesHandler(a)},
 			{Method: "GET", Pattern: memPat, Handler: membersHandler(a)},
 			{Method: "GET", Pattern: arPat, Handler: accessRequestsHandler(a)},
 			{Method: "POST", Pattern: renPat, Handler: renameHandler(a)},
 			{Method: "POST", Path: "/project/new", Handler: newProjectHandler(a)},
-		// P6.16 typst module (web-p616 flip) — Node TypstRouter route order
-		{Method: "POST", Path: "/project/new/typst", Handler: newTypstProjectHandler(a)},
+			// P6.16 typst module (web-p616 flip) — Node TypstRouter route order
+			{Method: "POST", Path: "/project/new/typst", Handler: newTypstProjectHandler(a)},
 			{Method: "POST", Pattern: archPat, Handler: flagHandler(a, opArchive)},
 			{Method: "DELETE", Pattern: archPat, Handler: flagHandler(a, opUnarchive)},
 			{Method: "POST", Pattern: trashPat, Handler: flagHandler(a, opTrash)},

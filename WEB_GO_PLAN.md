@@ -3125,6 +3125,55 @@ module has a Go-web representation + flip conf.
 ### P7 — (owner directive 2026-09-18, replaces the old Node-retirement P7)
 
 **Step 1 DONE (2026-09-21):** README.md in every `go/` sub-folder that ships
+
+**Step 2 STATUS (2026-09-22): ATTEMPTED — BLOCKED, REVERTED TO GREEN.**
+The runit cutover scripts were written + applied to the e2e stack (web-overleaf
+→ Go on 4000, web-api-overleaf → Go on 3000; Node web/api exited cleanly).
+Full e2e against Go-primary: **~90 failures vs ~12 pre-existing on Node**
+(same 292-test product subset, A/B same day). Live 404 evidence (nginx, real
+requests from the working hub/editor after cutover):
+`POST /api/project` (hub project list), `GET /tag` (tags family — **Go web
+has NO tags feature package at all**), `GET /project/:id`, `GET /hub/`
+(trailing slash), `GET /admin`, per-project `llm/models|compile-fix|
+source-context`, `github-sync/state|merge`, `track_changes`, `threads`,
+`sharing-updates`, `webdav/state`, `/user/github-sync/status`,
+`/user/git-servers`, `/user/git-pat/link`, `/user/list`, `/user/contacts`,
+`/user/mysettings`, `/user/send-test-email`, `/user/password/update`,
+`/template/:id/preview`, `/notifications/preferences/project/:id`,
+`/api/format-tex` (some methods).
+**Root cause:** the P1–P6 flip wave covered the planned route families; a set
+of MAIN-APP feature families was never in the flip plan (the plan's
+"execution precondition" listed only the P6 *module* owners). Go web is
+therefore not yet a 100% drop-in and the hard cutover is premature.
+Stack restored to the proven green state (Node primary + Go shadow/flip);
+container /etc/service run scripts back to Node. **Step 2 re-attempt
+precondition: the missing families below are ported + gated + flipped first**
+(step 3 = that porting work).
+
+**Step 3 slice 1 DONE (2026-09-22):** legacy project-dashboard redirects
+(`GET /project|/owned|/shared|/archived|/trashed|/untagged|/tags/:tag` →
+301 hub targets; Node `projectDashboardRedirects`, owner queue 7 2026-09-10)
+ported to `features/projectlist` — byte-verified against the live Node
+oracle (301 + Location + `Moved Permanently. Redirecting to …`; anonymous
+302 /login), unit-pinned (`dashredirect_test.go`) + contract spec
+`specs/legacy-dashboard-redirects.test.e2e.ts` (backend-agnostic, durable).
+
+**Known Go-web missing families (cutover evidence, 2026-09-22):**
+`projectlist: POST /api/project` (hub project-list JSON —
+ProjectListController.getProjectsJson) · **tags family (entire package)**
+· `GET /project/:id` (+ `GET /project/:id/doc/:id` state reads) · hub shell
+`GET /hub/` (trailing-slash parity) · `GET /admin` (+`/admin-hub`?, `/home`)
+· per-project LLM reads (`llm/models`, `llm/compile-fix`,
+`llm/source-context`) · github-sync (`state`, `merge`, `new/github-sync`,
+`/user/github-sync/status`) · git integration (`/user/git-servers`,
+`/user/git-pat/link`) · track-changes/threads/sharing-updates reads ·
+webdav `state` · user family gaps (`/user/list`, `/user/contacts`,
+`/user/mysettings`, `/user/send-test-email`, `/user/password/update`) ·
+`/template/:id/preview` · notifications prefs project-scoped (`/project/:id`) ·
+`/api/format-tex` (remaining methods) · token/redirect pages (`/read/:token`,
+`/event/:token`?, `/restricted`). — scope: ~8–14 feature families;
+suggest ordering by e2e impact (hub/editor critical path first), each as a
+standard port+flip+gate unit.
 code (85 READMEs total): the `go/` tree index, all 16 library packages,
 `go/s3x`, all 11 service roots + every `gitbridge/` sub-package, and the full
 `go/services/web` tree (`core/`, `contract/`, `features/` index + each feature
@@ -3242,3 +3291,8 @@ independent); P7 only after 100% prefix coverage + soak.
 Nothing in this plan blocks the nine-service steady state; it starts at M0 and
 touches the user only via the nginx flip table — which is exactly the property
 that made Phase C safe.
+
+> NOTE (2026-09-22): the missing-families list above is the LIVE 404 evidence
+> set (nginx, post-cutover window). Individual rows should be re-verified
+> per-method at porting time (route tables may already cover some methods —
+> e.g. `POST /project/:id/doc` exists (P4.11a) even where a read 404'd).
