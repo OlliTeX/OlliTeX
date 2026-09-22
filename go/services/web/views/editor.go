@@ -84,25 +84,30 @@ func EditorPage(d EditorData) string {
 
 // HubData — the /hub page per-request values (P6.1).
 type HubData struct {
-	Nonce     string
-	CSRF      string
-	Origin    string // site URL (alternate link)
-	HubAdmin  bool
-	GitBridge bool
-	JSON      map[string]string
-	Raw       map[string]string
+	Nonce      string
+	CSRF       string
+	Origin     string // site URL (alternate link)
+	CurrentURL string // requested path — Node canonical is path-aware (U9)
+	HubAdmin   bool
+	GitBridge  bool
+	JSON       map[string]string
+	Raw        map[string]string
 }
 
 // HubPage renders /hub (views/hub_template.go + slots).
 func HubPage(d HubData) string {
 	t := hubTemplate
+	cu := d.CurrentURL
+	if cu == "" {
+		cu = "/hub"
+	}
 	return ApplyPageSlots(t, PageSlots{
 		Nonce:       d.Nonce,
 		CSRF:        d.CSRF,
 		Title:       "OlliTeX Hub - OlliTeX, Online LaTeX Editor",
 		ProjectName: "OlliTeX Hub",
 		Origin:      d.Origin,
-		CurrentURL:  "/hub",
+		CurrentURL:  cu,
 		JSON:        d.JSON,
 		Raw:         d.Raw,
 		Bool: map[string]bool{

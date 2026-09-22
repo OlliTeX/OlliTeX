@@ -1,6 +1,10 @@
 // Package staticpages ports the NonCE StaticPages surface (P1 wave):
 //
 //	GET /            → logged-in: 302 /hub (owner 2026-09 #34); else 302 /login
+//	GET /home        → logged-in: 302 /login (HomeController.home — the
+//	                   external home pug is absent in this build; Node oracle
+//	                   2026-09-22: 302 "Found. Redirecting to /login"),
+//	                   anonymous: global gate (401 accept-json / 302 html)
 //	GET /learn* etc. → 301 https://www.overleaf.com<originalUrl> (CE marketing
 //	                    passthrough; pinned)
 //
@@ -11,17 +15,37 @@ package staticpages
 
 import (
 	"net/http"
+	"regexp"
 
 	"ollitex/go/services/web/core"
 )
 
 const marketingBase = "https://www.overleaf.com"
 
+// homeRe — /home (case-insensitive + Express trailing-slash tolerant; U9 oracle).
+var homeRe = regexp.MustCompile(`^/(?i:home)/?$`)
+
 func Feature(a *core.App) core.Feature {
 	return core.Feature{
 		Name: "staticpages",
 		Routes: []core.Route{
-			{Method: "GET", Path: "/", NoLogin: true, Handler: home(a)},
+			{
+				// U9: Node's '/' is NOT on the global-login whitelist — anonymous
+				// JSON gets the gate 401 (live-pinned 2026-09-22: N anon /
+				// Accept:application/json -> 401 Unauthorized; the Go NoLogin
+				// branch wrongly 302ed the JSON caller), anonymous HTML gets the
+				// gate 302 /login; logged-in passes the gate into home() -> 302
+				// /hub (owner 2026-09 #34).
+				Method:  "GET",
+				Path:    "/",
+				Handler: home(a),
+			},
+			// U9 (Node oracle 2026-09-22): /home = HomeController.home — the
+			// external home pug does NOT ship in this build, so logged-in
+			// requests 302 to /login. Not on the global-login whitelist:
+			// anonymous hits the gate first (401 accept-json / 302 html). Case-
+			// insensitive (Express default).
+			{Method: "GET", Pattern: homeRe, Handler: homeToLogin},
 			// LOGIN-REQUIRED (pinned: the gate runs before these — anonymous
 			// /learn → 302 /login; logged-in → the 301 below).
 			{Method: "GET", Path: "/learn", Handler: marketingRedirect},
@@ -43,6 +67,13 @@ func home(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		res.Redirect(cxt.Req, 302, "/login")
 	}
+}
+
+// homeToLogin — Node HomeController.home, CE branch (homepage feature off /
+// pug absent): res.redirect('/login'). Logged-in only reach it (the global
+// gate bounces anonymous first — pinned in the U9 gate battery).
+func homeToLogin(cxt *core.Cxt, res *core.Res) {
+	res.Redirect(cxt.Req, 302, "/login")
 }
 
 // marketingRedirect — router.mjs:1370 passthrough (/learn*, /blog*, /latex*,

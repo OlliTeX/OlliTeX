@@ -347,6 +347,7 @@ func tplPageData(cxt *core.Cxt) views.PageData {
 		if SessionIsAdmin(cxt.Sess) {
 			d.NavAdmin = views.AdminNavFragment
 		}
+		d.NavSiteAdmin = core.NavSiteAdmin(cxt.Sess)
 	}
 	if tok := cxt.Sess.CsrfToken(); tok != "" {
 		d.CSRFToken = tok

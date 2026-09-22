@@ -45,6 +45,7 @@ import (
 	"time"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/sitesettings"
 	"ollitex/go/services/web/features/templates"
 	"ollitex/go/services/web/views"
 
@@ -249,7 +250,7 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 			"ol-ExposedSettings":    ExposedSettingsJSON(cxt.SiteURL, templates.MenuGrant(ctx, cxt)),
 			"ol-splitTestVariants":  pinned_ol_splitTestVariants,
 			"ol-splitTestInfo":      pinned_ol_splitTestInfo,
-			"ol-navbar":             navbarJSON(cxt.SiteURL, currentURL, email, isAdmin),
+			"ol-navbar":             navbarJSON(cxt.SiteURL, currentURL, email, isAdmin, sitesettings.RegistrationEnabled(a, ctx)),
 			"ol-footer":             withSiteURL(pinned_ol_footer, cxt.SiteURL),
 			"ol-userSettings":       buildUserSettings(udoc),
 			"ol-user":               serializeUser(uid, email, udoc),

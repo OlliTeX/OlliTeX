@@ -97,6 +97,16 @@ type PageData struct {
 	Path      string // request path (alternate link)
 	UserEmail string // session user email (Node: ol-usersEmail + navbar pill)
 	UserID    string // session user id (ol-user_id)
+	// U9: navbar showSignUpLink — Node hasFeature('registration-page') =
+	// boolFromEnv(OVERLEAF_ENABLE_REGISTRATION_PAGE) ?? !(sso-saml||sso-ldap||
+	// sso-oidc site_settings enabled) — stack-wide, computed per request.
+	// Rendered as a JSON boolean true/false in the ol-navbar metas.
+	ShowSignUpLink bool
+	// NavSiteAdmin — layout-react navbar admin flags (canDisplayAdminMenu
+	// + canDisplayProjectUrlLookup collapse to it in this stack; see
+	// core.NavSiteAdmin). Replaces the baked `false` literals in the
+	// page-data navbar renders.
+	NavSiteAdmin bool
 	// P2 dynamic slots (empty strings render the anonymous/absent shape):
 	ResetErr   string // passwordReset meta: "" | "password_reset_token_expired"
 	EmailField string // setPassword form email input
@@ -170,6 +180,37 @@ func (p PageData) finalize(html string) string {
 	out = strings.ReplaceAll(out, slotLPAdmin, boolAttr(p.LaunchpadAdminExists))
 	// P3.4 register page (anon skeleton; fills on a logged-in session):
 	out = strings.ReplaceAll(out, slotRegUsers, htmlAttrEsc(p.UserEmail))
+	// U9: /login anon skeleton (captured signed-out) — Node fills these from
+	// the SESSION user when a logged-in visitor lands on /login (live-pinned
+	// 2026-09-22); anonymous keeps the anonymous shape: content="" and the
+	// valueless ol-user_id meta.
+	out = strings.ReplaceAll(out, "\x01LOGINUSER\x02", htmlAttrEsc(p.UserEmail))
+	if p.UserID == "" {
+		out = strings.ReplaceAll(out, "\x01LOGINUID\x02", "")
+	} else {
+		out = strings.ReplaceAll(out, "\x01LOGINUID\x02", ` content="`+htmlAttrEsc(p.UserID)+`"`)
+	}
+	// U9: navbar showSignUpLink (JSON boolean in the ol-navbar metas).
+	if p.ShowSignUpLink {
+		out = strings.ReplaceAll(out, "\x01SUPLINK\x02", "true")
+	} else {
+		out = strings.ReplaceAll(out, "\x01SUPLINK\x02", "false")
+	}
+	// U9: navbar admin flags (layout-react.pug — baked false in the page
+	// data; Node flips both for a site-admin session when
+	// ADMIN_PRIVILEGE_AVAILABLE=true). The dynamic editor/hub navbars are
+	// separate (navbarJSON / hubNavbar) and never carry this literal.
+	if p.NavSiteAdmin {
+		out = strings.ReplaceAll(out, "canDisplayAdminMenu\u0026quot;:false", "canDisplayAdminMenu\u0026quot;:true")
+		out = strings.ReplaceAll(out, "canDisplayProjectUrlLookup\u0026quot;:false", "canDisplayProjectUrlLookup\u0026quot;:true")
+	}
+	// U9: login navbar sessionUser (layout-react.pug:
+	// sessionUser ? {email} : undefined — key ABSENT when anonymous).
+	if p.UserEmail != "" {
+		out = strings.ReplaceAll(out, "\x01LOGINITEMS\x02", `,&quot;sessionUser&quot;:{&quot;email&quot;:&quot;`+htmlAttrEsc(p.UserEmail)+`&quot;},`)
+	} else {
+		out = strings.ReplaceAll(out, "\x01LOGINITEMS\x02", ",")
+	}
 	if p.UserID == "" {
 		out = strings.ReplaceAll(out, slotRegUID, "")
 	} else {

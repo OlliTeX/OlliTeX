@@ -518,3 +518,31 @@ func init() {
 		panic(fmt.Sprintf("validationToken regression: %q", validationToken("abcd")))
 	}
 }
+
+// SessionUserEmail — the logged-in user's email (Node layout-base
+// ol-usersEmail / navbar pill: SessionManager.getSessionUser(req.session)?.
+// email). CE session: session.user.email; SaaS: passport.user.email.
+func (s *Session) SessionUserEmail() string {
+	if raw, ok := s.Doc["passport"]; ok {
+		var p struct {
+			User json.RawMessage `json:"user"`
+		}
+		if json.Unmarshal(raw, &p) == nil && string(p.User) != "null" && string(p.User) != "" {
+			var u struct {
+				Email string `json:"email"`
+			}
+			if json.Unmarshal(p.User, &u) == nil && u.Email != "" {
+				return u.Email
+			}
+		}
+	}
+	if raw, ok := s.Doc["user"]; ok && string(raw) != "null" {
+		var u struct {
+			Email string `json:"email"`
+		}
+		if json.Unmarshal(raw, &u) == nil {
+			return u.Email
+		}
+	}
+	return ""
+}

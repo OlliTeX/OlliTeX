@@ -40,6 +40,9 @@ func Feature(a *core.App) core.Feature {
 	return core.Feature{
 		Name: "serveradmin",
 		Routes: []core.Route{
+			// U9: the /admin shell page (Express case + slash tolerant;
+			// canonical alternate link stays path-aware).
+			{Method: "GET", Pattern: adminPageRe, Handler: adminPage(a)},
 			{Method: "GET", Path: "/admin/editor-state", Handler: editorState(a)},
 			{Method: "POST", Path: "/admin/openEditor", Handler: openEditor(a)},
 			{Method: "POST", Path: "/admin/closeEditor", Handler: closeEditor(a)},

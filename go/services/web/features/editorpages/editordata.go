@@ -420,7 +420,7 @@ func sortStrings(x []string) {
 }
 
 // navbarJSON — ol-navbar (static config + dynamic currentUrl + sessionUser).
-func navbarJSON(siteURL, currentURL, email string, isAdmin bool) string {
+func navbarJSON(siteURL, currentURL, email string, isAdmin, showSignUp bool) string {
 	var sstr strings.Builder
 	sstr.WriteString(`{"customLogo":"/logo_full.svg"`)
 	sstr.WriteString(`,"customLogoDark":"/logo_full.svg"`)
@@ -441,14 +441,11 @@ func navbarJSON(siteURL, currentURL, email string, isAdmin bool) string {
 	sstr.WriteString(`,"suppressNavbarRight":false`)
 	sstr.WriteString(`,"suppressNavContentLinks":false`)
 	// showSignUpLink — Node: hasFeature('registration-page') =
-	// boolFromEnv(OVERLEAF_ENABLE_REGISTRATION_PAGE) ?? !(saml||ldap||oidc
-	// enabled) (modules/registration-page/index.mjs). In this e2e stack the
-	// env is unset and the SAML IdP is enabled (see the auth-config SSO
-	// list), so the wire value is FALSE — pinned live 2026-09-22 by the U2
-	// gate (the older 2026-09-19 TRUE pin pre-dates the e2e SAML enable
-	// and is stale; hub/settings/login pins re-verified on the U3+/user
-	// family units).
-	sstr.WriteString(`,"showSignUpLink":false`)
+	// boolFromEnv(OVERLEAF_ENABLE_REGISTRATION_PAGE) ?? !(sso-saml||sso-ldap||
+	// sso-oidc site_settings enabled), computed per request by the caller
+	// (U9 helper sitesettings.RegistrationEnabled; e2e stack: SAML IdP on
+	// -> false — U2 gate pin holds).
+	sstr.WriteString(`,"showSignUpLink":` + boolJSON(showSignUp))
 	sstr.WriteString(`,"currentUrl":"` + jesc(currentURL) + `"`)
 	sstr.WriteString(`,"sessionUser":{"email":"` + jesc(email) + `"`)
 	sstr.WriteString(`},"items":[{"text":"Library","url":"/library","class":"subdued","translatedText":"Library"},`)
