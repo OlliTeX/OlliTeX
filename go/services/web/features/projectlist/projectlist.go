@@ -67,6 +67,13 @@ import (
 // pin that 1:1 rather than "fixing" it.
 var dashTagPat = regexp.MustCompile(`^/project/tags/[^/]+$`)
 
+// dashSlashPat — Node/Express routing is case-insensitive AND loose on the
+// trailing slash: /Project/ (any case, exactly one trailing slash) hits the
+// /project dashboard 301 (pinned live 2026-09-22 U2: 301 →
+// /hub#/projects.all, "Moved Permanently. Redirecting to …"). The exact
+// paths above already cover the canonical lowercase forms.
+var dashSlashPat = regexp.MustCompile(`^/(?i:project)/$`)
+
 func dashRedir(loc string) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		res.Redirect(cxt.Req, 301, loc)
@@ -89,6 +96,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Path: "/project/trashed", Handler: dashRedir("/hub#/projects.trashed")},
 			{Method: "GET", Path: "/project/untagged", Handler: dashRedir("/hub#/projects.all")},
 			{Method: "GET", Pattern: dashTagPat, Handler: dashRedir("/hub#/projects.tags.tags")},
+			{Method: "GET", Pattern: dashSlashPat, Handler: dashRedir("/hub#/projects.all")},
 			{Method: "GET", Path: "/user/projects", Handler: handler(a)},
 			{Method: "GET", Pattern: entPat, Handler: entitiesHandler(a)},
 			{Method: "GET", Pattern: memPat, Handler: membersHandler(a)},

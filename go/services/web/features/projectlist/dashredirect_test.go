@@ -107,5 +107,34 @@ func TestDashboardRedirectTable(t *testing.T) {
 	if wantBody := "Moved Permanently. Redirecting to /hub#/projects.tags.tags"; w.Body.String() != wantBody {
 		t.Fatalf("tags: body %q", w.Body.String())
 	}
+
+	// U2 — /project/ (any case) — Node/Express case-insensitive + trailing
+	// slash: same dashboard 301 (pinned live 2026-09-22).
+	var slash *core.Route
+	for i := range f.Routes {
+		if f.Routes[i].Pattern != nil && f.Routes[i].Pattern == dashSlashPat {
+			slash = &f.Routes[i]
+		}
+	}
+	if slash == nil {
+		t.Fatal("dashSlashPat route not registered")
+	}
+	for _, p := range []string{"/project/", "/Project/", "/PROJECT/"} {
+		if !dashSlashPat.MatchString(p) {
+			t.Fatalf("dashSlashPat must match %q", p)
+		}
+		ws := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", p, nil)
+		req.Header.Set("Accept", "*/*")
+		slash.Handler(&core.Cxt{Req: req}, &core.Res{W: ws})
+		if ws.Code != 301 || ws.Header().Get("Location") != "/hub#/projects.all" {
+			t.Fatalf("%s: want 301 /hub#/projects.all, got %d %q", p, ws.Code, ws.Header().Get("Location"))
+		}
+	}
+	for _, p := range []string{"/project", "/project/owned", "/project/x/y"} {
+		if dashSlashPat.MatchString(p) {
+			t.Fatalf("dashSlashPat must NOT match %q", p)
+		}
+	}
 	_ = http.MethodGet
 }

@@ -2,7 +2,7 @@
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
 all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green**; **P4.12a file proxy (`GET|HEAD /Project/:id/file/:File_id`) ✔ 3/3 x3 (history-v1→Go-filestore blob chain, no-CT/chunked 200 pin, HEAD-404 fork quirk, guest/VA/authz battery) — ALSO FIXED the baked-in-capture-user bug in `restrictedHTML` (Go 403-restricted pages now render the requesting user; a P2-page variant of the same bug is deferred to a view-audit unit)**; **P4.12b doc download (`GET|HEAD /Project/:id/doc/:Doc_id/download`) ✔ 3/3 x3 (DU fromVersion=-1 lines, CD attachment, HEAD-200 asymmetry, sendStatus-404 pin) — 45-test P4 regression green** (2026-09-15). **P4.12c private API doc trio (GET|POST doc + changes/reject) ✔ 3/3 x3 (basic-auth surface, XPB+CSP pin, `NoSession` route option, 204 ETag quirk) — 47-test P4 regression green**; **P4.13a project upload (`POST /Project/:id/upload`) ✔ 3/3 x3 (thin-client upsert engine: docstore/v1H/DU call order, file↔doc swaps, cross-type 200+422/400/403/404/500 contract, `owner_ref`/docstore-seed env pins, `entCanWrite` collabRefs + 500-mailto parity fixes) — 65-test cross-regression green**; **P4.13b new-project zip upload (`POST /project/new/upload`) ✔ 3/3 x3 (FileSystemImportManager replica: zip-skip→topLevel-dir strip, FileTypeManager byte-level parity incl. utf16le-BOM + latin1 fallback + non-BMP→file + 3MiB decode gate, rootDoc priority pin, enforce-mode VA byte-pins, blocked-name `toString` → 500 + `zip-import-failure` deleter, multer `LIMIT_UNEXPECTED_FILE` HTML page, 22-case response+mongo+DU+docstore state battery) — FULL P4 regression green (36 p4* + 23 p411–p413b + P2/P3 sweep)** (2026-09-15). **P4.13b ALSO FIXED the P4.1 list owner+collaborator dedup bug (user who is owner AND invited-collaborator listed twice by Go; Node dedups best-access — latent, exposed by p4col-gate leftover projects) and hardened p413a/p413b/p413 flip harnesses against stale-include cascade failures.** **ALL OF P4 COMPLETE (2026-09-15): project list + entities + members + access-requests + rename + flags + create(+example) + delete/restore + clone + collaborators + invites + editor entity create/delete + file proxy + doc download + private doc trio + project upload + zip upload.**
-**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) IN PROGRESS — step 1 ✔ (85 READMEs), step 2 attempted + root-caused (missing main-app families — see P7 section), step 3 slice 1 ✔ (legacy dashboard redirects), step 3 slice 2 = U1 ✔ (POST /api/project + entire tags family, parity gate GREEN, dual-port Node==Go==Node) — U2..U9 remaining, then the hard cutover re-attempt.**
+**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) IN PROGRESS — step 1 ✔ (85 READMEs), step 2 attempted + root-caused (missing main-app families — see P7 section), step 3 slice 1 ✔ (legacy dashboard redirects), step 3 slice 2 = U1 ✔ (POST /api/project + entire tags family, parity gate GREEN, dual-port Node==Go==Node), step 3 slice 3 = U2 ✔ (editor-entry route family, parity gate GREEN) — U3..U9 remaining, then the hard cutover re-attempt.**
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -3202,9 +3202,45 @@ family — oracle-pinned → Go feature → PARITY GATE GREEN.**
   attaches it); `core.Cxt` gained `A *App`; `gofmt` drift in touched files
   normalized.
 
+*Step 3 slice 3 done (U2, 2026-09-22): the editor-entry route family —
+`GET /Project/:id`, `GET /project/:id`, `GET /editor/:id` in ANY case
+(Node/Express routing is case-insensitive — pinned live), id in either hex
+case, main + `/detacher|/detached`; non-empty invalid id → Node's exact
+404 JSON (objectId param validator wire); empty-id split (`/editor/` →
+generic 404 page, `/Project/` → dashboard 301); anonymous → 302 /login
+(auth first). Gate `specs/parity/web-go-u2-editor.test.e2e.ts` GREEN
+(3-leg dual-port, 17 records).
+- Go: `editorPagePattern` / `editorBadIdPattern` (case-insensitive prefix
+  + both hex cases; `editorBadId` handler answers Node's exact 404 JSON —
+  Go `res.JSON` = application/json; charset=utf-8 + weak ETag, matching
+  Node's), `dashSlashPat` (projectlist: `/project/` any case →
+  `/hub#/projects.all` 301), `primitiveObjectID` lowercases so an
+  uppercase-hex id resolves.
+- The gate (running as the oracle) surfaced + fixed five real divergences
+  in the P5.1-era editor port: **`canManageTemplatesMenu` = full
+  `hasTemplateAdminAccess` ladder** (now `templates.MenuGrant` on the
+  editor page, as in U1); **`canDisplayProjectUrlLookup`** = admin (Node
+  `adminPrivilegeAvailable && canDisplayAdminMenu &&
+  hasAdminCapability('view-project-setting')` — all true for admins in
+  this stack; was hardcoded false); **`showSignUpLink`** =
+  `boolFromEnv(OVERLEAF_ENABLE_REGISTRATION_PAGE) ?? !(saml||ldap||oidc)`
+  — e2e SAML is enabled ⇒ FALSE (the 2026-09-19 TRUE pin pre-dates the
+e2e SAML enable; hub + settings/login pins re-verified on the U3+/user
+  family units); **`ol-showTemplatesServerPro`** =
+  `Boolean(site_settings.templates) && (admin || nonAdminCanManage ||
+  templates.user_id == uid)` (admin ⇒ true, bare `content` meta); **the
+  loading-screen init class** = `getInitialTheme(getOverallTheme(user))`
+  (user `ace.overallTheme`: `light-`→light, `system`→system, `''`→dark,
+  else→dark; no ace: signUpDate < 2026-03-02 ⇒ dark else system).
+- Gate idiom lesson: **node `fetch` follows redirects by default** — the
+  earlier "200 OLi surface" records were the post-`302→/login` follow;
+  `redirect: 'manual'` exposes the true wire (301/302 + `location` +
+  `<p>…</p>` body).
+
 **Known Go-web missing families (cutover evidence, 2026-09-22):** ~~`POST
-/api/project`~~ ✅ U1 · ~~tags family~~ ✅ U1 · `GET /project/:id` (+
-`GET /project/:id/doc/:id` state reads) · hub shell `GET /hub/`
+/api/project`~~ ✅ U1 · ~~tags family~~ ✅ U1 · ~~editor entry
+`GET /Project|/project|/editor/:id`~~ ✅ U2 · `GET /project/:id/doc/:id`
+state reads) · hub shell `GET /hub/`
 (trailing-slash parity) · `GET /admin` (+`/admin-hub`?, `/home`) ·
 per-project LLM reads (`llm/models`, `llm/compile-fix`,
 `llm/source-context`) · github-sync (`state`, `merge`, `new/github-sync`,

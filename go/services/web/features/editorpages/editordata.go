@@ -429,17 +429,26 @@ func navbarJSON(siteURL, currentURL, email string, isAdmin bool) string {
 	sstr.WriteString(`,"hideLogo":false`)
 	sstr.WriteString(`,"canDisplayAdminMenu":` + boolJSON(isAdmin))
 	sstr.WriteString(`,"canDisplayAdminRedirect":false`)
-	sstr.WriteString(`,"canDisplayProjectUrlLookup":false`)
+	// canDisplayProjectUrlLookup — Node (layout-react.pug):
+	// settings.adminPrivilegeAvailable && canDisplayAdminMenu &&
+	// hasAdminCapability('view-project-setting', false). In this stack the
+	// admin-privilege terms are all true for site admins, so it equals
+	// isAdmin (U2 gate pin 2026-09-22: Node admin ⇒ true / member ⇒ false).
+	sstr.WriteString(`,"canDisplayProjectUrlLookup":` + boolJSON(isAdmin))
 	sstr.WriteString(`,"canDisplaySplitTestMenu":false`)
 	sstr.WriteString(`,"canDisplaySurveyMenu":false`)
 	sstr.WriteString(`,"canDisplayScriptLogMenu":false`)
 	sstr.WriteString(`,"suppressNavbarRight":false`)
 	sstr.WriteString(`,"suppressNavContentLinks":false`)
 	// showSignUpLink — Node: hasFeature('registration-page') =
-	// env OVERLEAF_ENABLE_REGISTRATION_PAGE ?? !(saml/ldap/oidc enable),
-	// pinned TRUE in this stack (live-captured 2026-09-19; re-pin on SSO
-	// state change).
-	sstr.WriteString(`,"showSignUpLink":true`)
+	// boolFromEnv(OVERLEAF_ENABLE_REGISTRATION_PAGE) ?? !(saml||ldap||oidc
+	// enabled) (modules/registration-page/index.mjs). In this e2e stack the
+	// env is unset and the SAML IdP is enabled (see the auth-config SSO
+	// list), so the wire value is FALSE — pinned live 2026-09-22 by the U2
+	// gate (the older 2026-09-19 TRUE pin pre-dates the e2e SAML enable
+	// and is stale; hub/settings/login pins re-verified on the U3+/user
+	// family units).
+	sstr.WriteString(`,"showSignUpLink":false`)
 	sstr.WriteString(`,"currentUrl":"` + jesc(currentURL) + `"`)
 	sstr.WriteString(`,"sessionUser":{"email":"` + jesc(email) + `"`)
 	sstr.WriteString(`},"items":[{"text":"Library","url":"/library","class":"subdued","translatedText":"Library"},`)

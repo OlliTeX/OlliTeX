@@ -24,6 +24,7 @@ type PageSlots struct {
 	ProjectName string // bare name slot (twitter:title / og:title)
 	Origin      string
 	CurrentURL  string
+	InitTheme   string // loading-screen-init-<v> (Node getInitialTheme; default "system")
 	JSON        map[string]string
 	Raw         map[string]string
 	Bool        map[string]bool
@@ -39,6 +40,11 @@ func ApplyPageSlots(template string, d PageSlots) string {
 	s = strings.ReplaceAll(s, "__TITLE__", edHTMLEscape(d.Title))
 	s = strings.ReplaceAll(s, "__ORIGIN__", d.Origin)
 	s = strings.ReplaceAll(s, "__CURRENTURL__", edHTMLEscape(d.CurrentURL))
+	if t := d.InitTheme; t != "" {
+		s = strings.ReplaceAll(s, "__INITTHEME__", t)
+	} else {
+		s = strings.ReplaceAll(s, "__INITTHEME__", "system")
+	}
 	for {
 		i := strings.Index(s, edSlotBeg)
 		if i < 0 {
