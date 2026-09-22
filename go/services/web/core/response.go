@@ -108,6 +108,21 @@ func (r *Res) SendStatus(code int) {
 // NoContent mirrors modern express res.sendStatus(204): status only —
 // empty body, no Content-Type/ETag/Content-Length (node-pinned P4.10a).
 func (r *Res) NoContent() {
+	// Node idiom res.status(204).end() — plain 204, no body, no Content-Type,
+	// no Content-Length, NO ETag (pinned U1 tag battery against Node).
+	r.W.Header().Set("Transfer-Encoding", "chunked")
+	r.W.WriteHeader(204)
+}
+
+// SendStatus204 — Node idiom res.sendStatus(204): no body, no Content-Type,
+// no Content-Length — BUT the Express etag IS computed on the 10-byte
+// status message "No Content" (pinned U10.1: history labels DELETE 204
+// carries ETag W/"a-<sha1-b64 27>", Node==Node stable).
+func (r *Res) SendStatus204() {
+	if msg := http.StatusText(204); msg != "" {
+		r.W.Header().Set("ETag", EtagWeakBody(msg))
+	}
+	r.W.Header().Set("Transfer-Encoding", "chunked")
 	r.W.WriteHeader(204)
 }
 

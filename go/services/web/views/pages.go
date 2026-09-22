@@ -16,6 +16,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"ollitex/go/services/web/core"
@@ -294,6 +295,9 @@ func Page(w http.ResponseWriter, d PageData, skeleton string) {
 	html := d.finalize(skeleton)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", csp)
+	// Express res.render always sends the full body length (Node sends
+	// Content-Length on rendered views — pinned U10.1: 15 KB 404/403 pages).
+	w.Header().Set("Content-Length", strconv.Itoa(len(html)))
 	// HttpPermissionsPolicy — rendered views only (pinned P3.1: the 500 view
 	// carries it, JSON routes do not). Set after the CSP so renderers can
 	// override either cleanly.
@@ -316,6 +320,7 @@ func StatusPage(w http.ResponseWriter, d PageData, status int, skeleton string) 
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
 	w.Header().Set("ETag", core.EtagWeakBody(html))
+	w.Header().Set("Content-Length", strconv.Itoa(len(html)))
 	w.WriteHeader(status)
 	_, _ = io.WriteString(w, html)
 }
@@ -426,6 +431,7 @@ func Error500Page(w http.ResponseWriter, d PageData) {
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
 	w.Header().Set("ETag", core.EtagWeakBody(body))
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(500)
 	_, _ = io.WriteString(w, body)
 }

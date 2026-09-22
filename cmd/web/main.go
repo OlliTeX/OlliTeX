@@ -31,6 +31,7 @@ import (
 	"ollitex/go/services/web/features/editorpages"
 	"ollitex/go/services/web/features/gitbridge"
 	"ollitex/go/services/web/features/healthcheck"
+	"ollitex/go/services/web/features/history"
 	"ollitex/go/services/web/features/hub"
 	"ollitex/go/services/web/features/instancestats"
 	"ollitex/go/services/web/features/languagetool"
@@ -156,6 +157,11 @@ func main() {
 	app.RegisterFeature(projectlist.Feature(app))
 	app.RegisterFeature(projectlist.AdminFeature(app))
 	app.RegisterFeature(adminusers.Feature(app))
+
+	// U10.1 surface: project history route family (updates / diff family /
+	// latest/history / changes / labels / version zip / blob / flush /
+	// restore+revert validation).
+	app.RegisterFeature(history.Feature(app))
 
 	// P6.4a surface: OlliTeX llm module settings surface (BYO provider rows,
 	// selected model, compliance rubrics, usage, grammar prefs, admin LLM

@@ -2,7 +2,7 @@
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
 all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green**; **P4.12a file proxy (`GET|HEAD /Project/:id/file/:File_id`) ✔ 3/3 x3 (history-v1→Go-filestore blob chain, no-CT/chunked 200 pin, HEAD-404 fork quirk, guest/VA/authz battery) — ALSO FIXED the baked-in-capture-user bug in `restrictedHTML` (Go 403-restricted pages now render the requesting user; a P2-page variant of the same bug is deferred to a view-audit unit)**; **P4.12b doc download (`GET|HEAD /Project/:id/doc/:Doc_id/download`) ✔ 3/3 x3 (DU fromVersion=-1 lines, CD attachment, HEAD-200 asymmetry, sendStatus-404 pin) — 45-test P4 regression green** (2026-09-15). **P4.12c private API doc trio (GET|POST doc + changes/reject) ✔ 3/3 x3 (basic-auth surface, XPB+CSP pin, `NoSession` route option, 204 ETag quirk) — 47-test P4 regression green**; **P4.13a project upload (`POST /Project/:id/upload`) ✔ 3/3 x3 (thin-client upsert engine: docstore/v1H/DU call order, file↔doc swaps, cross-type 200+422/400/403/404/500 contract, `owner_ref`/docstore-seed env pins, `entCanWrite` collabRefs + 500-mailto parity fixes) — 65-test cross-regression green**; **P4.13b new-project zip upload (`POST /project/new/upload`) ✔ 3/3 x3 (FileSystemImportManager replica: zip-skip→topLevel-dir strip, FileTypeManager byte-level parity incl. utf16le-BOM + latin1 fallback + non-BMP→file + 3MiB decode gate, rootDoc priority pin, enforce-mode VA byte-pins, blocked-name `toString` → 500 + `zip-import-failure` deleter, multer `LIMIT_UNEXPECTED_FILE` HTML page, 22-case response+mongo+DU+docstore state battery) — FULL P4 regression green (36 p4* + 23 p411–p413b + P2/P3 sweep)** (2026-09-15). **P4.13b ALSO FIXED the P4.1 list owner+collaborator dedup bug (user who is owner AND invited-collaborator listed twice by Go; Node dedups best-access — latent, exposed by p4col-gate leftover projects) and hardened p413a/p413b/p413 flip harnesses against stale-include cascade failures.** **ALL OF P4 COMPLETE (2026-09-15): project list + entities + members + access-requests + rename + flags + create(+example) + delete/restore + clone + collaborators + invites + editor entity create/delete + file proxy + doc download + private doc trio + project upload + zip upload.**
-**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) IN PROGRESS — step 1 ✔ (85 READMEs), step 2 attempted + root-caused (missing main-app families — see P7 section), step 3 slice 1 ✔ (legacy dashboard redirects), step 3 slice 2 = U1 ✔ (POST /api/project + entire tags family, parity gate GREEN, dual-port Node==Go==Node), step 3 slice 3 = U2 ✔ (editor-entry route family, parity gate GREEN) — U3..U9 remaining, then the hard cutover re-attempt.**
+**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) IN PROGRESS — step 1 ✔ (85 READMEs), step 2 attempted + root-caused (missing main-app families — see P7 section), step 3 slices: dashboard-redirects ✔, U1 ✔ (POST /api/project + tags family), U2 ✔ (editor entry), U8 ✔ (/user/contacts|emails|features), U9 ✔ (hub/admin/home shell + navbar page-data, 40-case parity gate GREEN, commit `99c1b3b25e`); U3 covered (LLM reads already present), U4/U5 + U6/U7 reconciled (disabled-surface P6.11 gate; packages already exist). NEXT: U10 residual web audit (project-history/diff, project-json, notifications, misc pages, template preview, admin misc), THEN the hard cutover re-attempt.**
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -3237,22 +3237,88 @@ e2e SAML enable; hub + settings/login pins re-verified on the U3+/user
   `redirect: 'manual'` exposes the true wire (301/302 + `location` +
   `<p>…</p>` body).
 
+**Step 3 slices done (U3–U9, 2026-09-22):**
+- **U3 (per-project LLM reads) — already covered**: `llm/models`,
+  `llm/compile-fix`, `llm/source-context` exist in
+  `go/services/web/features/llmsettings/` (P5-era port); audit found 0 gaps.
+- **U4/U5 (GitHub sync + git-servers) — reconciled for THIS stack**:
+  `GITHUB_SYNC_ENABLED` unset ⇒ GitHubSync module not registered by Node
+  (collections absent) ⇒ the P6.11 flip gate
+  (`specs/parity/web-go-p611-flip.test.e2e.ts`) already pins the 403/404/401
+  disabled-surface chain on both engines. A full GitHubSync port is out of
+  cutover scope unless the owner enables the feature (flag-gated surface).
+- **U6/U7 (track-changes/threads/webdav state) — reconciled**: packages
+  exist (`features/trackchanges`, `features/webdav`, threads under
+  projectlist); the earlier audit “gaps” were false positives from route
+  helpers (`p()` local regexp builders + `compile(...)`) the naive gap
+  scanner missed. Live A/B re-verification folded into the U9 battery.
+- **U8 (user-family JSON reads) — done**: `GET /user/contacts` (n DESC, ts
+  DESC stable order, top-50, holding-filter after slice; row shape pinned),
+  `GET /user/emails` (Node key-order wire; ABSENT `createdAt`/`_id` OMITTED
+  entirely — `JSON.stringify` drops undefined; `reversedHostname`),
+  `GET /user/features` (stored-order BSON keys = wire order; `{}` when the
+  user has no features field). POST/PUT/DELETE → 403 Forbidden; anonymous
+  gate chains (401 JSON / 302 HTML). Gate
+  `specs/parity/web-go-u8-userjson.test.e2e.ts` GREEN (3-leg, 20 records);
+  Go: `features/userpages/userjson.go` + unit tests.
+- **U9 (hub/admin/home shell + navbar page-data) — done, gate GREEN**
+  (40-case 3-leg matrix `specs/parity/web-go-u9-shells.test.e2e.ts`,
+  commit `99c1b3b25e`):
+  - `/hub` (+`/hub/`, `/HUB`, `/HUB/`) 200 Mantine hub, path-aware navbar
+    `currentUrl` + `<link alternate>` (Express case/slash parity; the
+    rendered canonical keeps the REQUESTED path — pinned).
+  - `/hub/admin`, `/hub/workspace` (+ case/slash variants) → 302 /hub.
+  - `/admin` shell: full Node render — LLM tab on/off per
+    `LLM_ENABLED==='true' || site_settings.llm.enabled` (on in this stack),
+    system-messages pug-escaped list (empty here), open sockets empty
+    `<ul></ul>` (http.globalAgent has no Go twin — pinned empty), saas
+    tabs absent; non-admin → 302 `/restricted?from=<pathname>` with **case
+    + trailing slash preserved** (Node oracle: `%2FAdmin`, `%2Fadmin%2F`).
+  - `/home` (+case/slash) → 302 /login (Node `HomeController.home` CE
+    branch — home pug absent in this build).
+  - root `/`: logged-in 302 /hub; anonymous global gate 401 `Unauthorized`
+    (accept-json) / 302 /login (accept-html → `<p>Found…</p>` body — the
+    302 body is Accept-shaped!); `NoLogin` dropped from the `/` route.
+  - navbar/page-data fixes (Node `layout-react.pug` + `ExpressLocals`
+    oracle): `showSignUpLink` = `hasFeature('registration-page')` (false
+    here — SAML on) computed once in `sitesettings.RegistrationEnabled`
+    and fed to hub navbars, the editor navbar, authpages and every
+    page-data render (slot `SUPLINK`); `canManageTemplatesMenu` = full
+    `MenuGrant` ladder on /user/settings + template pages;
+    **`canDisplayAdminMenu` + `canDisplayProjectUrlLookup` flip for a
+    site-admin session** (`core.NavSiteAdmin` =
+    `ADMIN_PRIVILEGE_AVAILABLE==='true'` && session
+    `passport.user.isAdmin` — Node `hasAdminAccess(sessionUser)`); the
+    settings-page `ol-user isAdmin` reads the users doc `isAdmin` field
+    (CE shape; `admin`/`adminRoles` legacy shapes stay as fallbacks);
+    /login logged-in navbar `sessionUser` + `ol-usersEmail`/`ol-user_id`
+    session-filled (LOGINUSER/LOGINUID/LOGINITEMS slots; anonymous keeps
+    the anonymous shape); /register anon fixture refreshed to the current
+    `showSignUpLink:false` wire.
+  - Gate lessons: battery tags get whitespace-normalized before cross-leg
+    lookup (padded `user  GET` vs `user GET`); A/B probes inside
+    `ol-e2e-overleaf-1` (shadow :4010 is container-local); a 302 body is
+    Accept-shaped (`<p>…</p>` under text/html).
+
 **Known Go-web missing families (cutover evidence, 2026-09-22):** ~~`POST
 /api/project`~~ ✅ U1 · ~~tags family~~ ✅ U1 · ~~editor entry
-`GET /Project|/project|/editor/:id`~~ ✅ U2 · `GET /project/:id/doc/:id`
-state reads) · hub shell `GET /hub/`
-(trailing-slash parity) · `GET /admin` (+`/admin-hub`?, `/home`) ·
+`GET /Project|/project|/editor/:id`~~ ✅ U2 · hub shell `GET /hub/`
+(trailing-slash parity) ✅ U9 · `GET /admin` + `/home` ✅ U9 ·
 per-project LLM reads (`llm/models`, `llm/compile-fix`,
-`llm/source-context`) · github-sync (`state`, `merge`, `new/github-sync`,
-`/user/github-sync/status`) · git integration (`/user/git-servers`,
-`/user/git-pat/link`) · track-changes/threads/sharing-updates reads ·
-webdav `state` · user family gaps (`/user/list`, `/user/contacts`,
-`/user/mysettings`, `/user/send-test-email`, `/user/password/update`) ·
-`/template/:id/preview` · notifications prefs project-scoped (`/project/:id`) ·
-`/api/format-tex` (remaining methods) · token/redirect pages (`/read/:token`,
-`/event/:token`?, `/restricted`). — scope: ~8–14 feature families;
-suggest ordering by e2e impact (hub/editor critical path first), each as a
-standard port+flip+gate unit.
+`llm/source-context`) ✅ U3 (already present) · github-sync (`state`,
+`merge`, `new/github-sync`, `/user/github-sync/status`) ✅ U4/U5
+(reconciled: disabled surface — P6.11 flip gate) · git integration
+(`/user/git-servers`, `/user/git-pat/link`) ✅ U4/U5 (reconciled) ·
+track-changes/threads/sharing-updates reads ✅ U6/U7 (reconciled) ·
+webdav `state` ✅ U6/U7 (reconciled) · user family gaps (`/user/list`,
+`/user/contacts`, `/user/mysettings`, `/user/send-test-email`,
+`/user/password/update`) — ✅ `/user/contacts` U8; remainder in U10 ·
+`/template/:id/preview` — U10 · notifications prefs project-scoped
+(`/project/:id`) — U10 · `/api/format-tex` (remaining methods) — U10 ·
+token/redirect pages (`/read/:token`, `/event/:token`?, `/restricted`)
+✅ `/restricted` U9 (gate); remainder in U10. — **U10 residual audit
+is the next unit: re-scan with the corrected (helper-aware) route audit,
+then port+gate true gaps in e2e-impact order, then the hard cutover.**
 code (85 READMEs total): the `go/` tree index, all 16 library packages,
 `go/s3x`, all 11 service roots + every `gitbridge/` sub-package, and the full
 `go/services/web` tree (`core/`, `contract/`, `features/` index + each feature
