@@ -2,7 +2,7 @@
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
 all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green**; **P4.12a file proxy (`GET|HEAD /Project/:id/file/:File_id`) ✔ 3/3 x3 (history-v1→Go-filestore blob chain, no-CT/chunked 200 pin, HEAD-404 fork quirk, guest/VA/authz battery) — ALSO FIXED the baked-in-capture-user bug in `restrictedHTML` (Go 403-restricted pages now render the requesting user; a P2-page variant of the same bug is deferred to a view-audit unit)**; **P4.12b doc download (`GET|HEAD /Project/:id/doc/:Doc_id/download`) ✔ 3/3 x3 (DU fromVersion=-1 lines, CD attachment, HEAD-200 asymmetry, sendStatus-404 pin) — 45-test P4 regression green** (2026-09-15). **P4.12c private API doc trio (GET|POST doc + changes/reject) ✔ 3/3 x3 (basic-auth surface, XPB+CSP pin, `NoSession` route option, 204 ETag quirk) — 47-test P4 regression green**; **P4.13a project upload (`POST /Project/:id/upload`) ✔ 3/3 x3 (thin-client upsert engine: docstore/v1H/DU call order, file↔doc swaps, cross-type 200+422/400/403/404/500 contract, `owner_ref`/docstore-seed env pins, `entCanWrite` collabRefs + 500-mailto parity fixes) — 65-test cross-regression green**; **P4.13b new-project zip upload (`POST /project/new/upload`) ✔ 3/3 x3 (FileSystemImportManager replica: zip-skip→topLevel-dir strip, FileTypeManager byte-level parity incl. utf16le-BOM + latin1 fallback + non-BMP→file + 3MiB decode gate, rootDoc priority pin, enforce-mode VA byte-pins, blocked-name `toString` → 500 + `zip-import-failure` deleter, multer `LIMIT_UNEXPECTED_FILE` HTML page, 22-case response+mongo+DU+docstore state battery) — FULL P4 regression green (36 p4* + 23 p411–p413b + P2/P3 sweep)** (2026-09-15). **P4.13b ALSO FIXED the P4.1 list owner+collaborator dedup bug (user who is owner AND invited-collaborator listed twice by Go; Node dedups best-access — latent, exposed by p4col-gate leftover projects) and hardened p413a/p413b/p413 flip harnesses against stale-include cascade failures.** **ALL OF P4 COMPLETE (2026-09-15): project list + entities + members + access-requests + rename + flags + create(+example) + delete/restore + clone + collaborators + invites + editor entity create/delete + file proxy + doc download + private doc trio + project upload + zip upload.**
-**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) IN PROGRESS — step 1 ✔ (85 READMEs), step 2 attempted + root-caused (missing main-app families — see P7 section), step 3 slices: dashboard-redirects ✔, U1 ✔ (POST /api/project + tags family), U2 ✔ (editor entry), U8 ✔ (/user/contacts|emails|features), U9 ✔ (hub/admin/home shell + navbar page-data, 40-case parity gate GREEN, commit `99c1b3b25e`); U3 covered (LLM reads already present), U4/U5 + U6/U7 reconciled (disabled-surface P6.11 gate; packages already exist). NEXT: U10 residual web audit (project-history/diff, project-json, notifications, misc pages, template preview, admin misc), THEN the hard cutover re-attempt.**
+**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) IN PROGRESS — step 1 ✔ (85 READMEs), step 2 attempted + root-caused (missing main-app families — see P7 section), step 3 slices: dashboard-redirects ✔, U1 ✔ (POST /api/project + tags family), U2 ✔ (editor entry), U8 ✔ (/user/contacts|emails|features), U9 ✔ (hub/admin/home shell + navbar page-data, 40-case parity gate GREEN, commit `99c1b3b25e`); U3 covered (LLM reads already present), U4/U5 + U6/U7 reconciled (disabled-surface P6.11 gate; packages already exist); U10.1 ✔ (Go history family, 53/53 gate GREEN, commit `477f1ad629`), U10.2a ✔ (analytics pokes + university redirects + project tokens + 404 pins + CSP parity fixes, 35/35 gate GREEN). NEXT: U10.2b entity rename/move/duplicate, U10.3 linked files, other missing families, U10.5 restore success paths, THEN the hard cutover.**
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -3319,6 +3319,48 @@ token/redirect pages (`/read/:token`, `/event/:token`?, `/restricted`)
 ✅ `/restricted` U9 (gate); remainder in U10. — **U10 residual audit
 is the next unit: re-scan with the corrected (helper-aware) route audit,
 then port+gate true gaps in e2e-impact order, then the hard cutover.**
+
+**U10 status (2026-09-23):**
+
+- **U10.1 (Go history family) — done, gate GREEN 53/53, commit
+  `477f1ad629`:** `go/services/web/features/history/` (7 files) — 16 routes
+  (updates, V1/V2 proxy, blob GET/HEAD/Range, labels, version-zip, flush,
+  changes, diff, restore/revert 400/500 family). Parity on status/body/
+  curated wire headers with nonce/created_at/ETag-hash normalization.
+- **U10.2a (residual slice A: analytics pokes, university redirects,
+  project tokens, 404 pins, logout page) — done, gate GREEN 35/35, this
+  commit:**
+  - `go/services/web/features/analytics/` — `POST /event/:event` (200/60
+    limiter `analytics-record-event`) + `PUT /editingSession/:projectId`
+    (20/60 `analytics-update-editing-session`, key `\<projectId\>:\<uid\>` =
+    Node's `params + clientId` join). Feature flag `apis.v1.url` honest —
+    unset in this stack → the 202 `Accepted` short-circuit is the wire
+    (pinned: text/plain, CL 8, ETag over `Accepted`).
+  - `staticpages` — `GET /university` + `GET /university/*` → 302
+    `/i/university…` (lowercased, first `.html` stripped, Node
+    UniversityController byte-parity).
+  - `projectlist.tokensHandler` — `GET /project/:id/tokens` (limiter
+    `get-project-tokens` 200/600): owner `tokens` absent → 403;
+    `tokens:{}` → 200 `{}`; owner tokens preserved in stored key order +
+    `readOnlyHashPrefix`/`readAndWriteHashPrefix` (sha256 hex :6) appended;
+    non-owner tokenRO → `{readOnly}`; else `{}`. `owner_ref` comes as
+    hex-string *or* ObjectID depending on writer — `strOrHex` normalises.
+  - **CSP parity fixes (latent bugs exposed by the full-header gate):**
+    rendered 404/restricted/logout pages now carry Node's per-request
+    nonce CSP (`views.Page`/`views.StatusPage` default `cspReact(d.Nonce)`
+    instead of the restrictive baseline), and the Express "Cannot
+    \u003cMETHOD\u003e \u003cpath\u003e" 404 page carries exactly `default-src 'none'`
+    (`pbhttp.ExpressNotFound`) — both verified live against Node before
+    and after.
+  - Battery `tests/e2e/specs/parity/u102a-matrix.cjs` (35 cases incl.
+    event-segment edge class, university edges, tokens owner/non-owner/
+    ghost/anon, 404 pins, logout page, es429 429-serial) + gate
+    `web-go-u102a.test.e2e.ts` (Node==Go==Node, per-leg limiter flush,
+    full app-header compare minus the documented transport exclusion
+    connection/keep-alive/date).
+- **NEXT: U10.2b entity rename/move/duplicate → U10.3 linked files +
+  remainder of the missing-family list above → U10.5 restore success
+  paths → hard cutover.**
 code (85 READMEs total): the `go/` tree index, all 16 library packages,
 `go/s3x`, all 11 service roots + every `gitbridge/` sub-package, and the full
 `go/services/web` tree (`core/`, `contract/`, `features/` index + each feature

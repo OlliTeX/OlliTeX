@@ -24,6 +24,7 @@ import (
 	"ollitex/go/mongoh"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/adminusers"
+	"ollitex/go/services/web/features/analytics"
 	"ollitex/go/services/web/features/authpages"
 	"ollitex/go/services/web/features/compile"
 	"ollitex/go/services/web/features/devcsrf"
@@ -162,6 +163,12 @@ func main() {
 	// latest/history / changes / labels / version zip / blob / flush /
 	// restore+revert validation).
 	app.RegisterFeature(history.Feature(app))
+
+	// U10.2 surface: analytics web pokes (POST /event/:event, PUT
+	// /editingSession/:projectId) — the `analytics` feature is OFF in this
+	// stack (apis.v1 unset), so both short-circuit to 202 "Accepted"
+	// behind their limiters (live-oracle pinned).
+	app.RegisterFeature(analytics.Feature(app))
 
 	// P6.4a surface: OlliTeX llm module settings surface (BYO provider rows,
 	// selected model, compliance rubrics, usage, grammar prefs, admin LLM

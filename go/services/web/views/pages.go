@@ -290,7 +290,10 @@ func cspReact(nonce string) string {
 func Page(w http.ResponseWriter, d PageData, skeleton string) {
 	csp := d.CSP
 	if csp == "" {
-		csp = cspRestrictive
+		// Node: every rendered page goes through the React layout — the
+		// nonce CSP (pinned U10.2 on 404/restricted/logout; explicit d.CSP
+		// still wins for callers that pin a different policy).
+		csp = cspReact(d.Nonce)
 	}
 	html := d.finalize(skeleton)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -313,7 +316,10 @@ func Page(w http.ResponseWriter, d PageData, skeleton string) {
 func StatusPage(w http.ResponseWriter, d PageData, status int, skeleton string) {
 	csp := d.CSP
 	if csp == "" {
-		csp = cspRestrictive
+		// U10.2: Node's 404/restricted status pages render through the React
+		// layout → nonce CSP (pinned live: 404 + restricted 403 both carry
+		// `script-src 'nonce-…' 'unsafe-inline' 'strict-dynamic' …`).
+		csp = cspReact(d.Nonce)
 	}
 	html := d.finalize(skeleton)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
