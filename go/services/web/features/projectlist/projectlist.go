@@ -195,6 +195,12 @@ func Feature(a *core.App) core.Feature {
 			// name→500 (Node's TPDS path doesn't map name-validation to 4xx). APIOnly →
 			// the web profile SKIPS it (Node web :4000 404s it) → unchanged.
 			{Method: "POST", Pattern: tpdsProjectNewPat, NoSession: true, APIOnly: true, Handler: tpdsCreateProjectHandler(a)},
+			// U-API — POST /user/:user_id/project/resolve (resolveProject, privateApiRouter,
+			// basic-auth; APIOnly). Node get-or-create: {projectId} → found(RW, active)
+			// →200 success / ghost→200 rejected; {projectName} → found→200 success /
+			// none→create blank→200 success; invalid name/pid → 400 strict-zod VA. APIOnly
+			// → the web profile SKIPS it (Node web :4000 404s it) → unchanged.
+			{Method: "POST", Pattern: tpdsProjectResolvePat, NoSession: true, APIOnly: true, Handler: tpdsResolveProjectHandler(a)},
 		},
 	}
 }

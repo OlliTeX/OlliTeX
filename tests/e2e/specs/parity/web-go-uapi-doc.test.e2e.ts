@@ -99,7 +99,7 @@ function ensureGoApi(): void {
 function cleanupCpGate(): void {
   const js = `
     const o = ObjectId("${OWNER}");
-    const ids = db.projects.find({ owner_ref: o, name: /^uapi-cp-gate/ }).toArray().map(p => p._id);
+    const ids = db.projects.find({ owner_ref: o, name: /^(uapi-cp-gate|resgate-gate)/ }).toArray().map(p => p._id);
     if (ids.length) { db.projects.deleteMany({ _id: { $in: ids } }); db.project_history.deleteMany({ project_id: { $in: ids } }); }
     console.log("cp-removed=" + ids.length);
   `

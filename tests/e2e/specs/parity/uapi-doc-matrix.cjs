@@ -201,6 +201,31 @@ async function main() {
   add('cp-slash-name', async () => post('/user/' + PI_UID + '/project/new', { projectName: 'a/b' }, VJ))
   add('cp-valid-name', async () => post('/user/' + PI_UID + '/project/new', { projectName: 'uapi-cp-gate' }, VJ))
 
+  // U-API — POST /user/:user_id/project/resolve (resolveProject, privateApiRouter,
+  // basic-auth; APIOnly). Node getOrCreateProject (get-by-id RW+active OR
+  // get-or-create-by-name). Wire (Node api :3000, pinned 2026-09-23):
+  // unauth/wrong → 401; user_id !24hex → 404 VA (params.user_id);
+  // {projectId:!24hex} → 400 VA (body.projectId); {} → 400 (197B, undefined or); {projectName:''}
+  // → 400 (120B, Too small); both keys → 400 (139B, Unrecognized key);
+  // {projectId:ghost} → 200 {"status":"rejected"} (21B);
+  // {projectName:existing} → 200 {"status":"success","projectId","historyId?,"otMigrationStage":0}
+  //   (historyId OMITTED when the project doc has no overleaf.history.id — the
+  //    uapi-wire seed has none; a freshly created blank has it = projectId);
+  // {projectName:new-name} → 200 success (CREATES a blank project named exactly that).
+  // SEED = the seeded uapi-wire fixture (owned by PI_UID, active).
+  const SEED = process.env.UAPI_SEEDNAME || 'uapi-wire'
+  add('res-unauth', async () => post('/user/' + PI_UID + '/project/resolve', { projectName: SEED }, J))
+  add('res-wrong', async () => post('/user/' + PI_UID + '/project/resolve', { projectName: SEED }, WJ))
+  add('res-invalid-oid', async () => post('/user/notahex/project/resolve', { projectName: 'x' }, VJ))
+  add('res-invalid-digit', async () => post('/user/123456789/project/resolve', { projectName: 'x' }, VJ))
+  add('res-bad-pid', async () => post('/user/' + PI_UID + '/project/resolve', { projectId: 'notahex' }, VJ))
+  add('res-empty-body', async () => post('/user/' + PI_UID + '/project/resolve', {}, VJ))
+  add('res-empty-name', async () => post('/user/' + PI_UID + '/project/resolve', { projectName: '' }, VJ))
+  add('res-both-keys', async () => post('/user/' + PI_UID + '/project/resolve', { projectId: 'notahex', projectName: 'x' }, VJ))
+  add('res-ghost-pid', async () => post('/user/' + PI_UID + '/project/resolve', { projectId: GHOST }, VJ))
+  add('res-existing-name', async () => post('/user/' + PI_UID + '/project/resolve', { projectName: SEED }, VJ))
+  add('res-new-name', async () => post('/user/' + PI_UID + '/project/resolve', { projectName: 'resgate-gate' }, VJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()
