@@ -226,6 +226,36 @@ async function main() {
   add('res-existing-name', async () => post('/user/' + PI_UID + '/project/resolve', { projectName: SEED }, VJ))
   add('res-new-name', async () => post('/user/' + PI_UID + '/project/resolve', { projectName: 'resgate-gate' }, VJ))
 
+  // U-API — POST /tpds/folder-update (updateFolder, privateApiRouter, basic-
+  // auth; APIOnly). Node TpdsUpdateHandler.createFolder -> getOrCreateProject
+  // -> FileTypeManager.shouldIgnore -> UpdateMerger.createFolder ->
+  // EditorController.promises.mkdirp -> ProjectEntityUpdateHandler.mkdirp
+  // (find-or-create each segment). Wire (Node api :3000, live-pinned 2026-09-23):
+  // unauth / wrong -> 401 (challenge); {} -> 400 (185B, userId+path undefined);
+  // {userId} -> 400 (114B, path undefined); {path} -> 400 (116B, userId
+  // undefined); {userId:not-an-oid} -> 400 (88B, Invalid Mongo ObjectId at
+  // body.userId); {userId:ghost} -> 500 (21B, no project -> Express 500);
+  // valid uid + path -> 200 JSON {entityId, projectId, path, folderId} (CREATES
+  // the folder; entityId=deepest, folderId=its parent, null at root). Node's
+  // mkdirp uses the PROJECT _id for the mongo filter; the Go port (tpdsMkdirp)
+  // matches. All 3 legs hit the SEEDed project A (re-seeded each run, so the
+  // created folders converge to the same OIDs and are wiped on the next run).
+  add('fu-unauth', async () => post('/tpds/folder-update', { userId: PI_UID, path: '/gu-g' }, J))
+  add('fu-wrong', async () => post('/tpds/folder-update', { userId: PI_UID, path: '/gu-g' }, WJ))
+  add('fu-no-body', async () => post('/tpds/folder-update', {}, VJ))
+  add('fu-uid-only', async () => post('/tpds/folder-update', { userId: PI_UID }, VJ))
+  add('fu-path-only', async () => post('/tpds/folder-update', { path: '/gu-g' }, VJ))
+  add('fu-bad-uid', async () => post('/tpds/folder-update', { userId: 'notanoid', path: '/gu-g' }, VJ))
+  // NB: {userId:ghost, path} (NO projectId/projectName) is a STATEFUL/undefined
+  // Node region — getOrCreateProject with no id/name falls through and Node
+  // itself is non-deterministic (500 "Internal Server Error" OR 200 resolving
+  // path:"/"). Not a stable wire contract, so it is deliberately EXCLUDED (the
+  // deterministic {projectId:ghost}-absent 500 and the valid {projectId} wire
+  // above are the pinned contract).
+  add('fu-root', async () => post('/tpds/folder-update', { userId: PI_UID, projectId: PJ, path: '/' }, VJ))
+  add('fu-top', async () => post('/tpds/folder-update', { userId: PI_UID, projectId: PJ, path: '/gu-g' }, VJ))
+  add('fu-nested', async () => post('/tpds/folder-update', { userId: PI_UID, projectId: PJ, path: '/gu-g/gu-n' }, VJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()

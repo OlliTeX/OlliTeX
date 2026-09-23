@@ -201,6 +201,15 @@ func Feature(a *core.App) core.Feature {
 			// none→create blank→200 success; invalid name/pid → 400 strict-zod VA. APIOnly
 			// → the web profile SKIPS it (Node web :4000 404s it) → unchanged.
 			{Method: "POST", Pattern: tpdsProjectResolvePat, NoSession: true, APIOnly: true, Handler: tpdsResolveProjectHandler(a)},
+			// U-API — POST /tpds/folder-update (updateFolder, privateApiRouter,
+			// basic-auth; APIOnly). Node splitPath(normalize) + get-or-create
+			// project + shouldIgnore(minimatch; live pattern undefined → no 409 in
+			// this stack) + tpdsMkdirp (find-or-create each segment; uses the
+			// PROJECT _id for the mongo filter — unlike upload upMkdirp, which
+			// assumes rootFolder._id==project._id) → 200 {entityId,projectId,path,
+			// folderId} / not-found→500 / 401 / 400 strict-zod VA. APIOnly → the
+			// web profile SKIPS it (Node web :4000 404s it) → unchanged.
+			{Method: "POST", Pattern: tpdsFolderUpdatePat, NoSession: true, APIOnly: true, Handler: apiFolderUpdateHandler(a)},
 		},
 	}
 }

@@ -3514,18 +3514,20 @@ verified :4000 POST → 403 == Node):
   blank project). Shared core `tpdsGetOrCreateByName`/`tpdsOwnedOrRWProjects`
   (owner_ref∪collaborator_refs deduped)/`tpdsProjectActive` (!archived&&!trashed)
   ported from Node for reuse by the folder/update endpoints.
-uapi gate now **46 cases diffs=0** (+7 cp +11 res; projectId normalized to "X"; gate
-auto-cleans uapi-cp-gate/resgate-gate → 0 strays). web regression u1/u103r/p413 green.
+uapi gate now **55 cases diffs=0** (+7 cp +11 res **+9 folder-update**; projectId
+normalized to "X"; gate auto-cleans uapi-cp-gate/resgate-gate → 0 strays; folder-
+created gu-* converge across the 3 legs + are re-seeded each run). web regression
+u1/u103r/p413 green.
 
-⛔ **STILL OPEN (TPDS write business logic, UpdateMerger/mkdirp):** `POST /
-tpds/folder-update` (createFolder → mkdirp + FileTypeManager.shouldIgnore),
-`POST|DELETE /user/:id/update/:path(.+)` + `/project/:pid/user/:uid/update/:path(.+)`
+⛔ **STILL OPEN (TPDS write business logic, UpdateMerger):** `POST|DELETE
+/user/:id/update/:path(.+)` + `/project/:pid/user/:uid/update/:path(.+)`
 (mergeUpdate/deleteUpdate), `POST|DELETE /project/:pid/contents/:path(.+)`
 (updateProjectContents/deleteProjectContents) + `/internal/*`. These are the
 FileStore/docstore/UpdateMerger-heavy endpoints — the heaviest of the cutover
 blockers; each needs its Node wire pinned + a stateful gated port.
+(`POST /tpds/folder-update` is now DONE + gated — see below.)
 
-**`POST /tpds/folder-update` — wire pinned (2026-09-23, Node api :3000):**
+**POST /tpds/folder-update — DONE + gated (2026-09-23) — wire pinned (Node api :3000):**
 - **401** (unauth): 12B `Unauthorized` text/plain + XPB + `WWW-Authenticate: OverleafLogin`.
 - **400** (zod, `application/json`, XPB, no WWW) — `userId` (zz.objectId) + `path` (required string), joined `; ` in order [userId, path], full body `{"error":"Validation error: <joined>","statusCode":400}`:
   - no body → **185B** (`...at \"body.userId\"; Invalid input: expected string, received undefined at \"body.path\"`)
@@ -3534,8 +3536,38 @@ blockers; each needs its Node wire pinned + a stateful gated port.
   - bad-uid → **88B** (`Invalid Mongo ObjectId at \"body.userId\"`)
 - **500** (21B `Internal Server Error` text/plain + XPB): valid-user + **empty path** (zod passes; mkdirp → `folder=null` → `folder._id` throws). Also other unexpected errors.
 - **409** (767B HTML `text/html` + XPB + ETag W/\"2ff-...\"): `<!DOCTYPE html>...<title>Something went wrong</title>...` full page (in-plan: HttpErrorHandler.conflict), body `Could not create folder`. **REACHED WHEN** `getOrCreateProject(uid,pid,name)==null` OR `FileTypeManager.shouldIgnore(path)`. NOTE: **stateful** — which project `getOrCreateProject` resolves (by `projectId` if given & user RW, else by `projectName`, else user's project) + user's RW decide 409 vs 200; a project admin isn't RW in → 409 even if it exists. (observed: same path can be 200 or 409 depending on project/RW state, so live-state pinning per-case is required — do NOT reduce to a static hidden-file rule.)
-- **200** (134B `application/json` + XPB) `{"entityId":"<lastFolderId>","projectId":"<pid>","path":"<path>","folderId":"<parentFolderId|null>"}` — mkdirp creates all missing path-segment folders under the resolved project (reuse Go `upMkdirp`, upload.go:547 — the faithful `ProjectEntityMongoUpdateHandler.mkdirp`); `entityId`=deepest folder id, `folderId`=its PARENT folder id (root-level child → parent=`rootFolder[0]._id`; `path==='/'` → entity=rootFolder, folderId=null). Parent id: walk `entParseTree(entFld(doc,"rootFolder"))` for the folder whose `.fold` contains entityId (entops `entFolder{idHex,fold}` + `entFindLoc` shape, entadd.go). `shouldIgnore`=Minimatch(`Settings.fileIgnorePattern`,{nocase,dot}).match(path) — **pin the live pattern value before implementing** (was undefined in /etc/overleaf/settings.js; the `.DS_Store` 409s were project-access state, not this).
-**NEXT (fresh window):** pin the live `fileIgnorePattern` + a few (projectId,RW,state)→409/200 cases on a stable project, then implement the handler (401 / 400×4 / 500-empty-path / 409 / 200) reusing upMkdirp + a parent-folder walker + the pinned 409 HTML body, gate all states, keep web gates green, commit.
+- **200** (134B `application/json` + XPB) `{"entityId":"<lastFolderId>","projectId":"<pid>","path":"<path>","folderId":"<parentFolderId|null>"}` — mkdirp creates all missing path-segment folders under the resolved project (Go `tpdsMkdirp` — find-or-create each segment, filtering the mongo `UpdateOne` by the **project** `_id`; `upMkdirp` was NOT reusable here — it assumes rootFolder._id==project._id); `entityId`=deepest folder id, `folderId`=its PARENT folder id (root-level child → parent=`rootFolder[0]._id`; `path==='/'` → entity=rootFolder, folderId=null). `shouldIgnore`=Minimatch(`Settings.fileIgnorePattern`,{nocase,dot}).match(path) — **undefined in this stack → never ignores** (the `.DS_Store` 409s were project-access state, not this rule).
+✅ **DONE + gated (2026-09-23) — `POST /tpds/folder-update`** (updateFolder,
+privateApiRouter, basic-auth; **APIOnly** → web profile SKIPS it, :4000 unchanged).
+Handler `features/projectlist/tpdsfolder.go apiFolderUpdateHandler` + new
+`tpdsMkdirp` (find-or-create each path segment; uses the **PROJECT _id** for the
+mongo `UpdateOne` filter). Wire (Node api :3000, all matched Node==Go):
+401 (unauth/wrong, 12B challenge) / 400 strict-zod (`{}`→185B, `{userId}`→114B,
+`{path}`→116B, bad-uid→88B) / valid→**200** `{entityId,projectId,path,folderId}`
+(root→entity=rootFolder,folderId=null; top→parent=rootFolder; nested→parent=the
+containing folder) / user-with-no-project (projectId absent, name absent)→**500**.
+
+**KEY BUG FOUND + FIXED:** the upload `upMkdirp` (upload.go) `UpdateOne` filter is
+`{_id: cur.folderID}` — it assumes **rootFolder._id == project._id** (true for the
+upload fixtures), so it 500s on any project where they differ (Go-created ones). So
+folder-update cannot reuse `upMkdirp` for the root seed. Wrote a fresh `tpdsMkdirp`
+that filters by the **project** `_id` (correct for ALL projects) + tracks the
+containing folder (parent) directly. Second bug: the first draft called `cancel()`
+immediately after `a.Mongo.DB(ctx)` and then ran `UpdateOne(ctx,...)` on the
+canceled ctx → "context canceled" 500; fixed by keeping the ctx live through both
+the update and the reload (cancel after both).
+
+**NOT in the gate (deliberate — honest-oracle):** `{userId:ghost, path}` with **no**
+projectId/projectName is a stateful/undefined Node region (Node itself returns 500
+OR 200 path:"/" non-deterministically across legs) → excluded; the deterministic
+`{}`/`{userId}`/`{path}`/bad-uid 400s + the valid-{projectId} 200 are the pinned
+contract. The 409 HTML body + shouldIgnore are present but NOT reachable in this
+stack (`Settings.fileIgnorePattern` is `undefined` → never ignores; projectless
+→ 500) — kept for faithful 1:1 should the pattern be set.
+
+Gate: `web-go-uapi-doc` + `uapi-doc-matrix.cjs` now **55 cases diffs=0** (added
+fu-unauth/wrong/no-body/uid-only/path-only/bad-uid/root/top/nested). Web regression
+u1/u103r/p413 green. go build/vet/test/gofmt clean.
 
 ✅ **DONE + gated (2026-09-23) — `GET /project/:id/details`** (privateApiRouter,
 **api-only**, NOT on webRouter). Introduced the `core.Route.APIOnly` marker:
