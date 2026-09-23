@@ -26,6 +26,10 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Path: "/logout", Handler: getLogoutPage},
 			{Method: "POST", Path: "/logout", Handler: postLogout(a)},
 			{Method: "GET", Path: "/restricted", Handler: pageHandler(views.RestrictedPage)},
+			// U10.3r: Node /read-only/one-time-login has NO requireLogin
+			// (UserPagesController.oneTimeLoginPage; login-whitelist route)
+			// — anonymous and logged-in both get the 200 page.
+			{Method: "GET", Path: "/read-only/one-time-login", NoLogin: true, Handler: pageHandler(views.OneTimeLoginPage)},
 		},
 	}
 }

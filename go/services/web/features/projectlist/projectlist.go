@@ -142,6 +142,11 @@ func Feature(a *core.App) core.Feature {
 			{Method: "POST", Pattern: entRenPat, Handler: entRenameHandler(a)},
 			{Method: "POST", Pattern: entMovPat, Handler: entMoveHandler(a)},
 			{Method: "POST", Pattern: entDupPat, Handler: entDuplicateHandler(a)},
+			// U10.3 — linked files (Node LinkedFilesRouter; CE: agents all
+			// disabled -> _getAgent null -> bare 400 after validation;
+			// validation/403/404/409 branches pinned by the LF gate).
+			{Method: "POST", Pattern: lfCreatePat, Handler: lfCreateHandler(a)},
+			{Method: "POST", Pattern: lfRefreshPat, Handler: lfRefreshHandler(a)},
 			// P4.11b editor entity deletion (web-p411b flip)
 			{Method: "DELETE", Pattern: delDocPat, Handler: delEntityHandler(a, "doc")},
 			{Method: "DELETE", Pattern: delFilePat, Handler: delEntityHandler(a, "file")},
@@ -155,11 +160,20 @@ func Feature(a *core.App) core.Feature {
 			{Method: "POST", Pattern: upPat, Handler: uploadHandler(a)},
 			// P4.13b new-project zip upload (POST /project/new/upload — session+csrf)
 			{Method: "POST", Pattern: nzipPat, Handler: newzipHandler(a)},
-			// P4.12c private API doc trio (web-p413 flip; basic auth in handler;
-			// NoSession = Node's privateApiRouter carries no session/csrf)
-			{Method: "GET", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiGetHandler(a))},
-			{Method: "POST", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiPostHandler(a))},
-			{Method: "POST", Pattern: docapiRejPat, NoSession: true, Handler: apiXPB(docapiRejectHandler(a))},
+			// P4.12c private API doc trio (web-p413 flip; basic auth in handler).
+			// U10.3r (pinned live 2026-09-23, web :4000): these are NoSession
+			// (the private-API gate issues its own fresh sid). The GET gate
+			// 401/302 carry the FULL helmet set but NO X-Powered-By (pinned);
+			// the valid-cred 200 res.send path carries XPB (set inside the
+			// handler); the rendered 404 page carries NEITHER XPB set on the page.
+			{Method: "GET", Pattern: docapiDlPat, NoSession: true, Handler: docapiGetHandler(a)},
+			// U10.3r (pinned live 2026-09-23, web profile :4000): Node's
+			// session+csrf chain (csrf BEFORE helmet) blocks BOTH POST routes —
+			// every POST, no-csrf → 403 text/plain "Forbidden" + XPB + CSP +
+			// fresh sid, NO helmet set (see core.APISend403); a valid-csrf POST
+			// then hits the basic-auth gate (401/302) in the handler.
+			{Method: "POST", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(apiCSRF403)},
+			{Method: "POST", Pattern: docapiRejPat, NoSession: true, Handler: apiXPB(apiCSRF403)},
 		},
 	}
 }

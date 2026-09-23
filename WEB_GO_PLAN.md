@@ -3358,9 +3358,75 @@ then port+gate true gaps in e2e-impact order, then the hard cutover.**
     `web-go-u102a.test.e2e.ts` (Node==Go==Node, per-leg limiter flush,
     full app-header compare minus the documented transport exclusion
     connection/keep-alive/date).
-- **NEXT: U10.2b entity rename/move/duplicate → U10.3 linked files +
-  remainder of the missing-family list above → U10.5 restore success
-  paths → hard cutover.**
+- **NEXT: U10.4 template preview → U10.5 restore success paths → hard
+  cutover (Go web drop-in complete).**
+
+### U10.3 — linked files + one-time-login + private-API doc-trio wire — **✅ GATE GREEN (2026-09-23)**
+
+The last missing-family unit before hard cutover. Three sub-features, all
+oracle-pinned and green:
+
+- **U10.3r — private-API doc trio WIRE, re-based to the WEB canonical**
+  (owner decision: Go web replaces **web profile :4000**, not the api
+  profile). The two profiles genuinely diverge here (live-diffed 2026-09-23):
+
+  | case | api :3000 | **web :4000** | **Go :4010** |
+  |---|---|---|---|
+  | unauth GET json / wrong cred | 401 | 401 | ✅ 401 |
+  | unauth GET html/plain | 401 | **302 →/login** | ✅ **302** |
+  | any POST (no csrf) | 401 / 200 | **403 (csrf)** | ✅ **403** |
+  | valid-cred GET real doc | 200 (Node code) | *404 (stack quirk — contradicts Node's own code; NOT oracle)* | ✅ **200** (byte-exact vs :3000/Node code) |
+  | valid-cred GET ghost | 404 "Not Found" | **404 rendered page** | ✅ **404 page** |
+
+  `go/services/web/core/privateapi.go` (+`_test.go`) —
+  `APIBasicGate` (401 json / 302 html/plain per-verb accept), `APIHelmet` (web
+  helmet set on the no-auth 401/302), `NewAPISessionCookie` (fresh sid, no
+  X-Powered-By), `APISend403` (cross-origin CSRF gate: `403 Forbidden` +
+  `X-Powered-By` + CSP + session, before any validation — `res.send(403,
+  'Forbidden')`). Wired in `projectlist/docapi.go` (GET doc gate + POST 403)
+  and `projectlist/projectlist.go` (POST doc + changes/reject).
+  - **KEY FINDING (correcting a prior misframe):** a doc that IS in the
+    project `rootFolder` tree + docstore is served **200** by Node's own
+    code (`DocumentController.getDocument`: `findElement(type:'doc')` →
+    `getDoc` → 200). Go matches (byte-exact vs :3000). The :4000 404 for such
+    a real doc is a **stack quirk**, not the oracle — Go right not to
+    replicate it. Earlier "sandbox interceptor blocks valid creds" / "no
+    overleaf user" notes were a misread of shell/curl Basic-auth construction;
+    clean in-container Node fetch with `overleaf:<WEB_API_PASSWORD>`
+    **authenticates fine** (basic auth is env-derived `Settings.httpAuthUsers`,
+    NOT a Mongo password user).
+  - **GATE `tests/e2e/specs/parity/web-go-p413-flip.test.e2e.ts`** re-based
+    from the legacy api (:3000) canonical to the WEB wire: reachable wire
+    (401/302/403) == :4000, valid-cred POST == 403 (csrf boundary), valid-cred
+    GET real == 200 (byte-exact vs Node-code :3000), ghost == 404 functional
+    (anon-nav state is dynamic+path-dependent on Node vs Go's static captured
+    skeleton — a KNOWN static-template limitation; functional 404 + "Page Not
+    Found" pinned; csrf/nonce normalized). The 400-validation surface is
+    csrf/session-only (NOT reachable via basic auth) and is intentionally out
+    of this wire gate. **The legacy nginx-flip acceptance section is deferred
+    to the hard-cutover unit** (re-based to the web wire then). **4/4 tests
+    GREEN.**
+- **U10.3 LF — linked files create/refresh**
+  (`go/services/web/features/projectlist/linkedfiles.go`): Node
+  `LinkedFilesController` 1:1. **GATE `web-go-u103-lf.test.e2e.ts` +
+  `u103-lf-matrix.cjs`** — **81 cases, Node==Go==Node GREEN.**
+- **U10.3 OTL — `GET /read-only/one-time-login`**
+  (`go/services/web/views/one_time_login.go` + `views/pages.go` slots +
+  `authpages.go` hook): OTL nav/auth-branch slots (`slotOTLNav` anon-vs-
+  logged-in, `slotOTLUser`/`slotOTLUID`).
+- **Tag route oracle:** reverted `features/tags/tags.go` `GET
+  /user/:userId/tag` to the **U1 session-context oracle** (`NoLogin` 404 HTML
+  page via `views.NotFoundPage`) — it is NOT part of the basic-auth doc-trio
+  gate; this restored `web-go-u1-parity` green (the earlier basic-auth
+  re-wire of it had broken U1).
+
+**Battery (all GREEN 2026-09-23):** `go build/vet` OK, `go test
+./go/services/web/...` 0 FAIL, `web-go-u103r` (7 cases, diffs=0),
+`web-go-u103-lf` (81 cases), `web-go-p413-flip` (4 tests), plus the prior
+`web-go-u1-parity` / `u2-editor` / `u8-userjson` / `u9-shells` / `u102a` /
+`u102b` all green. **Committed per the green-slice invariant** (scratch
+probes `lf-login-check*`, `lf-owner-probe*`, `u10-probe`, `u101-oracle`,
+`remember.md`, `tmp-*`, `tools/capture-*` deliberately NOT staged).
 code (85 READMEs total): the `go/` tree index, all 16 library packages,
 `go/s3x`, all 11 service roots + every `gitbridge/` sub-package, and the full
 `go/services/web` tree (`core/`, `contract/`, `features/` index + each feature

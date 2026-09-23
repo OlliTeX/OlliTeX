@@ -64,6 +64,12 @@ const (
 	// for site admins on EVERY page, including 404/403). Empty for
 	// non-admins; the page skeleton otherwise matches the user nav.
 	slotNavAdmin = "\x01NAVADMIN\x02"
+	// U10.3r slots (one_time_login.go): GET /read-only/one-time-login —
+	// anonymous skeleton; these fill from the session user when a
+	// logged-in visitor lands on the page (Node oracle, 2026-09-23).
+	slotOTLUser = "\x01OTLUSER\x02" // ol-usersEmail content ("" anon)
+	slotOTLUID  = "\x01OTLUID\x02"  // ol-user_id: `` or ` content="HEX"`
+	slotOTLNav  = "\x01OTLNAV\x02"  // navbar fragment (anon vs logged-in)
 	// P6.20 launchpad slots (pages_data_p620.go):
 	slotLPUID   = "\x01LPUID\x02" // ol-user_id: `` or ` content="HEX"` (REGUID semantics)
 	slotLPAdmin = "\x01LPADM\x02" // ol-adminUserExists bare-content boolean (` content`/``)
@@ -172,6 +178,22 @@ func (p PageData) finalize(html string) string {
 		out = strings.ReplaceAll(out, slotCanMgtTpl, "false")
 	}
 	out = strings.ReplaceAll(out, slotNavAdmin, p.NavAdmin)
+	// U10.3r one_time_login slots: OTLNAV injects the auth-branching navbar
+	// fragment FIRST (the logged-in fragment carries the form's csrf slot —
+	// Node renders the SESSION token there, not the anonymous one), then
+	// OTLUSER/OTLUID fill email/uid everywhere (skeleton + injected nav).
+	if p.UserID == "" {
+		out = strings.ReplaceAll(out, slotOTLUID, "")
+		out = strings.ReplaceAll(out, slotOTLNav, otlNavAnon)
+	} else {
+		out = strings.ReplaceAll(out, slotOTLUID, ` content="`+htmlAttrEsc(p.UserID)+`"`)
+		out = strings.ReplaceAll(out, slotOTLNav, otlNavIn)
+		// the injected fragment carries a csrf slot (Node: value=csrfToken —
+		// the SAME token as ol-csrfToken, session-bound when logged in):
+		// the initial pass ran before injection, so resolve it now.
+		out = strings.ReplaceAll(out, slotCSRF, p.CSRFToken)
+	}
+	out = strings.ReplaceAll(out, slotOTLUser, p.UserEmail)
 	// P6.20 launchpad slots:
 	if p.UserID == "" {
 		out = strings.ReplaceAll(out, slotLPUID, "")

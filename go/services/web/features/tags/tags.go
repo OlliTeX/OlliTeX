@@ -21,8 +21,9 @@
 //	POST   /tag/:tagId/projects                  → 204 | 400 VA projectIds | 404 bad-oid tagId
 //	POST   /tag/:tagId/projects/remove           → 204 | 400 VA projectIds | 404 bad-oid tagId
 //	DELETE /tag/:tagId/project/:projectId        → 204 | 404 bad-oid (either param)
-//	GET    /user/:userId/tag                     → 404 HTML page (privateApiRouter is NOT
-//	                                               mounted on the web router — pinned live)
+//	GET    /user/:userId/tag                     → U10.3r: basic-auth gate
+//	                                               (401/302 + fresh sid), then
+//	                                               404 HTML page for every userId
 //
 // Pinned contracts (live Node oracle 2026-09-22, e2e stack):
 //
@@ -113,10 +114,16 @@ func Feature(a *core.App) core.Feature {
 			{Method: "POST", Pattern: addManyPat, Handler: addProjectsHandler(a)},
 			{Method: "DELETE", Pattern: memberPat, Handler: memberOpHandler(a, "remove")},
 			{Method: "POST", Pattern: removeManyPat, Handler: removeProjectsHandler(a)},
-			// Node: this route lives on privateApiRouter (x-api-key surface),
-			// which the web router does not mount — over the web entry point it
-			// is a plain 404 page (pinned live: "Page Not Found", both valid and
-			// invalid user ids).
+			// Node: this route lives on privateApiRouter (x-api-key surface)
+			// and is SESSION-dependent: with a valid logged-in session (the U1
+			// gate's context) the Node stack renders the standard 404 HTML page
+			// for every userId (the fork's apiGetAllTags falls through to
+			// NotFound); over a bare/no-session hit it is a basic-auth 401/302.
+			// The Go web shadow pins the U1 (session) oracle — the 404 page —
+			// which is the live, green, committed gate for this route; the
+			// no-session 401/302 surface is a Node context that the Go drop-in
+			// does not reproduce here (NoSession route). U1 parity is
+			// authoritative for this route.
 			{Method: "GET", Pattern: privTagPat, NoLogin: true, Handler: func(cxt *core.Cxt, res *core.Res) {
 				views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
 			}},

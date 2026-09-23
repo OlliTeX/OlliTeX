@@ -6,16 +6,25 @@
 //	                                                 (DocumentController.trackChangesRejected)
 //
 // Auth: `requirePrivateApiAuth` = basic auth against WEB_API_USER /
-// WEB_API_PASSWORD. NO session, NO membership check — service-to-service.
-// Node oracle (pinned 2026-09-15):
+// WEB_API_PASSWORD. NO membership check — service-to-service.
 //
-//	no auth  + GET + accept json → 401 'Unauthorized' +
-//	                               WWW-Authenticate: OverleafLogin
-//	no auth  + GET + accept else  → 302 /login (Found. Redirecting to /login)
-//	no auth  + POST               → 403 'Forbidden' (app-level cross-origin
-//	                             request block, before route logic)
-//	wrong auth                    → 401 challenge
-//	right auth                    → handler runs
+// Node oracle (re-pinned for the WEB profile 2026-09-23; U10.3r):
+//
+//	no auth  + GET + explicit-json Accept    → 401 'Unauthorized' +
+//	                                              WWW-Authenticate: OverleafLogin
+//	no auth  + GET + html/none Accept        → 302 Location /login
+//	                                              (Accept-negotiated body, Vary: Accept,
+//	                                              query stripped)
+//	wrong auth + GET (any Accept)            → 401 challenge
+//	any state  + POST (both routes)          → 403 'Forbidden' (Node's
+//	                                              session+csrf chain blocks the
+//	                                              POSTs before basic auth)
+//	auth OK  + GET: bad/ghost ids            → WEB 404 HTML page
+//	right auth + GET (valid doc)             → handler runs
+//
+// NEW overleaf.sid cookie: the Node web stack runs the session middleware
+// on these routes too (pinned live: fresh sess:<sid> in redis with
+// csrfSecret + validationToken, cookie issued on 401/403/302).
 //
 // GET: project load (bad/ghost → 404 'Not Found') → findElement doc
 // (missing → NotFoundError → 404 'Not Found') →
@@ -43,7 +52,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -64,39 +72,6 @@ var (
 // atomic counter: keeps the "unused helper" lint quiet only if needed.
 func crChatBase() string { return crEnvOr("WEB_CHAT_URL", "http://127.0.0.1:3010") }
 
-func basicCreds() (user, pass string) {
-	return os.Getenv("WEB_API_USER"), os.Getenv("WEB_API_PASSWORD")
-}
-
-// basicAuthGate mirrors Node requirePrivateApiAuth + the app-level cross-origin
-// block. Returns true when the handler should continue; otherwise the
-// response is already written.
-// apiUnauthorized mirrors Node's send401WithChallenge on the API process:
-// www-authenticate + text/plain 401 "Unauthorized" via sendStatus —
-// NO nosniff (the web baseline never applies to the api profile) and no
-// ETag (sendStatus does not set one).
-func apiUnauthorized(res *core.Res) {
-	res.W.Header().Set("WWW-Authenticate", "OverleafLogin")
-	res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	res.W.Header().Set("ETag", core.EtagWeakBody("Unauthorized"))
-	res.W.Header().Set("Content-Length", "12")
-	res.W.WriteHeader(401)
-	_, _ = res.W.Write([]byte("Unauthorized"))
-}
-
-func basicAuthGate(res *core.Res, req *http.Request) bool {
-	if au, p, has := req.BasicAuth(); has {
-		eu, ep := basicCreds()
-		if eu != "" && au == eu && p == ep {
-			return true
-		}
-		apiUnauthorized(res)
-		return false
-	}
-	apiUnauthorized(res)
-	return false
-}
-
 // dpath walks a document by nested keys (mongo-driver decodes nested docs
 // to primitive.M / maps).
 // apiText mirrors express res.sendStatus text (404/500) on the api process:
@@ -109,17 +84,6 @@ func apiText(res *core.Res, code int, body string) {
 	res.W.WriteHeader(code)
 	_, _ = res.W.Write([]byte(body))
 }
-
-// apiXPB wraps a private-API handler with the express default
-// X-Powered-By: Express (Node api process sets it on every response —
-// pinned on the 200 GET, the 401 and the 404 alike).
-func apiXPB(h func(cxt *core.Cxt, res *core.Res)) func(cxt *core.Cxt, res *core.Res) {
-	return func(cxt *core.Cxt, res *core.Res) {
-		res.W.Header().Set("X-Powered-By", "Express")
-		h(cxt, res)
-	}
-}
-
 func dpath(d primitive.D, path ...string) (any, bool) {
 	v := any(d)
 	for _, p := range path {
@@ -171,7 +135,6 @@ func docapiFindDoc(root any, didHex string) (p string, ok bool) {
 	}
 	return "", false
 }
-
 func docapiFetch(cxt *core.Cxt, method, url string, body []byte) (int, []byte, error) {
 	var rd io.Reader
 	if body != nil {
@@ -193,6 +156,33 @@ func docapiFetch(cxt *core.Cxt, method, url string, body []byte) (int, []byte, e
 	return resp.StatusCode, buf, nil
 }
 
+// apiXPB wraps a private-API handler with the express default
+// X-Powered-By: Express (Node api process sets it on every response —
+// pinned on the 200 GET, the 401 and the 404 alike).
+func apiXPB(h func(cxt *core.Cxt, res *core.Res)) func(cxt *core.Cxt, res *core.Res) {
+	return func(cxt *core.Cxt, res *core.Res) {
+		res.W.Header().Set("X-Powered-By", "Express")
+		h(cxt, res)
+	}
+}
+
+// apiCSRF403 — U10.3r (route audit 2026-09-23, pinned live): on the Node WEB
+// stack the session+csrf chain blocks the doc trio's two POST routes before
+// basic auth — every POST, any auth state / Accept → 403 text/plain
+// "Forbidden" + fresh overleaf.sid (see core.APISend403). The Go
+// setDocument/reject handlers stay for parity with the :3000 api profile
+// but are unreachable via the web entry.
+func apiCSRF403(cxt *core.Cxt, res *core.Res) { cxt.A.APISend403(cxt, res) }
+
+// apiDoc404Page — U10.3r (pinned live 2026-09-23): Node's GET doc route on
+// the web stack renders the standard 404 HTML page for missing/invalid ids
+// (VA and NotFound both land in the web 404 handler — bad-oid AND ghost
+// valid-oid both → 404 HTML page). The rendered page rides the web-baseline
+// helmet set (post-helmet render) but carries NO X-Powered-By (page render).
+func apiDoc404Page(cxt *core.Cxt, res *core.Res) {
+	views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
+}
+
 // GET /project/:pid/doc/:did
 func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
@@ -203,27 +193,33 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 		pidHex, didHex := mm[1], mm[2]
-		if !basicAuthGate(res, req) {
+		if !a.APIBasicGate(cxt, res, req) {
 			return
 		}
+		// Valid-cred path (unreachable in e2e — sandbox interceptor blocks the
+		// WEB_API password; covered by Go unit test). The rendered 404 page /
+		// 200 body rides the web-baseline helmet set + fresh sid; the 200
+		// res.send path additionally carries X-Powered-By (pinned on 200 GET),
+		// the rendered 404 page does NOT (page render) — set per-response below.
+		a.NewAPISessionCookie(cxt, res)
+		a.APIHelmet(res, req)
 
-		if !delHex24(pidHex) {
-			res.JSON(404, delParamVA("Project_id"))
-			return
-		}
-		if !delHex24(didHex) {
-			res.JSON(404, delParamVA("doc_id"))
+		// U10.3r (pinned live 2026-09-23 on the web stack): Node renders the
+		// WEB 404 page for both bad-oid and ghost/missing on the GET route
+		// (accept-header independent — the web error handler owns it).
+		if !delHex24(pidHex) || !delHex24(didHex) {
+			apiDoc404Page(cxt, res)
 			return
 		}
 		oid, _ := primitive.ObjectIDFromHex(pidHex)
 		doc, _ := loadProjectFull(a, cxt, oid)
 		if doc == nil {
-			apiText(res, http.StatusNotFound, "Not Found")
+			apiDoc404Page(cxt, res)
 			return
 		}
 		pathName, dok := docapiFindDoc(dget(*doc, "rootFolder"), didHex)
 		if !dok {
-			apiText(res, http.StatusNotFound, "Not Found")
+			apiDoc404Page(cxt, res)
 			return
 		}
 
@@ -262,8 +258,10 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 		if plain {
 			// ?plain=1 → res.send semantics: text/plain + weak ETag + helmet
 			// nosniff (pinned: api plain-200 carries X-Content-Type-Options),
-			// exact Content-Length, XPB via the apiXPB wrapper.
+			// exact Content-Length, X-Powered-By (res.send path — the 200 is a
+			// res.send, unlike the rendered 404 page which carries no XPB).
 			pl := strings.Join(ddoc.Lines, "\n")
+			res.W.Header().Set("X-Powered-By", "Express")
 			res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			res.W.Header().Set("ETag", core.EtagWeakBody(pl))
 			res.W.Header().Set("X-Content-Type-Options", "nosniff")
@@ -349,6 +347,7 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			b.Write(qb)
 		}
 		b.WriteString("]}")
+		res.W.Header().Set("X-Powered-By", "Express") // res.send path (200), not the 404 page
 		res.JSON(200, []byte(b.String()))
 	}
 }
@@ -377,7 +376,7 @@ func docapiPostHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 		pidHex, didHex := mm[1], mm[2]
-		if !basicAuthGate(res, req) {
+		if !a.APIBasicGate(cxt, res, req) {
 			return
 		}
 
@@ -528,7 +527,7 @@ func docapiRejectHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(req.URL.Path, "/")))
 			return
 		}
-		if !basicAuthGate(res, req) {
+		if !a.APIBasicGate(cxt, res, req) {
 			return
 		}
 		// Node sends `res.status(204).send("No Content")` — express computes
