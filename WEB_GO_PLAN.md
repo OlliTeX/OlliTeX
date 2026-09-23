@@ -3412,20 +3412,57 @@ plain-404 / 200 with XPB; POST+reject: api gate or web `APISend403` 403) +
 - Web regression: `web-go-u103r` (7/diffs=0) + `web-go-p413-flip` (4/4) green;
   web POST/reject still 403 csrf.
 
-⛔ **STILL OPEN (cutover blocker — api profile not yet 100% 1:1):** the
-remaining api-profile **route surface** beyond the doc-trio, e.g.:
-  - `GET /project/:id` (unauth) → Node 404 vs Go 302→/login (needs per-route 404).
-  - `GET /project/:id/members` (unauth) → Node 404 vs Go 302→/login.
-  - `POST /tpds/folder-update` → Node 400 (validation) vs Go 404 (route missing).
-  - A full helper-aware api-route audit vs Node :3000 to enumerate the rest
-    (the doc-trio was the highest-value slice; there are more private-API /
-    service routes on the :3000 surface).
-  - A representative Node-api-:3000-baseline battery for those routes (same
-    pattern as web-go-uapi-doc), web gate kept green as regression.
+⛔ **STILL OPEN (cutover blocker) — the api-profile gap is ROUTE/PROFILE
+SELECTION, not route-by-route (confirmed 2026-09-23, authoritative Node model +
+empirical Node :3000 audit):**
 
-**The hard cutover remains blocked on the OPEN items above** (flipping
-`web-api-overleaf` to Go now would serve a non-1:1 :3000 surface — the
-doc-trio is correct, but the wider route surface still leaks web behavior).
+**Authoritative Node model** (services/web): ONE app, THREE routers —
+`webRouter` (browser/session), `privateApiRouter` (basic-auth service-to-service),
+`publicApiRouter` (public). `config.enabledServices` =
+`process.env.ENABLED_SERVICES || 'web,api'` (settings.defaults.js:954) selects
+which profile the process serves:
+- **web** profile (web-overleaf :4000) = `webRouter` **+** `privateApiRouter`
+  (+public). Serves browser routes AND basic-auth routes (the doc trio is on
+  BOTH — pinned by u103r on :4000).
+- **api** profile (web-api-overleaf :3000) = `privateApiRouter` +
+  `publicApiRouter`, **NO `webRouter`**. So the api profile serves ONLY the
+  basic-auth/public surface and **404s every browser/web route** (measured
+  Node :3000: `/project`, `/project/:id`, `/members`, `/entities`, `/tags`,
+  `/user/projects`, `/foo` ALL → 404 + XPB).
+
+**Go defect:** Go shares ONE route table across both profiles, so the api
+profile (ENABLED_SERVICES=api) still serves the web routes with their web
+wire — measured Go :4011: `/project` → **301→/hub**, `/project/:id` →
+**302→/login**, `/members` + `/entities` → **302→/login** (all should be 404 on
+api). And it is MISSING some basic-auth routes Node serves (`POST
+/user/x/project/new`, `POST /tpds/folder-update` → Node **401** basic-auth
+challenge; Go 404s them).
+
+**The fix (bounded architectural unit):** mirror Node's three-router split in
+Go — tag routes as web / privateApi / publicApi (per Node router.mjs placement),
+and in the api profile route ONLY privateApi+publicApi, 404ing everything else
+(api baseline: XPB + 404 page). Concretely:
+1. Enumerate Node's `privateApiRouter` route set (router.mjs + each module's
+   `applyRouter(..., privateApiRouter)` calls) and the `publicApiRouter` set.
+2. Add a route membership/profile marker to `core.Route` (e.g. `Routers:
+   []string{"web"}` / `{"privateApi"}` / `{"publicApi"}`) and set it per route
+   from the Node placement.
+3. In `core.App`, when `Profile=="api"`, skip routes not on privateApi+publicApi
+   (fall through to the existing api 404 tail); keep web routes web-only.
+4. Add the missing basic-auth routes (e.g. `POST /user/x/project/new`,
+   `POST /tpds/folder-update`) as privateApi routes with the `APIBasicGate401`
+   gate (401 for unauth) so they challenge like Node.
+5. **Gate:** extend the Node-api-:3000-baseline battery
+   (web-go-uapi-doc pattern) to include the now-404'd web routes (assert api
+   → 404) and the basic-auth 401 challenge routes; keep the **web** profile
+   gates green (u103r/p413) as regression.
+
+**RISK:** this touches the shared routing layer — do it in small gated slices,
+verify BOTH profiles each step (a web-profile regression is the main hazard),
+and do NOT flip web-api-overleaf until the api route set == Node api :3000.
+
+**The hard cutover remains blocked on this unit.** (web-overleaf/web profile
+is ready; web-api-overleaf/api profile is not yet 100%.)
 
 ### U10.3 — linked files + one-time-login + private-API doc-trio wire — **✅ GATE GREEN (2026-09-23)**
 
