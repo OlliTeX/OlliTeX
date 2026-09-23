@@ -59,6 +59,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -70,6 +71,11 @@ var (
 	// P4.13 / U-API — GET /project/:project_id/details (Node privateApiRouter
 	// ProjectApiController.getProjectDetails — api-only, NOT on webRouter).
 	detailsPat = regexp.MustCompile(`^/project/([^/]+)/details$`)
+	// U-API — GET /user/:user_id/personal_info (Node privateApiRouter
+	// UserInfoController.getPersonalInfo). The webRouter variant is the
+	// distinct path /user/personal_info with NO id — no collision here.
+	personalInfoPat = regexp.MustCompile(`^/user/([^/]+)/personal_info$`)
+	reNumID         = regexp.MustCompile(`^\d+$`) // legacy numeric overleaf.id
 )
 
 // atomic counter: keeps the "unused helper" lint quiet only if needed.
@@ -750,4 +756,103 @@ func details404Plain(r *core.Res) {
 	r.W.Header().Set("Content-Length", strconv.Itoa(len("Not Found")))
 	r.W.WriteHeader(http.StatusNotFound)
 	_, _ = r.W.Write([]byte("Not Found"))
+}
+
+// personalInfoGetHandler — U-API, GET /user/:user_id/personal_info
+// (Node privateApiRouter UserInfoController.getPersonalInfo).
+//
+//	unauth/wrong → 401 (challenge, APIBasicGate401)
+//	user_id not hex24 and not numeric → 404 JSON VA (params.user_id) + XPB
+//	valid id, user not found            → 404 text/plain "Not Found" (details404Plain)
+//	valid id, user present                → 200 JSON { id, first_name?, last_name?, email?, ... }
+//
+// id first; the remaining keys (first_name,last_name,email,signUpDate,role,
+// institution) are included only when truthy, in that order — matching Node's
+// formatPersonalInfo. The live Node :3000 wire (honest oracle) returns a
+// 404-JSON-VA for an invalid user_id (NOT the handler source's 400), so we pin
+// the wire.
+func personalInfoGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+	return func(c *core.Cxt, r *core.Res) {
+		req := c.Req
+		mm := personalInfoPat.FindStringSubmatch(req.URL.Path)
+		if mm == nil {
+			views.NotFoundPage(r.W, pageBase(c, strings.TrimPrefix(req.URL.Path, "/")))
+			return
+		}
+		uidRaw := mm[1]
+		if c.A.Cfg.Profile != "api" {
+			// Defensive: core.App skips API-only routes on the web profile, so
+			// this is unreachable on :4000; if it were, mirror the 404-VA wire.
+			r.W.Header().Set("X-Powered-By", "Express")
+			r.JSON(404, delParamVA("user_id"))
+			return
+		}
+		if !a.APIBasicGate401(c, r, req) {
+			return // unauth / wrong basic → 401 challenge wire
+		}
+		// user_id: hex24 ObjectId → _id ; all-numeric → overleaf.id ; else 404-VA.
+		var query bson.D
+		if reNumID.MatchString(uidRaw) {
+			// Node: `parseInt(userId,10)` → a JS number (double); an all-digit
+			// string (even 24+ digits) is treated as the legacy numeric
+			// overleaf.id and the query is "not found" → 404 text. Use
+			// ParseFloat (double) to mirror that (ParseInt would overflow a
+			// 24-digit id and wrongly return the 404-VA wire).
+			f, _ := strconv.ParseFloat(uidRaw, 64)
+			query = bson.D{{Key: "overleaf.id", Value: f}}
+		} else if delHex24(uidRaw) {
+			oid, _ := primitive.ObjectIDFromHex(uidRaw)
+			query = bson.D{{Key: "_id", Value: oid}}
+		} else {
+			r.W.Header().Set("X-Powered-By", "Express")
+			r.JSON(404, delParamVA("user_id"))
+			return
+		}
+		ctx := req.Context()
+		db, err := a.Mongo.DB(ctx)
+		if err != nil {
+			details404Plain(r)
+			return
+		}
+		var ud primitive.D
+		if err := db.Collection("users").FindOne(ctx, query,
+			options.FindOne().SetProjection(bson.D{
+				{Key: "_id", Value: 1}, {Key: "first_name", Value: 1},
+				{Key: "last_name", Value: 1}, {Key: "email", Value: 1},
+			})).Decode(&ud); err != nil {
+			// valid id but no such user → 404 text/plain "Not Found"
+			details404Plain(r)
+			return
+		}
+		truthy := func(v any) bool {
+			if v == nil {
+				return false
+			}
+			if s, ok := v.(string); ok {
+				return s != ""
+			}
+			return true
+		}
+		var sb strings.Builder
+		sb.WriteString(`{"id":`)
+		if idRaw, ok := dpath(ud, "_id"); ok && idRaw != nil {
+			if oid, ok2 := idRaw.(primitive.ObjectID); ok2 {
+				sb.WriteString(`"` + oid.Hex() + `"`)
+			} else {
+				core.WriteOrderedValue(&sb, idRaw)
+			}
+		} else {
+			sb.WriteString(`""`)
+		}
+		for _, key := range []string{"first_name", "last_name", "email", "signUpDate", "role", "institution"} {
+			v, ok := dpath(ud, key)
+			if ok && truthy(v) {
+				sb.WriteString(`,"` + key + `":`)
+				core.WriteOrderedValue(&sb, v)
+			}
+		}
+		sb.WriteString(`}`)
+		r.W.Header().Set("X-Powered-By", "Express")
+		r.JSON(200, []byte(sb.String()))
+	}
 }

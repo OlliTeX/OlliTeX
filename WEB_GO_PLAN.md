@@ -3467,7 +3467,7 @@ valid-cred → route-specific):
 |---|---|---|---|
 | **`GET /project/:id/details`** | **401** | 200 (project JSON) | ✅ **DONE + gated** |
 | **`GET /user/:userId/tag`** | 401 | 200 (tag array) | ⚠️ **HARD — deferred** (see note) |
-| **`GET /user/:id/personal_info`** | 401 | 200 (user JSON) | 404 (missing) |
+| **`GET /user/:id/personal_info`** | 401 | 200 (user JSON) | ✅ **DONE + gated** |
 | `POST /user/:id/project/new` | 401 | 500 (stack) | 404 (missing) |
 | `POST /tpds/folder-update` | 401 | 400 (validation) | 404 (missing) |
 | `/internal/*`, `/user\|project/:id/update/:path`, `/project/:id/contents/:path` | 401 | ... | 404 (several missing) |
@@ -3508,10 +3508,31 @@ Added shared `go/services/web/core/orderedjson.go` (order-preserving BSON→JSON
   `web-go-p413-flip` green — the web profile is entirely unchanged (details is
   APIOnly so the web profile never dispatches it).
 
-**The remaining fix (bounded, per-route):** for each remaining route Node's
-`privateApiRouter` serves that Go lacks: `GET /user/:id/personal_info` (dual —
-also on webRouter, read 200 user JSON) and the two write routes `POST
-/user/:id/project/new` (Node valid→500 in this stack; pin the unauth 401 + a
+✅ **DONE + gated (2026-09-23) — `GET /user/:user_id/personal_info`**
+(privateApiRouter, basic-auth; the webRouter variant is the **distinct** path
+`/user/personal_info` with NO id — no collision). Handler
+`features/projectlist/docapi.go personalInfoGetHandler` (APIOnly, so the web
+profile skips it; :4000 unchanged):
+  - unauth/wrong → 401 (challenge wire, `APIBasicGate401`).
+  - uid not hex24 and not all-digit → 404 JSON VA
+    `{error:"Validation error: Invalid Mongo ObjectId at \"params.user_id\"",
+    statusCode:404}` (+XPB) — the **real Node :3000 wire** (NOT the 400 the
+    handler source suggests; honest-or).
+  - uid all-digit (legacy overleaf.id) → query `overleaf.id`; a 24-digit id is
+    a JS **double** in Node (`parseInt`), so Go must use `ParseFloat` (not
+    `ParseInt`, which overflows and would wrongly 404-VA); absent user → 404
+    text/plain "Not Found" (the `666…` ghost case in the gate).
+  - valid → 200 JSON `{id, first_name?, last_name?, email?, …}` (id first,
+    truthy-only remaining keys; projection _id/first_name/last_name/email).
+- Gate: `web-go-uapi-doc` + `uapi-doc-matrix.cjs` now **23 cases diffs=0**
+  (doc-trio + 5 web-route 404s + 4 details + 4 personal_info:
+  unauth/invalid/ghost/valid).
+- Web regression: `web-go-u103r` (7/diffs=0) + `web-go-u1-parity` +
+  `web-go-p413-flip` green — the web profile is entirely unchanged.
+
+**The remaining fix (bounded, per-route):** the two write routes Node's
+`privateApiRouter` serves that Go still lacks: `POST /user/:id/project/new`
+(Node valid→500 in this stack; pin the unauth 401 + a
 faithful valid path) and `POST /tpds/folder-update` (Node valid→400 validation;
 pin unauth 401 + the 400 wire). Each as `NoSession`+(`APIOnly` if not on
 webRouter) with `APIBasicGate401`. Gate each on Node api :3000 == Go api :4011;

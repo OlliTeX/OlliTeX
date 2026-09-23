@@ -151,6 +151,20 @@ async function main() {
   add('details-ghost', async () => get('/project/111111111111111111111111/details', VJ))
   add('details-valid', async () => get(P + '/details', VJ))
 
+  // U-API — GET /user/:user_id/personal_info (privateApiRouter, basic-auth;
+  // the webRouter variant is the distinct path /user/personal_info — no
+  // collision). Node UserInfoController.getPersonalInfo wire: unauth→401
+  // (challenge), bad-uid (not hex24/numeric)→404 JSON {error:"Validation
+  // error: Invalid Mongo ObjectId at \"params.user_id\"",statusCode:404},
+  // ghost (hex24, absent)→404 text/plain "Not Found", valid→200 JSON
+  // {id, first_name, last_name, email} (id-first, truthy-only keys).
+  // Node api :3000 == Go api :4011.
+  const PI_UID = '6aa4b8b573ef0e5094f4cbc0'
+  add('pi-unauth', async () => get('/user/' + PI_UID + '/personal_info', J))
+  add('pi-invalid', async () => get('/user/notahex/personal_info', VJ))
+  add('pi-ghost', async () => get('/user/666666666666666666666666/personal_info', VJ))
+  add('pi-valid', async () => get('/user/' + PI_UID + '/personal_info', VJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()

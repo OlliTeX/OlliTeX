@@ -184,6 +184,11 @@ func Feature(a *core.App) core.Feature {
 			// unchanged. On the api profile it serves: unauth→401, bad-oid/ghost
 			// →404, valid→200 JSON (owner features, document order).
 			{Method: "GET", Pattern: detailsPat, NoSession: true, APIOnly: true, Handler: detailsGetHandler(a)},
+			// U-API — GET /user/:user_id/personal_info (privateApiRouter, basic-auth;
+			// the webRouter variant is the distinct path /user/personal_info — no
+			// collision). unauth→401, bad-uid→404 JSON VA, ghost→404 text, valid→
+			// 200 user-JSON (id-first). APIOnly → web profile skips it (unchanged).
+			{Method: "GET", Pattern: personalInfoPat, NoSession: true, APIOnly: true, Handler: personalInfoGetHandler(a)},
 		},
 	}
 }
