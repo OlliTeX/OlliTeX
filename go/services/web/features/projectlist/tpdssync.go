@@ -54,9 +54,10 @@ import (
 )
 
 var (
-	muDboxPat = regexp.MustCompile(`^/user/([^/]+)/update/(.+)$`)
-	muPidPat  = regexp.MustCompile(`^/project/([^/]+)/user/([^/]+)/update/(.+)$`)
-	ghContPat = regexp.MustCompile(`^/project/([^/]+)/contents/(.+)$`)
+	muDboxPat   = regexp.MustCompile(`^/user/([^/]+)/update/(.+)$`)
+	muPidPat    = regexp.MustCompile(`^/project/([^/]+)/user/([^/]+)/update/(.+)$`)
+	ghContPat   = regexp.MustCompile(`^/project/([^/]+)/contents/(.+)$`)
+	perfTestPat = regexp.MustCompile(`^/perfTest$`)
 )
 
 const tpdsRejected = `{"status":"rejected"}`
@@ -532,4 +533,20 @@ func resolveByNameActive(a *core.App, c *core.Cxt, uid primitive.ObjectID, name 
 		return active[0], true
 	}
 	return nil, false
+}
+
+// apiPerfTest — Node privateApiRouter GET /perfTest → plainTextResponse(res,
+// 'hello'): 200, text/plain; charset=utf-8, X-Content-Type-Options: nosniff,
+// X-Powered-By: Express, global CSP, ETag W/"5-...", Content-Length: 5, body
+// "hello" (pinned live Node :3000 2026-09-24). APIOnly (privateApiRouter).
+func apiPerfTest(a *core.App) func(c *core.Cxt, r *core.Res) {
+	return func(c *core.Cxt, r *core.Res) {
+		if c.A.Cfg.Profile != "api" {
+			tpdssyncXPB(r)
+			apiText(r, 404, "Not Found")
+			return
+		}
+		tpdssyncXPB(r)
+		r.PlainText(200, "hello")
+	}
 }

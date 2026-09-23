@@ -223,6 +223,9 @@ func Feature(a *core.App) core.Feature {
 			{Method: "DELETE", Pattern: muPidPat, NoSession: true, APIOnly: true, Handler: syncDeleteRoute()(a)},
 			{Method: "POST", Pattern: ghContPat, NoSession: true, APIOnly: true, Handler: syncGHUpdateRoute()(a)},
 			{Method: "DELETE", Pattern: ghContPat, NoSession: true, APIOnly: true, Handler: syncGHDeleteRoute()(a)},
+			// U-API — GET /perfTest (privateApiRouter, public, no auth):
+			// plainText 200 "hello" (nosniff + XPB + global CSP). APIOnly.
+			{Method: "GET", Pattern: perfTestPat, NoSession: true, APIOnly: true, Handler: apiPerfTest(a)},
 		},
 	}
 }

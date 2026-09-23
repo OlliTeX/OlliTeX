@@ -3547,13 +3547,17 @@ Wire nuances pinned + fixed:
   application/json` (Node's JSON body-parser then 400s the raw body — not the
   real wire). The gate's sync POST cases use a new `postRaw` helper (no forced
   content-type).
-uapi gate now **78 cases diffs=0** (+23 sync). web regression u1/u103r/p413
-green. web profile :4000/:4010 both 403 these (login-gated, no panic).
+uapi gate now **79 cases diffs=0** (+23 sync + perfTest). web regression u1/u103r/p413
+green. web profile :4000/:4010 both 403 the sync routes (login-gated, no panic);
+/perfTest both 302 login (APIOnly).
 
-⛔ **STILL OPEN (only cutover blocker left):** `/internal/*` endpoints
-(deactivate / expire-deleted / zip / compile / pdf — several Go-missing, some
-heavier). (`POST /tpds/folder-update` + all TPDS sync update endpoints are now
-DONE + gated — see below.)
+⛔ **STILL OPEN (api-profile cutover blockers) — Node :3000 mounts these, Go :4011 does not (all) — live-audited 2026-09-24:**
+- `/internal/*` (8): POST expire-deleted-projects-after-duration / expire-deleted-users-after-duration / project/:pid/expire-deleted-project, POST /internal/users/:uid/expire, GET /internal/project/:pid, GET /internal/project/:pid/zip, POST /internal/deactivateOldProjects, POST /internal/project/:pid/deactivate → Node 401 (mounted+auth) / Go 404. (POST compile/pdf is Node 404 → Go matches, need not port.)
+- Editor privateApi: POST /project/:pid/join (Node 401 / Go 404), POST /project/:pid/history/resync (Node 401 / Go 404); GET /project/:pid/doc/:doc_id + POST .../doc/:doc_id/changes/reject (Node 401 / Go 401 — mounted; MUST verify they actually work with valid auth, not 401→500).
+- `/status` ✓ (Go "web is alive (api)" == Node), `/health_check/{redis 200, mongo 500}` ✓ (both match).
+⇒ The api-profile surface is **NOT 100%**: the TPDS sync + project-new/resolve/folder-update slice is complete (+ gated), but the /internal/*×8 + editor privateApi (join, history/resync, verify doc-fetch family) rows above remain. Do NOT flip web-api-overleaf until they are 1:1 (plus the web valid-basic gap).
+
+✅ **GET /perfTest — DONE + gated (2026-09-24):** Node privateApiRouter `plainTextResponse(res,'hello')` → 200, text/plain; charset=utf-8, **X-Content-Type-Options: nosniff**, X-Powered-By: Express, global CSP `base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'`, ETag W/"5-...", CL 5, body `hello`. Go `apiPerfTest` (tpdssync.go) = `PlainText(200,"hello")` (nosniff) + XPB + global CSP — Node==Go (full-header match, same ETag). APIOnly (Node web :4000 does not mount it; web profile :4000/:4010 both 302 login — match). Gate case `api-perftest`.
 
 **POST /tpds/folder-update — DONE + gated (2026-09-23) — wire pinned (Node api :3000):**
 - **401** (unauth): 12B `Unauthorized` text/plain + XPB + `WWW-Authenticate: OverleafLogin`.

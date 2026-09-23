@@ -304,6 +304,11 @@ async function main() {
   add('sync-ghdel-unauth', async () => del('/project/' + PJ + '/contents/x.tex', J))
   add('sync-ghdel-badpid', async () => del('/project/badpid/contents/x.tex', VJ))
 
+  // U-API — GET /perfTest (privateApiRouter, public, no auth): plainText 200
+  // "hello" (nosniff + XPB + global CSP, ETag W/"5-..."). APIOnly (Node web
+  // :4000 does not mount it). Pinned Node :3000 (2026-09-24); Node==Go.
+  add('api-perftest', async () => get('/perfTest', {}))
+
   for (const c of CASES) {
     try {
       const r = await c.run()
