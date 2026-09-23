@@ -3458,34 +3458,38 @@ routes with their WEB wire (measured Go :4011 before the fix: `/project` →
   (7/diffs=0) + `web-go-u1-parity` + `web-go-p413-flip` green — the web
   profile (:4000 wire) is entirely unchanged.
 
-⛔ **STILL OPEN — MISSING BASIC-AUTH ROUTES** (present in Node's
-`privateApiRouter`, absent from Go, so Go 404s them where Node 401/400/200):
-measured Node api :3000 (unauth → 401 + WWW-Authenticate;
+⛔ **STILL OPEN — MISSING BASIC-AUTH **WRITE** ROUTES** (the three READ routes above —
+details, tag, personal_info — are all ✅ DONE+gated; the read surface is 1:1).
+These Node `privateApiRouter` **write** endpoints are absent from Go (Go 404s them
+where Node 401/400/200/409) and each needs a business-logic port (project-create/
+folder-create/file-merge — **not** exercised by the e2e journey suite, service-side
+Dropbox/GitHub/TPDS sync). measured Node api :3000 (unauth → 401 + WWW-Authenticate;
 valid-cred → route-specific):
 
 | route | Node api (unauth) | Node api (valid-cred) | Go api |
 |---|---|---|---|
 | **`GET /project/:id/details`** | **401** | 200 (project JSON) | ✅ **DONE + gated** |
-| **`GET /user/:userId/tag`** | 401 | 200 (tag array) | ⚠️ **HARD — deferred** (see note) |
+| **`GET /user/:userId/tag`** | 401 | 200 (tag array) | ✅ **DONE + gated** (commit `1bc6a6404d`) |
 | **`GET /user/:id/personal_info`** | 401 | 200 (user JSON) | ✅ **DONE + gated** |
 | `POST /user/:id/project/new` | 401 | 500 (stack) | 404 (missing) |
 | `POST /tpds/folder-update` | 401 | 400 (validation) | 404 (missing) |
 | `/internal/*`, `/user\|project/:id/update/:path`, `/project/:id/contents/:path` | 401 | ... | 404 (several missing) |
 
-> **⚠️ `GET /user/:userId/tag` — HARD, deferred (investigated 2026-09-23).**
-> **DUAL** route: Node serves it on BOTH profiles with DIFFERENT bodies —
-> web(session) → the **404 HTML page** (the U1 session oracle, pinned green by
-> `privTagPat` in `features/tags/tags.go`); api(basic-auth) → 200 tag array
-> (`[]` when none) / 401 / 404-VA. I implemented the api side twice and
-> verified it GREEN against Node (`web-go-uapi-doc`: unauth 401, bad-oid 404
-> JSON, valid 200 `[]` — byte-parity). **BUT** whichever form I used, adding
-> the api route for this path **perturbed the u1 (web, logged-in) 404 page**
-> (Go 14459 vs Node 15347) — an entanglement between the api route and the
-> session-dependent web 404-page oracle that needs a focused fresh-session
-> investigation (capture the u1 web 404 page in the committed state vs the
-> api-route state and diff at first-diff 2877). Not exercised by the e2e
-> journey suite (service endpoint), but required for a true api-profile 100%
-> drop-in. **Reverted to the green committed state (web u1 green) until then.**
+✅ **DONE + gated (2026-09-23, commit `1bc6a6404d`) — `GET /user/:userId/tag`**
+(privateApiRouter, basic-auth; was **HARD/defered**). The earlier two attempts
+failed because the `NoSession+APIOnly` route marked the path *sessionless* in
+the web profile (`routeNoSession`→true) → session init skipped → `cxt.Sess` nil
+→ the web 404-page oracle rendered **wrong** (u1: Go 14459 vs Node 15347). The
+**8dddb359c8 routeNoSession fix** (skip APIOnly when profile==web) is the
+enabler: session now inits, the web 404-page oracle renders byte-correct (u1
+STAYS green WITH the api route present), and the api route serves on :4011.
+Handler `features/tags/tags.go apiTagGetHandler` (NoSession+APIOnly, registered
+AFTER the web `privTagPat` oracle): unauth→401 (`APIBasicGate401`); userId not
+24-hex (incl. all-digit)→404 JSON VA `params.userId` (`oidParam`/`malformedParam`,
+with XPB set); valid oid (ghost or real)→200 `[tags]` (`mongoRun`+`dJSONTag`, ghost→`
+[]`). Case-insensitive 24-hex accepted (Node 200 for DEADBEEF…/6AbCdEf…). Wire nuance
+fixed after first green: Node sets XPB on the api 404-VA path (oidParam didn't).
+Gate `uapi-doc-matrix.cjs` +5 tag cases → **28 cases diffs=0**; u1/u103r/p413 green.
 
 ✅ **DONE + gated (2026-09-23) — `GET /project/:id/details`** (privateApiRouter,
 **api-only**, NOT on webRouter). Introduced the `core.Route.APIOnly` marker:
