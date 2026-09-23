@@ -360,6 +360,27 @@ async function main() {
   add('deact-badoid', async () => postRaw('/internal/project/notahex/deactivate', undefined, VJ))
   add('deact-ghost', async () => postRaw('/internal/project/' + GHOST + '/deactivate', undefined, VJ))
 
+  // POST /project/:Project_id/join (Node EditorRouter, privateApiRouter only,
+  // basic-auth; "called by the real-time API"). Pinned Node :3000 (2026-09-24):
+  // unauth/wrong→401 (challenge); bad Project_id→404 JSON VA params.Project_id;
+  // body invalid→400 JSON VA (userId union/unknown key); bothbad→404 joined;
+  // ghost→404 text "Not Found"; anon (private)→403 "Forbidden"; owner→200 JSON
+  // {project:<model>,privilegeLevel,isRestrictedUser,isTokenMember,isInvitedMember}
+  // (Node EditorHttpController.joinProject + ProjectEditorHandler.buildProjectModelView;
+  // owner is the fixed-owner seeded uapi-wire project → deterministic 3-leg wire).
+  const JOIN = `/project/${PJ}/join`
+  add('join-unauth', async () => post(JOIN, { userId: PI_UID }, J))
+  add('join-wrong', async () => post(JOIN, { userId: PI_UID }, WJ))
+  add('join-badparam', async () => post('/project/notahex/join', { userId: PI_UID }, VJ))
+  add('join-nobody', async () => post(JOIN, {}, VJ))
+  add('join-baduid', async () => post(JOIN, { userId: 'notahex' }, VJ))
+  add('join-nonstring', async () => post(JOIN, { userId: 123 }, VJ))
+  add('join-unknownkey', async () => post(JOIN, { userId: PI_UID, extra: 1 }, VJ))
+  add('join-bothbad', async () => post('/project/notahex/join', { userId: 'notahex' }, VJ))
+  add('join-ghost', async () => post('/project/' + GHOST + '/join', { userId: PI_UID }, VJ))
+  add('join-anon', async () => post(JOIN, { userId: 'anonymous-user' }, VJ))
+  add('join-owner200', async () => post(JOIN, { userId: PI_UID }, VJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()

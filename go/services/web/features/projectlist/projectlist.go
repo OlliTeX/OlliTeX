@@ -194,6 +194,16 @@ func Feature(a *core.App) core.Feature {
 			// (ghost or real)→200 text/plain "OK" (+ active:false + best-effort
 			// DU-flush/docstore-archive side effects).
 			{Method: "POST", Pattern: internalDeactivatePat, NoSession: true, APIOnly: true, Handler: internalDeactivateHandler(a)},
+			// U-API — POST /project/:Project_id/join (Node EditorRouter, privateApiRouter
+			// only, basic-auth; "called by the real-time API"). APIOnly → the web
+			// profile SKIPS it (Node does not wire this path on webRouter).
+			// unauth→401; bad Project_id→404 JSON VA (params.Project_id); body invalid→
+			// 400 JSON VA (userId union/unknown, param precedence→404 when both bad);
+			// ghost→404 text "Not Found"; access NONE→403 "Forbidden"; granted→200
+			// JSON {project:<model>,privilegeLevel,isRestrictedUser,isTokenMember,
+			// isInvitedMember} (Node EditorHttpController.joinProject +
+			// ProjectEditorHandler.buildProjectModelView, order-preserving).
+			{Method: "POST", Pattern: joinPat, NoSession: true, APIOnly: true, Handler: joinHandler(a)},
 			// U-API — GET /user/:user_id/personal_info (privateApiRouter, basic-auth;
 			// the webRouter variant is the distinct path /user/personal_info — no
 			// collision). unauth→401, bad-uid→404 JSON VA, ghost→404 text, valid→
