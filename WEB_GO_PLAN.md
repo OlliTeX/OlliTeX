@@ -3361,6 +3361,57 @@ then port+gate true gaps in e2e-impact order, then the hard cutover.**
 - **NEXT: U10.4 template preview → U10.5 restore success paths → hard
   cutover (Go web drop-in complete).**
 
+### ⛔ CUTOVER BLOCKER: Go **api profile** is not a 1:1 (verified 2026-09-23)
+
+The **web** profile (what `web-overleaf` serves; shadow :4010, ENABLED
+SERVICES=web) is a **complete, verified drop-in** (U10.3 close green; full
+parity battery green). But **`web-api-overleaf` → Go runs the `api` profile**
+(ENABLED_SERVICES=api). Auditing a Go **api-profile** instance (:4011)
+against Node **api :3000** found **Go falls back to the WEB wire** on the
+api surface — the concrete cutover blocker. Confirmed mismatches
+(Node api :3000 → Go api :4011):
+
+| case | Node api | Go api (current) | verdict |
+|---|---|---|---|
+| doc unauth json | 401 | 401 | OK |
+| **doc unauth *html*** | **401** | **302 →/login** (web) | ❌ |
+| doc wrong cred | 401 | 401 | OK |
+| doc valid GET (real) | 200 (JSON) | 200 (identical) | OK |
+| **doc valid POST** | **400/500 (reaches handler)** | **403 (web csrf)** | ❌ |
+| **no-auth POST** | **401** | **403 (web csrf)** | ❌ |
+| **doc ghost** | **404 plain "Not Found"** | **404 rendered HTML page** | ❌ |
+| GET /project/:id (unauth) | 404 | **302 →/login** | ❌ |
+| GET /project/:id/members (unauth) | 404 | **302 →/login** | ❌ |
+| **POST /tpds/folder-update** | **400 (validation)** | **404 (route missing)** | ❌ |
+
+**Root cause:** the `api`-profile doc-trio gate reuses the **web** wire —
+`APIBasicGate` (401/302 html-split), `APISend403` (csrf 403), and the
+rendered-HTML ghost 404 are **web-profile** behaviors that must NOT apply
+when `core.App.Cfg.Profile == "api"`.
+
+**Spec for the fix unit (profile-aware wire; do NOT regress the green web
+profile):** when `Profile == "api"`:
+1. `APIBasicGate` → unauth/wrong **always 401** (drop the html→302 split).
+2. **No** `APISend403` csrf gate — a cred-ful POST must **reach the handler**
+   (which returns the same 400/500/200 Node does for that state); no-auth POST →
+   401 (auth fails first), NOT 403.
+3. Ghost/project-not-found → **plain `404 "Not Found"`** text (not the rendered
+   HTML page; web profile keeps the HTML page).
+4. Unauth session-gated GETs (e.g. `GET /project/:id`, `/members`) → Node-api
+   returns **404** (not 302→/login). Match per-route.
+5. Restore missing api-profile routes as they surface (e.g.
+   `POST /tpds/folder-update` → Go currently 404 HTML; Node 400 validation),
+   via a corrected helper-aware api-route audit vs Node :3000.
+6. **Gate:** a Node-**api-:3000-baseline** parity battery (Node==Go==Node) for
+   the api-profile doc-trio + auth/POST wire + a representative api route set,
+   with the **web** profile gate (U10.3r/p413) kept green as regression.
+
+**Status:** spec complete; **not implemented** — deliberately deferred to a
+fresh window (subtle profile-aware refactor; risks regressing the verified
+web profile if rushed at the end of a 1d+ session). **The hard cutover is
+blocked on this unit** (flipping `web-api-overleaf` to Go now would serve the
+web wire on the :3000 surface).
+
 ### U10.3 — linked files + one-time-login + private-API doc-trio wire — **✅ GATE GREEN (2026-09-23)**
 
 The last missing-family unit before hard cutover. Three sub-features, all
