@@ -67,6 +67,9 @@ import (
 var (
 	docapiDlPat  = regexp.MustCompile(`^/project/([^/]+)/doc/([^/]+)$`)
 	docapiRejPat = regexp.MustCompile(`^/project/([^/]+)/doc/([^/]+)/changes/reject$`)
+	// P4.13 / U-API — GET /project/:project_id/details (Node privateApiRouter
+	// ProjectApiController.getProjectDetails — api-only, NOT on webRouter).
+	detailsPat = regexp.MustCompile(`^/project/([^/]+)/details$`)
 )
 
 // atomic counter: keeps the "unused helper" lint quiet only if needed.
@@ -633,3 +636,118 @@ func jsonTypeName(v any) string {
 }
 
 func lastUpdatedAtOK(v *int64) bool { return v == nil || *v > 0 }
+
+// --- GET /project/:project_id/details (Node privateApiRouter, api-only) ----
+//
+// Node ProjectDetailsHandler.getDetails (pinned live 2026-09-23 vs api :3000):
+//
+//	unauth/wrong  → 401 (basic-auth challenge; same wire as the doc trio)
+//	bad project_id→ 404 JSON {"error":"Validation error: Invalid Mongo ObjectId
+//	                  at \"params.project_id\"","statusCode":404}
+//	ghost project → 404 text/plain "Not Found" (same wire as the doc ghost 404)
+//	valid project → 200 JSON {name, [description], [compiler], features,
+//	                  [overleaf]} — undefined keys omitted (res.json), features
+//	                  = the OWNER user's user.features object (document order
+//	                  preserved via core.WriteOrderedValue), else defaultFeatures.
+//
+// The route is APIOnly: the web profile SKIPS it (Node's web stack does not
+// wire /project/:id/details on webRouter), so adding it changes nothing on
+// :4000 (the already-verified web profile).
+func detailsGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+	return func(c *core.Cxt, r *core.Res) {
+		req := c.Req
+		mm := detailsPat.FindStringSubmatch(req.URL.Path)
+		if mm == nil {
+			views.NotFoundPage(r.W, pageBase(c, strings.TrimPrefix(req.URL.Path, "/")))
+			return
+		}
+		pidHex := mm[1]
+		if c.A.Cfg.Profile != "api" {
+			// Defensive: core.App skips APIOnly routes on the web profile, so
+			// this is unreachable on :4000; if it ever is, 404 (Node web does too).
+			r.JSON(404, delParamVA("project_id"))
+			return
+		}
+		if !a.APIBasicGate401(c, r, req) {
+			return // unauth / wrong basic → 401 (challenge wire)
+		}
+		if !delHex24(pidHex) {
+			// Node's invalid-objectId 404 is a res.json (sets X-Powered-By) —
+			// pinned: 404 JSON + XPB, matching :3000.
+			r.W.Header().Set("X-Powered-By", "Express")
+			r.JSON(404, delParamVA("project_id"))
+			return
+		}
+		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		ctx := req.Context()
+		db, err := a.Mongo.DB(ctx)
+		if err != nil {
+			details404Plain(r)
+			return
+		}
+		var pd primitive.D
+		if err := db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&pd); err != nil {
+			details404Plain(r) // valid ObjectId but no such project → NotFoundError → 404
+			return
+		}
+
+		// owner user -> features (document order preserved)
+		var uid primitive.ObjectID
+		if uRaw, ok := dpath(pd, "owner_ref"); ok && uRaw != nil {
+			if o, ok2 := uRaw.(primitive.ObjectID); ok2 {
+				uid = o
+			}
+		}
+		featuresJSON := []byte(`{}`) // fallback = settings.defaultFeatures (not exercised in the gate)
+		if uid != (primitive.ObjectID{}) {
+			var ud primitive.D
+			if err := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: uid}}).Decode(&ud); err == nil {
+				if fv, ok := dpath(ud, "features"); ok && fv != nil {
+					if fd, ok2 := fv.(primitive.D); ok2 {
+						featuresJSON = core.OrderedD(fd)
+					}
+				}
+			}
+		}
+
+		// Assemble in Node key order, omitting keys whose value is undefined
+		// (undefined description/compiler/overleaf are dropped by res.json).
+		var sb strings.Builder
+		nameV, _ := dpath(pd, "name")
+		sb.WriteString(`{"name":`)
+		core.WriteOrderedValue(&sb, asStr(nameV))
+		sb.WriteString(`,`)
+		if v, ok := dpath(pd, "description"); ok && v != nil {
+			sb.WriteString(`"description":`)
+			core.WriteOrderedValue(&sb, v)
+			sb.WriteString(`,`)
+		}
+		if v, ok := dpath(pd, "compiler"); ok && v != nil {
+			sb.WriteString(`"compiler":`)
+			core.WriteOrderedValue(&sb, v)
+			sb.WriteString(`,`)
+		}
+		sb.WriteString(`"features":`)
+		sb.Write(featuresJSON)
+		if v, ok := dpath(pd, "overleaf"); ok && v != nil {
+			sb.WriteString(`,"overleaf":`)
+			core.WriteOrderedValue(&sb, v)
+		}
+		sb.WriteString(`}`)
+		r.W.Header().Set("X-Powered-By", "Express") // res.send path
+		r.JSON(200, []byte(sb.String()))
+	}
+}
+
+// details404Plain — valid-but-missing project: 404 text/plain "Not Found"
+// (pinned: identical wire to the api doc-ghost 404 — text/plain, X-Powered-By,
+// weak ETag over the 9-byte body, Content-Length 9; the fixed global CSP is
+// set by serve()).
+func details404Plain(r *core.Res) {
+	r.W.Header().Set("X-Powered-By", "Express")
+	r.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	r.W.Header().Set("ETag", core.EtagWeakBody("Not Found"))
+	r.W.Header().Set("Content-Length", strconv.Itoa(len("Not Found")))
+	r.W.WriteHeader(http.StatusNotFound)
+	_, _ = r.W.Write([]byte("Not Found"))
+}

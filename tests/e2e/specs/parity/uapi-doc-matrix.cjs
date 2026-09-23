@@ -140,6 +140,17 @@ async function main() {
   add('webroot-entities', async () => get('/entities', J))
   add('webroot-unknown', async () => get('/foo-404', J))
 
+  // U-API — GET /project/:id/details (privateApiRouter, API-ONLY route). Node
+  // ProjectDetailsHandler.getDetails wire: unauth→401 (challenge),
+  // invalid-oid→404 JSON {error:"Validation error: Invalid Mongo ObjectId at
+  // \"params.project_id\"",statusCode:404}, ghost→404 text/plain "Not Found",
+  // valid→200 JSON {name, features:<owner's user.features, document order>}
+  // (undefined desc/compiler/overleaf omitted). Node api :3000 == Go api :4011.
+  add('details-unauth', async () => get(P + '/details', J))
+  add('details-invalid', async () => get('/project/notahex/details', VJ))
+  add('details-ghost', async () => get('/project/111111111111111111111111/details', VJ))
+  add('details-valid', async () => get(P + '/details', VJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()

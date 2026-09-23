@@ -37,6 +37,15 @@ type Route struct {
 	// no overleaf.sid cookie while /login does).
 	NoSession bool
 
+	// APIOnly = mounted on Node's privateApiRouter / publicApiRouter but NOT
+	// on webRouter (e.g. GET /project/:id/details, POST /user/:id/project/new,
+	// POST /tpds/folder-update). Served on the api profile; the web profile
+	// SKIPS it (falls through to the web 404 tail — Node's web stack 404s these
+	// since they are not wired on webRouter). This is the "api-only" cell of the
+	// web/both/api-only matrix;
+	// NoSession (doc-trio, /status, health_check) = served on BOTH (dual).
+	APIOnly bool
+
 	// Pattern — Express-style regex route (P2a: /:token token access +
 	// consent routes). First/named capture group = route param (Cxt.Params
 	// ["token" / "1"]).
@@ -277,8 +286,12 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 				//           (but 200/302 on :4000); only /status,/health_check*,
 				//           doc-trio, snapshots, ... (NoSession) are 200/401/404.
 				// The web profile (:4000) is untouched — it serves all routes.
-				if a.Cfg.Profile == "api" && !rt.NoSession {
-					continue // not an api-route: skip → api 404 tail, like Node :3000
+				if a.Cfg.Profile == "api" && !rt.NoSession && !rt.APIOnly {
+					continue // web-router route: skip → api 404 tail, like Node :3000
+				}
+				if a.Cfg.Profile == "web" && rt.APIOnly {
+					continue // api-only route: Node's web stack does not mount it —
+					// skip → web 404 tail (unchanged, verified) instead of serving.
 				}
 				if rt.NoSession {
 					if rt.Pattern != nil {

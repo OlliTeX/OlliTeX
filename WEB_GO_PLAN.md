@@ -3463,23 +3463,43 @@ routes with their WEB wire (measured Go :4011 before the fix: `/project` →
 measured Node api :3000 (unauth → 401 + WWW-Authenticate;
 valid-cred → route-specific):
 
-| route | Node api (unauth) | Node api (valid-cred) | Go api (current) |
+| route | Node api (unauth) | Node api (valid-cred) | Go api |
 |---|---|---|---|
-| `POST /user/:id/project/new` | **401** | 500 (stack condition) | **404 (route missing)** |
-| `POST /tpds/folder-update` | **401** | 400 (validation) | **404 (route missing)** |
-| `GET /user/:id/personal_info` | **401** | 200 (user JSON) | **404 (route missing)** |
-| `GET /project/:id/details` | **401** | 200 (project JSON) | **404 (route missing)** |
-| `/internal/*` (deactivate/expire/zip/compile) | 401 | ... | 404 (several missing) |
+| **`GET /project/:id/details`** | **401** | 200 (project JSON) | ✅ **DONE + gated** |
+| **`GET /user/:id/personal_info`** | 401 | 200 (user JSON) | 404 (missing) |
+| `POST /user/:id/project/new` | 401 | 500 (stack) | 404 (missing) |
+| `POST /tpds/folder-update` | 401 | 400 (validation) | 404 (missing) |
+| `/internal/*`, `/user\|project/:id/update/:path`, `/project/:id/contents/:path` | 401 | ... | 404 (several missing) |
 
-**The remaining fix (bounded, per-route):** for each route Node's
-`privateApiRouter` serves that Go lacks, register it in Go as a `NoSession`
-route with the `core.APIBasicGate401` gate (unauth/wrong → 401, matching Node)
-and, where Node returns a **read** 200 (personal_info, details, tag), implement
-the valid-cred handler to return the same JSON (Node key order). **Gate** each
-addition on Node api :3000 == Go api :4011; keep the web profile gates green
-(u103r/u1/p413/uapi) as regression. The auth-boundary (unauth → 401) is the
-high-confidence wire pin; the valid-cred read 200s are per-route handler
-parity.
+✅ **DONE + gated (2026-09-23) — `GET /project/:id/details`** (privateApiRouter,
+**api-only**, NOT on webRouter). Introduced the `core.Route.APIOnly` marker:
+the web profile now SKIPS API-only routes (falls to the already-verified web 404
+tail — :4000 unchanged), while the api profile serves them. Handler
+`features/projectlist/docapi.go detailsGetHandler`:
+  - unauth/wrong → 401 (challenge wire, `APIBasicGate401`).
+  - invalid-oid → 404 JSON `{error:"Validation error: Invalid Mongo ObjectId at
+    \"params.project_id\"",statusCode:404}` + XPB (`delParamVA`).
+  - ghost (valid, missing) → 404 text/plain "Not Found" (+XPB, weak etag).
+  - valid → 200 JSON `{name, [description], [compiler], features, [overleaf]}`
+    with **undefined keys omitted** (Node res.json) and `features` = the OWNER
+    user's `user.features` object rendered in **document order** via the new
+    `core.WriteOrderedValue`/`core.OrderedD` helper (Go maps are unordered —
+    the 11 feature keys must appear exactly as Node stores them).
+Added shared `go/services/web/core/orderedjson.go` (order-preserving BSON→JSON).
+- Gate: `web-go-uapi-doc` + `uapi-doc-matrix.cjs` now 19 cases diffs=0
+  (doc-trio 401/404/200 + 5 web-route 404s + 4 details: unauth/invalid/ghost/valid).
+- Web regression: `web-go-u103r` (7/diffs=0) + `web-go-u1-parity` +
+  `web-go-p413-flip` green — the web profile is entirely unchanged (details is
+  APIOnly so the web profile never dispatches it).
+
+**The remaining fix (bounded, per-route):** for each remaining route Node's
+`privateApiRouter` serves that Go lacks: `GET /user/:id/personal_info` (dual —
+also on webRouter, read 200 user JSON) and the two write routes `POST
+/user/:id/project/new` (Node valid→500 in this stack; pin the unauth 401 + a
+faithful valid path) and `POST /tpds/folder-update` (Node valid→400 validation;
+pin unauth 401 + the 400 wire). Each as `NoSession`+(`APIOnly` if not on
+webRouter) with `APIBasicGate401`. Gate each on Node api :3000 == Go api :4011;
+keep the web gates green (u103r/u1/p413/uapi) as regression.
 
 **RISK:** this touches the shared routing layer — do it in small gated slices,
 verify BOTH profiles each step (a web-profile regression is the main hazard),

@@ -178,6 +178,12 @@ func Feature(a *core.App) core.Feature {
 			//         handler. Pinned vs Node api :3000.
 			{Method: "POST", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiPostHandler(a))},
 			{Method: "POST", Pattern: docapiRejPat, NoSession: true, Handler: apiXPB(docapiRejectHandler(a))},
+			// U-API — GET /project/:id/details (privateApiRouter, API-ONLY).
+			// APIOnly: the web profile SKIPS this route (core.App filter) and
+			// falls through to the already-verified web 404 tail — so :4000 is
+			// unchanged. On the api profile it serves: unauth→401, bad-oid/ghost
+			// →404, valid→200 JSON (owner features, document order).
+			{Method: "GET", Pattern: detailsPat, NoSession: true, APIOnly: true, Handler: detailsGetHandler(a)},
 		},
 	}
 }
