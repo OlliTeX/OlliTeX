@@ -138,6 +138,10 @@ func Feature(a *core.App) core.Feature {
 			// P4.11a editor entity creation (web-p411a flip)
 			{Method: "POST", Pattern: entDocPat, Handler: addEntityHandler(a, "doc")},
 			{Method: "POST", Pattern: entFolderPat, Handler: addEntityHandler(a, "folder")},
+			// U10.2b — entity rename/move/duplicate (Node EditorRouter POST family).
+			{Method: "POST", Pattern: entRenPat, Handler: entRenameHandler(a)},
+			{Method: "POST", Pattern: entMovPat, Handler: entMoveHandler(a)},
+			{Method: "POST", Pattern: entDupPat, Handler: entDuplicateHandler(a)},
 			// P4.11b editor entity deletion (web-p411b flip)
 			{Method: "DELETE", Pattern: delDocPat, Handler: delEntityHandler(a, "doc")},
 			{Method: "DELETE", Pattern: delFilePat, Handler: delEntityHandler(a, "file")},
