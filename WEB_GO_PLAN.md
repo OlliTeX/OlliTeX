@@ -3530,6 +3530,51 @@ profile skips it; :4000 unchanged):
 - Web regression: `web-go-u103r` (7/diffs=0) + `web-go-u1-parity` +
   `web-go-p413-flip` green — the web profile is entirely unchanged.
 
+✅ **DONE (2026-09-23) — fixed a nil-session PANIC on the web profile for the
+api-only routes** (committed `8dddb359c8`). `core.routeNoSession(r)` marked the
+`NoSession+APIOnly` routes (details, personal_info) "sessionless" even in the **web**
+profile, so `serve()` skipped session init → `cxt.Sess == nil` → the web
+fallback/login-gate called `(*Session).IsLoggedIn` on nil → **http panic →
+connection closed with NO response** (curl `Empty reply`; sv log: nil-deref at
+`session.go:392` via `app.go:343`). The web profile CRASHED on any request to
+those api-only routes, whatever auth. Fix: `routeNoSession` now skips `APIOnly`
+routes when `profile=="web"` (they are ABSENT on Node web, so they must not
+mark the path sessionless) — session inits normally, the web fallback runs clean.
+Verified: GO web :4010 details/personal_info no-basic → **302** (was empty-reply;
+== Node web :4000 302), api profile :4011 still 200/401; all green gates still
+pass (uapi 23/0, u1, u103r 7/0, p413 4).
+
+⚠️ **DISCOVERED (2026-09-23, accurate wire) — WEB-profile + VALID basic-auth is
+NOT Go-parity.** Node web (:4000), no session, `Authorization: Basic` **valid**
+creds + non-JSON Accept → **404 HTML page** (13920–13992B, per path: /members
+13920, /zzz-nope 13934, details 13986, personal_info 13992, tag 13972) or **403**
+(/project/:id 14085). Go web (:4010) instead **401** for the SAME request.
+Full Node web auth matrix (no session), pinned live 2026-09-23 (`/members` =
+a normal session-required web route):
+  | condition (no session)              | Node :4000   |
+  |---|---|
+  | no-auth, non-JSON (*/*  or XHR)    | **302 →/login** |
+  | no-auth, `Accept: application/json`| **401** |
+  | **valid** basic, non-JSON          | **404 page** (/project/:id → **403**) |
+  | **valid** basic, JSON Accept       | **401** |
+  | **wrong** basic (bad user &/or pw) | **401** |
+So the correct web model: valid basic is **authenticated** (passes the global
+login gate) and the request is dispatched to the route handler (handler access
+→ 403/404/200) or the web 404 (no web handler) — NOT bounced to 401. Go's
+`globalLoginBounce` currently 401s on ANY `Authorization` header. **Scope:**
+affacts the web profile only (the api profile is already 1:1: unauth→401, valid
+→200/404 — uapi gate green). **Frequency: low** — the basic cred is the private-
+API credential, services call the **api** profile (:3000) for TPDS/doc-trio
+(NoSession, served directly, unaffected); hitting a *session-gated web route*
+with valid basic is rare. **Fix (next window, NOT done here — risky, systemic,
+and per-path 404-page bytes must be re-verified):** in the web profile, treat a
+VALID basic (non-JSON) request as authenticated so it is not bounced; invalid
+basic → 401, JSON Accept → 401, no basic → 302. Verify the 404-page bytes match
+Node per-path (13920–13992) and that /project/:id → 403. A safe-but-approximative
+alternative (404 page in `globalLoginBounce` for valid basic) matches 4/5 routes
+(members/unknown/details/personal_info) but NOT /project/:id (403); the faithful
+fix dispatches to the handler.
+
 **The remaining fix (bounded, per-route):** the two write routes Node's
 `privateApiRouter` serves that Go still lacks: `POST /user/:id/project/new`
 (Node valid→500 in this stack; pin the unauth 401 + a
