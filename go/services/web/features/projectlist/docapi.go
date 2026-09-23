@@ -567,7 +567,9 @@ func docapiPostHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 	}
 }
 
-// POST /project/:pid/doc/:did/changes/reject — CE: always 204.
+// POST /project/:pid/doc/:did/changes/reject — api profile: strict body
+// validation (Node trackChangesRejectedSchema) → 400 (zod) or 204 (valid);
+// web profile: session+csrf chain blocks before basic auth → 403 (U10.3r).
 func docapiRejectHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		req := cxt.Req
@@ -578,20 +580,15 @@ func docapiRejectHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 		}
 		if a.Cfg.Profile == "api" {
 			if !a.APIBasicGate401(cxt, res, req) {
-				return
+				return // unauth / wrong basic → 401 (challenge wire)
 			}
-		} else {
-			// web profile: the session+csrf chain blocks the POST before basic
-			// auth — always 403 (pinned U10.3r/p413); the 204 below is
-			// unreachable via the web entry.
-			a.APISend403(cxt, res)
+			crjServe(cxt, res, req) // strict body validation → 400 (zod) / 204
 			return
 		}
-		// Node sends `res.status(204).send("No Content")` — express computes
-		// the ETag over the (stripped) 10-byte body, pinned: 204 carries
-		// W/"a-bAsFyilMr4Ra1hIU5PyoyFRunpI".
-		res.W.Header().Set("ETag", core.EtagWeakBody("No Content"))
-		res.NoContent()
+		// web profile: the session+csrf chain blocks the POST before basic
+		// auth — always 403 (pinned U10.3r/p413); the 204 is unreachable via
+		// the web entry.
+		a.APISend403(cxt, res)
 	}
 }
 

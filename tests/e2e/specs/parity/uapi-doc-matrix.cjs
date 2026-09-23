@@ -47,6 +47,7 @@ if (!VALID) {
 const PJ = process.env.UAPI_PJ
 const DOC = process.env.UAPI_DOC
 const GHOST = process.env.UAPI_GHOST || '666666666666666666666666'
+const PI_UID = '6aa4b8b573ef0e5094f4cbc0' // e2e admin (fixed fixture)
 if (!PJ || !DOC) {
   console.error('ERR|missing-fixture: UAPI_PJ / UAPI_DOC not set')
   process.exit(1)
@@ -138,6 +139,33 @@ async function main() {
   add('post-doc-unauth', async () => post(DOCGET, {}))
   add('post-rej-unauth', async () => post(REJ, {}))
 
+  // U-API — POST /project/:id/doc/:doc_id/changes/reject (privateApiRouter, API-only).
+  // Node DocumentController.trackChangesRejected: strict zod body
+  //   rejectedChangeAuthorIds: z.array(zz.objectId())  (required)
+  //   userId: zz.objectId().nullish()                    (optional, may be null)
+  //   previews: z.array(changePreview).optional()        (optional)
+  // valid→204; any violation→400 JSON (zod, all issues, schema order, then
+  // unknown-keys, joined "; "); array body→400 JSON; scalar/null/bad-JSON body
+  // →400 HTML (705B express error page). All Node==Go verified (37-case compare,
+  // 2026-09-24). PI_UID is the e2e admin (valid 24-hex oid).
+  const PV = { sectionPath: [], startLine: 1, changes: [], slice: 's', sliceStart: 0, userIds: [PI_UID] }
+  add('rej-valid-nullU', async () => post(REJ, { rejectedChangeAuthorIds: [PI_UID], userId: null }, VJ))
+  add('rej-valid-uid', async () => post(REJ, { rejectedChangeAuthorIds: [PI_UID], userId: PI_UID }, VJ))
+  add('rej-valid-prev', async () => post(REJ, { rejectedChangeAuthorIds: [PI_UID], previews: [PV] }, VJ))
+  add('rej-nobody', async () => post(REJ, undefined, VJ))
+  add('rej-rca-bad', async () => post(REJ, { rejectedChangeAuthorIds: ['no'] }, VJ))
+  add('rej-uid-num', async () => post(REJ, { rejectedChangeAuthorIds: [PI_UID], userId: 5 }, VJ))
+  add('rej-uid-nostr', async () => post(REJ, { rejectedChangeAuthorIds: [PI_UID], userId: 'no' }, VJ))
+  add('rej-unk-key', async () => post(REJ, { rejectedChangeAuthorIds: [PI_UID], userId: PI_UID, bogus: 1 }, VJ))
+  add('rej-prev-{}', async () => post(REJ, { rejectedChangeAuthorIds: [PI_UID], previews: [{}] }, VJ))
+  add('rej-prev-extra', async () => post(REJ, { rejectedChangeAuthorIds: [PI_UID], previews: [{ ...PV, bogus: 1 }] }, VJ))
+  add('rej-changes-nop', async () => post(REJ, { rejectedChangeAuthorIds: [PI_UID], previews: [{ ...PV, changes: [{ i: 'a' }] }] }, VJ))
+  add('rej-rca-unk', async () => post(REJ, { rejectedChangeAuthorIds: 'x', other: 1 }, VJ))
+  add('rej-arr-body', async () => post(REJ, '[1]', VJ))
+  add('rej-raw-num', async () => post(REJ, '123', VJ))
+  add('rej-raw-null', async () => post(REJ, 'null', VJ))
+  add('rej-badjson', async () => post(REJ, '{bad', VJ))
+
   // wrong basic (any Accept → 401, never content-negotiates)
   add('doc-wrong-json', async () => get(DOCGET, WJ))
   add('doc-wrong-html', async () => get(DOCGET, WH))
@@ -179,7 +207,6 @@ async function main() {
   // ghost (hex24, absent)→404 text/plain "Not Found", valid→200 JSON
   // {id, first_name, last_name, email} (id-first, truthy-only keys).
   // Node api :3000 == Go api :4011.
-  const PI_UID = '6aa4b8b573ef0e5094f4cbc0'
   add('pi-unauth', async () => get('/user/' + PI_UID + '/personal_info', J))
   add('pi-invalid', async () => get('/user/notahex/personal_info', VJ))
   add('pi-ghost', async () => get('/user/666666666666666666666666/personal_info', VJ))
