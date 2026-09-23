@@ -3471,8 +3471,9 @@ valid-cred → route-specific):
 | **`GET /project/:id/details`** | **401** | 200 (project JSON) | ✅ **DONE + gated** |
 | **`GET /user/:userId/tag`** | 401 | 200 (tag array) | ✅ **DONE + gated** (commit `1bc6a6404d`) |
 | **`GET /user/:id/personal_info`** | 401 | 200 (user JSON) | ✅ **DONE + gated** |
-| `POST /user/:id/project/new` | 401 | 500 (stack) | 404 (missing) |
-| `POST /tpds/folder-update` | 401 | 400 (validation) | 404 (missing) |
+| `POST /user/:id/project/new` | **401** | 400/500/200 | ✅ **DONE + gated** (`ea50a53ee7`) |
+| `POST /user/:id/project/resolve` | **401** | 400/200 | ✅ **DONE + gated** (`80b71e6d8d`) |
+| `POST /tpds/folder-update` | 401 | 400 (validation) / 409 / 200 | 404 (missing) |
 | `/internal/*`, `/user\|project/:id/update/:path`, `/project/:id/contents/:path` | 401 | ... | 404 (several missing) |
 
 ✅ **DONE + gated (2026-09-23, commit `1bc6a6404d`) — `GET /user/:userId/tag`**
@@ -3490,6 +3491,39 @@ with XPB set); valid oid (ghost or real)→200 `[tags]` (`mongoRun`+`dJSONTag`, 
 []`). Case-insensitive 24-hex accepted (Node 200 for DEADBEEF…/6AbCdEf…). Wire nuance
 fixed after first green: Node sets XPB on the api 404-VA path (oidParam didn't).
 Gate `uapi-doc-matrix.cjs` +5 tag cases → **28 cases diffs=0**; u1/u103r/p413 green.
+
+✅ **DONE + gated (2026-09-23) — `POST /user/:id/project/new` (createProject)
+`ea50a53ee7` + `POST /user/:id/project/resolve` (resolveProject) `80b71e6d8d`.**
+The two project-level TPDS write endpoints (owner confirmed the target deployment
+USES Dropbox/GitHub sync, so the api write surface is a cutover requirement).
+Handler `features/projectlist/tpdsapi.go` (NoSession+APIOnly → web SKIPS;
+verified :4000 POST → 403 == Node): 
+- createProject: unauth→401; uid !24hex→404 JSON VA `params.user_id` (91B);
+  valid-uid+valid-name→**200 `{"projectId":"<24hex>"}`** (40B, CREATES a BLANK
+  project — reuses P4.7 `crInsertProject`/`crInitHistory`/`nzipEnsureUnique`
+  (generateUniqueName, ` (N)` suffix == Node)); invalid-name (empty/slash/wsp/
+  too-long/absent)→**500** `Internal Server Error` (21B; Node's TPDS path leaves
+  the name-validation error unmapped → Express 500).
+- resolveProject: unauth→401; uid !24hex→404 VA; **4 strict-zod 400 branches**
+  (bad-pid 91B `body.projectId`; empty-body 197B; empty-name 120B `Too small`;
+  both-keys 185B — the `Invalid Mongo ObjectId at body.projectId; ` prefix appears
+  only when the pid is NOT 24-hex, zod .or() joins matched-branch errors);
+  ghost-pid→**200 `{"status":"rejected"}`** (21B); existing/new-name→**200
+  success** `{"status":"success","projectId","historyId?","otMigrationStage":0}`
+  (historyId OMItTED when the doc has no overleaf.history.id; new-name CREATES a
+  blank project). Shared core `tpdsGetOrCreateByName`/`tpdsOwnedOrRWProjects`
+  (owner_ref∪collaborator_refs deduped)/`tpdsProjectActive` (!archived&&!trashed)
+  ported from Node for reuse by the folder/update endpoints.
+uapi gate now **46 cases diffs=0** (+7 cp +11 res; projectId normalized to "X"; gate
+auto-cleans uapi-cp-gate/resgate-gate → 0 strays). web regression u1/u103r/p413 green.
+
+⛔ **STILL OPEN (TPDS write business logic, UpdateMerger/mkdirp):** `POST /
+tpds/folder-update` (createFolder → mkdirp + FileTypeManager.shouldIgnore),
+`POST|DELETE /user/:id/update/:path(.+)` + `/project/:pid/user/:uid/update/:path(.+)`
+(mergeUpdate/deleteUpdate), `POST|DELETE /project/:pid/contents/:path(.+)`
+(updateProjectContents/deleteProjectContents) + `/internal/*`. These are the
+FileStore/docstore/UpdateMerger-heavy endpoints — the heaviest of the cutover
+blockers; each needs its Node wire pinned + a stateful gated port.
 
 ✅ **DONE + gated (2026-09-23) — `GET /project/:id/details`** (privateApiRouter,
 **api-only**, NOT on webRouter). Introduced the `core.Route.APIOnly` marker:
