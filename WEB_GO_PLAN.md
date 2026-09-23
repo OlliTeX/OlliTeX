@@ -3466,10 +3466,26 @@ valid-cred → route-specific):
 | route | Node api (unauth) | Node api (valid-cred) | Go api |
 |---|---|---|---|
 | **`GET /project/:id/details`** | **401** | 200 (project JSON) | ✅ **DONE + gated** |
+| **`GET /user/:userId/tag`** | 401 | 200 (tag array) | ⚠️ **HARD — deferred** (see note) |
 | **`GET /user/:id/personal_info`** | 401 | 200 (user JSON) | 404 (missing) |
 | `POST /user/:id/project/new` | 401 | 500 (stack) | 404 (missing) |
 | `POST /tpds/folder-update` | 401 | 400 (validation) | 404 (missing) |
 | `/internal/*`, `/user\|project/:id/update/:path`, `/project/:id/contents/:path` | 401 | ... | 404 (several missing) |
+
+> **⚠️ `GET /user/:userId/tag` — HARD, deferred (investigated 2026-09-23).**
+> **DUAL** route: Node serves it on BOTH profiles with DIFFERENT bodies —
+> web(session) → the **404 HTML page** (the U1 session oracle, pinned green by
+> `privTagPat` in `features/tags/tags.go`); api(basic-auth) → 200 tag array
+> (`[]` when none) / 401 / 404-VA. I implemented the api side twice and
+> verified it GREEN against Node (`web-go-uapi-doc`: unauth 401, bad-oid 404
+> JSON, valid 200 `[]` — byte-parity). **BUT** whichever form I used, adding
+> the api route for this path **perturbed the u1 (web, logged-in) 404 page**
+> (Go 14459 vs Node 15347) — an entanglement between the api route and the
+> session-dependent web 404-page oracle that needs a focused fresh-session
+> investigation (capture the u1 web 404 page in the committed state vs the
+> api-route state and diff at first-diff 2877). Not exercised by the e2e
+> journey suite (service endpoint), but required for a true api-profile 100%
+> drop-in. **Reverted to the green committed state (web u1 green) until then.**
 
 ✅ **DONE + gated (2026-09-23) — `GET /project/:id/details`** (privateApiRouter,
 **api-only**, NOT on webRouter). Introduced the `core.Route.APIOnly` marker:
