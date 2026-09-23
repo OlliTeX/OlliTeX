@@ -3525,6 +3525,18 @@ tpds/folder-update` (createFolder → mkdirp + FileTypeManager.shouldIgnore),
 FileStore/docstore/UpdateMerger-heavy endpoints — the heaviest of the cutover
 blockers; each needs its Node wire pinned + a stateful gated port.
 
+**`POST /tpds/folder-update` — wire pinned (2026-09-23, Node api :3000):**
+- **401** (unauth): 12B `Unauthorized` text/plain + XPB + `WWW-Authenticate: OverleafLogin`.
+- **400** (zod, `application/json`, XPB, no WWW) — `userId` (zz.objectId) + `path` (required string), joined `; ` in order [userId, path], full body `{"error":"Validation error: <joined>","statusCode":400}`:
+  - no body → **185B** (`...at \"body.userId\"; Invalid input: expected string, received undefined at \"body.path\"`)
+  - uid-only → **114B** (`...at \"body.path\"`)
+  - path-only → **116B** (`...at \"body.userId\"`)
+  - bad-uid → **88B** (`Invalid Mongo ObjectId at \"body.userId\"`)
+- **500** (21B `Internal Server Error` text/plain + XPB): valid-user + **empty path** (zod passes; mkdirp → `folder=null` → `folder._id` throws). Also other unexpected errors.
+- **409** (767B HTML `text/html` + XPB + ETag W/\"2ff-...\"): `<!DOCTYPE html>...<title>Something went wrong</title>...` full page (in-plan: HttpErrorHandler.conflict), body `Could not create folder`. **REACHED WHEN** `getOrCreateProject(uid,pid,name)==null` OR `FileTypeManager.shouldIgnore(path)`. NOTE: **stateful** — which project `getOrCreateProject` resolves (by `projectId` if given & user RW, else by `projectName`, else user's project) + user's RW decide 409 vs 200; a project admin isn't RW in → 409 even if it exists. (observed: same path can be 200 or 409 depending on project/RW state, so live-state pinning per-case is required — do NOT reduce to a static hidden-file rule.)
+- **200** (134B `application/json` + XPB) `{"entityId":"<lastFolderId>","projectId":"<pid>","path":"<path>","folderId":"<parentFolderId|null>"}` — mkdirp creates all missing path-segment folders under the resolved project (reuse Go `upMkdirp`, upload.go:547 — the faithful `ProjectEntityMongoUpdateHandler.mkdirp`); `entityId`=deepest folder id, `folderId`=its PARENT folder id (root-level child → parent=`rootFolder[0]._id`; `path==='/'` → entity=rootFolder, folderId=null). Parent id: walk `entParseTree(entFld(doc,"rootFolder"))` for the folder whose `.fold` contains entityId (entops `entFolder{idHex,fold}` + `entFindLoc` shape, entadd.go). `shouldIgnore`=Minimatch(`Settings.fileIgnorePattern`,{nocase,dot}).match(path) — **pin the live pattern value before implementing** (was undefined in /etc/overleaf/settings.js; the `.DS_Store` 409s were project-access state, not this).
+**NEXT (fresh window):** pin the live `fileIgnorePattern` + a few (projectId,RW,state)→409/200 cases on a stable project, then implement the handler (401 / 400×4 / 500-empty-path / 409 / 200) reusing upMkdirp + a parent-folder walker + the pinned 409 HTML body, gate all states, keep web gates green, commit.
+
 ✅ **DONE + gated (2026-09-23) — `GET /project/:id/details`** (privateApiRouter,
 **api-only**, NOT on webRouter). Introduced the `core.Route.APIOnly` marker:
 the web profile now SKIPS API-only routes (falls to the already-verified web 404
