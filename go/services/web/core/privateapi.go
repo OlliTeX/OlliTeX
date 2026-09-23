@@ -118,3 +118,40 @@ func (a *App) APIBasicGate(cxt *Cxt, res *Res, req *http.Request) bool {
 	res.Redirect(req, 302, "/login")
 	return false
 }
+
+// APIBasicGate401 — the api-profile (ENABLED_SERVICES=api) private-API gate.
+// Distinct from the web gate (APIBasicGate): the api process never
+// content-negotiates an UNAUTHENTICATED request into a 302/login redirect or a
+// csrf 403 — it always answers 401, for any Accept and any method. Pinned live
+// 2026-09-23 against Node api :3000 (doc-trio GET json+html, no-auth POST all
+// → 401 "Unauthorized") with full header capture. The api 401 carries:
+//
+//	WWW-Authenticate: OverleafLogin, X-Powered-By: Express,
+//	Content-Security-Policy <fixed api policy> (set globally in serve()),
+//	Content-Type text/plain; charset=utf-8, weak ETag over "Unauthorized",
+//	Content-Length 12 — and NONE of the web helmet baseline and NO session
+//	cookie (the api profile mounts no session middleware).
+//
+// Right credentials → true (the handler runs: GET → 200/404, POST → the
+// setDocument/reject logic). Wrong/absent credentials → false (401 sent).
+func (a *App) APIBasicGate401(cxt *Cxt, res *Res, req *http.Request) bool {
+	send401 := func() {
+		res.W.Header().Set("WWW-Authenticate", "OverleafLogin")
+		res.W.Header().Set("X-Powered-By", "Express")
+		res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		res.W.Header().Set("Content-Length", "12")
+		res.W.Header().Set("ETag", EtagWeakBody("Unauthorized"))
+		res.W.WriteHeader(401)
+		_, _ = res.W.Write([]byte("Unauthorized"))
+	}
+	if au, p, has := req.BasicAuth(); has {
+		eu, ep := privateAPICreds()
+		if eu != "" && au == eu && p == ep {
+			return true
+		}
+		send401()
+		return false
+	}
+	send401()
+	return false
+}

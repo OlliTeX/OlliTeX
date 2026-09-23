@@ -183,6 +183,29 @@ func apiDoc404Page(cxt *core.Cxt, res *core.Res) {
 	views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
 }
 
+// apiDoc404 — profile-aware 404 for the private-API doc-trio GET route:
+//
+//   - web profile → the rendered WEB 404 HTML page (apiDoc404Page), pinned U10.3r.
+//   - api profile → the plain express "Not Found" text: Content-Type
+//     text/plain; charset=utf-8, weak ETag over the 9-byte body, Content-Length
+//     9, X-Powered-By: Express (the api baseline; the fixed CSP is set globally
+//     in serve()), NO web helmet, NO session cookie.
+//
+// Pinned live 2026-09-23 against Node api :3000 (ghost valid-cred GET → 404
+// "Not Found").
+func apiDoc404(cxt *core.Cxt, res *core.Res) {
+	if cxt.A.Cfg.Profile == "api" {
+		res.W.Header().Set("X-Powered-By", "Express")
+		res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		res.W.Header().Set("ETag", core.EtagWeakBody("Not Found"))
+		res.W.Header().Set("Content-Length", strconv.Itoa(len("Not Found")))
+		res.W.WriteHeader(http.StatusNotFound)
+		_, _ = res.W.Write([]byte("Not Found"))
+		return
+	}
+	apiDoc404Page(cxt, res)
+}
+
 // GET /project/:pid/doc/:did
 func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
@@ -193,33 +216,38 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 		pidHex, didHex := mm[1], mm[2]
-		if !a.APIBasicGate(cxt, res, req) {
+		if a.Cfg.Profile == "api" {
+			if !a.APIBasicGate401(cxt, res, req) {
+				return
+			}
+		} else if !a.APIBasicGate(cxt, res, req) {
 			return
 		}
-		// Valid-cred path (unreachable in e2e — sandbox interceptor blocks the
-		// WEB_API password; covered by Go unit test). The rendered 404 page /
-		// 200 body rides the web-baseline helmet set + fresh sid; the 200
-		// res.send path additionally carries X-Powered-By (pinned on 200 GET),
-		// the rendered 404 page does NOT (page render) — set per-response below.
-		a.NewAPISessionCookie(cxt, res)
-		a.APIHelmet(res, req)
+		if a.Cfg.Profile != "api" {
+			// web profile only: fresh session sid + full helmet baseline
+			// (pinned U10.3r). The api profile carries no session cookie and
+			// none of the helmet set — its baseline is the global CSP (serve())
+			// + X-Powered-By set per-response below.
+			a.NewAPISessionCookie(cxt, res)
+			a.APIHelmet(res, req)
+		}
 
 		// U10.3r (pinned live 2026-09-23 on the web stack): Node renders the
 		// WEB 404 page for both bad-oid and ghost/missing on the GET route
 		// (accept-header independent — the web error handler owns it).
 		if !delHex24(pidHex) || !delHex24(didHex) {
-			apiDoc404Page(cxt, res)
+			apiDoc404(cxt, res)
 			return
 		}
 		oid, _ := primitive.ObjectIDFromHex(pidHex)
 		doc, _ := loadProjectFull(a, cxt, oid)
 		if doc == nil {
-			apiDoc404Page(cxt, res)
+			apiDoc404(cxt, res)
 			return
 		}
 		pathName, dok := docapiFindDoc(dget(*doc, "rootFolder"), didHex)
 		if !dok {
-			apiDoc404Page(cxt, res)
+			apiDoc404(cxt, res)
 			return
 		}
 
@@ -376,7 +404,15 @@ func docapiPostHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 		pidHex, didHex := mm[1], mm[2]
-		if !a.APIBasicGate(cxt, res, req) {
+		if a.Cfg.Profile == "api" {
+			if !a.APIBasicGate401(cxt, res, req) {
+				return
+			}
+		} else {
+			// web profile: the session+csrf chain blocks the POST before basic
+			// auth — always 403 (pinned U10.3r/p413); the setDocument logic below
+			// is unreachable via the web entry.
+			a.APISend403(cxt, res)
 			return
 		}
 
@@ -527,7 +563,15 @@ func docapiRejectHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(req.URL.Path, "/")))
 			return
 		}
-		if !a.APIBasicGate(cxt, res, req) {
+		if a.Cfg.Profile == "api" {
+			if !a.APIBasicGate401(cxt, res, req) {
+				return
+			}
+		} else {
+			// web profile: the session+csrf chain blocks the POST before basic
+			// auth — always 403 (pinned U10.3r/p413); the 204 below is
+			// unreachable via the web entry.
+			a.APISend403(cxt, res)
 			return
 		}
 		// Node sends `res.status(204).send("No Content")` — express computes

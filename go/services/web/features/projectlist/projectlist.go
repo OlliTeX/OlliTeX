@@ -167,13 +167,17 @@ func Feature(a *core.App) core.Feature {
 			// the valid-cred 200 res.send path carries XPB (set inside the
 			// handler); the rendered 404 page carries NEITHER XPB set on the page.
 			{Method: "GET", Pattern: docapiDlPat, NoSession: true, Handler: docapiGetHandler(a)},
-			// U10.3r (pinned live 2026-09-23, web profile :4000): Node's
-			// session+csrf chain (csrf BEFORE helmet) blocks BOTH POST routes —
-			// every POST, no-csrf → 403 text/plain "Forbidden" + XPB + CSP +
-			// fresh sid, NO helmet set (see core.APISend403); a valid-csrf POST
-			// then hits the basic-auth gate (401/302) in the handler.
-			{Method: "POST", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(apiCSRF403)},
-			{Method: "POST", Pattern: docapiRejPat, NoSession: true, Handler: apiXPB(apiCSRF403)},
+			// U10.3r (pinned live 2026-09-23) — PROFILE-AWARE (2026-09-23 api fix):
+			//   web: Node's session+csrf chain (csrf BEFORE helmet) blocks BOTH
+			//         POST routes → 403 text/plain "Forbidden" + XPB + CSP + fresh
+			//         sid, NO helmet set (the handler's web branch calls
+			//         core.APISend403; identical wire to the former apiCSRF403).
+			//   api: NO session/csrf chain — the 401 gate (core.APIBasicGate401)
+			//         answers 401 for unauth/wrong (any Accept/method); a valid-
+			//         cred POST reaches the setDocument / reject logic in the
+			//         handler. Pinned vs Node api :3000.
+			{Method: "POST", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiPostHandler(a))},
+			{Method: "POST", Pattern: docapiRejPat, NoSession: true, Handler: apiXPB(docapiRejectHandler(a))},
 		},
 	}
 }

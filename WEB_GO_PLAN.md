@@ -3384,33 +3384,48 @@ api surface — the concrete cutover blocker. Confirmed mismatches
 | GET /project/:id/members (unauth) | 404 | **302 →/login** | ❌ |
 | **POST /tpds/folder-update** | **400 (validation)** | **404 (route missing)** | ❌ |
 
-**Root cause:** the `api`-profile doc-trio gate reuses the **web** wire —
+**Root cause:** the `api`-profile doc-trio gate reused the **web** wire —
 `APIBasicGate` (401/302 html-split), `APISend403` (csrf 403), and the
 rendered-HTML ghost 404 are **web-profile** behaviors that must NOT apply
 when `core.App.Cfg.Profile == "api"`.
 
-**Spec for the fix unit (profile-aware wire; do NOT regress the green web
-profile):** when `Profile == "api"`:
-1. `APIBasicGate` → unauth/wrong **always 401** (drop the html→302 split).
-2. **No** `APISend403` csrf gate — a cred-ful POST must **reach the handler**
-   (which returns the same 400/500/200 Node does for that state); no-auth POST →
-   401 (auth fails first), NOT 403.
-3. Ghost/project-not-found → **plain `404 "Not Found"`** text (not the rendered
-   HTML page; web profile keeps the HTML page).
-4. Unauth session-gated GETs (e.g. `GET /project/:id`, `/members`) → Node-api
-   returns **404** (not 302→/login). Match per-route.
-5. Restore missing api-profile routes as they surface (e.g.
-   `POST /tpds/folder-update` → Go currently 404 HTML; Node 400 validation),
-   via a corrected helper-aware api-route audit vs Node :3000.
-6. **Gate:** a Node-**api-:3000-baseline** parity battery (Node==Go==Node) for
-   the api-profile doc-trio + auth/POST wire + a representative api route set,
-   with the **web** profile gate (U10.3r/p413) kept green as regression.
+> The ⛔ table above is the **pre-fix audit** (the ❌ rows are the defects
+> found on 2026-09-23). The **doc-trio** ❌ rows are now **fixed + gated**
+> (see ✅ below); the non-doc-trio ❌ rows (`/project/:id`, `/members`,
+> `POST /tpds/folder-update`, …) remain **open**.
 
-**Status:** spec complete; **not implemented** — deliberately deferred to a
-fresh window (subtle profile-aware refactor; risks regressing the verified
-web profile if rushed at the end of a 1d+ session). **The hard cutover is
-blocked on this unit** (flipping `web-api-overleaf` to Go now would serve the
-web wire on the :3000 surface).
+**Status (2026-09-23): the doc-trio wire is DONE + gated ✅; the remaining
+api-profile route surface is still OPEN.**
+
+✅ **DONE (profile-aware, gated, green):** the private-API **doc-trio** wire
+(GET + POST + reject). Fix: `core.APIBasicGate401` (api gate: unauth/wrong →
+401 for ANY Accept; +WWW-Authenticate +X-Powered-By, no helmet/cookie) +
+profile branches in `features/projectlist/docapi.go` (GET: api gate /
+plain-404 / 200 with XPB; POST+reject: api gate or web `APISend403` 403) +
+`apiDoc404` (api → plain 404, web → HTML page). Web path left byte-identical.
+- Gate: `tests/e2e/specs/parity/web-go-uapi-doc.test.e2e.ts` +
+  `uapi-doc-matrix.cjs` — Node api :3000 == Go api :4011 == Node, **10 cases
+  diffs=0** (unauth/wrong → 401, ghost → 404 plain, real → 200 JSON, POST
+  unauth → 401).
+- sv-managed Go api shadow: `server-ce/runit/web-go-api-overleaf/run`
+  (ENABLED_SERVICES=api, 127.0.0.1:4011) — mirror of `web-go-overleaf`.
+- Web regression: `web-go-u103r` (7/diffs=0) + `web-go-p413-flip` (4/4) green;
+  web POST/reject still 403 csrf.
+
+⛔ **STILL OPEN (cutover blocker — api profile not yet 100% 1:1):** the
+remaining api-profile **route surface** beyond the doc-trio, e.g.:
+  - `GET /project/:id` (unauth) → Node 404 vs Go 302→/login (needs per-route 404).
+  - `GET /project/:id/members` (unauth) → Node 404 vs Go 302→/login.
+  - `POST /tpds/folder-update` → Node 400 (validation) vs Go 404 (route missing).
+  - A full helper-aware api-route audit vs Node :3000 to enumerate the rest
+    (the doc-trio was the highest-value slice; there are more private-API /
+    service routes on the :3000 surface).
+  - A representative Node-api-:3000-baseline battery for those routes (same
+    pattern as web-go-uapi-doc), web gate kept green as regression.
+
+**The hard cutover remains blocked on the OPEN items above** (flipping
+`web-api-overleaf` to Go now would serve a non-1:1 :3000 surface — the
+doc-trio is correct, but the wider route surface still leaks web behavior).
 
 ### U10.3 — linked files + one-time-login + private-API doc-trio wire — **✅ GATE GREEN (2026-09-23)**
 
