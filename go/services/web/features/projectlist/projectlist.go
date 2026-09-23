@@ -188,6 +188,12 @@ func Feature(a *core.App) core.Feature {
 			// Same Node handler (ProjectDetailsHandler.getDetails) as /project/:id/
 			// details → identical 200 body; only the path differs.
 			{Method: "GET", Pattern: internalProjectPat, NoSession: true, APIOnly: true, Handler: internalProjectGetHandler(a)},
+			// U-API — POST /internal/project/:project_id/deactivate (Node
+			// InactiveProjectController.deactivateProject; basic-auth, APIOnly).
+			// unauth→401, bad-oid→404 JSON VA (params.project_id), valid-oid
+			// (ghost or real)→200 text/plain "OK" (+ active:false + best-effort
+			// DU-flush/docstore-archive side effects).
+			{Method: "POST", Pattern: internalDeactivatePat, NoSession: true, APIOnly: true, Handler: internalDeactivateHandler(a)},
 			// U-API — GET /user/:user_id/personal_info (privateApiRouter, basic-auth;
 			// the webRouter variant is the distinct path /user/personal_info — no
 			// collision). unauth→401, bad-uid→404 JSON VA, ghost→404 text, valid→

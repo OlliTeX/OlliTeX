@@ -49,6 +49,7 @@ package projectlist
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -75,6 +76,10 @@ var (
 	// ProjectApiController.getProjectDetails). Same Node handler (and thus same
 	// 200 body) as /project/:id/details; only the path + param name differ.
 	internalProjectPat = regexp.MustCompile(`^/internal/project/([^/]+)$`)
+	// U-API — POST /internal/project/:project_id/deactivate (Node
+	// privateApiRouter InactiveProjectController.deactivateProject). Cron/
+	// admin-facing deactivation of a specific project; basic-auth, api-only.
+	internalDeactivatePat = regexp.MustCompile(`^/internal/project/([^/]+)/deactivate$`)
 	// U-API — GET /user/:user_id/personal_info (Node privateApiRouter
 	// UserInfoController.getPersonalInfo). The webRouter variant is the
 	// distinct path /user/personal_info with NO id — no collision here.
@@ -760,6 +765,76 @@ func detailsGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 // {name,description?,compiler?,features,overleaf?}.
 func internalProjectGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 	return detailsHandlerWithPattern(a, internalProjectPat)
+}
+
+// internalDeactivateHandler — POST /internal/project/:project_id/deactivate
+// (Node privateApiRouter InactiveProjectController.deactivateProject).
+//
+// Node (InactiveProjectManager.deactivateProject + controller), pinned live
+// Node :3000 (2026-09-24):
+//
+//	unauth / wrong basic → 401 (challenge; APIBasicGate401 wire)
+//	project_id not hex24  → 404 JSON {"error":"Validation error: Invalid Mongo
+//	                          ObjectId at \"params.project_id\"","statusCode":404}
+//	valid oid (ghost or a
+//	real project)           → 200 text/plain "OK" (2B, X-Powered-By, weak ETag,
+//	                          no nosniff, global CSP)
+//
+// 200 side effects (best-effort, Node's documented order):
+//  1. flushProjectToMongoAndDelete = DELETE {document-updater}/project/{pid}
+//  2. DocstoreManager.archiveProject = POST {docstore}/project/{pid}/archive
+//  3. markAsInactive = Mongo projects.updateOne({_id}, {active:false})
+//
+// In this healthy stack every step returns 2xx (verified: real project →
+// active:false, ghost → no-op). Node would 500 if a step throws; that
+// failure edge is not exercised by the parity gates (all deps are up).
+func internalDeactivateHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+	return func(c *core.Cxt, r *core.Res) {
+		req := c.Req
+		mm := internalDeactivatePat.FindStringSubmatch(req.URL.Path)
+		if mm == nil {
+			views.NotFoundPage(r.W, pageBase(c, strings.TrimPrefix(req.URL.Path, "/")))
+			return
+		}
+		pidHex := mm[1]
+		if c.A.Cfg.Profile != "api" {
+			// Defensive: the web profile skips APIOnly routes; if one ever
+			// reaches here it 404s (Node's web stack does not wire this path).
+			r.W.Header().Set("X-Powered-By", "Express")
+			r.JSON(404, delParamVA("project_id"))
+			return
+		}
+		if !a.APIBasicGate401(c, r, req) {
+			return // unauth / wrong basic → 401 challenge wire
+		}
+		if !delHex24(pidHex) {
+			// res.json sets X-Powered-By; the 404-VA body matches details/internal.
+			r.W.Header().Set("X-Powered-By", "Express")
+			r.JSON(404, delParamVA("project_id"))
+			return
+		}
+		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		pid := oid.Hex()
+
+		// 1. document-updater flush+delete (best-effort; healthy stack → 2xx).
+		fireHTTP(c, http.MethodDelete, cduBase()+"/project/"+pid, nil)
+		// 2. docstore archive (best-effort; no-op persistor in this build).
+		fireHTTP(c, http.MethodPost, strings.TrimSuffix(crDocstoreBase(), "/")+"/project/"+pid+"/archive", nil)
+		// 3. markAsInactive = projects.active = false.
+		if a.Mongo != nil {
+			ctx, cancel := context.WithTimeout(req.Context(), 5*time.Second)
+			defer cancel()
+			if db, err := a.Mongo.DB(ctx); err == nil {
+				_, _ = db.Collection("projects").UpdateOne(
+					ctx,
+					bson.D{{Key: "_id", Value: oid}},
+					bson.D{{Key: "$set", Value: bson.D{{Key: "active", Value: false}}}})
+			}
+		}
+		// Wire: 200 "OK" — text/plain, 2B, X-Powered-By, weak ETag, no nosniff.
+		r.W.Header().Set("X-Powered-By", "Express")
+		apiText(r, 200, "OK")
+	}
 }
 
 // details404Plain — valid-but-missing project: 404 text/plain "Not Found"

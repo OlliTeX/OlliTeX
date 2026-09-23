@@ -348,6 +348,18 @@ async function main() {
   add('idp-ghost', async () => get('/internal/project/' + GHOST, VJ))
   add('idp-valid', async () => get('/internal/project/' + PJ, VJ))
 
+  // POST /internal/project/:project_id/deactivate (Node
+  // InactiveProjectController.deactivateProject; basic-auth, api-only).
+  // Pinned Node :3000 (2026-09-24): unauth/wrong→401 "Unauthorized" (text/plain,
+  // +WWW-Authenticate+XPB+CSP); bad-oid→404 JSON VA params.project_id;
+  // valid-oid (ghost→no-op, real→active:false)→200 text/plain "OK" (2B, XPB,
+  // weak ETag, no nosniff, +CSP). No body. Only the ghost leg reaches the 200
+  // (a no-op mutation), so this gate is non-destructive.
+  add('deact-unauth', async () => postRaw('/internal/project/' + PJ + '/deactivate', undefined, { accept: 'application/json' }))
+  add('deact-wrong', async () => postRaw('/internal/project/' + PJ + '/deactivate', undefined, WJ))
+  add('deact-badoid', async () => postRaw('/internal/project/notahex/deactivate', undefined, VJ))
+  add('deact-ghost', async () => postRaw('/internal/project/' + GHOST + '/deactivate', undefined, VJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()
