@@ -617,9 +617,20 @@ func (a *App) CommitSess(sess *Session, w http.ResponseWriter) {
 // routeNoSession reports whether the requested path is a NoSession route
 // (publicApiRouter/privateApiRouter parity).
 func (a *App) routeNoSession(r *http.Request) bool {
+	web := a.Cfg.Profile == "web"
 	for _, f := range a.feats {
 		for i := range f.Routes {
 			rt := &f.Routes[i]
+			// APIOnly routes are ABSENT from Node's web profile (Route.APIOnly):
+			// they must not mark the path "sessionless" there — doing so skips
+			// session init, leaves cxt.Sess nil, and the web fallback /
+			// login-gate derefs it → nil-pointer panic (empty reply; pinned
+			// 2026-09-23: web /project/:id/details + /user/:id/personal_info
+			// crashed before this). On the api profile they ARE mounted
+			// (NoSession, basic-auth) and count as before.
+			if web && rt.APIOnly {
+				continue
+			}
 			if (rt.Path == r.URL.Path && rt.Method == r.Method) ||
 				(rt.Pattern != nil && rt.Pattern.MatchString(r.URL.Path) && rt.Method == r.Method) {
 				return rt.NoSession
