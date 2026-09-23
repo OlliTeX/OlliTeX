@@ -71,6 +71,10 @@ var (
 	// P4.13 / U-API — GET /project/:project_id/details (Node privateApiRouter
 	// ProjectApiController.getProjectDetails — api-only, NOT on webRouter).
 	detailsPat = regexp.MustCompile(`^/project/([^/]+)/details$`)
+	// U-API — GET /internal/project/:project_id (Node privateApiRouter
+	// ProjectApiController.getProjectDetails). Same Node handler (and thus same
+	// 200 body) as /project/:id/details; only the path + param name differ.
+	internalProjectPat = regexp.MustCompile(`^/internal/project/([^/]+)$`)
 	// U-API — GET /user/:user_id/personal_info (Node privateApiRouter
 	// UserInfoController.getPersonalInfo). The webRouter variant is the
 	// distinct path /user/personal_info with NO id — no collision here.
@@ -659,10 +663,10 @@ func lastUpdatedAtOK(v *int64) bool { return v == nil || *v > 0 }
 // The route is APIOnly: the web profile SKIPS it (Node's web stack does not
 // wire /project/:id/details on webRouter), so adding it changes nothing on
 // :4000 (the already-verified web profile).
-func detailsGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+func detailsHandlerWithPattern(a *core.App, pat *regexp.Regexp) func(c *core.Cxt, r *core.Res) {
 	return func(c *core.Cxt, r *core.Res) {
 		req := c.Req
-		mm := detailsPat.FindStringSubmatch(req.URL.Path)
+		mm := pat.FindStringSubmatch(req.URL.Path)
 		if mm == nil {
 			views.NotFoundPage(r.W, pageBase(c, strings.TrimPrefix(req.URL.Path, "/")))
 			return
@@ -743,6 +747,22 @@ func detailsGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		r.W.Header().Set("X-Powered-By", "Express") // res.send path
 		r.JSON(200, []byte(sb.String()))
 	}
+}
+
+// detailsGetHandler — GET /project/:project_id/details (privateApiRouter, API-ONLY).
+func detailsGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+	return detailsHandlerWithPattern(a, detailsPat)
+}
+
+// internalProjectGetHandler — GET /internal/project/:project_id
+// (privateApiRouter, API-ONLY). Node's ProjectApiController.getProjectDetails
+// calls the SAME ProjectDetailsHandler.getDetails(projectId) as /project/:id/
+// details, so the 200 body is identical; only the path differs. Wire pinned
+// Node :3000 (2026-09-24): unauth→401 (challenge), bad-oid→404 JSON VA
+// params.project_id, ghost→404 text/plain "Not Found", valid→200 JSON
+// {name,description?,compiler?,features,overleaf?}.
+func internalProjectGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+	return detailsHandlerWithPattern(a, internalProjectPat)
 }
 
 // details404Plain — valid-but-missing project: 404 text/plain "Not Found"

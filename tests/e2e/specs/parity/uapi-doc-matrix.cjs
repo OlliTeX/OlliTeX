@@ -309,6 +309,18 @@ async function main() {
   // :4000 does not mount it). Pinned Node :3000 (2026-09-24); Node==Go.
   add('api-perftest', async () => get('/perfTest', {}))
 
+  // U-API — GET /internal/project/:project_id (privateApiRouter, API-ONLY).
+  // Same Node handler (ProjectDetailsHandler.getDetails) as /project/:id/details
+  // → identical 200 body; only the path + param name (project_id) differ.
+  // Wire pinned Node :3000 (2026-09-24): unauth→401 (challenge); bad-oid→404
+  // JSON VA params.project_id; ghost→404 text/plain "Not Found"; valid→200 JSON
+  // {name,description?,compiler?,features,overleaf?} (PJ is the seeded fixture,
+  // body has no random ids so the 3 legs converge).
+  add('idp-unauth', async () => get('/internal/project/' + PJ, J))
+  add('idp-badoid', async () => get('/internal/project/notahex', VJ))
+  add('idp-ghost', async () => get('/internal/project/' + GHOST, VJ))
+  add('idp-valid', async () => get('/internal/project/' + PJ, VJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()
