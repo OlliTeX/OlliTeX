@@ -127,7 +127,75 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: privTagPat, NoLogin: true, Handler: func(cxt *core.Cxt, res *core.Res) {
 				views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
 			}},
+			// U-API (privateApiRouter): the api-profile (basic-auth) variant of
+			// GET /user/:userId/tag — Node TagsController.apiGetAllTags. Wire
+			// (Node api :3000, live-pinned 2026-09-23): unauth/wrong → 401
+			// (challenge); userId not a 24-hex oid → 404 JSON VA (params.userId);
+			// valid oid (ghost OR real) → 200 [tags] / []. APIOnly → the web
+			// profile SKIPS this (serving the U1 404-page oracle above); the
+			// routeNoSession fix keeps the web 404 page session-correct (u1
+			// green). Registered AFTER the web oracle, so on the web profile the
+			// NoLogin 404-page handler is reached first.
+			{Method: "GET", Pattern: privTagPat, NoSession: true, APIOnly: true, Handler: apiTagGetHandler(a)},
 		},
+	}
+}
+
+// apiTagGetHandler — Node privateApiRouter GET /user/:userId/tag
+// (TagsController.apiGetAllTags → _getTags → Tag.find({user_id}) →
+// res.json(allTags)). Reuses the web tag machinery (oidParam for the
+// 404-VA params.userId wire, mongoRun + dJSONTag for the tag-array body).
+func apiTagGetHandler(a *core.App) func(*core.Cxt, *core.Res) {
+	return func(c *core.Cxt, r *core.Res) {
+		req := c.Req
+		if c.A.Cfg.Profile != "api" {
+			// Defensive: core.App skips APIOnly routes on the web profile, so
+			// this is unreachable on :4000; if it were, mirror the 404-VA wire.
+			r.W.Header().Set("X-Powered-By", "Express")
+			r.JSON(404, malformedParam("userId"))
+			return
+		}
+		if !a.APIBasicGate401(c, r, req) {
+			return // unauth / wrong basic → 401 challenge wire
+		}
+		// The api-profile wire carries X-Powered-By: Express on the 404-VA and
+		// 200 responses (Node sets it on the VA path + res.json). oidParam does
+		// NOT set it (the web tag handlers don't need it), so set it here first
+		// so the 404-VA response carries it (pinned: Node :3000 tag-invalid =
+		// XPB present; the Go leg was missing it → uapi diff).
+		r.W.Header().Set("X-Powered-By", "Express")
+		uid, ok := oidParam(c, r, "1", "userId") // not 24-hex → 404 VA (params.userId)
+		if !ok {
+			return
+		}
+		// Node: Tag.find({ user_id: userId }) → res.json(allTags). An absent
+		// user yields an empty cursor → [] → 200 (not a 404).
+		var docs []primitive.D
+		err := mongoRun(a, c, func(db *mongo.Database, ctx context.Context) error {
+			cur, e := db.Collection("tags").Find(ctx, bson.D{{Key: "user_id", Value: uid}})
+			if e != nil {
+				return e
+			}
+			defer cur.Close(ctx)
+			for cur.Next(ctx) {
+				var d primitive.D
+				if decErr := cur.Decode(&d); decErr != nil {
+					continue
+				}
+				docs = append(docs, d)
+			}
+			return cur.Err()
+		})
+		if err != nil {
+			serve500Page(c, r)
+			return
+		}
+		out := make([]string, 0, len(docs))
+		for _, d := range docs {
+			out = append(out, string(dJSONTag(d)))
+		}
+		r.W.Header().Set("X-Powered-By", "Express")
+		r.JSON(200, []byte("["+strings.Join(out, ",")+"]"))
 	}
 }
 

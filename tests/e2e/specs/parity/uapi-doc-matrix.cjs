@@ -165,6 +165,19 @@ async function main() {
   add('pi-ghost', async () => get('/user/666666666666666666666666/personal_info', VJ))
   add('pi-valid', async () => get('/user/' + PI_UID + '/personal_info', VJ))
 
+  // U-API — GET /user/:userId/tag (privateApiRouter, basic-auth; Node
+  // TagsController.apiGetAllTags → Tag.find({user_id}) → res.json). Wire
+  // (Node api :3000, live-pinned 2026-09-23): unauth → 401 (challenge);
+  // userId not a 24-hex oid (notahex / all-digit) → 404 JSON VA (params.userId);
+  // valid oid (ghost OR real) → 200 [tags] (admin fixture has none → []). The
+  // web profile serves the U1 session 404-page oracle instead (APIOnly); u1
+  // stays green (this is an api-profile :3000 oracle).
+  add('tag-unauth', async () => get('/user/' + PI_UID + '/tag', J))
+  add('tag-invalid', async () => get('/user/notahex/tag', VJ))
+  add('tag-ghost', async () => get('/user/666666666666666666666666/tag', VJ))
+  add('tag-digit', async () => get('/user/123456789/tag', VJ))
+  add('tag-valid', async () => get('/user/' + PI_UID + '/tag', VJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()
