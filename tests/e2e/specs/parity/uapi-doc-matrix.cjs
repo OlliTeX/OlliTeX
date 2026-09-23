@@ -89,8 +89,13 @@ async function main() {
     ].join('§')
     // One line per case: escape newlines/tabs in the body so every case is
     // exactly one output line (robust to multi-line bodies like the 404 page,
-    // and the "cases=N" summary counts cases, not lines).
-    const body1 = String(r._body || '').replace(/\r?\n/g, '\\n').replace(/\t/g, '\\t')
+    // and the "cases=N" summary counts cases, not lines). createProject's
+    // valid-200 body carries a freshly-generated random projectId — normalize
+    // it to "X" so Node==Go compare on the wire (each leg creates its own id).
+    const body1 = String(r._body || '')
+      .replace(/\r?\n/g, '\\n')
+      .replace(/\t/g, '\\t')
+      .replace(/"projectId":"[0-9a-f]{24}"/gi, '"projectId":"X"')
     out.push(`${label}|${r.status}|${hdr}|${body1}`)
   }
   const get = async (path, headers) => {
@@ -177,6 +182,24 @@ async function main() {
   add('tag-ghost', async () => get('/user/666666666666666666666666/tag', VJ))
   add('tag-digit', async () => get('/user/123456789/tag', VJ))
   add('tag-valid', async () => get('/user/' + PI_UID + '/tag', VJ))
+
+  // U-API — POST /user/:user_id/project/new (createProject, privateApiRouter,
+  // basic-auth; APIOnly). Node TpdsController.createProject →
+  // generateUniqueName → createBlankProject (BLANK: rootFolder, no main.tex)
+  // → res.json({projectId}). Wire (Node api :3000, pinned 2026-09-23):
+  // unauth / wrong → 401 (challenge); user_id !24-hex → 404 JSON VA
+  // (params.user_id); valid-uid + valid-name → 200 {"projectId":"<24hex>"}
+  // (CREATES a BLANK project; projectId normalized to "X" above); valid-uid +
+  // invalid-name (empty / slash) → 500 "Internal Server Error" (Node's TPDS
+  // path leaves the name-validation error unmapped → Express 500; NO project
+  // created). Only cp-valid-name writes state; the test cleans it up.
+  add('cp-unauth', async () => post('/user/' + PI_UID + '/project/new', { projectName: 'uapi-cp-gate' }, J))
+  add('cp-wrong', async () => post('/user/' + PI_UID + '/project/new', { projectName: 'uapi-cp-gate' }, WJ))
+  add('cp-invalid-oid', async () => post('/user/notahex/project/new', { projectName: 'x' }, VJ))
+  add('cp-invalid-digit', async () => post('/user/123456789/project/new', {}, VJ))
+  add('cp-empty-name', async () => post('/user/' + PI_UID + '/project/new', { projectName: '' }, VJ))
+  add('cp-slash-name', async () => post('/user/' + PI_UID + '/project/new', { projectName: 'a/b' }, VJ))
+  add('cp-valid-name', async () => post('/user/' + PI_UID + '/project/new', { projectName: 'uapi-cp-gate' }, VJ))
 
   for (const c of CASES) {
     try {

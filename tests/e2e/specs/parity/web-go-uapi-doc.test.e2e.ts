@@ -93,6 +93,21 @@ function ensureGoApi(): void {
   dexe(overleafC, 'sv up web-go-api-overleaf >/dev/null 2>&1 || true; sleep 1')
 }
 
+// The cp-valid-name case (POST /user/:uid/project/new) CREATES a blank project
+// per leg (Node L1, Go L2, Node L3 → "uapi-cp-gate", " (1)", " (2)" for the
+// OWNER). Remove them after the legs so the gate leaves no stray state.
+function cleanupCpGate(): void {
+  const js = `
+    const o = ObjectId("${OWNER}");
+    const ids = db.projects.find({ owner_ref: o, name: /^uapi-cp-gate/ }).toArray().map(p => p._id);
+    if (ids.length) { db.projects.deleteMany({ _id: { $in: ids } }); db.project_history.deleteMany({ project_id: { $in: ids } }); }
+    console.log("cp-removed=" + ids.length);
+  `
+  fs.writeFileSync('/tmp/uapi-cp-cleanup.js', js)
+  execFileSync('docker', ['cp', '/tmp/uapi-cp-cleanup.js', `${mongoC}:/tmp/uapi-cp-cleanup.js`], { stdio: 'ignore' })
+  dexe(mongoC, 'mongosh --quiet sharelatex /tmp/uapi-cp-cleanup.js')
+}
+
 function leg(legNo: number, pj: string, doc: string): string {
   const raw = dexeStrict(overleafC, `UAPI_PJ=${pj} UAPI_DOC=${doc} node /tmp/uapi-doc-matrix.cjs ${legNo} 2>/tmp/uapi-err-${legNo} || { echo UAPI-LEG-ERR; cat /tmp/uapi-err-${legNo}; exit 1; }`)
   const lines = raw.split('\n').map((l) => l.trimEnd()).filter((l) => l.length > 0)
@@ -117,6 +132,9 @@ test('uapi: private-API doc trio (API profile) Node api :3000 == Go api :4011 ==
   const l1 = leg(1, STATE.A, STATE.DA)
   const l2 = leg(2, STATE.A, STATE.DA)
   const l3 = leg(1, STATE.A, STATE.DA)
+  // cp-valid-name created a blank project per leg — clean up now (already
+  // captured in l1/l2/l3, so cleanup does not affect the comparison).
+  cleanupCpGate()
 
   test.info().annotations.push({ type: 'uapi-leg', description: l1 })
   test.info().annotations.push({ type: 'uapi-go', description: l2 })

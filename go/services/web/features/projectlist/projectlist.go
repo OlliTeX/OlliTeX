@@ -189,6 +189,12 @@ func Feature(a *core.App) core.Feature {
 			// collision). unauth→401, bad-uid→404 JSON VA, ghost→404 text, valid→
 			// 200 user-JSON (id-first). APIOnly → web profile skips it (unchanged).
 			{Method: "GET", Pattern: personalInfoPat, NoSession: true, APIOnly: true, Handler: personalInfoGetHandler(a)},
+			// U-API — POST /user/:user_id/project/new (createProject, privateApiRouter,
+			// basic-auth; APIOnly). unauth→401, bad-uid→404 JSON VA (params.user_id),
+			// valid-uid+valid-name→200 {projectId} (creates a BLANK project), invalid
+			// name→500 (Node's TPDS path doesn't map name-validation to 4xx). APIOnly →
+			// the web profile SKIPS it (Node web :4000 404s it) → unchanged.
+			{Method: "POST", Pattern: tpdsProjectNewPat, NoSession: true, APIOnly: true, Handler: tpdsCreateProjectHandler(a)},
 		},
 	}
 }
