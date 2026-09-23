@@ -1,10 +1,18 @@
-// U-API — private-API (basic-auth) document trio parity, API profile.
+// U-API — private-API (basic-auth) document trio + API-profile route
+// selection parity, API profile.
 //
 // The API profile (ENABLED_SERVICES=api, the service web-api-overleaf serves
 // on :3000) has a wire DISTINCT from the web profile (pinned by
 // web-go-u103r): unauth/wrong → 401 for ANY Accept (no 302/login), POST → 401
 // (no csrf 403), ghost → 404 plain "Not Found", X-Powered-By present, no
 // session cookie, no helmet baseline.
+//
+// This gate ALSO pins API-profile route/profile selection (Node :3000 does not
+// mount webRouter): web-only routes (/, /project/:id, /project/:id/members,
+// /entities, unknown paths) → 404 with the Express finalhandler wire
+// (x-powered-by: Express, x-content-type-options: nosniff,
+// content-security-policy: default-src 'none'), NOT the web profile's 301/302
+// login bounce.
 //
 // Three-leg gate inside ol-e2e-overleaf-1:
 //   Node api (:3000, leg 1)  ==  Go api (:4011, leg 2)  ==  Node api (:3000, leg 3)

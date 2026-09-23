@@ -87,7 +87,11 @@ async function main() {
       r.headers.get('www-authenticate') || '',
       helmet,
     ].join('§')
-    out.push(`${label}|${r.status}|${hdr}|${r._body}`)
+    // One line per case: escape newlines/tabs in the body so every case is
+    // exactly one output line (robust to multi-line bodies like the 404 page,
+    // and the "cases=N" summary counts cases, not lines).
+    const body1 = String(r._body || '').replace(/\r?\n/g, '\\n').replace(/\t/g, '\\t')
+    out.push(`${label}|${r.status}|${hdr}|${body1}`)
   }
   const get = async (path, headers) => {
     const r = await fetch(BASE + path, { headers: headers || {}, redirect: 'manual' })
@@ -122,6 +126,19 @@ async function main() {
   // valid cred: ghost → 404 plain, real → 200 JSON (both API-profile wire)
   add('doc-ghost-valid', async () => get(GHOSTGET, VJ))
   add('doc-valid-real', async () => get(DOCGET, VJ))
+
+  // API-profile web-route exclusion (Node :3000 does NOT mount webRouter —
+  // pinned live 2026-09-23): web-only routes 404 with the Express
+  // finalhandler wire (Cannot <METHOD> <path>, content-security-policy:
+  // "default-src 'none'", x-content-type-options: nosniff, x-powered-by:
+  // Express), NOT the web profile's 301/302 login bounce. These pin the
+  // route/profile-selection fix (previously Go api 301/302'd them).
+  const P = '/project/' + PJ
+  add('webroot-slash', async () => get('/', J))
+  add('webroot-project', async () => get(P, J))
+  add('webroot-members', async () => get(P + '/members', J))
+  add('webroot-entities', async () => get('/entities', J))
+  add('webroot-unknown', async () => get('/foo-404', J))
 
   for (const c of CASES) {
     try {

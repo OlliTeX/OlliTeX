@@ -267,6 +267,19 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 				continue
 			}
 			if rt.Path == r.URL.Path || (rt.Pattern != nil && rt.Pattern.MatchString(r.URL.Path)) {
+				// api profile (ENABLED_SERVICES=api, Node's :3000): serve ONLY
+				// the privateApiRouter + publicApiRouter routes. In Go those are
+				// exactly the NoSession routes (no session/csrf middleware — Node's
+				// api profile mounts neither webRouter nor its session stack).
+				// Web-router routes (NoSession=false) are 404 here, exactly like
+				// Node :3000, which does not mount webRouter:
+				//   pinned: /project, /members, /entities, / → 404 + XPB on :3000
+				//           (but 200/302 on :4000); only /status,/health_check*,
+				//           doc-trio, snapshots, ... (NoSession) are 200/401/404.
+				// The web profile (:4000) is untouched — it serves all routes.
+				if a.Cfg.Profile == "api" && !rt.NoSession {
+					continue // not an api-route: skip → api 404 tail, like Node :3000
+				}
 				if rt.NoSession {
 					if rt.Pattern != nil {
 						if m := rt.Pattern.FindStringSubmatch(r.URL.Path); m != nil {

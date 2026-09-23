@@ -3430,39 +3430,65 @@ which profile the process serves:
   Node :3000: `/project`, `/project/:id`, `/members`, `/entities`, `/tags`,
   `/user/projects`, `/foo` ALL → 404 + XPB).
 
-**Go defect:** Go shares ONE route table across both profiles, so the api
-profile (ENABLED_SERVICES=api) still serves the web routes with their web
-wire — measured Go :4011: `/project` → **301→/hub**, `/project/:id` →
-**302→/login**, `/members` + `/entities` → **302→/login** (all should be 404 on
-api). And it is MISSING some basic-auth routes Node serves (`POST
-/user/x/project/new`, `POST /tpds/folder-update` → Node **401** basic-auth
-challenge; Go 404s them).
+✅ **FIXED + gated (2026-09-23) — the Web-route LEAK on the api profile:**
+Go shared ONE route table across both profiles, so the api profile served web
+routes with their WEB wire (measured Go :4011 before the fix: `/project` →
+**301→/hub**, `/project/:id` → **302→/login**, `/members` + `/entities` →
+**302→/login**). Fix implemented + gated:
+- **Route/profile selection filter** (`go/services/web/core/app.go` dispatch
+  loop): in the `api` profile, a matched route with `!NoSession` (i.e. a
+  web-router route — Node's api profile does NOT mount `webRouter`) is
+  **skipped** (`continue`) and falls through to the api 404 tail. The
+  `web` profile is untouched (serves all routes). This is systemic — it fixes
+  **every** web-route leak at once (no whack-a-mole). Safety proven by audit:
+  every api/service route that exists in Go (doc-trio, /status, /health_check*,
+  snapshots, token-info, saved) is `NoSession`, and every non-`NoSession`
+  route is a web route Node also 404s on :3000.
+- **404-tail wire** (`go/pbhttp/gate.go` `ExpressNotFound`): the finalhandler
+  `Cannot <METHOD> <path>` 404 now carries `x-powered-by: Express` +
+  `x-content-type-options: nosniff` (in addition to the existing CSP
+  `default-src 'none'`), matching Node :3000 byte-for-byte (142-byte
+  `Cannot GET /foo` body). The app-level doc-ghost 404 ("Not Found" plain)
+  keeps its distinct set (XPB, no nosniff) — the two 404 types differ in Node
+  and now in Go.
+- **Gate:** `web-go-uapi-doc` + `uapi-doc-matrix.cjs` extended with 5
+  api-web-route-exclusion cases (`webroot-slash/-project/-members/-entities/
+  -unknown`) — Node api :3000 == Go api :4011 == Node, **15 cases diffs=0**
+  (doc-trio 401/404/200 + the 5 web-route 404s). Web regression: `web-go-u103r`
+  (7/diffs=0) + `web-go-u1-parity` + `web-go-p413-flip` green — the web
+  profile (:4000 wire) is entirely unchanged.
 
-**The fix (bounded architectural unit):** mirror Node's three-router split in
-Go — tag routes as web / privateApi / publicApi (per Node router.mjs placement),
-and in the api profile route ONLY privateApi+publicApi, 404ing everything else
-(api baseline: XPB + 404 page). Concretely:
-1. Enumerate Node's `privateApiRouter` route set (router.mjs + each module's
-   `applyRouter(..., privateApiRouter)` calls) and the `publicApiRouter` set.
-2. Add a route membership/profile marker to `core.Route` (e.g. `Routers:
-   []string{"web"}` / `{"privateApi"}` / `{"publicApi"}`) and set it per route
-   from the Node placement.
-3. In `core.App`, when `Profile=="api"`, skip routes not on privateApi+publicApi
-   (fall through to the existing api 404 tail); keep web routes web-only.
-4. Add the missing basic-auth routes (e.g. `POST /user/x/project/new`,
-   `POST /tpds/folder-update`) as privateApi routes with the `APIBasicGate401`
-   gate (401 for unauth) so they challenge like Node.
-5. **Gate:** extend the Node-api-:3000-baseline battery
-   (web-go-uapi-doc pattern) to include the now-404'd web routes (assert api
-   → 404) and the basic-auth 401 challenge routes; keep the **web** profile
-   gates green (u103r/p413) as regression.
+⛔ **STILL OPEN — MISSING BASIC-AUTH ROUTES** (present in Node's
+`privateApiRouter`, absent from Go, so Go 404s them where Node 401/400/200):
+measured Node api :3000 (unauth → 401 + WWW-Authenticate;
+valid-cred → route-specific):
+
+| route | Node api (unauth) | Node api (valid-cred) | Go api (current) |
+|---|---|---|---|
+| `POST /user/:id/project/new` | **401** | 500 (stack condition) | **404 (route missing)** |
+| `POST /tpds/folder-update` | **401** | 400 (validation) | **404 (route missing)** |
+| `GET /user/:id/personal_info` | **401** | 200 (user JSON) | **404 (route missing)** |
+| `GET /project/:id/details` | **401** | 200 (project JSON) | **404 (route missing)** |
+| `/internal/*` (deactivate/expire/zip/compile) | 401 | ... | 404 (several missing) |
+
+**The remaining fix (bounded, per-route):** for each route Node's
+`privateApiRouter` serves that Go lacks, register it in Go as a `NoSession`
+route with the `core.APIBasicGate401` gate (unauth/wrong → 401, matching Node)
+and, where Node returns a **read** 200 (personal_info, details, tag), implement
+the valid-cred handler to return the same JSON (Node key order). **Gate** each
+addition on Node api :3000 == Go api :4011; keep the web profile gates green
+(u103r/u1/p413/uapi) as regression. The auth-boundary (unauth → 401) is the
+high-confidence wire pin; the valid-cred read 200s are per-route handler
+parity.
 
 **RISK:** this touches the shared routing layer — do it in small gated slices,
 verify BOTH profiles each step (a web-profile regression is the main hazard),
 and do NOT flip web-api-overleaf until the api route set == Node api :3000.
 
 **The hard cutover remains blocked on this unit.** (web-overleaf/web profile
-is ready; web-api-overleaf/api profile is not yet 100%.)
+is a complete verified drop-in; web-api-overleaf/api profile: doc-trio +
+web-route-exclusion + 404-tail DONE, remaining = the missing basic-auth
+routes above.)
 
 ### U10.3 — linked files + one-time-login + private-API doc-trio wire — **✅ GATE GREEN (2026-09-23)**
 
