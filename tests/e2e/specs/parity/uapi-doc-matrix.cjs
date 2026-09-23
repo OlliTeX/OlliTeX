@@ -109,6 +109,21 @@ async function main() {
     r._body = await r.text()
     return r
   }
+  const del = async (path, headers) => {
+    const r = await fetch(BASE + path, { method: 'DELETE', headers: headers || {}, redirect: 'manual' })
+    r._body = await r.text()
+    return r
+  }
+  // postRaw: POST a RAW (non-JSON) body with only the given headers (no forced
+  // content-type). The TPDS third-party-sync update endpoints accept the raw
+  // webhook body (Dropbox/GitHub send file contents, not JSON); forcing
+  // application/json makes Node's body-parser 400 the raw body — not the real
+  // wire.
+  const postRaw = async (path, body, headers) => {
+    const r = await fetch(BASE + path, { method: 'POST', headers: headers || {}, body, redirect: 'manual' })
+    r._body = await r.text()
+    return r
+  }
 
   const J = { accept: 'application/json' }
   const H = { accept: 'text/html' }
@@ -255,6 +270,39 @@ async function main() {
   add('fu-root', async () => post('/tpds/folder-update', { userId: PI_UID, projectId: PJ, path: '/' }, VJ))
   add('fu-top', async () => post('/tpds/folder-update', { userId: PI_UID, projectId: PJ, path: '/gu-g' }, VJ))
   add('fu-nested', async () => post('/tpds/folder-update', { userId: PI_UID, projectId: PJ, path: '/gu-g/gu-n' }, VJ))
+
+  // U-API — TPDS third-party-sync update endpoints (Dropbox mergeUpdate/
+  // deleteUpdate + GitHub updateProjectContents/deleteProjectContents),
+  // privateApiRouter, basic-auth (APIOnly). Deterministic 3-leg-stable states
+  // (401 / 404-VA single+joined / mergeUpdate rejected / GitHub 404-Not-Found /
+  // Dropbox-DELETE 200 "OK" / GitHub-DELETE 200 {}). The 200-applied doc/file
+  // upsert was verified via a direct Node==Go comparison on separate per-leg
+  // projects (entityId/rev are stateful per leg on a shared project, so it is
+  // not 3-leg gate-able). All of the cases above leave the seeded project PJ
+  // untouched, so the 3 legs converge.
+  add('sync-mu-dbox-unauth', async () => postRaw('/user/' + PI_UID + '/update/mu-g/x.tex', 'hello', J))
+  add('sync-mu-dbox-wrong', async () => postRaw('/user/' + PI_UID + '/update/mu-g/x.tex', 'hello', WJ))
+  add('sync-mu-dbox-baduid', async () => postRaw('/user/notahex/update/mu-g/x.tex', 'hello', VJ))
+  add('sync-mu-pid-unauth', async () => postRaw('/project/' + PJ + '/user/' + PI_UID + '/update/x.tex', 'hello', J))
+  add('sync-mu-pid-badpid', async () => postRaw('/project/badpid/user/' + PI_UID + '/update/x.tex', 'hello', VJ))
+  add('sync-mu-pid-baduid', async () => postRaw('/project/' + PJ + '/user/notahex/update/x.tex', 'hello', VJ))
+  add('sync-mu-pid-bothbad', async () => postRaw('/project/badpid/user/notahex/update/x.tex', 'hello', VJ))
+  add('sync-mu-pid-ghostpid', async () => postRaw('/project/' + GHOST + '/user/' + PI_UID + '/update/x.tex', 'hello', VJ))
+  add('sync-mu-pid-ghostuid', async () => postRaw('/project/' + PJ + '/user/' + GHOST + '/update/x.tex', 'hello', VJ))
+  add('sync-gh-unauth', async () => postRaw('/project/' + PJ + '/contents/x.tex', 'hello', J))
+  add('sync-gh-badpid', async () => postRaw('/project/badpid/contents/x.tex', 'hello', VJ))
+  add('sync-gh-ghostpid', async () => postRaw('/project/' + GHOST + '/contents/x.tex', 'hello', VJ))
+  add('sync-du-dbox-unauth', async () => del('/user/' + PI_UID + '/update/mu-g/x.tex', J))
+  add('sync-du-dbox-ghostuid', async () => del('/user/' + GHOST + '/update/mu-g/x.tex', VJ))
+  add('sync-du-dbox-baduid', async () => del('/user/notahex/update/mu-g/x.tex', VJ))
+  add('sync-du-pid-unauth', async () => del('/project/' + PJ + '/user/' + PI_UID + '/update/x.tex', J))
+  add('sync-du-pid-ghostpid', async () => del('/project/' + GHOST + '/user/' + PI_UID + '/update/x.tex', VJ))
+  add('sync-du-pid-ghostuid', async () => del('/project/' + PJ + '/user/' + GHOST + '/update/x.tex', VJ))
+  add('sync-du-pid-baduid', async () => del('/project/' + PJ + '/user/notahex/update/x.tex', VJ))
+  add('sync-du-pid-bothbad', async () => del('/project/badpid/user/notahex/update/x.tex', VJ))
+  add('sync-ghdel-ghostpid', async () => del('/project/' + GHOST + '/contents/x.tex', VJ))
+  add('sync-ghdel-unauth', async () => del('/project/' + PJ + '/contents/x.tex', J))
+  add('sync-ghdel-badpid', async () => del('/project/badpid/contents/x.tex', VJ))
 
   for (const c of CASES) {
     try {

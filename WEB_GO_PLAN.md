@@ -3519,13 +3519,41 @@ normalized to "X"; gate auto-cleans uapi-cp-gate/resgate-gate → 0 strays; fold
 created gu-* converge across the 3 legs + are re-seeded each run). web regression
 u1/u103r/p413 green.
 
-⛔ **STILL OPEN (TPDS write business logic, UpdateMerger):** `POST|DELETE
+✅ **TPDS sync update endpoints — DONE + gated (2026-09-23):** `POST|DELETE
 /user/:id/update/:path(.+)` + `/project/:pid/user/:uid/update/:path(.+)`
-(mergeUpdate/deleteUpdate), `POST|DELETE /project/:pid/contents/:path(.+)`
-(updateProjectContents/deleteProjectContents) + `/internal/*`. These are the
-FileStore/docstore/UpdateMerger-heavy endpoints — the heaviest of the cutover
-blockers; each needs its Node wire pinned + a stateful gated port.
-(`POST /tpds/folder-update` is now DONE + gated — see below.)
+(mergeUpdate/deleteUpdate) and `POST|DELETE /project/:pid/contents/:path(.+)`
+(updateProjectContents/deleteProjectContents). Node wire pinned + ported
+faithfully to `tpdssync.go` (reuses the `up*` upsert primitives —
+`upDocstorePut`/`upPutBlob`/`upReplaceFile`/`upSwapDocToFile`/`upSwapFileToDoc`
+— and `tpdsGetOrCreateByName`/`tpdsOwnedOrRWProjects`/`tpdsProjectActive`
+shared with the folder/update handlers). Wired states (Node api :3000 == Go
+api :4011, gated): 401 (unauth/wrong); mergeUpdate dropbox+by-id 404-VA
+(`params.user_id`, + `params.project_id` when the by-id route also has a bad
+pid — zod joins `; ` in definition order); by-id ghost-user/ghost-project →
+**200 `{"status":"rejected"}`**; GitHub 404-VA `params.project_id`; GitHub
+ghost → **404 `Not Found`**; Dropbox-DELETE (ghost/bad/valid) → **200 `OK`**;
+GitHub-DELETE ghost/no-entity → **200 `{}`**; valid → **200 applied**
+(doc `{status,projectId,entityId,entityType:"doc",folderId,rev:"1"}` / file
+`...entityType:"file",rev:"0"}` / GitHub `{entityId,rev:N}`). The 200-applied
+doc/file upsert is verified by a direct Node==Go comparison on separate
+per-leg projects (entityId/rev are stateful per leg on a shared project, so it
+is not 3-leg gate-able); the deterministic states above are the gate cases.
+Wire nuances pinned + fixed:
+- The api-profile 404 `Not Found` carries **NO `X-Content-Type-Options`**
+  (Node omits it). Go's core `PlainText` wrongly adds nosniff → the 8
+  tpdssync 404s now use `apiText` (text/plain + weak ETag + Content-Length,
+  no nosniff), matching Node (details/pi/ghost all confirmed no-nosniff).
+- The raw webhook body must NOT be forced through `content-type:
+  application/json` (Node's JSON body-parser then 400s the raw body — not the
+  real wire). The gate's sync POST cases use a new `postRaw` helper (no forced
+  content-type).
+uapi gate now **78 cases diffs=0** (+23 sync). web regression u1/u103r/p413
+green. web profile :4000/:4010 both 403 these (login-gated, no panic).
+
+⛔ **STILL OPEN (only cutover blocker left):** `/internal/*` endpoints
+(deactivate / expire-deleted / zip / compile / pdf — several Go-missing, some
+heavier). (`POST /tpds/folder-update` + all TPDS sync update endpoints are now
+DONE + gated — see below.)
 
 **POST /tpds/folder-update — DONE + gated (2026-09-23) — wire pinned (Node api :3000):**
 - **401** (unauth): 12B `Unauthorized` text/plain + XPB + `WWW-Authenticate: OverleafLogin`.

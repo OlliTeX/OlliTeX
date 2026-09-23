@@ -210,6 +210,19 @@ func Feature(a *core.App) core.Feature {
 			// folderId} / not-found→500 / 401 / 400 strict-zod VA. APIOnly → the
 			// web profile SKIPS it (Node web :4000 404s it) → unchanged.
 			{Method: "POST", Pattern: tpdsFolderUpdatePat, NoSession: true, APIOnly: true, Handler: apiFolderUpdateHandler(a)},
+			// U-API — TPDS third-party-sync update endpoints (Dropbox + GitHub),
+			// privateApiRouter, basic-auth; APIOnly (web profile skips them —
+			// Node web :4000 404s them). mergeUpdate (new/replace/swap doc|file
+			// upsert via the P4 primitives) + deleteUpdate + updateProjectContents
+			// + deleteProjectContents. Wire pinned Node :3000 (2026-09-23):
+			// 401/404-VA/200-applied(rev string)/rejected / GH 404-Not-Found +
+			// GH rev-number / DROPBOX-DELETE 200 "OK" / GH-DELETE 200 {}|{entityId}.
+			{Method: "POST", Pattern: muDboxPat, NoSession: true, APIOnly: true, Handler: syncMergeRoute()(a)},
+			{Method: "DELETE", Pattern: muDboxPat, NoSession: true, APIOnly: true, Handler: syncDeleteRoute()(a)},
+			{Method: "POST", Pattern: muPidPat, NoSession: true, APIOnly: true, Handler: syncMergeRoute()(a)},
+			{Method: "DELETE", Pattern: muPidPat, NoSession: true, APIOnly: true, Handler: syncDeleteRoute()(a)},
+			{Method: "POST", Pattern: ghContPat, NoSession: true, APIOnly: true, Handler: syncGHUpdateRoute()(a)},
+			{Method: "DELETE", Pattern: ghContPat, NoSession: true, APIOnly: true, Handler: syncGHDeleteRoute()(a)},
 		},
 	}
 }
