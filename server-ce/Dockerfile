@@ -58,6 +58,20 @@ ENV NODE_OPTIONS="--require /overleaf/.pnp.cjs --import /overleaf/.pnp.register.
 # --------------------------------------------------
 ADD server-ce/runit /etc/service
 
+# P7 cutover (2026-09-24): after the Go web drop-in, `web-overleaf` and
+# `web-api-overleaf` are the CANONICAL web services (they exec
+# /usr/local/bin/go-services/web). The three `web-go-*` entries are A/B *shadow*
+# experiments left over from the flip work — they must NOT be enabled by
+# default (web-go-overleaf/web-go-flip run non-executable ./run → runit
+# "access denied" crash-loop + log spam; web-go-api-overleaf is a redundant
+# shadow instance). Their definitions are preserved under /etc/service.disabled
+# for MANUAL re-enable (flips: server-ce/nginx/flips/*) if a future A/B is
+# needed.
+RUN mkdir -p /etc/service.disabled \
+ && for s in web-go-overleaf web-go-flip web-go-api-overleaf; do \
+      [ -d /etc/service/$s ] && mv /etc/service/$s /etc/service.disabled/; \
+    done
+
 # Copy runit global settings to its location
 # ------------------------------------------
 ADD server-ce/config/env.sh /etc/overleaf/env.sh
