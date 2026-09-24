@@ -74,7 +74,7 @@ services:
       - ../services/web/config:/overleaf/services/web/config
       - ../locales:/overleaf/locales
       - ../services/web/modules:/overleaf/services/web/modules
-      - ../services/web/public:/overleaf/services/web/public
+      - ../public:/overleaf/public
 
   webpack:
     volumes:
@@ -83,7 +83,7 @@ services:
       - ../services/web/frontend:/overleaf/services/web/frontend
       - ../locales:/overleaf/locales
       - ../services/web/modules:/overleaf/services/web/modules
-      - ../services/web/public:/overleaf/services/web/public
+      - ../public:/overleaf/public
       - ../services/web/transform:/overleaf/services/web/transform
       - ../services/web/types:/overleaf/services/web/types
       - ../services/web/webpack-plugins:/overleaf/services/web/webpack-plugins

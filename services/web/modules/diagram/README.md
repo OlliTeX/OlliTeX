@@ -27,7 +27,7 @@ no telemetry, no external origin.
 ## Implementation
 
 The full `svgedit` 7.4.2 app (npm `dist/editor/` build) is **vendored as a
-static subtree** at `services/web/public/static/svgedit/` and served by
+static subtree** at `public/static/svgedit/` and served by
 Overleaf at `/static/svgedit/`:
 
 - `Editor.js` — the app bundle (self-contained ESM, no imports at runtime
@@ -125,7 +125,7 @@ when no explicit preference is stored yet.
 
 ## Files
 
-- `services/web/public/static/svgedit/` — vendored SVG-Edit 7.4.2 app
+- `public/static/svgedit/` — vendored SVG-Edit 7.4.2 app
   (Editor.js, CSS, icons, extensions, `LICENSE`) plus the host entry
   (`embed.html`, `embed.css`, `embed.js` bridge + config + rebrand).
 - `frontend/js/components/diagram-editor.tsx` — the editor shell: iframe,
@@ -154,7 +154,7 @@ when no explicit preference is stored yet.
 SVG-Edit 7.4.2 ships under a permissive OR-licensing choice
 (`(MIT AND Apache-2.0 AND ISC AND LGPL-3.0-or-later AND X11)`,
 `svgedit@7.4.2` on npm). We take the **MIT** grant: the full text is
-vendored at `services/web/public/static/svgedit/LICENSE`
+vendored at `public/static/svgedit/LICENSE`
 (`LICENSE-MIT.txt` from the package) and the version/provenance is this
 README. The vendored tree is unmodified except for the added `embed.*`
 host files and the removal of source maps/tests. Two official-dist

@@ -108,7 +108,7 @@ RUN OVERLEAF_CONFIG=/overleaf/services/web/config/settings.webpack.js nice yarn 
 
 # intermediate image for removing source maps ahead of copying into final production image
 FROM webpack AS webpack-no-sourcemaps
-RUN nice find /overleaf/services/web/public -name '*.js.map' -delete
+RUN nice find /overleaf/public -name '*.js.map' -delete
 
 
 # copy source code and precompile pug images
@@ -149,6 +149,6 @@ FROM pug AS app
 ARG SENTRY_RELEASE
 ENV SENTRY_RELEASE=$SENTRY_RELEASE
 ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/DigiCertGlobalG2TLSRSASHA2562020CA1-1.crt
-COPY --from=webpack-no-sourcemaps /overleaf/services/web/public /overleaf/services/web/public
+COPY --from=webpack-no-sourcemaps /overleaf/public /overleaf/public
 USER node
 CMD ["node", "--expose-gc", "--trace-warnings", "app.mjs"]

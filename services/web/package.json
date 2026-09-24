@@ -8,7 +8,7 @@
     "./*": "./*"
   },
   "directories": {
-    "public": "./public"
+    "public": "../public"
   },
   "scripts": {
     "test:acceptance:run_dir": "bin/test_acceptance_run_dir",

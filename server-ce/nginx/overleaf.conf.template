@@ -2,7 +2,7 @@ server {
 	listen         80;
 	server_name    _; # Catch all, see http://nginx.org/en/docs/http/server_names.html
 
-	root /overleaf/services/web/public/;
+	root /overleaf/public/;
 
 	# block external access to prometheus /metrics
 	location /metrics {

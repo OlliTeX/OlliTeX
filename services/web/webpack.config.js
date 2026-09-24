@@ -115,7 +115,7 @@ module.exports = {
   // Note: webpack-dev-server does not write the bundle to disk, instead it is
   // kept in memory for speed
   output: {
-    path: path.join(__dirname, 'public'),
+    path: path.join(__dirname, '../public'),
 
     publicPath: '/',
     workerPublicPath: '/',

@@ -44,7 +44,7 @@ type Config struct {
 	MongoURI      string // mongoh chain (MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://HOST/sharelatex)
 
 	// Feature directories
-	PublicDir  string // services/web/public (static root)
+	PublicDir  string // public (repo root, P7 step 6; static root)
 	LocalesDir string // locales (repo root, P7 step 6)
 	ViewsDir   string // not used by Go (templates live in go/...), kept for parity scripts
 
@@ -161,11 +161,11 @@ func LoadConfig() (*Config, error) {
 	if d := os.Getenv("WEB_GO_PUBLIC_DIR"); d != "" {
 		publicDir = d
 	} else if d := os.Getenv("OVERLEAF_HOME"); d != "" {
-		publicDir = d + "/services/web/public"
+		publicDir = d + "/public"
 		localesDir = d + "/locales"
 	}
 	if publicDir == "" {
-		publicDir = "/overleaf/services/web/public"
+		publicDir = "/overleaf/public"
 		localesDir = "/overleaf/locales"
 	}
 

@@ -89,7 +89,7 @@ e2e-report: ## Open the Playwright HTML report
 
 .PHONY: deploy-test
 deploy-test: build ## Deploy the bundle into the test stack + restart (web caches the manifest in memory)
-	docker cp $(SERVICES_WEB)/public/. $(TEST_STACK):/overleaf/services/web/public/
+	docker cp public/. $(TEST_STACK):/overleaf/public/
 	docker restart $(TEST_STACK)
 	@echo "waiting for http://localhost:$(STACK_PORT)/login …"
 	@for i in $$(seq 1 40); do \
