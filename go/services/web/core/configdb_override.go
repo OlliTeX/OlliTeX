@@ -75,3 +75,17 @@ func applyConfigDBOverrides(cfg *Config) {
 		}
 	}
 }
+
+// ConfigDBPath — the resolved SQLite config-DB path, shared by the /hub
+// admin, the operator CLI (cmd/configdb), and this env→override layer — so
+// all three manage the SAME database file.
+func ConfigDBPath() string { return configDBPath() }
+
+// ConfigDBOverridableKeys — a copy of the curated non-secret keys the /hub
+// admin may read (GET) / write (PUT). The PUT endpoint validates against
+// this set; infra / secrets / security toggles are intentionally absent.
+func ConfigDBOverridableKeys() []string {
+	out := make([]string, len(curatedConfigDBKeys))
+	copy(out, curatedConfigDBKeys)
+	return out
+}

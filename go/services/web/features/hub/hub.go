@@ -9,6 +9,8 @@
 //	DELETE /api/hub-theme     (requireLogin, site admin) → {"ok":true}
 //	GET    /api/hub/health    (requireLogin, site admin) → core JSON
 //	GET    /api/hub/notes     (global login gate) → docs/RELEASE_NOTES.md
+//	GET    /api/hub/config    (requireLogin, site admin) → JSON {key: value|null}
+//	PUT    /api/hub/config    (requireLogin, site admin) → {ok:true} | 400 {"error":"…"}
 //
 // Node ground truth (2026-09-16 oracle, /tmp/p61):
 //
@@ -101,6 +103,11 @@ func Feature(a *core.App) core.Feature {
 			{Method: "DELETE", Path: "/api/hub-theme", Handler: clearTheme(a)},
 			{Method: "GET", Path: "/api/hub/health", Handler: hubHealth(a)},
 			{Method: "GET", Path: "/api/hub/notes", Handler: releaseNotes()},
+			// /api/hub/config — manage the SQLite config DB (P7-post item 1,
+			// "managed by the admin part of /hub"). site-admin + CSRF (core);
+			// curated non-secret keys only (hub/config.go).
+			{Method: "GET", Path: "/api/hub/config", Handler: getHubConfig(a)},
+			{Method: "PUT", Path: "/api/hub/config", Handler: putHubConfig(a)},
 		},
 	}
 }
