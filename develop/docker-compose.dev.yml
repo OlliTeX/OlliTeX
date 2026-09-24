@@ -72,7 +72,7 @@ services:
       - ../services/web/app:/overleaf/services/web/app
       - ../services/web/app.mjs:/overleaf/services/web/app.mjs
       - ../services/web/config:/overleaf/services/web/config
-      - ../services/web/locales:/overleaf/services/web/locales
+      - ../locales:/overleaf/locales
       - ../services/web/modules:/overleaf/services/web/modules
       - ../services/web/public:/overleaf/services/web/public
 
@@ -81,7 +81,7 @@ services:
       - ../services/web/app:/overleaf/services/web/app
       - ../services/web/config:/overleaf/services/web/config
       - ../services/web/frontend:/overleaf/services/web/frontend
-      - ../services/web/locales:/overleaf/services/web/locales
+      - ../locales:/overleaf/locales
       - ../services/web/modules:/overleaf/services/web/modules
       - ../services/web/public:/overleaf/services/web/public
       - ../services/web/transform:/overleaf/services/web/transform

@@ -45,7 +45,7 @@ type Config struct {
 
 	// Feature directories
 	PublicDir  string // services/web/public (static root)
-	LocalesDir string // services/web/locales
+	LocalesDir string // locales (repo root, P7 step 6)
 	ViewsDir   string // not used by Go (templates live in go/...), kept for parity scripts
 
 	// health checks
@@ -162,11 +162,11 @@ func LoadConfig() (*Config, error) {
 		publicDir = d
 	} else if d := os.Getenv("OVERLEAF_HOME"); d != "" {
 		publicDir = d + "/services/web/public"
-		localesDir = d + "/services/web/locales"
+		localesDir = d + "/locales"
 	}
 	if publicDir == "" {
 		publicDir = "/overleaf/services/web/public"
-		localesDir = "/overleaf/services/web/locales"
+		localesDir = "/overleaf/locales"
 	}
 
 	cfg := &Config{

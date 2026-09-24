@@ -4,24 +4,24 @@ import { URL } from 'node:url'
 import pug from 'pug-runtime'
 import logger from '@overleaf/logger'
 import SafeHTMLSubstitution from '../Features/Helpers/SafeHTMLSubstitution.mjs'
-import cs from '../../../locales/cs.json' with { type: 'json' }
-import da from '../../../locales/da.json' with { type: 'json' }
-import de from '../../../locales/de.json' with { type: 'json' }
-import en from '../../../locales/en.json' with { type: 'json' }
-import es from '../../../locales/es.json' with { type: 'json' }
-import fi from '../../../locales/fi.json' with { type: 'json' }
-import fr from '../../../locales/fr.json' with { type: 'json' }
-import it from '../../../locales/it.json' with { type: 'json' }
-import ja from '../../../locales/ja.json' with { type: 'json' }
-import ko from '../../../locales/ko.json' with { type: 'json' }
-import nl from '../../../locales/nl.json' with { type: 'json' }
-import no from '../../../locales/no.json' with { type: 'json' }
-import pl from '../../../locales/pl.json' with { type: 'json' }
-import pt from '../../../locales/pt.json' with { type: 'json' }
-import ru from '../../../locales/ru.json' with { type: 'json' }
-import sv from '../../../locales/sv.json' with { type: 'json' }
-import tr from '../../../locales/tr.json' with { type: 'json' }
-import zhCN from '../../../locales/zh-CN.json' with { type: 'json' }
+import cs from '../../../../../locales/cs.json' with { type: 'json' }
+import da from '../../../../../locales/da.json' with { type: 'json' }
+import de from '../../../../../locales/de.json' with { type: 'json' }
+import en from '../../../../../locales/en.json' with { type: 'json' }
+import es from '../../../../../locales/es.json' with { type: 'json' }
+import fi from '../../../../../locales/fi.json' with { type: 'json' }
+import fr from '../../../../../locales/fr.json' with { type: 'json' }
+import it from '../../../../../locales/it.json' with { type: 'json' }
+import ja from '../../../../../locales/ja.json' with { type: 'json' }
+import ko from '../../../../../locales/ko.json' with { type: 'json' }
+import nl from '../../../../../locales/nl.json' with { type: 'json' }
+import no from '../../../../../locales/no.json' with { type: 'json' }
+import pl from '../../../../../locales/pl.json' with { type: 'json' }
+import pt from '../../../../../locales/pt.json' with { type: 'json' }
+import ru from '../../../../../locales/ru.json' with { type: 'json' }
+import sv from '../../../../../locales/sv.json' with { type: 'json' }
+import tr from '../../../../../locales/tr.json' with { type: 'json' }
+import zhCN from '../../../../../locales/zh-CN.json' with { type: 'json' }
 
 const locales = {
   cs,
