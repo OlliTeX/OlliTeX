@@ -3939,6 +3939,8 @@ that made Phase C safe.
 P7 CORE + git-bridge are DONE and verified (this section covers only the remaining reorg + P7-post). Continuation goal `e7f1a940`.
 Steps 1-3 (go/READMEs, permanent flip+image+e2e, error fixes) DONE. This spec covers steps 4-7.
 
+**STATUS (2026-09-24):** Slice A (shared types → kept `types/api/`, commit `bccf426d5e`) DONE — the Node backend is now cleanly junk-able (zero frontend runtime/type deps). **Steps 4 (move) + 5-7 are BLOCKED** on the two OPEN DECISIONS below (Oracle PRESERVE vs RETIRE = the step-4 operational-tooling disposition; Production rebuild PAUSE vs pre-approve). This block is not caution: the reorg invariant "re-verify after each move; must not break `make image`/e2e" CANNOT be satisfied for the JS/webpack/Docker parts without the owner-gated `make image` build (step E), which the plan itself marks as **STOP** pending the owner's green-light. **P7-post item 1 (SQLite config DB) is DONE** (it was unblocked + safe) — see the P7-post list below.
+
 **SCOPE / BOUNDARY (verified 2026-09-24):**
 - **KEEP** (the live UI + assets, relocated): `services/web/frontend/` (React app; the `@/` TS alias = `services/web/frontend/js/*` — self-contained) → `frontend/` (mirror `go/`); `services/web/public/` (~861 MB built assets) → repo root `public/`; `services/web/locales/` (~1.7 MB) → repo root `locales/`; the frontend build system (`webpack.config.js`, `package.json`, `babel.config.cjs`, `tsconfig*.json`, `scripts/`, `styles…`, `types/`, `shared/`, `knip.ts`, `eslint/lint` configs, `vitest*`, `tailwind.config.js`).
 - **JUNK** (Node backend, Go-superseded by `go/services/web`; **per-module split, NOT whole dirs** — see MODULE SEPARATION MAP): `services/web/app/` (417 tracked: `src/Features/` 52 dirs, `src/infrastructure/`, `src/models/`, `src/router.mjs`, `templates/`, `views/`), `services/web/app.mjs`, the backend tests `services/web/test/unit/` (196 tracked; **KEEP** `test/frontend/` at 336), and the per-module backends (the 7 BACKEND_ONLY modules whole + `app/`+`test/` of the 25 MIXED modules). Owner deletes the junk folder later (per step 4); keep it recoverable meanwhile.
@@ -3958,7 +3960,16 @@ Steps 1-3 (go/READMEs, permanent flip+image+e2e, error fixes) DONE. This spec co
 - **C.** `services/web/frontend/` → `frontend/` (mirror `go/`); update the `@/` alias target, `package.json`, `webpack.config.js`, `tsconfig`, and internal relative paths.
 - **D.** `services/web/public/` → `public/`, `services/web/locales/` → `locales/` (repo root); update refs 1-4.
 - **E.** `make image` (~30 min) build → e2e green (`a5smoke` + `smoke` + parity battery) → **STOP** (the production/shared-stack cycle awaits the owner's green-light).
-- **THEN P7-post:** SQLite config DB · GDPR cookie consent · /hub email templates · go-i18n.
+- **THEN P7-post (ordered after the reorg per remember.md):**
+- **1. ✅ DONE (this goal, 2026-09-24 — 4 green slices, all `go build ./...`+`go vet`+gofmt+tests green):** SQLite config DB —
+  - store `go/libraries/configstore` (commit `81f6f6233e`, 10 tests);
+  - CLI backup `cmd/configdb` `list/get/set/delete/export/backup/restore` (commit `4d0aa59865`, 10 tests + live backup↔restore smoke);
+  - **env→SQLite override** — `core/config.go`+`core/configdb_override.go` (commit `7f260c1d97`): the Go web reads curated non-secret keys {AppName, SiteURL, CacheStaticAssets} from the DB on top of env; infra/secrets/security-toggles excluded + tested; no-op when the DB is absent;
+  - **/hub admin** — `go/services/web/features/hub/config.go` `GET/PUT /api/hub/config` (commit `98d21c2d00`), site-admin + CSRF, mirrors `/api/hub-theme`.
+  - All four manage ONE db file (`CONFIG_DB_PATH` / `$OVERLEAF_HOME/configdb/` / `./configdb/`). Owner may extend the curated key set by review.
+- **2. ⏳** GDPR cookie consent — banner + Go Secure/HttpOnly/SameSite consent-cookie handler/middleware + conditional tracking-script injection.
+- **3. ⏳** /hub email templates — OlliTeX-rebranded; textareas + save + reset-to-default.
+- **4. ⏳** go-i18n — project internationalization (nicksnyder/go-i18n).
 
 **OPEN DECISIONS (owner, 2026-09-24):**
 1. **Oracle** — PRESERVE (default/safe) vs RETIRE the Node web oracle.
