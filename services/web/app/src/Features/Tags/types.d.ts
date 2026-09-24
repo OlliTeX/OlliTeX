@@ -1,7 +1,3 @@
-export type Tag = {
-  _id: string
-  user_id: string
-  name: string
-  color?: string
-  project_ids?: string[]
-}
+// Re-export shim — the canonical type now lives in services/web/types/api/tags.d.ts
+// (P7 reorg: shared type moved into the kept types/ home so the Node backend can be junked).
+export * from '../../../../types/api/tags'
