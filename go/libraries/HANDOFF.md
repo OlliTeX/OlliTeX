@@ -1,14 +1,14 @@
 # /go/libraries — Node→Go 1:1 library ports (HANDOFF — keep current every package)
 
-> **⚠ KNOWN-RED oracle (2026-09-21):** `TestSafePathnameOracle` is intentionally
-> RED — 28,634/80,782 rows expose three defects in the otc `safe_pathname.go`
-> port (U+FEFF whitespace, rune-vs-UTF-16-unit surrogate matching, missing JS
-> `.` line-terminator guards). Evidence, repro, and fix spec:
-> `go/libraries/HANDOFF_SAFE_PATHNAME.md`. Fixture is Node-generated ground
-> truth; reference impl at commit `a8a67f3` passes 80,782/80,782.
-
-> **Do not "fix" the red oracle by editing `safe_pathname_oracle_test.go` or
-> `testdata/spfuzz2.json`** — fix `go/libraries/otc/safe_pathname.go` instead.
+> **KNOWN-RED oracle FIXED (2026-09-24):** `TestSafePathnameOracle` is GREEN
+> (80,782/80,782). The three defects in `go/libraries/otc/safe_pathname.go`
+> (U+FEFF whitespace, rune-vs-UTF-16-unit surrogate matching, missing JS `.`
+> line-terminator guards) were fixed by rewriting the port to operate on UTF-16
+> code units, matching the Node reference. Evidence + spec:
+> `go/libraries/HANDOFF_SAFE_PATHNAME.md`. CLSI-side acceptance replica at
+> `services/clsi.go/safepathname_oracle/`. The fixture is Node-generated
+> ground truth (do not edit the oracle test or fixture — fix
+> `safe_pathname.go` instead).
 
 **Directive (owner, 2026-09-20):** 1:1 drop-in **GOLANG** conversion of everything under
 `libraries/*` into `/go/libraries/*`, stepping up tests: strict test suite per package

@@ -61,14 +61,12 @@ OT error family implementing `oerror.InfoProvider` (see the C1/B4
 concurrent-edit surface mirrors the 42-test origin/snapshot/change/rebase +
 57-test operation/transform suites). **Coverage: 88.6%** (above the 85% gate).
 
-**KNOWN-RED oracle**: `TestSafePathnameOracle` (80,782 Node-generated rows,
-fixture `testdata/spfuzz2.json`) is intentionally red until the upstream
-`safe_pathname.go` is fixed. 28,634/80,782 rows expose three defect classes —
-U+FEFF whitespace, per-rune vs per-UTF-16-unit surrogate matching, and
-missing JS `.` line-terminator guards. Full evidence + fix spec:
-`go/libraries/HANDOFF_SAFE_PATHNAME.md`. Do not "fix" the test or the fixture;
-fix the implementation (reference impl: commit a8a67f3,
-`services/clsi.go/ot/safepathname.go`, deleted but recoverable via `git show`).
+**safe_pathname oracle (GREEN 2026-09-24)**: `TestSafePathnameOracle`
+(80,782 Node-generated rows, fixture `testdata/spfuzz2.json`) passes — the port
+now operates per UTF-16 code unit (defect: per-rune sup matching + missing V8
+`.` line-terminator guards + `unicode.IsSpace` missing U+FEFF; all fixed, see
+`go/libraries/HANDOFF_SAFE_PATHNAME.md`). The CLSI-side acceptance replica
+(`services/clsi.go/safepathname_oracle`) runs the same fixture in the clsi module.
 
 ## Dependencies
 Standard library (`crypto/sha1`, `unicode/utf16`, `os`, `path`, `time`,
