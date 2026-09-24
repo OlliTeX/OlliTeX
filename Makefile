@@ -209,6 +209,7 @@ go-build: ## Build all Go service binaries into ./bin
 	$(GO) build -o bin/docstore ./cmd/docstore
 	$(GO) build -o bin/web ./cmd/web
 	$(GO) build -o bin/seaweed-migrate ./cmd/seaweed-migrate  ## fs <-> SeaweedFS(S3) conversion + health tool
+	$(GO) build -o bin/configdb ./cmd/configdb  ## operator CLI for the SQLite config DB (P7-post)
 
 .PHONY: go-run-linked-url-proxy
 go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
