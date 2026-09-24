@@ -381,6 +381,28 @@ async function main() {
   add('join-anon', async () => post(JOIN, { userId: 'anonymous-user' }, VJ))
   add('join-owner200', async () => post(JOIN, { userId: PI_UID }, VJ))
 
+  // POST /project/:Project_id/history/resync (Node HistoryRouter, privateApiRouter
+  // only; HistoryController.resyncProjectHistory — heavy DU resync on the 204 path,
+  // which we do NOT live-drive). Pinned Node :3000 (2026-09-24, full-header):
+  // unauth/wrong→401; bad Project_id→404 JSON VA params.Project_id; body invalid→
+  // 400 JSON VA (historyRangesMigration enum / resyncProjectStructureOnly bool /
+  // unknown key, joined "; " in that order); both-bad→404 (param precedence);
+  // ghost→500 text "Internal Server Error" (Node quirk: getProject null→TypeError→
+  // throw); overleaf.history.id absent (the uapi-wire seed has overleaf=null)→
+  // 404 text "Not Found" (ProjectHistoryDisabledError). 204 path NOT gated (heavy).
+  const RS = `/project/${PJ}/history/resync`
+  add('rsync-unauth', async () => post(RS, {}, J))
+  add('rsync-wrong', async () => post(RS, {}, WJ))
+  add('rsync-badparam', async () => post('/project/notahex/history/resync', {}, VJ))
+  add('rsync-badenum', async () => post(RS, { historyRangesMigration: 'bogus' }, VJ))
+  add('rsync-badbool', async () => post(RS, { resyncProjectStructureOnly: 123 }, VJ))
+  add('rsync-unknown', async () => post(RS, { foo: 1 }, VJ))
+  add('rsync-bothbad', async () => post('/project/notahex/history/resync', { historyRangesMigration: 'bogus' }, VJ))
+  add('rsync-enumbool', async () => post(RS, { historyRangesMigration: 'bogus', resyncProjectStructureOnly: 123 }, VJ))
+  add('rsync-nullenum', async () => post(RS, { historyRangesMigration: null }, VJ))
+  add('rsync-disabled', async () => post(RS, {}, VJ))
+  add('rsync-ghost', async () => post('/project/' + GHOST + '/history/resync', {}, VJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()

@@ -204,6 +204,14 @@ func Feature(a *core.App) core.Feature {
 			// isInvitedMember} (Node EditorHttpController.joinProject +
 			// ProjectEditorHandler.buildProjectModelView, order-preserving).
 			{Method: "POST", Pattern: joinPat, NoSession: true, APIOnly: true, Handler: joinHandler(a)},
+			// U-API — POST /project/:Project_id/history/resync (Node HistoryRouter,
+			// privateApiRouter only; HistoryController.resyncProjectHistory). APIOnly.
+			// unauth→401; bad Project_id→404 JSON VA (params.Project_id); body invalid→
+			// 400 JSON VA (enum/bool/unknown, param precedence→404 when both bad);
+			// ghost→500 "Internal Server Error" (Node quirk); overleaf.history.id
+			// absent→404 "Not Found"; history-enabled→204 (best-effort DU resync;
+			// NOT gated — heavy cross-service, same standard as deactivate).
+			{Method: "POST", Pattern: rsyncPat, NoSession: true, APIOnly: true, Handler: resyncHistoryHandler(a)},
 			// U-API — GET /user/:user_id/personal_info (privateApiRouter, basic-auth;
 			// the webRouter variant is the distinct path /user/personal_info — no
 			// collision). unauth→401, bad-uid→404 JSON VA, ghost→404 text, valid→
