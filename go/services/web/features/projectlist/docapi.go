@@ -6,16 +6,25 @@
 //	                                                 (DocumentController.trackChangesRejected)
 //
 // Auth: `requirePrivateApiAuth` = basic auth against WEB_API_USER /
-// WEB_API_PASSWORD. NO session, NO membership check — service-to-service.
-// Node oracle (pinned 2026-09-15):
+// WEB_API_PASSWORD. NO membership check — service-to-service.
 //
-//	no auth  + GET + accept json → 401 'Unauthorized' +
-//	                               WWW-Authenticate: OverleafLogin
-//	no auth  + GET + accept else  → 302 /login (Found. Redirecting to /login)
-//	no auth  + POST               → 403 'Forbidden' (app-level cross-origin
-//	                             request block, before route logic)
-//	wrong auth                    → 401 challenge
-//	right auth                    → handler runs
+// Node oracle (re-pinned for the WEB profile 2026-09-23; U10.3r):
+//
+//	no auth  + GET + explicit-json Accept    → 401 'Unauthorized' +
+//	                                              WWW-Authenticate: OverleafLogin
+//	no auth  + GET + html/none Accept        → 302 Location /login
+//	                                              (Accept-negotiated body, Vary: Accept,
+//	                                              query stripped)
+//	wrong auth + GET (any Accept)            → 401 challenge
+//	any state  + POST (both routes)          → 403 'Forbidden' (Node's
+//	                                              session+csrf chain blocks the
+//	                                              POSTs before basic auth)
+//	auth OK  + GET: bad/ghost ids            → WEB 404 HTML page
+//	right auth + GET (valid doc)             → handler runs
+//
+// NEW overleaf.sid cookie: the Node web stack runs the session middleware
+// on these routes too (pinned live: fresh sess:<sid> in redis with
+// csrfSecret + validationToken, cookie issued on 401/403/302).
 //
 // GET: project load (bad/ghost → 404 'Not Found') → findElement doc
 // (missing → NotFoundError → 404 'Not Found') →
@@ -43,7 +52,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -51,6 +59,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -59,43 +68,22 @@ import (
 var (
 	docapiDlPat  = regexp.MustCompile(`^/project/([^/]+)/doc/([^/]+)$`)
 	docapiRejPat = regexp.MustCompile(`^/project/([^/]+)/doc/([^/]+)/changes/reject$`)
+	// P4.13 / U-API — GET /project/:project_id/details (Node privateApiRouter
+	// ProjectApiController.getProjectDetails — api-only, NOT on webRouter).
+	detailsPat = regexp.MustCompile(`^/project/([^/]+)/details$`)
+	// U-API — GET /internal/project/:project_id (Node privateApiRouter
+	// ProjectApiController.getProjectDetails). Same Node handler (and thus same
+	// 200 body) as /project/:id/details; only the path + param name differ.
+	internalProjectPat = regexp.MustCompile(`^/internal/project/([^/]+)$`)
+	// U-API — GET /user/:user_id/personal_info (Node privateApiRouter
+	// UserInfoController.getPersonalInfo). The webRouter variant is the
+	// distinct path /user/personal_info with NO id — no collision here.
+	personalInfoPat = regexp.MustCompile(`^/user/([^/]+)/personal_info$`)
+	reNumID         = regexp.MustCompile(`^\d+$`) // legacy numeric overleaf.id
 )
 
 // atomic counter: keeps the "unused helper" lint quiet only if needed.
 func crChatBase() string { return crEnvOr("WEB_CHAT_URL", "http://127.0.0.1:3010") }
-
-func basicCreds() (user, pass string) {
-	return os.Getenv("WEB_API_USER"), os.Getenv("WEB_API_PASSWORD")
-}
-
-// basicAuthGate mirrors Node requirePrivateApiAuth + the app-level cross-origin
-// block. Returns true when the handler should continue; otherwise the
-// response is already written.
-// apiUnauthorized mirrors Node's send401WithChallenge on the API process:
-// www-authenticate + text/plain 401 "Unauthorized" via sendStatus —
-// NO nosniff (the web baseline never applies to the api profile) and no
-// ETag (sendStatus does not set one).
-func apiUnauthorized(res *core.Res) {
-	res.W.Header().Set("WWW-Authenticate", "OverleafLogin")
-	res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	res.W.Header().Set("ETag", core.EtagWeakBody("Unauthorized"))
-	res.W.Header().Set("Content-Length", "12")
-	res.W.WriteHeader(401)
-	_, _ = res.W.Write([]byte("Unauthorized"))
-}
-
-func basicAuthGate(res *core.Res, req *http.Request) bool {
-	if au, p, has := req.BasicAuth(); has {
-		eu, ep := basicCreds()
-		if eu != "" && au == eu && p == ep {
-			return true
-		}
-		apiUnauthorized(res)
-		return false
-	}
-	apiUnauthorized(res)
-	return false
-}
 
 // dpath walks a document by nested keys (mongo-driver decodes nested docs
 // to primitive.M / maps).
@@ -109,17 +97,6 @@ func apiText(res *core.Res, code int, body string) {
 	res.W.WriteHeader(code)
 	_, _ = res.W.Write([]byte(body))
 }
-
-// apiXPB wraps a private-API handler with the express default
-// X-Powered-By: Express (Node api process sets it on every response —
-// pinned on the 200 GET, the 401 and the 404 alike).
-func apiXPB(h func(cxt *core.Cxt, res *core.Res)) func(cxt *core.Cxt, res *core.Res) {
-	return func(cxt *core.Cxt, res *core.Res) {
-		res.W.Header().Set("X-Powered-By", "Express")
-		h(cxt, res)
-	}
-}
-
 func dpath(d primitive.D, path ...string) (any, bool) {
 	v := any(d)
 	for _, p := range path {
@@ -171,7 +148,6 @@ func docapiFindDoc(root any, didHex string) (p string, ok bool) {
 	}
 	return "", false
 }
-
 func docapiFetch(cxt *core.Cxt, method, url string, body []byte) (int, []byte, error) {
 	var rd io.Reader
 	if body != nil {
@@ -193,6 +169,56 @@ func docapiFetch(cxt *core.Cxt, method, url string, body []byte) (int, []byte, e
 	return resp.StatusCode, buf, nil
 }
 
+// apiXPB wraps a private-API handler with the express default
+// X-Powered-By: Express (Node api process sets it on every response —
+// pinned on the 200 GET, the 401 and the 404 alike).
+func apiXPB(h func(cxt *core.Cxt, res *core.Res)) func(cxt *core.Cxt, res *core.Res) {
+	return func(cxt *core.Cxt, res *core.Res) {
+		res.W.Header().Set("X-Powered-By", "Express")
+		h(cxt, res)
+	}
+}
+
+// apiCSRF403 — U10.3r (route audit 2026-09-23, pinned live): on the Node WEB
+// stack the session+csrf chain blocks the doc trio's two POST routes before
+// basic auth — every POST, any auth state / Accept → 403 text/plain
+// "Forbidden" + fresh overleaf.sid (see core.APISend403). The Go
+// setDocument/reject handlers stay for parity with the :3000 api profile
+// but are unreachable via the web entry.
+func apiCSRF403(cxt *core.Cxt, res *core.Res) { cxt.A.APISend403(cxt, res) }
+
+// apiDoc404Page — U10.3r (pinned live 2026-09-23): Node's GET doc route on
+// the web stack renders the standard 404 HTML page for missing/invalid ids
+// (VA and NotFound both land in the web 404 handler — bad-oid AND ghost
+// valid-oid both → 404 HTML page). The rendered page rides the web-baseline
+// helmet set (post-helmet render) but carries NO X-Powered-By (page render).
+func apiDoc404Page(cxt *core.Cxt, res *core.Res) {
+	views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
+}
+
+// apiDoc404 — profile-aware 404 for the private-API doc-trio GET route:
+//
+//   - web profile → the rendered WEB 404 HTML page (apiDoc404Page), pinned U10.3r.
+//   - api profile → the plain express "Not Found" text: Content-Type
+//     text/plain; charset=utf-8, weak ETag over the 9-byte body, Content-Length
+//     9, X-Powered-By: Express (the api baseline; the fixed CSP is set globally
+//     in serve()), NO web helmet, NO session cookie.
+//
+// Pinned live 2026-09-23 against Node api :3000 (ghost valid-cred GET → 404
+// "Not Found").
+func apiDoc404(cxt *core.Cxt, res *core.Res) {
+	if cxt.A.Cfg.Profile == "api" {
+		res.W.Header().Set("X-Powered-By", "Express")
+		res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		res.W.Header().Set("ETag", core.EtagWeakBody("Not Found"))
+		res.W.Header().Set("Content-Length", strconv.Itoa(len("Not Found")))
+		res.W.WriteHeader(http.StatusNotFound)
+		_, _ = res.W.Write([]byte("Not Found"))
+		return
+	}
+	apiDoc404Page(cxt, res)
+}
+
 // GET /project/:pid/doc/:did
 func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
@@ -203,27 +229,38 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 		pidHex, didHex := mm[1], mm[2]
-		if !basicAuthGate(res, req) {
+		if a.Cfg.Profile == "api" {
+			if !a.APIBasicGate401(cxt, res, req) {
+				return
+			}
+		} else if !a.APIBasicGate(cxt, res, req) {
 			return
+		}
+		if a.Cfg.Profile != "api" {
+			// web profile only: fresh session sid + full helmet baseline
+			// (pinned U10.3r). The api profile carries no session cookie and
+			// none of the helmet set — its baseline is the global CSP (serve())
+			// + X-Powered-By set per-response below.
+			a.NewAPISessionCookie(cxt, res)
+			a.APIHelmet(res, req)
 		}
 
-		if !delHex24(pidHex) {
-			res.JSON(404, delParamVA("Project_id"))
-			return
-		}
-		if !delHex24(didHex) {
-			res.JSON(404, delParamVA("doc_id"))
+		// U10.3r (pinned live 2026-09-23 on the web stack): Node renders the
+		// WEB 404 page for both bad-oid and ghost/missing on the GET route
+		// (accept-header independent — the web error handler owns it).
+		if !delHex24(pidHex) || !delHex24(didHex) {
+			apiDoc404(cxt, res)
 			return
 		}
 		oid, _ := primitive.ObjectIDFromHex(pidHex)
 		doc, _ := loadProjectFull(a, cxt, oid)
 		if doc == nil {
-			apiText(res, http.StatusNotFound, "Not Found")
+			apiDoc404(cxt, res)
 			return
 		}
 		pathName, dok := docapiFindDoc(dget(*doc, "rootFolder"), didHex)
 		if !dok {
-			apiText(res, http.StatusNotFound, "Not Found")
+			apiDoc404(cxt, res)
 			return
 		}
 
@@ -262,8 +299,10 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 		if plain {
 			// ?plain=1 → res.send semantics: text/plain + weak ETag + helmet
 			// nosniff (pinned: api plain-200 carries X-Content-Type-Options),
-			// exact Content-Length, XPB via the apiXPB wrapper.
+			// exact Content-Length, X-Powered-By (res.send path — the 200 is a
+			// res.send, unlike the rendered 404 page which carries no XPB).
 			pl := strings.Join(ddoc.Lines, "\n")
+			res.W.Header().Set("X-Powered-By", "Express")
 			res.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			res.W.Header().Set("ETag", core.EtagWeakBody(pl))
 			res.W.Header().Set("X-Content-Type-Options", "nosniff")
@@ -349,6 +388,7 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			b.Write(qb)
 		}
 		b.WriteString("]}")
+		res.W.Header().Set("X-Powered-By", "Express") // res.send path (200), not the 404 page
 		res.JSON(200, []byte(b.String()))
 	}
 }
@@ -377,7 +417,15 @@ func docapiPostHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 		pidHex, didHex := mm[1], mm[2]
-		if !basicAuthGate(res, req) {
+		if a.Cfg.Profile == "api" {
+			if !a.APIBasicGate401(cxt, res, req) {
+				return
+			}
+		} else {
+			// web profile: the session+csrf chain blocks the POST before basic
+			// auth — always 403 (pinned U10.3r/p413); the setDocument logic below
+			// is unreachable via the web entry.
+			a.APISend403(cxt, res)
 			return
 		}
 
@@ -519,7 +567,9 @@ func docapiPostHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 	}
 }
 
-// POST /project/:pid/doc/:did/changes/reject — CE: always 204.
+// POST /project/:pid/doc/:did/changes/reject — api profile: strict body
+// validation (Node trackChangesRejectedSchema) → 400 (zod) or 204 (valid);
+// web profile: session+csrf chain blocks before basic auth → 403 (U10.3r).
 func docapiRejectHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		req := cxt.Req
@@ -528,14 +578,17 @@ func docapiRejectHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(req.URL.Path, "/")))
 			return
 		}
-		if !basicAuthGate(res, req) {
+		if a.Cfg.Profile == "api" {
+			if !a.APIBasicGate401(cxt, res, req) {
+				return // unauth / wrong basic → 401 (challenge wire)
+			}
+			crjServe(cxt, res, req) // strict body validation → 400 (zod) / 204
 			return
 		}
-		// Node sends `res.status(204).send("No Content")` — express computes
-		// the ETag over the (stripped) 10-byte body, pinned: 204 carries
-		// W/"a-bAsFyilMr4Ra1hIU5PyoyFRunpI".
-		res.W.Header().Set("ETag", core.EtagWeakBody("No Content"))
-		res.NoContent()
+		// web profile: the session+csrf chain blocks the POST before basic
+		// auth — always 403 (pinned U10.3r/p413); the 204 is unreachable via
+		// the web entry.
+		a.APISend403(cxt, res)
 	}
 }
 
@@ -590,3 +643,233 @@ func jsonTypeName(v any) string {
 }
 
 func lastUpdatedAtOK(v *int64) bool { return v == nil || *v > 0 }
+
+// --- GET /project/:project_id/details (Node privateApiRouter, api-only) ----
+//
+// Node ProjectDetailsHandler.getDetails (pinned live 2026-09-23 vs api :3000):
+//
+//	unauth/wrong  → 401 (basic-auth challenge; same wire as the doc trio)
+//	bad project_id→ 404 JSON {"error":"Validation error: Invalid Mongo ObjectId
+//	                  at \"params.project_id\"","statusCode":404}
+//	ghost project → 404 text/plain "Not Found" (same wire as the doc ghost 404)
+//	valid project → 200 JSON {name, [description], [compiler], features,
+//	                  [overleaf]} — undefined keys omitted (res.json), features
+//	                  = the OWNER user's user.features object (document order
+//	                  preserved via core.WriteOrderedValue), else defaultFeatures.
+//
+// The route is APIOnly: the web profile SKIPS it (Node's web stack does not
+// wire /project/:id/details on webRouter), so adding it changes nothing on
+// :4000 (the already-verified web profile).
+func detailsHandlerWithPattern(a *core.App, pat *regexp.Regexp) func(c *core.Cxt, r *core.Res) {
+	return func(c *core.Cxt, r *core.Res) {
+		req := c.Req
+		mm := pat.FindStringSubmatch(req.URL.Path)
+		if mm == nil {
+			views.NotFoundPage(r.W, pageBase(c, strings.TrimPrefix(req.URL.Path, "/")))
+			return
+		}
+		pidHex := mm[1]
+		if c.A.Cfg.Profile != "api" {
+			// Defensive: core.App skips APIOnly routes on the web profile, so
+			// this is unreachable on :4000; if it ever is, 404 (Node web does too).
+			r.JSON(404, delParamVA("project_id"))
+			return
+		}
+		if !a.APIBasicGate401(c, r, req) {
+			return // unauth / wrong basic → 401 (challenge wire)
+		}
+		if !delHex24(pidHex) {
+			// Node's invalid-objectId 404 is a res.json (sets X-Powered-By) —
+			// pinned: 404 JSON + XPB, matching :3000.
+			r.W.Header().Set("X-Powered-By", "Express")
+			r.JSON(404, delParamVA("project_id"))
+			return
+		}
+		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		ctx := req.Context()
+		db, err := a.Mongo.DB(ctx)
+		if err != nil {
+			details404Plain(r)
+			return
+		}
+		var pd primitive.D
+		if err := db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&pd); err != nil {
+			details404Plain(r) // valid ObjectId but no such project → NotFoundError → 404
+			return
+		}
+
+		// owner user -> features (document order preserved)
+		var uid primitive.ObjectID
+		if uRaw, ok := dpath(pd, "owner_ref"); ok && uRaw != nil {
+			if o, ok2 := uRaw.(primitive.ObjectID); ok2 {
+				uid = o
+			}
+		}
+		featuresJSON := []byte(`{}`) // fallback = settings.defaultFeatures (not exercised in the gate)
+		if uid != (primitive.ObjectID{}) {
+			var ud primitive.D
+			if err := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: uid}}).Decode(&ud); err == nil {
+				if fv, ok := dpath(ud, "features"); ok && fv != nil {
+					if fd, ok2 := fv.(primitive.D); ok2 {
+						featuresJSON = core.OrderedD(fd)
+					}
+				}
+			}
+		}
+
+		// Assemble in Node key order, omitting keys whose value is undefined
+		// (undefined description/compiler/overleaf are dropped by res.json).
+		var sb strings.Builder
+		nameV, _ := dpath(pd, "name")
+		sb.WriteString(`{"name":`)
+		core.WriteOrderedValue(&sb, asStr(nameV))
+		sb.WriteString(`,`)
+		if v, ok := dpath(pd, "description"); ok && v != nil {
+			sb.WriteString(`"description":`)
+			core.WriteOrderedValue(&sb, v)
+			sb.WriteString(`,`)
+		}
+		if v, ok := dpath(pd, "compiler"); ok && v != nil {
+			sb.WriteString(`"compiler":`)
+			core.WriteOrderedValue(&sb, v)
+			sb.WriteString(`,`)
+		}
+		sb.WriteString(`"features":`)
+		sb.Write(featuresJSON)
+		if v, ok := dpath(pd, "overleaf"); ok && v != nil {
+			sb.WriteString(`,"overleaf":`)
+			core.WriteOrderedValue(&sb, v)
+		}
+		sb.WriteString(`}`)
+		r.W.Header().Set("X-Powered-By", "Express") // res.send path
+		r.JSON(200, []byte(sb.String()))
+	}
+}
+
+// detailsGetHandler — GET /project/:project_id/details (privateApiRouter, API-ONLY).
+func detailsGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+	return detailsHandlerWithPattern(a, detailsPat)
+}
+
+// internalProjectGetHandler — GET /internal/project/:project_id
+// (privateApiRouter, API-ONLY). Node's ProjectApiController.getProjectDetails
+// calls the SAME ProjectDetailsHandler.getDetails(projectId) as /project/:id/
+// details, so the 200 body is identical; only the path differs. Wire pinned
+// Node :3000 (2026-09-24): unauth→401 (challenge), bad-oid→404 JSON VA
+// params.project_id, ghost→404 text/plain "Not Found", valid→200 JSON
+// {name,description?,compiler?,features,overleaf?}.
+func internalProjectGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+	return detailsHandlerWithPattern(a, internalProjectPat)
+}
+
+// details404Plain — valid-but-missing project: 404 text/plain "Not Found"
+// (pinned: identical wire to the api doc-ghost 404 — text/plain, X-Powered-By,
+// weak ETag over the 9-byte body, Content-Length 9; the fixed global CSP is
+// set by serve()).
+func details404Plain(r *core.Res) {
+	r.W.Header().Set("X-Powered-By", "Express")
+	r.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	r.W.Header().Set("ETag", core.EtagWeakBody("Not Found"))
+	r.W.Header().Set("Content-Length", strconv.Itoa(len("Not Found")))
+	r.W.WriteHeader(http.StatusNotFound)
+	_, _ = r.W.Write([]byte("Not Found"))
+}
+
+// personalInfoGetHandler — U-API, GET /user/:user_id/personal_info
+// (Node privateApiRouter UserInfoController.getPersonalInfo).
+//
+//	unauth/wrong → 401 (challenge, APIBasicGate401)
+//	user_id not hex24 and not numeric → 404 JSON VA (params.user_id) + XPB
+//	valid id, user not found            → 404 text/plain "Not Found" (details404Plain)
+//	valid id, user present                → 200 JSON { id, first_name?, last_name?, email?, ... }
+//
+// id first; the remaining keys (first_name,last_name,email,signUpDate,role,
+// institution) are included only when truthy, in that order — matching Node's
+// formatPersonalInfo. The live Node :3000 wire (honest oracle) returns a
+// 404-JSON-VA for an invalid user_id (NOT the handler source's 400), so we pin
+// the wire.
+func personalInfoGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+	return func(c *core.Cxt, r *core.Res) {
+		req := c.Req
+		mm := personalInfoPat.FindStringSubmatch(req.URL.Path)
+		if mm == nil {
+			views.NotFoundPage(r.W, pageBase(c, strings.TrimPrefix(req.URL.Path, "/")))
+			return
+		}
+		uidRaw := mm[1]
+		if c.A.Cfg.Profile != "api" {
+			// Defensive: core.App skips API-only routes on the web profile, so
+			// this is unreachable on :4000; if it were, mirror the 404-VA wire.
+			r.W.Header().Set("X-Powered-By", "Express")
+			r.JSON(404, delParamVA("user_id"))
+			return
+		}
+		if !a.APIBasicGate401(c, r, req) {
+			return // unauth / wrong basic → 401 challenge wire
+		}
+		// user_id: hex24 ObjectId → _id ; all-numeric → overleaf.id ; else 404-VA.
+		var query bson.D
+		if reNumID.MatchString(uidRaw) {
+			// Node: `parseInt(userId,10)` → a JS number (double); an all-digit
+			// string (even 24+ digits) is treated as the legacy numeric
+			// overleaf.id and the query is "not found" → 404 text. Use
+			// ParseFloat (double) to mirror that (ParseInt would overflow a
+			// 24-digit id and wrongly return the 404-VA wire).
+			f, _ := strconv.ParseFloat(uidRaw, 64)
+			query = bson.D{{Key: "overleaf.id", Value: f}}
+		} else if delHex24(uidRaw) {
+			oid, _ := primitive.ObjectIDFromHex(uidRaw)
+			query = bson.D{{Key: "_id", Value: oid}}
+		} else {
+			r.W.Header().Set("X-Powered-By", "Express")
+			r.JSON(404, delParamVA("user_id"))
+			return
+		}
+		ctx := req.Context()
+		db, err := a.Mongo.DB(ctx)
+		if err != nil {
+			details404Plain(r)
+			return
+		}
+		var ud primitive.D
+		if err := db.Collection("users").FindOne(ctx, query,
+			options.FindOne().SetProjection(bson.D{
+				{Key: "_id", Value: 1}, {Key: "first_name", Value: 1},
+				{Key: "last_name", Value: 1}, {Key: "email", Value: 1},
+			})).Decode(&ud); err != nil {
+			// valid id but no such user → 404 text/plain "Not Found"
+			details404Plain(r)
+			return
+		}
+		truthy := func(v any) bool {
+			if v == nil {
+				return false
+			}
+			if s, ok := v.(string); ok {
+				return s != ""
+			}
+			return true
+		}
+		var sb strings.Builder
+		sb.WriteString(`{"id":`)
+		if idRaw, ok := dpath(ud, "_id"); ok && idRaw != nil {
+			if oid, ok2 := idRaw.(primitive.ObjectID); ok2 {
+				sb.WriteString(`"` + oid.Hex() + `"`)
+			} else {
+				core.WriteOrderedValue(&sb, idRaw)
+			}
+		} else {
+			sb.WriteString(`""`)
+		}
+		for _, key := range []string{"first_name", "last_name", "email", "signUpDate", "role", "institution"} {
+			v, ok := dpath(ud, key)
+			if ok && truthy(v) {
+				sb.WriteString(`,"` + key + `":`)
+				core.WriteOrderedValue(&sb, v)
+			}
+		}
+		sb.WriteString(`}`)
+		r.W.Header().Set("X-Powered-By", "Express")
+		r.JSON(200, []byte(sb.String()))
+	}
+}

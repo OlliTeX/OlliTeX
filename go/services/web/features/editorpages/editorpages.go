@@ -3,6 +3,13 @@
 //	GET /editor/:Project_id     (ProjectController.loadEditor)
 //	GET /Project/:Project_id     (legacy prefix, same controller)
 //
+// U2 (2026-09-22): Node/Express routing is case-INsensitive, so BOTH
+// prefixes — /editor and /project — in ANY case, plus the project id in
+// either hex case, all drive the SAME handler (pinned live); a non-empty
+// invalid id answers Node's exact 404 JSON instead (`editorBadId`), while
+// the empty-id forms keep their split behaviour (Node truth): /editor/
+// → generic 404 page, /Project/ → the dashboard 301 (projectlist).
+//
 // Node ground truth: services/web/app/src/Features/Project/ProjectController
 // .mjs (loadEditor) + views chain layout-base → layout-react → ide-react +
 // project/editor/_meta.pug. The page is a single ~35 kB HTML line whose
@@ -35,16 +42,30 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/sitesettings"
+	"ollitex/go/services/web/features/templates"
 	"ollitex/go/services/web/views"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// editorPagePattern — both main-shell prefixes, 24-hex project id.
-var editorPagePattern = regexp.MustCompile(`^/(?:editor|Project)/(?P<id>[0-9a-f]{24})(?P<role>/detacher|/detached)?$`)
+// editorPagePattern — both main-shell prefixes (Node/Express routing is
+// case-INsensitive: /editor|/project in ANY case) + a 24-hex project id in
+// either hex case; optional detach suffix (P5.1b).
+var editorPagePattern = regexp.MustCompile(`^/(?i:editor|project)/(?P<id>[0-9a-fA-F]{24})(?P<role>/detacher|/detached)?$`)
+
+// editorBadIdPattern — the same route family with a NON-empty, non-valid
+// ObjectId (Node: loadEditorSchema logs the fallback, the objectId param
+// validator 404s: {"error":"Validation error: Invalid Mongo ObjectId at
+// \"params.Project_id\"","statusCode":404}, application/json — pinned
+// live 2026-09-22 U2). Empty id (/editor/ or /Project/) does NOT hit this:
+// /editor/ falls through to the generic 404 page (Node truth), /Project/
+// matches the dashboard 301 (projectlist) — both pinned in the U2 gate.
+var editorBadIdPattern = regexp.MustCompile(`^/(?i:editor|project)/(?P<id>[^/]+)(?P<role>/detacher|/detached)?$`)
 
 // Feature registers the editor page routes.
 func Feature(a *core.App) core.Feature {
@@ -52,6 +73,7 @@ func Feature(a *core.App) core.Feature {
 		Name: "editorpages",
 		Routes: []core.Route{
 			{Method: "GET", Pattern: editorPagePattern, Handler: editorPage(a)},
+			{Method: "GET", Pattern: editorBadIdPattern, Handler: editorBadId},
 		},
 	}
 }
@@ -151,88 +173,99 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 		projTags := anySlice(pdoc["tags"])
 
 		d := views.EditorData{
-			Nonce:       views.NewNonce(),
-			CSRF:        cxt.Sess.CsrfToken(),
+			Nonce: views.NewNonce(),
+			CSRF:  cxt.Sess.CsrfToken(),
 			// Node <title> = "<projectName> - OlliTeX, Online LaTeX Editor"
 			// (pinned oracle: /editor, /Project AND the detach shells).
 			Title:       projName + " - OlliTeX, Online LaTeX Editor",
 			ProjectName: projName,
 			Origin:      cxt.SiteURL,
 			CurrentURL:  currentURL,
+			InitTheme:   initialLoadingScreenTheme(udoc),
 			Detached:    detachRole == "detached",
 		}
 
 		// ---- raw slots ----
 		d.Raw = map[string]string{
-			"ol-csrfToken":       d.CSRF,
-			"ol-baseAssetPath":   "/",
-			"ol-mathJaxPath":     "/js/libs/mathjax-4.1.2/tex-svg.js",
+			"ol-csrfToken":        d.CSRF,
+			"ol-baseAssetPath":    "/",
+			"ol-mathJaxPath":      "/js/libs/mathjax-4.1.2/tex-svg.js",
 			"ol-dictionariesRoot": "/js/dictionaries/0.0.3/",
-			"ol-usersEmail":      email,
-			"ol-user_id":         uid,
-			"ol-project_id":      pid,
-			"ol-projectName":     projName,
+			"ol-usersEmail":       email,
+			"ol-user_id":          uid,
+			"ol-project_id":       pid,
+			"ol-projectName":      projName,
 		}
 
 		// ---- boolean slots (true → bare `content` attr; absent → bare) ----
+		// showTemplatesServerPro — Node (ProjectController.loadEditor:
+		// ~line 895): Features.hasFeature('templates-server-pro') =
+		// Boolean(site_settings.templates — the section EXISTs in this stack)
+		// AND (hasAdminAccess(user) || Settings.templates?.nonAdminCanManage
+		// || Settings.templates.user_id === userId). In this stack
+		// nonAdminCanManage is unseeded (never grants) and templates.user_id
+		// is unset, so it resolves to site-admin ⇒ true (bare `content` —
+		// pegged in the U2 gate 2026-09-22) / member ⇒ absent.
+		showTemplatesServerPro := showTemplatesServerProFor(a, ctx, isAdmin, uid)
 		d.Bool = map[string]bool{
-			"ol-ownerHasSharingUpdates":    sharingUpdates,
-			"ol-latexEditorAvailable":      true,
-			"ol-gitBridgeEnabled":          gitBridge,
-			"ol-useShareJsHash":            true,
-			"ol-showSymbolPalette":         true,
-			"ol-symbolPaletteAvailable":    true,
-			"ol-hasTrackChangesFeature":    trackChanges,
-			"ol-customerIoEnabled":         true,
+			"ol-ownerHasSharingUpdates": sharingUpdates,
+			"ol-latexEditorAvailable":   true,
+			"ol-gitBridgeEnabled":       gitBridge,
+			"ol-useShareJsHash":         true,
+			"ol-showSymbolPalette":      true,
+			"ol-symbolPaletteAvailable": true,
+			"ol-hasTrackChangesFeature": trackChanges,
+			"ol-customerIoEnabled":      true,
+			"ol-showTemplatesServerPro": showTemplatesServerPro,
 			// false (absent in oracle): isManagedAccount, canUseClsiCache,
 			// canUsePng2Pdf, anonymous, isTokenMember,
 			// isRestrictedTokenMember, wikiEnabled, debugPdfDetach,
 			// showAiFeatures, showAiFeaturesDisabled, hasUnlimitedAi,
 			// hasAiFreeTier, showUpgradePrompt, showSupport,
-			// showTemplatesServerPro, isSaas, shouldLoadHotjar,
+			// isSaas, shouldLoadHotjar,
 			// ro-mirror-on-client-no-local-storage
 		}
 
 		// ---- string/number (typed) slots ----
-			d.Typed = map[string]string{
-				"ol-maxDocLength":"2097152",
-				"ol-maxReconnectGracefullyIntervalMs":"30000",
-				"ol-otMigrationStage":"0",
-				"ol-defaultLatexCompiler":"pdflatex",
-				"ol-loadingText":"Loading",
-				"ol-translationIoNotLoaded":"Could not connect to WebSocket server",
-				"ol-translationLoadErrorMessage":"Could not load translations",
-				"ol-translationUnableToJoin":"Could not connect to collaboration server",
-			}
-			// P5.1b — ol-detachRole: empty on main (bare meta), "detacher"/
-			// "detached" on the detach shells (content=…).
-			if detachRole != "" {
-				d.Typed["ol-detachRole"] = detachRole
-			}
+		d.Typed = map[string]string{
+			"ol-maxDocLength":                     "2097152",
+			"ol-maxReconnectGracefullyIntervalMs": "30000",
+			"ol-otMigrationStage":                 "0",
+			"ol-defaultLatexCompiler":             "pdflatex",
+			"ol-loadingText":                      "Loading",
+			"ol-translationIoNotLoaded":           "Could not connect to WebSocket server",
+			"ol-translationLoadErrorMessage":      "Could not load translations",
+			"ol-translationUnableToJoin":          "Could not connect to collaboration server",
+		}
+		// P5.1b — ol-detachRole: empty on main (bare meta), "detacher"/
+		// "detached" on the detach shells (content=…).
+		if detachRole != "" {
+			d.Typed["ol-detachRole"] = detachRole
+		}
 
 		// ---- json slots ----
 		d.JSON = map[string]string{
-			"ol-ab":          pinned_ol_ab,
-			"ol-i18n":        pinned_ol_i18n,
-			"ol-ExposedSettings": pinned_ol_ExposedSettings,
-			"ol-splitTestVariants": pinned_ol_splitTestVariants,
-			"ol-splitTestInfo": pinned_ol_splitTestInfo,
-			"ol-navbar":      navbarJSON(cxt.SiteURL, currentURL, email, isAdmin),
-			"ol-footer":      withSiteURL(pinned_ol_footer, cxt.SiteURL),
-			"ol-userSettings": buildUserSettings(udoc),
-			"ol-user":        serializeUser(uid, email, udoc),
-			"ol-learnedWords":   jsonArr(learned),
-			"ol-inactiveTutorials": jsonArr(inactive),
-			"ol-capabilities":   pinned_ol_capabilities,
-			"ol-grammarSettings": pinned_ol_grammarSettings,
-			"ol-wsRetryHandshake": pinned_ol_wsRetryHandshake,
-			"ol-imageNames":     pinned_ol_imageNames,
-			"ol-languages":      pinned_ol_languages,
-			"ol-editorThemes":   pinned_ol_editorThemes,
+			"ol-ab":                 pinned_ol_ab,
+			"ol-i18n":               pinned_ol_i18n,
+			"ol-ExposedSettings":    ExposedSettingsJSON(cxt.SiteURL, templates.MenuGrant(ctx, cxt)),
+			"ol-splitTestVariants":  pinned_ol_splitTestVariants,
+			"ol-splitTestInfo":      pinned_ol_splitTestInfo,
+			"ol-navbar":             navbarJSON(cxt.SiteURL, currentURL, email, isAdmin, sitesettings.RegistrationEnabled(a, ctx)),
+			"ol-footer":             withSiteURL(pinned_ol_footer, cxt.SiteURL),
+			"ol-userSettings":       buildUserSettings(udoc),
+			"ol-user":               serializeUser(uid, email, udoc),
+			"ol-learnedWords":       jsonArr(learned),
+			"ol-inactiveTutorials":  jsonArr(inactive),
+			"ol-capabilities":       pinned_ol_capabilities,
+			"ol-grammarSettings":    pinned_ol_grammarSettings,
+			"ol-wsRetryHandshake":   pinned_ol_wsRetryHandshake,
+			"ol-imageNames":         pinned_ol_imageNames,
+			"ol-languages":          pinned_ol_languages,
+			"ol-editorThemes":       pinned_ol_editorThemes,
 			"ol-legacyEditorThemes": pinned_ol_legacyEditorThemes,
-			"ol-projectTags":    jsonArr(serializeTags(projTags)),
-			"ol-compileSettings": fmt.Sprintf(`{"compileTimeout":%d}`, compileTimeout),
-			"ol-overallThemes":  pinned_ol_overallThemes,
+			"ol-projectTags":        jsonArr(serializeTags(projTags)),
+			"ol-compileSettings":    fmt.Sprintf(`{"compileTimeout":%d}`, compileTimeout),
+			"ol-overallThemes":      pinned_ol_overallThemes,
 		}
 
 		writeEditor(res.W, d, views.EditorPage(d))
@@ -279,10 +312,10 @@ func loadUserDoc(a *core.App, ctx context.Context, uid string) (map[string]any, 
 }
 
 type projDoc struct {
-	owner_ref  any
-	name       any
-	tags       any
-	refs       map[string]any // collab/review/readonly/token refs + publicAccesLevel
+	owner_ref any
+	name      any
+	tags      any
+	refs      map[string]any // collab/review/readonly/token refs + publicAccesLevel
 }
 
 func loadProject(a *core.App, ctx context.Context, oid primitive.ObjectID) (map[string]any, bool) {
@@ -347,6 +380,86 @@ func ownerHasSharingUpdates(a *core.App, ctx context.Context, ownerRef string) b
 	return true // CE default: enabled
 }
 
+// showTemplatesServerProFor — Node
+// `Features.hasFeature('templates-server-pro') && (hasAdminAccess(user) ||
+// Settings.templates?.nonAdminCanManage || Settings.templates.user_id ===
+// userId)` (hasFeature = Boolean(site_settings.templates — section exists)).
+// One site_settings read; section existence gates everything (Node ANDs the
+// feature flag first).
+func showTemplatesServerProFor(a *core.App, ctx context.Context, isAdmin bool, uid string) bool {
+	if a == nil || a.Mongo == nil {
+		return false
+	}
+	db, err := a.Mongo.DB(ctx)
+	if err != nil {
+		return false
+	}
+	var doc bson.M
+	if db.Collection("site_settings").FindOne(ctx, bson.D{{Key: "_id", Value: "global"}}).Decode(&doc) != nil {
+		return false
+	}
+	sec, ok := doc["templates"].(bson.M)
+	if !ok {
+		return false // hasFeature('templates-server-pro') = false
+	}
+	if isAdmin {
+		return true
+	}
+	if nonAdmin, _ := sec["nonAdminCanManage"].(bool); nonAdmin {
+		return true
+	}
+	nodeUID, _ := sec["user_id"].(string)
+	return nodeUID != "" && nodeUID == uid
+}
+
+// initialLoadingScreenTheme — Node (UserSettingsHelper):
+// getInitialTheme(getOverallTheme(user)) — ace.overallTheme if set (the
+// odd 'light-' enum value maps to 'light'; 'system'→system; ”→dark;
+// anything else → dark); otherwise signUpDate < 2026-03-02T12:00Z → dark
+// else system (Node: undefined signUpDate < Date is false ⇒ system).
+func initialLoadingScreenTheme(doc map[string]any) string {
+	has := false
+	overall := ""
+	if ace, ok := doc["ace"].(map[string]any); ok {
+		if v, ok2 := ace["overallTheme"].(string); ok2 {
+			has, overall = true, v
+		}
+	}
+	if !has {
+		cutoff := time.Date(2026, time.March, 2, 12, 0, 0, 0, time.UTC).UnixMilli()
+		if ms, ok := millisOf(doc["signUpDate"]); ok && ms < cutoff {
+			return "dark"
+		}
+		return "system"
+	}
+	switch overall {
+	case "light-":
+		return "light"
+	case "":
+		return "dark"
+	case "system":
+		return "system"
+	default:
+		return "dark"
+	}
+}
+
+func millisOf(v any) (int64, bool) {
+	switch t := v.(type) {
+	case time.Time:
+		return t.UnixMilli(), true
+	case primitive.DateTime:
+		return int64(t), true
+	case int64:
+		return t, true
+	case int32:
+		return int64(t), true
+	case float64:
+		return int64(t), true
+	}
+	return 0, false
+}
+
 func projectlistUserIsAdmin(a *core.App, ctx context.Context, uid string) bool {
 	if a.Mongo == nil || uid == "" {
 		return false
@@ -366,10 +479,19 @@ func projectlistUserIsAdmin(a *core.App, ctx context.Context, uid string) bool {
 	return false
 }
 
+// editorBadId — Node contract for /editor|/project/<invalid ObjectId> in ANY
+// case (U2 oracle, 2026-09-22): the express route matches, loadEditorSchema
+// logs the enforced fallback, then the objectId param validator answers
+// 404 JSON on the WIRE (application/json; charset=utf-8 + weak ETag).
+// Anonymous is bounced to /login FIRST (global gate) — pinned in the gate.
+func editorBadId(cxt *core.Cxt, res *core.Res) {
+	res.JSON(404, []byte(`{"error":"Validation error: Invalid Mongo ObjectId at \"params.Project_id\"","statusCode":404}`))
+}
+
 // ---------- tiny decoders ----------
 
 func primitiveObjectID(hex string) primitive.ObjectID {
-	oid, _ := primitive.ObjectIDFromHex(hex)
+	oid, _ := primitive.ObjectIDFromHex(strings.ToLower(hex))
 	return oid
 }
 

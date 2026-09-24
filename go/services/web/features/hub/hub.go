@@ -49,6 +49,7 @@ import (
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/editorpages"
+	"ollitex/go/services/web/features/sitesettings"
 	"ollitex/go/services/web/views"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -63,13 +64,38 @@ type mode = map[string]any
 // ---------- routes ----------
 
 // Feature registers the ollitex-hub routes (P6.1).
+
+// U9: Express is case-insensitive AND trailing-slash tolerant — variants
+// pinned by the U9 gate oracle (N/G A/B 2026-09-22).
+var (
+	hubRe          = regexp.MustCompile(`^/(?i:hub)/?$`)
+	hubAdminRe     = regexp.MustCompile(`^/(?i:hub/admin)/?$`)
+	hubWorkspaceRe = regexp.MustCompile(`^/(?i:hub/workspace)/?$`)
+)
+
 func Feature(a *core.App) core.Feature {
 	return core.Feature{
 		Name: "ollitex-hub",
 		Routes: []core.Route{
 			{Method: "GET", Path: "/hub", Handler: hubPage(a)},
+			// U9: Express is case-insensitive AND slash-tolerant — /HUB, /hub/,
+			// /HUB/ all render the hub (canonical link reflects the requested
+			// path — Node oracle 2026-09-22). Same for the /hub/admin and
+			// /hub/workspace redirect aliases (302 /hub).
+			{
+				Method:  "GET",
+				Pattern: hubRe, Handler: hubPage(a),
+			},
 			{Method: "GET", Path: "/hub/admin", Handler: redirectToHub},
+			{
+				Method:  "GET",
+				Pattern: hubAdminRe, Handler: redirectToHub,
+			},
 			{Method: "GET", Path: "/hub/workspace", Handler: redirectToHub},
+			{
+				Method:  "GET",
+				Pattern: hubWorkspaceRe, Handler: redirectToHub,
+			},
 			{Method: "GET", Path: "/api/hub-theme", Handler: getTheme(a)},
 			{Method: "PUT", Path: "/api/hub-theme", Handler: saveTheme(a)},
 			{Method: "DELETE", Path: "/api/hub-theme", Handler: clearTheme(a)},
@@ -109,14 +135,15 @@ func hubPage(a *core.App) func(*core.Cxt, *core.Res) {
 		hubTheme := themeSnapshotJSON(a, ctx) // "null" or {version,light,dark}
 
 		d := views.HubData{
-			Nonce:     views.NewNonce(),
-			CSRF:      cxt.Sess.CsrfToken(),
-			Origin:    cxt.SiteURL,
-			HubAdmin:  isAdmin,
-			GitBridge: os.Getenv("OVERLEAF_GITBRIDGE_ENABLED") == "true",
+			Nonce:      views.NewNonce(),
+			CSRF:       cxt.Sess.CsrfToken(),
+			Origin:     cxt.SiteURL,
+			CurrentURL: cxt.Req.URL.Path, // Node canonical is path-aware (/hub, /hub/, /HUB/...)
+			HubAdmin:   isAdmin,
+			GitBridge:  os.Getenv("OVERLEAF_GITBRIDGE_ENABLED") == "true",
 			JSON: map[string]string{
 				"ol-ExposedSettings": editorpages.ExposedSettingsJSON(cxt.SiteURL, isAdmin),
-				"ol-navbar":          hubNavbar(email, isAdmin),
+				"ol-navbar":          hubNavbar(a, ctx, email, cxt.Req.URL.Path, isAdmin),
 				"ol-footer":          editorpages.HubFooterJSON(cxt.SiteURL),
 				"ol-user":            serializeHubUser(uid, email, udoc, aceRaw),
 				"ol-userSettings":    editorpages.BuildUserSettings(udoc),
@@ -146,10 +173,18 @@ func hubPage(a *core.App) func(*core.Cxt, *core.Res) {
 // "title" key, hideLogo:true, suppressNavContentLinks:true; admin flips
 // canDisplayAdminMenu + canDisplayProjectUrlLookup. Items identical for
 // both roles (Library + Templates).
-func hubNavbar(email string, isAdmin bool) string {
+func hubNavbar(a *core.App, ctx context.Context, email, currentURL string, isAdmin bool) string {
 	b := "false"
 	if isAdmin {
 		b = "true"
+	}
+	// showSignUpLink — Node: hasFeature('registration-page') =
+	// boolFromEnv(OVERLEAF_ENABLE_REGISTRATION_PAGE) ?? !(sso-saml||sso-ldap||
+	// sso-oidc site_settings enabled). Computed per request; e2e stack:
+	// sso-saml enabled -> false (N/G A/B live-captured 2026-09-22).
+	su := "false"
+	if sitesettings.RegistrationEnabled(a, ctx) {
+		su = "true"
 	}
 	return `{"customLogo":"/logo_full.svg` +
 		`","customLogoDark":"/logo_full.svg` +
@@ -163,12 +198,8 @@ func hubNavbar(email string, isAdmin bool) string {
 		`,"canDisplayScriptLogMenu":false` +
 		`,"suppressNavbarRight":false` +
 		`,"suppressNavContentLinks":true` +
-		// showSignUpLink — Node: hasFeature('registration-page') =
-	// env OVERLEAF_ENABLE_REGISTRATION_PAGE ?? !(saml/ldap/oidc enable),
-	// pinned TRUE in this stack (live-captured 2026-09-19; re-pin on SSO
-	// state change).
-	`,"showSignUpLink":true` +
-		`,"currentUrl":"/hub"` +
+		`,"showSignUpLink":` + su +
+		`,"currentUrl":"` + currentURL + `"` +
 		`,"sessionUser":{"email":"` + jsString(email)[1:len(jsString(email))-1] + `"` +
 		`},"items":` +
 		`[{"text":"Library","url":"/library","class":"subdued","translatedText":"Library"},` +
@@ -801,24 +832,24 @@ var hubAceCanonical = []string{
 // them (no-default paths: overallTheme, syntaxValidation, fontFamily,
 // lineHeight — omitted when not stored).
 var hubAceDefaults = map[string]string{
-	"mode":                `"none"`,
-	"theme":               `"textmate"`,
-	"lightTheme":          `"textmate"`,
-	"darkTheme":           `"overleaf_dark"`,
-	"fontSize":            "12",
-	"autoComplete":        "true",
-	"autoPairDelimiters":  "true",
-	"spellCheckLanguage":  `"en"`,
-	"pdfViewer":           `"pdfjs"`,
-	"previewTabs":         "false",
-	"mathPreview":         "true",
-	"breadcrumbs":         "false",
-	"editorTabs":          "true",
-	"nonBlinkingCursor":   "false",
+	"mode":                 `"none"`,
+	"theme":                `"textmate"`,
+	"lightTheme":           `"textmate"`,
+	"darkTheme":            `"overleaf_dark"`,
+	"fontSize":             "12",
+	"autoComplete":         "true",
+	"autoPairDelimiters":   "true",
+	"spellCheckLanguage":   `"en"`,
+	"pdfViewer":            `"pdfjs"`,
+	"previewTabs":          "false",
+	"mathPreview":          "true",
+	"breadcrumbs":          "false",
+	"editorTabs":           "true",
+	"nonBlinkingCursor":    "false",
 	"referencesSearchMode": `"advanced"`,
-	"darkModePdf":         "false",
-	"floatingMenu":        "true",
-	"customKeybindings":   "{}",
+	"darkModePdf":          "false",
+	"floatingMenu":         "true",
+	"customKeybindings":    "{}",
 }
 
 // hubAceProviders — the three ref-provider blocks, always rendered first.

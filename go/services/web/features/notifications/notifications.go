@@ -156,7 +156,7 @@ func ntfPageData(cxt *core.Cxt) views.PageData {
 		// P6.13 per-user page slots (the captured page skeletons carry the
 		// NAVADMIN / CANMGTPL slots — Node renders both on every page render,
 		// including the error pages, per the live user).
-		d.CanManageTemplateMenu = templates.SessionMenuGrant(cxt.Sess)
+		d.CanManageTemplateMenu = templates.MenuGrant(cxt.Req.Context(), cxt)
 		if templates.SessionIsAdmin(cxt.Sess) {
 			d.NavAdmin = views.AdminNavFragment
 		}

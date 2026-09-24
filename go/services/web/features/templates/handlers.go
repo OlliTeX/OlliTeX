@@ -267,23 +267,52 @@ func SessionMenuGrant(sess *core.Session) bool {
 	if sess == nil {
 		return false
 	}
+	// Node ExpressLocals: SessionManager.getSessionUser = session.user ||
+	// session.passport.user, then AdminAuthorizationHelper.hasAdminAccess =
+	// Boolean(user.isAdmin) (+ legacy Settings.templates.user_id match).
+	// OlliTeX CE sessions carry the user under `user` (passport is the
+	// fallback shape only). Both are honored, in that order.
+	grant := func(raw json.RawMessage) bool {
+		var u struct {
+			IsAdmin bool   `json:"isAdmin"`
+			ID      string `json:"_id"`
+		}
+		if json.Unmarshal(raw, &u) != nil {
+			return false
+		}
+		if u.IsAdmin {
+			return true
+		}
+		env := os.Getenv("OVERLEAF_TEMPLATES_USER_ID")
+		if env != "" && u.ID == env {
+			return true
+		}
+		return false
+	}
+	if raw, ok := sess.GetRaw("user"); ok && grant(raw) {
+		return true
+	}
 	if raw, ok := sess.GetRaw("passport"); ok {
 		var pp struct {
-			User struct {
-				IsAdmin bool   `json:"isAdmin"`
-				ID      string `json:"_id"`
-			} `json:"user"`
+			User json.RawMessage `json:"user"`
 		}
-		if json.Unmarshal(raw, &pp) == nil {
-			if pp.User.IsAdmin {
-				return true
-			}
-			if env := os.Getenv("OVERLEAF_TEMPLATES_USER_ID"); env != "" && pp.User.ID == env {
-				return true
-			}
+		if json.Unmarshal(raw, &pp) == nil && len(pp.User) > 0 && grant(pp.User) {
+			return true
 		}
 	}
 	return false
+}
+
+// MenuGrant evaluates the full Node ladder (hasTemplateAdminAccess) for the
+// request: session isAdmin → OVERLEAF_TEMPLATES_USER_ID → DB user isAdmin →
+// DB flags.canManageTemplates → site section allUsersCanManageTemplates.
+// Node re-computes this per-request for every page render (ExpressLocals),
+// so all Go page data must use it, not the session-only SessionMenuGrant.
+func MenuGrant(ctx context.Context, cxt *core.Cxt) bool {
+	if cxt == nil {
+		return false
+	}
+	return tplPrivileged(ctx, cxt.A, cxt)
 }
 
 // SessionIsAdmin: session passport user.isAdmin (Node shows the Admin
@@ -314,10 +343,11 @@ func tplPageData(cxt *core.Cxt) views.PageData {
 		UserID:    uid,
 	}
 	if cxt.Sess != nil {
-		d.CanManageTemplateMenu = SessionMenuGrant(cxt.Sess)
+		d.CanManageTemplateMenu = MenuGrant(cxt.Req.Context(), cxt)
 		if SessionIsAdmin(cxt.Sess) {
 			d.NavAdmin = views.AdminNavFragment
 		}
+		d.NavSiteAdmin = core.NavSiteAdmin(cxt.Sess)
 	}
 	if tok := cxt.Sess.CsrfToken(); tok != "" {
 		d.CSRFToken = tok
@@ -360,9 +390,11 @@ func singleQuery(q map[string][]string, key string) (string, bool) {
 }
 
 // hGetTemplate — GET /api/template?key=_id|name&val=… (Node getTemplate):
-//   key=_id   : isValid(val) ? findById : null
-//   key=name  : findOne({name})
-//   key=other / missing : null
+//
+//	key=_id   : isValid(val) ? findById : null
+//	key=name  : findOne({name})
+//	key=other / missing : null
+//
 // found → _formatTemplateForPage (pinned key order; cleanHtml author
 // linksOnly / description reachText; absent document fields DROPPED).
 func hGetTemplate(a *core.App) func(*core.Cxt, *core.Res) {
@@ -566,12 +598,13 @@ func tplSortKey(d *bson.D, by string) (time.Time, string) {
 }
 
 // hList — Node getCategoryTemplates + _sortTemplates (pinned):
-//   category=all (default) → all; else {category: '/templates/'+category}
-//   by ∉ {lastUpdated,name} (non-empty invalid) → next(error) → 500 page
-//   by='' → lodash no-op → natural order; asc/desc stable
-//   duplicate params → ARRAY → TypeError → 500 page
-//   list item: id, version(String), name, author(plainText),
-//              description(plainText), category, lastUpdated
+//
+//	category=all (default) → all; else {category: '/templates/'+category}
+//	by ∉ {lastUpdated,name} (non-empty invalid) → next(error) → 500 page
+//	by='' → lodash no-op → natural order; asc/desc stable
+//	duplicate params → ARRAY → TypeError → 500 page
+//	list item: id, version(String), name, author(plainText),
+//	           description(plainText), category, lastUpdated
 func hList(a *core.App) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		ctx := cxt.Req.Context()
@@ -679,8 +712,8 @@ func tplFormatForList(d *bson.D) string {
 //   - filestore non-2xx other      → res.status(n).json({url,method,status[,body]})
 //   - ok + image style             → 200 application/octet-stream (bytes)
 //   - ok + no image style          → 200 application/pdf   (bytes)
-//   (placeholder-SVG branch = dead code: fetchStreamWithResponse throws on
-//    every non-2xx before the controller would see response.ok=false)
+//     (placeholder-SVG branch = dead code: fetchStreamWithResponse throws on
+//     every non-2xx before the controller would see response.ok=false)
 func hPreview(a *core.App) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		ctx := cxt.Req.Context()
@@ -810,8 +843,8 @@ func tplZipBytes(meta string, zipBody, pdfBody []byte, pdfOK bool) []byte {
 //   - ghost id   → 500 {"message":"Template not found"}
 //   - filestore zip missing → 500 {"message":"request failed"}
 //   - ok → 200 application/zip, Content-Disposition
-//          attachment; filename="<sanitized>_v<version>.bundle.zip",
-//          Content-Length set; entries template.json + source.zip [+ output.pdf]
+//     attachment; filename="<sanitized>_v<version>.bundle.zip",
+//     Content-Length set; entries template.json + source.zip [+ output.pdf]
 func hBundle(a *core.App) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		ctx := cxt.Req.Context()

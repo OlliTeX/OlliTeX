@@ -42,9 +42,43 @@
 package projectlist
 
 import (
+	"regexp"
 
 	"ollitex/go/services/web/core"
 )
+
+// ---------- legacy project-dashboard redirects (P7 cutover gap) ----------
+//
+// Node source (oracle): services/web/app/src/router.mjs
+// projectDashboardRedirects (owner queue 7, 2026-09-10): the legacy
+// project-list pages are REMOVED — every dashboard state renders in the hub
+// (/hub#/projects.*). The routes 301 so bookmarks and SSO deep links land in
+// the hub. Project APIs (POST /project/new*, POST /api/project,
+// /user/projects, /project/:id/entities) are untouched; editor deep links
+// (/editor/:id, legacy /Project/:id) stay.
+//
+// Node oracle (captured 2026-09-22 on the e2e stack, Node v22.21.1):
+//
+//	authed:     301 + Location + text/plain "Moved Permanently. Redirecting to <target>"
+//	anonymous: 302 /login (requireLogin bounce; exact Express body)
+//
+// NOTE the literal `/project/tags/:tag` target — Node itself 301s every tag
+// to the SAME hub route `/hub#/projects.tags.tags` (Node's static string); we
+// pin that 1:1 rather than "fixing" it.
+var dashTagPat = regexp.MustCompile(`^/project/tags/[^/]+$`)
+
+// dashSlashPat — Node/Express routing is case-insensitive AND loose on the
+// trailing slash: /Project/ (any case, exactly one trailing slash) hits the
+// /project dashboard 301 (pinned live 2026-09-22 U2: 301 →
+// /hub#/projects.all, "Moved Permanently. Redirecting to …"). The exact
+// paths above already cover the canonical lowercase forms.
+var dashSlashPat = regexp.MustCompile(`^/(?i:project)/$`)
+
+func dashRedir(loc string) func(*core.Cxt, *core.Res) {
+	return func(cxt *core.Cxt, res *core.Res) {
+		res.Redirect(cxt.Req, 301, loc)
+	}
+}
 
 // Feature registers the project-list route. `NoLogin` is left false so the
 // global login gate bounces anonymous requests exactly like Node's
@@ -53,14 +87,26 @@ func Feature(a *core.App) core.Feature {
 	return core.Feature{
 		Name: "projectlist",
 		Routes: []core.Route{
+			// Node registers projectDashboardRedirects BEFORE the other
+			// /project routes — keep that order (first match wins).
+			{Method: "GET", Path: "/project", Handler: dashRedir("/hub#/projects.all")},
+			{Method: "GET", Path: "/project/owned", Handler: dashRedir("/hub#/projects.owned")},
+			{Method: "GET", Path: "/project/shared", Handler: dashRedir("/hub#/projects.shared")},
+			{Method: "GET", Path: "/project/archived", Handler: dashRedir("/hub#/projects.archived")},
+			{Method: "GET", Path: "/project/trashed", Handler: dashRedir("/hub#/projects.trashed")},
+			{Method: "GET", Path: "/project/untagged", Handler: dashRedir("/hub#/projects.all")},
+			{Method: "GET", Pattern: dashTagPat, Handler: dashRedir("/hub#/projects.tags.tags")},
+			{Method: "GET", Pattern: dashSlashPat, Handler: dashRedir("/hub#/projects.all")},
 			{Method: "GET", Path: "/user/projects", Handler: handler(a)},
 			{Method: "GET", Pattern: entPat, Handler: entitiesHandler(a)},
 			{Method: "GET", Pattern: memPat, Handler: membersHandler(a)},
 			{Method: "GET", Pattern: arPat, Handler: accessRequestsHandler(a)},
 			{Method: "POST", Pattern: renPat, Handler: renameHandler(a)},
 			{Method: "POST", Path: "/project/new", Handler: newProjectHandler(a)},
-		// P6.16 typst module (web-p616 flip) — Node TypstRouter route order
-		{Method: "POST", Path: "/project/new/typst", Handler: newTypstProjectHandler(a)},
+			// U1 (P7): the JSON project list (Node: /project/new → /api/project order)
+			{Method: "POST", Path: "/api/project", Handler: apProjectHandler(a)},
+			// P6.16 typst module (web-p616 flip) — Node TypstRouter route order
+			{Method: "POST", Path: "/project/new/typst", Handler: newTypstProjectHandler(a)},
 			{Method: "POST", Pattern: archPat, Handler: flagHandler(a, opArchive)},
 			{Method: "DELETE", Pattern: archPat, Handler: flagHandler(a, opUnarchive)},
 			{Method: "POST", Pattern: trashPat, Handler: flagHandler(a, opTrash)},
@@ -92,6 +138,15 @@ func Feature(a *core.App) core.Feature {
 			// P4.11a editor entity creation (web-p411a flip)
 			{Method: "POST", Pattern: entDocPat, Handler: addEntityHandler(a, "doc")},
 			{Method: "POST", Pattern: entFolderPat, Handler: addEntityHandler(a, "folder")},
+			// U10.2b — entity rename/move/duplicate (Node EditorRouter POST family).
+			{Method: "POST", Pattern: entRenPat, Handler: entRenameHandler(a)},
+			{Method: "POST", Pattern: entMovPat, Handler: entMoveHandler(a)},
+			{Method: "POST", Pattern: entDupPat, Handler: entDuplicateHandler(a)},
+			// U10.3 — linked files (Node LinkedFilesRouter; CE: agents all
+			// disabled -> _getAgent null -> bare 400 after validation;
+			// validation/403/404/409 branches pinned by the LF gate).
+			{Method: "POST", Pattern: lfCreatePat, Handler: lfCreateHandler(a)},
+			{Method: "POST", Pattern: lfRefreshPat, Handler: lfRefreshHandler(a)},
 			// P4.11b editor entity deletion (web-p411b flip)
 			{Method: "DELETE", Pattern: delDocPat, Handler: delEntityHandler(a, "doc")},
 			{Method: "DELETE", Pattern: delFilePat, Handler: delEntityHandler(a, "file")},
@@ -105,11 +160,76 @@ func Feature(a *core.App) core.Feature {
 			{Method: "POST", Pattern: upPat, Handler: uploadHandler(a)},
 			// P4.13b new-project zip upload (POST /project/new/upload — session+csrf)
 			{Method: "POST", Pattern: nzipPat, Handler: newzipHandler(a)},
-			// P4.12c private API doc trio (web-p413 flip; basic auth in handler;
-			// NoSession = Node's privateApiRouter carries no session/csrf)
-			{Method: "GET", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiGetHandler(a))},
+			// P4.12c private API doc trio (web-p413 flip; basic auth in handler).
+			// U10.3r (pinned live 2026-09-23, web :4000): these are NoSession
+			// (the private-API gate issues its own fresh sid). The GET gate
+			// 401/302 carry the FULL helmet set but NO X-Powered-By (pinned);
+			// the valid-cred 200 res.send path carries XPB (set inside the
+			// handler); the rendered 404 page carries NEITHER XPB set on the page.
+			{Method: "GET", Pattern: docapiDlPat, NoSession: true, Handler: docapiGetHandler(a)},
+			// U10.3r (pinned live 2026-09-23) — PROFILE-AWARE (2026-09-23 api fix):
+			//   web: Node's session+csrf chain (csrf BEFORE helmet) blocks BOTH
+			//         POST routes → 403 text/plain "Forbidden" + XPB + CSP + fresh
+			//         sid, NO helmet set (the handler's web branch calls
+			//         core.APISend403; identical wire to the former apiCSRF403).
+			//   api: NO session/csrf chain — the 401 gate (core.APIBasicGate401)
+			//         answers 401 for unauth/wrong (any Accept/method); a valid-
+			//         cred POST reaches the setDocument / reject logic in the
+			//         handler. Pinned vs Node api :3000.
 			{Method: "POST", Pattern: docapiDlPat, NoSession: true, Handler: apiXPB(docapiPostHandler(a))},
 			{Method: "POST", Pattern: docapiRejPat, NoSession: true, Handler: apiXPB(docapiRejectHandler(a))},
+			// U-API — GET /project/:id/details (privateApiRouter, API-ONLY).
+			// APIOnly: the web profile SKIPS this route (core.App filter) and
+			// falls through to the already-verified web 404 tail — so :4000 is
+			// unchanged. On the api profile it serves: unauth→401, bad-oid/ghost
+			// →404, valid→200 JSON (owner features, document order).
+			{Method: "GET", Pattern: detailsPat, NoSession: true, APIOnly: true, Handler: detailsGetHandler(a)},
+			// U-API — GET /internal/project/:project_id (privateApiRouter, API-ONLY).
+			// Same Node handler (ProjectDetailsHandler.getDetails) as /project/:id/
+			// details → identical 200 body; only the path differs.
+			{Method: "GET", Pattern: internalProjectPat, NoSession: true, APIOnly: true, Handler: internalProjectGetHandler(a)},
+			// U-API — GET /user/:user_id/personal_info (privateApiRouter, basic-auth;
+			// the webRouter variant is the distinct path /user/personal_info — no
+			// collision). unauth→401, bad-uid→404 JSON VA, ghost→404 text, valid→
+			// 200 user-JSON (id-first). APIOnly → web profile skips it (unchanged).
+			{Method: "GET", Pattern: personalInfoPat, NoSession: true, APIOnly: true, Handler: personalInfoGetHandler(a)},
+			// U-API — POST /user/:user_id/project/new (createProject, privateApiRouter,
+			// basic-auth; APIOnly). unauth→401, bad-uid→404 JSON VA (params.user_id),
+			// valid-uid+valid-name→200 {projectId} (creates a BLANK project), invalid
+			// name→500 (Node's TPDS path doesn't map name-validation to 4xx). APIOnly →
+			// the web profile SKIPS it (Node web :4000 404s it) → unchanged.
+			{Method: "POST", Pattern: tpdsProjectNewPat, NoSession: true, APIOnly: true, Handler: tpdsCreateProjectHandler(a)},
+			// U-API — POST /user/:user_id/project/resolve (resolveProject, privateApiRouter,
+			// basic-auth; APIOnly). Node get-or-create: {projectId} → found(RW, active)
+			// →200 success / ghost→200 rejected; {projectName} → found→200 success /
+			// none→create blank→200 success; invalid name/pid → 400 strict-zod VA. APIOnly
+			// → the web profile SKIPS it (Node web :4000 404s it) → unchanged.
+			{Method: "POST", Pattern: tpdsProjectResolvePat, NoSession: true, APIOnly: true, Handler: tpdsResolveProjectHandler(a)},
+			// U-API — POST /tpds/folder-update (updateFolder, privateApiRouter,
+			// basic-auth; APIOnly). Node splitPath(normalize) + get-or-create
+			// project + shouldIgnore(minimatch; live pattern undefined → no 409 in
+			// this stack) + tpdsMkdirp (find-or-create each segment; uses the
+			// PROJECT _id for the mongo filter — unlike upload upMkdirp, which
+			// assumes rootFolder._id==project._id) → 200 {entityId,projectId,path,
+			// folderId} / not-found→500 / 401 / 400 strict-zod VA. APIOnly → the
+			// web profile SKIPS it (Node web :4000 404s it) → unchanged.
+			{Method: "POST", Pattern: tpdsFolderUpdatePat, NoSession: true, APIOnly: true, Handler: apiFolderUpdateHandler(a)},
+			// U-API — TPDS third-party-sync update endpoints (Dropbox + GitHub),
+			// privateApiRouter, basic-auth; APIOnly (web profile skips them —
+			// Node web :4000 404s them). mergeUpdate (new/replace/swap doc|file
+			// upsert via the P4 primitives) + deleteUpdate + updateProjectContents
+			// + deleteProjectContents. Wire pinned Node :3000 (2026-09-23):
+			// 401/404-VA/200-applied(rev string)/rejected / GH 404-Not-Found +
+			// GH rev-number / DROPBOX-DELETE 200 "OK" / GH-DELETE 200 {}|{entityId}.
+			{Method: "POST", Pattern: muDboxPat, NoSession: true, APIOnly: true, Handler: syncMergeRoute()(a)},
+			{Method: "DELETE", Pattern: muDboxPat, NoSession: true, APIOnly: true, Handler: syncDeleteRoute()(a)},
+			{Method: "POST", Pattern: muPidPat, NoSession: true, APIOnly: true, Handler: syncMergeRoute()(a)},
+			{Method: "DELETE", Pattern: muPidPat, NoSession: true, APIOnly: true, Handler: syncDeleteRoute()(a)},
+			{Method: "POST", Pattern: ghContPat, NoSession: true, APIOnly: true, Handler: syncGHUpdateRoute()(a)},
+			{Method: "DELETE", Pattern: ghContPat, NoSession: true, APIOnly: true, Handler: syncGHDeleteRoute()(a)},
+			// U-API — GET /perfTest (privateApiRouter, public, no auth):
+			// plainText 200 "hello" (nosniff + XPB + global CSP). APIOnly.
+			{Method: "GET", Pattern: perfTestPat, NoSession: true, APIOnly: true, Handler: apiPerfTest(a)},
 		},
 	}
 }

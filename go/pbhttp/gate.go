@@ -18,6 +18,21 @@ func ExpressNotFound(w http.ResponseWriter, r *http.Request) {
 	body := "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">" +
 		"\n<title>Error</title>\n</head>\n<body>\n<pre>" + msg + "</pre>\n</body>\n</html>\n"
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// Express finalhandler sets its own CSP on the default error page
+	// (pinned U10.2 live: the `Cannot <METHOD> <path>` 404 carries exactly
+	// `Content-Security-Policy: default-src 'none'` — not the app's
+	// helmet baseline).
+	w.Header().Set("Content-Security-Policy", "default-src 'none'")
+	// Express finalhandler also carries these two on every default error
+	// page (pinned live on the api profile :3000 `Cannot GET /foo` 404):
+	//   x-powered-by: Express         (Express sets it on all responses)
+	//   x-content-type-options: nosniff (finalhandler adds it to error pages)
+	// NOTE: the app-level 404 (doc-ghost "Not Found" plain) does NOT carry
+	// nosniff — only this finalhandler-type page does; apiDoc404 keeps its
+	// distinct set. (pinned: Node api /foo 404 has nosniff+XPB; /doc ghost
+	// 404 has XPB only.)
+	w.Header().Set("X-Powered-By", "Express")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusNotFound)
 	_, _ = w.Write([]byte(body))
 }

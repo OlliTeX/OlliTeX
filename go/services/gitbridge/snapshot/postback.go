@@ -3,11 +3,11 @@
 package snapshot
 
 import (
-	"encoding/json"
-	"strings"
 	"crypto/rand"
+	"encoding/json"
 	"math/big"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 

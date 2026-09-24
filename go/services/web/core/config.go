@@ -54,6 +54,11 @@ type Config struct {
 	// api profile
 	APIUser     string // WEB_API_USER
 	APIPassword string // WEB_API_PASSWORD
+
+	// analytics feature gate: Node Features.hasFeature('analytics') =
+	// Boolean(Settings.apis.v1.url) — apis.v1 unset in this stack, so the
+	// whole analytics surface is the 202 short-circuit (U10.2).
+	V1APIURL string // APIS_V1_URL (empty → feature off)
 }
 
 func env(k, def string) string {

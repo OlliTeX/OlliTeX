@@ -24,19 +24,22 @@ import (
 	"ollitex/go/mongoh"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/adminusers"
+	"ollitex/go/services/web/features/analytics"
 	"ollitex/go/services/web/features/authpages"
 	"ollitex/go/services/web/features/compile"
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/dropbox"
 	"ollitex/go/services/web/features/editorpages"
+	"ollitex/go/services/web/features/gitbridge"
 	"ollitex/go/services/web/features/healthcheck"
+	"ollitex/go/services/web/features/history"
 	"ollitex/go/services/web/features/hub"
 	"ollitex/go/services/web/features/instancestats"
-	"ollitex/go/services/web/features/gitbridge"
+	"ollitex/go/services/web/features/languagetool"
+	"ollitex/go/services/web/features/launchpad"
 	"ollitex/go/services/web/features/library"
 	"ollitex/go/services/web/features/llmsettings"
 	"ollitex/go/services/web/features/mendeley"
-	"ollitex/go/services/web/features/languagetool"
 	"ollitex/go/services/web/features/notifications"
 	"ollitex/go/services/web/features/orcidpicker"
 	"ollitex/go/services/web/features/pageshells"
@@ -48,9 +51,10 @@ import (
 	"ollitex/go/services/web/features/staticpages"
 	"ollitex/go/services/web/features/status"
 	"ollitex/go/services/web/features/systemmessages"
+	"ollitex/go/services/web/features/tags"
 	"ollitex/go/services/web/features/templates"
-	"ollitex/go/services/web/features/tokenaccess"
 	"ollitex/go/services/web/features/texfmt"
+	"ollitex/go/services/web/features/tokenaccess"
 	"ollitex/go/services/web/features/trackchanges"
 	"ollitex/go/services/web/features/userpages"
 	"ollitex/go/services/web/features/webdav"
@@ -142,6 +146,11 @@ func main() {
 	app.RegisterFeature(userpages.Feature(app))
 	app.RegisterFeature(registrationpage.Feature(app))
 
+	// P6.20 surface: launchpad (first-admin bootstrap) — the last P6 flip.
+	// Oracle + bake pins in go/services/web/features/launchpad +
+	// go/services/web/views/pages_data_p620.go.
+	app.RegisterFeature(launchpad.Feature(app))
+
 	// P3.6 surface: Manage/Site SiteSettings leaf.
 	app.RegisterFeature(sitesettings.Feature(app))
 
@@ -149,6 +158,17 @@ func main() {
 	app.RegisterFeature(projectlist.Feature(app))
 	app.RegisterFeature(projectlist.AdminFeature(app))
 	app.RegisterFeature(adminusers.Feature(app))
+
+	// U10.1 surface: project history route family (updates / diff family /
+	// latest/history / changes / labels / version zip / blob / flush /
+	// restore+revert validation).
+	app.RegisterFeature(history.Feature(app))
+
+	// U10.2 surface: analytics web pokes (POST /event/:event, PUT
+	// /editingSession/:projectId) — the `analytics` feature is OFF in this
+	// stack (apis.v1 unset), so both short-circuit to 202 "Accepted"
+	// behind their limiters (live-oracle pinned).
+	app.RegisterFeature(analytics.Feature(app))
 
 	// P6.4a surface: OlliTeX llm module settings surface (BYO provider rows,
 	// selected model, compliance rubrics, usage, grammar prefs, admin LLM
@@ -227,6 +247,10 @@ func main() {
 	// redirects, /api/hub-theme theme API, /api/hub/health, /api/hub/notes).
 	app.RegisterFeature(hub.Feature(app))
 
+	// P7 completion U1: project-tag surface (GET/POST /tag, tag member ops,
+	// tags VA/limiters pinned against the live Node oracle).
+	app.RegisterFeature(tags.Feature(app))
+
 	// web profile: unknown-route 404 view (general/404) — Node
 	// webRouter.get('*', ErrorController.notFound).
 	app.SetRender404(func(cxt *core.Cxt, res *core.Res) {
@@ -257,7 +281,7 @@ func main() {
 		// The skeleton carries the slash ("7420/<path>"); trim our leading
 		// slash so the render is "7420/zzz-..." and not "7420//zzz-...".
 		pth := strings.TrimPrefix(cxt.Req.URL.Path, "/")
-				views.NotFoundPage(res.W, views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin, Path: pth, UserEmail: pe, UserID: uid, CanManageTemplateMenu: templates.SessionMenuGrant(cxt.Sess), NavAdmin: tplNavAdmin(cxt.Sess)})
+		views.NotFoundPage(res.W, views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin, Path: pth, UserEmail: pe, UserID: uid, CanManageTemplateMenu: templates.MenuGrant(cxt.Req.Context(), cxt), NavAdmin: tplNavAdmin(cxt.Sess)})
 	})
 
 	// web profile: rendered 403 page (general/restricted) — the global

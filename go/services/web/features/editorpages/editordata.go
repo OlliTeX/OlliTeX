@@ -420,7 +420,7 @@ func sortStrings(x []string) {
 }
 
 // navbarJSON — ol-navbar (static config + dynamic currentUrl + sessionUser).
-func navbarJSON(siteURL, currentURL, email string, isAdmin bool) string {
+func navbarJSON(siteURL, currentURL, email string, isAdmin, showSignUp bool) string {
 	var sstr strings.Builder
 	sstr.WriteString(`{"customLogo":"/logo_full.svg"`)
 	sstr.WriteString(`,"customLogoDark":"/logo_full.svg"`)
@@ -429,17 +429,23 @@ func navbarJSON(siteURL, currentURL, email string, isAdmin bool) string {
 	sstr.WriteString(`,"hideLogo":false`)
 	sstr.WriteString(`,"canDisplayAdminMenu":` + boolJSON(isAdmin))
 	sstr.WriteString(`,"canDisplayAdminRedirect":false`)
-	sstr.WriteString(`,"canDisplayProjectUrlLookup":false`)
+	// canDisplayProjectUrlLookup — Node (layout-react.pug):
+	// settings.adminPrivilegeAvailable && canDisplayAdminMenu &&
+	// hasAdminCapability('view-project-setting', false). In this stack the
+	// admin-privilege terms are all true for site admins, so it equals
+	// isAdmin (U2 gate pin 2026-09-22: Node admin ⇒ true / member ⇒ false).
+	sstr.WriteString(`,"canDisplayProjectUrlLookup":` + boolJSON(isAdmin))
 	sstr.WriteString(`,"canDisplaySplitTestMenu":false`)
 	sstr.WriteString(`,"canDisplaySurveyMenu":false`)
 	sstr.WriteString(`,"canDisplayScriptLogMenu":false`)
 	sstr.WriteString(`,"suppressNavbarRight":false`)
 	sstr.WriteString(`,"suppressNavContentLinks":false`)
 	// showSignUpLink — Node: hasFeature('registration-page') =
-	// env OVERLEAF_ENABLE_REGISTRATION_PAGE ?? !(saml/ldap/oidc enable),
-	// pinned TRUE in this stack (live-captured 2026-09-19; re-pin on SSO
-	// state change).
-	sstr.WriteString(`,"showSignUpLink":true`)
+	// boolFromEnv(OVERLEAF_ENABLE_REGISTRATION_PAGE) ?? !(sso-saml||sso-ldap||
+	// sso-oidc site_settings enabled), computed per request by the caller
+	// (U9 helper sitesettings.RegistrationEnabled; e2e stack: SAML IdP on
+	// -> false — U2 gate pin holds).
+	sstr.WriteString(`,"showSignUpLink":` + boolJSON(showSignUp))
 	sstr.WriteString(`,"currentUrl":"` + jesc(currentURL) + `"`)
 	sstr.WriteString(`,"sessionUser":{"email":"` + jesc(email) + `"`)
 	sstr.WriteString(`},"items":[{"text":"Library","url":"/library","class":"subdued","translatedText":"Library"},`)

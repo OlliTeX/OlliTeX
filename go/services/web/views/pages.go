@@ -16,6 +16,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"ollitex/go/services/web/core"
@@ -63,6 +64,15 @@ const (
 	// for site admins on EVERY page, including 404/403). Empty for
 	// non-admins; the page skeleton otherwise matches the user nav.
 	slotNavAdmin = "\x01NAVADMIN\x02"
+	// U10.3r slots (one_time_login.go): GET /read-only/one-time-login —
+	// anonymous skeleton; these fill from the session user when a
+	// logged-in visitor lands on the page (Node oracle, 2026-09-23).
+	slotOTLUser = "\x01OTLUSER\x02" // ol-usersEmail content ("" anon)
+	slotOTLUID  = "\x01OTLUID\x02"  // ol-user_id: `` or ` content="HEX"`
+	slotOTLNav  = "\x01OTLNAV\x02"  // navbar fragment (anon vs logged-in)
+	// P6.20 launchpad slots (pages_data_p620.go):
+	slotLPUID   = "\x01LPUID\x02" // ol-user_id: `` or ` content="HEX"` (REGUID semantics)
+	slotLPAdmin = "\x01LPADM\x02" // ol-adminUserExists bare-content boolean (` content`/``)
 	// origin captured from the e2e fixtures (rewritten per request).
 	capturedOrigin = "http://127.0.0.1:7420"
 )
@@ -94,6 +104,16 @@ type PageData struct {
 	Path      string // request path (alternate link)
 	UserEmail string // session user email (Node: ol-usersEmail + navbar pill)
 	UserID    string // session user id (ol-user_id)
+	// U9: navbar showSignUpLink — Node hasFeature('registration-page') =
+	// boolFromEnv(OVERLEAF_ENABLE_REGISTRATION_PAGE) ?? !(sso-saml||sso-ldap||
+	// sso-oidc site_settings enabled) — stack-wide, computed per request.
+	// Rendered as a JSON boolean true/false in the ol-navbar metas.
+	ShowSignUpLink bool
+	// NavSiteAdmin — layout-react navbar admin flags (canDisplayAdminMenu
+	// + canDisplayProjectUrlLookup collapse to it in this stack; see
+	// core.NavSiteAdmin). Replaces the baked `false` literals in the
+	// page-data navbar renders.
+	NavSiteAdmin bool
 	// P2 dynamic slots (empty strings render the anonymous/absent shape):
 	ResetErr   string // passwordReset meta: "" | "password_reset_token_expired"
 	EmailField string // setPassword form email input
@@ -113,6 +133,7 @@ type PageData struct {
 	LibUsersJSON                 string // P6.5: ol-userSettings JSON (editorpages.BuildUserSettings)
 	CanManageTemplateMenu        bool   // P6.13: ExposedSettings.canManageTemplatesMenu (per-user)
 	NavAdmin                     string // P6.13: admin navbar fragment (site admins only)
+	LaunchpadAdminExists         bool   // P6.20: ol-adminUserExists bare-content boolean
 }
 
 func (p PageData) finalize(html string) string {
@@ -157,8 +178,62 @@ func (p PageData) finalize(html string) string {
 		out = strings.ReplaceAll(out, slotCanMgtTpl, "false")
 	}
 	out = strings.ReplaceAll(out, slotNavAdmin, p.NavAdmin)
+	// U10.3r one_time_login slots: OTLNAV injects the auth-branching navbar
+	// fragment FIRST (the logged-in fragment carries the form's csrf slot —
+	// Node renders the SESSION token there, not the anonymous one), then
+	// OTLUSER/OTLUID fill email/uid everywhere (skeleton + injected nav).
+	if p.UserID == "" {
+		out = strings.ReplaceAll(out, slotOTLUID, "")
+		out = strings.ReplaceAll(out, slotOTLNav, otlNavAnon)
+	} else {
+		out = strings.ReplaceAll(out, slotOTLUID, ` content="`+htmlAttrEsc(p.UserID)+`"`)
+		out = strings.ReplaceAll(out, slotOTLNav, otlNavIn)
+		// the injected fragment carries a csrf slot (Node: value=csrfToken —
+		// the SAME token as ol-csrfToken, session-bound when logged in):
+		// the initial pass ran before injection, so resolve it now.
+		out = strings.ReplaceAll(out, slotCSRF, p.CSRFToken)
+	}
+	out = strings.ReplaceAll(out, slotOTLUser, p.UserEmail)
+	// P6.20 launchpad slots:
+	if p.UserID == "" {
+		out = strings.ReplaceAll(out, slotLPUID, "")
+	} else {
+		out = strings.ReplaceAll(out, slotLPUID, ` content="`+htmlAttrEsc(p.UserID)+`"`)
+	}
+	out = strings.ReplaceAll(out, slotLPAdmin, boolAttr(p.LaunchpadAdminExists))
 	// P3.4 register page (anon skeleton; fills on a logged-in session):
 	out = strings.ReplaceAll(out, slotRegUsers, htmlAttrEsc(p.UserEmail))
+	// U9: /login anon skeleton (captured signed-out) — Node fills these from
+	// the SESSION user when a logged-in visitor lands on /login (live-pinned
+	// 2026-09-22); anonymous keeps the anonymous shape: content="" and the
+	// valueless ol-user_id meta.
+	out = strings.ReplaceAll(out, "\x01LOGINUSER\x02", htmlAttrEsc(p.UserEmail))
+	if p.UserID == "" {
+		out = strings.ReplaceAll(out, "\x01LOGINUID\x02", "")
+	} else {
+		out = strings.ReplaceAll(out, "\x01LOGINUID\x02", ` content="`+htmlAttrEsc(p.UserID)+`"`)
+	}
+	// U9: navbar showSignUpLink (JSON boolean in the ol-navbar metas).
+	if p.ShowSignUpLink {
+		out = strings.ReplaceAll(out, "\x01SUPLINK\x02", "true")
+	} else {
+		out = strings.ReplaceAll(out, "\x01SUPLINK\x02", "false")
+	}
+	// U9: navbar admin flags (layout-react.pug — baked false in the page
+	// data; Node flips both for a site-admin session when
+	// ADMIN_PRIVILEGE_AVAILABLE=true). The dynamic editor/hub navbars are
+	// separate (navbarJSON / hubNavbar) and never carry this literal.
+	if p.NavSiteAdmin {
+		out = strings.ReplaceAll(out, "canDisplayAdminMenu\u0026quot;:false", "canDisplayAdminMenu\u0026quot;:true")
+		out = strings.ReplaceAll(out, "canDisplayProjectUrlLookup\u0026quot;:false", "canDisplayProjectUrlLookup\u0026quot;:true")
+	}
+	// U9: login navbar sessionUser (layout-react.pug:
+	// sessionUser ? {email} : undefined — key ABSENT when anonymous).
+	if p.UserEmail != "" {
+		out = strings.ReplaceAll(out, "\x01LOGINITEMS\x02", `,&quot;sessionUser&quot;:{&quot;email&quot;:&quot;`+htmlAttrEsc(p.UserEmail)+`&quot;},`)
+	} else {
+		out = strings.ReplaceAll(out, "\x01LOGINITEMS\x02", ",")
+	}
 	if p.UserID == "" {
 		out = strings.ReplaceAll(out, slotRegUID, "")
 	} else {
@@ -237,11 +312,17 @@ func cspReact(nonce string) string {
 func Page(w http.ResponseWriter, d PageData, skeleton string) {
 	csp := d.CSP
 	if csp == "" {
-		csp = cspRestrictive
+		// Node: every rendered page goes through the React layout — the
+		// nonce CSP (pinned U10.2 on 404/restricted/logout; explicit d.CSP
+		// still wins for callers that pin a different policy).
+		csp = cspReact(d.Nonce)
 	}
 	html := d.finalize(skeleton)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", csp)
+	// Express res.render always sends the full body length (Node sends
+	// Content-Length on rendered views — pinned U10.1: 15 KB 404/403 pages).
+	w.Header().Set("Content-Length", strconv.Itoa(len(html)))
 	// HttpPermissionsPolicy — rendered views only (pinned P3.1: the 500 view
 	// carries it, JSON routes do not). Set after the CSP so renderers can
 	// override either cleanly.
@@ -257,13 +338,17 @@ func Page(w http.ResponseWriter, d PageData, skeleton string) {
 func StatusPage(w http.ResponseWriter, d PageData, status int, skeleton string) {
 	csp := d.CSP
 	if csp == "" {
-		csp = cspRestrictive
+		// U10.2: Node's 404/restricted status pages render through the React
+		// layout → nonce CSP (pinned live: 404 + restricted 403 both carry
+		// `script-src 'nonce-…' 'unsafe-inline' 'strict-dynamic' …`).
+		csp = cspReact(d.Nonce)
 	}
 	html := d.finalize(skeleton)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
 	w.Header().Set("ETag", core.EtagWeakBody(html))
+	w.Header().Set("Content-Length", strconv.Itoa(len(html)))
 	w.WriteHeader(status)
 	_, _ = io.WriteString(w, html)
 }
@@ -297,6 +382,27 @@ func Restricted403AppTitle(w http.ResponseWriter, d PageData) {
 
 // LoginPage / RegisterPage / LogoutConfirmation / Restricted / NotFound.
 func LoginPage(w http.ResponseWriter, d PageData) { d.CSP = cspReact(d.Nonce); Page(w, d, loginHTML) }
+
+// LaunchpadAdminPage / LaunchpadFreshPage — the P6.20 launchpad bakes
+// (pages_data_p620.go). CSP = cspReact (pinned live 2026-09-21 on the
+// 200 admin page: `script-src 'nonce-…' 'unsafe-inline' 'strict-dynamic'
+// https: 'report-sample'; object-src 'none'; base-uri 'none'`). The
+// admin page is only rendered for a site-admin session (Node
+// hasAdminAccess), so ExposedSettings.canManageTemplatesMenu = true and
+// ol-adminUserExists = true there; the fresh (anonymous, no-admin) page
+// renders the opposite per its capture.
+func LaunchpadAdminPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	d.CanManageTemplateMenu = true
+	d.LaunchpadAdminExists = true
+	Page(w, d, launchpadAdminHTML)
+}
+func LaunchpadFreshPage(w http.ResponseWriter, d PageData) {
+	d.CSP = cspReact(d.Nonce)
+	d.CanManageTemplateMenu = false
+	d.LaunchpadAdminExists = false
+	Page(w, d, launchpadFreshHTML)
+}
 
 // SettingsPage — GET /user/settings (React layout: nonce CSP, pinned P3.3).
 func SettingsPage(w http.ResponseWriter, d PageData) {
@@ -353,6 +459,7 @@ func Error500Page(w http.ResponseWriter, d PageData) {
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
 	w.Header().Set("ETag", core.EtagWeakBody(body))
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(500)
 	_, _ = io.WriteString(w, body)
 }

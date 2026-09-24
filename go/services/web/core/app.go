@@ -37,6 +37,15 @@ type Route struct {
 	// no overleaf.sid cookie while /login does).
 	NoSession bool
 
+	// APIOnly = mounted on Node's privateApiRouter / publicApiRouter but NOT
+	// on webRouter (e.g. GET /project/:id/details, POST /user/:id/project/new,
+	// POST /tpds/folder-update). Served on the api profile; the web profile
+	// SKIPS it (falls through to the web 404 tail — Node's web stack 404s these
+	// since they are not wired on webRouter). This is the "api-only" cell of the
+	// web/both/api-only matrix;
+	// NoSession (doc-trio, /status, health_check) = served on BOTH (dual).
+	APIOnly bool
+
 	// Pattern — Express-style regex route (P2a: /:token token access +
 	// consent routes). First/named capture group = route param (Cxt.Params
 	// ["token" / "1"]).
@@ -54,6 +63,7 @@ type Feature struct {
 type Cxt struct {
 	Req     *http.Request
 	Sess    *Session
+	A       *App              // the running app (DB ladder access for page data)
 	SiteURL string            // configured site URL (views' origin + siteUrl)
 	Params  map[string]string // route params (P2a pattern routes)
 }
@@ -149,7 +159,7 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 	}
 
 	res := &Res{W: w}
-	cxt := &Cxt{Req: r, SiteURL: a.Cfg.SiteURL}
+	cxt := &Cxt{Req: r, A: a, SiteURL: a.Cfg.SiteURL}
 
 	// static (web profile; nginx usually answers first, but the app must
 	// be identical when it sees the request — serveStaticWrapper).
@@ -266,6 +276,23 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 				continue
 			}
 			if rt.Path == r.URL.Path || (rt.Pattern != nil && rt.Pattern.MatchString(r.URL.Path)) {
+				// api profile (ENABLED_SERVICES=api, Node's :3000): serve ONLY
+				// the privateApiRouter + publicApiRouter routes. In Go those are
+				// exactly the NoSession routes (no session/csrf middleware — Node's
+				// api profile mounts neither webRouter nor its session stack).
+				// Web-router routes (NoSession=false) are 404 here, exactly like
+				// Node :3000, which does not mount webRouter:
+				//   pinned: /project, /members, /entities, / → 404 + XPB on :3000
+				//           (but 200/302 on :4000); only /status,/health_check*,
+				//           doc-trio, snapshots, ... (NoSession) are 200/401/404.
+				// The web profile (:4000) is untouched — it serves all routes.
+				if a.Cfg.Profile == "api" && !rt.NoSession && !rt.APIOnly {
+					continue // web-router route: skip → api 404 tail, like Node :3000
+				}
+				if a.Cfg.Profile == "web" && rt.APIOnly {
+					continue // api-only route: Node's web stack does not mount it —
+					// skip → web 404 tail (unchanged, verified) instead of serving.
+				}
 				if rt.NoSession {
 					if rt.Pattern != nil {
 						if m := rt.Pattern.FindStringSubmatch(r.URL.Path); m != nil {
@@ -590,9 +617,20 @@ func (a *App) CommitSess(sess *Session, w http.ResponseWriter) {
 // routeNoSession reports whether the requested path is a NoSession route
 // (publicApiRouter/privateApiRouter parity).
 func (a *App) routeNoSession(r *http.Request) bool {
+	web := a.Cfg.Profile == "web"
 	for _, f := range a.feats {
 		for i := range f.Routes {
 			rt := &f.Routes[i]
+			// APIOnly routes are ABSENT from Node's web profile (Route.APIOnly):
+			// they must not mark the path "sessionless" there — doing so skips
+			// session init, leaves cxt.Sess nil, and the web fallback /
+			// login-gate derefs it → nil-pointer panic (empty reply; pinned
+			// 2026-09-23: web /project/:id/details + /user/:id/personal_info
+			// crashed before this). On the api profile they ARE mounted
+			// (NoSession, basic-auth) and count as before.
+			if web && rt.APIOnly {
+				continue
+			}
 			if (rt.Path == r.URL.Path && rt.Method == r.Method) ||
 				(rt.Pattern != nil && rt.Pattern.MatchString(r.URL.Path) && rt.Method == r.Method) {
 				return rt.NoSession

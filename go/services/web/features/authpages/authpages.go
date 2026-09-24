@@ -5,8 +5,13 @@
 package authpages
 
 import (
+	"context"
 	"net/http"
+	"time"
+
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/sitesettings"
+	"ollitex/go/services/web/features/templates"
 	"ollitex/go/services/web/views"
 )
 
@@ -21,6 +26,10 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Path: "/logout", Handler: getLogoutPage},
 			{Method: "POST", Path: "/logout", Handler: postLogout(a)},
 			{Method: "GET", Path: "/restricted", Handler: pageHandler(views.RestrictedPage)},
+			// U10.3r: Node /read-only/one-time-login has NO requireLogin
+			// (UserPagesController.oneTimeLoginPage; login-whitelist route)
+			// — anonymous and logged-in both get the 200 page.
+			{Method: "GET", Path: "/read-only/one-time-login", NoLogin: true, Handler: pageHandler(views.OneTimeLoginPage)},
 		},
 	}
 }
@@ -42,7 +51,45 @@ func pageData(cxt *core.Cxt) views.PageData {
 	if origin == "" {
 		origin = originOfReq(cxt)
 	}
-	return views.PageData{CSRFToken: tok, Nonce: views.NewNonce(), Origin: origin, Path: "restricted"}
+	ctx, cancel := context.WithTimeout(cxt.Req.Context(), 3*time.Second)
+	defer cancel()
+	return views.PageData{
+		CSRFToken: tok,
+		Nonce:     views.NewNonce(),
+		Origin:    origin,
+		Path:      "restricted",
+		UserEmail: sessEmail(cxt),
+		UserID:    sessUID(cxt),
+		// U9: hasFeature('registration-page') — stack-wide registration-page
+		// flag (env ?? SSO site_settings); e2e: SAML on -> false.
+		ShowSignUpLink: sitesettings.RegistrationEnabled(cxt.A, ctx),
+		// U9: layout-react navbar admin flags — hasAdminAccess(session) &&
+		// ADMIN_PRIVILEGE_AVAILABLE (this stack true); the U9 gate pins
+		// admin true / member false on /login, /logout, /user/settings.
+		NavSiteAdmin: core.NavSiteAdmin(cxt.Sess),
+		// U9: ExposedSettings.canManageTemplatesMenu — the full DB admin
+		// ladder (Node ExpressLocals; live-pinned 2026-09-22: admin session
+		// true / user false on /logout, the P6.13 slot the other pages get).
+		CanManageTemplateMenu: templates.MenuGrant(ctx, cxt),
+	}
+}
+
+// sessEmail / sessUID — Node's layout-base renders ol-usersEmail +
+// ol-user_id + the navbar account pill from the SESSION user on EVERY page
+// (live-pinned 2026-09-22: N fills e2e-user@e2e.test on the logged-in
+// /restricted + /login pages; anonymous renders ").
+func sessEmail(cxt *core.Cxt) string {
+	if cxt.Sess != nil && cxt.Sess.IsLoggedIn() {
+		return cxt.Sess.SessionUserEmail()
+	}
+	return ""
+}
+
+func sessUID(cxt *core.Cxt) string {
+	if cxt.Sess != nil && cxt.Sess.IsLoggedIn() {
+		return cxt.Sess.UserIDHex()
+	}
+	return ""
 }
 
 func pageHandler(f func(http.ResponseWriter, views.PageData)) func(*core.Cxt, *core.Res) {

@@ -40,6 +40,9 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Path: "/user/sessions", Handler: getSessionsPage(a)},
 			{Method: "GET", Path: "/user/sessions/list", Handler: getSessionList(a)},
 			{Method: "POST", Path: "/user/sessions/clear", Handler: postClear(a, mail)},
+			{Method: "GET", Path: "/user/contacts", Handler: getContacts(a)},
+			{Method: "GET", Path: "/user/emails", Handler: getEmails(a)},
+			{Method: "GET", Path: "/user/features", Handler: getFeatures(a)},
 		},
 	}
 }

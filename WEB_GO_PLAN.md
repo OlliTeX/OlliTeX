@@ -2,6 +2,7 @@
 
 Status: **IN PROGRESS** — P0+M0 ✔ (6/6), P1 ✔ (3/3), P2 ✔ (4/4), **P3.1 ✔ (3/3), P3.2 ✔ (3/3), P3.3 ✔ (3/3), P3.4 ✔ registration-page (3/3),**
 all 2026-09-14); **P3.5 user-activate = OUT OF SCOPE (SaaS, not ported); P3.6 SiteSettings ✔ GATE 3/3 GREEN** — **all of P3 complete.** **P4.1 project-list ✔ 3/3; P4.2 project-entities ✔ 3/3; P4.3 project-members ✔ 3/3; P4.4 access-requests ✔ 3/3; P4.5 project-rename ✔ 3/3; P4.6 project-flag-writes ✔ 3/3; P4.7 basic project-creation (`POST /project/new`) ✔ 3/3; **P4.7b example project-creation (`template: "example"`) ✔ 3/3 — both `basic` + `example` templates done**; **P4.8 project delete/restore (`DELETE /Project/:id`, `POST /Project/:id/restore`) ✔ 3/3 — deletedProjects record + $unset-archived contract byte-pinned**; **P4.9 project clone (`POST /Project/:id/clone`) ✔ 3/3 — incl. Node's missing-name→500 quirk + per-edit `version` counter pin**; **P4.10a collaborator mutations** (`PUT /project/:id/users/:uid` set-level, `POST /project/:id/leave`, `DELETE /project/:id/users/:uid`, access-request decline/grant, `POST /project/:id/transfer-ownership`) **✔ 3/3 — setLevel $pull+$addToSet+$set tc contract, 8-mail battery, transfer flush+contacts, byte-pinned VA errors** (all 2026-09-14/15); **P4.10b invites + sharing-links + token-acceptance ✔ 3/3 x3 (10 routes, 6-mail battery, sink-token live-selection, invite shell / Invalid-404 / restricted-403 views, raw-SMTP mail byte-parity)** — **ALL OF P4 (project-entities surface + collaborators + invites) COMPLETE: 36/36 regression green** (2026-09-15); **P4.11a editor entity creation (`POST /project/:id/doc` + `/folder`) ✔ 3/3 x3 (SafePath replica, docstore call-order pin, folder-JSON/doc-text 400 split, blocked-word table) — 39/39 P4 regression green**; **P4.11b editor entity deletion (`DELETE /project/:id/{doc,file,folder}/:entity_id`) ✔ 3/3 x3 ($pull + $inc + $set + conditional $unset rootDoc_id, per-subtree-doc docstore PATCH with 404-after-write quirk, 422 root-folder guard, params-VA 404-JSON) — 42/42 full P4 regression green**; **P4.12a file proxy (`GET|HEAD /Project/:id/file/:File_id`) ✔ 3/3 x3 (history-v1→Go-filestore blob chain, no-CT/chunked 200 pin, HEAD-404 fork quirk, guest/VA/authz battery) — ALSO FIXED the baked-in-capture-user bug in `restrictedHTML` (Go 403-restricted pages now render the requesting user; a P2-page variant of the same bug is deferred to a view-audit unit)**; **P4.12b doc download (`GET|HEAD /Project/:id/doc/:Doc_id/download`) ✔ 3/3 x3 (DU fromVersion=-1 lines, CD attachment, HEAD-200 asymmetry, sendStatus-404 pin) — 45-test P4 regression green** (2026-09-15). **P4.12c private API doc trio (GET|POST doc + changes/reject) ✔ 3/3 x3 (basic-auth surface, XPB+CSP pin, `NoSession` route option, 204 ETag quirk) — 47-test P4 regression green**; **P4.13a project upload (`POST /Project/:id/upload`) ✔ 3/3 x3 (thin-client upsert engine: docstore/v1H/DU call order, file↔doc swaps, cross-type 200+422/400/403/404/500 contract, `owner_ref`/docstore-seed env pins, `entCanWrite` collabRefs + 500-mailto parity fixes) — 65-test cross-regression green**; **P4.13b new-project zip upload (`POST /project/new/upload`) ✔ 3/3 x3 (FileSystemImportManager replica: zip-skip→topLevel-dir strip, FileTypeManager byte-level parity incl. utf16le-BOM + latin1 fallback + non-BMP→file + 3MiB decode gate, rootDoc priority pin, enforce-mode VA byte-pins, blocked-name `toString` → 500 + `zip-import-failure` deleter, multer `LIMIT_UNEXPECTED_FILE` HTML page, 22-case response+mongo+DU+docstore state battery) — FULL P4 regression green (36 p4* + 23 p411–p413b + P2/P3 sweep)** (2026-09-15). **P4.13b ALSO FIXED the P4.1 list owner+collaborator dedup bug (user who is owner AND invited-collaborator listed twice by Go; Node dedups best-access — latent, exposed by p4col-gate leftover projects) and hardened p413a/p413b/p413 flip harnesses against stale-include cascade failures.** **ALL OF P4 COMPLETE (2026-09-15): project list + entities + members + access-requests + rename + flags + create(+example) + delete/restore + clone + collaborators + invites + editor entity create/delete + file proxy + doc download + private doc trio + project upload + zip upload.**
+**P5 ✔ (gate green). P6 ✔ — P6.20 launchpad GATE GREEN (2026-09-21) was the last P6 flip (see the P6.20 section below P6.TAIL). P7 (owner 7-step directive) IN PROGRESS — step 1 ✔ (85 READMEs), step 2 attempted + root-caused (missing main-app families — see P7 section), step 3 slices: dashboard-redirects ✔, U1 ✔ (POST /api/project + tags family), U2 ✔ (editor entry), U8 ✔ (/user/contacts|emails|features), U9 ✔ (hub/admin/home shell + navbar page-data, 40-case parity gate GREEN, commit `99c1b3b25e`); U3 covered (LLM reads already present), U4/U5 + U6/U7 reconciled (disabled-surface P6.11 gate; packages already exist); U10.1 ✔ (Go history family, 53/53 gate GREEN, commit `477f1ad629`), U10.2a ✔ (analytics pokes + university redirects + project tokens + 404 pins + CSP parity fixes, 35/35 gate GREEN). NEXT: U10.2b entity rename/move/duplicate, U10.3 linked files, other missing families, U10.5 restore success paths, THEN the hard cutover.**
 Companion to `GO_CUTOVER_PLAN.md` (Phase D complete: the nine microservices are
 Go-only as of `8090d454fb`). P4.3–P7 to come.
 
@@ -3041,7 +3042,750 @@ registration-page, saml/oidc (with P2), toast-image, …
 (Exact set = M0 output from `modules/*/index.mjs` + `SaaSModule`/`CEUI`
 registries.)
 
+### P6.TAIL — the "tail modules" audit (2026-09-21; goal P6→P7→Post-P7)
+
+A live audit of every `services/web/modules/*` directory settles the open "tail
+modules" list (python-runner, diagram, latex-editor, ce-ui, server-ce-scripts,
+saml/oidc tails, toast-image, launchpad, full-project-search, symbol-palette,
+reference-picker, sandboxed-compiles). A module needs a Go-web flip **only if it
+owns server-side routes** (`app/src/*Router*.mjs` under the module). Matrix:
+
+| module | owns routes? (`app/`?) | verdict |
+|---|---|---|
+| **launchpad** | **YES** — `LaunchpadRouter`: `GET /launchpad` + `POST /launchpad/register_admin` / `register_ldap_admin` / `register_saml_admin` / `send_test_email` | **→ P6.20 conversion (the ONLY real tail flip)** |
+| python-runner | no (frontend only: pyodide worker, output pane) | **NO-OP** (no routes) |
+| diagram | no (frontend only: visual editor) | **NO-OP** (no routes) |
+| latex-editor | no (frontend only: equation editor) | **NO-OP** (no routes) |
+| ce-ui | no (frontend only: styles + nav switcher) | **NO-OP** (no routes) |
+| toast-image | no (frontend only: image-editor UI) | **NO-OP** (no routes) |
+| full-project-search | no (frontend only: search UI + client utils) | **NO-OP** (no routes) |
+| symbol-palette | no (frontend only: in-editor symbol palette) | **NO-OP** (no routes) |
+| reference-picker | no (frontend only: reference-picker UI) | **NO-OP** (no routes) |
+| sandboxed-compiles | no (pure config seed: `env → Settings.allowedImageNames`) | **NO-OP** (no routes) |
+| server-ce-scripts | no (ops CLI scripts only: create-user / delete-user / migrate-*) | **NO-OP** (ops tooling, not a web route) |
+| user-activate | yes, but **P3.5 = SaaS, OUT OF SCOPE** by decision (2026-09-14) | documented skip |
+| authentication (saml/oidc/ldap) | yes, but **P2 auth family** (not a P6 tail); handshakes inert on this stack (`EXTERNAL_AUTH` unset; `f_saml` pinned all-50) | folds into P7 step-4 audit |
+
+**Evidence (verified 2026-09-21):** the 10 NO-OP modules all have **no `app/`
+directory** (`app/src=no app/routes=no-app`); their `index.mjs` either boots a
+frontend bundle or seeds settings. `sandboxed-compiles/index.mjs` is a pure
+env→`Settings` seeder. `server-ce-scripts` ships CLI scripts only. `launchpad` is
+the **only** tail module with `app/src/Launchpad{Router,Controller}.mjs`.
+
+**Consequence for P7 step-4 (Node backend → junk):** once **P6.20 (launchpad)**
+lands, **every** route-owning module under `services/web/modules/` has a Go-web
+representation except: (a) the 10 NO-OP modules (no routes — their frontend/ops
+files are handled by P7 step 5/7 frontend re-org + junk, not a route flip); (b) `user-activate` (SaaS skip); (c) the `authentication` saml/oidc/ldap handshakes (P2 family, inert, audited under step 4).
+
+### P6.20 — launchpad flip — **GATE GREEN (2026-09-21, 1.3m, 4-leg parity)**
+
+The last P6 tail flip (the only one). P6 is now complete: every route-owning
+module has a Go-web representation + flip conf.
+
+- **Oracle (Node, live stack, captured 2026-09-21):** fresh world (0 admins):
+  `GET /launchpad` → 200 fresh page (14596 B raw, `Etag: W/"3904-…"`, cspReact);
+  `POST register_admin` → 400 empty / 400 `password is too short` /
+  400 `password contains an invalid character` /
+  200 `{"redir":"/launchpad"}` then 403 `admin user already exists`, anon → 302 `/login`;
+  `register_saml_admin` → **403 `Forbidden`** (fork `authMethod()` = "ldap" — the
+  SSO `authentication/ldap` module loads in every web process and sets
+  `Settings.ldap` unconditionally; the 'saml'/'local' branches are unreachable);
+  `register_ldap_admin` → 200 `{"redir":"/launchpad","email":…}` (external doc:
+  `first_name`=full email, `last_name` "", **no hashedPassword**, `emails[0].confirmedAt`
+  number, `reversedHostname "tset.e2e"`). Default world (admin exists): GET → 302
+  `/login`; both registers → 403. Logged: admin GET → 200 admin page (16982 B raw,
+  `Etag: W/"4256-…"`); non-admin GET → 302 `/restricted`; `send_test_email`
+  no-email → 400 `{"message":"no email address supplied"}`; happy → 200
+  `{"message":"Email Sent"}` + sink `noreply@e2e.test → to | "A Test Email from OlliTeX"`;
+  non-admin email → 302 `/restricted?from=%2Flaunchpad%2Fsend_test_email`;
+  anon email → 302 `/login`. Local fresh doc = **45 keys** (mongoose baseline +
+  email/first_name(localpart)/isAdmin/holdingAccount:false/analyticsId/hashedPassword/
+  emails[0]{email,reversedHostname,createdAt,_id}; **no last_name key**). Raw
+  captures: `tools/capture-p620-raw/`.
+- **Bake:** `go/services/web/views/pages_data_p620.go` (2 const HTMLs + slots
+  `NONCE/CSRF/OLUSERS/LPUID/CANMGTPL/LPADM`); reverse-render verified byte-identical
+  (`launchpad: skeleton verified … 16960/14572 bytes`); `views/pages.go` renders
+  `LaunchpadAdminPage`/`LaunchpadFreshPage` (cspReact).
+- **Feature:** `go/services/web/features/launchpad/` — 5 routes (4 NoLogin per the
+  Node whitelist; `send_test_email` behind the global login gate), exact Node gate
+  order (pinned in code comments), validators = Node `validateEmail` /
+  `validatePassword` (strength options unset → min 8/max 72/char-sets +
+  contains-email + `stringSimilarity` multiset ratio > 0.7 with the Node
+  length-exemption), fresh-user creation = `registrationpage.NewUserDoc` baseline +
+  launchpad fields (fresh 45-key doc == live Node doc shape), 500 path =
+  `views.Error500Page`. Registered in `cmd/web/main.go`.
+- **Flip:** `server-ce/nginx/flips/web-p620.conf` (5 routes, method-guarded, Go
+  :4010, wrong-method → Node — same shape family as P6.9).
+- **Gate:** `tests/e2e/specs/parity/web-go-p620-flip.test.e2e.ts` — 4-leg
+  (strip → Node battery → cumulative flip → Go battery → strip → Node re-battery),
+  24 pins incl. both page bakes (body + weak-ETag length) and both user-doc shapes
+  (mongosh asserts), smtp-sink mail pin, fixture-integrity `finally`-style restore
+  (e2e-admin admin; gate users erased). **GREEN, zero diffs.**
+
 ### P7 — (owner directive 2026-09-18, replaces the old Node-retirement P7)
+
+**Step 1 DONE (2026-09-21):** README.md in every `go/` sub-folder that ships
+
+**Step 2 STATUS (2026-09-22): ATTEMPTED — BLOCKED, REVERTED TO GREEN.**
+The runit cutover scripts were written + applied to the e2e stack (web-overleaf
+→ Go on 4000, web-api-overleaf → Go on 3000; Node web/api exited cleanly).
+Full e2e against Go-primary: **~90 failures vs ~12 pre-existing on Node**
+(same 292-test product subset, A/B same day). Live 404 evidence (nginx, real
+requests from the working hub/editor after cutover):
+`POST /api/project` (hub project list), `GET /tag` (tags family — **Go web
+has NO tags feature package at all**), `GET /project/:id`, `GET /hub/`
+(trailing slash), `GET /admin`, per-project `llm/models|compile-fix|
+source-context`, `github-sync/state|merge`, `track_changes`, `threads`,
+`sharing-updates`, `webdav/state`, `/user/github-sync/status`,
+`/user/git-servers`, `/user/git-pat/link`, `/user/list`, `/user/contacts`,
+`/user/mysettings`, `/user/send-test-email`, `/user/password/update`,
+`/template/:id/preview`, `/notifications/preferences/project/:id`,
+`/api/format-tex` (some methods).
+**Root cause:** the P1–P6 flip wave covered the planned route families; a set
+of MAIN-APP feature families was never in the flip plan (the plan's
+"execution precondition" listed only the P6 *module* owners). Go web is
+therefore not yet a 100% drop-in and the hard cutover is premature.
+Stack restored to the proven green state (Node primary + Go shadow/flip);
+container /etc/service run scripts back to Node. **Step 2 re-attempt
+precondition: the missing families below are ported + gated + flipped first**
+(step 3 = that porting work).
+
+*Step 3 slice 1 DONE (2026-09-22):** legacy project-dashboard redirects
+(`GET /project|/owned|/shared|/archived|/trashed|/untagged|/tags/:tag` →
+301 hub targets; Node `projectDashboardRedirects`, owner queue 7 2026-09-10)
+ported to `features/projectlist` — byte-verified against the live Node
+oracle (301 + Location + `Moved Permanently. Redirecting to …`; anonymous
+302 /login), unit-pinned (`dashredirect_test.go`) + contract spec
+`specs/legacy-dashboard-redirects.test.e2e.ts` (backend-agnostic, durable).
+
+**Step 3 slice 2 done (U1, 2026-09-22): `POST /api/project` + the entire tags
+family — oracle-pinned → Go feature → PARITY GATE GREEN.**
+- Oracle captured live from Node (in-container, post-login CSRF re-fetch
+  discipline): 43-case battery + edges + the full VA wire (byte-exact
+  messages incl. unknown-key ordering + the double-backslash color-pattern
+  text; the `enforce-log` fallback is log-only on the wire → Go enforces the
+  primary schema and emits Node-exact error text).
+- Go: `features/tags` (new package: GET/POST /tag, rename, edit, delete,
+  project(s) add/remove, `GET /user/:userId/tag` → 404 page) +
+  `features/projectlist/apiproject.go` (filters/sort/page semantics, token
+  dedup, archived>trashed, readOnly-nulls, stable lastUpdated sort with the
+  mongoose lazy `default:()=>new Date()` fill modeled as
+  `apFillDefaults` before sort — unit-pinned `TestAPFillDefaults`).
+- Parity gate `specs/parity/web-go-u1-parity.test.e2e.ts` (3-leg Node==Go==
+  Node battery, in-container dual-port :4000 vs :4010 — same mongo/redis,
+  same network vantage; per-leg limiter reset via redis DEL; per-run unique
+  tag names; `lastUpdated` fill-normalized as a set; ETag shape-pinned).
+- The dual-port design also surfaced + fixed real divergences the earlier
+  flip-vhost approach could not (different create/dup state per leg was
+  invisible there): Go limiter points were 10 where Node wires 30 for
+  rename/add/remove-tag (Node router.mjs: all 30/60); `remove-projects-`
+  **`from`**-tag is Node's limiter name; VA color-pattern message carries
+  double backslashes; **`canManageTemplatesMenu` must run the full
+  `hasTemplateAdminAccess` ladder (session isAdmin → env → DB user
+  isAdmin → flags → site section) on every page render** (the session-only
+  grant was wrong: CE sessions carry no `isAdmin`; Node reads the DB user),
+  exported as `templates.MenuGrant` and wired into all Go page data
+  (404/500/403 pages, tags privTag 404, templates pages, notifications
+  pages) via `core.Cxt.A` (added) so no call site needs the App thread;
+  `pageBase` in tags now also renders the admin nav fragment for session
+  admins (Node ExpressLocals does both on every page).
+- **Environment note (parked, documented):** in this e2e container an
+  unidentified vhost rewriter removes nginx-injected flips mid-test (worked
+  standalone, worked in 17 prior gates; forensics exhausted — no process,
+  no script, no cron found; inotify churn suggests a rename-based writer
+  ~1-2s cadence). The flip path itself is proven (P0–P6.20 gates + cutover
+  day-1 audit will re-prove it under the real runit switch); U1 parity is
+  therefore pinned by the dual-port gate, which exercises the identical
+  route surface.
+- Also fixed along the way: csrf must be sent on bodyless mutations on both
+  stacks (Node 403 `invalid csrf token` otherwise — the battery now always
+  attaches it); `core.Cxt` gained `A *App`; `gofmt` drift in touched files
+  normalized.
+
+*Step 3 slice 3 done (U2, 2026-09-22): the editor-entry route family —
+`GET /Project/:id`, `GET /project/:id`, `GET /editor/:id` in ANY case
+(Node/Express routing is case-insensitive — pinned live), id in either hex
+case, main + `/detacher|/detached`; non-empty invalid id → Node's exact
+404 JSON (objectId param validator wire); empty-id split (`/editor/` →
+generic 404 page, `/Project/` → dashboard 301); anonymous → 302 /login
+(auth first). Gate `specs/parity/web-go-u2-editor.test.e2e.ts` GREEN
+(3-leg dual-port, 17 records).
+- Go: `editorPagePattern` / `editorBadIdPattern` (case-insensitive prefix
+  + both hex cases; `editorBadId` handler answers Node's exact 404 JSON —
+  Go `res.JSON` = application/json; charset=utf-8 + weak ETag, matching
+  Node's), `dashSlashPat` (projectlist: `/project/` any case →
+  `/hub#/projects.all` 301), `primitiveObjectID` lowercases so an
+  uppercase-hex id resolves.
+- The gate (running as the oracle) surfaced + fixed five real divergences
+  in the P5.1-era editor port: **`canManageTemplatesMenu` = full
+  `hasTemplateAdminAccess` ladder** (now `templates.MenuGrant` on the
+  editor page, as in U1); **`canDisplayProjectUrlLookup`** = admin (Node
+  `adminPrivilegeAvailable && canDisplayAdminMenu &&
+  hasAdminCapability('view-project-setting')` — all true for admins in
+  this stack; was hardcoded false); **`showSignUpLink`** =
+  `boolFromEnv(OVERLEAF_ENABLE_REGISTRATION_PAGE) ?? !(saml||ldap||oidc)`
+  — e2e SAML is enabled ⇒ FALSE (the 2026-09-19 TRUE pin pre-dates the
+e2e SAML enable; hub + settings/login pins re-verified on the U3+/user
+  family units); **`ol-showTemplatesServerPro`** =
+  `Boolean(site_settings.templates) && (admin || nonAdminCanManage ||
+  templates.user_id == uid)` (admin ⇒ true, bare `content` meta); **the
+  loading-screen init class** = `getInitialTheme(getOverallTheme(user))`
+  (user `ace.overallTheme`: `light-`→light, `system`→system, `''`→dark,
+  else→dark; no ace: signUpDate < 2026-03-02 ⇒ dark else system).
+- Gate idiom lesson: **node `fetch` follows redirects by default** — the
+  earlier "200 OLi surface" records were the post-`302→/login` follow;
+  `redirect: 'manual'` exposes the true wire (301/302 + `location` +
+  `<p>…</p>` body).
+
+**Step 3 slices done (U3–U9, 2026-09-22):**
+- **U3 (per-project LLM reads) — already covered**: `llm/models`,
+  `llm/compile-fix`, `llm/source-context` exist in
+  `go/services/web/features/llmsettings/` (P5-era port); audit found 0 gaps.
+- **U4/U5 (GitHub sync + git-servers) — reconciled for THIS stack**:
+  `GITHUB_SYNC_ENABLED` unset ⇒ GitHubSync module not registered by Node
+  (collections absent) ⇒ the P6.11 flip gate
+  (`specs/parity/web-go-p611-flip.test.e2e.ts`) already pins the 403/404/401
+  disabled-surface chain on both engines. A full GitHubSync port is out of
+  cutover scope unless the owner enables the feature (flag-gated surface).
+- **U6/U7 (track-changes/threads/webdav state) — reconciled**: packages
+  exist (`features/trackchanges`, `features/webdav`, threads under
+  projectlist); the earlier audit “gaps” were false positives from route
+  helpers (`p()` local regexp builders + `compile(...)`) the naive gap
+  scanner missed. Live A/B re-verification folded into the U9 battery.
+- **U8 (user-family JSON reads) — done**: `GET /user/contacts` (n DESC, ts
+  DESC stable order, top-50, holding-filter after slice; row shape pinned),
+  `GET /user/emails` (Node key-order wire; ABSENT `createdAt`/`_id` OMITTED
+  entirely — `JSON.stringify` drops undefined; `reversedHostname`),
+  `GET /user/features` (stored-order BSON keys = wire order; `{}` when the
+  user has no features field). POST/PUT/DELETE → 403 Forbidden; anonymous
+  gate chains (401 JSON / 302 HTML). Gate
+  `specs/parity/web-go-u8-userjson.test.e2e.ts` GREEN (3-leg, 20 records);
+  Go: `features/userpages/userjson.go` + unit tests.
+- **U9 (hub/admin/home shell + navbar page-data) — done, gate GREEN**
+  (40-case 3-leg matrix `specs/parity/web-go-u9-shells.test.e2e.ts`,
+  commit `99c1b3b25e`):
+  - `/hub` (+`/hub/`, `/HUB`, `/HUB/`) 200 Mantine hub, path-aware navbar
+    `currentUrl` + `<link alternate>` (Express case/slash parity; the
+    rendered canonical keeps the REQUESTED path — pinned).
+  - `/hub/admin`, `/hub/workspace` (+ case/slash variants) → 302 /hub.
+  - `/admin` shell: full Node render — LLM tab on/off per
+    `LLM_ENABLED==='true' || site_settings.llm.enabled` (on in this stack),
+    system-messages pug-escaped list (empty here), open sockets empty
+    `<ul></ul>` (http.globalAgent has no Go twin — pinned empty), saas
+    tabs absent; non-admin → 302 `/restricted?from=<pathname>` with **case
+    + trailing slash preserved** (Node oracle: `%2FAdmin`, `%2Fadmin%2F`).
+  - `/home` (+case/slash) → 302 /login (Node `HomeController.home` CE
+    branch — home pug absent in this build).
+  - root `/`: logged-in 302 /hub; anonymous global gate 401 `Unauthorized`
+    (accept-json) / 302 /login (accept-html → `<p>Found…</p>` body — the
+    302 body is Accept-shaped!); `NoLogin` dropped from the `/` route.
+  - navbar/page-data fixes (Node `layout-react.pug` + `ExpressLocals`
+    oracle): `showSignUpLink` = `hasFeature('registration-page')` (false
+    here — SAML on) computed once in `sitesettings.RegistrationEnabled`
+    and fed to hub navbars, the editor navbar, authpages and every
+    page-data render (slot `SUPLINK`); `canManageTemplatesMenu` = full
+    `MenuGrant` ladder on /user/settings + template pages;
+    **`canDisplayAdminMenu` + `canDisplayProjectUrlLookup` flip for a
+    site-admin session** (`core.NavSiteAdmin` =
+    `ADMIN_PRIVILEGE_AVAILABLE==='true'` && session
+    `passport.user.isAdmin` — Node `hasAdminAccess(sessionUser)`); the
+    settings-page `ol-user isAdmin` reads the users doc `isAdmin` field
+    (CE shape; `admin`/`adminRoles` legacy shapes stay as fallbacks);
+    /login logged-in navbar `sessionUser` + `ol-usersEmail`/`ol-user_id`
+    session-filled (LOGINUSER/LOGINUID/LOGINITEMS slots; anonymous keeps
+    the anonymous shape); /register anon fixture refreshed to the current
+    `showSignUpLink:false` wire.
+  - Gate lessons: battery tags get whitespace-normalized before cross-leg
+    lookup (padded `user  GET` vs `user GET`); A/B probes inside
+    `ol-e2e-overleaf-1` (shadow :4010 is container-local); a 302 body is
+    Accept-shaped (`<p>…</p>` under text/html).
+
+**Known Go-web missing families (cutover evidence, 2026-09-22):** ~~`POST
+/api/project`~~ ✅ U1 · ~~tags family~~ ✅ U1 · ~~editor entry
+`GET /Project|/project|/editor/:id`~~ ✅ U2 · hub shell `GET /hub/`
+(trailing-slash parity) ✅ U9 · `GET /admin` + `/home` ✅ U9 ·
+per-project LLM reads (`llm/models`, `llm/compile-fix`,
+`llm/source-context`) ✅ U3 (already present) · github-sync (`state`,
+`merge`, `new/github-sync`, `/user/github-sync/status`) ✅ U4/U5
+(reconciled: disabled surface — P6.11 flip gate) · git integration
+(`/user/git-servers`, `/user/git-pat/link`) ✅ U4/U5 (reconciled) ·
+track-changes/threads/sharing-updates reads ✅ U6/U7 (reconciled) ·
+webdav `state` ✅ U6/U7 (reconciled) · user family gaps (`/user/list`,
+`/user/contacts`, `/user/mysettings`, `/user/send-test-email`,
+`/user/password/update`) — ✅ `/user/contacts` U8; remainder in U10 ·
+`/template/:id/preview` — U10 · notifications prefs project-scoped
+(`/project/:id`) — U10 · `/api/format-tex` (remaining methods) — U10 ·
+token/redirect pages (`/read/:token`, `/event/:token`?, `/restricted`)
+✅ `/restricted` U9 (gate); remainder in U10. — **U10 residual audit
+is the next unit: re-scan with the corrected (helper-aware) route audit,
+then port+gate true gaps in e2e-impact order, then the hard cutover.**
+
+**U10 status (2026-09-23):**
+
+- **U10.1 (Go history family) — done, gate GREEN 53/53, commit
+  `477f1ad629`:** `go/services/web/features/history/` (7 files) — 16 routes
+  (updates, V1/V2 proxy, blob GET/HEAD/Range, labels, version-zip, flush,
+  changes, diff, restore/revert 400/500 family). Parity on status/body/
+  curated wire headers with nonce/created_at/ETag-hash normalization.
+- **U10.2a (residual slice A: analytics pokes, university redirects,
+  project tokens, 404 pins, logout page) — done, gate GREEN 35/35, this
+  commit:**
+  - `go/services/web/features/analytics/` — `POST /event/:event` (200/60
+    limiter `analytics-record-event`) + `PUT /editingSession/:projectId`
+    (20/60 `analytics-update-editing-session`, key `\<projectId\>:\<uid\>` =
+    Node's `params + clientId` join). Feature flag `apis.v1.url` honest —
+    unset in this stack → the 202 `Accepted` short-circuit is the wire
+    (pinned: text/plain, CL 8, ETag over `Accepted`).
+  - `staticpages` — `GET /university` + `GET /university/*` → 302
+    `/i/university…` (lowercased, first `.html` stripped, Node
+    UniversityController byte-parity).
+  - `projectlist.tokensHandler` — `GET /project/:id/tokens` (limiter
+    `get-project-tokens` 200/600): owner `tokens` absent → 403;
+    `tokens:{}` → 200 `{}`; owner tokens preserved in stored key order +
+    `readOnlyHashPrefix`/`readAndWriteHashPrefix` (sha256 hex :6) appended;
+    non-owner tokenRO → `{readOnly}`; else `{}`. `owner_ref` comes as
+    hex-string *or* ObjectID depending on writer — `strOrHex` normalises.
+  - **CSP parity fixes (latent bugs exposed by the full-header gate):**
+    rendered 404/restricted/logout pages now carry Node's per-request
+    nonce CSP (`views.Page`/`views.StatusPage` default `cspReact(d.Nonce)`
+    instead of the restrictive baseline), and the Express "Cannot
+    \u003cMETHOD\u003e \u003cpath\u003e" 404 page carries exactly `default-src 'none'`
+    (`pbhttp.ExpressNotFound`) — both verified live against Node before
+    and after.
+  - Battery `tests/e2e/specs/parity/u102a-matrix.cjs` (35 cases incl.
+    event-segment edge class, university edges, tokens owner/non-owner/
+    ghost/anon, 404 pins, logout page, es429 429-serial) + gate
+    `web-go-u102a.test.e2e.ts` (Node==Go==Node, per-leg limiter flush,
+    full app-header compare minus the documented transport exclusion
+    connection/keep-alive/date).
+- **NEXT: U10.4 template preview → U10.5 restore success paths → hard
+  cutover (Go web drop-in complete).**
+
+### ⛔ CUTOVER BLOCKER: Go **api profile** is not a 1:1 (verified 2026-09-23)
+
+The **web** profile (what `web-overleaf` serves; shadow :4010, ENABLED
+SERVICES=web) is a **complete, verified drop-in** (U10.3 close green; full
+parity battery green). But **`web-api-overleaf` → Go runs the `api` profile**
+(ENABLED_SERVICES=api). Auditing a Go **api-profile** instance (:4011)
+against Node **api :3000** found **Go falls back to the WEB wire** on the
+api surface — the concrete cutover blocker. Confirmed mismatches
+(Node api :3000 → Go api :4011):
+
+| case | Node api | Go api (current) | verdict |
+|---|---|---|---|
+| doc unauth json | 401 | 401 | OK |
+| **doc unauth *html*** | **401** | **302 →/login** (web) | ❌ |
+| doc wrong cred | 401 | 401 | OK |
+| doc valid GET (real) | 200 (JSON) | 200 (identical) | OK |
+| **doc valid POST** | **400/500 (reaches handler)** | **403 (web csrf)** | ❌ |
+| **no-auth POST** | **401** | **403 (web csrf)** | ❌ |
+| **doc ghost** | **404 plain "Not Found"** | **404 rendered HTML page** | ❌ |
+| GET /project/:id (unauth) | 404 | **302 →/login** | ❌ |
+| GET /project/:id/members (unauth) | 404 | **302 →/login** | ❌ |
+| **POST /tpds/folder-update** | **400 (validation)** | **404 (route missing)** | ❌ |
+
+**Root cause:** the `api`-profile doc-trio gate reused the **web** wire —
+`APIBasicGate` (401/302 html-split), `APISend403` (csrf 403), and the
+rendered-HTML ghost 404 are **web-profile** behaviors that must NOT apply
+when `core.App.Cfg.Profile == "api"`.
+
+> The ⛔ table above is the **pre-fix audit** (the ❌ rows are the defects
+> found on 2026-09-23). The **doc-trio** ❌ rows are now **fixed + gated**
+> (see ✅ below); the non-doc-trio ❌ rows (`/project/:id`, `/members`,
+> `POST /tpds/folder-update`, …) remain **open**.
+
+**Status (2026-09-23): the doc-trio wire is DONE + gated ✅; the remaining
+api-profile route surface is still OPEN.**
+
+✅ **DONE (profile-aware, gated, green):** the private-API **doc-trio** wire
+(GET + POST + reject). Fix: `core.APIBasicGate401` (api gate: unauth/wrong →
+401 for ANY Accept; +WWW-Authenticate +X-Powered-By, no helmet/cookie) +
+profile branches in `features/projectlist/docapi.go` (GET: api gate /
+plain-404 / 200 with XPB; POST+reject: api gate or web `APISend403` 403) +
+`apiDoc404` (api → plain 404, web → HTML page). Web path left byte-identical.
+- Gate: `tests/e2e/specs/parity/web-go-uapi-doc.test.e2e.ts` +
+  `uapi-doc-matrix.cjs` — Node api :3000 == Go api :4011 == Node, **10 cases
+  diffs=0** (unauth/wrong → 401, ghost → 404 plain, real → 200 JSON, POST
+  unauth → 401).
+- sv-managed Go api shadow: `server-ce/runit/web-go-api-overleaf/run`
+  (ENABLED_SERVICES=api, 127.0.0.1:4011) — mirror of `web-go-overleaf`.
+- Web regression: `web-go-u103r` (7/diffs=0) + `web-go-p413-flip` (4/4) green;
+  web POST/reject still 403 csrf.
+
+⛔ **STILL OPEN (cutover blocker) — the api-profile gap is ROUTE/PROFILE
+SELECTION, not route-by-route (confirmed 2026-09-23, authoritative Node model +
+empirical Node :3000 audit):**
+
+**Authoritative Node model** (services/web): ONE app, THREE routers —
+`webRouter` (browser/session), `privateApiRouter` (basic-auth service-to-service),
+`publicApiRouter` (public). `config.enabledServices` =
+`process.env.ENABLED_SERVICES || 'web,api'` (settings.defaults.js:954) selects
+which profile the process serves:
+- **web** profile (web-overleaf :4000) = `webRouter` **+** `privateApiRouter`
+  (+public). Serves browser routes AND basic-auth routes (the doc trio is on
+  BOTH — pinned by u103r on :4000).
+- **api** profile (web-api-overleaf :3000) = `privateApiRouter` +
+  `publicApiRouter`, **NO `webRouter`**. So the api profile serves ONLY the
+  basic-auth/public surface and **404s every browser/web route** (measured
+  Node :3000: `/project`, `/project/:id`, `/members`, `/entities`, `/tags`,
+  `/user/projects`, `/foo` ALL → 404 + XPB).
+
+✅ **FIXED + gated (2026-09-23) — the Web-route LEAK on the api profile:**
+Go shared ONE route table across both profiles, so the api profile served web
+routes with their WEB wire (measured Go :4011 before the fix: `/project` →
+**301→/hub**, `/project/:id` → **302→/login**, `/members` + `/entities` →
+**302→/login**). Fix implemented + gated:
+- **Route/profile selection filter** (`go/services/web/core/app.go` dispatch
+  loop): in the `api` profile, a matched route with `!NoSession` (i.e. a
+  web-router route — Node's api profile does NOT mount `webRouter`) is
+  **skipped** (`continue`) and falls through to the api 404 tail. The
+  `web` profile is untouched (serves all routes). This is systemic — it fixes
+  **every** web-route leak at once (no whack-a-mole). Safety proven by audit:
+  every api/service route that exists in Go (doc-trio, /status, /health_check*,
+  snapshots, token-info, saved) is `NoSession`, and every non-`NoSession`
+  route is a web route Node also 404s on :3000.
+- **404-tail wire** (`go/pbhttp/gate.go` `ExpressNotFound`): the finalhandler
+  `Cannot <METHOD> <path>` 404 now carries `x-powered-by: Express` +
+  `x-content-type-options: nosniff` (in addition to the existing CSP
+  `default-src 'none'`), matching Node :3000 byte-for-byte (142-byte
+  `Cannot GET /foo` body). The app-level doc-ghost 404 ("Not Found" plain)
+  keeps its distinct set (XPB, no nosniff) — the two 404 types differ in Node
+  and now in Go.
+- **Gate:** `web-go-uapi-doc` + `uapi-doc-matrix.cjs` extended with 5
+  api-web-route-exclusion cases (`webroot-slash/-project/-members/-entities/
+  -unknown`) — Node api :3000 == Go api :4011 == Node, **15 cases diffs=0**
+  (doc-trio 401/404/200 + the 5 web-route 404s). Web regression: `web-go-u103r`
+  (7/diffs=0) + `web-go-u1-parity` + `web-go-p413-flip` green — the web
+  profile (:4000 wire) is entirely unchanged.
+
+⛔ **STILL OPEN — MISSING BASIC-AUTH **WRITE** ROUTES** (the three READ routes above —
+details, tag, personal_info — are all ✅ DONE+gated; the read surface is 1:1).
+These Node `privateApiRouter` **write** endpoints are absent from Go (Go 404s them
+where Node 401/400/200/409) and each needs a business-logic port (project-create/
+folder-create/file-merge — **not** exercised by the e2e journey suite, service-side
+Dropbox/GitHub/TPDS sync). measured Node api :3000 (unauth → 401 + WWW-Authenticate;
+valid-cred → route-specific):
+
+| route | Node api (unauth) | Node api (valid-cred) | Go api |
+|---|---|---|---|
+| **`GET /project/:id/details`** | **401** | 200 (project JSON) | ✅ **DONE + gated** |
+| **`GET /user/:userId/tag`** | 401 | 200 (tag array) | ✅ **DONE + gated** (commit `1bc6a6404d`) |
+| **`GET /user/:id/personal_info`** | 401 | 200 (user JSON) | ✅ **DONE + gated** |
+| `POST /user/:id/project/new` | **401** | 400/500/200 | ✅ **DONE + gated** (`ea50a53ee7`) |
+| `POST /user/:id/project/resolve` | **401** | 400/200 | ✅ **DONE + gated** (`80b71e6d8d`) |
+| `POST /tpds/folder-update` | 401 | 400 (validation) / 409 / 200 | 404 (missing) |
+| `/internal/*`, `/user\|project/:id/update/:path`, `/project/:id/contents/:path` | 401 | ... | 404 (several missing) |
+
+✅ **DONE + gated (2026-09-23, commit `1bc6a6404d`) — `GET /user/:userId/tag`**
+(privateApiRouter, basic-auth; was **HARD/defered**). The earlier two attempts
+failed because the `NoSession+APIOnly` route marked the path *sessionless* in
+the web profile (`routeNoSession`→true) → session init skipped → `cxt.Sess` nil
+→ the web 404-page oracle rendered **wrong** (u1: Go 14459 vs Node 15347). The
+**8dddb359c8 routeNoSession fix** (skip APIOnly when profile==web) is the
+enabler: session now inits, the web 404-page oracle renders byte-correct (u1
+STAYS green WITH the api route present), and the api route serves on :4011.
+Handler `features/tags/tags.go apiTagGetHandler` (NoSession+APIOnly, registered
+AFTER the web `privTagPat` oracle): unauth→401 (`APIBasicGate401`); userId not
+24-hex (incl. all-digit)→404 JSON VA `params.userId` (`oidParam`/`malformedParam`,
+with XPB set); valid oid (ghost or real)→200 `[tags]` (`mongoRun`+`dJSONTag`, ghost→`
+[]`). Case-insensitive 24-hex accepted (Node 200 for DEADBEEF…/6AbCdEf…). Wire nuance
+fixed after first green: Node sets XPB on the api 404-VA path (oidParam didn't).
+Gate `uapi-doc-matrix.cjs` +5 tag cases → **28 cases diffs=0**; u1/u103r/p413 green.
+
+✅ **DONE + gated (2026-09-23) — `POST /user/:id/project/new` (createProject)
+`ea50a53ee7` + `POST /user/:id/project/resolve` (resolveProject) `80b71e6d8d`.**
+The two project-level TPDS write endpoints (owner confirmed the target deployment
+USES Dropbox/GitHub sync, so the api write surface is a cutover requirement).
+Handler `features/projectlist/tpdsapi.go` (NoSession+APIOnly → web SKIPS;
+verified :4000 POST → 403 == Node): 
+- createProject: unauth→401; uid !24hex→404 JSON VA `params.user_id` (91B);
+  valid-uid+valid-name→**200 `{"projectId":"<24hex>"}`** (40B, CREATES a BLANK
+  project — reuses P4.7 `crInsertProject`/`crInitHistory`/`nzipEnsureUnique`
+  (generateUniqueName, ` (N)` suffix == Node)); invalid-name (empty/slash/wsp/
+  too-long/absent)→**500** `Internal Server Error` (21B; Node's TPDS path leaves
+  the name-validation error unmapped → Express 500).
+- resolveProject: unauth→401; uid !24hex→404 VA; **4 strict-zod 400 branches**
+  (bad-pid 91B `body.projectId`; empty-body 197B; empty-name 120B `Too small`;
+  both-keys 185B — the `Invalid Mongo ObjectId at body.projectId; ` prefix appears
+  only when the pid is NOT 24-hex, zod .or() joins matched-branch errors);
+  ghost-pid→**200 `{"status":"rejected"}`** (21B); existing/new-name→**200
+  success** `{"status":"success","projectId","historyId?","otMigrationStage":0}`
+  (historyId OMItTED when the doc has no overleaf.history.id; new-name CREATES a
+  blank project). Shared core `tpdsGetOrCreateByName`/`tpdsOwnedOrRWProjects`
+  (owner_ref∪collaborator_refs deduped)/`tpdsProjectActive` (!archived&&!trashed)
+  ported from Node for reuse by the folder/update endpoints.
+uapi gate now **55 cases diffs=0** (+7 cp +11 res **+9 folder-update**; projectId
+normalized to "X"; gate auto-cleans uapi-cp-gate/resgate-gate → 0 strays; folder-
+created gu-* converge across the 3 legs + are re-seeded each run). web regression
+u1/u103r/p413 green.
+
+✅ **TPDS sync update endpoints — DONE + gated (2026-09-23):** `POST|DELETE
+/user/:id/update/:path(.+)` + `/project/:pid/user/:uid/update/:path(.+)`
+(mergeUpdate/deleteUpdate) and `POST|DELETE /project/:pid/contents/:path(.+)`
+(updateProjectContents/deleteProjectContents). Node wire pinned + ported
+faithfully to `tpdssync.go` (reuses the `up*` upsert primitives —
+`upDocstorePut`/`upPutBlob`/`upReplaceFile`/`upSwapDocToFile`/`upSwapFileToDoc`
+— and `tpdsGetOrCreateByName`/`tpdsOwnedOrRWProjects`/`tpdsProjectActive`
+shared with the folder/update handlers). Wired states (Node api :3000 == Go
+api :4011, gated): 401 (unauth/wrong); mergeUpdate dropbox+by-id 404-VA
+(`params.user_id`, + `params.project_id` when the by-id route also has a bad
+pid — zod joins `; ` in definition order); by-id ghost-user/ghost-project →
+**200 `{"status":"rejected"}`**; GitHub 404-VA `params.project_id`; GitHub
+ghost → **404 `Not Found`**; Dropbox-DELETE (ghost/bad/valid) → **200 `OK`**;
+GitHub-DELETE ghost/no-entity → **200 `{}`**; valid → **200 applied**
+(doc `{status,projectId,entityId,entityType:"doc",folderId,rev:"1"}` / file
+`...entityType:"file",rev:"0"}` / GitHub `{entityId,rev:N}`). The 200-applied
+doc/file upsert is verified by a direct Node==Go comparison on separate
+per-leg projects (entityId/rev are stateful per leg on a shared project, so it
+is not 3-leg gate-able); the deterministic states above are the gate cases.
+Wire nuances pinned + fixed:
+- The api-profile 404 `Not Found` carries **NO `X-Content-Type-Options`**
+  (Node omits it). Go's core `PlainText` wrongly adds nosniff → the 8
+  tpdssync 404s now use `apiText` (text/plain + weak ETag + Content-Length,
+  no nosniff), matching Node (details/pi/ghost all confirmed no-nosniff).
+- The raw webhook body must NOT be forced through `content-type:
+  application/json` (Node's JSON body-parser then 400s the raw body — not the
+  real wire). The gate's sync POST cases use a new `postRaw` helper (no forced
+  content-type).
+uapi gate now **79 cases diffs=0** (+23 sync + perfTest). web regression u1/u103r/p413
+green. web profile :4000/:4010 both 403 the sync routes (login-gated, no panic);
+/perfTest both 302 login (APIOnly).
+
+⛔ **STILL OPEN (api-profile cutover blockers) — Node :3000 mounts these, Go :4011 does not (all) — live-audited 2026-09-24:**
+- `/internal/*` (DESTRUCTIVE/cron — 7 remaining): POST expire-deleted-projects-after-duration / expire-deleted-users-after-duration / project/:pid/expire-deleted-project, POST /internal/users/:uid/expire, GET /internal/project/:pid/zip, POST /internal/deactivateOldProjects, POST /internal/project/:pid/deactivate → Node 401 (mounted+auth) / Go 404. These are STATEFUL (deactivate/archive/flush-DU); 200-paths are destructive and must NOT be live-driven on the shared e2e stack (one `deactivateOldProjects` probe deactivated 10 old never-opened fixtures — natural cron behavior; key fixtures stayed healthy). (POST compile/pdf is Node 404 → Go matches, need not port.)
+- Editor privateApi **remaining**: POST /project/:pid/join (Node 401 / Go 404), POST /project/:pid/history/resync (Node 401 / Go 404) — heavy OT-session/history business logic. (`GET /project/:pid/doc/:doc_id` **already DONE+gated**; `POST .../doc/:doc_id/changes/reject` **now DONE+gated** — below.)
+- `/status` ✓ (Go "web is alive (api)" == Node), `/health_check/{redis 200, mongo 500}` ✓ (both match).
+⇒ The api-profile surface is **NOT 100%**: the TPDS sync + project-new/resolve/folder-update slice is complete (+ gated), `GET /perfTest` + `GET /internal/project/:id` are DONE+gated, and editor `GET doc/:doc_id` + `POST .../changes/reject` are DONE+gated (below); the /internal/* destructive×7 + editor `join` + `history/resync` rows above remain. Do NOT flip web-api-overleaf until they are 1:1 (plus the web valid-basic gap).
+
+✅ **POST /project/:id/doc/:doc_id/changes/reject — DONE + gated (2026-09-24):** Node `DocumentController.trackChangesRejected` = strict zod body `rejectedChangeAuthorIds: z.array(zz.objectId())` (required) + `userId: zz.objectId().nullish()` + `previews: z.array(changePreview).optional()` (nested strictObject: sectionPath/string[], startLine/int≥1, changes[], slice/string, sliceStart/int≥0, userIds/oid[]). Wire (pinning Node :3000):
+  - valid → **204** empty (XPB; ETag W/"a-…" over "No Content");
+  - any zod violation → **400 JSON** `{"error":"Validation error: <issue>; …","statusCode":400}` (all issues, SCHEMA-declaration order, then unknown-keys, joined "; "; int-check short-circuits min → "expected int, received number"; min → "Too small: expected number to be >=N");
+  - array body → **400 JSON** `expected object, received array at body` (zod — always JSON);
+  - scalar/null/bad-JSON body → **400 Accept-negotiated** (express err-handler precedes helmet): `accept:application/json` → **400 `{}`** (2B, BARE — no CSP/nosniff, via core.BareWrite); no-accept|text/html|`*/*` → **400 HTML 705B** error page (BARE — no CSP). Pinned full-header for both (CSP was the last diff — Go's web-baseline was leaking CSP into the raw-body 400).
+  - unauth/wrong → **401** (challenge). Go: `crjServe` + `crjValidate` (+ nested field validators) in new `crjvalidate.go`; handler `docapiRejectHandler` (docapi.go, after `APIBasicGate401`) calls `crjServe`. 16 gate cases `rej-*`; **uapi now 99 cases diffs=0** (full-header match incl. Accept variants).
+
+✅ **GET /internal/project/:project_id — DONE + gated (2026-09-24):** Node privateApiRouter `ProjectApiController.getProjectDetails` → calls the SAME `ProjectDetailsHandler.getDetails(projectId)` as `/project/:id/details` → **identical 200 body**; only the path + param name (`project_id`) differ. Wire pinned Node :3000: unauth→**401** (challenge); bad-oid→**404** JSON VA `params.project_id`; ghost→**404** text/plain `Not Found`; valid→**200** JSON `{name,description?,compiler?,features,overleaf?}`. Go `internalProjectGetHandler` (docapi.go) reuses `detailsHandlerWithPattern(a, internalProjectPat)` (extracted from `detailsGetHandler` — behavior unchanged, details gate still green). Gate cases idp-unauth/idp-badoid/idp-ghost/idp-valid; uapi now **83 cases diffs=0**.
+
+✅ **GET /perfTest — DONE + gated (2026-09-24):** Node privateApiRouter `plainTextResponse(res,'hello')` → 200, text/plain; charset=utf-8, **X-Content-Type-Options: nosniff**, X-Powered-By: Express, global CSP `base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'`, ETag W/"5-...", CL 5, body `hello`. Go `apiPerfTest` (tpdssync.go) = `PlainText(200,"hello")` (nosniff) + XPB + global CSP — Node==Go (full-header match, same ETag). APIOnly (Node web :4000 does not mount it; web profile :4000/:4010 both 302 login — match). Gate case `api-perftest`.
+
+**POST /tpds/folder-update — DONE + gated (2026-09-23) — wire pinned (Node api :3000):**
+- **401** (unauth): 12B `Unauthorized` text/plain + XPB + `WWW-Authenticate: OverleafLogin`.
+- **400** (zod, `application/json`, XPB, no WWW) — `userId` (zz.objectId) + `path` (required string), joined `; ` in order [userId, path], full body `{"error":"Validation error: <joined>","statusCode":400}`:
+  - no body → **185B** (`...at \"body.userId\"; Invalid input: expected string, received undefined at \"body.path\"`)
+  - uid-only → **114B** (`...at \"body.path\"`)
+  - path-only → **116B** (`...at \"body.userId\"`)
+  - bad-uid → **88B** (`Invalid Mongo ObjectId at \"body.userId\"`)
+- **500** (21B `Internal Server Error` text/plain + XPB): valid-user + **empty path** (zod passes; mkdirp → `folder=null` → `folder._id` throws). Also other unexpected errors.
+- **409** (767B HTML `text/html` + XPB + ETag W/\"2ff-...\"): `<!DOCTYPE html>...<title>Something went wrong</title>...` full page (in-plan: HttpErrorHandler.conflict), body `Could not create folder`. **REACHED WHEN** `getOrCreateProject(uid,pid,name)==null` OR `FileTypeManager.shouldIgnore(path)`. NOTE: **stateful** — which project `getOrCreateProject` resolves (by `projectId` if given & user RW, else by `projectName`, else user's project) + user's RW decide 409 vs 200; a project admin isn't RW in → 409 even if it exists. (observed: same path can be 200 or 409 depending on project/RW state, so live-state pinning per-case is required — do NOT reduce to a static hidden-file rule.)
+- **200** (134B `application/json` + XPB) `{"entityId":"<lastFolderId>","projectId":"<pid>","path":"<path>","folderId":"<parentFolderId|null>"}` — mkdirp creates all missing path-segment folders under the resolved project (Go `tpdsMkdirp` — find-or-create each segment, filtering the mongo `UpdateOne` by the **project** `_id`; `upMkdirp` was NOT reusable here — it assumes rootFolder._id==project._id); `entityId`=deepest folder id, `folderId`=its PARENT folder id (root-level child → parent=`rootFolder[0]._id`; `path==='/'` → entity=rootFolder, folderId=null). `shouldIgnore`=Minimatch(`Settings.fileIgnorePattern`,{nocase,dot}).match(path) — **undefined in this stack → never ignores** (the `.DS_Store` 409s were project-access state, not this rule).
+✅ **DONE + gated (2026-09-23) — `POST /tpds/folder-update`** (updateFolder,
+privateApiRouter, basic-auth; **APIOnly** → web profile SKIPS it, :4000 unchanged).
+Handler `features/projectlist/tpdsfolder.go apiFolderUpdateHandler` + new
+`tpdsMkdirp` (find-or-create each path segment; uses the **PROJECT _id** for the
+mongo `UpdateOne` filter). Wire (Node api :3000, all matched Node==Go):
+401 (unauth/wrong, 12B challenge) / 400 strict-zod (`{}`→185B, `{userId}`→114B,
+`{path}`→116B, bad-uid→88B) / valid→**200** `{entityId,projectId,path,folderId}`
+(root→entity=rootFolder,folderId=null; top→parent=rootFolder; nested→parent=the
+containing folder) / user-with-no-project (projectId absent, name absent)→**500**.
+
+**KEY BUG FOUND + FIXED:** the upload `upMkdirp` (upload.go) `UpdateOne` filter is
+`{_id: cur.folderID}` — it assumes **rootFolder._id == project._id** (true for the
+upload fixtures), so it 500s on any project where they differ (Go-created ones). So
+folder-update cannot reuse `upMkdirp` for the root seed. Wrote a fresh `tpdsMkdirp`
+that filters by the **project** `_id` (correct for ALL projects) + tracks the
+containing folder (parent) directly. Second bug: the first draft called `cancel()`
+immediately after `a.Mongo.DB(ctx)` and then ran `UpdateOne(ctx,...)` on the
+canceled ctx → "context canceled" 500; fixed by keeping the ctx live through both
+the update and the reload (cancel after both).
+
+**NOT in the gate (deliberate — honest-oracle):** `{userId:ghost, path}` with **no**
+projectId/projectName is a stateful/undefined Node region (Node itself returns 500
+OR 200 path:"/" non-deterministically across legs) → excluded; the deterministic
+`{}`/`{userId}`/`{path}`/bad-uid 400s + the valid-{projectId} 200 are the pinned
+contract. The 409 HTML body + shouldIgnore are present but NOT reachable in this
+stack (`Settings.fileIgnorePattern` is `undefined` → never ignores; projectless
+→ 500) — kept for faithful 1:1 should the pattern be set.
+
+Gate: `web-go-uapi-doc` + `uapi-doc-matrix.cjs` now **55 cases diffs=0** (added
+fu-unauth/wrong/no-body/uid-only/path-only/bad-uid/root/top/nested). Web regression
+u1/u103r/p413 green. go build/vet/test/gofmt clean.
+
+✅ **DONE + gated (2026-09-23) — `GET /project/:id/details`** (privateApiRouter,
+**api-only**, NOT on webRouter). Introduced the `core.Route.APIOnly` marker:
+the web profile now SKIPS API-only routes (falls to the already-verified web 404
+tail — :4000 unchanged), while the api profile serves them. Handler
+`features/projectlist/docapi.go detailsGetHandler`:
+  - unauth/wrong → 401 (challenge wire, `APIBasicGate401`).
+  - invalid-oid → 404 JSON `{error:"Validation error: Invalid Mongo ObjectId at
+    \"params.project_id\"",statusCode:404}` + XPB (`delParamVA`).
+  - ghost (valid, missing) → 404 text/plain "Not Found" (+XPB, weak etag).
+  - valid → 200 JSON `{name, [description], [compiler], features, [overleaf]}`
+    with **undefined keys omitted** (Node res.json) and `features` = the OWNER
+    user's `user.features` object rendered in **document order** via the new
+    `core.WriteOrderedValue`/`core.OrderedD` helper (Go maps are unordered —
+    the 11 feature keys must appear exactly as Node stores them).
+Added shared `go/services/web/core/orderedjson.go` (order-preserving BSON→JSON).
+- Gate: `web-go-uapi-doc` + `uapi-doc-matrix.cjs` now 19 cases diffs=0
+  (doc-trio 401/404/200 + 5 web-route 404s + 4 details: unauth/invalid/ghost/valid).
+- Web regression: `web-go-u103r` (7/diffs=0) + `web-go-u1-parity` +
+  `web-go-p413-flip` green — the web profile is entirely unchanged (details is
+  APIOnly so the web profile never dispatches it).
+
+✅ **DONE + gated (2026-09-23) — `GET /user/:user_id/personal_info`**
+(privateApiRouter, basic-auth; the webRouter variant is the **distinct** path
+`/user/personal_info` with NO id — no collision). Handler
+`features/projectlist/docapi.go personalInfoGetHandler` (APIOnly, so the web
+profile skips it; :4000 unchanged):
+  - unauth/wrong → 401 (challenge wire, `APIBasicGate401`).
+  - uid not hex24 and not all-digit → 404 JSON VA
+    `{error:"Validation error: Invalid Mongo ObjectId at \"params.user_id\"",
+    statusCode:404}` (+XPB) — the **real Node :3000 wire** (NOT the 400 the
+    handler source suggests; honest-or).
+  - uid all-digit (legacy overleaf.id) → query `overleaf.id`; a 24-digit id is
+    a JS **double** in Node (`parseInt`), so Go must use `ParseFloat` (not
+    `ParseInt`, which overflows and would wrongly 404-VA); absent user → 404
+    text/plain "Not Found" (the `666…` ghost case in the gate).
+  - valid → 200 JSON `{id, first_name?, last_name?, email?, …}` (id first,
+    truthy-only remaining keys; projection _id/first_name/last_name/email).
+- Gate: `web-go-uapi-doc` + `uapi-doc-matrix.cjs` now **23 cases diffs=0**
+  (doc-trio + 5 web-route 404s + 4 details + 4 personal_info:
+  unauth/invalid/ghost/valid).
+- Web regression: `web-go-u103r` (7/diffs=0) + `web-go-u1-parity` +
+  `web-go-p413-flip` green — the web profile is entirely unchanged.
+
+✅ **DONE (2026-09-23) — fixed a nil-session PANIC on the web profile for the
+api-only routes** (committed `8dddb359c8`). `core.routeNoSession(r)` marked the
+`NoSession+APIOnly` routes (details, personal_info) "sessionless" even in the **web**
+profile, so `serve()` skipped session init → `cxt.Sess == nil` → the web
+fallback/login-gate called `(*Session).IsLoggedIn` on nil → **http panic →
+connection closed with NO response** (curl `Empty reply`; sv log: nil-deref at
+`session.go:392` via `app.go:343`). The web profile CRASHED on any request to
+those api-only routes, whatever auth. Fix: `routeNoSession` now skips `APIOnly`
+routes when `profile=="web"` (they are ABSENT on Node web, so they must not
+mark the path sessionless) — session inits normally, the web fallback runs clean.
+Verified: GO web :4010 details/personal_info no-basic → **302** (was empty-reply;
+== Node web :4000 302), api profile :4011 still 200/401; all green gates still
+pass (uapi 23/0, u1, u103r 7/0, p413 4).
+
+⚠️ **DISCOVERED (2026-09-23, accurate wire) — WEB-profile + VALID basic-auth is
+NOT Go-parity.** Node web (:4000), no session, `Authorization: Basic` **valid**
+creds + non-JSON Accept → **404 HTML page** (13920–13992B, per path: /members
+13920, /zzz-nope 13934, details 13986, personal_info 13992, tag 13972) or **403**
+(/project/:id 14085). Go web (:4010) instead **401** for the SAME request.
+Full Node web auth matrix (no session), pinned live 2026-09-23 (`/members` =
+a normal session-required web route):
+  | condition (no session)              | Node :4000   |
+  |---|---|
+  | no-auth, non-JSON (*/*  or XHR)    | **302 →/login** |
+  | no-auth, `Accept: application/json`| **401** |
+  | **valid** basic, non-JSON          | **404 page** (/project/:id → **403**) |
+  | **valid** basic, JSON Accept       | **401** |
+  | **wrong** basic (bad user &/or pw) | **401** |
+So the correct web model: valid basic is **authenticated** (passes the global
+login gate) and the request is dispatched to the route handler (handler access
+→ 403/404/200) or the web 404 (no web handler) — NOT bounced to 401. Go's
+`globalLoginBounce` currently 401s on ANY `Authorization` header. **Scope:**
+affacts the web profile only (the api profile is already 1:1: unauth→401, valid
+→200/404 — uapi gate green). **Frequency: low** — the basic cred is the private-
+API credential, services call the **api** profile (:3000) for TPDS/doc-trio
+(NoSession, served directly, unaffected); hitting a *session-gated web route*
+with valid basic is rare. **Fix (next window, NOT done here — risky, systemic,
+and per-path 404-page bytes must be re-verified):** in the web profile, treat a
+VALID basic (non-JSON) request as authenticated so it is not bounced; invalid
+basic → 401, JSON Accept → 401, no basic → 302. Verify the 404-page bytes match
+Node per-path (13920–13992) and that /project/:id → 403. A safe-but-approximative
+alternative (404 page in `globalLoginBounce` for valid basic) matches 4/5 routes
+(members/unknown/details/personal_info) but NOT /project/:id (403); the faithful
+fix dispatches to the handler.
+
+**The remaining fix (bounded, per-route):** the two write routes Node's
+`privateApiRouter` serves that Go still lacks: `POST /user/:id/project/new`
+(Node valid→500 in this stack; pin the unauth 401 + a
+faithful valid path) and `POST /tpds/folder-update` (Node valid→400 validation;
+pin unauth 401 + the 400 wire). Each as `NoSession`+(`APIOnly` if not on
+webRouter) with `APIBasicGate401`. Gate each on Node api :3000 == Go api :4011;
+keep the web gates green (u103r/u1/p413/uapi) as regression.
+
+**RISK:** this touches the shared routing layer — do it in small gated slices,
+verify BOTH profiles each step (a web-profile regression is the main hazard),
+and do NOT flip web-api-overleaf until the api route set == Node api :3000.
+
+**The hard cutover remains blocked on this unit.** (web-overleaf/web profile
+is a complete verified drop-in; web-api-overleaf/api profile: doc-trio +
+web-route-exclusion + 404-tail DONE, remaining = the missing basic-auth
+routes above.)
+
+### U10.3 — linked files + one-time-login + private-API doc-trio wire — **✅ GATE GREEN (2026-09-23)**
+
+The last missing-family unit before hard cutover. Three sub-features, all
+oracle-pinned and green:
+
+- **U10.3r — private-API doc trio WIRE, re-based to the WEB canonical**
+  (owner decision: Go web replaces **web profile :4000**, not the api
+  profile). The two profiles genuinely diverge here (live-diffed 2026-09-23):
+
+  | case | api :3000 | **web :4000** | **Go :4010** |
+  |---|---|---|---|
+  | unauth GET json / wrong cred | 401 | 401 | ✅ 401 |
+  | unauth GET html/plain | 401 | **302 →/login** | ✅ **302** |
+  | any POST (no csrf) | 401 / 200 | **403 (csrf)** | ✅ **403** |
+  | valid-cred GET real doc | 200 (Node code) | *404 (stack quirk — contradicts Node's own code; NOT oracle)* | ✅ **200** (byte-exact vs :3000/Node code) |
+  | valid-cred GET ghost | 404 "Not Found" | **404 rendered page** | ✅ **404 page** |
+
+  `go/services/web/core/privateapi.go` (+`_test.go`) —
+  `APIBasicGate` (401 json / 302 html/plain per-verb accept), `APIHelmet` (web
+  helmet set on the no-auth 401/302), `NewAPISessionCookie` (fresh sid, no
+  X-Powered-By), `APISend403` (cross-origin CSRF gate: `403 Forbidden` +
+  `X-Powered-By` + CSP + session, before any validation — `res.send(403,
+  'Forbidden')`). Wired in `projectlist/docapi.go` (GET doc gate + POST 403)
+  and `projectlist/projectlist.go` (POST doc + changes/reject).
+  - **KEY FINDING (correcting a prior misframe):** a doc that IS in the
+    project `rootFolder` tree + docstore is served **200** by Node's own
+    code (`DocumentController.getDocument`: `findElement(type:'doc')` →
+    `getDoc` → 200). Go matches (byte-exact vs :3000). The :4000 404 for such
+    a real doc is a **stack quirk**, not the oracle — Go right not to
+    replicate it. Earlier "sandbox interceptor blocks valid creds" / "no
+    overleaf user" notes were a misread of shell/curl Basic-auth construction;
+    clean in-container Node fetch with `overleaf:<WEB_API_PASSWORD>`
+    **authenticates fine** (basic auth is env-derived `Settings.httpAuthUsers`,
+    NOT a Mongo password user).
+  - **GATE `tests/e2e/specs/parity/web-go-p413-flip.test.e2e.ts`** re-based
+    from the legacy api (:3000) canonical to the WEB wire: reachable wire
+    (401/302/403) == :4000, valid-cred POST == 403 (csrf boundary), valid-cred
+    GET real == 200 (byte-exact vs Node-code :3000), ghost == 404 functional
+    (anon-nav state is dynamic+path-dependent on Node vs Go's static captured
+    skeleton — a KNOWN static-template limitation; functional 404 + "Page Not
+    Found" pinned; csrf/nonce normalized). The 400-validation surface is
+    csrf/session-only (NOT reachable via basic auth) and is intentionally out
+    of this wire gate. **The legacy nginx-flip acceptance section is deferred
+    to the hard-cutover unit** (re-based to the web wire then). **4/4 tests
+    GREEN.**
+- **U10.3 LF — linked files create/refresh**
+  (`go/services/web/features/projectlist/linkedfiles.go`): Node
+  `LinkedFilesController` 1:1. **GATE `web-go-u103-lf.test.e2e.ts` +
+  `u103-lf-matrix.cjs`** — **81 cases, Node==Go==Node GREEN.**
+- **U10.3 OTL — `GET /read-only/one-time-login`**
+  (`go/services/web/views/one_time_login.go` + `views/pages.go` slots +
+  `authpages.go` hook): OTL nav/auth-branch slots (`slotOTLNav` anon-vs-
+  logged-in, `slotOTLUser`/`slotOTLUID`).
+- **Tag route oracle:** reverted `features/tags/tags.go` `GET
+  /user/:userId/tag` to the **U1 session-context oracle** (`NoLogin` 404 HTML
+  page via `views.NotFoundPage`) — it is NOT part of the basic-auth doc-trio
+  gate; this restored `web-go-u1-parity` green (the earlier basic-auth
+  re-wire of it had broken U1).
+
+**Battery (all GREEN 2026-09-23):** `go build/vet` OK, `go test
+./go/services/web/...` 0 FAIL, `web-go-u103r` (7 cases, diffs=0),
+`web-go-u103-lf` (81 cases), `web-go-p413-flip` (4 tests), plus the prior
+`web-go-u1-parity` / `u2-editor` / `u8-userjson` / `u9-shells` / `u102a` /
+`u102b` all green. **Committed per the green-slice invariant** (scratch
+probes `lf-login-check*`, `lf-owner-probe*`, `u10-probe`, `u101-oracle`,
+`remember.md`, `tmp-*`, `tools/capture-*` deliberately NOT staged).
+code (85 READMEs total): the `go/` tree index, all 16 library packages,
+`go/s3x`, all 11 service roots + every `gitbridge/` sub-package, and the full
+`go/services/web` tree (`core/`, `contract/`, `features/` index + each feature
+package incl. `launchpad`, `views/`). Fixture dirs (`*/testdata`, the empty
+`persistors/loc`) are excluded (fixtures, not code).
 
 1. Visit all `go/` sub-folders and describe their content and functionality in README.md files (placed in the corresponding sub-folders) such that LLMs and humans can use them to orient themselves and understand what the corresponding code does.
 2. Permanently switch to the web go backend (point both runit services at `bin/web`, exactly what Phase D did for the nine services), rebuild the image, cycle both live stacks, full e2e suite green (as far as the credentials for the external services allow), commit record.
@@ -3154,3 +3898,8 @@ independent); P7 only after 100% prefix coverage + soak.
 Nothing in this plan blocks the nine-service steady state; it starts at M0 and
 touches the user only via the nginx flip table — which is exactly the property
 that made Phase C safe.
+
+> NOTE (2026-09-22): the missing-families list above is the LIVE 404 evidence
+> set (nginx, post-cutover window). Individual rows should be re-verified
+> per-method at porting time (route tables may already cover some methods —
+> e.g. `POST /project/:id/doc` exists (P4.11a) even where a read 404'd).

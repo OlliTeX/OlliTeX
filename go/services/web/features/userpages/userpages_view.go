@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/sitesettings"
+	"ollitex/go/services/web/features/templates"
 	"ollitex/go/services/web/views"
 	"strings"
 	"unicode"
@@ -18,6 +20,15 @@ func pageBase(cxt *core.Cxt, email, uid string) views.PageData {
 		Origin:    cxt.SiteURL,
 		UserEmail: email,
 		UserID:    uid,
+		// U9 (live gate 2026-09-22): ol-ExposedSettings
+		// canManageTemplatesMenu = the full template-admin ladder per
+		// session role (Node page-level pin: admin true, member false),
+		// and the navbar showSignUpLink = hasFeature('registration-page')
+		// (false in this SAML stack — env/SSO resolution shared with
+		// the authpages/hub/navbars).
+		CanManageTemplateMenu: templates.MenuGrant(cxt.Req.Context(), cxt),
+		ShowSignUpLink:        sitesettings.RegistrationEnabled(cxt.A, cxt.Req.Context()),
+		NavSiteAdmin:          core.NavSiteAdmin(cxt.Sess),
 	}
 	if cxt.Sess != nil {
 		d.CSRFToken = cxt.Sess.CsrfToken()

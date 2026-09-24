@@ -21,8 +21,8 @@ func BuildUserSettings(doc map[string]any) string {
 
 // NavbarJSON — the `ol-navbar` meta (ExpressLocals navbar locals; isAdmin
 // toggles canDisplayAdminMenu + canDisplayProjectUrlLookup).
-func NavbarJSON(siteURL, currentURL, email string, isAdmin bool) string {
-	return navbarJSON(siteURL, currentURL, email, isAdmin)
+func NavbarJSON(siteURL, currentURL, email string, isAdmin, showSignUp bool) string {
+	return navbarJSON(siteURL, currentURL, email, isAdmin, showSignUp)
 }
 
 // FooterJSON — the `ol-footer` meta (static in this stack; siteUrl-substituted).

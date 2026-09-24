@@ -792,28 +792,184 @@ func inviteAcceptHandler(a *core.App) func(*core.Cxt, *core.Res) {
 }
 
 // ==================== GET /project/:id/tokens ====================
-
+//
+// Node (this build) — CollaboratorsController.getShareTokens +
+// CollaboratorsGetter.getPublicShareTokens (U10.2 live-pinned):
+//   - the finder is {_id: projectId} with isOwner / hasTokenReadOnlyAccess
+//     as PROJECTIONS (never a filter condition) — memberInfo is always the
+//     project doc; the flags decide what comes back:
+//     isOwner            -> memberInfo.tokens (ABSENT -> !tokens -> 403)
+//     hasTokenROAccess   -> { readOnly: tokens.readOnly }
+//     otherwise          -> {}
+//     hasTokenROAccess = $in [uid, tokenAccessReadOnly_refs] AND
+//     publicAccesLevel === 'tokenBased'.
+//   - readOnly/readAndWrite members get their 6-char sha256 hash prefix
+//     appended, then res.json(tokens)
+//   - anonymous is unreachable — the global login wall gates first.
+//
+// Rate limiter: get-project-tokens (200/60*60), key = clientId only.
 func tokensHandler(a *core.App) func(*core.Cxt, *core.Res) {
+	// Feature(nil) unit-test path: guard the limiter construction (limOfAP
+	// idiom — Consume is nil-safe and fails open).
+	var tokLim *core.RateLimiter
+	if a != nil {
+		tokLim = core.NewRateLimiter(a.Redis, "get-project-tokens", 200, 60*10)
+	}
 	return func(cxt *core.Cxt, res *core.Res) {
+		if !tokLim.Consume(limID(cxt)) {
+			core.Send429(res, "Rate limit reached, please try again later")
+			return
+		}
 		uid, doc, ok := gateRead(a, cxt, res)
 		if !ok {
 			return
 		}
 		_ = uid
-		// Node getShareTokens: link-sharing feature is ON in this build;
-		// getPublicShareTokens crashes (Mongo: $in requires an array) when
-		// tokenAccessReadOnly_refs is ABSENT → 500 view (pinned: the gate's
-		// tokensMember case hits exactly that).
-		if dget(*doc, "tokenAccessReadOnly_refs") == nil {
-			d500 := pageBase(cxt, cxt.Req.URL.Path)
-			d500.AdminEmail = invAdminEmail()
-			views.Error500Page(res.W, d500)
-			return
+
+		tokens := map[string]any{}
+		if strings.ToLower(strOrHex(dget(*doc, "owner_ref"))) == strings.ToLower(uid) {
+			t := dget(*doc, "tokens")
+			if t == nil {
+				res.SendStatus(403) // Node: !tokens (undefined) -> sendStatus(403)
+				return
+			}
+			if m, okm := t.(primitive.D); okm {
+				for _, kv := range m {
+					tokens[kv.Key] = kv.Value
+				}
+			} else if m, okm := t.(map[string]any); okm {
+				tokens = m
+			}
+		} else {
+			if p, _ := dget(*doc, "publicAccesLevel").(string); p == "tokenBased" {
+				if invA(dget(*doc, "tokenAccessReadOnly_refs"), uid) {
+					if t := dget(*doc, "tokens"); t != nil {
+						if m, okm := t.(primitive.D); okm {
+							for _, kv := range m {
+								if kv.Key == "readOnly" {
+									tokens["readOnly"] = kv.Value
+								}
+							}
+						}
+					}
+				}
+			}
 		}
-		// Present-but-unresolvable branch (owner with no `tokens` field or no
-		// token membership): Node sendStatus(403) → "Forbidden".
-		res.SendStatus(403)
+
+		if v, ok := tokens["readOnly"].(string); ok && v != "" {
+			tokens["readOnlyHashPrefix"] = tokenHashPrefix(v)
+		}
+		if v, ok := tokens["readAndWrite"].(string); ok && v != "" {
+			tokens["readAndWriteHashPrefix"] = tokenHashPrefix(v)
+		}
+
+		// Node res.json(tokens) — key order = insertion order; JS puts the
+		// hashPrefix keys AFTER the stored token keys. Build the array in
+		// stored order, then the prefix keys, to match the byte wire.
+		order := []string{}
+		val := func(k string) any { return tokens[k] }
+		switch d := dget(*doc, "tokens").(type) {
+		case primitive.D:
+			for _, kv := range d {
+				order = append(order, kv.Key)
+			}
+		case map[string]any:
+			for k := range d {
+				order = append(order, k)
+			}
+		}
+		// non-owner tokenRO branch: the only key is readOnly (or none).
+		if len(order) == 0 {
+			if _, has := tokens["readOnly"]; has {
+				order = append(order, "readOnly")
+			} else if _, has := tokens["readAndWrite"]; has {
+				order = append(order, "readAndWrite")
+			}
+		}
+		for _, k := range []string{"readOnlyHashPrefix", "readAndWriteHashPrefix"} {
+			if _, has := tokens[k]; has {
+				order = append(order, k)
+			}
+		}
+		var b strings.Builder
+		b.WriteString("{")
+		first := true
+		for _, k := range order {
+			if !first {
+				b.WriteString(",")
+			}
+			first = false
+			switch v := val(k).(type) {
+			case string:
+				b.WriteString(`"` + k + `":"` + jsonEscape(v) + `"`)
+			case bool:
+				b.WriteString(`"` + k + `":`)
+				if v {
+					b.WriteString("true")
+				} else {
+					b.WriteString("false")
+				}
+			default:
+				b.WriteString(`"` + k + `":null`)
+			}
+		}
+		b.WriteString("}")
+		res.JSON(200, []byte(b.String()))
 	}
+}
+
+// strOrHex — owner_ref is stored either as a hex string (fixture
+// projects) or a primitive.ObjectID (Node-created ones); normalise both
+// (U10.2 tk2 battery: owner-403 case needs ObjectID owners to resolve).
+func strOrHex(v any) string {
+	if s := asStr(v); s != "" {
+		return s
+	}
+	return oidHex(v)
+}
+
+// tokenHashPrefix — TokenAccessHandler.createTokenHashPrefix:
+// sha256(token) hex, first 6 chars (U10.2).
+func tokenHashPrefix(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])[:6]
+}
+
+// jsonEscape — minimal JSON string escaping for token values (the only
+// strings that flow through this handler are base62/uuid tokens).
+func jsonEscape(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case '\\':
+			b.WriteString(`\\`)
+		case '"':
+			b.WriteString(`\"`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		case '\b':
+			b.WriteString(`\b`)
+		case '\f':
+			b.WriteString(`\f`)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// limID — RateLimiterMiddleware client id (userId || req.ip).
+func limID(cxt *core.Cxt) string {
+	if cxt.Sess != nil {
+		if _, uid := core.PassportUser(cxt.Sess); uid != "" {
+			return uid
+		}
+	}
+	return core.ClientIP(cxt.Req)
 }
 
 // ==================== split-test-disabled sharing routes ====================

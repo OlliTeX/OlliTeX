@@ -90,7 +90,10 @@ func userMetaJSON(doc map[string]any, uidHex, email string) string {
 	get := func(k string) (any, bool) { v, ok := doc[k]; return v, ok }
 	s := strings.Builder{}
 	s.WriteString(`{"id":"` + uidHex + `"`)
-	s.WriteString(`,"isAdmin":` + b(str(doc["admin"]) || rolesInclude(doc["adminRoles"], "admin")))
+	// Node serializeUser: user.isAdmin — the CE users doc carries it as
+	// doc.isAdmin (live A/B pin U9: admin true / user false); the admin /
+	// adminRoles shapes stay as fallbacks for legacy stacks.
+	s.WriteString(`,"isAdmin":` + b(boolOf(doc["isAdmin"]) || str(doc["admin"]) || rolesInclude(doc["adminRoles"], "admin")))
 	s.WriteString(`,"email":"` + jsonEscape(email) + `"`)
 	if v, ok := get("allowedFreeTrial"); ok && v != nil {
 		s.WriteString(`,"allowedFreeTrial":` + b(boolOf(v)))

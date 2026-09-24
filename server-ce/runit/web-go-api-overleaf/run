@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Ollitex Go web service (API profile) — WEB_GO_PLAN.md. SHADOW of the Node
+# 'api' profile (ENABLED_SERVICES=api, the service the Node stack serves on
+# :3000 via web-api-overleaf). It listens on 127.0.0.1:4011 so A/B / parity
+# gates can compare it directly against the Node api on :3000 without
+# touching the live :3000 route.
+#
+# One Go binary, two profiles — selected by ENABLED_SERVICES (core/config.go):
+# web-go-overleaf runs "web" on :4010; this service runs "api" on :4011. The
+# api profile wire differs from web (unauth → 401 for ANY Accept, no session
+# cookie, no helmet baseline, X-Powered-By present) — see
+# go/services/web/core/privateapi.go (APIBasicGate401) and
+# features/projectlist/docapi.go.
+#
+# The api profile binds 0.0.0.0:3000 by default (OVERLEAF_HTTP2_PORT); the
+# WEB_GO_LISTEN override below pins it to 127.0.0.1:4011 so it does not
+# collide with the live Node api on :3000.
+#
+# If the binary is absent (an image lineage without the Go web build) the
+# service exits cleanly instead of crash-looping (same contract as
+# web-go-overleaf).
+[ -x /usr/local/bin/go-services/web ] || exit 0
+
+source /etc/overleaf/env.sh
+export ENABLED_SERVICES="api"
+export WEB_GO_LISTEN="127.0.0.1:4011"
+
+# Private-API service credentials: the image bakes them into
+# /etc/overleaf/settings.js (genScript, build-time env) where the Node APIs
+# read them from; Go reads process env — export the pair so basic-auth
+# parity holds. /usr/bin/node is explicit because runit's svd PATH is minimal.
+if [ -f /etc/overleaf/settings.js ]; then
+  WEB_PAIR=$(/usr/bin/node -p 'const s=require("/etc/overleaf/settings.js"); const u=Object.keys(s.httpAuthUsers||{}); u[0]?u[0]+":"+s.httpAuthUsers[u[0]]:""' 2>>/var/log/overleaf/web-go-api.log || true)
+  if [ -n "$WEB_PAIR" ] && [ "${WEB_PAIR#*:}" != "$WEB_PAIR" ]; then
+    export WEB_API_USER=${WEB_PAIR%%:*}
+    export WEB_API_PASSWORD=${WEB_PAIR#*:}
+  fi
+  echo "webgo-api: WEB_API_USER set=$([ -n "$WEB_API_USER" ] && echo yes || echo no) PASS-LEN=${#WEB_API_PASSWORD}" >>/var/log/overleaf/web-go-api.log
+fi
+
+exec /sbin/setuser www-data /usr/local/bin/go-services/web >> /var/log/overleaf/web-go-api.log 2>&1
