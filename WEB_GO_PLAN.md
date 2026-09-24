@@ -3932,3 +3932,34 @@ that made Phase C safe.
 > set (nginx, post-cutover window). Individual rows should be re-verified
 > per-method at porting time (route tables may already cover some methods —
 > e.g. `POST /project/:id/doc` exists (P4.11a) even where a read 404'd).
+
+---
+
+### P7.5 — Node-retirement reorg (owner steps 4-7) — executable spec (2026-09-24)
+P7 CORE + git-bridge are DONE and verified (this section covers only the remaining reorg + P7-post). Continuation goal `e7f1a940`.
+Steps 1-3 (go/READMEs, permanent flip+image+e2e, error fixes) DONE. This spec covers steps 4-7.
+
+**SCOPE / BOUNDARY (verified 2026-09-24):**
+- **KEEP** (the live UI + assets, relocated): `services/web/frontend/` (React app; the `@/` TS alias = `services/web/frontend/js/*` — self-contained) → `frontend/` (mirror `go/`); `services/web/public/` (~861 MB built assets) → repo root `public/`; `services/web/locales/` (~1.7 MB) → repo root `locales/`; the frontend build system (`webpack.config.js`, `package.json`, `babel.config.cjs`, `tsconfig*.json`, `scripts/`, `styles…`, `types/`, `shared/`, `knip.ts`, `eslint/lint` configs, `vitest*`, `tailwind.config.js`).
+- **JUNK** (Node backend, Go-superseded by `go/services/web`, 37 feature pkgs): `services/web/app/` (366 source files: `src/Features/` 52 dirs, `src/infrastructure/`, `src/models/`, `src/router.mjs`, `templates/`, `views/`), `services/web/app.mjs`, the backend test suite `services/web/test/` (6.6 M), and the 34 `services/web/modules/` SaaS/CE-unused module dirs. Owner deletes the junk folder later (per step 4); keep it recoverable meanwhile.
+- **KEY CROSS-DEP (the only one):** 24 frontend files `import { Tag } from '…/app/src/Features/Tags/types'` — a TYPE-ONLY import of `services/web/app/src/Features/Tags/types.d.ts` (`export type Tag = {…}`); erased at webpack compile, needed only for `tsc`. **Resolution:** relocate the shared backend types (`Types`-only `.d.ts` like `Tags/types.d.ts` + any others) to a shared types home (e.g. `frontend/js/shared/types/` or `types/`) and repoint the 24 imports → after which `app/` is purely junk (no frontend dep remains). Verify with a frontend `tsc`/type-check.
+- **ORACLE:** the Node web oracle (e2e `:4000`/`:3000`) is currently the Node primary in `ol-e2e-overleaf-1`. Decision OPEN (owner): **PRESERVE** (keep the Node web servable from its new location so parity re-verification stays possible) vs **RETIRE** (Go is the product; parity already proven during the port). Safe default = **PRESERVE**.
+
+**COUPLED REFERENCES TO UPDATE (one coordinated change, update all together):**
+1. `server-ce/nginx/overleaf.conf.template:5` — `root /overleaf/services/web/public/` → `root /overleaf/public/`.
+2. `go/services/web/core/config.go:164-169` — `PublicDir`=`…/services/web/public` → `…/public`; `LocalesDir`=`…/services/web/locales` → `…/locales`.
+3. `services/web/webpack.config.js:118` — `output.path = path.join(__dirname,'public')` → repo-root `public/`.
+4. `server-ce/Dockerfile` — `COPY … services/*/package.json`, the `services/web/…cache` webpack/babel mounts, and the `node genScript compile` build path (must still build the frontend from its new home).
+5. Frontend internal paths — the 24 `Tags/types` imports → the shared types home; `tsconfig.json` `baseUrl`/`paths`; any `package.json`/`scripts` that reference `services/web/…` or `app/`.
+
+**EXECUTION ORDER (git-tracked slices, `git mv`, rollback via `git`):**
+- **A.** Relocate the shared backend TYPE to the shared types home + repoint the 24 imports; frontend type-check MUST pass before B. (Safe, unblocks the rest.)
+- **B.** `app/` + `modules/` + `app.mjs` + backend `test/` → `junk/` (verify no KEEP file references `app/` after A).
+- **C.** `services/web/frontend/` → `frontend/` (mirror `go/`); update the `@/` alias target, `package.json`, `webpack.config.js`, `tsconfig`, and internal relative paths.
+- **D.** `services/web/public/` → `public/`, `services/web/locales/` → `locales/` (repo root); update refs 1-4.
+- **E.** `make image` (~30 min) build → e2e green (`a5smoke` + `smoke` + parity battery) → **STOP** (the production/shared-stack cycle awaits the owner's green-light).
+- **THEN P7-post:** SQLite config DB · GDPR cookie consent · /hub email templates · go-i18n.
+
+**OPEN DECISIONS (owner, 2026-09-24):**
+1. **Oracle** — PRESERVE (default/safe) vs RETIRE the Node web oracle.
+2. **Production** — pre-approve the `make image` rebuild + the shared/dev-stack cycle-once-green, vs PAUSE before those two (default = PAUSE, per the "confirm before external dev stack" rule).
