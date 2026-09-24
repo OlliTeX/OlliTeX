@@ -194,6 +194,20 @@ func Feature(a *core.App) core.Feature {
 			// (ghost or real)→200 text/plain "OK" (+ active:false + best-effort
 			// DU-flush/docstore-archive side effects).
 			{Method: "POST", Pattern: internalDeactivatePat, NoSession: true, APIOnly: true, Handler: internalDeactivateHandler(a)},
+			// U-API — the six Node /internal/* cron + PII + download endpoints
+			// (router.mjs privateApiRouter, basic-auth, APIOnly → web profile skips).
+			// Wire (pinned Node :3000, 2026-09-24): all → unauth→401; :param
+			// endpoints → bad-id→404 JSON VA; expire-project active→200 "OK"
+			// (no-op), ghost→404 "Not Found"; zip ghost→404 "Not Found". The 200
+			// bulk / 204 / zip-200 / destructive single-expire SUCCESS legs are
+			// best-effort in Go (NOT gated — destructive/heavy, same standard as
+			// deactivate + history/resync-204): Go returns the faithful status.
+			{Method: "POST", Pattern: internalExpireProjectsPat, NoSession: true, APIOnly: true, Handler: internalExpireProjectsAfterDuration(a)},
+			{Method: "POST", Pattern: internalExpireUsersPat, NoSession: true, APIOnly: true, Handler: internalExpireUsersAfterDuration(a)},
+			{Method: "POST", Pattern: internalExpireProjectPat, NoSession: true, APIOnly: true, Handler: internalExpireProjectHandler(a)},
+			{Method: "POST", Pattern: internalExpireUserPat, NoSession: true, APIOnly: true, Handler: internalExpireUserHandler(a)},
+			{Method: "GET", Pattern: internalZipPat, NoSession: true, APIOnly: true, Handler: internalZipHandler(a)},
+			{Method: "POST", Pattern: internalDeactivateOldPat, NoSession: true, APIOnly: true, Handler: internalDeactivateOldProjects(a)},
 			// U-API — POST /project/:Project_id/join (Node EditorRouter, privateApiRouter
 			// only, basic-auth; "called by the real-time API"). APIOnly → the web
 			// profile SKIPS it (Node does not wire this path on webRouter).

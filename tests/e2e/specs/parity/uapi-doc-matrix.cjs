@@ -403,6 +403,62 @@ async function main() {
   add('rsync-disabled', async () => post(RS, {}, VJ))
   add('rsync-ghost', async () => post('/project/' + GHOST + '/history/resync', {}, VJ))
 
+  // ---- the six Node /internal/* cron + PII + download endpoints (2026-09-24) ----
+  // All privateApiRouter, basic-auth, api-only. SAFE legs are gated (401 +
+  // bad-id VA + the non-mutating expire-project outcomes). The DESTRUCTIVE / HEAVY
+  // success legs (bulk 200, expire-user 204, zip 200, destructive single-expire)
+  // are best-effort in Go and NOT driven here (same standard as deactivate +
+  // history/resync-204). PJ = the active seeded uapi-wire fixture (no leftover
+  // deletedProject record → active→200 is a true no-op, non-destructive).
+  //
+  // POST /internal/project/:projectId/expire-deleted-project (Node
+  // ProjectController.expireDeletedProject → ProjectDeleter). Pinned Node :3000:
+  //   unauth/wrong → 401 (challenge); bad projectId → 404 JSON VA
+  //   params.projectId; ACTIVE project → 200 text/plain "OK" (no-op); GHOST (no
+  //   project, no deletedProject record) → 404 text/plain "Not Found".
+  const EXP = (id) => `/internal/project/${id}/expire-deleted-project`
+  add('exp-proj-unauth', async () => postRaw(EXP(PJ), undefined, J))
+  add('exp-proj-wrong', async () => postRaw(EXP(PJ), undefined, WJ))
+  add('exp-proj-badoid', async () => postRaw(EXP('notahex'), undefined, VJ))
+  add('exp-proj-active', async () => postRaw(EXP(PJ), undefined, VJ)) // 200 "OK" no-op
+  add('exp-proj-ghost', async () => postRaw(EXP(GHOST), undefined, VJ)) // 404 "Not Found"
+  //
+  // POST /internal/users/:userId/expire (Node UserController.expireDeletedUser
+  // → UserDeleter, 204 success). Pinned: unauth/wrong → 401 (challenge); bad
+  // userId → 404 JSON VA params.userId. (204 + ghost→500 are side-effecting → NOT gated.)
+  const USR = (id) => `/internal/users/${id}/expire`
+  add('exp-user-unauth', async () => postRaw(USR(PI_UID), undefined, J))
+  add('exp-user-wrong', async () => postRaw(USR(PI_UID), undefined, WJ))
+  add('exp-user-badoid', async () => postRaw(USR('notahex'), undefined, VJ))
+  //
+  // GET /internal/project/:Project_id/zip (Node ProjectDownloadsController.
+  // downloadProject, 200 zip). Pinned: unauth/wrong → 401 (challenge); bad
+  // Project_id → 404 JSON VA params.Project_id. (valid-project zip 200 is heavy
+  // + non-deterministic → NOT gated; ghost zip wire is unstable → NOT gated.)
+  const ZIP = (id) => `/internal/project/${id}/zip`
+  add('zip-unauth', async () => get(ZIP(PJ), J))
+  add('zip-wrong', async () => get(ZIP(PJ), WJ))
+  add('zip-badoid', async () => get(ZIP('notahex'), VJ))
+  //
+  // POST /internal/expire-deleted-projects-after-duration (Node ProjectController
+  // .expireDeletedProjectsAfterDuration → bulk ProjectDeleter, 200 success). Pinned:
+  // unauth/wrong → 401 (challenge). (200 bulk is destructive on a stack with
+  // deletedProjects → NOT gated.)
+  add('bulk-proj-unauth', async () => postRaw('/internal/expire-deleted-projects-after-duration', undefined, J))
+  add('bulk-proj-wrong', async () => postRaw('/internal/expire-deleted-projects-after-duration', undefined, WJ))
+  //
+  // POST /internal/expire-deleted-users-after-duration (Node UserController
+  // .expireDeletedUsersAfterDuration → bulk UserDeleter, 200 success). Pinned:
+  // unauth/wrong → 401 (challenge). (200 bulk destructive → NOT gated.)
+  add('bulk-user-unauth', async () => postRaw('/internal/expire-deleted-users-after-duration', undefined, J))
+  add('bulk-user-wrong', async () => postRaw('/internal/expire-deleted-users-after-duration', undefined, WJ))
+  //
+  // POST /internal/deactivateOldProjects (Node InactiveProjectController.
+  // deactivateOldProjects → bulk deactivate, 200 success). Pinned: unauth/wrong →
+  // 401 (challenge). (200 bulk deactivates old active projects → destructive → NOT gated.)
+  add('deactold-unauth', async () => postRaw('/internal/deactivateOldProjects', undefined, J))
+  add('deactold-wrong', async () => postRaw('/internal/deactivateOldProjects', undefined, WJ))
+
   for (const c of CASES) {
     try {
       const r = await c.run()
