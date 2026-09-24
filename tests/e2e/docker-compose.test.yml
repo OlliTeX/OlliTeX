@@ -197,15 +197,18 @@ services:
     networks: [e2e]
 
   git-bridge:
-    image: ${GIT_BRIDGE_IMAGE:-sharelatex/git-bridge:ext-6.3.0-port}
+    # P7 cutover (2026-09-24): the 1:1 Go git-bridge (go/services/gitbridge)
+    # replaces the Java sharelatex/git-bridge. Image = node:24 (glibc + `git`)
+    # + the cmd/gitbridge binary, config-agnostic; config is mounted from
+    # gitbridge-runtime.json (same schema as the Java runtime.json).
+    #   build:    go/services/gitbridge/build.sh   -> gitbridge-go:latest
+    #   rollback: image: sharelatex/git-bridge:ext-6.3.0-port
+    #             command: ['/server-pro-start.sh']   (revive the Java service)
+    image: gitbridge-go:latest
     user: root
-    command: ['/server-pro-start.sh']
-    environment:
-      GIT_BRIDGE_API_BASE_URL: 'http://overleaf:3000/api/v0/'
-      GIT_BRIDGE_OAUTH2_SERVER: 'http://overleaf'
-      GIT_BRIDGE_POSTBACK_BASE_URL: 'http://git-bridge:8000'
-      GIT_BRIDGE_ROOT_DIR: '/data/git-bridge'
+    command: ['git_bridge', 'serve', '/conf/runtime.json']
     volumes:
+      - ./gitbridge-runtime.json:/conf/runtime.json:ro
       - gb-data:/data/git-bridge
     depends_on:
       - overleaf

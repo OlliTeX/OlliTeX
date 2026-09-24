@@ -53,6 +53,27 @@ type Config struct {
 	SQLiteHeapLimitBytes int             `json:"sqliteHeapLimitBytes"`
 }
 
+// normalizeUserPasswordEnabled coerces the userPasswordEnabled config value to the
+// string form Config stores. Java's runtime.json sends a JSON bool (e.g. false);
+// some deployments use the strings "true"/"false". IsUserPasswordEnabled compares
+// the stored string == "true", so normalize bool→"true"/"false", keep strings, and
+// treat absent as "" (disabled).
+func normalizeUserPasswordEnabled(v interface{}) string {
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case bool:
+		if x {
+			return "true"
+		}
+		return "false"
+	case string:
+		return x
+	default:
+		return fmt.Sprintf("%v", x)
+	}
+}
+
 // Load reads and parses a config file (ConfigFileException semantics).
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
@@ -64,7 +85,7 @@ func Load(path string) (*Config, error) {
 		PostbackURL          string          `json:"postbackBaseUrl"`
 		AllowedCorsOrigins   string          `json:"allowedCorsOrigins"`
 		Oauth2Server         string          `json:"oauth2Server"`
-		UserPasswordEnabled  string          `json:"userPasswordEnabled"`
+		UserPasswordEnabled  interface{}     `json:"userPasswordEnabled"`
 		RepoStore            json.RawMessage `json:"repoStore"`
 		SwapStore            json.RawMessage `json:"swapStore"`
 		SwapJob              json.RawMessage `json:"swapJob"`
@@ -110,7 +131,7 @@ func Load(path string) (*Config, error) {
 		config.PostbackURL += "/"
 	}
 	config.Oauth2Server = s.Oauth2Server
-	config.UserPasswordEnabled = s.UserPasswordEnabled
+	config.UserPasswordEnabled = normalizeUserPasswordEnabled(s.UserPasswordEnabled)
 	if s.RepoStore != nil {
 		var rs RepoStore
 		if err := json.Unmarshal(s.RepoStore, &rs); err != nil {
