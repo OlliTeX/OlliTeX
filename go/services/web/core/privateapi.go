@@ -3,6 +3,7 @@ package core
 import (
 	"net/http"
 	"os"
+	"strconv"
 )
 
 // Private-API (basic-auth) trio primitives — U10.3r (2026-09-23, pinned live
@@ -154,4 +155,44 @@ func (a *App) APIBasicGate401(cxt *Cxt, res *Res, req *http.Request) bool {
 	}
 	send401()
 	return false
+}
+
+// SendRestricted403JSON — the WEB-profile /project/:id (editorPage) restricted
+// 403 for a request that accepts JSON (Node AuthorizationMiddleware restricted
+// content-negotiation): 24B `{"message":"restricted"}` + the fixed CSP
+// (CSPDefaultPolicy) + the web helmet baseline (incl. nosniff; the no-cache set
+// applies because noCacheFor matches the project page) + the weak ETag over the
+// body (W/"18-WWEMZJpglINrlZwTEutmkjASLhM"). Returns false (write nothing) when
+// the request does NOT accept JSON, so the caller falls back to the "Restricted"
+// 403 page (views.Restricted403).
+func (a *App) SendRestricted403JSON(res *Res, req *http.Request) bool {
+	if !a.acceptsJSON(req) {
+		return false
+	}
+	body := []byte(`{"message":"restricted"}`)
+	res.W.Header().Set("Content-Type", "application/json; charset=utf-8")
+	res.W.Header().Set("Content-Security-Policy", CSPDefaultPolicy)
+	a.setWebBaseline(res.W, req, false)
+	res.W.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	res.W.Header().Set("ETag", EtagWeakBody(string(body)))
+	res.W.WriteHeader(403)
+	_, _ = res.W.Write(body)
+	return true
+}
+
+// basicAuthValid — pure (no write) private-API basic-credential check, the
+// same comparison APIBasicGate401 uses: req carries a valid WEB_API_USER /
+// WEB_API_PASSWORD Basic cred. Used by App.webAuthed to decide, for a
+// web-profile request, whether a present Authorization header authenticates it
+// (Node requireGlobalLogin: Authorization present → basic decision rules).
+func (a *App) basicAuthValid(req *http.Request) bool {
+	if req == nil {
+		return false
+	}
+	au, p, has := req.BasicAuth()
+	if !has {
+		return false
+	}
+	eu, ep := privateAPICreds()
+	return eu != "" && au == eu && p == ep
 }

@@ -107,9 +107,22 @@ func pageBase(cxt *core.Cxt) views.PageData {
 func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		if cxt.Sess == nil || !cxt.Sess.IsLoggedIn() {
-			// anonymous — the global gate normally bounces here, but a
-			// public-access profile reaches the handler: mirror Node's
-			// requireLogin 302 /login.
+			if a.Cfg.Profile == "web" && !a.Cfg.AllowPublicAccess {
+				// requireGlobalLogin is enabled: an unauthenticated (no-auth)
+				// request is 302-bounced before reaching here, and the only
+				// request that reaches here WITHOUT a session is one authenticated
+				// by a VALID private-API basic (Node requireGlobalLogin: Authorization
+				// present → basic check → next()). Node: /project/:id authenticated
+				// but no session user → 403 restricted, Accept-negotiated (JSON
+				// {"message":"restricted"} / else the "Restricted" page).
+				if a.SendRestricted403JSON(res, cxt.Req) {
+					return
+				}
+				views.Restricted403(res.W, pageBase(cxt))
+				return
+			}
+			// public-access profile (or api): mirror Node's requireLogin
+			// 302 /login (pinned — anon reaches the handler there).
 			res.Redirect(cxt.Req, 302, "/login")
 			return
 		}

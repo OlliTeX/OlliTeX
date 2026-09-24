@@ -310,7 +310,7 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 					rt.Handler(cxt, res)
 					return
 				}
-				if a.Cfg.Profile == "web" && !a.Cfg.AllowPublicAccess && !rt.NoLogin && !cxt.Sess.IsLoggedIn() {
+				if a.Cfg.Profile == "web" && !a.Cfg.AllowPublicAccess && !rt.NoLogin && !a.webAuthed(cxt, r) {
 					a.globalLoginBounce(cxt, res, r)
 					a.maybeSaveSession(cxt, w, rw)
 					return
@@ -340,7 +340,7 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 		// Node requireGlobalLogin: the NoLogin/NoSession whitelist applies to
 		// EVERY method — anonymous OPTIONS /status → 200 Allow, anonymous
 		// OPTIONS /zzz-nope → 302 (pinned P6.18).
-		gated := !a.Cfg.AllowPublicAccess && !cxt.Sess.IsLoggedIn()
+		gated := !a.Cfg.AllowPublicAccess && !a.webAuthed(cxt, r)
 		if gated && a.pathHasNoLogin(r.URL.Path) {
 			gated = false
 		}
@@ -456,6 +456,22 @@ func (a *App) serve500(cxt *Cxt, res *Res, err error) {
 		return
 	}
 	res.SendStatus(500)
+}
+
+// webAuthed — the auth decision of Node's requireGlobalLogin for the web
+// profile (mirror the Node ordering in AuthenticationController.
+// requireGlobalLogin). When an Authorization header is PRESENT the
+// basic-credential decision is authoritative (valid → authenticated, invalid →
+// unauthenticated — the session is ignored, exactly like Node). When absent
+// the session decides. This is what lets a *valid* private-API basic cred
+// authenticate a web-profile request (→ dispatched to the route / web 404
+// view) instead of being bounced to 401, matching Node; an invalid cred still
+// 401s.
+func (a *App) webAuthed(cxt *Cxt, r *http.Request) bool {
+	if r.Header.Get("Authorization") != "" {
+		return a.basicAuthValid(r)
+	}
+	return cxt.Sess != nil && cxt.Sess.IsLoggedIn()
 }
 
 // globalLoginBounce implements router.mjs:215 requireGlobalLogin for a

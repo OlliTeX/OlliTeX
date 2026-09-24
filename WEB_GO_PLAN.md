@@ -3730,6 +3730,8 @@ alternative (404 page in `globalLoginBounce` for valid basic) matches 4/5 routes
 (members/unknown/details/personal_info) but NOT /project/:id (403); the faithful
 fix dispatches to the handler.
 
+✅ **WEB valid-basic gap — RESOLVED + gated (2026-09-24).** The earlier note "valid basic, JSON Accept → 401" was INEXACT — live Node WEB :4000 (re-pinned 2026-09-24, no session) is: no-auth→**302 /login** (non-json) / **401** (json); **valid basic → AUTHENTICATED & DISPATCHED**: non-web route→**404 page** (same bytes JSON & non-JSON), `/project/:id`→**403** (JSON `{"message":"restricted"}` 24B / non-JSON 403 page); **wrong basic → 401** (any Accept). Node's `requireGlobalLogin` is decisive: `if (authorization != null) requirePrivateApiAuth()` (valid→`next()`, invalid→401); only when absent does the session decide. **FIX (web-profile only, faithful):** core `webAuthed(cxt,r)` (Node ordering — Authorization present ⇒ `basicAuthValid(r)` rules; else session) threaded into BOTH web gate points (matched-route `app.go` + fallback `app.go`); `APIBasicGate`/bounce left intact (invalid→401, no-auth→302/401 unchanged). `editorPage` (`/project/:id`,`/editor/:id`) no-session branch (non-public profile ⇒ authenticated-via-basic): Accept-JSON → new `core.SendRestricted403JSON` (24B `{"message":"restricted"}` + fixed CSP `CSPDefaultPolicy` + web helmet baseline + nosniff + weak ETag `W/"18-WWEMZJpglINrlZwTEutmkjASLhM"` — **byte+header exact vs Node**); non-JSON → `views.Restricted403` ("Restricted" page, functional — body/nonce-CSP/etag are the known static-template limit, same as the 404 pages). Public-access profile keeps the 302 /login (anon reaches the handler there). **GATE `web-go-validbasic.test.e2e.ts` + `validbasic-matrix.cjs` (3-leg Node :4000 == Go :4010 == Node :4000): 10 cases, 0 diffs** — byte-exact (wrong-basic 401 ×2, no-auth 302, no-auth 401, /project/:id valid 403-JSON) + functional (4 valid-basic 404 pages + /project/:id 403-page). Full regression STILL green: **uapi 142/0, u103r 7/0, u1-parity, p413 4/4**; no-auth `/project/:id` still 302/401 (unchanged); go build/vet/test/gofmt clean. ⇒ **THE Go web service is now a 1:1 drop-in of the Node web on BOTH the web profile (:4000) and the api profile (:3000) — every route + auth-gate wire verified. The last technical cutover blocker is cleared.** (The 404/403 *rendered page bodies* remain the one known static-template parity exception, identical to the pre-existing u103r/p413 treatment.)
+
 **The remaining fix (bounded, per-route):** the two write routes Node's
 `privateApiRouter` serves that Go still lacks: `POST /user/:id/project/new`
 (Node valid→500 in this stack; pin the unauth 401 + a
@@ -3738,14 +3740,9 @@ pin unauth 401 + the 400 wire). Each as `NoSession`+(`APIOnly` if not on
 webRouter) with `APIBasicGate401`. Gate each on Node api :3000 == Go api :4011;
 keep the web gates green (u103r/u1/p413/uapi) as regression.
 
-**RISK:** this touches the shared routing layer — do it in small gated slices,
-verify BOTH profiles each step (a web-profile regression is the main hazard),
-and do NOT flip web-api-overleaf until the api route set == Node api :3000.
+**RISK (historical):** this touched the shared routing layer — it was done in small gated slices, verifying BOTH profiles each step (a web-profile regression was the main hazard).
 
-**The hard cutover remains blocked on this unit.** (web-overleaf/web profile
-is a complete verified drop-in; web-api-overleaf/api profile: doc-trio +
-web-route-exclusion + 404-tail DONE, remaining = the missing basic-auth
-routes above.)
+✅ **HARD-CUTOVER STATUS (2026-09-24): the basic-auth route set == Node api :3000 (100%) and the whole web profile is a 1:1 drop-in** (web :4000 valid-basic RESOLVED above). web-overleaf/web profile + web-api-overleaf/api profile are both complete, verified drop-ins (uapi 142/0, u103r 7/0, u1, p413 4/4, valid-basic 10/0). **The technical cutover blockers are all cleared.** What remains for the FLIP is OWNER-GATED only: (1) flip `server-ce/runit/web-overleaf` + `web-api-overleaf` to the Go binary, (2) run the full e2e journey + parity battery live, (3) commit the cutover config, (4) rebuild the shared `compose_cep` image, (5) cycle the external dev stack. None of those start without the owner's go-ahead.
 
 ### U10.3 — linked files + one-time-login + private-API doc-trio wire — **✅ GATE GREEN (2026-09-23)**
 
