@@ -9,16 +9,18 @@ STATUS: CLSI 34 packages ported + 1 NEW (historyresourcewriter, PRODUCTION CODE
   + errors MissingUpdates helpers and temporarily dropped metrics to 74.1% and
   errors to 87.5% until they're exercised (restored by the HRW tests §10.9).
   HRW files: historyresourcewriter.go (639L) + sync.go (491L) BUILD + VET
-  CLEAN; test file 461L (9 Node-mirror scenario tests green; pkg coverage
-  69.7%). NEXT ACTIVE: finish HRW coverage (≥90% per §10.8/§10.9) → commit HRW
-  → compile core (compilemanager 1021L + compilecontroller 491L).
+  CLEAN; 27 scenario tests (2 cov files) green; pkg coverage 94.0% (gate MET
+  90%). errors 100.0% and metrics 100.0% RESTORED. NEXT ACTIVE: commit HRW +
+  otc file_map/snapshot diff → compile core (compilemanager 1021L +
+  compilecontroller 491L).
 Build: go build ./... = OK | go vet ./... = clean | go test ./... = ALL ok.
   otc (root module): build + test GREEN incl. safe_pathname oracle 80,782 rows
   (= 0 mismatches; see go/libraries/HANDOFF_SAFE_PATHNAME.md for the GREEN
   acceptance record + CLSI-side replica at services/clsi.go/safepathname_oracle/).
-git: HEAD 62532d8 (HRW port + otc raw-file shape + this HANDOFF, PUSHED to origin
-  go_compile_test). BRANCH go_compile_test (b74bb81 otc safe_pathname RED->GREEN
-  also pushed). UNCOMMITTED: only the install-artifact bump
+git: HEAD 932890d (HRW coverage tests → 94.0%, gate MET 90% 35/35, PUSHED to origin
+  go_compile_test). BRANCH go_compile_test (preceding: 62532d8 HRW port + otc
+  raw-file shape + this HANDOFF; b74bb81 otc safe_pathname oracle RED->GREEN,
+  both pushed). UNCOMMITTED: only the install-artifact bump
   .yarn/install-state.gz (leave local / commit as churn — not build-relevant).
   Untracked: services/clsi.go/.pi/ (tool scratch — not part of the port).
 safe_pathname: FIXED + ACCEPTED (oracle GREEN 80,782/80,782). Commit b74bb81 —
@@ -66,10 +68,10 @@ otc (LIB-15, shared `ollitex` module at repo root `go/libraries/otc/`):
     else in otc is green.
 
 CLSI remaining modules (in §1 order):
-  - historyresourcewriter (869L) — PRODUCTION CODE WRITTEN this session (639+491 L,
-    build+vet clean, 9 Node-mirror tests green @ 69.7%). Remaining: coverage tests
-    per §10.8/§10.9 (clsi-cache populate, missing-updates rethrow, draft, tikz,
-    nested dirs, changesFromRaw, fetchString 404, fullSync), then ≥90% gate.
+  - historyresourcewriter (869L) — DONE (639+491 L, build+vet clean, 27 scenario
+    tests green @ 94.0%; coverage gate MET per §10.9: clsi-cache populate,
+    missing-updates rethrow, draft, tikz, nested dirs, changesFromRaw, fetchString
+    404, fullSync, defaultPngConvert bridge all exercised; all 35 pkgs ≥ 90%).
   - compile core: compilemanager (1021L) + compilecontroller (491L) — deps ALL met
     (dockerrunner DONE otc B DONE); compilemanager uses HRW Result.
   - error middleware port (from app.js `err` handler — see §4/12.2)
@@ -101,7 +103,7 @@ CLSI remaining modules (in §1 order):
 | 1 | TODO-e5399221 | config (175L) | DONE 93.0% (gate 90% MET — remeasured 2026-09-24). |
 | 2 | errors/req/lp/logger | errors, requestparser, lastprojectaccess, logger | DONE: errors 98.4%, requestparser 93.7%, lastprojectaccess 100.0%, logger 100.0. |
 | 5 | TODO-d9502cb0 | Output side: clsicache (528L), contentcachemanager (447L), outputcachemanager (688L) | DONE — clsicachehandler 93.9%, contentcachemanager 96.7%, outputcachemanager 92.1%. |
-| 6 | TODO-fac1ee46 | Content cache: resourcewriter, historyresourcewriter, urlcache, urlfetcher | IN PROGRESS — urlcache 96.8%, urlfetcher 96.2%, resourcewriter 93.2%; historyresourcewriter: PRODUCTION CODE WRITTEN (build+vet+9 scenario tests green, 69.7% cover — finish ≥90%, §10.9). |
+| 6 | TODO-fac1ee46 | Content cache: resourcewriter, historyresourcewriter, urlcache, urlfetcher | DONE 2026-09-24 — urlcache 96.6%, urlfetcher 93.8%, resourcewriter 93.2%, historyresourcewriter 94.0% (coverage gate MET 94.0% ≥ 90%; §10.8/§10.9 closed). |
 | 3 | TODO-6a350144 | Compile core: commandrunner (19L), compilemanager (1021L), compilecontroller (491L) | IN PROGRESS — commandrunner 100.0%; compilemanager + compilecontroller remain (otc B dep NOW met after HRW). |
 | 7 | TODO-843bd163 | Conversion: tikzmanager (129L), png2pdf (96L), conversionmanager (936L), conversionoutputcleaner (port) | DONE 2026-09-20: tikzmanager 94.9%, png2pdf 93.4%, conversionmanager 91.6%, conversionoutputcleaner 100%, fileuploadmiddleware 93.9%. |
 | 4 | TODO-02cae9d7 | DockerRunner (634L) → `dockerrunner` (hand-rolled HTTP-over-unix Engine SPI) + fake for tests | DONE 2026-09-24 (engine.go + unixengine + pipeline + monitor + fingerprint + FakeEngine = 90.9%). |
@@ -182,8 +184,7 @@ Controllers (HTTP edge)
 
 Compile core
   CompileManager.js (1021L)     → compilemanager/ (deps ALL met: dockerrunner + otc B)
-  HistoryResourceWriter.js (869L) → historyresourcewriter/ (IN PRODUCTION WRITE;
-                                   stale draft REPLACED, design §10)
+  HistoryResourceWriter.js (869L) → historyresourcewriter/ (DONE 2026-09-24, 94.0%, 27 scenario tests, design §10)
   ResourceWriter.js (398L)      → resourcewriter/ (DONE 93.2%, otc wired)
   DockerRunner.mjs (634L)       → dockerrunner/ (DONE 90.9%, §4/12)
   OutputCacheManager.js         → outputcachemanager/ (DONE 92.1%, §5/7 LOCKED)
@@ -1053,9 +1054,8 @@ file). Success gate: `file.path === 'output.pdf' && file.size > 0`.
 3. **historyresourcewriter** (PRODUCTION CODE WRITTEN this session) — full 1:1
    port of HistoryResourceWriter.js 869L. Stale draft (105L, wrong Runner
    interface) REPLACED. Locked design + verified signatures: §10 below.
-   otc Phase B dep is MET (blob_store.go shipped). Current: 639L + 491L + 461L
-   test; build+vet+9 scenario tests GREEN (cov 69.7%); coverage scenarios
-   remaining per §10.8/§10.9.
+   otc Phase B dep is MET (blob_store.go shipped). Current: 639L + 491L + 3 cov test files (27 scenario tests);
+   build+vet+all GREEN (cov 94.0%, gate MET §10.9).
 
 4. **compile core** (compilemanager 1021L + compilecontroller 491L) — deps ALL met
    (dockerrunner + otc B). CompileManager uses HRW Result (full 1:1:
@@ -1187,9 +1187,8 @@ primitive is ported; only the *backend wiring* (filestore URL prefix) stays loca
 HistoryResourceWriter's BlobStore extends BaseBlobStore, as in Node).
 
 **Next (in order):**
-1. historyresourcewriter — IN PRODUCTION WRITE (full investigation done this
-   session; every seam signature verified against live Go packages; locked
-   design + test plan: §10). Stale draft REPLACED. Target: package ≥ 90%.
+1. historyresourcewriter — DONE (cov 94.0%≥90%, gate MET; 27 scenario tests
+   green; errors+metrics restored 100%; §10.9 COMPLETE).
 2. compilemanager.go (1021L) — deps all met. CompileController (491L, route
    layer) AFTER — it's mostly z-schema request parsing + wire.
 3. error middleware + apps/server (route table §3.2, load agent TCP 3048 + HTTP 3049)
@@ -1456,7 +1455,7 @@ removed when no child files), ensureHasParentFolder (parent in entries → early
 changesFromRaw (add+move+edit ops), fetchString 404→NotFound, fullSync (all paths changed,
 resync deleted), incremental dirty set.
 
-### 10.9 IMPLEMENTATION STATUS (2026-09-24, production write done, tests partial)
+### 10.9 IMPLEMENTATION STATUS (2026-09-24, COMPLETE — coverage gate MET 94.0%)
 
 Files (in `services/clsi.go/historyresourcewriter/`, all UNCOMMITTED):
 - `historyresourcewriter.go` (639L): seams (§10.1), Request/Result (§10.2),
@@ -1477,10 +1476,30 @@ Files (in `services/clsi.go/historyresourcewriter/`, all UNCOMMITTED):
   conversion (sync1/sync2/sync3 attempt-once), ReServeOptimisedAfterModeSwitch,
   AnalyticsNoSlowList, AnalyticsSlowPngPng2pdfOff/On, AnalyticsBelowThreshold,
   AnalyticsMultipleSlowPngs, AnalyticsMixedThreshold.
+- `historyresourcewriter_cov_test.go` (~230L) + `historyresourcewriter_cov2_test.go`
+  (~290L): close every §10.8 "Plus" gap — clsi-cache populate end-to-end (seam
+  writes resync → load source clsi-cache → post-sync delete; populate error/no-ok
+  → remote fallback; corrupt history.json.gz → warn + remote fallback), MissingUpdates
+  tracking (resync maxInt accumulation history lv5 + resync lv2 → final lv5 with
+  noRawSnapshot), draft PREFIX + dirty re-save (real draftmodemanager.PREFIX),
+  tikz output.tex WriteOutputFileIfNeeded success + "write failed" tag, hollow
+  byteLength-only "file without content and hash" path, CreateProjectDir error →
+  "write failed", download-error continue (blob fail, main.tex still written),
+  PngConvert/CommitConversion error swallow, ClearCache RemoveAll-error branch,
+  SaveSlowPngList nil→`[]`, loadSnapshotFromFile corrupt-gunzip + bad-JSON paths,
+  saveSnapshot rename/MkdirAll failures, removeExtraneousEntries Remove-error,
+  ensureHasParentFolder (parent-as-file), defaultPngConvert bridge (stats-on-
+  success / timings-always via png2pdf.RunFunc), incremental (non-full-sync)
+  ApplyOps (dirty + Add/Move/Remove/noOp + restored-deleted + re-save with
+  advanced lv) and IncrementalModeChange (mode-switch re-serve + opt-not-cached
+  convert path + commit count), gunzipBytes truncated-stream error.
+
+Final numbers (2026-09-24, `go clean -testcache -cache && go test ./... -cover`):
+- HRW pkg **94.0%** (gate MET; all 35 CLSI pkgs ≥ 90%).
 
 Verified this session:
 - `go build ./historyresourcewriter/` + `go vet` clean; `go test` GREEN;
-  pkg coverage 69.7% (gate = 90%). clsi module `go build ./...` + `go test
+  pkg coverage 94.0% (gate = 90%, MET 2026-09-24). clsi module `go build ./...` + `go test
   ./...` all green.
 - otc dependency committed: `b74bb81` (safe_pathname oracle GREEN + CLSI
   replica). otc file_map.go/snapshot.go diff (FileMapFromAny/SnapshotFromRaw
@@ -1489,30 +1508,5 @@ Verified this session:
   ships WITH the HRW commit (it is the HRW consumer).
 - otc `go build` + `go test` GREEN at repo root after those edits.
 
-Coverage gaps to close (per §10.8 "Plus:") — the 9 tests above use the
-remote-fallback path only (fresh cache dir, no pre-seeded snapshot):
-1. clsi-cache populate: DownloadHistorySnapshot seam writes the resync file,
-   load follows it (source = "clsi-cache"); populate fail + RawSnapshot nil →
-   rethrow MissingUpdates (maxLocalBaseVersion from missing-updates info);
-   populate disabled + corrupt history.json.gz → warn + remote fallback.
-2. draft branch: request.Draft + root resource in files → PREFIX written
-   (assert REAL draftmodemanager.PREFIX, not a mock) + dirty re-save.
-3. tikz branch: snapshot has output.tex → WriteOutputFileIfNeeded called with
-   hasOutputTex=true (assert arg); without → false.
-4. nested dir discovery/removal: pre-seeded extraneous subdir removed when no
-   file maps to it; dir→file promotion (folder replaced by same-name file).
-5. changesFromRaw: add+move+edit raw ops → changedPaths incremental set;
-   bad op → "invalid raw change operation" OError.
-6. fetchString 404: FetchStringFunc seam returns &fetchutils.RequestFailedError
-   {Status:404} → errors.NewNotFoundError propagates (blob fetch fails, loop
-   swallows → IncDownloadFailed path); non-404 error retries then returns the
-   final error.
-7. fullSync end-to-end: resync loaded → all paths changed, resync file
-   deleted post-sync (deleteResyncSnapshot), Result.BaseHistoryVersion =
-   remote + len(changes).
-8. ensureHasParentFolder early-return (parent already discovered).
-9. loadSnapshotFromFile corruption path (bad gzip → warn + fallback) and
-   SaveSlowPngList nil-list → `[]`.
-
-After the tests: commit HRW + otc file_map/snapshot diff; re-measure
-coverage (gate ≥90%: HRW pkg + metrics + errors restore)
+Coverage: ALL gaps closed (2)–(11) exercised. HRW pkg 94.0%, gate 35/35 ≥ 90%.
+Commit HRW + otc file_map/snapshot diff.

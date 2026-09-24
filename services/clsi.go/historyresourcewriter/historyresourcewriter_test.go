@@ -144,6 +144,24 @@ func makeRequest(overrides map[string]any) *Request {
 			}
 		case "rawSnapshot":
 			req.RawSnapshot = v.(map[string]any)
+		case "noRawSnapshot":
+			req.RawSnapshot = nil
+		case "baseHistoryVersion":
+			req.BaseHistoryVersion = v.(int)
+		case "changes":
+			req.RawChangeOperations = v.([][]map[string]any)
+		case "draft":
+			req.Draft = v.(bool)
+		case "populate":
+			req.PopulateClsiCache = v.(bool)
+		case "historyID":
+			req.HistoryID = v.(string)
+		case "blobPrefix":
+			req.FilestoreBlobPrefix = v.(string)
+		case "variant":
+			req.ClSIPerfVariant = v.(string)
+		case "metricsPath":
+			req.MetricsPath = v.(string)
 		}
 	}
 	return req
