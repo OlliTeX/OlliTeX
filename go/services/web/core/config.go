@@ -169,7 +169,7 @@ func LoadConfig() (*Config, error) {
 		localesDir = "/overleaf/services/web/locales"
 	}
 
-	return &Config{
+	cfg := &Config{
 		Profile:           profile,
 		ListenAddr:        listen,
 		SessionSecrets:    cleaned,
@@ -195,7 +195,12 @@ func LoadConfig() (*Config, error) {
 		SmokeTestUserID:   os.Getenv("SMOKE_TEST_USER_ID"),
 		APIUser:           os.Getenv("WEB_API_USER"),
 		APIPassword:       os.Getenv("WEB_API_PASSWORD"),
-	}, nil
+	}
+	// SQLite config-DB override (P7-post item 1): apply curated, non-secret,
+	// non-infra keys from the SQLite config DB on top of the env contract.
+	// Opt-in + no-op when the DB is absent — see configdb_override.go.
+	applyConfigDBOverrides(cfg)
+	return cfg, nil
 }
 
 type ConfigError struct{ Msg string }
