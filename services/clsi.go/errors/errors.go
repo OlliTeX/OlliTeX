@@ -139,6 +139,27 @@ type MissingUpdatesError struct {
 
 func (e *MissingUpdatesError) Error() string { return e.Message }
 
+func NewMissingUpdatesError(message string, info map[string]any) *MissingUpdatesError {
+	return &MissingUpdatesError{Message: message, Info: info}
+}
+
+// IsMissingUpdates reports whether err is a MissingUpdatesError
+// (Node: `err instanceof Errors.MissingUpdatesError`). Walks the Unwrap
+// chain the same way the existing Is* helpers do.
+func IsMissingUpdates(err error) bool {
+	for err != nil {
+		if _, ok := err.(*MissingUpdatesError); ok {
+			return true
+		}
+		if u, ok := err.(interface{ Unwrap() error }); ok {
+			err = u.Unwrap()
+		} else {
+			return false
+		}
+	}
+	return false
+}
+
 // ConversionError (Errors.ConversionError): super(message, { exitCode, type }).
 type ConversionError struct {
 	Message    string

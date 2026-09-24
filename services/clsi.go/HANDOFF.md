@@ -3,15 +3,19 @@
 ## 0. CURRENT STATE (authoritative — updated 2026-09-24)
 
 ```
-STATUS: CLSI 33 packages ported (29/33 ≥ 90% gate). dockerode/otc duplication RESOLVED:
-  clsi/ot DELETED (commit 83e7967) in favor of shared otc (LIB-15, user directive 09-21);
-  clsi/resourcewriter imports ollitex otc; safe_pathname oracle (80,782 rows) attached to
-  otc (harness go/libraries/otc/safe_pathname_oracle_test.go, commit 83e7967).
-Dockerrunner: IN PROGRESS (design locked §4/12; engine SPI written; pipeline+unixengine+
-  tests remain — see §1 row 4, §8).
-Build: go build = OK (non-dockerrunner) | go vet = clean | go test: 29/33 pkgs green
-Cover: 4 packages below 90 gate (to fix): errors 79.7%, xrefparser 86.7%, config 89.3%,
-  metrics 69.2% (metrics+errors dropped after upstream merge d4f9c24 — re-test).
+STATUS: CLSI 34 packages ported; ALL 34 ≥ 90% gate (strict re-measure 2026-09-24:
+  metrics 100.0, errors 98.4, xrefparser 97.8, config 93.0, dockerrunner 90.9,
+  rest as table below). dockerrunner COMPLETE (engine.go SPI + unixengine +
+  pipeline + monitor + FakeEngine, 90.9%). otc Phase B (BlobStore) DONE —
+  `go/libraries/otc/blob_store.go` exports BlobStore + BaseBlobStore.
+  NEXT ACTIVE: historyresourcewriter PRODUCTION WRITE (all investigation done;
+  stale 105L draft must be REPLACED — see §8).
+Build: go build ./... = OK | go vet ./... = clean | go test ./... -count=1
+  = ALL 34 pkgs ok.
+git: HEAD 5f6e609 (handoff-only, UNPUSHED — origin at b44b4b3); branch
+  go_compile_test; UNSTAGED: errors.go (MissingUpdates helpers), metrics.go
+  (Png2pdfSkippedSmall counter) — both are HRW-ready, committed with the HRW
+  write.
 minimatch: ACCEPTED + COMMITTED+PUSHED (a518e9c; 49,828 oracle rows, 0 mismatches).
 ```
 
@@ -35,25 +39,28 @@ otc (LIB-15, shared `ollitex` module at repo root `go/libraries/otc/`):
     Node-generated from /tmp/otfuzz) to otc: `go/libraries/otc/safe_pathname.go` +
     `safe_pathname_oracle_test.go`. Upstream go/otc built + green on this machine.
   - otc import path from clsi module: `ollitex/go/libraries/otc` (replaced ../../ → repo
-    root module `ollitex`). clsi/resourcewriter is the current consumer.
+    root module `ollitex`). Consumers: clsi/resourcewriter (and HRW, in write).
   - Phase C history (upstream go modules, via merged main): slices 2–6 + minimatch +
-    Phase C1/C2/C3/C4 + Phase B4 all merged (d4f9c24 merge). Phase B (BlobStore
-    backends) history remains OPEN upstream.
-  - safe_pathname oracle: 80,782 rows, Node-generated (gen via /tmp/otto/d3.js +
-    /tmp/otfuzz fuzzer), attached at commit 83e7967. Divergence class (documented in
-    otc/handoff): line-terminator guard `{0x0A,0x0D,0x2028,0x2029}` — Go port rejects
-    `{0x00-0x09,0x0B-0x0C,0x0E-0x1F}` (JS `\s` vs Go `\p{L}` differences). NOT a bug,
-    NOT a gate failure — otc is in the acceptance-accepted (divergence documented)
-    category.
+    Phase C1/C2/C3/C4 + Phase B4 all merged (d4f9c24 merge).
+  - Phase B (BlobStore) NOW PORTED (was OPEN upstream): `blob_store.go` with
+    `BlobStore` interface + `BaseBlobStore{FetchString, PutStringFn, PutObjectFn}`
+    (GetBlob default nil; GetString "" for empty hash else FetchString;
+    GetObject JSON.parse or {}). HRW extends it with the 4-branch filestore URL
+    logic exactly as Node's `class BlobStore extends BlobStoreBase`.
+    `NewBlobNotFound(hash)` = blob <hash> not found.
+  - safe_pathname oracle: 80,782 rows — INTENTIONALLY RED until upstream fixes:
+    28,634/80,782 mismatches, 3 defect classes (spec: go/libraries/HANDOFF_SAFE_PATHNAME.md).
+    Everything else in otc is green.
 
 CLSI remaining modules (in §1 order):
+  - historyresourcewriter (869L) — IN PRODUCTION WRITE (otc Phase B dep NOW met;
+    design + seams in §8 step 1). Stale 105L draft REPLACED (its Runner interface is
+    wrong — Node syncResourcesToDisk does NOT use DockerRunner).
+  - compile core: compilemanager (1021L) + compilecontroller (491L) — deps ALL met
+    (dockerrunner DONE otc B DONE); compilemanager uses HRW Result.
   - error middleware port (from app.js `err` handler — see §4/12.2)
-  - dockerrunner (design §4/12 + §8)
-  - compile core: compilemanager (1021L) + compilecontroller (491L) — DEPENDS ON
-    dockerrunner for fake-injection in tests
-  - historyresourcewriter (869L) — DEPENDS ON otc (Phase B open)
   - apps/server (route table §3.2) + load agent (TCP 3048 + HTTP 3049)
-  - cmd/clsi main + Makefile + live smoke (needs Docker texlive image)
+  - cmd/clsi main + Makefile + live smoke (Docker texlive image PRESENT — pulled)
   - clsi_typst.go (NEW — port services/clsi_typst to clsi_typst.go, feature-equivalent
     to clsi.go, reuses go/libraries/otc (LIB-15) not a 1:1 copy; see next-session notes
     §8)
@@ -66,9 +73,10 @@ CLSI remaining modules (in §1 order):
 3. `todo list` (Pi todos) — filter by tags `clsi`/`go-port`.
 4. `/tmp/clsi_proj` symlink may not exist in a new container: recreate with
    `ln -sfn /home/davrot/compile/OlliTeX_comp /tmp/clsi_proj`.
-5. **NFS flakiness**: write large files to `/tmp/` then `cp` into place (single command);
-   heredoc at ≤250L per chunk (longer gets eaten); re-`cp` + `gofmt` + `go build` +
-   `go test` in ONE atomic bash call after each large `write`.
+5. **Path is CASE-SENSITIVE (`OlliTeX_comp`, TeX!)** — a bit-flip in the path (e.g. `Ollitex_comp`)
+   creates a stray shadow dir / ENOENT; this is NOT NFS flakiness. Large writes: stage
+   to `/tmp/` then ONE atomic `cp` + `gofmt` + `go build` + `go test` (Write tool
+   truncates >~300 lines).
 
 ## 1. Task List
 
@@ -76,41 +84,41 @@ CLSI remaining modules (in §1 order):
 |---|---------|------|--------|
 | 0 | TODO-9e50c129 | Node baseline (unit + acceptance) as parity reference | BLOCKED (PnP `.pnp.cjs` missing in this repo copy — see §2.1). Test EXPECTATIONs in `services/clsi/test/` = practical spec. |
 | mm | (oracle) | minimatch port | ACCEPTED (a518e9c pushed; 49,828 oracle rows; 78.7% cover; divergence README'd). |
-| 1 | TODO-e5399221 | config (175L) | DONE 89.3% (gate 90% — re-test after upstream merge; may differ) |
-| 2 | errors/req/lp/logger | errors, requestparser, lastprojectaccess, logger | DONE: errors 79.7%, requestparser 90.0%, lastprojectaccess 100.0%, logger 100.0 |
-| 5 | TODO-d9502cb0 | Output side: clsicache (528L), contentcachemanager (447L), outputcachemanager (688L) | IN PROGRESS — clsicachehandler 93.7%, contentcachemanager 96.7%, outputcachemanager 92.1% |
-| 6 | TODO-fac1ee46 | Content cache: resourcewriter, historyresourcewriter, urlcache, urlfetcher | IN PROGRESS — urlcache 96.6%, urlfetcher 93.8%, **resourcewriter 93.2% (otc wired, minimal divergences)**; historyresourcewriter 15 open |
-| 3 | TODO-6a350144 | Compile core: commandrunner (19L), compilemanager (1021L), compilecontroller (491L) | IN PROGRESS — commandrunner 100.0%; compilecontroller ported; compilemanager 15 (otc B dep) |
-| 7 | TODO-843bd163 | Conversion: tikzmanager (129L), png2pdf (96L), conversionmanager (936L), conversionoutputcleaner (port) | DONE 2026-09-20: tikzmanager 94.4%, png2pdf 92.9%, conversionmanager 91.4%, conversionoutputcleaner 100% |
-| 4 | TODO-02cae9d7 | DockerRunner (634L) → `dockerrunner` (hand-rolled HTTP-over-unix Engine SPI) + fake for tests | IN PROGRESS (design §4/12; engine SPI written; pipeline+fake+unixengine+tests remain — see §8) |
-| 8 | TODO-d7feecff | Server layer: app (route table), load agent (TCP 3048 + HTTP 3049), /status /health_check /smoke_test_force /metrics, error middleware | OPEN (design §4/12 below) |
-| 9 | TODO-f464d516 | cmd/clsi main + Makefile + live smoke + Node parity matrix | OPEN |
+| 1 | TODO-e5399221 | config (175L) | DONE 93.0% (gate 90% MET — remeasured 2026-09-24). |
+| 2 | errors/req/lp/logger | errors, requestparser, lastprojectaccess, logger | DONE: errors 98.4%, requestparser 93.7%, lastprojectaccess 100.0%, logger 100.0. |
+| 5 | TODO-d9502cb0 | Output side: clsicache (528L), contentcachemanager (447L), outputcachemanager (688L) | DONE — clsicachehandler 93.9%, contentcachemanager 96.7%, outputcachemanager 92.1%. |
+| 6 | TODO-fac1ee46 | Content cache: resourcewriter, historyresourcewriter, urlcache, urlfetcher | IN PROGRESS — urlcache 96.8%, urlfetcher 96.2%, resourcewriter 93.2%; historyresourcewriter: IN PRODUCTION WRITE (design §8 step 1). |
+| 3 | TODO-6a350144 | Compile core: commandrunner (19L), compilemanager (1021L), compilecontroller (491L) | IN PROGRESS — commandrunner 100.0%; compilemanager + compilecontroller remain (otc B dep NOW met after HRW). |
+| 7 | TODO-843bd163 | Conversion: tikzmanager (129L), png2pdf (96L), conversionmanager (936L), conversionoutputcleaner (port) | DONE 2026-09-20: tikzmanager 94.9%, png2pdf 93.4%, conversionmanager 91.6%, conversionoutputcleaner 100%, fileuploadmiddleware 93.9%. |
+| 4 | TODO-02cae9d7 | DockerRunner (634L) → `dockerrunner` (hand-rolled HTTP-over-unix Engine SPI) + fake for tests | DONE 2026-09-24 (engine.go + unixengine + pipeline + monitor + fingerprint + FakeEngine = 90.9%). |
+| 8 | TODO-d7feecff | Server layer: app (route table), load agent (TCP 3048 + HTTP 3049), /status /health_check /smoke_test_force /metrics, error middleware | OPEN (design §4/12 below). |
+| 9 | TODO-f464d516 | cmd/clsi main + Makefile + live smoke + Node parity matrix | OPEN (UNBLOCKED: texlive/texlive:latest-full present). |
 
-Coverage log (strict per-package ≥ 90%; 2026-09-24 remeasure):
+Coverage log (strict per-package ≥ 90%; 2026-09-24 remeasure — 34 packages):
 
 | package | cover | package | cover |
 |---|---|---|---|
-| clsicachehandler | 93.7 | outputcontroller | 100.0 |
-| commandrunner | 100.0 | outputfilearchivemanager | 90.2 |
-| config | **89.3** ❌ | outputfilefinder | 94.6 |
-| contentcachemanager | 96.7 | outputfileoptimiser | 96.7 |
-| contentcachemetrics | 91.5 | png2pdf | 92.9 |
-| contentcacheworker | 100.0 | requestparser | 90.0 |
-| conversionmanager | 91.4 | resourcestatemanager | 93.4 |
+| clsicachehandler | 93.9 | outputcontroller | 100.0 |
+| commandrunner | 100.0 | outputfilearchivemanager | 91.5 |
+| config | **93.0** ✅ | outputfilefinder | 98.2 |
+| contentcachemanager | 96.7 | outputfileoptimiser | 97.7 |
+| contentcachemetrics | 93.1 | png2pdf | 93.4 |
+| contentcacheworker | 100.0 | requestparser | 93.7 |
+| conversionmanager | 91.6 | resourcestatemanager | 94.6 |
 | conversionoutputcleaner | 100.0 | resourcewriter | 93.2 |
-| dockerlockmanager | 90.2 | safereader | 95.7 |
-| draftmodemanager | 90.0 | statsmanager | 100.0 |
-| errors | **79.7** ❌ | synctexparser | 93.9 |
-| fileuploadmiddleware | 93.9 | tikzmanager | 94.4 |
-| lastprojectaccess | 100.0 | urlcache | 96.6 |
-| latexmetrics | 91.1 | urlfetcher | 93.8 |
-| latexrunner | 94.3 | xrefparser | **86.7** ❌ |
+| dockerlockmanager | 93.3 | safereader | 94.2 |
+| draftmodemanager | 93.1 | statsmanager | 100.0 |
+| errors | **98.4** ✅ | synctexparser | 93.9 |
+| fileuploadmiddleware | 93.9 | tikzmanager | 94.9 |
+| lastprojectaccess | 100.0 | urlcache | 96.8 |
+| latexmetrics | 91.9 | urlfetcher | 96.2 |
+| latexrunner | 95.6 | xrefparser | **97.8** ✅ |
 | lockmanager | 100.0 | logger | 100.0 |
-| metrics | **69.2** ❌ | | |
+| metrics | **100.0** ✅ | dockerrunner | 90.9 |
 
-**Coverage gate: 29/33 pkgs ≥ 90%.** Below: errors (79.7%), xrefparser (86.7%), config
-(89.3%), metrics (69.2%) — re-test after upstream merge (d4f9c24) since upstream may
-have touched these files.
+**Coverage gate: 34/34 pkgs ≥ 90%.** The four previously-below packages (errors,
+ xrefparser, config, metrics) were lifted by thin tests on 2026-09-24; dockerrunner
+ first measured at 90.9%.
 
 Coverage gate cmd: `cd services/clsi.go && go clean -testcache -cache && go test ./... -cover`.
 
@@ -123,7 +131,9 @@ Coverage gate cmd: `cd services/clsi.go && go clean -testcache -cache && go test
 - Docker backbone for CLSI: **hand-rolled HTTP-on-unix client** (zero-dep policy, §4/1).
 - Docker socket: `/var/run/docker.sock` (probe:
   `curl -s --unix-socket /var/run/docker.sock http://localhost/containers/json`).
-- Docker images available: `test_unit_clsi-test_unit:latest` (1.7GB), `hello-world` (25MB).
+- Docker images available: `texlive/texlive:latest-full` (2.74GB, pulled
+  2026-09-24 — live compile smoke UNBLOCKED), `test_unit_clsi-test_unit:latest`
+  (1.7GB), `hello-world` (25MB).
 - Node 24 / yarn 4: **PnP install broken in THIS copy** (`.pnp.cjs` missing) — tests are
   available AS FILES (test/unit/js, test/acceptance/js), Docker run works via dockerode
   at 1.7GB.
@@ -154,22 +164,24 @@ Controllers (HTTP edge)
   OutputController.js  (31L)    → outputcontroller.go (DONE 100%)
 
 Compile core
-  CompileManager.js (1021L)     → compilemanager.go (OTC Phase B dep)
-  HistoryResourceWriter.js (869L) → historyresourcewriter.go (OPEN — otc dep)
-  ResourceWriter.js (398L)      → resourcewriter.go (DONE 93.2%, otc wired)
-  DockerRunner.mjs (634L)       → dockerrunner (design §4/12, SPI written)
-  OutputCacheManager.js         → outputcachemanager.go (DONE 92.1%, §5/7 LOCKED)
+  CompileManager.js (1021L)     → compilemanager/ (deps ALL met: dockerrunner + otc B)
+  HistoryResourceWriter.js (869L) → historyresourcewriter/ (IN PRODUCTION WRITE;
+                                   stale draft REPLACED, design §10)
+  ResourceWriter.js (398L)      → resourcewriter/ (DONE 93.2%, otc wired)
+  DockerRunner.mjs (634L)       → dockerrunner/ (DONE 90.9%, §4/12)
+  OutputCacheManager.js         → outputcachemanager/ (DONE 92.1%, §5/7 LOCKED)
   OutputFileFinder/Optimiser/
-  ArchiveManager                → outputfilefinder.go (DONE 94.6%)/
-                                  outputfileoptimiser.go (DONE 96.7%)/
-                                  outputfilearchivemanager.go (DONE 90.2%)
-  OTC → go/libraries/otc (shared LIB-15; Phase B open; applied via clsi/resourcewriter)
-
-Content / URL cache
-  CLSICacheHandler.js (528L)    → clsicachehandler.go (DONE 93.7%)
-  ContentCacheManager.js (447L) → contentcachemanager.go (DONE 96.7%)
-  UrlCache.js (227L) / UrlFetcher.js (111L) → urlcache.go (DONE 96.6%) /
-                                           urlfetcher.go (DONE 93.8%)
+  ArchiveManager                → outputfilefinder/ (DONE 98.2%)/
+                                  outputfileoptimiser/ (DONE 97.7%)/
+                                  outputfilearchivemanager/ (DONE 91.5%)
+  OTC → go/libraries/otc (shared LIB-15; Phase B DONE; applied via
+                          clsi/resourcewriter + historyresourcewriter (otc
+                          BlobStore))
+  Content / URL cache
+  CLSICacheHandler.js (528L)    → clsicachehandler/ (DONE 93.9%)
+  ContentCacheManager.js (447L) → contentcachemanager/ (DONE 96.7%)
+  UrlCache.js (227L) / UrlFetcher.js (111L) → urlcache/ (DONE 96.8%) /
+                                           urlfetcher/ (DONE 96.2%)
 
 Locking / persistence
   LockManager.js                → lockmanager.go (DONE 100%)
@@ -185,10 +197,12 @@ Conversion path (added 2026-09-20)
   ContentCacheMetrics.js        → contentcachemetrics.go (DONE 91.5%)
   ContentCacheWorker.js         → contentcacheworker.go (DONE 100%)
   LatexRunner.js (404L)         → latexrunner.go (DONE 94.3%)
-  CLSICacheHandler.js           → clsicachehandler.go (DONE 93.7%)
+  CLSICacheHandler.js           → clsicachehandler.go (DONE 93.9%)
   CLSICompileQueue.js           → (in compilecontroller; not yet ported)
-  Metrics.js / LatexMetrics.js  → metrics.go (DONE 69.2% — RE-TEST after upstream) /
-                                   latexmetrics.go (DONE 91.1%)
+  Metrics.js                    → metrics/ (DONE 100.0%) +
+                                   clsi_metrics seam (HRW observes via
+                                   metrics.ShouldSkipMetrics)
+  LatexMetrics.js               → latexmetrics/ (DONE 91.9%)
 ```
 
 ### 3.1 Route table (must match exactly; `app.js` is the spec)
@@ -351,7 +365,7 @@ connection-close on error.
   forget (Strace/ArchiveLogs), scheduleBulkCleanup delay=max(CACHE_AGE+oldest-now,0)+60000,
   nodeParseInt16 (0x hex prefix, sign, leading-ws skip), fileHidden ^\.|\/\./, buildId
   hexdate-hexrandom. 60+ tests covering copy/archive/ensureContentDir/cleanupAll error
-  seams directly. Test file ≈31KB, staged via /tmp + cp (NFS-safe).
+  seams directly. Test file ≈31KB, staged via /tmp + cp (big-writes-safe).
 - [x] (session 8) minimatch PORT COMPLETE (2026-09-19): segast.go (AST parsePortion +
   toRegExpSource: flatten adopt/adoptWithSpace/usurp 10-pass, fillNegs, guards, extglob arms
   incl. `|` alternation + negated `!(...)` end-guard `(?:$|/)` on ROOT filledNegs) and
@@ -546,8 +560,9 @@ ot_dataset oracle fixture: /tmp/otto/ot_dataset.json (35 rows) -> to be copied
 - [x] (2026-09-24) Merge upstream main (d4f9c24): otc Phase B4 + Phase C slices 2–6 +
   integrated minimatch port; go/minimatch conflict resolved in favor of upstream.
 - [x] (2026-09-24) `config.MaxContainerAge` + env `DOCKERRUNNER_MAX_CONTAINER_AGE` (b609dfb).
-- [ ] (2026-09-24) Coverage re-measure: **4 pkgs below gate** — errors 79.7%, xrefparser
-  86.7%, config 89.3%, metrics 69.2% (upstream merge moved some files; needs re-test).
+- [x] Coverage re-measure (this session): gate MET 34/34 — errors 98.4%,
+  xrefparser 97.8%, config 93.0%, metrics 100.0 (thin seam tests added;
+  the 4 below-gate numbers above were the pre-merge remeasure).
 
 ## 6. Risks / Watch-outs (Go-specific pitfalls hit in past sessions)
 
@@ -574,16 +589,12 @@ ot_dataset oracle fixture: /tmp/otto/ot_dataset.json (35 rows) -> to be copied
 - **`Path.extname` on Node** uses preDotState state machine (hand-rolled).
 - **`archive_logs`/`strace`**: NOT in settings.defaults.cjs (both undefined → false);
   probe confirms `clsi.optimiseInDocker = true`.
-- **NFS instability**: write large files to `/tmp/stage/` then `cp` + `gofmt` + `go build` +
-  `go test` in ONE atomic bash command. **Write tool truncates >~300 lines** — use
-  `cat > file <<'EOF'` heredocs for large Go files. **Bash heredoc truncates at ~250
-  lines** — chunk Go files at ≤120L per heredoc; `gofmt -e` after EACH chunk before
-  appending more. **`edit` tool on a corrupted file = chaos** — when a staged file gets
-  corrupted from partial edit applications, the ONLY safe recovery is `cp` from the
-  last-known-good build (e.g. mmgo) and re-applying the single needed fix, NOT another
-  edit chain on the corrupt file.
-  `go test` in ONE atomic bash command. **Write tool truncates >~300 lines** — use
-  `cat > file <<'EOF'` heredocs for large Go files.
+- **Large writes (NOT NFS — mount is fine)**: write large files to `/tmp/` then `cp` +
+  `gofmt` + `go build` + `go test` in ONE atomic bash command. **Write tool truncates
+  >~300 lines** — use `cat > file <<'EOF'` heredocs, chunked ≤120L with `gofmt -e` after
+  each chunk. **`edit` tool on a corrupted file = chaos** — recovery is `cp` from the
+  last-known-good and re-apply the single needed fix. (2026-09-24 "NFS flakiness" was
+  a case-sensitive path bit-flip — `OlliTeX_comp` vs `Ollitex_comp` — NOT a mount issue.)
 - **ALWAYS use `timeout`** on bash commands that touch node/ or v8/ (50k/20k entries).
 - **minimatch Go pitfalls (session 7, 2026-09-18)**:
   - **pass2 double-increment** (`for i:=0; i<len; i++ { i+=2; continue }`) SKIPS THE CHAR
@@ -970,13 +981,10 @@ file). Success gate: `file.path === 'output.pdf' && file.size > 0`.
 
 ## 8. Immediate Next Steps (for the next session)
 
-1. **dockerrunner** (IN PROGRESS this session). Design locked §4/12. Files:
-   `dockerrunner.go` (DockerRunner struct + Runner interface + New),
-   `engine.go` (Engine SPI: `Inspect(id)`, `Create(id, CreateOpts)`,
-   `Start(id)`, `Kill(id)`, `Wait(id) io.ReadCloser + <int exit>`, `Attach(id)
-   io.ReadCloser`, `Destroy(id)`), `fingerprint.go` (md5 of CreateOpts JSON).
-   Remaining: `pipeline.go` (runOnce gate model), `unixengine.go` (blocking
-   HTTP-over-unix for production), `dockerrunner_test.go` (FakeEngine driven).
+1. **dockerrunner** — DONE (2026-09-24): engine.go SPI + unixengine.go +
+   pipeline.go (gate model) + monitor.go + fingerprint.go + FakeEngine tests
+   (90.9%). Wire facts below were provenance (oracle probes + dockerode 4.0.9
+   source); now encoded in dockerrunner/*.go. Retained for provenance.
    **runOnce gate model (LOCKED this session, exact Node 1:1 mapping)**:
    - Node `DockerRunner.mjs` `_runAndWaitForContainer` = "gate" model:
      `once = _.once(callback)`; `streamEnd` + `containerReturn` flags both
@@ -1022,31 +1030,39 @@ file). Success gate: `file.path === 'output.pdf' && file.size > 0`.
      (NOT of the container ID — because different commands on same image
      need different keys). Already in `fingerprint.go`.
 
-2. **Fix 4 packages below 90 gate** (errors 79.7%, xrefparser 86.7%, config 89.3%,
-   metrics 69.2%) — first check whether upstream merge (d4f9c24) already
-   pushed them over 90 (re-test after clean -testcache).
+2. **Fix 4 packages below 90 gate** — DONE (2026-09-24): thin seam tests added;
+   errors 98.4%, xrefparser 97.8%, config 93.0%, metrics 100.0. Gate = 34/34.
 
-3. **compile core** (compilemanager + compilecontroller) — depends on otc
-   (Phase B still OPEN upstream; clsi/ot deleted → import shared otc).
+3. **historyresourcewriter** (IN PRODUCTION WRITE this session) — full 1:1
+   port of HistoryResourceWriter.js 869L. Stale draft (105L, wrong Runner
+   interface) REPLACED. Locked design + verified signatures: §10 below.
+   otc Phase B dep is MET (blob_store.go shipped).
 
-4. **error middleware + server layer** (§4/12 + §3.2 locked design above).
+4. **compile core** (compilemanager 1021L + compilecontroller 491L) — deps ALL met
+   (dockerrunner + otc B). CompileManager uses HRW Result (full 1:1:
+   `Result{Snapshot, ProjectDir, CompileDir, OutputDir, Stats, Timings}`).
 
-5. **clsi_typst.go** (NEW — per user directive 2026-09-21): port
+5. **error middleware + server layer** (§4/12 + §3.2 locked design above).
+
+6. **clsi_typst.go** (NEW — per user directive 2026-09-21): port
    `services/clsi_typst` to `services/clsi_typst.go`, feature-equivalent to
    clsi.go (reuses `go/libraries/otc` LIB-15 for content), reuses clsi.go
    packages where possible, HANDOFF.md in `clsi_typst.go/`. (This is a
    SEPARATE Go module from clsi.go.)
 
-6. **cmd/clsi main + Makefile + live smoke** (Docker texlive image needs to be
-   built — blocked on `test_unit_clsi-test_unit:latest` availability).
+7. **cmd/clsi main + Makefile + live smoke** — UNBLOCKED (texlive/texlive:
+   latest-full present, pulled 2026-09-24). Do `hello-world` wire smoke first,
+   then texlive production smoke.
 
-Deferred (otc-dependent, upstream Phase B):
-- HistoryResourceWriter (15 open — otc Phase B dep)
-- CompileManager (depends on otc Phase B + dockerrunner)
+Deferred (upstream scope, does NOT block porting):
+- otc safe_pathname oracle (28,634/80,782 mismatches; spec:
+  go/libraries/HANDOFF_SAFE_PATHNAME.md) — re-run `go test ./go/libraries/otc`
+  from repo root once upstream fixes it.
 
 Blocked / environment:
-- Docker texlive image for live smoke (`test_unit_clsi-test_unit:latest` at
-  1.7GB available; texlive variant NOT yet built).
+- Node baseline (TODO-9e50c129): PnP `.pnp.cjs` missing in this repo copy —
+  test expectations in `services/clsi/test/` + Docker baseline in CI are the
+  practical spec.
 
 ## 9. Session notes (2026-09-24 THIS SESSION)
 
@@ -1072,10 +1088,10 @@ Blocked / environment:
   origin/main (d4f9c24 is upstream merged into ours).
 - **otc oracle** (`safe_pathname_oracle_test.go`, 80,782 rows) — GREEN,
   attached to otc via commit 83e7967.
-- **NFS flakiness** (2026-09-24): hit twice more this session (HANDOFF.md
-  cp + go build). Use `/tmp/` staging + atomic `cp + gofmt + go build + go
-  test` in ONE bash command. **Bash heredoc truncates at ~250 lines** — chunk
-  Go files ≤120L per chunk.
+- **CORRECTION (2026-09-24, user)**: the "NFS flakiness" noted above was a
+  misdiagnosis — the repo dir name is case-sensitive `OlliTeX_comp`; bit-flips in the
+  path (e.g. `Ollitex_comp`) create shadow dirs / ENOENT. The NFS4 mount is fine.
+  `/tmp/` staging is retained only for large-write chunking.
 ## Session outcome (2026-09-24)
 
 **dockerrunner COMPLETE (90.9% coverage):**
@@ -1112,18 +1128,16 @@ primitive is ported; only the *backend wiring* (filestore URL prefix) stays loca
 HistoryResourceWriter's BlobStore extends BaseBlobStore, as in Node).
 
 **Next (in order):**
-1. historyresourcewriter.go (port from HistoryResourceWriter.js 869L — needs otc: blob_store,
-   history, snapshot, file_data; local BlobStore extends ollitex BaseBlobStore like Node
-   BlobStoreBase)
-2. compilemanager.go (1021L) — deps: resourcewriter (93.2), latexrunner (94.3), dockerrunner,
-   lockmanager (100), clsicachehandler (93.7), contentcachemetrics, statsmanager, synctexparser,
-   tikzmanager, safeReader, latexmetrics, clsi-metrics, errors, png2pdf, commandrunner, config.
-   CompileController (491L, route layer) AFTER — it's mostly z-schema request parsing + wire.
+1. historyresourcewriter — IN PRODUCTION WRITE (full investigation done this
+   session; every seam signature verified against live Go packages; locked
+   design + test plan: §10). Stale draft REPLACED. Target: package ≥ 90%.
+2. compilemanager.go (1021L) — deps all met. CompileController (491L, route
+   layer) AFTER — it's mostly z-schema request parsing + wire.
 3. error middleware + apps/server (route table §3.2, load agent TCP 3048 + HTTP 3049)
-4. cmd/clsi main + Makefile + live smoke (Docker texlive image; only test_unit image present →
-   smoke limited to /v1/version + compile-not-allowed + monitor; see §8)
-5. clsi_typst.go (new service; feature-equivalent, reuses otc + shared packages; own HANDOFF per
-   next-session notes §8)
+4. cmd/clsi main + Makefile + live smoke (texlive/texlive:latest-full present;
+   `hello-world` wire smoke first, then texlive production smoke)
+5. clsi_typst.go (new service; feature-equivalent, reuses otc + shared packages;
+   own HANDOFF per next-session notes)
 
 ### Docker wire (probe-verified against live Engine 29.5.3, 2026-09-24)
 - Create: POST /containers/create?name=X — name from QUERY (body name ignored); 409 body
@@ -1142,3 +1156,239 @@ HistoryResourceWriter's BlobStore extends BaseBlobStore, as in Node).
 - waitForContainer: Node clears the waitPromise on settled (first-wins = clearTimeout model)
 - Lock held INSIDE startOnce (inspect→create→attach→start); released on return (kill+wait
   already captured); 404+AutoRemove = container gone → nil,nil (dockerode throw:false)
+## 10. HRW (historyresourcewriter) — LOCKED DESIGN + VERIFIED SEAMS (2026-09-23)
+
+Status: investigation COMPLETE (Node HistoryResourceWriter.js 869L + Metrics.js +
+blob_store_base.js + HistoryResourceWriter.test.js 327L re-read in full; every Go
+seam signature probed against live packages). The stale draft
+`historyresourcewriter/historyresourcewriter.go` (105L) has the WRONG
+`Runner interface{ Run(...) }` + `commandrunner` import — Node syncResourcesToDisk
+does NOT import DockerRunner. **Draft is to be REPLACED entirely.**
+
+### 10.1 Go seams (package-level function vars, mirror Node vi.doMock targets)
+- `DownloadUrlToFile func(projectID, urlStr, fallbackURL, destPath string,
+  lastModified *time.Time, conversionSuffix string) (*urlcache.ConversionHandle, error)`
+  → `urlcache.DownloadUrlToFile`
+- `IsConversionCached func(projectID, urlStr string, lastModified *time.Time) (bool, error)`
+  → `urlcache.IsConversionCached`
+- `CommitConversion func(conversionPath, cachePath, destPath string) error`
+  → `urlcache.CommitConversion`
+- `CreateProjectDir func(projectID string) error` → `urlcache.CreateProjectDir`
+- `GetProjectCacheDir func(projectID string) string` → `urlcache.GetProjectCacheDir`
+- `Png2PdfEnabled func() bool` → `png2pdf.IsEnabled`
+- `PngConvert func(projectID, cacheProjectDir string, relativePaths []string,
+  stats *png2pdf.Stats, timings *png2pdf.Timings) error`
+  → `png2pdf.ConvertPngFilesInCacheDir` (HRW keeps `map[string]any` and bridges)
+- `DownloadHistorySnapshot func(projectID, userID, cacheDir string) (bool, error)`
+  → `clsicachehandler.DownloadHistorySnapshot`
+- `IsExtraneousFile func(p string) bool` → `resourcewriter.IsExtraneousFile`
+- `WriteOutputFileIfNeeded func(compileDir string, hasOutputTex bool, content string) error`
+  → `tikzmanager.WriteOutputFileIfNeeded` (hasOutputTex = snapshot.GetFile("output.tex") != nil)
+- `fetchStringFunc func(ctx context.Context, url string, opts ...*fetchutils.Options) (string, error)`
+  → `fetchutils.FetchString` (BlobStore.FetchString uses it)
+- Draft prefix: use `draftmodemanager.PREFIX` constant directly (no seam —
+  Go test asserts the REAL prefix, Node test mocked it to '').
+
+### 10.2 Request/Result (in HRW package, NOT requestparser)
+```go
+type Request struct {
+    BaseHistoryVersion int
+    RawSnapshot map[string]any
+    GlobalBlobs []string
+    RawChangeOperations [][]map[string]any  // raw op array per change
+    PopulateClsiCache bool
+    Png2pdf bool
+    HistoryID string
+    FilestoreBlobPrefix string
+    ClSIPerfVariant string
+    Draft bool
+    RootResourcePath string
+    CompileGroup string
+    MetricsPath string   // for metrics.ShouldSkipMetrics
+}
+type Result struct {
+    BaseHistoryVersion int
+    ResourceList []Resource  // {Path string}
+}
+func SyncResourcesToDisk(ctx context.Context, projectID, userID string,
+    request *Request, compileDir string, timings map[string]any, stats map[string]any) (*Result, error)
+```
+(baseHistoryVersion return = localBaseVersion + len(changes); stats/timings are
+maps so compilemanager can add keys, mirroring Node `Record<string, number>`.)
+
+### 10.3 BlobStore (Node `class BlobStore extends BlobStoreBase`)
+Go: `struct { *otc.BaseBlobStore }` + fields historyID/filestoreBlobPrefix/clsiPerfVariant/globalBlobs;
+embed so GetBlob/GetBlobURL/GetString/GetObject delegate; supply `FetchString` = 3-attempt
+retry loop (each attempt in ctx with 3s timeout → fetchutils timeout):
+```
+fetchString(hash):
+  for attempt := 1..3:
+    s, err := fetchStringFunc(ctx, getBlobURL(hash), timeout 3s)
+    if err == nil: return s
+    if fErr, ok := err.(*fetchutils.RequestFailedError); ok && fErr.Status == 404:
+      return "", err (→ errors.NewNotFoundError)  // otc wraps into BlobNotFound
+    warn logger {url, remainingAttempts} "compile from cache: history blob download failed"
+    sleep 100ms (context-aware)
+  return last error
+```
+getBlobURL(hash) (4 branches, base = `Settings.apis.filestore.url` = config Get().APIs.FileStore.URL):
+1. filestoreBlobPrefix != "" → url = base + "/" + filestoreBlobPrefix + "/" + hash
+2. clsiPerfVariant != "" → host = config Get().APIs.Perf.Host (settings.apis.clsiPerf.host),
+   path = "/variant/" + clsiPerfVariant + "/" + hash + "/hash/" ... EXACT Node:
+   `u.pathname = \`/variant/${clsiPerfVariant}/hash/${hash}\`` (host is apis.clsiPerf.host,
+   which Go stores at `APIs.Perf.Host` + port; URL host includes port).
+3. globalBlobs contains hash → path = "/history/global/hash/" + hash
+4. else → path = "/history/project/" + historyID + "/hash/" + hash
+Note: config has APIs.Perf.Host ("127.0.0.1:3043" default, CLSI_PERF_HOST/PORT). Node
+`apis.clsiPerf.host` — settings key is `apis.clsiPerf.host`; Go mapping verified: Perf.Host
+carries host:port, so for the perf-variant URL set url.Host = Perf.Host, keep scheme http.
+
+### 10.4 changesFromRawChangeOperations (Node: `Change.mustFromRaw({operations: o, timestamp: '0'})`)
+Node's raw change has operations array + timestamp '0'. Go otc ChangeFromRaw/parseRawTime
+REJECTS '0' (not a valid time — gop error). **Use synthetic construction** instead:
+```go
+func changesFromRawChangeOperations(raw [][]map[string]any) []otc.Change {
+  var out []otc.Change
+  for _, opsRaw := range raw {
+    var ops []otc.Operation
+    for _, oRaw := range opsRaw {
+      op, _ := otc.OperationFromRaw(oRaw)  // tolerate (empty op)
+      ops = append(ops, op)
+    }
+    // NewChange with zero time.Time mirrors Node mustFromRaw({operations, timestamp:'0'});
+    // timestamp only affects Change.Timestamp/ToRaw, never ApplyAll semantics.
+    out = append(out, *otc.NewChange(ops, time.Time{}, nil, nil, nil, nil, nil))
+  }
+  return out
+}
+```
+(OperationFromRaw is exported; NewChange exported; exported `Operations` field.)
+
+### 10.5 syncResourcesToDisk flow (verbatim Node port)
+1. cacheKey = path.Base(compileDir); remoteBaseVersion = request.BaseHistoryVersion
+2. loadSnapshot(projectID, userID, cacheKey, remoteBaseVersion, populateClsiCache):
+   - candidates [historyPath, resyncPath]: try loadSnapshotFromFile; on MissingUpdatesError
+     track maxLocalBaseVersion; else warn "cannot read history from disk"; ENOENT silent
+   - if populateClsiCache: loadSnapshotFromClsiCache (downloadHistorySnapshot → !ok
+     "needs full sync", baseHistoryVersion:-1), else loadSnapshotFromFile(resyncPath, fullSync=true)
+     on error warn "cannot download from clsi-cache"; track max
+   - throw NewMissingUpdatesError("needs more updates", {baseHistoryVersion: maxLocalBaseVersion})
+3. loadSnapshotFromFile: gunzip → JSON {rawSnapshot, globalBlobs, localBaseVersion,
+   dirty (default []), png2pdf (default false)}; if localBaseVersion < remoteBaseVersion
+   → NewMissingUpdatesError("missing updates", {baseHistoryVersion: localBaseVersion})
+4. try/catch: loadSnapshot fails AND request.RawSnapshot == nil → re-throw (missing
+   snapshot); else warn "bad local history state during full resync" (only for non-MissingUpdates),
+   source='remote', localBaseVersion=remoteBaseVersion, rawSnapshot=request's,
+   globalBlobs=[], dirty=[], fullSync=true
+5. globalBlobs dedupe + merge request.globalBlobs; snapshot = SnapshotFromRaw
+6. changes = changesFromRawChangeOperations(rawChangeOperations[localBaseVersion-remoteBaseVersion:])
+   (slice start = localBaseVersion - remoteBaseVersion)
+7. applyAll timing: timings["snapshotApplyAll"] = ms ceil (Go: measure via time.Now);
+   if !metrics.ShouldSkipMetrics(request.MetricsPath): observe snapshotApplyAllDurationSeconds
+   histogram {group: compileGroup, source} — port as metrics counter/float append
+   (no prom exposure yet; see §4/8 metrics note: model as Gauge/counter named
+   "clsi_snapshot_applyAll_duration_seconds" — EXPOSE ONLY IF server /metrics needs it;
+   simplest: store last observed value in a metrics float + Count of observations)
+8. entriesDepthFirst = discoverExistingEntries(compileDir, ".") (sorted readdir, postorder
+   children before parent — MUST iterate insertion order for deletion logic; Node Map iterates
+   insertion order → Go: keep []string slice + map, iterate slice)
+9. removeExtraneousEntries(compileDir, snapshot, entriesDepthFirst):
+   keepFolders = {""}; for each (path, isDir) in depth-first order:
+   - isDir: if snapshot has no file at path: path still a dir — if keepFolders has path:
+     keepFolders.add(dirname(path)); else rmdir + remove from entries; continue.
+     If snapshot DOES have a file at this path (dir→file): for each child starting with
+     path+"/": rmdir/unlink child + drop from entries; rmdir path; drop path.
+   - non-dir (file): if snapshot has file OR !isExtraneousFile(path): keepFolders.add(dirname);
+     else unlink + drop
+10. ensureHasParentFolder(compileDir, path, entries) for each path in changedPaths — recursive:
+    if parentFolderPath := path.Dir(path) is in entries: return; else recurse(parentFolderPath),
+    mkdir(parentFolderPath), entries.add(parentFolderPath, true)
+11. changedPaths: fullSync ? all pathnames : (set from dirty + (draft? rootResourcePath)
+    + (pngModeChanged? all .png paths) + per-change operations (Add: pathname; Move:
+    pathname, and newPathname if !isRemoveFile; Edit: pathname) + (snapshot pathnames NOT in
+    entriesDepthFirst) + shouldConvert paths NOT attempted via isConversionCached)
+12. snapshot.loadFiles("eager", blobStore) (ctx) timing → timings["snapshotLoadEager"]
+13. per changedPath (sequential — Node is sequential `for path of changedPaths`):
+    file = snapshot.getFile(path); if nil continue (deleted)
+    content := file.GetContent(true) (filterTrackedDeletes=true)
+    if content != nil:
+      if path == request.RootResourcePath:
+        if request.Draft: content = PREFIX + content; dirty.push(path)
+        writeOutputFileIfNeeded(compileDir, snapshot.GetFile(tikz.OutputTex) != nil, content)
+      writeFile(path, content, "utf-8")
+    else:
+      hash := file.GetHash(); if nil → OError("unexpected file without content and hash", {path})
+      createProjectDir(projectID) (once)
+      url = blobStore.getBlobURL(hash)
+      destPath = filepath.Join(compileDir, path)
+      if shouldConvert.has(path): handle, err := downloadUrlToFile(projectID, url, "", destPath,
+        new time.Time (epoch 0 for lastModified → new Date(0) = Unix epoch, NOT zero value!), cacheKey)
+        if handle != nil → pngFilesToConvert.push(handle)
+      else: downloadUrlToFile(projectID, url, "", destPath, epoch0, "")
+      on error: logger.Warn/Err {err, projectId, path, resourceUrl} "error downloading file for
+        resources"; metrics.IncDownloadFailed (download-failed counter)
+    Node aborts on first error after the loop (allDone check → rethrow); Go: defer rethrow pattern
+      (collect first error, rethrow after loop) OR rethrow immediately (Node's promise.allSettled
+      then `for... if !result.success throw Otag.tag(reason,'write failed',{'path':path})`)
+14. baseHistoryVersion = localBaseVersion + len(changes)
+15. saveSnapshot IF (fullSync || len(changes)>0 || wasDirty || len(dirty)>0 || pngModeChanged):
+    gzip level 1, JSON {globalBlobs, localBaseVersion, rawSnapshot: snapshot.ToRaw(), dirty,
+    png2pdf: request.png2pdf}, tmp file flag 'wx' then rename (os.OpenFile O_CREATE|O_EXCL)
+16. deleteResyncSnapshot IF fullSync: unlink resyncPath, ENOENT silent
+17. return Result{baseHistoryVersion, resourceList: [{Path: p} for p in snapshot.GetFilePathnames()]}
+
+Note: Node `new Date(0)` = Unix epoch 1970-01-01T00:00:00Z → Go `time.Unix(0,0)`,
+NOT `time.Time{}` (which is year 0001).
+
+### 10.6 clearCache/saveSlowPngList (exported, compilemanager calls)
+- `ClearCache(projectID, userID, cacheKey string) error` — rm -rf snapshotPath(cacheKey).DIR,
+  ENOENT silent, else logger.Warn "compile from cache: failed to clear history cache".
+  Note: Node clearCache signature is (projectId, userId, cacheKey) but snapshotPath uses
+  cacheKey alone; Go same.
+- `SaveSlowPngList(cacheKey string, slowPngs []string) error` — mkdir dir, write
+  JSON to slowPngPath+~, rename. Best-effort (compile caller catches).
+- loadSlowPngList(cacheKey) ([]string, error) — read+parse, ENOENT→[], corrupt→[]
+  (warn "cannot read slow-png list").
+- snapshotPath(cacheKey) → {dir: <ClSI cache dir>/<cacheKey>, path: history.json.gz,
+  resyncPath: history-resync.json.gz, slowPngPath: png2pdf-slow.json}. ClSI cache dir =
+  config.Get().Path.ClsiCacheDir (env CLSI_CACHE_PATH, default /clsi/cache).
+
+### 10.7 shouldConvert / png2pdf gating (Node syncResourcesToDisk lines 530-655)
+- slowPngs = loadSlowPngList(cacheKey) (set)
+- for each snapshot path: is .png AND in slowPngs → byteLength (file.GetByteLength() || 0);
+  if byteLength < config.Get().Png2pdfMinFileSizeBytes ("Settings.png2pdfMinFileSizeBytes",
+  default 1MB): metrics.IncPng2pdfSkippedSmall, skip; else shouldConvert.add(path)
+- if len(shouldConvert) > 0: stats["optimisable-png-count"] = len; stats["projectHasUnconvertedPngs"] = 1
+- png2pdfActive = request.Png2pdf && Png2PdfEnabled(); if !active: shouldConvert = empty
+- if pngModeChanged (lastPng2pdf != request.Png2pdf) && active: for each .png path NOT in
+  shouldConvert: hash → url; if isConversionCached(projectID, url, epoch0): shouldConvert.add(path)
+- pngModeChanged computed from loadSnapshot result {png2pdf: lastPng2pdf} (default false)
+
+### 10.8 Test plan (port HistoryResourceWriter.test.js; fake seams, NO Docker)
+Node test (327L) mocks Settings/logger/metrics/fetch-utils/UrlCache/Png2Pdf/TikzManager/
+DraftModeManager/CLSICacheHandler/ResourceWriter/Metrics. Go equivalents: t.Setenv +
+config.ForTest() for CLSI_CACHE_PATH / FILESTORE_PARALLEL_FILE_DOWNLOADS /
+PNG2PDF_MIN_FILE_SIZE_BYTES; inject seams (10.1) with fakes:
+- fake download: writes "png-bytes" to destPath; with suffix: if url not in optCache
+  → add, return ConversionHandle{conv, cache, dest}; else nil (cached)
+- fake isConversionCached: optCache.has(url)
+- fake commitConversion: move conv→cache, copy cache→dest
+- fake PngConvert: records calls
+- fake fetchString: 404-able (to exercise NotFound), else returns "" for empty hash
+- request rawSnapshot fixture: files {fig.png: {hash, byteLength}, main.tex: {content:"hello"}}
+  → otc.SnapshotFromRaw with files map (Node rawSnapshot shape = {files: {...}})
+Scenarios: (a) saveSlowPngList writes png2pdf-slow.json; (b) slow-list gating: sync1
+no slow → normal download (no suffix), sync2 after SaveSlowPngList(["fig.png"]) →
+download with suffix + PngConvert + commit; sync3 → cached, no conversion (attempt-once);
+(c) mode switch: off → reverts (no suffix), on → re-serves .opt (suffix, but conversion
+is NOT run since cache hit → downloadUrlToFile returns nil handle); (d)-(f) analytics:
+no slow → no stats; png2pdf off + slow → projectHasUnconvertedPngs=1 + optimisable-png-count;
+on → converts; below threshold → skipped-small counter, no stats; two slow PNGs →
+count 2; mixed sizes → count 1 (only above-threshold counted).
+Plus: clsi-cache populate path (fake DownloadHistorySnapshot returns resync file),
+populate fail + no rawSnapshot → re-throw "needs more updates" (maxLocalBaseVersion
+from MissingUpdates info), draft branch (PREFIX + writeFile), tikz branch (output.tex
+skipped when snapshot has output.tex), nested dir discovery/removal (extraneous dir
+removed when no child files), ensureHasParentFolder (parent in entries → early return),
+changesFromRaw (add+move+edit ops), fetchString 404→NotFound, fullSync (all paths changed,
+resync deleted), incremental dirty set.

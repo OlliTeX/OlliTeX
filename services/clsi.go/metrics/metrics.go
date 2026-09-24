@@ -135,6 +135,60 @@ func init() {
 // IncDownloadFailed mirrors Metrics.inc('download-failed').
 func IncDownloadFailed() { DownloadFailed.Inc() }
 
+// Png2pdfSkippedSmall mirrors the @overleaf/metrics inc('png2pdf-skipped-small')
+// call in HistoryResourceWriter (a small slow-PNG not worth converting).
+var Png2pdfSkippedSmall *Counter
+
+func init() { Png2pdfSkippedSmall = &Counter{Name: "png2pdf-skipped-small"} }
+
+// IncPng2pdfSkippedSmall mirrors Metrics.inc('png2pdf-skipped-small').
+func IncPng2pdfSkippedSmall() { Png2pdfSkippedSmall.Inc() }
+
+// Histogram observations (Node ClsiMetrics.snapshotApplyAllDurationSeconds /
+// snapshotLoadEagerDurationSeconds prom histograms). The port keeps one
+// named counter per histogram (same as Count); the prometheus exposure
+// arrives with the /metrics endpoint.
+type Histogram struct {
+	Name     string
+	Observed int64
+	SumSecs  float64
+	Mu       sync.Mutex
+	// ObservedBy tracks per-label observations: key = "group\x00source".
+	// Prometheus labels; kept so the later /metrics exposure and tests can
+	// assert the right (group, source) bucket was hit.
+	ObservedBy map[string]int64
+}
+
+func (h *Histogram) Observe(group, source string, seconds float64) {
+	h.Mu.Lock()
+	h.Observed++
+	h.SumSecs += seconds
+	if h.ObservedBy == nil {
+		h.ObservedBy = map[string]int64{}
+	}
+	h.ObservedBy[group+"\u0000"+source]++
+	h.Mu.Unlock()
+}
+
+func (h *Histogram) ObservedCount(group, source string) int64 {
+	h.Mu.Lock()
+	defer h.Mu.Unlock()
+	return h.ObservedBy[group+"\u0000"+source]
+}
+
+// SnapshotApplyAllDurationSeconds / SnapshotLoadEagerDurationSeconds port the
+// two CLSI prom histograms observed in syncResourcesToDisk.
+var (
+	SnapshotApplyAllDurationSeconds  = &Histogram{Name: "clsi_snapshot_applyAll_duration_seconds"}
+	SnapshotLoadEagerDurationSeconds = &Histogram{Name: "clsi_snapshot_loadEager_duration_seconds"}
+)
+
+func (h *Histogram) Get() (observed int64, sumSecs float64) {
+	h.Mu.Lock()
+	defer h.Mu.Unlock()
+	return h.Observed, h.SumSecs
+}
+
 // ShouldSkipTimer mirrors the port of shouldSkipMetrics for timers:
 // returns true if the request is a health/perf path. Mirrors the semantics
 // of the node shouldSkipFlags(request) used around Metrics.Timer.
