@@ -16,11 +16,11 @@ Build: go build ./... = OK | go vet ./... = clean | go test ./... = ALL ok.
   otc (root module): build + test GREEN incl. safe_pathname oracle 80,782 rows
   (= 0 mismatches; see go/libraries/HANDOFF_SAFE_PATHNAME.md for the GREEN
   acceptance record + CLSI-side replica at services/clsi.go/safepathname_oracle/).
-git: HEAD b74bb81 (otc safe_pathname oracle RED->GREEN, PUSHED to origin
-  go_compile_test). BRANCH go_compile_test. UNCOMMITTED: otc file_map.go +
-  snapshot.go (JSON-decoded raw-file shape for SnapshotFromRaw/ FileMapFromAny —
-  needed by HRW; small, commit with HRW). UNTRACKED: services/clsi.go/
-  historyresourcewriter/ (the new pkg).
+git: HEAD 62532d8 (HRW port + otc raw-file shape + this HANDOFF, PUSHED to origin
+  go_compile_test). BRANCH go_compile_test (b74bb81 otc safe_pathname RED->GREEN
+  also pushed). UNCOMMITTED: only the install-artifact bump
+  .yarn/install-state.gz (leave local / commit as churn — not build-relevant).
+  Untracked: services/clsi.go/.pi/ (tool scratch — not part of the port).
 safe_pathname: FIXED + ACCEPTED (oracle GREEN 80,782/80,782). Commit b74bb81 —
   3 defect classes fixed (U+FEFF is JS \s; per-UTF-16-unit counting; V8
   line-terminator guard). Handoff + oracle gate: go/libraries/HANDOFF_SAFE_
