@@ -3963,3 +3963,10 @@ Steps 1-3 (go/READMEs, permanent flip+image+e2e, error fixes) DONE. This spec co
 **OPEN DECISIONS (owner, 2026-09-24):**
 1. **Oracle** — PRESERVE (default/safe) vs RETIRE the Node web oracle.
 2. **Production** — pre-approve the `make image` rebuild + the shared/dev-stack cycle-once-green, vs PAUSE before those two (default = PAUSE, per the "confirm before external dev stack" rule).
+
+**P7.5 VERIFIED BOUNDARY (execution-ready, 2026-09-24):** the ENTIRE frontend/shared/types → backend coupling is **type-only** — **no runtime value import**. The shared type modules that must be relocated before the backend is junk-able:
+- `Tag` — `app/src/Features/Tags/types.d.ts` (7 lines, self-contained) — 22-24 frontend importers.
+- `Source` — `app/src/Features/Authorization/types.d.ts` (33 lines, self-contained) — `types/project/dashboard/api.d.ts`.
+- notification prefs types — `modules/notifications/app/src/types.{d.ts,js}` (types are in the .d.ts; the .js is an `export {}` runtime stub) — `ide-settings/hooks/use-project-notification-preferences.ts` (imports via `import type`).
+- `SharingPermissions` — `modules/sharing-permissions/app/src/types` — `types/user.ts`.
+All other kept-tree `app/` references are **comments** (safe-path.ts, email.tsx, response.d.ts, file-list.ts), not dependencies. Relocate the 4 type modules into the kept shared types home (`services/web/types/`) and repoint the imports → the Node backend (`app/` 417 files, `modules/` 803, `app.mjs`, backend `test/`) has **zero** frontend runtime/type deps and is cleanly junk-able. Oracle stays safe (current e2e image still serves Node from the old path; preservation is a build-time choice at step E, not a consequence of the repo move).
