@@ -435,15 +435,19 @@ func tpdsGetOrCreateByName(a *core.App, c *core.Cxt, uid primitive.ObjectID, nam
 		}
 		crInsertProject(a, c, pj, rootID, nil, name, uid.Hex(), sp, "pdflatex", bson.A{}, bson.A{}, 0)
 		crInitHistory(c, pj.Hex())
-		var pd primitive.D
-		if a.Mongo != nil {
-			ctx := c.Req.Context()
-			if db, err := a.Mongo.DB(ctx); err == nil {
-				_ = db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: pj}}).Decode(&pd)
-			}
-		}
-		pd = bson.D{{Key: "_id", Value: pj}} // fallback if decode missing
-		return pd, true
+		// The created project's overleaf.history.id is its own _id (crInsertProject
+		// sets it; Node: initializeProject(project._id) returns project._id). Node's
+		// resolveProject therefore INCLUDES historyId (== projectId) for a freshly
+		// created project, so mirror that: build the resolved doc with the history id
+		// so tpdsResolved200 emits historyId. (An earlier unconditional bare-`_id`
+		// fallback here discarded it — the P7 hard-cutover exposed this parity gap on
+		// the uapi `res-new-name` create leg before the GET legs matched it.)
+		return bson.D{
+			{Key: "_id", Value: pj},
+			{Key: "overleaf", Value: bson.D{{Key: "history", Value: bson.D{
+				{Key: "id", Value: pj.Hex()},
+			}}}},
+		}, true
 	}
 	var active []primitive.D
 	for _, pd := range matches {
