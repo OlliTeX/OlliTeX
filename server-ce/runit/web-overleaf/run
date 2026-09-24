@@ -1,14 +1,31 @@
 #!/bin/bash
-
-NODE_PARAMS=""
-if [ "$DEBUG_NODE" == "true" ]; then
-    echo "running debug - web"
-    NODE_PARAMS="--inspect=0.0.0.0:40000"
-fi
+# Ollitex Go web service (WEB_GO_PLAN.md — P7 hard cutover). The Go replacement
+# of services/web: this service IS the web service on 127.0.0.1:4000 (the
+# nginx proxy_pass upstream). One Go binary, two profiles, selected by
+# ENABLED_SERVICES (see go/services/web/core/config.go) — this one runs "web".
+#
+# The Node implementation (exec /usr/bin/node /overleaf/services/web/app.mjs)
+# is replaced by the Go binary; the env contract is otherwise identical to the
+# Node run-script LISTEN_ADDRESS/ENABLED_SERVICES/WEB_PORT. GIT_BRIDGE_* is
+# inherited from the container env (server-ce/Dockerfile) exactly like Node —
+# not hardcoded here, so the service stays portable across stacks.
+[ -x /usr/local/bin/go-services/web ] || { echo "go web binary missing" >&2; exit 1; }
 
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 export ENABLED_SERVICES="web"
 export WEB_PORT="4000"
 
-exec /sbin/setuser www-data /usr/bin/node $NODE_PARAMS /overleaf/services/web/app.mjs >> /var/log/overleaf/web.log 2>&1
+# Private-API service credentials: Node reads Settings.httpAuthUsers from
+# /etc/overleaf/settings.js (baked at build time); the Go binary reads process
+# env — export the pair so basic-auth parity holds. /usr/bin/node is explicit
+# because runit's svd PATH is minimal.
+if [ -f /etc/overleaf/settings.js ]; then
+  WEB_PAIR=$(/usr/bin/node -p 'const s=require("/etc/overleaf/settings.js"); const u=Object.keys(s.httpAuthUsers||{}); u[0]?u[0]+":"+s.httpAuthUsers[u[0]]:""' 2>/dev/null || true)
+  if [ -n "$WEB_PAIR" ] && [ "${WEB_PAIR#*:}" != "$WEB_PAIR" ]; then
+    export WEB_API_USER=${WEB_PAIR%%:*}
+    export WEB_API_PASSWORD=${WEB_PAIR#*:}
+  fi
+fi
+
+exec /sbin/setuser www-data /usr/local/bin/go-services/web >> /var/log/overleaf/web.log 2>&1

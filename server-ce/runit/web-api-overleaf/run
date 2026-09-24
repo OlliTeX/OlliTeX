@@ -1,14 +1,34 @@
 #!/bin/bash
-
-NODE_PARAMS=""
-if [ "$DEBUG_NODE" == "true" ]; then
-    echo "running debug - web-api"
-    NODE_PARAMS="--inspect=0.0.0.0:30000"
-fi
+# Ollitex Go web service — API profile (WEB_GO_PLAN.md — P7 hard cutover).
+# The Go replacement of the Node 'api' profile (ENABLED_SERVICES=api, :3000).
+# This service IS the api service the Node stack served on 0.0.0.0:3000
+# (internal private-API callers). One Go binary, two profiles, selected by
+# ENABLED_SERVICES (see go/services/web/core/config.go) — this one runs "api".
+#
+# The Node implementation (exec /usr/bin/node /overleaf/services/web/app.mjs)
+# is replaced by the Go binary. The api profile binds 0.0.0.0:3000 by default
+# (OVERLEAF_HTTP2_PORT); WEB_GO_LISTEN makes the bind explicit and identical to
+# the Node service it replaces. Env contract otherwise identical (api profile
+# wire differs from web: unauth→401 for any Accept, X-Powered-By present — see
+# go/services/web/core/privateapi.go (APIBasicGate401)).
+[ -x /usr/local/bin/go-services/web ] || { echo "go web binary missing" >&2; exit 1; }
 
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=0.0.0.0
 export ENABLED_SERVICES="api"
+export WEB_GO_LISTEN="0.0.0.0:3000"
 export METRICS_APP_NAME="web-api"
 
-exec /sbin/setuser www-data /usr/bin/node $NODE_PARAMS /overleaf/services/web/app.mjs >> /var/log/overleaf/web-api.log 2>&1
+# Private-API service credentials: Node reads Settings.httpAuthUsers from
+# /etc/overleaf/settings.js (baked at build time); the Go binary reads process
+# env — export the pair so basic-auth parity holds. /usr/bin/node is explicit
+# because runit's svd PATH is minimal.
+if [ -f /etc/overleaf/settings.js ]; then
+  WEB_PAIR=$(/usr/bin/node -p 'const s=require("/etc/overleaf/settings.js"); const u=Object.keys(s.httpAuthUsers||{}); u[0]?u[0]+":"+s.httpAuthUsers[u[0]]:""' 2>/dev/null || true)
+  if [ -n "$WEB_PAIR" ] && [ "${WEB_PAIR#*:}" != "$WEB_PAIR" ]; then
+    export WEB_API_USER=${WEB_PAIR%%:*}
+    export WEB_API_PASSWORD=${WEB_PAIR#*:}
+  fi
+fi
+
+exec /sbin/setuser www-data /usr/local/bin/go-services/web >> /var/log/overleaf/web-api.log 2>&1
