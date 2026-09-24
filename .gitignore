@@ -48,3 +48,12 @@ tests/e2e/parity/reference/
 
 # local Go web build artifact (container /usr/local/bin/go-services/web is canonical)
 /web
+
+# Web static build output (P7 step 6: public/ moved to repo root; webpack output.path → <root>/public)
+/public/manifest.json
+/public/js
+/public/minjs
+/public/stylesheets
+/public/fonts
+/public/images
+/public/*.module.wasm

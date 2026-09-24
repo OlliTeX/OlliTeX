@@ -1,14 +1,6 @@
 data/*
 coverage
 
-public/manifest.json
-
-public/js
-public/minjs
-public/stylesheets
-public/fonts
-public/images
-
 modules/**/Makefile
 
 # Precompiled pug files
@@ -38,4 +30,3 @@ frontend/js/features/source-editor/lezer-bibtex/bibtex.terms.mjs
 debug-storybook.log
 
 .cache
-public/*.module.wasm
