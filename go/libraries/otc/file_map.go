@@ -64,17 +64,35 @@ func NewFileMap(files map[string]*File) (*FileMap, error) {
 	return fm, nil
 }
 
-// FileMapFromRaw mirrors FileMap.fromRaw.
+// FileMapFromRaw mirrors FileMap.fromRaw (strict typed map).
 func FileMapFromRaw(raw map[string]map[string]any) (*FileMap, error) {
+	return FileMapFromAny(unwrapTypedFiles(raw))
+}
+
+// FileMapFromAny accepts the JSON-decoded raw shape (map[string]any) as well
+// as the typed shape unwrapped. Node's FileMap.fromRaw iterates Object.entries
+// and does not care about Go's map value type.
+func FileMapFromAny(raw map[string]any) (*FileMap, error) {
 	files := make(map[string]*File, len(raw))
 	for k, v := range raw {
-		f, err := FileFromRaw(v)
+		m, _ := v.(map[string]any)
+		f, err := FileFromRaw(m)
 		if err != nil {
 			return nil, err
 		}
-		files[k] = f
+		if f != nil {
+			files[k] = f
+		}
 	}
 	return NewFileMap(files)
+}
+
+func unwrapTypedFiles(raw map[string]map[string]any) map[string]any {
+	out := make(map[string]any, len(raw))
+	for k, v := range raw {
+		out[k] = v
+	}
+	return out
 }
 
 // ToRaw mirrors FileMap.toRaw.

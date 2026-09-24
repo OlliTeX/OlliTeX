@@ -43,12 +43,16 @@ func NewSnapshot(fileMap *FileMap, projectVersion *string, v2 *V2DocVersions, ts
 }
 
 // SnapshotFromRaw mirrors Snapshot.fromRaw.
+//
+// raw["files"] may be the static shape (map[string]map[string]any, from
+// ToRaw) or the JSON-decoded shape (map[string]any, what requestparser
+// hands to history writer). Node accepts the raw object in both cases.
 func SnapshotFromRaw(raw map[string]any) (*Snapshot, error) {
-	files, _ := raw["files"].(map[string]map[string]any)
-	if !rawHas(raw, "files") {
+	files, ok := rawFilesToAny(raw)
+	if !ok {
 		return nil, gop("bad raw.files")
 	}
-	fm, err := FileMapFromRaw(files)
+	fm, err := FileMapFromAny(files)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +73,29 @@ func SnapshotFromRaw(raw map[string]any) (*Snapshot, error) {
 		ts = &t
 	}
 	return NewSnapshot(fm, pv, v2, ts), nil
+}
+
+// rawFilesToAny normalises raw["files"] to map[string]any. It accepts the
+// typed ToRaw shape (map[string]map[string]any) and the JSON-decoded shape
+// (map[string]any). Node accepts both because it sees one shape: a plain
+// object. A missing or wrongly-typed "files" is the "bad raw.files" error.
+func rawFilesToAny(raw map[string]any) (map[string]any, bool) {
+	v, present := raw["files"]
+	if !present {
+		return nil, false
+	}
+	switch files := v.(type) {
+	case map[string]map[string]any:
+		out := make(map[string]any, len(files))
+		for k, fv := range files {
+			out[k] = fv
+		}
+		return out, true
+	case map[string]any:
+		return files, true
+	default:
+		return nil, false
+	}
 }
 
 // ToRaw mirrors Snapshot.toRaw.
