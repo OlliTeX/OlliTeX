@@ -31,6 +31,7 @@ import (
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/dropbox"
 	"ollitex/go/services/web/features/editorpages"
+	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/features/gitbridge"
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/history"
@@ -253,6 +254,10 @@ func main() {
 	// P6 surface (P6.1): ollitex-hub module (/hub page, /hub legacy
 	// redirects, /api/hub-theme theme API, /api/hub/health, /api/hub/notes).
 	app.RegisterFeature(hub.Feature(app))
+
+	// P7-post item 3: /hub-managed email templates (GET/PUT/DELETE
+	// /api/hub/email-templates[/name]; overrides in Mongo emailtemplateoverrides).
+	app.RegisterFeature(emailtemplates.Feature(app, nil))
 
 	// P7 completion U1: project-tag surface (GET/POST /tag, tag member ops,
 	// tags VA/limiters pinned against the live Node oracle).
