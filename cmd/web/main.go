@@ -26,6 +26,7 @@ import (
 	"ollitex/go/services/web/features/adminusers"
 	"ollitex/go/services/web/features/analytics"
 	"ollitex/go/services/web/features/authpages"
+	"ollitex/go/services/web/features/collabhistory"
 	"ollitex/go/services/web/features/compile"
 	"ollitex/go/services/web/features/consent"
 	"ollitex/go/services/web/features/devcsrf"
@@ -224,6 +225,11 @@ func main() {
 	// P6.14 surface: notifications preferences (global + per-project GET/POST,
 	// /user/notification-preferences 301s, /user/send-test-email).
 	app.RegisterFeature(notifications.Feature(app))
+
+	// D19 S3: Yjs version-history REST (collab room = version index). Routes:
+	// GET  /project/:pid/collab/history, /collab/history/:v, GET /collab/doc,
+	// POST /collab/history/:v/restore. Role-gated (owner/collab RW, readOnly RO).
+	app.RegisterFeature(collabhistory.Feature(app))
 
 	// P6.15 surface: LanguageTool proxy (languages, check, admin connection
 	// check).

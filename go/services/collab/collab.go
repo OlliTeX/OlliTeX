@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/reearth/ygo/crdt"
 	"github.com/reearth/ygo/persistence"
 	ws "github.com/reearth/ygo/provider/websocket"
 	"go.mongodb.org/mongo-driver/bson"
@@ -70,7 +71,15 @@ type Options struct {
 	// CompactEvery — how often the ygo server triggers Compact per room:
 	// 0 = on room unload only (ygo default); >0 = also after every N
 	// persistence flushes. 0 keeps the current (safe) behavior.
-	CompactEvery    int
+	CompactEvery int
+	// SeedFn — server-side initial-content seeding (S3). The server is the
+	// single source of the first content: clients join EMPTY and receive the
+	// seed through the initial sync. Called once per room, only for rooms with
+	// NO stored versions, via the ygo OnLoadDocument lifecycle hook; the
+	// returned text is inserted as the room's version 1. A returned "" seeds
+	// nothing; an error fails the room load (fail-closed). Nil = no seeding
+	// (rooms stay empty until a client writes).
+	SeedFn          func(ctx context.Context, room string) (string, error)
 	AllowedOrigins  []string
 	MaxConnections  int
 	MaxPeersPerRoom int
@@ -113,6 +122,34 @@ func New(opts Options) (*Service, error) {
 	adapter.KeepVersions = opts.KeepVersions
 	srv := ws.NewServerWithPersistence(adapter)
 	srv.CompactEvery = opts.CompactEvery
+	// Room seeding (S3): ygo fires OnLoadDocument exactly once per room when
+	// the doc first loads. We seed only truly-empty rooms (no stored versions)
+	// and persist the seed as version 1, so every peer's initial sync carries
+	// it. Non-empty rooms are untouched (no double seed, no overwrite of an
+	// intentionally emptied doc).
+	if opts.SeedFn != nil {
+		srv.OnLoadDocument = func(ctx context.Context, room string, doc *crdt.Doc) error {
+			lv, lerr := store.Load(ctx, room)
+			if lerr != nil {
+				return lerr
+			}
+			if lv.Version > 0 {
+				return nil // room already has history
+			}
+			text, serr := opts.SeedFn(ctx, room)
+			if serr != nil {
+				return serr
+			}
+			if text == "" {
+				return nil // no seed content — room stays empty
+			}
+			doc.Transact(func(txn *crdt.Transaction) {
+				txn.GetText(TextType).Insert(txn, 0, text, nil)
+			})
+			_, aerr := store.AppendUpdate(ctx, room, doc.EncodeStateAsUpdate())
+			return aerr
+		}
+	}
 	srv.Authorize = func(r *http.Request) (ws.ConnectionConfig, bool) {
 		uid, err := opts.Auth.Identity(r)
 		if err != nil || uid == "" {

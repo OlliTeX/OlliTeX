@@ -47,6 +47,9 @@ and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
 | D18 | **Toolkit placement**: `tools/toolkit` → repo-root **`toolkit/`** (visible root position), all references updated | APPROVED — **DONE this commit** |
 | D19 | **Collaboration pivot — Option B (Yjs/Ygo, HARD CUT)**: the document model becomes Yjs; server = **ygo** (`github.com/reearth/ygo`, Re:Earth's pure-Go CRDT stack — Hocuspocus-compatible WS server, Redis-Streams cluster relay, versioned persistence + snapshots, awareness; MIT; v1.50.0 pinned). The 2014 substrate (real-time Node + socket.io fork + ShareJS + OT client/editor-core) is **retired junk after the flip — no OT legacy reader** (owner hard-cut call 2026-09-25). Support-LLM real-time port: irrelevant (their own copy). Existing OT history is **not portable** — new projects seed Y.Text from current file content; OT history drops. | APPROVED — **IN PROGRESS (ARC-9)** |
 | D16* | `clsi`/`clsi_typst`/`project-history` still support-LLM territory; **`real-time` is SUPERSEDED** by D19 (pivot, not port) | SUPERSEDED (real-time) |
+| D20 | **Collab client stack**: browser `yjs` (stable v13 line) + `y-websocket` + `y-indexeddb` + `y-undo`; CodeMirror-6 bridge is OUR code (full-replace sync loop; y-cursor is CM5-only → awareness-rendered cursors via a CM6 decoration plugin). **yhub = REST DESIGN SPEC ONLY (history/changeset/restore shape), never a runtime** (AGPL/beta + Postgres + Redis Streams = D5/D19 conflict). `k_yrs_go`/`electric` investigated and **rejected** (wrong substrate). Client code MIT-compatible with the AGPL product. | CONFIRMED (owner 2026-09-25) |
+| D21 | **Notifications**: email stack stays **`wneessen/go-mail`** (owner-approved P3; stronger client than `go-pkgz/notify`'s SMTP — adopting notify as a mailer REJECTED; its multi-channel shape is only a design reference). Non-email delivery (webhook/Slack/in-app presence) = separate arc under owner-delegated discretion (2026-09-25 "make the priority decisions yourself"); the Yjs awareness stack already provides the real-time presence half. | RECORDED |
+| D22 | **Observability modernization (owner note 2026-09-25)**: rework `features/instancestats` (Mongo time-series + email-threshold alerts) onto the **Prometheus + Grafana** ecosystem: Go services expose Prometheus-format `/metrics` (client_golang; the existing `go/libraries/ometrics` registry becomes a bridge/collector), node_exporter (host) + cAdvisor (containers) scrapes, Prometheus sidecar (runit/compose, OFF-BY-DEFAULT to keep clean-by-default images), Grafana embedded in /hub (kiosk iframe, Mantine `GrafanaPanel`), admin email alerts re-implemented as Prometheus rule alerts → webhook → the existing email pipeline. Loki/Alloy (logs) = optional phase. Single-host stack (NO k8s) → static scrape configs, no ServiceMonitor/K8s auth bits. Phased: A instrument → B Prometheus → C Grafana/hub → D alerts (product behavior kept) → E optional Loki → legacy series retirement. **Sized after the D19 flip (S4) so it measures the live Go stack.** | RECORDED — PLANNED (owner note for later) |
 
 ---
 
@@ -328,9 +331,46 @@ it; `LegacyAdapter` forwards to `MongoStore.Compact` with the `KeepVersions`
 policy). Env: `COLLAB_KEEP_VERSIONS`, `COLLAB_COMPACT_EVERY` (default 0/0 =
 unchanged behavior). New hermetic test `TestKeepVersionsWiring` pins the
 adapter→store `keep` pass-through. This is the bound that keeps the
-single-doc log under Mongo's 16 MB cap for long-lived rooms (set
+``single-doc log under Mongo's 16 MB cap for long-lived rooms (set
 `COLLAB_KEEP_VERSIONS` > 0 + rely on snapshots for older history if a room
 outgrows the cap). — **DONE**
+
+**S3 — server slice DONE (this commit)** — the Yjs history surface lands on
+Go web, decoupled from the OT engine:
+- **`roomdoc.go`** (`go/services/collab`): the shared ROOM-DOC domain ops on
+  any `VersionedPersistence` — `SeedTextContent` (room's v1 from initial
+  file content; no-op if versions exist), `TextAt` (materialize version v's
+  visible text), `HeadText` (current head text+version), `RestoreToVersion`
+  (CRDT-correct restore: load head, delete-all+insert content(v) in ONE txn,
+  append the delta as a NEW version — no time-travel, converges for all live
+  peers; no new version when content already equals v), `ClientEdit` (test
+  helper that emulates one browser edit end-to-end). `TextType = "content"`
+  is the single shared Y.Text name the client + both server surfaces agree
+  on. Hermetic (FilePersistence) + live-Mongo suites GREEN.
+- **Seed hook** (`Service.SeedFn` → ygo `OnLoadDocument`): the SERVER is the
+  single source of the first content — peers join EMPTY and receive the seed
+  via initial sync; `OnLoadDocument` fires once per room, seeds only
+  truly-empty rooms, persists as v1, fails room load on seed error
+  (fail-closed). `TestSeedOverWS` pins the full y-protocol path (gorilla
+  dial + step1 exchange) and that exactly ONE seed version is created for
+  two peers.
+- **`features/collabhistory`** (Go web REST, yhub-shape as SPEC): `
+  GET /project/:pid/collab/history` (versions newest-first; ≥read),
+  `GET /project/:pid/collab/history/:v` (version content; ≥read),
+  `POST /project/:pid/collab/history/:v/restore` (write),
+  `GET /project/:pid/collab/doc` (head; ≥read). Role-gated via the shared
+  `collab` policy (owner/collab = RW, readOnly = RO, else 404 no-leak). The
+  CRDT mechanics live in the collab package — this package is HTTP + policy
+  ONLY, so the history surface and the WS surface cannot drift apart on doc
+  semantics. 28 web feature packages still green.
+- Registered in `cmd/web`.
+
+**S3 remaining (NEXT)**: client editor page — the yjs stack (D20) wired as a
+hard cut of the OT `ShareJsDoc`/`SocketIoShim`/`ShareJs` client inside the
+IDE (`frontend/js/features/ide-react` + `source-editor`), then the editor
+page loads the Yjs engine instead of the OT engine. The client `TextType =
+"content"` must match the server constant. Then S4 flip.
+
 - **Supersedes** the remaining "make OT services real" work (ARC-1/ARC-2 OT
   persistence machinery) and the D16 support-LLM real-time port: with a CRDT
   the transform/meshing layer no longer exists — history **is** the update
