@@ -195,6 +195,14 @@ test-go: ## Run the Go service test suite (race detector + coverage)
 .PHONY: test
 test: test-go ## Run repo tests (Go services; node front-end uses 'unit'/'hub')
 
+.PHONY: go-test-history-v1
+go-test-history-v1: ## history-v1 Go module gate (hermetic; separate module)
+	cd services/history-v1.go && $(GO) build -buildvcs=false ./... && $(GO) vet -buildvcs=false ./... && test -z "$$(gofmt -l .)" && $(GO) test -count=1 -race -buildvcs=false ./...
+
+.PHONY: go-test-document-updater
+go-test-document-updater: ## document-updater Go module gate (internal packages; separate module)
+	cd services/document-updater.go && $(GO) build -buildvcs=false ./... && $(GO) vet -buildvcs=false ./... && test -z "$$(gofmt -l .)" && $(GO) test -count=1 -race -buildvcs=false ./...
+
 .PHONY: go-build
 go-build: ## Build all Go service binaries into ./bin
 	@mkdir -p bin
