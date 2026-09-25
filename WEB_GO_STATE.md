@@ -285,7 +285,11 @@ WS server with auth hooks / rate limits, `VersionedPersistence` conformance
 suite, file/sqlite/memory backends, Redis pub-sub + Streams cluster relay,
 awareness, snapshots/compaction, `cmd/ygo-server` reference).
 
-**S1 — DONE** — `go/services/collab` service embedding the ygo WS server (13 tests green under -race; `make go-test-collab`; Dockerfile gobuilder list; ygo@v1.50.0 pinned in go.mod/go.sum, additions-only diff):
+**S1 — DONE** — `go/services/collab` service embedding the ygo WS server (15 tests green under -race; `make go-test-collab`; Dockerfile gobuilder list; ygo@v1.50.0 pinned in go.mod/go.sum, additions-only diff):
+
+**LIBS CONSIDERED (owner 2026-09-25, both aligned to the plan):**
+- `coder/websocket` — excellent Go WS lib (ISC, context-aware, zero-alloc), but our only production WS path is ygo's provider (gorilla-internal); adopting it means rewriting S1 and contradicts D19/D20. **Rejected for this plan** (revisit only if the ygo server itself is dropped).
+- `go.mongodb.org/mongo-driver/v2` (v2.9.1) — technically adoptable (needs Go 1.25+/Mongo 4.4+, both ok) but a repo-wide major bump against byte-pinned oracle-parity code. **Deferred** to a dedicated migration arc AFTER the S4 flip is stable; never mixed into a feature slice.
 - `Authorize` hook = OlliTeX session (cookie → Redis session store, shared
   `core` primitives) + project access (owner/collab = read-write,
   readOnly = **read-only peer** via ygo `ConnectionConfig`);
@@ -298,6 +302,24 @@ awareness, snapshots/compaction, `cmd/ygo-server` reference).
   web; S3: client editor page (yjs stack, hard cut of OT editor);
   S4: flip — real-time Node + OT substrate → junk, runit + nginx + image
   + new Yjs e2e (convergence / offline reload / history restore).
+**S2 — DONE** — `MongoStore` (`mongostore.go`): `VersionedPersistence` over
+Mongo (one room doc: versioned update log `upds[]` + named snapshots
+`snaps{}`; every mutation is a single-doc atomic write). Two server facts
+pinned by live testing (Mongo 8.3): (a) **`$push` is NOT a valid
+update-pipeline stage** — appends use `$concatArrays` (aggregation
+expression) with `$ifNull($head,0)+1` computed via `$let`; (b) a
+$set-with-$filter MUST be a pipeline (array-form) update — a plain update
+stores the `$filter` doc as a literal value and corrupts the log.
+**`persistence.RunConformance` GREEN** against live Mongo (all subtests:
+append/list ordering, GetUpdate, MaterializeAt, PruneAfter target=2/0,
+Compact, snapshot round-trip, Delete; crash-injection subtest skipped by
+contract — single-doc writes need no crash choreography) +
+`LegacyAdapter` bridge round-trip (the exact WS-server path). Test-quirk
+pinned: `RunConformance`'s `factory()` must hand back a FRESH store per
+subtest (MemoryPersistence semantics) — the Mongo test clears rooms per
+factory call. `Service` now takes `Options.Store` (dev default unchanged =
+FilePersistence; S4 wires Mongo in production).
+  Remaining S2 slice: restore/history endpoints on Go web (next).
 - **Supersedes** the remaining "make OT services real" work (ARC-1/ARC-2 OT
   persistence machinery) and the D16 support-LLM real-time port: with a CRDT
   the transform/meshing layer no longer exists — history **is** the update
