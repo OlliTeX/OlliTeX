@@ -19,18 +19,27 @@ type mongoClient struct {
 	db *mongo.Database
 }
 
-// NewMongo connects (MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL ||
+// NewMongoClient connects (MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL ||
 // mongodb://host/sharelatex, mirroring core config precedence) and returns
-// the Mongo implementation.
-func NewMongo(ctx context.Context, uri, dbName string) (Mongo, error) {
+// the client + database for the given db name.
+func NewMongoClient(ctx context.Context, uri, dbName string) (*mongo.Client, *mongo.Database, error) {
 	c, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := c.Ping(ctx, nil); err != nil {
+		return nil, nil, err
+	}
+	return c, c.Database(dbName), nil
+}
+
+// NewMongo connects and returns the Mongo implementation.
+func NewMongo(ctx context.Context, uri, dbName string) (Mongo, error) {
+	_, db, err := NewMongoClient(ctx, uri, dbName)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Ping(ctx, nil); err != nil {
-		return nil, err
-	}
-	return &mongoClient{db: c.Database(dbName)}, nil
+	return &mongoClient{db: db}, nil
 }
 
 func objID(id string) (primitive.ObjectID, bool) {

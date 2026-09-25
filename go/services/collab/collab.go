@@ -55,8 +55,12 @@ type AuthSource interface {
 
 // Options — service construction inputs.
 type Options struct {
-	Auth            AuthSource
-	DataDir         string // ygo FilePersistence root (per-room update logs + snapshots)
+	Auth AuthSource
+	// Store — the versioned persistence for room state. S2 production =
+	// MongoStore (NewMongoStore); dev/test = nil, which defaults to ygo's
+	// FilePersistence under DataDir.
+	Store           persistence.VersionedPersistence
+	DataDir         string // used only when Store == nil (FilePersistence root)
 	AllowedOrigins  []string
 	MaxConnections  int
 	MaxPeersPerRoom int
@@ -66,13 +70,12 @@ type Options struct {
 // room endpoint; the room name is the base path segment.
 type Service struct {
 	Server *ws.Server
-	store  *persistence.FilePersistence
+	store  persistence.VersionedPersistence
 }
 
-// Compile-time guarantee that the store satisfies the versioned interface
-// (S2 history endpoints use this surface; the WS server only needs the
-// adapter bridge).
-var _ persistence.VersionedPersistence = (*persistence.FilePersistence)(nil)
+// Store — the versioned store backing this service (history endpoints use
+// this surface directly).
+func (s *Service) Store() persistence.VersionedPersistence { return s.store }
 
 // New builds the service. ygo server = relay + doc lifecycle + persistence;
 // the Authorize hook is the only place OlliTeX policy enters.
@@ -80,12 +83,18 @@ func New(opts Options) (*Service, error) {
 	if opts.Auth == nil {
 		return nil, errors.New("collab: Auth source required (fail closed)")
 	}
-	store, err := persistence.NewFilePersistence(opts.DataDir)
-	if err != nil {
-		return nil, err
+	var store persistence.VersionedPersistence
+	if opts.Store != nil {
+		store = opts.Store
+	} else {
+		var err error
+		store, err = persistence.NewFilePersistence(opts.DataDir)
+		if err != nil {
+			return nil, err
+		}
 	}
-	// The ygo WS server takes the two-method PersistenceAdapter; File
-	// Persistence speaks the versioned interface, so bridge with LegacyAdapter.
+	// The ygo WS server takes the two-method PersistenceAdapter; the versioned
+	// store speaks the fuller interface, so bridge with LegacyAdapter.
 	srv := ws.NewServerWithPersistence(persistence.NewLegacyAdapter(store))
 	srv.Authorize = func(r *http.Request) (ws.ConnectionConfig, bool) {
 		uid, err := opts.Auth.Identity(r)
