@@ -61,7 +61,7 @@ func run(args []string, out io.Writer) error {
 	case "help", "-h", "--help":
 		return usage(out)
 	case "list", "get", "set", "delete", "export", "backup", "restore",
-		"import-env", "init", "doctor":
+		"import-env", "import-defaults", "defaults", "init", "doctor":
 		return dispatch(cmd, rest, out)
 	default:
 		return fmt.Errorf("unknown command %q (see: configdb help)", cmd)
@@ -189,6 +189,21 @@ func dispatch(cmd string, args []string, out io.Writer) error {
 		}
 		return importEnvFile(s, args[0], out)
 
+	case "import-defaults", "defaults":
+		if cmd == "defaults" {
+			if len(args) >= 1 {
+				b, err := os.ReadFile(args[0])
+				if err != nil {
+					return err
+				}
+				fmt.Fprintln(out, string(b))
+				return nil
+			}
+			fmt.Fprintln(out, configschema.EmbeddedDefaults)
+			return nil
+		}
+		return importDefaults(s, out)
+
 	case "init":
 		return initStore(s, out)
 
@@ -284,6 +299,69 @@ func importEnvFile(s *configstore.ConfigStore, path string, out io.Writer) error
 	return nil
 }
 
+// importDefaults seeds the store from the defaults JSONC (embedded, or
+// $CONFIGDB_DEFAULTS_FILE when set) — first-boot population. NEVER clobbers a
+// key already present in the store; null entries (no static default) are
+// skipped; unknown keys are skipped + counted.
+func importDefaults(s *configstore.ConfigStore, out io.Writer) error {
+	var (
+		def map[string]any
+		err error
+		src = "embedded"
+	)
+	if f := os.Getenv("CONFIGDB_DEFAULTS_FILE"); f != "" {
+		b, rerr := os.ReadFile(f)
+		if rerr != nil {
+			return rerr
+		}
+		def, err = configschema.ParseDefaultsFile(string(b))
+		src = f
+	} else {
+		def, err = configschema.Defaults()
+	}
+	if err != nil {
+		return err
+	}
+	seeded, existing, unknown, nulls := 0, 0, 0, 0
+	for k, v := range def {
+		if v == nil {
+			nulls++
+			continue
+		}
+		if !configschema.Known(k) {
+			unknown++
+			continue
+		}
+		if _, gerr := s.Get(k); gerr == nil {
+			existing++
+			continue
+		}
+		sv := rawValueString(v)
+		if err := s.Set(k, sv, "cli:import-defaults:"+src); err != nil {
+			return err
+		}
+		seeded++
+	}
+	keys, _ := s.Keys()
+	fmt.Fprintf(out, "defaults(%s): seeded %d, kept %d already-set, %d no-default, %d unknown -> store now has %d keys\n", src, seeded, existing, nulls, unknown, len(keys))
+	return nil
+}
+
+func rawValueString(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case float64:
+		return fmt.Sprintf("%v", int64(x))
+	case bool:
+		if x {
+			return "true"
+		}
+		return "false"
+	}
+	return ""
+}
+
 func initStore(s *configstore.ConfigStore, out io.Writer) error {
 	if raw := os.Getenv(configstore.EncryptionKeyEnv); raw != "" {
 		if _, err := configstore.ParseKey(raw); err != nil {
@@ -313,11 +391,16 @@ func initStore(s *configstore.ConfigStore, out io.Writer) error {
 		}
 		imported++
 	}
+	// Step 3 (initial setup JSONC seed): populate the remaining keys from the
+	// defaults file (embedded or $CONFIGDB_DEFAULTS_FILE). Never clobbers.
+	if err := importDefaults(s, out); err != nil {
+		return err
+	}
 	keys, err := s.Keys()
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "db ready: %s (now %d keys; seeded %d from the process env, existing values untouched)\n", dbPath(), len(keys), imported)
+	fmt.Fprintf(out, "db ready: %s (now %d keys; env-seeded %d, defaults-seeded per line above, existing values untouched)\n", dbPath(), len(keys), imported)
 	return nil
 }
 
@@ -356,7 +439,9 @@ Usage:
   configdb backup [DEST]             write a JSON backup (default ./configdb-backup-<ts>.json)
   configdb restore SRC               load a JSON backup into the store
   configdb import-env FILE           import known keys from a KEY=VALUE env file (bootstrap)
-  configdb init                      (un)configure the encryption key + seed from process env
+  configdb import-defaults [FILE]    seed from the defaults JSONC (embedded/FILE; never clobbers)
+  configdb defaults [FILE]           print the defaults JSONC (embedded/FILE)
+  configdb init                      (un)configure the encryption key + seed env + seed defaults
   configdb doctor                    key/db/read-back health
   configdb help                      this help
 

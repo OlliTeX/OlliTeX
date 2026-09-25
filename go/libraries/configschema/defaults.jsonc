@@ -1,0 +1,167 @@
+// defaults.jsonc — initial-setup seed for the SQLite config DB (ARC-3, D6).
+// Loaded by: cmd/configdb import-defaults [FILE] and tools/toolkit/bin/config.
+// JSONC: line (//), block (/* */) comments and trailing commas allowed.
+// Semantics: import never clobbers a key already set in the DB (first-boot
+// seed). null = no static default (taken from env or left unset).
+{
+    // ── core ──
+    "APP_NAME": "OlliTeX", // Product name shown in the UI, e-mails and titles
+    "SITE_URL": null, // Public base URL (links, e-mails, redirects)
+    "ENABLED_SERVICES": "web,api", // Which server profiles run: web and/or api
+    "ALLOWED_ORIGINS": null, // Comma-separated allowed CORS origins
+    "ADMIN_PRIVILEGE_AVAILABLE": false, // Enable the site-admin privilege
+    "SITE_OPEN": true, // Site-wide 'open' toggle (false = closed-notice page)
+    "EDITOR_OPEN": true, // Editor-open toggle (false = closed-notice for editor loads)
+    "EXPOSE_HOSTNAME": false, // Expose the hostname in responses
+    "OVERLEAF_ALLOW_PUBLIC_ACCESS": false, // Allow anonymous public access
+    "OVERLEAF_DISABLE_CHAT": false, // Disable built-in chat
+    "OVERLEAF_DISABLE_LINK_SHARING": false, // Disable link sharing
+    "OVERLEAF_ALLOW_ANONYMOUS_READ_AND_WRITE_SHARING": false, // Allow anonymous read+write sharing
+    "OVERLEAF_HISTORY_RESTORE": false, // Enable history restore in the editor
+    "NAV_HIDE_POWERED_BY": false, // Hide 'Powered by' in the nav
+    "ROBOTS_NOINDEX": false, // Send robots noindex on anonymous pages
+    "ADDITIONAL_TEXT_EXTENSIONS": null, // Extra file extensions treated as text
+    "ADMIN_EMAIL": null, // Site-admin contact address (e-mails, footer)
+    "CACHE_STATIC_ASSETS": true, // Etag/cache static assets
+    "COOKIE_DOMAIN": null, // Cookie domain (security-relevant, usually a deploy constant)
+    "COOKIE_ROLLING_SESSION": true, // Roll (slide) the session expiry
+    "COOKIE_SESSION_LENGTH": 604800, // Session cookie lifetime (seconds)
+    // ── boot ──
+    "OVERLEAF_HOME": null, // Install home dir (logs, configdb, volumes)
+    "CONFIG_DB_PATH": null, // Explicit SQLite config-DB file path
+    "WEB_GO_PUBLIC_DIR": null, // Baked frontend asset dir for the Go web
+    "NODE_ENV": "production", // Runtime environment label
+    "OVERLEAF_STORAGE_ENV_FILE": null, // Storage (persistor) env file used by filestore/blob backends
+    "RELEASE_NOTES_PATH": null, // Release-notes path surfaced in the UI
+    // ── services ──
+    "OVERLEAF_MONGO_URL": null, // MongoDB connection string (may embed credentials)  [secret: masked in listings; field-encrypted in the store]
+    "DOCSTORE_HOST": null, // docstore service host
+    "WEB_DOCSTORE_URL": null, // docstore URL as seen by the web
+    "DOCUMENT_UPDATER_HOST": null, // document-updater service host
+    "WEB_DOCUMENT_UPDATER_URL": null, // document-updater URL as seen by the web
+    "WEB_DOCUPDATER_URL": null, // document-updater URL (legacy alias)
+    "WEB_FILESTORE_URL": null, // filestore (S3/TPDS) URL
+    "PROJECT_HISTORY_HOST": null, // project-history host
+    "PROJECT_HISTORY_URL": null, // project-history URL
+    "WEB_PROJECT_HISTORY_URL": null, // project-history URL as seen by the web
+    "REALTIME_URL": null, // real-time (socket) URL
+    "V1_HISTORY_URL": null, // history-v1 URL (e.g. http://127.0.0.1:3100/api)
+    "WEB_V1_HISTORY_URL": null, // history-v1 URL as seen by the web
+    "APIS_V1_URL": null, // v1 API base URL surface
+    "CLSI_LB_HOST": null, // compile-server (clsi) load-balancer host
+    "CLSI_TYPEST_URL": null, // clsi_typst URL
+    "WEB_CHAT_URL": null, // chat service URL
+    "GIT_BRIDGE_HOST": "git-bridge", // git-bridge service host
+    "GIT_BRIDGE_PORT": 8000, // git-bridge service port
+    "GIT_BRIDGE_ENABLED": false, // Enable Git integration
+    "OVERLEAF_GITBRIDGE_ENABLED": false, // Enable Git integration (alternate switch name)
+    // ── email ──
+    "OVERLEAF_EMAIL_DRIVER": "smtp", // Mail driver (smtp|ses)
+    "OVERLEAF_EMAIL_SMTP_HOST": null, // SMTP host (or SES endpoint)
+    "OVERLEAF_EMAIL_SMTP_PORT": 587, // SMTP port
+    "OVERLEAF_EMAIL_FROM_ADDRESS": null, // From address for outbound mail
+    "OVERLEAF_EMAIL_REPLY_TO": null, // Reply-To address
+    "OVERLEAF_EMAIL_SMTP_NAME": null, // SMTP display name
+    "OVERLEAF_EMAIL_SMTP_USER": null, // SMTP user
+    "OVERLEAF_EMAIL_SMTP_PASS": null, // SMTP password (field-encrypted at rest)  [secret: masked in listings; field-encrypted in the store]
+    "OVERLEAF_EMAIL_SMTP_SECURE": false, // SMTP TLS (secure=true)
+    "OVERLEAF_EMAIL_SMTP_IGNORE_TLS": false, // Ignore TLS verification (insecure relays)
+    "EMAIL_TLS_REJECT_UNAUTHORIZED": true, // Reject unauthorized TLS certificates
+    "EMAIL_CONFIRMATION_DISABLED": false, // Skip account-confirmation e-mail
+    "OVERLEAF_EMAIL_AWS_SES_ACCESS_KEY_ID": null, // AWS SES access key id  [secret: masked in listings; field-encrypted in the store]
+    "OVERLEAF_EMAIL_AWS_SES_SECRET_KEY": null, // AWS SES secret key  [secret: masked in listings; field-encrypted in the store]
+    "OVERLEAF_EMAIL_AWS_SES_REGION": null, // AWS SES region
+    // ── integrations ──
+    "OVERLEAF_ZOTERO": false, // Enable Zotero integration
+    "ZOTERO_CLIENT_KEY": null, // Zotero client key  [secret: masked in listings; field-encrypted in the store]
+    "ZOTERO_CLIENT_SECRET": null, // Zotero client secret  [secret: masked in listings; field-encrypted in the store]
+    "MENDELEY_CLIENT_ID": null, // Mendeley client id (present => enabled)  [secret: masked in listings; field-encrypted in the store]
+    "MENDELEY_CLIENT_SECRET": null, // Mendeley client secret  [secret: masked in listings; field-encrypted in the store]
+    "MENDELEY_CIPHER_LABEL": null, // Mendeley token cipher label
+    "MENDELEY_CIPHER_PASSWORD": null, // Mendeley token cipher password  [secret: masked in listings; field-encrypted in the store]
+    "GITHUB_SYNC_ENABLED": false, // Enable GitHub sync
+    "GITHUB_SYNC_CLIENT_ID": null, // GitHub OAuth client id  [secret: masked in listings; field-encrypted in the store]
+    "GITHUB_SYNC_CLIENT_SECRET": null, // GitHub OAuth client secret  [secret: masked in listings; field-encrypted in the store]
+    "GITHUB_TOKEN_CIPHER_FILE": null, // GitHub token cipher file
+    "GITHUB_TOKEN_CIPHER_LABEL": null, // GitHub token cipher label
+    "DROPBOX_ENABLED": false, // Enable Dropbox sync
+    "DROPBOX_APP_KEY": null, // Dropbox app key  [secret: masked in listings; field-encrypted in the store]
+    "DROPBOX_APP_SECRET": null, // Dropbox app secret  [secret: masked in listings; field-encrypted in the store]
+    "WEBDAV_ENABLED": false, // Enable WebDAV sync
+    "WEBDAV_ROOT_PATH": "/Overleaf", // WebDAV root path
+    "WEBDAV_REQUEST_TIMEOUT_MS": 60000, // WebDAV request timeout (ms)
+    "WEBDAV_RETRY_COUNT": 2, // WebDAV retry count
+    "WEBDAV_RETRY_DELAY_MS": 500, // WebDAV retry delay (ms)
+    "WEBDAV_TOKEN_CIPHER_LABEL": null, // WebDAV token cipher label
+    "WEBDAV_TOKEN_CIPHER_PASSWORD": null, // WebDAV token cipher password  [secret: masked in listings; field-encrypted in the store]
+    "WEBDAV_TOKEN_CIPHER_PREVIOUS_LABEL": null, // WebDAV previous cipher label (rotation)
+    "WEBDAV_TOKEN_CIPHER_PREVIOUS_PASSWORD": null, // WebDAV previous cipher password (rotation)  [secret: masked in listings; field-encrypted in the store]
+    "OVERLEAF_EXTERNAL_URLS": false, // Enable linked (external) file types
+    "OVERLEAF_LINKED_URL_ALLOWED_RESOURCES": null, // Regex for allowed external resources
+    "ENABLED_LINKED_FILE_TYPES": null, // Extra enabled linked-file types (comma list)
+    // ── compilation ──
+    "DEFAULT_LATEX_COMPILER": "pdflatex", // Default LaTeX compiler
+    "TEX_COMPILER_EXTRA_FLAGS": null, // Extra compiler flags
+    "SANDBOXED_COMPILES": false, // Enable sandboxed (docker) compiles
+    "DOCKER_RUNNER": false, // Use the docker compile runner
+    "SANDBOXED_COMPILES_HOST_DIR": null, // Host dir for sandboxed compiles
+    "COMPILES_HOST_DIR": null, // Compile host dir (fallback of SANDBOXED_COMPILES_HOST_DIR)
+    "DOCKER_SOCKET_PATH": null, // Docker socket path
+    "TEXLIVE_IMAGE_USER": null, // User inside the texlive image
+    "ALL_TEX_LIVE_DOCKER_IMAGES": null, // Comma list of TeXLive docker images
+    "ALL_TEX_LIVE_DOCKER_IMAGE_NAMES": null, // Comma list of display names for the images
+    "TEX_LIVE_DOCKER_IMAGE": "texlive/texlive:latest-full", // Default TeXLive image
+    "COMPILE_TYPEST_ENABLED": true, // Enable Typst compilation
+    "ENABLE_PANDOC_CONVERSIONS": false, // Enable pandoc (Markdown→LaTeX) conversions
+    "PANDOC_IMAGE": "pandoc-ol:3.10.0.0", // Pandoc compile image
+    "FILE_IGNORE_PATTERN": null, // File ignore pattern for sync/compile
+    "ENABLE_PYTHON_RUNNER": false, // Enable the Python runner
+    "ENABLE_PDF_CACHING": true, // Enable PDF caching
+    // ── limits ──
+    "MAX_UPLOAD_SIZE": 50, // Max upload size (MiB)
+    "MAX_ENTITIES_PER_PROJECT": 2000, // Max files per project
+    "INSTANCE_STATS_RETENTION_DAYS": null, // Instance-stats retention (days)
+    "OVERLEAF_BIB_LIBRARY_TRASH_RETENTION_DAYS": null, // Reference-library trash retention (days)
+    "OVERLEAF_PROJECT_HARD_DELETION_DELAY": 7776000000, // Project hard-deletion delay (ms)
+    "OVERLEAF_USER_HARD_DELETION_DELAY": 7776000000, // User hard-deletion delay (ms)
+    // ── core ──
+    "OVERLEAF_ENABLE_REGISTRATION_PAGE": true, // Enable the self-registration page
+    "OVERLEAF_ALLOWED_REGISTRATION_EMAIL_DOMAINS": null, // Allowed registration email domains (comma/space list)
+    "OVERLEAF_REGISTRATION_DISABLED_REDIRECT": null, // Redirect when registration is disabled
+    "OVERLEAF_TEMPLATES_USER_ID": null, // Template-gallery owner user id
+    "OVERLEAF_TEMPLATE_CATEGORIES": null, // Extra template categories (space list)
+    "OVERLEAF_TEMPLATE_GALLERY": false, // Enable the template gallery
+    "LLM_ENABLED": null, // Enable LLM features
+    "LLM_ADMIN_SETTINGS_PATH": null, // LLM admin settings path
+    "LANGUAGE_TOOL_LEVEL": null, // LanguageTool integration level
+    // ── services ──
+    "LANGUAGE_TOOL_HOST": null, // LanguageTool host
+    "LANGUAGE_TOOL_PORT": null, // LanguageTool port
+    "LANGUAGE_TOOL_URL": null, // LanguageTool base URL
+    // ── security ──
+    "OVERLEAF_SESSION_SECRET": null, // Session/cookie encryption secret  [secret: masked in listings; field-encrypted in the store]
+    "CRYPTO_RANDOM": null, // Random crypto material (legacy secret)  [secret: masked in listings; field-encrypted in the store]
+    "SESSION_SECRET_UPCOMING": null, // Upcoming session secret (rotation)  [secret: masked in listings; field-encrypted in the store]
+    "SESSION_SECRET_FALLBACK": null, // Fallback session secret (rotation)  [secret: masked in listings; field-encrypted in the store]
+    "WEB_API_USER": null, // Internal web↔api basic-auth user  [secret: masked in listings; field-encrypted in the store]
+    "WEB_API_PASSWORD": null, // Internal web↔api basic-auth password  [secret: masked in listings; field-encrypted in the store]
+    "STAGING_PASSWORD": null, // history-v1 basic-auth password  [secret: masked in listings; field-encrypted in the store]
+    "OT_JWT_AUTH_KEY": null, // history-v1 JWT signing key  [secret: masked in listings; field-encrypted in the store]
+    "OT_JWT_AUTH_OLD_KEY": null, // history-v1 JWT old signing key (rotation)  [secret: masked in listings; field-encrypted in the store]
+    "OT_JWT_AUTH_ALG": "HS256", // history-v1 JWT algorithm
+    "V1_HISTORY_USER": null, // history-v1 basic-auth user  [secret: masked in listings; field-encrypted in the store]
+    "V1_HISTORY_PASSWORD": null, // history-v1 basic-auth password (web side)  [secret: masked in listings; field-encrypted in the store]
+    "REALTIME_USER": null, // real-time API user  [secret: masked in listings; field-encrypted in the store]
+    "REALTIME_PASS": null, // real-time API password  [secret: masked in listings; field-encrypted in the store]
+    "SECRET_TOKEN": null, // Generic secret token  [secret: masked in listings; field-encrypted in the store]
+    "OVERLEAF_INVITE_TOKEN_SECRET": null, // Invite token signing secret  [secret: masked in listings; field-encrypted in the store]
+    "TOKEN_CIPHER_FILE": null, // Token cipher file
+    "TOKEN_CIPHER_LABEL": null, // Token cipher label
+    "TOKEN_CIPHER_PASSWORD": null, // Token cipher password  [secret: masked in listings; field-encrypted in the store]
+    "SITE_SETTINGS_CIPHER_FILE": null, // Site-settings cipher file
+    "SITE_SETTINGS_CIPHER_LABEL": null, // Site-settings cipher label
+    "BCRYPT_ROUNDS": null, // bcrypt cost rounds
+    // ── test ──
+    "SMOKE_TEST_USER_ID": null, // Smoke-test user id (dev)
+    "WEB_GO_DEBUG_AUTH": null, // Go web debug auth override (dev)
+}

@@ -134,12 +134,23 @@ func TestInitAndDoctor(t *testing.T) {
 	if !strings.Contains(out, "CONFIG_DB_ENCRYPTION_KEY=") {
 		t.Fatalf("init should print the generated key line: %q", out)
 	}
-	if !strings.Contains(out, "seeded 2 from the process env") { // APP_NAME + CONFIG_DB_PATH
+	if !strings.Contains(out, "env-seeded 2") { // APP_NAME + CONFIG_DB_PATH
 		t.Fatalf("init should seed from env: %q", out)
+	}
+	if !strings.Contains(out, "defaults(embedded): seeded 5") {
+		t.Fatalf("init should seed the defaults JSONC: %q", out)
+	}
+	if !strings.Contains(out, "kept 1 already-set") { // APP_NAME must not be clobbered
+		t.Fatalf("env-seeded value must survive the defaults pass: %q", out)
 	}
 	out, err = runArgs(t, "get", "APP_NAME")
 	if err != nil || !strings.Contains(out, "InitFromEnv") {
 		t.Fatalf("APP_NAME after init = %q, %v", out, err)
+	}
+	// a typed default must be seeded
+	out, err = runArgs(t, "get", "GIT_BRIDGE_PORT")
+	if err != nil || !strings.Contains(out, "8000") {
+		t.Fatalf("GIT_BRIDGE_PORT after init = %q, %v", out, err)
 	}
 
 	out, err = runArgs(t, "doctor")
@@ -148,5 +159,57 @@ func TestInitAndDoctor(t *testing.T) {
 	}
 	if !strings.Contains(out, "encryption: NOT configured") || !strings.Contains(out, "read-back: OK") {
 		t.Fatalf("doctor = %q", out)
+	}
+}
+
+// TestImportDefaults — the JSONC initial-setup seed (never clobbers, typed
+// values, unknown keys skipped).
+func TestImportDefaults(t *testing.T) {
+	t.Setenv("CONFIG_DB_PATH", filepath.Join(t.TempDir(), "db.sqlite3"))
+	out, err := runArgs(t, "import-defaults")
+	if err != nil {
+		t.Fatalf("import-defaults: %v", err)
+	}
+	if !strings.Contains(out, "embedded") || !strings.Contains(out, "seeded") {
+		t.Fatalf("import-defaults = %q", out)
+	}
+	// env-supplied value wins over the default
+	if out, err := runArgs(t, "set", "GIT_BRIDGE_PORT", "8080"); err != nil {
+		t.Fatal(out)
+	}
+	out, err = runArgs(t, "import-defaults")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _ = runArgs(t, "get", "GIT_BRIDGE_PORT")
+	if !strings.Contains(out, "8080") {
+		t.Fatalf("import-defaults must not clobber: GIT_BRIDGE_PORT=%q", out)
+	}
+
+	// custom FILE + unknown key skipped + null skipped
+	dir := t.TempDir()
+	t.Setenv("CONFIG_DB_PATH", filepath.Join(dir, "db.sqlite3"))
+	f := filepath.Join(dir, "d.jsonc")
+	if err := os.WriteFile(f, []byte(`{ // seed
+  "APP_NAME": "FromFile", // from the file
+  "NO_SUCH": "x",         // unknown -> skipped
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CONFIGDB_DEFAULTS_FILE", f)
+	out, err = runArgs(t, "import-defaults")
+	if err != nil || !strings.Contains(out, "1 unknown") {
+		t.Fatalf("file import = %q, %v", out, err)
+	}
+	t.Setenv("CONFIGDB_DEFAULTS_FILE", "")
+	out, _ = runArgs(t, "get", "APP_NAME")
+	if !strings.Contains(out, "FromFile") {
+		t.Fatalf("APP_NAME = %q", out)
+	}
+
+	// `defaults` prints the JSONC
+	out, err = runArgs(t, "defaults")
+	if err != nil || !strings.Contains(out, `"APP_NAME": "OlliTeX"`) || !strings.Contains(out, "// ") {
+		t.Fatalf("defaults print = %q, %v", out, err)
 	}
 }

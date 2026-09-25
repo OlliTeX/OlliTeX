@@ -162,6 +162,14 @@ green.
   to the host `go run ./cmd/configdb`; end-to-end verified (init → import-env
   → masked get → doctor, clean rc's). NOTE: a re-bake (ARC-6/D9) is required
   before the container route has the new binary.
+- **(done) Defaults JSONC — initial setup seed** (owner request, 2026-09-25):
+  `go/libraries/configschema/defaults.jsonc` (embedded via go:embed; the
+  operator's commented view of all 149 keys — `// comment` + `/* */`
+  + trailing commas parse; string content is comment-safe) is the single seed
+  source. `configdb import-defaults [FILE]` / `defaults` + `init` now do
+  key → env seed → defaults seed in one shot; **never clobbers** an existing
+  DB value; typed defaults (bool/int/string) verified against the registry
+  by test. Toolkit `bin/config` documents it.
 - Remaining (slices B–D):
   10. **Web wiring**: `core.LoadConfig` + `/api/hub/config` honor the registry
       (DB value > env > default) group by group (email first), so the web
