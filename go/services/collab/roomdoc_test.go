@@ -115,6 +115,19 @@ func runRoomDocScenario(t *testing.T, ctx context.Context, store persistence.Ver
 	}
 }
 
+// TestTextTypeContract — pins the cross-language wire contract for the room's
+// content type name. The CLIENT pins the same constant in
+// frontend/js/features/ide-react/collab/text-type.test.ts (TEXT_TYPE ===
+// "content"). The server seeds/versions/restores doc.getText(TextType); the
+// client mirrors doc.getText(TEXT_TYPE). Rename only in BOTH files in the
+// same commit — a one-sided rename is a silent content-loss bug (the room
+// would read/write a different type and always appear empty).
+func TestTextTypeContract(t *testing.T) {
+	if TextType != "content" {
+		t.Fatalf("TextType = %q, want \"content\" (wire contract; client pins the same string)", TextType)
+	}
+}
+
 func TestRoomDocFilePersistence(t *testing.T) {
 	ctx := context.Background()
 	store, err := persistence.NewFilePersistence(t.TempDir())

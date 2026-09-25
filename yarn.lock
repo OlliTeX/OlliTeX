@@ -7498,7 +7498,11 @@ __metadata:
     xml-crypto: "npm:^2.1.6"
     xml2js: "npm:^0.6.2"
     xregexp: "npm:^4.3.0"
+    y-indexeddb: "npm:9.0.12"
+    y-protocols: "npm:1.0.7"
+    y-websocket: "npm:3.1.0"
     yauzl: "npm:^3.4.0"
+    yjs: "npm:13.6.32"
     yup: "npm:^0.32.11"
     zod: "npm:^4.0.17"
     zod-validation-error: "npm:^4.0.1"
@@ -21797,6 +21801,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"isomorphic.js@npm:^0.2.4":
+  version: 0.2.5
+  resolution: "isomorphic.js@npm:0.2.5"
+  checksum: 10c0/7cd268c8e58146a8160c8cd16596291fd1fbf3e8799a325f269accda9dc1238806e371ccef0b66fe2ad957209230c55997248d8b6d02cf2d7c575ffeb759c789
+  languageName: node
+  linkType: hard
+
 "isstream@npm:~0.1.2":
   version: 0.1.2
   resolution: "isstream@npm:0.1.2"
@@ -22767,6 +22778,19 @@ __metadata:
     prelude-ls: "npm:~1.1.2"
     type-check: "npm:~0.3.2"
   checksum: 10c0/e440df9de4233da0b389cd55bd61f0f6aaff766400bebbccd1231b81801f6dbc1d816c676ebe8d70566394b749fa624b1ed1c68070e9c94999f0bdecc64cb676
+  languageName: node
+  linkType: hard
+
+"lib0@npm:^0.2.102, lib0@npm:^0.2.74, lib0@npm:^0.2.85, lib0@npm:^0.2.99":
+  version: 0.2.117
+  resolution: "lib0@npm:0.2.117"
+  dependencies:
+    isomorphic.js: "npm:^0.2.4"
+  bin:
+    0ecdsa-generate-keypair: bin/0ecdsa-generate-keypair.js
+    0gentesthtml: bin/gentesthtml.js
+    0serve: bin/0serve.js
+  checksum: 10c0/d1b9205890d5d0cbd95ffdb0d6df6f9fd2c315b89e195fc9b015f3778046fb34bc12e94205ccf410a3073b836444045dcef6671fa2f6d5a7f70ebf8b6b0c0616
   languageName: node
   linkType: hard
 
@@ -34064,6 +34088,40 @@ __metadata:
   languageName: node
   linkType: hard
 
+"y-indexeddb@npm:9.0.12":
+  version: 9.0.12
+  resolution: "y-indexeddb@npm:9.0.12"
+  dependencies:
+    lib0: "npm:^0.2.74"
+  peerDependencies:
+    yjs: ^13.0.0
+  checksum: 10c0/b31fbc12ef4a7d71f09212db02570af07c6a17b02537ce4cbb29f0549137adcbebf613cb2af63fa1d13e0932645be0293a4e7189cb5bf5dc6263cf2f72b65004
+  languageName: node
+  linkType: hard
+
+"y-protocols@npm:1.0.7, y-protocols@npm:^1.0.5":
+  version: 1.0.7
+  resolution: "y-protocols@npm:1.0.7"
+  dependencies:
+    lib0: "npm:^0.2.85"
+  peerDependencies:
+    yjs: ^13.0.0
+  checksum: 10c0/70e14ab50b9200e97602c5effc3e14ae4ea0f51479a1628569af7cc12a6739fbc02484335828f5c508a4bf6fa0c3ef5ae1c17e13346b7a6093abeb9627f59021
+  languageName: node
+  linkType: hard
+
+"y-websocket@npm:3.1.0":
+  version: 3.1.0
+  resolution: "y-websocket@npm:3.1.0"
+  dependencies:
+    lib0: "npm:^0.2.102"
+    y-protocols: "npm:^1.0.5"
+  peerDependencies:
+    yjs: ^13.5.6
+  checksum: 10c0/880f20bbf37be63a78c84acb2f00d71000cd53115dfaaafef00868ba031fdf8c42cf1ecdbcec3bb1dbd68fb1b6aea60b0a54b590162abdc8c4b23b6d6dad9f08
+  languageName: node
+  linkType: hard
+
 "y18n@npm:^4.0.0":
   version: 4.0.3
   resolution: "y18n@npm:4.0.3"
@@ -34225,6 +34283,15 @@ __metadata:
   dependencies:
     pend: "npm:~1.2.0"
   checksum: 10c0/17a98c42c0065e8af429eb8a61f7a0e4562181ed54080366b838f34f741b6829f167f804787c86b7646bb042707f35871739f053de0548285e405a2eae4da025
+  languageName: node
+  linkType: hard
+
+"yjs@npm:13.6.32":
+  version: 13.6.32
+  resolution: "yjs@npm:13.6.32"
+  dependencies:
+    lib0: "npm:^0.2.99"
+  checksum: 10c0/07b50f475d3749a6b135e959fdc805eea8e7fdad4d6177b151c9d30463399577586252e34b3949fdd03260ee7b8526fa01a8b10c64e2506fc96ca6e22ae58032
   languageName: node
   linkType: hard
 

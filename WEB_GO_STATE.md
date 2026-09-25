@@ -51,6 +51,7 @@ and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
 | D21 | **Notifications**: email stack stays **`wneessen/go-mail`** (owner-approved P3; stronger client than `go-pkgz/notify`'s SMTP — adopting notify as a mailer REJECTED; its multi-channel shape is only a design reference). Non-email delivery (webhook/Slack/in-app presence) = separate arc under owner-delegated discretion (2026-09-25 "make the priority decisions yourself"); the Yjs awareness stack already provides the real-time presence half. | RECORDED |
 | D22 | **Observability modernization (owner note 2026-09-25)**: rework `features/instancestats` (Mongo time-series + email-threshold alerts) onto the **Prometheus + Grafana** ecosystem: Go services expose Prometheus-format `/metrics` (client_golang; the existing `go/libraries/ometrics` registry becomes a bridge/collector), node_exporter (host) + cAdvisor (containers) scrapes, Prometheus sidecar (runit/compose, OFF-BY-DEFAULT to keep clean-by-default images), Grafana embedded in /hub (kiosk iframe, Mantine `GrafanaPanel`), admin email alerts re-implemented as Prometheus rule alerts → webhook → the existing email pipeline. Loki/Alloy (logs) = optional phase. Single-host stack (NO k8s) → static scrape configs, no ServiceMonitor/K8s auth bits. Phased: A instrument → B Prometheus → C Grafana/hub → D alerts (product behavior kept) → E optional Loki → legacy series retirement. **Sized after the D19 flip (S4) so it measures the live Go stack.** | RECORDED — PLANNED (owner note for later) |
 | D23 | **Config-DB consumer contract (this commit)**: new shared library `go/libraries/configres` — ONE file-path contract (`$CONFIG_DB_PATH → $OVERLEAF_HOME/configdb/configdb.sqlite3 → ./configdb/configdb.sqlite3`, the same file /hub + `cmd/configdb` + toolkit manage) and ONE precedence chain **config-DB → legacy env → static default** for every service consumer. `Open()` reads only and never creates the file (pre-config-DB deployments stay bit-identical — additive-by-default). Precedence rule: first USABLE value wins; unparseable/empty fall through (a /hub typo can't break a service boot); explicit zero IS a value (pinned: `COLLAB_KEEP_VERSIONS=0` = keep-all). First consumer: `cmd/collab` resolves `COLLAB_KEEP_VERSIONS`/`COLLAB_COMPACT_EVERY` through it (registered in the `configschema` registry + `defaults.jsonc` lockstep → visible in /hub admin + operator CLI; int type-checked on PUT). Binding = service start (like every boot parameter); registry descriptions state it. This is the D6 "single source of truth" consumer side for non-web services — extensible to any future service knob without re-deriving the contract. | DONE (goal item 2) |
+| D24 | **Yjs client sync design (S3 client engine)**: the D20 goal's "full-replacement sync" is EXPLICITLY REFINED (decision, not drift) — tested against yjs 13.6.32 in the engine's test suite, full-replace in BOTH directions merges CONCURRENT whole-document edits to a DUPLICATED document (X+X — the failure D19 forbids for seeding). D24: **LOCAL direction = granular delta ops** (host hands the editor's change spans in old-space coordinates — exactly `CodeMirror.iterChanges`; replay right-to-left, delete-then-insert per span, ONE transaction = one undo entry) + **REMOTE direction = full mirror** (re-derive the host from the Y.Text; zero index math remote-side). Safety model: Yjs fires type observers SYNCHRONOUSLY within the applying task (probe-verified); CM6 dispatches run in their own tasks ⇒ invariant `after every task host === Y.Text` ⇒ spans are valid Y coordinates ⇒ peers converge; re-entrancy guards close the in-task loop. Accepted trade-off (documented + test-pinned): two concurrent whole-document rewrites interleave both texts (any text CRDT); convergence + no-loss are invariants. **Undo split:** CM6 `history()` owns user-facing undo (remote mirrors dispatch `userEvent:'input.remote'`); the engine's y-undo is the programmatic seam tracking LOCAL-origin only (yjs default `trackedOrigins={null}` makes explicit tracking mandatory — discovered + pinned by test). **Browser gate:** provider attachment gates on the browser `window` (modern Node exposes a native WebSocket — gating on the substrate would misfire), so the engine is headless importable/testable. Engine = `frontend/js/features/ide-react/collab` (ydoc/sync/providers/codemirror/engine + 14-test Node suite in the frontend workspace); S4 wiring stays mechanical (README snippet). | DONE (S3 client engine core) |
 
 ---
 
@@ -377,11 +378,33 @@ Go web, decoupled from the OT engine:
   semantics. 28 web feature packages still green.
 - Registered in `cmd/web`.
 
-**S3 remaining (NEXT)**: client editor page — the yjs stack (D20) wired as a
-hard cut of the OT `ShareJsDoc`/`SocketIoShim`/`ShareJs` client inside the
-IDE (`frontend/js/features/ide-react` + `source-editor`), then the editor
-page loads the Yjs engine instead of the OT engine. The client `TextType =
-"content"` must match the server constant. Then S4 flip.
+**S3 client engine core — DONE (this commit, D24)** — the Yjs client engine
+`frontend/js/features/ide-react/collab/` lands as a complete, tested unit:
+`newYContent()` (Y.Doc + `content` Y.Text + LOCAL-origin programmatic
+y-undo), the D24 `YTextSync` bridge (granular local spans → Y.Text /
+full-mirror remote → host; probe-verified synchronous-observer model →
+convergence invariant), `attachProviders` (y-websocket → `/collab/:pid`
+same-origin cookie auth; y-indexeddb v9 offline; browser-gated so the
+engine is headless-testable), `syncExtension` (the CM6 updateListener
+half), `createEngine()` facade. **14-test Node suite GREEN in the frontend
+workspace** (seed path, granular convergence, concurrent disjoint +
+whole-doc, no-op idempotency, delete-to-empty, undo seam, endpoint/URL
+contract). Wire contract pinned on BOTH languages (`roomdoc_test.go`
+`TestTextTypeContract` ↔ `test/text-type.test.ts`). Gated: tsc **586
+baseline held** (zero new), prettier clean, Go `collab` green, zero
+`services/web` net-diff / no regressions. The engine is intentionally NOT
+yet wired into the live editor (that hard cut is the S4 flip, below).
+
+**S3 remaining (NOW the S4-flip step)**: (a) awareness/presence cursors
+(the item-1 presence layer over `y-protocols/awareness` — needs the editor
+integration + browser/e2e to do responsibly); (b) the hard cut — the IDE's
+OT `ShareJsDoc`/`ConnectionManager`/`EditorFacade` transport replaced by
+`createEngine()` (the mechanical wiring snippet is in the package README),
+track-changes/comments `HistoryOTShareDoc` port-vs-junk verdict, retiring
+`frontend/js/vendor/libs/sharejs.js` + the `real-time` service; (c) new Yjs
+e2e (convergence / offline-reload / history-restore) on the live stack.
+The client `TextType = "content"` already matches the server constant
+(pinned on both sides). Then S4 flip.
 
 - **Supersedes** the remaining "make OT services real" work (ARC-1/ARC-2 OT
   persistence machinery) and the D16 support-LLM real-time port: with a CRDT
