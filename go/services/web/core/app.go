@@ -672,6 +672,15 @@ func (a *App) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	defer f.Close()
+	// Node parity (Server.mjs): serveStaticWrapper is mounted with
+	// `setHeaders: removeCSPHeaders` — static asset responses MUST NOT carry
+	// the app's default CSP (CSP.mjs removeCSPHeaders: Content-Security-Policy
+	// + Content-Security-Policy-Report-Only). It also matters functionally:
+	// that policy (default-src 'none') initializes dedicated Web-Worker
+	// policies when the webpack worker chunk is the entry, blocking their
+	// importScripts() of shared chunks (editor worker, build 3).
+	w.Header().Del("Content-Security-Policy")
+	w.Header().Del("Content-Security-Policy-Report-Only")
 	if a.Cfg.CacheStaticAssets {
 		w.Header().Set("Cache-Control", "public, max-age=31536000")
 	}

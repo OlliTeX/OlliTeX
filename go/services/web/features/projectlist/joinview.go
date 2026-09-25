@@ -484,7 +484,13 @@ func joinProjectModelView(pd primitive.D, ownerMember *primitive.D, members, inv
 	if x := dget(pd, "publicAccesLevel"); x != nil {
 		v = append(v, primitive.E{Key: "publicAccesLevel", Value: x})
 	}
-	v = append(v, primitive.E{Key: "dropboxEnabled", Value: dget(pd, "existsInDropbox") != nil})
+	// Node (ProjectEditorHandler.mjs): `dropboxEnabled: !!project.existsInDropbox`
+	// — strict truthiness. NOT existence: `dget(...) != nil` would report true
+	// whenever the field is present (Go project creation writes it explicitly,
+	// e.g. deletedByExternalDataSource:false), flipping the frontend flag and
+	// raising the blocking "renamed or deleted by external data source" modal
+	// on every editor load.
+	v = append(v, primitive.E{Key: "dropboxEnabled", Value: btruth(dget(pd, "existsInDropbox"))})
 	if x := dget(pd, "compiler"); x != nil {
 		v = append(v, primitive.E{Key: "compiler", Value: x})
 	}
@@ -501,7 +507,7 @@ func joinProjectModelView(pd primitive.D, ownerMember *primitive.D, members, inv
 	if x := dget(pd, "png2pdf"); x != nil {
 		v = append(v, primitive.E{Key: "png2pdf", Value: x})
 	}
-	v = append(v, primitive.E{Key: "deletedByExternalDataSource", Value: dget(pd, "deletedByExternalDataSource") != nil})
+	v = append(v, primitive.E{Key: "deletedByExternalDataSource", Value: btruth(dget(pd, "deletedByExternalDataSource"))})
 	if x := dget(pd, "imageName"); x != nil {
 		v = append(v, primitive.E{Key: "imageName", Value: x})
 	}
@@ -550,6 +556,15 @@ func joinProjectModelView(pd primitive.D, ownerMember *primitive.D, members, inv
 
 // notFalse — Node `x !== false`: true for missing/true/non-boolean; false only
 // when the value is boolean false.
+// btruth — Node truthiness of a stored flag: true ONLY when the value is
+// boolean true (absent/false/other types → false). Mirrors JS `!!x` for the
+// boolean flags the project view exposes (see notFalse for the `x !== false`
+// variant).
+func btruth(v any) bool {
+	b, _ := v.(bool)
+	return b
+}
+
 func notFalse(v any) bool {
 	if b, ok := v.(bool); ok {
 		return b
