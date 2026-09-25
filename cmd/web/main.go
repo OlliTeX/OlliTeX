@@ -27,6 +27,7 @@ import (
 	"ollitex/go/services/web/features/analytics"
 	"ollitex/go/services/web/features/authpages"
 	"ollitex/go/services/web/features/compile"
+	"ollitex/go/services/web/features/consent"
 	"ollitex/go/services/web/features/devcsrf"
 	"ollitex/go/services/web/features/dropbox"
 	"ollitex/go/services/web/features/editorpages"
@@ -169,6 +170,12 @@ func main() {
 	// stack (apis.v1 unset), so both short-circuit to 202 "Accepted"
 	// behind their limiters (live-oracle pinned).
 	app.RegisterFeature(analytics.Feature(app))
+
+	// GDPR cookie consent (remember.md P7-post item 2): GET/POST
+	// /cookie-consent (NoLogin, CSRF on the POST) sets/parses the `oa` consent
+	// cookie the first-party trackers gate on; consent.ConsentAllowsAnalytics
+	// is the server-side tracking-injection predicate.
+	app.RegisterFeature(consent.Feature(app))
 
 	// P6.4a surface: OlliTeX llm module settings surface (BYO provider rows,
 	// selected model, compliance rubrics, usage, grammar prefs, admin LLM
