@@ -99,6 +99,8 @@ func Feature(a *core.App) core.Feature {
 		Routes: []core.Route{
 			{Method: "GET", Path: "/cookie-consent", NoLogin: true, Handler: hGetConsent},
 			{Method: "POST", Path: "/cookie-consent", NoLogin: true, Handler: hSetConsent},
+			// the banner's privacy/cookie-policy link target (legal.go)
+			{Method: "GET", Pattern: legalPageRe, NoLogin: true, Handler: legalPage},
 		},
 	}
 }

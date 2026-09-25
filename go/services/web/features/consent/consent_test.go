@@ -17,7 +17,11 @@ func TestRouteTable(t *testing.T) {
 	seen := 0
 	for _, r := range f.Routes {
 		seen++
-		switch r.Method + " " + r.Path {
+		key := r.Method + " " + r.Path
+		if r.Pattern != nil {
+			key = r.Method + " " + r.Pattern.String()
+		}
+		switch key {
 		case "GET /cookie-consent", "POST /cookie-consent":
 			// must be NoLogin (anonymous consent on marketing pages);
 			// CSRF is applied by core for every POST regardless.
@@ -27,12 +31,71 @@ func TestRouteTable(t *testing.T) {
 			if r.Handler == nil {
 				t.Fatalf("%s %s: no handler", r.Method, r.Path)
 			}
+		case "GET " + legalPageRe.String():
+			// the banner's privacy/cookie link target (legal.go)
+			if !r.NoLogin {
+				t.Fatalf("legal page must be NoLogin (public)")
+			}
+			if r.Pattern == nil {
+				t.Fatalf("legal page must use a Pattern (Express case/slash variants)")
+			}
+			if r.Handler == nil {
+				t.Fatalf("legal page: no handler")
+			}
 		default:
 			t.Fatalf("unexpected route %s %s", r.Method, r.Path)
 		}
 	}
-	if seen != 2 {
-		t.Fatalf("route count %d, want 2 (GET+POST /cookie-consent)", seen)
+	if seen != 3 {
+		t.Fatalf("route count %d, want 3 (2 consent + 1 legal)", seen)
+	}
+}
+
+// ---------- /legal page ----------
+
+func TestLegalPage(t *testing.T) {
+	w := httptest.NewRecorder()
+	cxt := &core.Cxt{Req: httptest.NewRequest("GET", "/legal", nil)}
+	res := &core.Res{W: w}
+	legalPage(cxt, res)
+	if w.Code != 200 {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "text/html; charset=utf-8" {
+		t.Fatalf("Content-Type = %q", ct)
+	}
+	body := w.Body.String()
+	for _, want := range []string{`<section id="cookies"`, `<section id="privacy"`, "oa=1", "oa=0", "SameSite=Lax"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %q", want)
+		}
+	}
+	// CSP safety: the page must stay clean under the app default CSP
+	// (default-src 'none') — no scripts, inline styles, or external refs.
+	for _, bad := range []string{"<script", "<style", "<link", "<iframe", "http://", "https://", "src=", "href="} {
+		if strings.Contains(body, bad) {
+			t.Errorf("body contains CSP-hostile %q", bad)
+		}
+	}
+	if w.Header().Get("ETag") == "" {
+		t.Errorf("want weak ETag (static page)")
+	}
+}
+
+func TestLegalPatternVariants(t *testing.T) {
+	for _, p := range []string{"/legal", "/legal/", "/Legal", "/LEGAL"} {
+		if !legalPageRe.MatchString(p) {
+			t.Errorf("legalPageRe must match %q (Express case/slash tolerance)", p)
+		}
+	}
+	for _, p := range []string{"/legalfoo", "/legalx", "/legal/"} {
+		// note: /legal/ IS a valid variant
+		if p == "/legal/" {
+			continue
+		}
+		if legalPageRe.MatchString(p) {
+			t.Errorf("legalPageRe wrongly matches %q", p)
+		}
 	}
 }
 
