@@ -27,10 +27,13 @@
 //	COLLAB_MAX_CONNECTIONS / COLLAB_MAX_PEERS_PER_ROOM (0 = unlimited)
 //	COLLAB_KEEP_VERSIONS     history retention for server auto-compaction
 //	                         (0 = keep-all — default; N = retain most recent
-//	                         N updates, oldest folded into one record)
+//	                         N updates, oldest folded into one record).
+//	                         The /hub config-DB value wins over this env
+//	                         (configres: DB → env → default; binds on start).
 //	COLLAB_COMPACT_EVERY     how often the server compacts a room
 //	                         (0 = on room unload only — default; N = also after
-//	                         every N persistence flushes)
+//	                         every N persistence flushes); same config-DB
+//	                         precedence as COLLAB_KEEP_VERSIONS.
 package main
 
 import (
@@ -49,6 +52,7 @@ import (
 
 	gredis "github.com/redis/go-redis/v9"
 
+	"ollitex/go/libraries/configres"
 	"ollitex/go/services/collab"
 )
 
@@ -94,8 +98,15 @@ func main() {
 	}
 	maxConn, _ := strconv.Atoi(env("COLLAB_MAX_CONNECTIONS", "0"))
 	maxPeers, _ := strconv.Atoi(env("COLLAB_MAX_PEERS_PER_ROOM", "0"))
-	keepVersions, _ := strconv.Atoi(env("COLLAB_KEEP_VERSIONS", "0"))
-	compactEvery, _ := strconv.Atoi(env("COLLAB_COMPACT_EVERY", "0"))
+	// Config-DB (D6) precedence for the retention knobs: /hub-admin value →
+	// env → default, via the shared configres contract (Open never creates
+	// the file — a pre-config-DB deployment is bit-identical).
+	cfgStore := configres.Open()
+	if cfgStore != nil {
+		defer cfgStore.Close()
+	}
+	keepVersions := configres.Int(cfgStore, "COLLAB_KEEP_VERSIONS", "COLLAB_KEEP_VERSIONS", 0)
+	compactEvery := configres.Int(cfgStore, "COLLAB_COMPACT_EVERY", "COLLAB_COMPACT_EVERY", 0)
 
 	svc, err := collab.New(collab.Options{
 		Auth:            auth,

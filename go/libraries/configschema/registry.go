@@ -94,6 +94,8 @@ var Registry = []Param{
 	{Key: "GIT_BRIDGE_PORT", Kind: KInt, Group: "services", Default: "8000", Description: "git-bridge service port."},
 	{Key: "GIT_BRIDGE_ENABLED", Kind: KBool, Group: "services", Default: "false", Description: "Enable Git integration."},
 	{Key: "OVERLEAF_GITBRIDGE_ENABLED", Kind: KBool, Group: "services", Default: "false", Description: "Enable Git integration (alternate switch name)."},
+	{Key: "COLLAB_KEEP_VERSIONS", Kind: KInt, Group: "services", Default: "0", Description: "collab (ygo) room history retention: keep the most recent N versions (0 = keep all). Binds on collab service start."},
+	{Key: "COLLAB_COMPACT_EVERY", Kind: KInt, Group: "services", Default: "0", Description: "collab (ygo) room auto-compaction cadence: fold old versions after every N persistence flushes (0 = on room unload only). Binds on collab service start."},
 
 	// ---------- email ----------
 	{Key: "OVERLEAF_EMAIL_DRIVER", Kind: KString, Group: "email", Default: "smtp", Description: "Mail driver (smtp|ses)."},

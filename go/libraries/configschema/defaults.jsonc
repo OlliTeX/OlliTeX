@@ -55,6 +55,8 @@
     "GIT_BRIDGE_PORT": 8000, // git-bridge service port
     "GIT_BRIDGE_ENABLED": false, // Enable Git integration
     "OVERLEAF_GITBRIDGE_ENABLED": false, // Enable Git integration (alternate switch name)
+    "COLLAB_KEEP_VERSIONS": 0, // collab (ygo) room history retention: 0 = keep all
+    "COLLAB_COMPACT_EVERY": 0, // collab (ygo) auto-compaction cadence: 0 = on unload only
     // ── email ──
     "OVERLEAF_EMAIL_DRIVER": "smtp", // Mail driver (smtp|ses)
     "OVERLEAF_EMAIL_SMTP_HOST": null, // SMTP host (or SES endpoint)

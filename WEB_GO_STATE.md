@@ -50,6 +50,7 @@ and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
 | D20 | **Collab client stack**: browser `yjs` (stable v13 line) + `y-websocket` + `y-indexeddb` + `y-undo`; CodeMirror-6 bridge is OUR code (full-replace sync loop; y-cursor is CM5-only → awareness-rendered cursors via a CM6 decoration plugin). **yhub = REST DESIGN SPEC ONLY (history/changeset/restore shape), never a runtime** (AGPL/beta + Postgres + Redis Streams = D5/D19 conflict). `k_yrs_go`/`electric` investigated and **rejected** (wrong substrate). Client code MIT-compatible with the AGPL product. | CONFIRMED (owner 2026-09-25) |
 | D21 | **Notifications**: email stack stays **`wneessen/go-mail`** (owner-approved P3; stronger client than `go-pkgz/notify`'s SMTP — adopting notify as a mailer REJECTED; its multi-channel shape is only a design reference). Non-email delivery (webhook/Slack/in-app presence) = separate arc under owner-delegated discretion (2026-09-25 "make the priority decisions yourself"); the Yjs awareness stack already provides the real-time presence half. | RECORDED |
 | D22 | **Observability modernization (owner note 2026-09-25)**: rework `features/instancestats` (Mongo time-series + email-threshold alerts) onto the **Prometheus + Grafana** ecosystem: Go services expose Prometheus-format `/metrics` (client_golang; the existing `go/libraries/ometrics` registry becomes a bridge/collector), node_exporter (host) + cAdvisor (containers) scrapes, Prometheus sidecar (runit/compose, OFF-BY-DEFAULT to keep clean-by-default images), Grafana embedded in /hub (kiosk iframe, Mantine `GrafanaPanel`), admin email alerts re-implemented as Prometheus rule alerts → webhook → the existing email pipeline. Loki/Alloy (logs) = optional phase. Single-host stack (NO k8s) → static scrape configs, no ServiceMonitor/K8s auth bits. Phased: A instrument → B Prometheus → C Grafana/hub → D alerts (product behavior kept) → E optional Loki → legacy series retirement. **Sized after the D19 flip (S4) so it measures the live Go stack.** | RECORDED — PLANNED (owner note for later) |
+| D23 | **Config-DB consumer contract (this commit)**: new shared library `go/libraries/configres` — ONE file-path contract (`$CONFIG_DB_PATH → $OVERLEAF_HOME/configdb/configdb.sqlite3 → ./configdb/configdb.sqlite3`, the same file /hub + `cmd/configdb` + toolkit manage) and ONE precedence chain **config-DB → legacy env → static default** for every service consumer. `Open()` reads only and never creates the file (pre-config-DB deployments stay bit-identical — additive-by-default). Precedence rule: first USABLE value wins; unparseable/empty fall through (a /hub typo can't break a service boot); explicit zero IS a value (pinned: `COLLAB_KEEP_VERSIONS=0` = keep-all). First consumer: `cmd/collab` resolves `COLLAB_KEEP_VERSIONS`/`COLLAB_COMPACT_EVERY` through it (registered in the `configschema` registry + `defaults.jsonc` lockstep → visible in /hub admin + operator CLI; int type-checked on PUT). Binding = service start (like every boot parameter); registry descriptions state it. This is the D6 "single source of truth" consumer side for non-web services — extensible to any future service knob without re-deriving the contract. | DONE (goal item 2) |
 
 ---
 
@@ -334,6 +335,17 @@ adapter→store `keep` pass-through. This is the bound that keeps the
 ``single-doc log under Mongo's 16 MB cap for long-lived rooms (set
 `COLLAB_KEEP_VERSIONS` > 0 + rely on snapshots for older history if a room
 outgrows the cap). — **DONE**
+
+**RETENTION KNOBS → /hub admin (goal item 2) — DONE (this commit)**
+(D23): the two collab retention knobs are now first-class config-DB keys —
+`COLLAB_KEEP_VERSIONS` + `COLLAB_COMPACT_EVERY` in the `configschema`
+registry (`services` group, int, default 0) with `defaults.jsonc` lockstep,
+managed by /hub admin (`GET /api/hub/config` lists them; `PUT` type-checks
+ints) and the operator CLI; the `cmd/collab` service resolves them through
+the new `configres` contract (DB → env → default; bind-on-start; additive
+when the DB is absent). Full precedence matrix tested (incl. the zero-value
+and junk-value fall-through seams); configschema + configres + hub + collab
++ collabhistory suites green (28 web pkgs ok).
 
 **S3 — server slice DONE (this commit)** — the Yjs history surface lands on
 Go web, decoupled from the OT engine:
