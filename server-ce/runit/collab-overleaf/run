@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Ollitex Go collab service (D19 collaboration pivot, 2026-09-25) — the
+# Yjs/ygo real-time room service. Serves:
+#   WS   /collab/{projectId}   (browser y-websocket clients; nginx passes
+#                               /collab/* here WITH the Upgrade headers —
+#                               see server-ce/nginx/overleaf.conf.template)
+#   GET  /healthz              (ops; same-origin-internal)
+# Same contract as the web session store (cookie overleaf.sid, Redis key
+# sess:<sid> → passport.user) — see go/services/collab/collab.go.
+#
+# GATED on binary presence (image-lineage safety, same pattern as
+# web-go-overleaf): an image lineage without the Go collab build exits
+# cleanly instead of crash-looping.
+[ -x /usr/local/bin/go-services/collab ] || exit 0
+
+source /etc/overleaf/env.sh
+export COLLAB_LISTEN=127.0.0.1:3450
+# Mongo/Redis/session env comes from the container environment dump
+# (env.sh sources /etc/container_environment.sh): OVERLEAF_MONGO_URL,
+# REDIS_HOST/PORT/PASS. Retention knobs resolve config-DB → env →
+# default via the shared configres contract (D23). COLLAB_ALLOWED_ORIGINS
+# is left UNSET on purpose: ygo then enforces its default same-origin
+# check (Origin host == HTTP Host), which the same-origin nginx pass
+# (Host forwarded as $host) satisfies exactly.
+exec /sbin/setuser www-data /usr/local/bin/go-services/collab >> /var/log/overleaf/collab.log 2>&1

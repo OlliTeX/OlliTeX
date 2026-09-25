@@ -395,6 +395,21 @@ baseline held** (zero new), prettier clean, Go `collab` green, zero
 `services/web` net-diff / no regressions. The engine is intentionally NOT
 yet wired into the live editor (that hard cut is the S4 flip, below).
 
+**S4 prep (a) — collab service goes live in the image (this commit)**: the
+Go collab service gets its deployment artifacts. Runit service
+`server-ce/runit/collab-overleaf/run` (binary-gated exit for
+non-Go-lineage images, same pattern as `web-go-overleaf`; `COLLAB_LISTEN=
+127.0.0.1:3450`; Mongo/Redis/session env from the container env dump;
+`COLLAB_ALLOWED_ORIGINS` intentionally UNSET → ygo's default same-origin
+check exactly matches the same-origin nginx pass). Nginx vhost
+(`overleaf.conf.template`): `location /collab` → 127.0.0.1:3450 with WS
+Upgrade headers (modeled on the `/socket.io` block), placed before the
+stylesheets group; longest-prefix match wins over `location /`. No compose
+change needed (service runs in-container under runit like all go-services).
+Inert until the next image re-bake + cycle (live WS/seed/REST verification
+is the next step, on the `ol-e2e` stack per the P7-constraint that the
+canonical dev verification uses the isolated `ol-e2e-mongo-1`).
+
 **S3 remaining (NOW the S4-flip step)**: (a) awareness/presence cursors
 (the item-1 presence layer over `y-protocols/awareness` — needs the editor
 integration + browser/e2e to do responsibly); (b) the hard cut — the IDE's
