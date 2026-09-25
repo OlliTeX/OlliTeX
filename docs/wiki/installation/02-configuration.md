@@ -6,8 +6,8 @@ Goal: know where every setting lives.
 
 `server-ce/config/env.sh` is the one place for instance configuration
 (site name, URL, SMTP host *name*, auth providers, compile images, LLM
-admin gate, …). The toolkit under `tools/toolkit` (with
-`tools/toolkit/lib/images.env` as the image-allowlist source of truth)
+admin gate, …). The toolkit under `toolkit` (with
+`toolkit/lib/images.env` as the image-allowlist source of truth)
 seeds the compose env from it.
 
 > **Rule of the house:** configuration is env-driven. Do not bake values
@@ -23,7 +23,7 @@ seeds the compose env from it.
 | SMTP host / credentials | compose env + Site settings → Email | host at deploy time, credentials via the hub (encrypted) |
 | SSO (SAML/OIDC/LDAP) | hub: Site settings → Integrations | via UI, encrypted storage |
 | LLM BYO / rates | hub: Site settings → LLM → Rate Limiter | via UI |
-| TeX Live / typst images | `tools/toolkit/lib/images.env` | allow-list for the compile sandboxes |
+| TeX Live / typst images | `toolkit/lib/images.env` | allow-list for the compile sandboxes |
 
 ## Verification
 

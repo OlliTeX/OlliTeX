@@ -11,6 +11,8 @@ date
 source /etc/container_environment.sh
 source /etc/overleaf/env.sh
 
-cd /overleaf/services/web && /sbin/setuser www-data node scripts/process_notifications.mjs
+# Go port of the node process_notifications.mjs cron: same claim protocol,
+# byte-exact mail (oracle-pinned templates), same retry/dead-lettering.
+cd /overleaf && /sbin/setuser www-data /usr/local/bin/go-services/cronmail
 
 echo "Done."

@@ -1,5 +1,5 @@
 // defaults.jsonc — initial-setup seed for the SQLite config DB (ARC-3, D6).
-// Loaded by: cmd/configdb import-defaults [FILE] and tools/toolkit/bin/config.
+// Loaded by: cmd/configdb import-defaults [FILE] and toolkit/bin/config.
 // JSONC: line (//), block (/* */) comments and trailing commas allowed.
 // Semantics: import never clobbers a key already set in the DB (first-boot
 // seed). null = no static default (taken from env or left unset).

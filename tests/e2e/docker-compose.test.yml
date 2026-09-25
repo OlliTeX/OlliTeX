@@ -15,7 +15,7 @@ services:
     # 2026-09-16 (owner task T9): same DB as prod (mongo 8.3). Fresh 8.x used
     # to segfault on this host's kernel (SERVER-121912 / SHSTK) — the fix is
     # the GLIBC hwcaps workaround the toolkit already uses for the prod
-    # mongo (tools/toolkit/lib/docker-compose.mongo.yml). Data volume is
+    # mongo (toolkit/lib/docker-compose.mongo.yml). Data volume is
     # disposable: stack-reset + reseed after the bump.
     image: mongo:8.3
     environment:

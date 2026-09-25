@@ -18,7 +18,7 @@ compiles (Docker-isolated compile containers):
 ![The sandboxed compiles leaf](../assets/installation/04-security-sandboxed.png)
 
 - Compiles run in a restricted image; the allowed image list is managed in
-  `tools/toolkit/lib/images.env` (single source of truth for the
+  `toolkit/lib/images.env` (single source of truth for the
   `sharelatex` → `ollitex` image names).
 - LaTeX uses the TeX Live image; Typst uses the `typst` compile image.
 

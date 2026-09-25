@@ -42,6 +42,9 @@ and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
 | D13 | **Storybook**: expose as much web UI as possible | APPROVED |
 | D14 | **git-bridge**: confirmed already Go (`gitbridge-go:latest`). **DELETE `services/git-bridge`** (Java) + clean the Java `build-git-bridge` Makefile target | APPROVED |
 | D15 | **Procedural**: stop appending to `WEB_GO_PLAN.md`; maintain this file as the state doc | APPROVED |
+| D16 | **`services/clsi`, `clsi_typst`, `project-history`, `real-time`** are being converted to Go **by support LLMs** (parallel; "ready soon") — do NOT re-port; integrate + audit when they land | AWARE (no action) |
+| D17 | **Notifications email-dispatch cron → Go** (kills last `modules/notifications/app` runtime dependency) | APPROVED — **DONE this commit** (see §4 ARC-8) |
+| D18 | **Toolkit placement**: `tools/toolkit` → repo-root **`toolkit/`** (visible root position), all references updated | APPROVED — **DONE this commit** |
 
 ---
 
@@ -77,6 +80,9 @@ and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
   - 203 `services/web/modules/**` Node-backend files deleted: 21 module `app/`
     trees, 26 `index.*` boot stubs (incl. `sandboxed-compiles` whole module),
     21 dead node-app test files, 3 non-workspace `package.json`.
+    **(2026-09-25 update)** the dispatch cron is now the Go `cronmail`
+    binary (ARC-8); `modules/notifications/app` + `scripts/process_notifications.mjs`
+    are superseded — junk-sweep candidates once the rebuilt image is live.
     **Kept alive (verified live):** `notifications` app+tests (cron chain via
     `server-ce/cron/notification-email-dispatch.sh` →
     `scripts/process_notifications.mjs`), `server-ce-scripts` (grunt/ops
@@ -101,6 +107,19 @@ and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
     (frontends untouched, restorations byte-identical to HEAD).
   - **Open (owner note):** the 17 vitest `@/…` alias failures exist at clean
     baseline on this host — pre-dates this arc; CI may differ.
+- **Owner decisions (2026-09-25, this turn):**
+  - **`services/clsi`, `services/clsi_typst`, `services/project-history`,
+    `services/real-time` are under Go conversion by SUPPORT LLMS** (in
+    parallel; "ready soon"). Do NOT re-port them; do NOT block ARC work on
+    them; when they land, integrate+audit them the same way as
+    history-v1/document-updater (GO_SERVICES_INTEGRATION pattern).
+  - **Notifications email-dispatch cron: port to Go** (kills the last
+    `modules/notifications/app` runtime dependency; unlocks junk-ifying the
+    remainder of `services/web`). — **DONE this commit** (ARC-8).
+  - **Toolkit move: `tools/toolkit` → repo-root `toolkit/`** (visible root
+    position) — update all references (REPO_ROOT in `bin/config`, docs,
+    compose comments, Dockerfile-base comment). — **DONE this commit**
+    (17 refs updated; host-route + container-route both verified).
 
 ---
 
@@ -184,7 +203,7 @@ green.
   absent; seeds from the process env without clobbering), `doctor`
   (key/db/read-back health). 5 new tests; old contract tests untouched
   (green).
-- **(done) Toolkit emergency path** (`tools/toolkit/bin/config`): drives the
+- **(done) Toolkit emergency path** (`toolkit/bin/config`): drives the
   same CLI **with no web service / /hub required**; routes to the running
   OlliTeX container (`OLLITEX_CONTAINER` or image auto-detect) or falls back
   to the host `go run ./cmd/configdb`; end-to-end verified (init → import-env
@@ -210,6 +229,50 @@ green.
     length, …).
 14. **Publish the "boot env" list** (the minimal env needed to boot /hub so the
     rest is editable in /hub) — see §8 Q2.
+
+### ARC-8 · Notifications email-dispatch cron → Go (D17) — **DONE (this commit)**
+The node dispatch chain (`server-ce/cron/notification-email-dispatch.sh` →
+`scripts/process_notifications.mjs` → `modules/notifications/app/src/
+ProcessNotifications.mjs`) is replaced by a byte-exact Go service:
+
+- **`go/services/cronmail`** — package:
+  - **Templates** (`render.go` + `oraclebase_go.go`): the two live
+    `emailNotifications` types — `projectNotification` (chat comments) +
+    `trackedChangesNotification` (legacy scheduler) — rendered from
+    **oracle-pinned base bytes** (generated from the real Node
+    `EmailBuilder` output; `tmp-cronmail-oracle.mjs`) with exact-value
+    splice of the dynamic slots (title, schema.org action JSON, CTA URL,
+    message, logo). `& < > \u2028 \u2029` script-safety per
+    `StringHelper.stringifyJsonForScript`; `escape` = lodash-_.escape order
+    (& first); `cleanEntityText` = oracle-pinned sanitize of the
+    already-escaped template domain.
+  - **Protocol 1:1** (`process.go` + `store.go`): node claim filter
+    (due + {never-processed / retryable / legacy-retryable(`type` key) /
+    stale-in-progress(>1h); not `dead`) with atomic `processing` claim;
+    `attempts++` on failure; dead-letter at `OVERLEAF_NOTIFICATIONS_MAX_ATTEMPTS`
+    (default 3); exponential backoff `2^att * (OVERLEAF_NOTIFICATION_SILENCE_PERIOD_MS
+    || 2h)`; dry-run (`OVERLEAF_NOTIFICATIONS_DRY_RUN=true`) claims, renders,
+    does NOT send, releases the claim at end of run (node `_releaseForDryRun`);
+    `PROCESS_NOTIFICATIONS_BATCH_SIZE` (100) cap; `to` resolved from
+    `toUserId`/`fromUserId` via `users` (node
+    `EmailNotificationUtils.getRecipicentIdOrUserEmail`); send via the shared
+    `core.Mail` seam (SMTP settings identical to the node EmailSender).
+- **`cmd/cronmail`** — one cron-friendly pass, exit 0/1, stats JSON to stderr.
+- **Gate** — `make go-test-cronmail` (gofmt/vet/build + `-race` tests):
+  golden **byte-parity test** (6 oracle fixtures, subject+html+text exact),
+  escape/clean/jsonForScript pins, and 10 loop-semantics tests (happy, dry-run
+  release, retry→dead at 3, missing/unknown emailType, legacy `type`,
+  recipient resolution + missing-recipient, batch cap, stale reclaim). All
+  green.
+- **Wiring**: `server-ce/Dockerfile` gobuilder list += `cronmail`;
+  `server-ce/cron/notification-email-dispatch.sh` now execs
+  `/usr/local/bin/go-services/cronmail` (env + crontab entry unchanged).
+- **Effect**: the last **live** dependency on `modules/notifications/app` is
+  gone; that tree + `scripts/process_notifications.mjs` + the queue-consumer
+  half of `document-updater` (Bull `ProjectNotificationQueueConsumer`) become
+  ARC-4 junk-sweep candidates (queue path is dead: no live Node web consumer
+  ever ran it in this stack — the producers are chat Go + the legacy
+  scheduler writing straight to `emailNotifications`).
 
 ### ARC-4 · Removals (D1/D2/D3/D14)
 15. **Junk-page removal** (§5) + e2e adaptations.

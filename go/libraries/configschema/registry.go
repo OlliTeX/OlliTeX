@@ -5,7 +5,7 @@
 //
 //   - cmd/configdb       (CLI: list/set/get/import-env/init; the emergency
 //     path when /hub cannot start)
-//   - tools/toolkit bin/config (host-side wrapper around the CLI)
+//   - toolkit bin/config (host-side wrapper around the CLI)
 //   - go/services/web   (LoadConfig + /api/hub/config: DB value wins, then
 //     the legacy env, then the default)
 //

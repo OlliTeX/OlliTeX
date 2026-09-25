@@ -218,7 +218,11 @@ go-build: ## Build all Go service binaries into ./bin
 	$(GO) build -o bin/web ./cmd/web
 	$(GO) build -o bin/seaweed-migrate ./cmd/seaweed-migrate  ## fs <-> SeaweedFS(S3) conversion + health tool
 	$(GO) build -o bin/configdb ./cmd/configdb  ## operator CLI for the SQLite config DB (P7-post)
+	$(GO) build -o bin/cronmail ./cmd/cronmail  ## scheduled notification-email dispatch (replaces the Node process_notifications cron)
 
+.PHONY: go-test-cronmail
+go-test-cronmail: ## cronmail gate (byte-exact oracle templates + claim/loop semantics)
+	$(GO) build -buildvcs=false ./go/services/cronmail/... ./cmd/cronmail/ && $(GO) vet -buildvcs=false ./go/services/cronmail/... ./cmd/cronmail/ && test -z "$$(gofmt -l go/services/cronmail cmd/cronmail)" && $(GO) test -count=1 -race -buildvcs=false ./go/services/cronmail/...
 .PHONY: go-run-linked-url-proxy
 go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
 	$(GO) run ./cmd/linked-url-proxy

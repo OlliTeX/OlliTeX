@@ -65,7 +65,7 @@ docs/wiki/
 │   └── 09-operations.md          # system messages, sessions, diagnostics
 └── installation/
     ├── 01-docker.md              # server-ce make all + compose example
-    ├── 02-configuration.md       # env.sh + tools/toolkit seed map
+    ├── 02-configuration.md       # env.sh + toolkit seed map
     ├── 03-upgrade.md             # image swap + data notes
     └── 04-security-sandbox.md    # sandbox compiles, trusted-user warning
 ```

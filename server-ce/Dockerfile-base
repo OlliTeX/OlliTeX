@@ -60,7 +60,7 @@ RUN chmod 755 /sbin/setuser
 # OlliTeX enforces sandboxed compiles (clsi DockerRunner), so no TeX
 # binaries are needed inside the server image — compiles run in the
 # official image (default: texlive/texlive:latest-full; pin via the
-# TEXLIVE_IMAGE environment / tools/toolkit/lib/images.env). This also
+# TEXLIVE_IMAGE environment / toolkit/lib/images.env). This also
 # removes the install-tl download from image builds entirely.
 # Set up overleaf user and home directory
 # -----------------------------------------

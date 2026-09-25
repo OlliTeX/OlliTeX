@@ -83,7 +83,7 @@ administrator tools) **plus** the OlliTeX-specific stack:
   document import (`.docx`, `.md`) and export (`.docx`, `.md`, `.html`),
   WebDAV/Nextcloud sync, Dropbox, sign-up page.
 - **Operations toolkit** — environment-driven configuration
-  (`server-ce/config/env.sh` + `tools/toolkit` seed), a central
+  (`server-ce/config/env.sh` + `toolkit` seed), a central
   [Makefile](Makefile) entry point, an AGPL-compliant rebrand with provenance
   kept visible (see the local `BRANDING.md` handoff notes).
 
@@ -97,7 +97,7 @@ administrator tools) **plus** the OlliTeX-specific stack:
 >
 > - Default compile image: **`texlive/texlive:latest-full`** (the official
 >   TeX Live image); pin a specific build with the `TEXLIVE_IMAGE`
->   environment variable or [`tools/toolkit/lib/images.env`](tools/toolkit/lib/images.env).
+>   environment variable or [`toolkit/lib/images.env`](toolkit/lib/images.env).
 > - The server needs access to a Docker socket (or rootless Docker) so the
 >   compile containers can start — the same mechanism that runs the Typst
 >   compile containers. Mounting the Docker socket is the standard way to
@@ -118,7 +118,7 @@ The [`Dockerfile-base`](server-ce/Dockerfile-base) builds the
 `sharelatex/sharelatex-base:*` image (dependencies + TeX Live) and
 [`Dockerfile`](server-ce/Dockerfile) builds the application image on top.
 Configuration lives in [`server-ce/config/env.sh`](server-ce/config/env.sh)
-(plus toolkit seeds under `tools/toolkit`) — one place for site name, URL,
+(plus toolkit seeds under `toolkit`) — one place for site name, URL,
 auth providers, LLM admin gates, compile images, and so on.
 
 A ready-to-run local deployment (nginx + overleaf + mongo + redis) lives in
