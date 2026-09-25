@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { ActionIcon, Group, Tooltip } from '@mantine/core'
 import { notify } from './notify'
 import Icon from './icons'
-import { OverallTheme, setTheme, storedOverallTheme } from '../../../../../frontend/js/shared/mantine/overall-theme'
+import { OverallTheme, setTheme, storedOverallTheme } from '../../../../../../../frontend/js/shared/mantine/overall-theme'
 
 /**
  * Dark / Light / System selector for the hub headers.

@@ -7,7 +7,7 @@ import {
   getJSON,
   postJSON,
   putJSON,
-} from '../../../frontend/js/infrastructure/fetch-json'
+} from '../../../../../frontend/js/infrastructure/fetch-json'
 
 describe('fetchJSON', function () {
   before(function () {

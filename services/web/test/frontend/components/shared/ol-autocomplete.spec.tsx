@@ -4,7 +4,7 @@ import OLForm from '@/shared/components/ol/ol-form'
 import OLAutocomplete, {
   OLAutocompleteItem,
   OLAutocompleteProps,
-} from '../../../../frontend/js/shared/components/ol/ol-autocomplete'
+} from '../../../../../../frontend/js/shared/components/ol/ol-autocomplete'
 
 const testItems: OLAutocompleteItem[] = [
   { value: 'apple', label: 'Apple' },

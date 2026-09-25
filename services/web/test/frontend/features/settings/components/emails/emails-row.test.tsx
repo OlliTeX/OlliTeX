@@ -2,13 +2,13 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
 import { cloneDeep } from 'lodash'
-import EmailsRow from '../../../../../../frontend/js/features/settings/components/emails/row'
+import EmailsRow from '../../../../../../../../frontend/js/features/settings/components/emails/row'
 import {
   professionalUserData,
   unconfirmedUserData,
 } from '../../fixtures/test-user-email-data'
 import { UserEmailData } from '../../../../../../types/user-email'
-import { UserEmailsProvider } from '../../../../../../frontend/js/features/settings/context/user-email-context'
+import { UserEmailsProvider } from '../../../../../../../../frontend/js/features/settings/context/user-email-context'
 import { Affiliation } from '../../../../../../types/affiliation'
 import getMeta from '@/utils/meta'
 import { SplitTestProvider } from '@/shared/context/split-test-context'

@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import {
   findDefinition,
   parseDefinitionsFromDoc,
-} from '../../../../../../frontend/js/features/source-editor/utils/command-definitions/command-definition'
+} from '../../../../../../../../frontend/js/features/source-editor/utils/command-definitions/command-definition'
 
 describe('command-definition', function () {
   describe('parseDefinitionsFromDoc', function () {

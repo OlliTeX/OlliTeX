@@ -12,7 +12,7 @@ import addonLinks from '@storybook/addon-links'
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 // @ts-ignore
-import en from '../../../services/web/locales/en.json'
+import en from '../../../locales/en.json'
 
 function resetMeta() {
   window.metaAttributesCache = new Map()
@@ -176,7 +176,7 @@ export default definePreview({
       return {
         mainStyle: await import(
           // @ts-ignore
-          `!!to-string-loader!css-loader!resolve-url-loader!sass-loader!../../../services/web/frontend/stylesheets/main-style.scss`
+          `!!to-string-loader!css-loader!resolve-url-loader!sass-loader!../../../frontend/stylesheets/main-style.scss`
         ),
       }
     },

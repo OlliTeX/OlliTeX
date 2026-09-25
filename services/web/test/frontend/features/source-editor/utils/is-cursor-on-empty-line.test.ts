@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { EditorState, EditorSelection } from '@codemirror/state'
-import { isCursorOnEmptyLine } from '../../../../../frontend/js/features/source-editor/utils/is-cursor-on-empty-line'
+import { isCursorOnEmptyLine } from '../../../../../../../frontend/js/features/source-editor/utils/is-cursor-on-empty-line'
 
 function cursorState(doc: string, cursorPos: number) {
   return EditorState.create({

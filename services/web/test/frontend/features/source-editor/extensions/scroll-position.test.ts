@@ -6,7 +6,7 @@ import { EditorState } from '@codemirror/state'
 import {
   restoreScrollPosition,
   scrollPosition,
-} from '../../../../../frontend/js/features/source-editor/extensions/scroll-position'
+} from '../../../../../../../frontend/js/features/source-editor/extensions/scroll-position'
 
 const doc = `
 \\documentclass{article}

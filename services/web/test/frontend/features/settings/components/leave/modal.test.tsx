@@ -2,7 +2,7 @@ import sinon from 'sinon'
 import { fireEvent, screen, render, waitFor } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
 
-import LeaveModal from '../../../../../../frontend/js/features/settings/components/leave/modal'
+import LeaveModal from '../../../../../../../../frontend/js/features/settings/components/leave/modal'
 import getMeta from '@/utils/meta'
 
 describe('<LeaveModal />', function () {

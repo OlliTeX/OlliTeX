@@ -7,8 +7,8 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
-import { FetchError } from '../../../../../../frontend/js/infrastructure/fetch-json'
-import { SSOLinkingWidget } from '../../../../../../frontend/js/features/settings/components/linking/sso-widget'
+import { FetchError } from '../../../../../../../../frontend/js/infrastructure/fetch-json'
+import { SSOLinkingWidget } from '../../../../../../../../frontend/js/features/settings/components/linking/sso-widget'
 
 describe('<SSOLinkingWidget />', function () {
   const defaultProps = {

@@ -54,6 +54,7 @@ COPY libraries/settings/package.json /overleaf/libraries/settings/package.json
 COPY libraries/stream-utils/package.json /overleaf/libraries/stream-utils/package.json
 COPY libraries/validation-tools/package.json /overleaf/libraries/validation-tools/package.json
 COPY services/web/package.json /overleaf/services/web/package.json
+COPY frontend/package.json /overleaf/frontend/package.json
 COPY tools/migrations/package.json /overleaf/tools/migrations/package.json
 COPY .yarn/patches/ /overleaf/.yarn/patches/
 
@@ -90,6 +91,14 @@ COPY libraries/stream-utils/ /overleaf/libraries/stream-utils/
 COPY libraries/validation-tools/ /overleaf/libraries/validation-tools/
 COPY services/web/ /overleaf/services/web/
 COPY tools/migrations/ /overleaf/tools/migrations/
+# P7 step 5/6: the web app source (frontend/), locales/, and static public/ now
+# live at the monorepo ROOT (not under services/web/). webpack (workdir
+# /overleaf/services/web) reads `../../frontend`-> /overleaf/frontend and emits to
+# `../public`-> /overleaf/public; the Node runtime reads `../../locales`
+# -> /overleaf/locales. So the three root dirs are copied in this build stage.
+COPY frontend/ /overleaf/frontend/
+COPY locales/ /overleaf/locales/
+COPY public/ /overleaf/public/
 
 # Build the latex parser
 RUN cd /overleaf/services/web && yarn run 'lezer-latex:generate'
@@ -131,6 +140,8 @@ COPY libraries/stream-utils/ /overleaf/libraries/stream-utils/
 COPY libraries/validation-tools/ /overleaf/libraries/validation-tools/
 COPY services/web/ /overleaf/services/web/
 COPY tools/migrations/ /overleaf/tools/migrations/
+# P7 step 5/6: locales/ now lives at the monorepo root -> /overleaf/locales
+COPY locales/ /overleaf/locales/
 
 # Omit Server Pro/CE specific scripts from SaaS image
 RUN rm /overleaf/services/web/modules/server-ce-scripts -rf

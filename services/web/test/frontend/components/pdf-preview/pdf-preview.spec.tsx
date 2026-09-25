@@ -1,12 +1,12 @@
 import localStorage from '@/infrastructure/local-storage'
-import PdfPreview from '../../../../frontend/js/features/pdf-preview/components/pdf-preview'
+import PdfPreview from '../../../../../../frontend/js/features/pdf-preview/components/pdf-preview'
 import { EditorProviders } from '../../helpers/editor-providers'
 import { mockScope } from './scope'
 import {
   IdeLayout,
   IdeView,
   useLayoutContext,
-} from '../../../../frontend/js/shared/context/layout-context'
+} from '../../../../../../frontend/js/shared/context/layout-context'
 import { FC, PropsWithChildren, ReactElement, useEffect } from 'react'
 import { useLocalCompileContext } from '@/shared/context/local-compile-context'
 

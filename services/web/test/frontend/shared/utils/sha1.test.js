@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { generateSHA1Hash } from '../../../../frontend/js/shared/utils/sha1'
+import { generateSHA1Hash } from '../../../../../../frontend/js/shared/utils/sha1'
 import crypto from 'node:crypto'
 
 function generateSHA1HashNode(content) {

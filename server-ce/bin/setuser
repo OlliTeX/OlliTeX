@@ -1,0 +1,41 @@
+#!/bin/sh
+# setuser — phusion-baseimage-compatible privilege-dropping helper.
+#
+#   phusion/baseimage ships /sbin/setuser; a plain Ubuntu base does not, so
+#   OlliTeX ships an equivalent here (installed by Dockerfile-base →
+#   /sbin/setuser). It accepts the invocation shape our runit run scripts
+#   use:
+#
+#       setuser [GROUP=]USER [UMASK] command [args...]
+#
+#   and execs the command as USER (GID = USER, or GROUP if given as
+#   GROUP=USER), honouring UMASK if present. The environment is PRESERVED
+#   (the run scripts depend on NODE_OPTIONS / OVERLEAF_CONFIG / the
+#   /etc/overleaf/env.d fragments, etc.) — this mirrors the phusion helper.
+#
+#   Implemented on setpriv (util-linux, always present on Ubuntu). We are
+#   root inside the container (my_init runs as root), so setpriv can drop
+#   privileges without a password.
+set -eu
+
+[ "$#" -ge 2 ] || { echo "Usage: setuser USER [UMASK] command [args...]" >&2; exit 1; }
+
+TARGET="$1"; shift
+
+# Optional UMASK (a 3-digit octal token as the 2nd arg) — phusion allows it;
+# our scripts don't use it, but honour it if present.
+if [ "$#" -ge 2 ]; then
+  case "$2" in
+    [0-7][0-7][0-7]) umask "$2"; shift ;;
+  esac
+fi
+
+[ "$#" -ge 1 ] || { echo "setuser: no command given" >&2; exit 1; }
+
+# Split an optional GROUP= prefix (e.g. www-data=www-data).
+case "$TARGET" in
+  *=*) GROUP="${TARGET%%=*}"; UNAME="${TARGET#*=}" ;;
+  *)   GROUP="$TARGET";      UNAME="$TARGET" ;;
+esac
+
+exec setpriv --reuid "$UNAME" --regid "$GROUP" --init-groups "$@"

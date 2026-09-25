@@ -8,7 +8,7 @@ import {
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
 import sinon from 'sinon'
-import ProjectListRoot from '../../../../../frontend/js/features/project-list/components/project-list-root'
+import ProjectListRoot from '../../../../../../../frontend/js/features/project-list/components/project-list-root'
 import { renderWithProjectListContext } from '../helpers/render-with-context'
 import * as eventTracking from '@/infrastructure/event-tracking'
 import {

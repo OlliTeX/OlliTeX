@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { loadLocale } from './utils.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
-const EN_JSON = Path.join(__dirname, '../../locales/en.json')
+const EN_JSON = Path.join(__dirname, '../../../../locales/en.json')
 const CHECK = process.argv.includes('--check')
 const SYNC_NON_EN = process.argv.includes('--sync-non-en')
 
@@ -36,8 +36,8 @@ async function main() {
     find . -type f \
       -not -path './cypress/results/*' \
       -not -path './data/*' \
-      -not -path './frontend/extracted-translations.json' \
-      -not -path './locales/*' \
+      -not -path '../frontend/extracted-translations.json' \
+      -not -path '../locales/*' \
       -not -path './public/*' \
       -not -path '*/node_modules/*' \
       -not -path '*/scripts/*' \
@@ -113,7 +113,7 @@ async function main() {
     if (CHECK) {
       throw new Error('--check is incompatible with --sync-non-en')
     }
-    const LOCALES = Path.join(__dirname, '../../locales')
+    const LOCALES = Path.join(__dirname, '../../../../locales')
     for (const name of await fs.promises.readdir(LOCALES)) {
       if (name === 'README.md') continue
       if (name === 'en.json') continue

@@ -80,7 +80,7 @@ services:
     volumes:
       - ../services/web/app:/overleaf/services/web/app
       - ../services/web/config:/overleaf/services/web/config
-      - ../services/web/frontend:/overleaf/services/web/frontend
+      - ../frontend:/overleaf/frontend
       - ../locales:/overleaf/locales
       - ../services/web/modules:/overleaf/services/web/modules
       - ../public:/overleaf/public

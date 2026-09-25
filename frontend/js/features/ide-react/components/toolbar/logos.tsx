@@ -1,0 +1,48 @@
+import OLTooltip from '@/shared/components/ol/ol-tooltip'
+import MaterialIcon from '@/shared/components/material-icon'
+import { useTranslation } from 'react-i18next'
+import { Cobranding } from '../../../../../../services/web/types/cobranding'
+
+type ToolbarLogosProps = {
+  cobranding?: Cobranding
+}
+
+export const ToolbarLogos = ({ cobranding }: ToolbarLogosProps) => {
+  const { t } = useTranslation()
+
+  return (
+    <div className="ide-redesign-toolbar-logos">
+      <OLTooltip
+        id="tooltip-home-button"
+        description={t('back_to_your_projects')}
+        overlayProps={{ delay: 0, placement: 'bottom' }}
+      >
+        <div className="ide-redesign-toolbar-home-button">
+          {/* Owner #9 (2026-09-13 editor wave): home/logo goes to the user's
+              projects in the /hub (legacy /project retired). */}
+          <a href="/hub#/projects" className="ide-redesign-toolbar-home-link">
+            <span className="toolbar-ol-logo" aria-label={t('overleaf_logo')} />
+            <MaterialIcon type="home" className="toolbar-ol-home-button" />
+          </a>
+        </div>
+      </OLTooltip>
+      {cobranding && cobranding.logoImgUrl && (
+        <>
+          <span className="ide-redesign-toolbar-cobranding-separator" />
+          <a
+            className="ide-redesign-toolbar-cobranding-link"
+            href={cobranding.brandVariationHomeUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            <img
+              src={cobranding.logoImgUrl}
+              className="ide-redesign-toolbar-cobranding-logo"
+              alt={cobranding.brandVariationName}
+            />
+          </a>
+        </>
+      )}
+    </div>
+  )
+}

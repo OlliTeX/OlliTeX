@@ -1,4 +1,4 @@
-import BetaBadge from '../../../../frontend/js/shared/components/beta-badge'
+import BetaBadge from '../../../../../../frontend/js/shared/components/beta-badge'
 
 describe('beta badge', function () {
   it('renders the url and tooltip text', function () {

@@ -135,7 +135,7 @@ release: selftest ## Gate + docker image; promotion (push/cycle/probe) stays a m
 	$(MAKE) image
 	@echo ""
 	@echo "next (owner, on purpose):"
-	@echo "  1) docker push sharelatex/sharelatex:main   (+ ext tag if you want the alias)"
+	@echo "  1) docker push ollitex/ollitex:main   (+ ext tag if you want the alias)"
 	@echo "  2) cd /data_1/docker/compose_cep && sh cycle_overleafserver.sh"
 	@echo "  3) run the 17-point prod probe (https://psintern… login, admin)"
 

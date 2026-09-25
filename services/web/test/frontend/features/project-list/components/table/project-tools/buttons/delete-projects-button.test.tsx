@@ -1,10 +1,10 @@
 import { fireEvent, screen, render } from '@testing-library/react'
-import DeleteProjectsButton from '../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/delete-projects-button'
+import DeleteProjectsButton from '../../../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/delete-projects-button'
 import { makeLongProjectList } from '../../../../fixtures/projects-data'
 import {
   ProjectListContext,
   ProjectListContextValue,
-} from '../../../../../../../../frontend/js/features/project-list/context/project-list-context'
+} from '../../../../../../../../../../frontend/js/features/project-list/context/project-list-context'
 import { SplitTestProvider } from '@/shared/context/split-test-context'
 
 const { deletableList } = makeLongProjectList(40)

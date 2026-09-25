@@ -1,4 +1,4 @@
-import UploadProjectModal from '../../../../../../frontend/js/features/project-list/components/new-project-button/upload-project-modal'
+import UploadProjectModal from '../../../../../../../../frontend/js/features/project-list/components/new-project-button/upload-project-modal'
 import { SplitTestProvider } from '@/shared/context/split-test-context'
 import { UserSettingsProvider } from '@/shared/context/user-settings-context'
 

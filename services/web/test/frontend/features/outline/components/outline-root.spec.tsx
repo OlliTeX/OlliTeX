@@ -1,4 +1,4 @@
-import OutlineRoot from '../../../../../frontend/js/features/outline/components/outline-root'
+import OutlineRoot from '../../../../../../../frontend/js/features/outline/components/outline-root'
 
 describe('<OutlineRoot />', function () {
   it('renders outline', function () {

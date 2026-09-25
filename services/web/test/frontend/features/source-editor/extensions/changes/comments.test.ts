@@ -13,9 +13,9 @@ import {
 import {
   historyOT,
   setTrackChangesUserId,
-} from '../../../../../../frontend/js/features/source-editor/extensions/history-ot'
-import { trackDetachedComments } from '../../../../../../frontend/js/features/source-editor/extensions/track-detached-comments'
-import { historyOTType } from '../../../../../../frontend/js/features/ide-react/editor/share-js-history-ot-type'
+} from '../../../../../../../../frontend/js/features/source-editor/extensions/history-ot'
+import { trackDetachedComments } from '../../../../../../../../frontend/js/features/source-editor/extensions/track-detached-comments'
+import { historyOTType } from '../../../../../../../../frontend/js/features/ide-react/editor/share-js-history-ot-type'
 
 const setup = (
   content: string,

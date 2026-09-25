@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
-import { Filter } from '../../../../../frontend/js/features/project-list/context/project-list-context'
+import { Filter } from '../../../../../../../frontend/js/features/project-list/context/project-list-context'
 import { Tag } from '../../../../../app/src/Features/Tags/types'
-import ProjectListTitle from '../../../../../frontend/js/features/project-list/components/title/project-list-title'
+import ProjectListTitle from '../../../../../../../frontend/js/features/project-list/components/title/project-list-title'
 
 describe('<ProjectListTitle />', function () {
   type TestCase = {

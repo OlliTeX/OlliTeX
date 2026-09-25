@@ -51,7 +51,7 @@ services:
   # SMTP :1025 (in-network, no auth) · API :8025 → 127.0.0.1:18025 for the
   # smtp-capture spec.
   smtpsink:
-    image: ${OVERLEAF_IMAGE:-sharelatex/sharelatex:main}
+    image: ${OVERLEAF_IMAGE:-ollitex/ollitex:main}
     # env -u NODE_OPTIONS: the overleaf image preloads its Yarn PnP hooks
     # (--require .pnp.cjs / --import .pnp.register.mjs), which breaks running
     # a standalone CJS script; the sink needs none of them.
@@ -67,7 +67,7 @@ services:
     networks: [e2e]
 
   overleaf:
-    image: ${OVERLEAF_IMAGE:-sharelatex/sharelatex:main}
+    image: ${OVERLEAF_IMAGE:-ollitex/ollitex:main}
     hostname: overleaf
     depends_on:
       mongo:
@@ -198,13 +198,13 @@ services:
 
   git-bridge:
     # P7 cutover (2026-09-24): the 1:1 Go git-bridge (go/services/gitbridge)
-    # replaces the Java sharelatex/git-bridge. Image = node:24 (glibc + `git`)
-    # + the cmd/gitbridge binary, config-agnostic; config is mounted from
+    # replaces the Java sharelatex/git-bridge. Image = ollitex/git-bridge
+    # (ubuntu:26.04 + git) with the cmd/gitbridge Go binary, config-agnostic. Config is mounted from
     # gitbridge-runtime.json (same schema as the Java runtime.json).
-    #   build:    go/services/gitbridge/build.sh   -> gitbridge-go:latest
+    #   build:    go/services/gitbridge/build.sh   -> ollitex/git-bridge:latest
     #   rollback: image: sharelatex/git-bridge:ext-6.3.0-port
     #             command: ['/server-pro-start.sh']   (revive the Java service)
-    image: gitbridge-go:latest
+    image: ollitex/git-bridge:latest
     user: root
     command: ['git_bridge', 'serve', '/conf/runtime.json']
     volumes:

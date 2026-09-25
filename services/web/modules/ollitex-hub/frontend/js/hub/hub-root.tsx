@@ -6,9 +6,9 @@ import Icon from '../shared/icons'
 import ThemeToggle from '../shared/theme-toggle'
 import Rail from './rail'
 import SectionBoundary from './section-boundary'
-import { UserProvider } from '../../../../../frontend/js/shared/context/user-context'
-import SystemMessages from '../../../../../frontend/js/shared/components/system-messages'
-import { SSOProvider } from '../../../../../frontend/js/features/settings/context/sso-context'
+import { UserProvider } from '../../../../../../../frontend/js/shared/context/user-context'
+import SystemMessages from '../../../../../../../frontend/js/shared/components/system-messages'
+import { SSOProvider } from '../../../../../../../frontend/js/features/settings/context/sso-context'
 import { renderLeaf } from './leaves'
 import { HUB_NAV, HubNode, indexNav, visibleNav } from './nav-tree'
 import { accordionState } from './accordion-state'
@@ -20,13 +20,13 @@ import {
   getAppliedHubTheme,
   onAppliedHubThemeChange,
 } from './hub-theme'
-import OlliTProvider from '../../../../../frontend/js/shared/mantine/provider'
-import { UserSettingsProvider } from '../../../../../frontend/js/shared/context/user-settings-context'
-import { SplitTestProvider } from '../../../../../frontend/js/shared/context/split-test-context'
+import OlliTProvider from '../../../../../../../frontend/js/shared/mantine/provider'
+import { UserSettingsProvider } from '../../../../../../../frontend/js/shared/context/user-settings-context'
+import { SplitTestProvider } from '../../../../../../../frontend/js/shared/context/split-test-context'
 import {
   currentColorScheme,
   onColorSchemeChange,
-} from '../../../../../frontend/js/shared/mantine/overall-theme'
+} from '../../../../../../../frontend/js/shared/mantine/overall-theme'
 
 function parseHash(): string {
   try {

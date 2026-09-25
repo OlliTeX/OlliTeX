@@ -6,14 +6,14 @@ import {
   within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import EmailsSection from '../../../../../../frontend/js/features/settings/components/emails-section'
+import EmailsSection from '../../../../../../../../frontend/js/features/settings/components/emails-section'
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
 import { UserEmailData } from '../../../../../../types/user-email'
 import { Affiliation } from '../../../../../../types/affiliation'
 import withMarkup from '../../../../helpers/with-markup'
 import getMeta from '@/utils/meta'
-import { clearDomainCache } from '../../../../../../frontend/js/features/settings/components/emails/add-email/input'
+import { clearDomainCache } from '../../../../../../../../frontend/js/features/settings/components/emails/add-email/input'
 import { SplitTestProvider } from '@/shared/context/split-test-context'
 
 const userEmailData: UserEmailData & { affiliation: Affiliation } = {

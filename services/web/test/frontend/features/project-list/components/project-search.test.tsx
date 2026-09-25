@@ -1,10 +1,10 @@
 import sinon from 'sinon'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { expect } from 'chai'
-import SearchForm from '../../../../../frontend/js/features/project-list/components/search-form'
+import SearchForm from '../../../../../../../frontend/js/features/project-list/components/search-form'
 import * as eventTracking from '@/infrastructure/event-tracking'
 import fetchMock from 'fetch-mock'
-import { Filter } from '../../../../../frontend/js/features/project-list/context/project-list-context'
+import { Filter } from '../../../../../../../frontend/js/features/project-list/context/project-list-context'
 import { Tag } from '../../../../../app/src/Features/Tags/types'
 
 describe('Project list search form', function () {

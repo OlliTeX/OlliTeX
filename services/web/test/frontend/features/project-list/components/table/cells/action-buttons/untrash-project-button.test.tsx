@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
-import { UntrashProjectButtonTooltip } from '../../../../../../../../frontend/js/features/project-list/components/table/cells/action-buttons/untrash-project-button'
+import { UntrashProjectButtonTooltip } from '../../../../../../../../../../frontend/js/features/project-list/components/table/cells/action-buttons/untrash-project-button'
 import {
   archiveableProject,
   trashedProject,

@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react'
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
-import NewProjectButton from '../../../../../frontend/js/features/project-list/components/new-project-button'
+import NewProjectButton from '../../../../../../../frontend/js/features/project-list/components/new-project-button'
 import { renderWithProjectListContext } from '../helpers/render-with-context'
 import getMeta from '@/utils/meta'
 

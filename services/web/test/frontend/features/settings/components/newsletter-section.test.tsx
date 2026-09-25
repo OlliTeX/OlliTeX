@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { screen, render } from '@testing-library/react'
 
-import NewsletterSection from '../../../../../frontend/js/features/settings/components/newsletter-section'
+import NewsletterSection from '../../../../../../../frontend/js/features/settings/components/newsletter-section'
 
 describe('<NewsletterSection />', function () {
   it('shows link to sessions', async function () {

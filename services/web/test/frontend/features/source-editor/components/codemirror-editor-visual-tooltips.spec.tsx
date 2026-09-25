@@ -3,7 +3,7 @@ import {
   EditorProviders,
   makeEditorPropertiesProvider,
 } from '../../../helpers/editor-providers'
-import CodemirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import CodemirrorEditor from '../../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { TestContainer } from '../helpers/test-container'
 
 describe('<CodeMirrorEditor/> tooltips in Visual mode', function () {

@@ -1,6 +1,6 @@
 import sinon from 'sinon'
 import { renderHook } from '@testing-library/react'
-import useCallbackHandlers from '../../../../frontend/js/shared/hooks/use-callback-handlers'
+import useCallbackHandlers from '../../../../../../frontend/js/shared/hooks/use-callback-handlers'
 
 describe('useCallbackHandlers', function () {
   it('adds, removes and calls all handlers without duplicate', async function () {

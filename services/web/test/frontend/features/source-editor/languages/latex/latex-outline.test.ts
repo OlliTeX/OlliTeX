@@ -2,12 +2,12 @@ import { LanguageSupport } from '@codemirror/language'
 import { EditorState, Text } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { expect } from 'chai'
-import { documentOutline } from '../../../../../../frontend/js/features/source-editor/languages/latex/document-outline'
+import { documentOutline } from '../../../../../../../../frontend/js/features/source-editor/languages/latex/document-outline'
 import {
   FlatOutline,
   getNestingLevel,
-} from '../../../../../../frontend/js/features/source-editor/utils/tree-query'
-import { LaTeXLanguage } from '../../../../../../frontend/js/features/source-editor/languages/latex/latex-language'
+} from '../../../../../../../../frontend/js/features/source-editor/utils/tree-query'
+import { LaTeXLanguage } from '../../../../../../../../frontend/js/features/source-editor/languages/latex/latex-language'
 import {
   Book,
   Chapter,
@@ -17,7 +17,7 @@ import {
   SubParagraph,
   SubSection,
   SubSubSection,
-} from '../../../../../../frontend/js/features/source-editor/lezer-latex/latex.terms.mjs'
+} from '../../../../../../../../frontend/js/features/source-editor/lezer-latex/latex.terms.mjs'
 
 const latex = new LanguageSupport(LaTeXLanguage, documentOutline.extension)
 

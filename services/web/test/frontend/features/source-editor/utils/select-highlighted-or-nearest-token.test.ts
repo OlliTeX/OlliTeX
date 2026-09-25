@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { EditorState, EditorSelection } from '@codemirror/state'
-import { selectHighlightedOrNearestToken } from '../../../../../frontend/js/features/source-editor/utils/select-highlighted-or-nearest-token'
+import { selectHighlightedOrNearestToken } from '../../../../../../../frontend/js/features/source-editor/utils/select-highlighted-or-nearest-token'
 
 function cursorState(doc: string, cursorPos: number) {
   return EditorState.create({

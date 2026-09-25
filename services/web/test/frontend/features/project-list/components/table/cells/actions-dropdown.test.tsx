@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
-import ActionsDropdown from '../../../../../../../frontend/js/features/project-list/components/dropdown/actions-dropdown'
+import ActionsDropdown from '../../../../../../../../../frontend/js/features/project-list/components/dropdown/actions-dropdown'
 import {
   trashedProject,
   trashedAndNotOwnedProject,

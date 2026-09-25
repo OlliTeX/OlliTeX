@@ -3,7 +3,7 @@ import {
   EditorProviders,
   makeEditorPropertiesProvider,
 } from '../../../helpers/editor-providers'
-import CodemirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import CodemirrorEditor from '../../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { FC } from 'react'
 import { FileTreePathContext } from '@/features/file-tree/contexts/file-tree-path'
 import { TestContainer } from '../helpers/test-container'

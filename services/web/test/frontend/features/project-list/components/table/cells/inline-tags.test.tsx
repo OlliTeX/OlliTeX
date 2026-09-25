@@ -5,7 +5,7 @@ import {
   resetProjectListContextFetch,
   renderWithProjectListContext,
 } from '../../../helpers/render-with-context'
-import InlineTags from '../../../../../../../frontend/js/features/project-list/components/table/cells/inline-tags'
+import InlineTags from '../../../../../../../../../frontend/js/features/project-list/components/table/cells/inline-tags'
 import {
   archivedProject,
   copyableProject,

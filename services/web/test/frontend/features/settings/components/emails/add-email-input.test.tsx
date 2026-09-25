@@ -4,8 +4,8 @@ import sinon from 'sinon'
 import fetchMock from 'fetch-mock'
 import Input, {
   clearDomainCache,
-} from '../../../../../../frontend/js/features/settings/components/emails/add-email/input'
-import domainBlocklist from '../../../../../../frontend/js/features/settings/domain-blocklist'
+} from '../../../../../../../../frontend/js/features/settings/components/emails/add-email/input'
+import domainBlocklist from '../../../../../../../../frontend/js/features/settings/domain-blocklist'
 
 const testInstitutionData = [
   { university: { id: 124 }, hostname: 'domain.edu' },

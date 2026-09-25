@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
 
 import { renderWithEditorContext } from '../../../helpers/render-with-context'
-import FileViewHeader from '../../../../../frontend/js/features/file-view/components/file-view-header'
+import FileViewHeader from '../../../../../../../frontend/js/features/file-view/components/file-view-header'
 import { USER_ID } from '../../../helpers/editor-providers'
 import { fileViewFile } from '@/features/ide-react/util/file-view'
 import { projectOutputFile, textFile, urlFile } from '../util/files'

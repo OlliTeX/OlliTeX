@@ -14,7 +14,7 @@ module.exports = {
   darkMode: ['class'],
   corePlugins: { preflight: false },
   content: [
-    './frontend/js/**/*.{ts,tsx,js,jsx}',
+    '../../frontend/js/**/*.{ts,tsx,js,jsx}',
     './modules/*/frontend/js/**/*.{ts,tsx,js,jsx}',
     './app/views/**/*.pug',
   ],

@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import sinon from 'sinon'
 import { screen, render, waitFor } from '@testing-library/react'
 import * as eventTracking from '@/infrastructure/event-tracking'
-import SettingsPageRoot from '../../../../../frontend/js/features/settings/components/root'
+import SettingsPageRoot from '../../../../../../../frontend/js/features/settings/components/root'
 import getMeta from '@/utils/meta'
 
 describe('<SettingsPageRoot />', function () {

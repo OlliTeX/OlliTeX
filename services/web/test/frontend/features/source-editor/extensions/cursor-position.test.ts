@@ -6,7 +6,7 @@ import { EditorSelection, EditorState } from '@codemirror/state'
 import {
   cursorPosition,
   restoreCursorPosition,
-} from '../../../../../frontend/js/features/source-editor/extensions/cursor-position'
+} from '../../../../../../../frontend/js/features/source-editor/extensions/cursor-position'
 
 const doc = `
 \\documentclass{article}

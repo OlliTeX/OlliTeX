@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { render, screen } from '@testing-library/react'
 
-import MessageGroup from '../../../../../frontend/js/features/chat/components/message-group'
+import MessageGroup from '../../../../../../../frontend/js/features/chat/components/message-group'
 import { stubMathJax, tearDownMathJaxStubs } from './stubs'
 import { User, UserId } from '@ol-types/user'
 import {

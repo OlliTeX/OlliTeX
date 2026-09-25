@@ -6,7 +6,7 @@ import {
   cutSelection,
   pasteWithoutFormatting,
   pasteWithFormatting,
-} from '../../../../../frontend/js/features/source-editor/commands/clipboard'
+} from '../../../../../../../frontend/js/features/source-editor/commands/clipboard'
 
 const createClipboardStub = () => {
   const stub = {

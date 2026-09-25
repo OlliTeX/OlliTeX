@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { EditorState, Text } from '@codemirror/state'
-import { LaTeXLanguage } from '../../../../../../frontend/js/features/source-editor/languages/latex/latex-language'
+import { LaTeXLanguage } from '../../../../../../../../frontend/js/features/source-editor/languages/latex/latex-language'
 import {
   ensureSyntaxTree,
   foldNodeProp,

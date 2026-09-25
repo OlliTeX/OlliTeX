@@ -57,3 +57,10 @@ tests/e2e/parity/reference/
 /public/fonts
 /public/images
 /public/*.module.wasm
+
+# Web app (frontend/) build artifacts (P7 step 5: frontend/ moved to repo root)
+/frontend/js/features/source-editor/themes/ace/
+/frontend/js/features/source-editor/lezer-latex/latex.mjs
+/frontend/js/features/source-editor/lezer-latex/latex.terms.mjs
+/frontend/js/features/source-editor/lezer-bibtex/bibtex.mjs
+/frontend/js/features/source-editor/lezer-bibtex/bibtex.terms.mjs

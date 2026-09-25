@@ -5,7 +5,7 @@ import {
   USER_EMAIL,
   USER_ID,
 } from '../../../helpers/editor-providers'
-import CodemirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import CodemirrorEditor from '../../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { mockScope } from '../helpers/mock-scope'
 import { TestContainer } from '../helpers/test-container'
 import { mockProject } from '../helpers/mock-project'

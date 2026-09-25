@@ -14,7 +14,7 @@ import path from 'path'
 import {
   parseTypstLog,
   parseTypstLogEntries,
-} from '../../../../frontend/js/ide/log-parser/typst-log-parser'
+} from '../../../../../../frontend/js/ide/log-parser/typst-log-parser'
 
 // The fixtures live under modules/typst/test/fixtures (see F3.9 ledger note:
 // clsi_typst keeps the same files as source of truth; this copy is used by

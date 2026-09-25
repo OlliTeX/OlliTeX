@@ -1,7 +1,7 @@
 import {
   detachChannelId,
   detachChannel as _detachChannel,
-} from '../../../frontend/js/shared/context/detach-context'
+} from '../../../../../frontend/js/shared/context/detach-context'
 
 // for tests, assert that detachChannel is defined, as BroadcastChannel is available
 export const detachChannel = _detachChannel!

@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import sinon from 'sinon'
-import { DownloadProjectButtonTooltip } from '../../../../../../../../frontend/js/features/project-list/components/table/cells/action-buttons/download-project-button'
+import { DownloadProjectButtonTooltip } from '../../../../../../../../../../frontend/js/features/project-list/components/table/cells/action-buttons/download-project-button'
 import { projectsData } from '../../../../fixtures/projects-data'
 import { location } from '@/shared/components/location'
 

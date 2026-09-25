@@ -21,7 +21,7 @@
 import { expect } from 'chai'
 import { EditorState } from '@codemirror/state'
 import { parseTypstOutline } from '../../../frontend/js/languages/typst/document-outline'
-import { makeTypstHeadingOutlineItem } from '../../../../../frontend/js/features/source-editor/utils/tree-operations/outline'
+import { makeTypstHeadingOutlineItem } from '../../../../../../../frontend/js/features/source-editor/utils/tree-operations/outline'
 
 describe('modules/typst: document outline (F3.6)', function () {
   it('parses =-run headings with 1-based levels, skipping code/comments', function () {

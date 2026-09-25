@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { cloneDeep } from 'lodash'
 import { professionalUserData } from '../fixtures/test-user-email-data'
 import { Affiliation } from '../../../../../types/affiliation'
-import { emailMustBeConfirmedViaSAML } from '../../../../../frontend/js/features/settings/utils/email-confirmation'
+import { emailMustBeConfirmedViaSAML } from '../../../../../../../frontend/js/features/settings/utils/email-confirmation'
 
 describe('emailMustBeConfirmedViaSAML', function () {
   beforeEach(function () {

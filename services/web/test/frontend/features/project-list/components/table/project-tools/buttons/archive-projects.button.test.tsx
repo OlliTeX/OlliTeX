@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react'
-import ArchiveProjectsButton from '../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/archive-projects-button'
+import ArchiveProjectsButton from '../../../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/archive-projects-button'
 import {
   resetProjectListContextFetch,
   renderWithProjectListContext,

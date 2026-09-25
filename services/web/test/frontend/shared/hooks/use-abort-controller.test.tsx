@@ -2,8 +2,8 @@ import fetchMock from 'fetch-mock'
 import { expect } from 'chai'
 import React from 'react'
 import { render, waitFor } from '@testing-library/react'
-import useAbortController from '../../../../frontend/js/shared/hooks/use-abort-controller'
-import { getJSON } from '../../../../frontend/js/infrastructure/fetch-json'
+import useAbortController from '../../../../../../frontend/js/shared/hooks/use-abort-controller'
+import { getJSON } from '../../../../../../frontend/js/infrastructure/fetch-json'
 
 describe('useAbortController', function () {
   let status: {

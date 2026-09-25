@@ -2,7 +2,7 @@ import { Project } from '../../../../../types/project/dashboard/api'
 import {
   isDeletableProject,
   isLeavableProject,
-} from '../../../../../frontend/js/features/project-list/util/project'
+} from '../../../../../../../frontend/js/features/project-list/util/project'
 import moment from 'moment'
 
 export const owner = {

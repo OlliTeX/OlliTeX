@@ -1,5 +1,5 @@
 import MaterialIcon from '@/shared/components/material-icon'
-import unfilledIconTypes from '../../../../frontend/fonts/material-symbols/unfilled-symbols.mjs'
+import unfilledIconTypes from '../../../../../../frontend/fonts/material-symbols/unfilled-symbols.mjs'
 
 const FONT_SIZE = 40
 

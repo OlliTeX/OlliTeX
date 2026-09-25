@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { expect } from 'chai'
-import PdfCompileTime from '../../../../frontend/js/features/pdf-preview/components/pdf-compile-time'
-import { DetachCompileContext } from '../../../../frontend/js/shared/context/detach-compile-context'
+import PdfCompileTime from '../../../../../../frontend/js/features/pdf-preview/components/pdf-compile-time'
+import { DetachCompileContext } from '../../../../../../frontend/js/shared/context/detach-compile-context'
 
 function renderComponent(compileTimeClientE2E?: number) {
   return render(

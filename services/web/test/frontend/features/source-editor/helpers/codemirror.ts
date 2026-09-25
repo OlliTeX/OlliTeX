@@ -3,7 +3,7 @@ import { LanguageSupport } from '@codemirror/language'
 import { EditorSelection, Line, SelectionRange } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { Assertion } from 'chai'
-import { LaTeXLanguage } from '../../../../../frontend/js/features/source-editor/languages/latex/latex-language'
+import { LaTeXLanguage } from '../../../../../../../frontend/js/features/source-editor/languages/latex/latex-language'
 
 export class CodemirrorTestSession {
   public view: EditorView

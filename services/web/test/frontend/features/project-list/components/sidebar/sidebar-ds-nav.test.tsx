@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect } from 'chai'
-import SidebarDsNav from '../../../../../../frontend/js/features/project-list/components/sidebar/sidebar-ds-nav'
+import SidebarDsNav from '../../../../../../../../frontend/js/features/project-list/components/sidebar/sidebar-ds-nav'
 import {
   renderWithProjectListContext,
   resetProjectListContextFetch,

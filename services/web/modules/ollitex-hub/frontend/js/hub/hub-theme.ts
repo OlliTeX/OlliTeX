@@ -11,7 +11,7 @@
 // sees the instance's hub branding; the admin edits it under
 // Site settings → GENERAL → Appearance.
 import getMeta from '@/utils/meta'
-import { OLL_GREEN, OLLITEX_RADIUS } from '../../../../../frontend/js/shared/mantine/palette'
+import { OLL_GREEN, OLLITEX_RADIUS } from '../../../../../../../frontend/js/shared/mantine/palette'
 
 export interface HubMode {
   primary: string

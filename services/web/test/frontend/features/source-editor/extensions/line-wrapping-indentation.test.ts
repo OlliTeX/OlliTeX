@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { EditorView, DecorationSet } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
-import { buildDecorations } from '../../../../../frontend/js/features/source-editor/extensions/line-wrapping-indentation'
+import { buildDecorations } from '../../../../../../../frontend/js/features/source-editor/extensions/line-wrapping-indentation'
 
 const basicDoc = `
 \\begin{document}

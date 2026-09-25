@@ -4,7 +4,7 @@ import { screen, Screen, fireEvent, waitFor } from '@testing-library/react'
 import fetchMock, { CallLog } from 'fetch-mock'
 import userEvent from '@testing-library/user-event'
 
-import ShareProjectModal from '../../../../../frontend/js/features/share-project-modal/components/share-project-modal'
+import ShareProjectModal from '../../../../../../../frontend/js/features/share-project-modal/components/share-project-modal'
 import { renderWithEditorContext } from '../../../helpers/render-with-context'
 import {
   makeProjectProvider,

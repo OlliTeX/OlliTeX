@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { LeaveProjectButtonTooltip } from '../../../../../../../../frontend/js/features/project-list/components/table/cells/action-buttons/leave-project-button'
+import { LeaveProjectButtonTooltip } from '../../../../../../../../../../frontend/js/features/project-list/components/table/cells/action-buttons/leave-project-button'
 import {
   trashedProject,
   trashedAndNotOwnedProject,

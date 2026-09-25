@@ -5,7 +5,7 @@ import {
   EmailContextType,
   UserEmailsProvider,
   useUserEmailsContext,
-} from '../../../../../frontend/js/features/settings/context/user-email-context'
+} from '../../../../../../../frontend/js/features/settings/context/user-email-context'
 import fetchMock from 'fetch-mock'
 import {
   confirmedUserData,

@@ -3,7 +3,7 @@ import {
   getFileExtension,
   hasImageExtension,
   isSvgFile,
-} from '../../../../../frontend/js/features/source-editor/utils/file'
+} from '../../../../../../../frontend/js/features/source-editor/utils/file'
 
 describe('file utilities', function () {
   describe('getFileExtension', function () {

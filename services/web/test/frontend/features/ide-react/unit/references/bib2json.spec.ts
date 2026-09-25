@@ -1,5 +1,5 @@
 import { Bib2JsonEntry } from '@/features/ide-react/references/types'
-import BibtexParserImport from '../../../../../../frontend/js/features/ide-react/references/bib2json'
+import BibtexParserImport from '../../../../../../../../frontend/js/features/ide-react/references/bib2json'
 import { expect } from 'chai'
 
 const BibtexParser = BibtexParserImport as unknown as (

@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react'
-import TrashProjectsButton from '../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/trash-projects-button'
+import TrashProjectsButton from '../../../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/trash-projects-button'
 import {
   resetProjectListContextFetch,
   renderWithProjectListContext,

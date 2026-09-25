@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { expect } from 'chai'
-import HotkeysModalBottomText from '../../../../../frontend/js/features/hotkeys-modal/components/hotkeys-modal-bottom-text'
+import HotkeysModalBottomText from '../../../../../../../frontend/js/features/hotkeys-modal/components/hotkeys-modal-bottom-text'
 
 describe('<HotkeysModalBottomText />', function () {
   it('renders the correct text', function () {

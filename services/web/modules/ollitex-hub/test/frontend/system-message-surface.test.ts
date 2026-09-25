@@ -3,7 +3,7 @@ import {
   detectMessageSurface,
   messageVisibleForSurface,
   normalizePlacementsChecked,
-} from '../../../../frontend/js/shared/components/system-message-surface'
+} from '../../../../../../frontend/js/shared/components/system-message-surface'
 
 describe('system message placement (#17b)', () => {
   describe('detectMessageSurface', () => {

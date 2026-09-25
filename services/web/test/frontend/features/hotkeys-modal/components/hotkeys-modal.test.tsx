@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { ComponentProps } from 'react'
 import { SplitTestProvider } from '@/shared/context/split-test-context'
-import HotkeysModal from '../../../../../frontend/js/features/hotkeys-modal/components/hotkeys-modal'
+import HotkeysModal from '../../../../../../../frontend/js/features/hotkeys-modal/components/hotkeys-modal'
 import { expect } from 'chai'
 import sinon from 'sinon'
 

@@ -1,10 +1,10 @@
 import { fireEvent, screen, render } from '@testing-library/react'
-import LeaveProjectsButton from '../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/leave-projects-button'
+import LeaveProjectsButton from '../../../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/leave-projects-button'
 import { makeLongProjectList } from '../../../../fixtures/projects-data'
 import {
   ProjectListContext,
   ProjectListContextValue,
-} from '../../../../../../../../frontend/js/features/project-list/context/project-list-context'
+} from '../../../../../../../../../../frontend/js/features/project-list/context/project-list-context'
 import { SplitTestProvider } from '@/shared/context/split-test-context'
 
 const { leavableList } = makeLongProjectList(40)

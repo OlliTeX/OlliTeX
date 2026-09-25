@@ -1,12 +1,12 @@
 import { useState, FC } from 'react'
-import ToggleSwitch from '../../../../../frontend/js/features/history/components/change-list/toggle-switch'
-import ChangeList from '../../../../../frontend/js/features/history/components/change-list/change-list'
+import ToggleSwitch from '../../../../../../../frontend/js/features/history/components/change-list/toggle-switch'
+import ChangeList from '../../../../../../../frontend/js/features/history/components/change-list/change-list'
 import {
   EditorProviders,
   USER_EMAIL,
   USER_ID,
 } from '../../../helpers/editor-providers'
-import { HistoryProvider } from '../../../../../frontend/js/features/history/context/history-context'
+import { HistoryProvider } from '../../../../../../../frontend/js/features/history/context/history-context'
 import { updates } from '../fixtures/updates'
 import { labels } from '../fixtures/labels'
 import { formatTime, relativeDate } from '@/features/utils/format-date'

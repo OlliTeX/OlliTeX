@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import { expect } from 'chai'
 import { render } from '@testing-library/react'
 
-import useExpandCollapse from '../../../../frontend/js/shared/hooks/use-expand-collapse'
+import useExpandCollapse from '../../../../../../frontend/js/shared/hooks/use-expand-collapse'
 
 const sampleContent = (
   <div>

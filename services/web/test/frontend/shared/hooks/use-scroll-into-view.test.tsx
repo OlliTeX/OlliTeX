@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import { expect } from 'chai'
 import sinon from 'sinon'
-import useScrollIntoView from '../../../../frontend/js/shared/hooks/use-scroll-into-view'
+import useScrollIntoView from '../../../../../../frontend/js/shared/hooks/use-scroll-into-view'
 
 describe('useScrollIntoView', function () {
   function createTargetElement({ id, top }: { id: string; top: number }) {

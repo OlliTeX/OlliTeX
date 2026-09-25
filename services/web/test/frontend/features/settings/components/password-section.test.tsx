@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { fireEvent, screen, render } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
-import PasswordSection from '../../../../../frontend/js/features/settings/components/password-section'
+import PasswordSection from '../../../../../../../frontend/js/features/settings/components/password-section'
 import getMeta from '@/utils/meta'
 
 describe('<PasswordSection />', function () {

@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import sinon from 'sinon'
 import { screen, fireEvent, render, within } from '@testing-library/react'
-import { IntegrationLinkingWidget } from '../../../../../../frontend/js/features/settings/components/linking/integration-widget'
+import { IntegrationLinkingWidget } from '../../../../../../../../frontend/js/features/settings/components/linking/integration-widget'
 import * as eventTracking from '@/infrastructure/event-tracking'
 
 describe('<IntegrationLinkingWidgetTest/>', function () {

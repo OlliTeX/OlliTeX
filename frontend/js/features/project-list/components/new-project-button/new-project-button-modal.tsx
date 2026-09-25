@@ -1,0 +1,103 @@
+import BlankProjectModal from './blank-project-modal'
+import ExampleProjectModal from './example-project-modal'
+import importOverleafModules from '../../../../../macros/import-overleaf-module.macro'
+import { JSXElementConstructor, lazy, Suspense, useCallback } from 'react'
+import { Nullable } from '../../../../../../services/web/types/utils'
+import { FullSizeLoadingSpinner } from '@/shared/components/loading-spinner'
+import { useLocation } from '@/shared/hooks/use-location'
+import { Tag } from '../../../../../../services/web/app/src/Features/Tags/types'
+
+const UploadProjectModal = lazy(() => import('./upload-project-modal'))
+const ImportDocumentModal = lazy(() => import('./import-document-modal'))
+
+export type NewProjectButtonModalVariant =
+  | 'blank_project'
+  | 'example_project'
+  | 'upload_project'
+  | 'import_from_github'
+  | 'import_docx'
+  | 'import_markdown'
+  | 'blank_typst_project'
+
+type NewProjectButtonModalProps = {
+  modal: Nullable<NewProjectButtonModalVariant>
+  onHide: () => void
+  initialTags?: Tag[]
+}
+
+function NewProjectButtonModal({
+  modal,
+  onHide,
+  initialTags,
+}: NewProjectButtonModalProps) {
+  const [importProjectFromGithubModalWrapper] = importOverleafModules(
+    'importProjectFromGithubModalWrapper'
+  )
+  const ImportProjectFromGithubModalWrapper: JSXElementConstructor<{
+    onHide: () => void
+  }> = importProjectFromGithubModalWrapper?.import.default
+
+  // Typst: "Blank Typst project" modal (module typst).
+  const [typstNewProjectModalWrapperModule] = importOverleafModules(
+    'typstNewProjectModalWrapper'
+  )
+  const TypstNewProjectModalWrapper: JSXElementConstructor<{
+    onHide: () => void
+  }> = typstNewProjectModalWrapperModule?.import.default
+
+  const location = useLocation()
+
+  const openProject = useCallback(
+    (projectId: string, convertedFrom?: string) => {
+      const url = convertedFrom
+        ? `/project/${projectId}?converted-from=${convertedFrom}`
+        : `/project/${projectId}`
+
+      location.assign(url)
+    },
+    [location]
+  )
+
+  switch (modal) {
+    case 'blank_project':
+      return <BlankProjectModal onHide={onHide} initialTags={initialTags} />
+    case 'example_project':
+      return <ExampleProjectModal onHide={onHide} initialTags={initialTags} />
+    case 'upload_project':
+      return (
+        <Suspense fallback={<FullSizeLoadingSpinner delay={500} />}>
+          <UploadProjectModal onHide={onHide} openProject={openProject} />
+        </Suspense>
+      )
+    case 'import_docx':
+      return (
+        <Suspense fallback={<FullSizeLoadingSpinner delay={500} />}>
+          <ImportDocumentModal
+            type="docx"
+            onHide={onHide}
+            openProject={openProject}
+          />
+        </Suspense>
+      )
+    case 'import_markdown':
+      return (
+        <Suspense fallback={<FullSizeLoadingSpinner delay={500} />}>
+          <ImportDocumentModal
+            type="markdown"
+            onHide={onHide}
+            openProject={openProject}
+          />
+        </Suspense>
+      )
+    case 'import_from_github':
+      return <ImportProjectFromGithubModalWrapper onHide={onHide} />
+    case 'blank_typst_project':
+      return TypstNewProjectModalWrapper ? (
+        <TypstNewProjectModalWrapper onHide={onHide} />
+      ) : null
+    default:
+      return null
+  }
+}
+
+export default NewProjectButtonModal

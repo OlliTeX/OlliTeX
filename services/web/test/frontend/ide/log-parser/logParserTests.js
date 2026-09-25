@@ -1,6 +1,6 @@
 import { expect } from 'chai'
-import LatexLogParser from '../../../../frontend/js/ide/log-parser/latex-log-parser'
-import BibLogParser from '../../../../frontend/js/ide/log-parser/bib-log-parser'
+import LatexLogParser from '../../../../../../frontend/js/ide/log-parser/latex-log-parser'
+import BibLogParser from '../../../../../../frontend/js/ide/log-parser/bib-log-parser'
 
 const fixturePath = '../../helpers/fixtures/logs/'
 const fs = require('fs')

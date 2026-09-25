@@ -5,7 +5,7 @@ import {
   render,
 } from '@testing-library/react'
 
-import LeaveSection from '../../../../../frontend/js/features/settings/components/leave-section'
+import LeaveSection from '../../../../../../../frontend/js/features/settings/components/leave-section'
 import getMeta from '@/utils/meta'
 
 describe('<LeaveSection />', function () {

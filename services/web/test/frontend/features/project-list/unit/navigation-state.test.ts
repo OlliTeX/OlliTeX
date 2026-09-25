@@ -4,8 +4,8 @@ import {
   getNavigationState,
   getNavigationUrl,
   migrateLegacyNavigationState,
-} from '../../../../../frontend/js/features/project-list/util/navigation-state'
-import { UNCATEGORIZED_KEY } from '../../../../../frontend/js/features/project-list/context/project-list-context'
+} from '../../../../../../../frontend/js/features/project-list/util/navigation-state'
+import { UNCATEGORIZED_KEY } from '../../../../../../../frontend/js/features/project-list/context/project-list-context'
 
 const LEGACY_FILTER_KEY = 'project-list-filter'
 const LEGACY_SELECTED_TAG_ID_KEY = 'project-list-selected-tag-id'

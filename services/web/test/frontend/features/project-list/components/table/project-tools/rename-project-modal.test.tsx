@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect } from 'chai'
-import RenameProjectModal from '../../../../../../../frontend/js/features/project-list/components/modals/rename-project-modal'
+import RenameProjectModal from '../../../../../../../../../frontend/js/features/project-list/components/modals/rename-project-modal'
 import {
   renderWithProjectListContext,
   resetProjectListContextFetch,

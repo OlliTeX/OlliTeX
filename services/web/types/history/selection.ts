@@ -1,4 +1,4 @@
-import { FileDiff } from '../../frontend/js/features/history/services/types/file'
+import { FileDiff } from '../../../../frontend/js/features/history/services/types/file'
 import { Nullable } from '../utils'
 
 type Docs = Record<string, unknown>

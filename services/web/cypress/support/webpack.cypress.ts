@@ -44,19 +44,19 @@ const buildConfig = () => {
   // add entrypoint under '/' for latex-linter worker
   addWorker(
     'latex-linter-worker',
-    '../../frontend/js/features/source-editor/languages/latex/linter/latex-linter.worker'
+    '../../../../frontend/js/features/source-editor/languages/latex/linter/latex-linter.worker'
   )
 
   // add entrypoint under '/' for hunspell worker
   addWorker(
     'hunspell-worker',
-    '../../frontend/js/features/source-editor/hunspell/hunspell.worker'
+    '../../../../frontend/js/features/source-editor/hunspell/hunspell.worker'
   )
 
   // add entrypoint under '/' for references worker
   addWorker(
     'references-worker',
-    '../../frontend/js/features/ide-react/references/references.worker.ts'
+    '../../../../frontend/js/features/ide-react/references/references.worker.ts'
   )
 
   // add entrypoints under '/' for pdfjs workers

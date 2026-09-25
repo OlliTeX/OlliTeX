@@ -6,7 +6,7 @@ import {
 import fetchMock from 'fetch-mock'
 
 import { renderWithEditorContext } from '../../../helpers/render-with-context'
-import FileView from '../../../../../frontend/js/features/file-view/components/file-view'
+import FileView from '../../../../../../../frontend/js/features/file-view/components/file-view'
 import { imageFile, textFile } from '../util/files'
 
 describe('<FileView/>', function () {

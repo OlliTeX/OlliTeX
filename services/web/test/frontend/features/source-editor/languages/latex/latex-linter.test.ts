@@ -1,8 +1,8 @@
 import { assert } from 'chai'
-import LintWorker from '../../../../../../frontend/js/features/source-editor/languages/latex/linter/latex-linter.worker'
-import { errorsToDiagnostics } from '../../../../../../frontend/js/features/source-editor/languages/latex/linter/errors-to-diagnostics'
+import LintWorker from '../../../../../../../../frontend/js/features/source-editor/languages/latex/linter/latex-linter.worker'
+import { errorsToDiagnostics } from '../../../../../../../../frontend/js/features/source-editor/languages/latex/linter/errors-to-diagnostics'
 import { Diagnostic } from '@codemirror/lint'
-import { mergeCompatibleOverlappingDiagnostics } from '../../../../../../frontend/js/features/source-editor/languages/latex/linter/merge-overlapping-diagnostics'
+import { mergeCompatibleOverlappingDiagnostics } from '../../../../../../../../frontend/js/features/source-editor/languages/latex/linter/merge-overlapping-diagnostics'
 
 const { Parse } = new LintWorker()
 

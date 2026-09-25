@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { expect } from 'chai'
-import { SSOAlert } from '../../../../../../frontend/js/features/settings/components/emails/sso-alert'
+import { SSOAlert } from '../../../../../../../../frontend/js/features/settings/components/emails/sso-alert'
 
 describe('<SSOAlert/>', function () {
   describe('when there is no institutional linking information', function () {

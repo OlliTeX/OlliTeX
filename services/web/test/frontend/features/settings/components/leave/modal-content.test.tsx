@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { screen, render } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
 
-import LeaveModalContent from '../../../../../../frontend/js/features/settings/components/leave/modal-content'
+import LeaveModalContent from '../../../../../../../../frontend/js/features/settings/components/leave/modal-content'
 import getMeta from '@/utils/meta'
 
 describe('<LeaveModalContent />', function () {

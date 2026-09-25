@@ -4,7 +4,7 @@ import { EditorView } from '@codemirror/view'
 import {
   editable,
   setEditable,
-} from '../../../../../frontend/js/features/source-editor/extensions/editable'
+} from '../../../../../../../frontend/js/features/source-editor/extensions/editable'
 
 const doc = `\\documentclass{article}
 \\begin{document}

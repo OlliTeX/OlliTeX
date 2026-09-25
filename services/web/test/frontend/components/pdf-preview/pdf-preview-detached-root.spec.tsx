@@ -1,4 +1,4 @@
-import PdfPreviewDetachedRoot from '../../../../frontend/js/features/pdf-preview/components/pdf-preview-detached-root'
+import PdfPreviewDetachedRoot from '../../../../../../frontend/js/features/pdf-preview/components/pdf-preview-detached-root'
 import { detachChannel, testDetachChannel } from '../../helpers/detach-channel'
 
 describe('<PdfPreviewDetachedRoot/>', function () {

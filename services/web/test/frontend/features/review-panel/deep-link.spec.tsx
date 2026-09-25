@@ -1,5 +1,5 @@
-import CodeMirrorEditor from '../../../../frontend/js/features/source-editor/components/codemirror-editor'
-import { GlobalToasts } from '../../../../frontend/js/features/ide-react/components/global-toasts'
+import CodeMirrorEditor from '../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import { GlobalToasts } from '../../../../../../frontend/js/features/ide-react/components/global-toasts'
 import {
   EditorProviders,
   makeProjectProvider,

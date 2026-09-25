@@ -1,4 +1,4 @@
-import OutlineItem from '../../../../../frontend/js/features/outline/components/outline-item'
+import OutlineItem from '../../../../../../../frontend/js/features/outline/components/outline-item'
 
 describe('<OutlineItem />', function () {
   it('renders basic item', function () {

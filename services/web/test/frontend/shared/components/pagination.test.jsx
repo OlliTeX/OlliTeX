@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { render, screen } from '@testing-library/react'
-import Pagination from '../../../../frontend/js/shared/components/pagination'
+import Pagination from '../../../../../../frontend/js/shared/components/pagination'
 
 describe('<Pagination />', function () {
   it('renders with current page handled', async function () {

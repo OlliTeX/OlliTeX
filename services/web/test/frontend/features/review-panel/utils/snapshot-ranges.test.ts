@@ -6,7 +6,7 @@ import {
   TextOperation,
   TrackingProps,
 } from 'overleaf-editor-core'
-import { buildRangesFromSnapshot } from '../../../../../frontend/js/features/review-panel/utils/snapshot-ranges'
+import { buildRangesFromSnapshot } from '../../../../../../../frontend/js/features/review-panel/utils/snapshot-ranges'
 
 describe('buildRangesFromSnapshot', function () {
   it('includes anchored comments', function () {

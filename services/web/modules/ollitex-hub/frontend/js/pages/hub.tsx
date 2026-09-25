@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import HubRoot from '../hub/hub-root'
 
 // Material Symbols icon font (icon glyphs in the hub chrome/sections).
-import '../../../../../frontend/fonts/material-symbols/material-symbols.css'
+import '../../../../../../../frontend/fonts/material-symbols/material-symbols.css'
 // Thin scrollbar + hub chrome styles (Wave A #8).
 import '../hub/hub.css'
 // Theme bridge for legacy Bootstrap widgets embedded in hub cards/modals

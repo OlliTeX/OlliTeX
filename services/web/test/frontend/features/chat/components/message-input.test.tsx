@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import sinon from 'sinon'
 import { screen, render, fireEvent } from '@testing-library/react'
 
-import MessageInput from '../../../../../frontend/js/features/chat/components/message-input'
+import MessageInput from '../../../../../../../frontend/js/features/chat/components/message-input'
 
 describe('<MessageInput />', function () {
   let resetUnreadMessages: () => void

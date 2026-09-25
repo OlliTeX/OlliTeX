@@ -6,7 +6,7 @@ import {
   waitFor,
   waitForElementToBeRemoved,
 } from '@testing-library/react'
-import EmailsSection from '../../../../../../frontend/js/features/settings/components/emails-section'
+import EmailsSection from '../../../../../../../../frontend/js/features/settings/components/emails-section'
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
 import { cloneDeep } from 'lodash'

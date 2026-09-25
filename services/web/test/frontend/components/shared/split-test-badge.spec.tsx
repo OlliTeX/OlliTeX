@@ -1,4 +1,4 @@
-import SplitTestBadge from '../../../../frontend/js/shared/components/split-test-badge'
+import SplitTestBadge from '../../../../../../frontend/js/shared/components/split-test-badge'
 import { EditorProviders } from '../../helpers/editor-providers'
 
 describe('split test badge', function () {

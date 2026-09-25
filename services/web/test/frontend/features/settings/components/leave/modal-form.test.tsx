@@ -3,7 +3,7 @@ import sinon from 'sinon'
 import { fireEvent, screen, render, waitFor } from '@testing-library/react'
 import fetchMock, { type FetchMock } from 'fetch-mock'
 
-import LeaveModalForm from '../../../../../../frontend/js/features/settings/components/leave/modal-form'
+import LeaveModalForm from '../../../../../../../../frontend/js/features/settings/components/leave/modal-form'
 import { location } from '@/shared/components/location'
 import getMeta from '@/utils/meta'
 

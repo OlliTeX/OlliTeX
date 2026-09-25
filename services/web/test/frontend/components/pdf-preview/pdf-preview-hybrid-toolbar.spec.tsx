@@ -1,5 +1,5 @@
 import { EditorProviders } from '../../helpers/editor-providers'
-import PdfPreviewHybridToolbar from '../../../../frontend/js/features/pdf-preview/components/pdf-preview-hybrid-toolbar'
+import PdfPreviewHybridToolbar from '../../../../../../frontend/js/features/pdf-preview/components/pdf-preview-hybrid-toolbar'
 import { testDetachChannel } from '../../helpers/detach-channel'
 
 describe('<PdfPreviewHybridToolbar/>', function () {

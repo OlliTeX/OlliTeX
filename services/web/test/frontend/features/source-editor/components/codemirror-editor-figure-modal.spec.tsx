@@ -1,4 +1,4 @@
-import CodemirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import CodemirrorEditor from '../../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import {
   EditorProviders,
   makeEditorPropertiesProvider,

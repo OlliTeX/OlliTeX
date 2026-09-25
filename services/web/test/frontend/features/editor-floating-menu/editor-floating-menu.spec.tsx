@@ -1,4 +1,4 @@
-import CodeMirrorEditor from '../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import CodeMirrorEditor from '../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { EditorProviders, USER_ID } from '../../helpers/editor-providers'
 import { mockScope } from '../source-editor/helpers/mock-scope'
 import { TestContainer } from '../source-editor/helpers/test-container'

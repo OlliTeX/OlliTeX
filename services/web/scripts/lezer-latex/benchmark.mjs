@@ -1,4 +1,4 @@
-import { parser } from '../../frontend/js/features/source-editor/lezer-latex/latex.mjs'
+import { parser } from '../../../../frontend/js/features/source-editor/lezer-latex/latex.mjs'
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'

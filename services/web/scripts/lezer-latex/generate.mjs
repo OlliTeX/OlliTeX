@@ -8,29 +8,29 @@ const grammars = [
   {
     grammarPath: path.resolve(
       import.meta.dirname,
-      '../../frontend/js/features/source-editor/lezer-latex/latex.grammar'
+      '../../../../frontend/js/features/source-editor/lezer-latex/latex.grammar'
     ),
     parserOutputPath: path.resolve(
       import.meta.dirname,
-      '../../frontend/js/features/source-editor/lezer-latex/latex.mjs'
+      '../../../../frontend/js/features/source-editor/lezer-latex/latex.mjs'
     ),
     termsOutputPath: path.resolve(
       import.meta.dirname,
-      '../../frontend/js/features/source-editor/lezer-latex/latex.terms.mjs'
+      '../../../../frontend/js/features/source-editor/lezer-latex/latex.terms.mjs'
     ),
   },
   {
     grammarPath: path.resolve(
       import.meta.dirname,
-      '../../frontend/js/features/source-editor/lezer-bibtex/bibtex.grammar'
+      '../../../../frontend/js/features/source-editor/lezer-bibtex/bibtex.grammar'
     ),
     parserOutputPath: path.resolve(
       import.meta.dirname,
-      '../../frontend/js/features/source-editor/lezer-bibtex/bibtex.mjs'
+      '../../../../frontend/js/features/source-editor/lezer-bibtex/bibtex.mjs'
     ),
     termsOutputPath: path.resolve(
       import.meta.dirname,
-      '../../frontend/js/features/source-editor/lezer-bibtex/bibtex.terms.mjs'
+      '../../../../frontend/js/features/source-editor/lezer-bibtex/bibtex.terms.mjs'
     ),
   },
 ]

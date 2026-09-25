@@ -1,5 +1,5 @@
 import { EditorProviders } from '../../helpers/editor-providers'
-import DetachCompileButtonWrapper from '../../../../frontend/js/features/pdf-preview/components/detach-compile-button-wrapper'
+import DetachCompileButtonWrapper from '../../../../../../frontend/js/features/pdf-preview/components/detach-compile-button-wrapper'
 import { mockScope } from './scope'
 import { testDetachChannel } from '../../helpers/detach-channel'
 

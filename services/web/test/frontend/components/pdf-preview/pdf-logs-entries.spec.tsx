@@ -1,5 +1,5 @@
 import { EditorProviders } from '../../helpers/editor-providers'
-import PdfLogsEntries from '../../../../frontend/js/features/pdf-preview/components/pdf-logs-entries'
+import PdfLogsEntries from '../../../../../../frontend/js/features/pdf-preview/components/pdf-logs-entries'
 import { detachChannel, testDetachChannel } from '../../helpers/detach-channel'
 import { FileTreePathContext } from '@/features/file-tree/contexts/file-tree-path'
 import { FindResult } from '@/features/file-tree/util/path'

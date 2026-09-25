@@ -1,5 +1,5 @@
 import { expect, use } from 'chai'
-import { toggleRanges } from '../../../../../frontend/js/features/source-editor/commands/ranges'
+import { toggleRanges } from '../../../../../../../frontend/js/features/source-editor/commands/ranges'
 import { CodemirrorTestSession, viewHelpers } from '../helpers/codemirror'
 
 use(viewHelpers)

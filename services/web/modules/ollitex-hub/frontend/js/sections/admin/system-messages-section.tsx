@@ -17,7 +17,7 @@ import { invalidate, useSectionData } from '../../shared/use-section-data'
 import {
   PLACEMENT_OPTIONS,
   normalizePlacementsChecked,
-} from '../../../../../../frontend/js/shared/components/system-message-surface'
+} from '../../../../../../../../frontend/js/shared/components/system-message-surface'
 
 type Msg = {
   _id?: string

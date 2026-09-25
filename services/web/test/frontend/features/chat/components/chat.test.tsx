@@ -6,7 +6,7 @@ import {
 } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
 
-import ChatPane from '../../../../../frontend/js/features/chat/components/chat-pane'
+import ChatPane from '../../../../../../../frontend/js/features/chat/components/chat-pane'
 import { renderWithEditorContext } from '../../../helpers/render-with-context'
 import { stubMathJax, tearDownMathJaxStubs } from './stubs'
 import { UserId } from '@ol-types/user'

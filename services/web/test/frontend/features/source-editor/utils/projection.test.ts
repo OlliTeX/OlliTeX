@@ -3,7 +3,7 @@ import { EditorState } from '@codemirror/state'
 import {
   ProjectionItem,
   updatePosition,
-} from '../../../../../frontend/js/features/source-editor/utils/tree-operations/projection'
+} from '../../../../../../../frontend/js/features/source-editor/utils/tree-operations/projection'
 
 class TestItem extends ProjectionItem {}
 

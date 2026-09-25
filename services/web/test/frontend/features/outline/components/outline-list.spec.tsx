@@ -1,4 +1,4 @@
-import OutlineList from '../../../../../frontend/js/features/outline/components/outline-list'
+import OutlineList from '../../../../../../../frontend/js/features/outline/components/outline-list'
 
 describe('<OutlineList />', function () {
   it('renders items', function () {

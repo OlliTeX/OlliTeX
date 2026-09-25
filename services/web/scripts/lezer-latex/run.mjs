@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { logTree } from './print-tree.mjs'
-import { parser as LaTeXParser } from '../../frontend/js/features/source-editor/lezer-latex/latex.mjs'
-import { parser as BibTeXParser } from '../../frontend/js/features/source-editor/lezer-bibtex/bibtex.mjs'
+import { parser as LaTeXParser } from '../../../../frontend/js/features/source-editor/lezer-latex/latex.mjs'
+import { parser as BibTeXParser } from '../../../../frontend/js/features/source-editor/lezer-bibtex/bibtex.mjs'
 
 // Runs the lezer-latex or lezer-bibtex parser on a supplied file, and prints the resulting
 // parse tree to stdout

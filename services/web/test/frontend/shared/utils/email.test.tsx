@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { isValidEmail } from '../../../../frontend/js/shared/utils/email'
+import { isValidEmail } from '../../../../../../frontend/js/shared/utils/email'
 
 const validEmailAddresses = [
   'email@example.com',

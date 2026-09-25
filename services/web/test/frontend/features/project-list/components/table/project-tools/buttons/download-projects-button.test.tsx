@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react'
-import DownloadProjectsButton from '../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/download-projects-button'
+import DownloadProjectsButton from '../../../../../../../../../../frontend/js/features/project-list/components/table/project-tools/buttons/download-projects-button'
 import {
   resetProjectListContextFetch,
   renderWithProjectListContext,

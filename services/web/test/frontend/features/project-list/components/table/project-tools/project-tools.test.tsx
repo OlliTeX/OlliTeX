@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react'
 import { expect } from 'chai'
-import ProjectTools from '../../../../../../../frontend/js/features/project-list/components/table/project-tools/project-tools'
+import ProjectTools from '../../../../../../../../../frontend/js/features/project-list/components/table/project-tools/project-tools'
 import {
   renderWithProjectListContext,
   resetProjectListContextFetch,

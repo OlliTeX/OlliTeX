@@ -1,8 +1,15 @@
 # --------------------------------------------------
-# Overleaf Base Image (sharelatex/sharelatex-base)
+# Ollitex Base Image (sharelatex/sharelatex-base)
+#
+# Base = ubuntu:26.04 (2026-09, owner: align all images to the current
+# Ubuntu LTS). The phusion/baseimage base previously supplied the OS AND the
+# process manager (runit + /sbin/my_init). On a plain Ubuntu base we add the
+# process manager back: `runit` (apt) + my_init (vendored at server-ce/bin/
+# my_init — stdlib-only python3). Everything else (deps, Node 24, overleaf
+# user) is unchanged.
 # --------------------------------------------------
 
-FROM phusion/baseimage:noble-1.0.3
+FROM ubuntu:26.04
 
 # Update to ensure dependencies are updated
 # ------------------------------------------
@@ -19,8 +26,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 &&  apt-get update \
 &&  apt-get install -y \
       unattended-upgrades \
-      build-essential wget net-tools unzip time poppler-utils optipng strace nginx git python3 python-is-python3 zlib1g-dev libpcre3-dev gettext-base libwww-perl ca-certificates curl gnupg \
-      qpdf \
+      build-essential wget net-tools unzip time poppler-utils optipng strace nginx git python3 python-is-python3 zlib1g-dev libpcre2-dev gettext-base libwww-perl ca-certificates curl gnupg \
+      qpdf runit bsdmainutils \
 # upgrade base-image, batch all the upgrades together, rather than installing them on-by-one (which is slow!)
 &&  unattended-upgrade --verbose --no-minimal-upgrade-steps \
 # install Node.js https://github.com/nodesource/distributions#nodejs
@@ -34,6 +41,20 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # We are adding a custom nginx config in the main Dockerfile.
       /etc/nginx/nginx.conf \
       /etc/nginx/sites-enabled/default
+
+# Process manager entrypoint + lifecycle dirs (replaces the phusion baseimage
+# built-ins). my_init is stdlib-only python3; it drives `runsvdir` over
+# /etc/service and the /etc/my_init*.d hooks the app relies on.
+COPY server-ce/bin/my_init /sbin/my_init
+RUN chmod 755 /sbin/my_init \
+    && mkdir -p /etc/service /etc/my_init.d /etc/my_init.pre_shutdown.d /etc/my_init.post_shutdown.d \
+    && install -d -m 700 -o root -g root /etc/container_environment
+
+# phusion-baseimage privilege-drop helper (`setuser`), used by every overleaf
+# runit run script (`/sbin/setuser www-data <cmd>`). phusion ships it; a plain
+# Ubuntu base does not, so we vendor an equivalent (see server-ce/bin/setuser).
+COPY server-ce/bin/setuser /sbin/setuser
+RUN chmod 755 /sbin/setuser
 
 # TeX Live: intentionally NOT installed (owner #10, 2026-09-16).
 # OlliTeX enforces sandboxed compiles (clsi DockerRunner), so no TeX

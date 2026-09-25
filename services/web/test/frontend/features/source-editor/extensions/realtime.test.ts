@@ -1,11 +1,11 @@
 import sinon from 'sinon'
 import { expect } from 'chai'
 import { EventEmitter } from 'events'
-import { EditorFacade } from '../../../../../frontend/js/features/source-editor/extensions/realtime'
+import { EditorFacade } from '../../../../../../../frontend/js/features/source-editor/extensions/realtime'
 import {
   historyOT,
   rangesState,
-} from '../../../../../frontend/js/features/source-editor/extensions/history-ot'
+} from '../../../../../../../frontend/js/features/source-editor/extensions/history-ot'
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import {
@@ -17,7 +17,7 @@ import {
   TextOperation,
   TrackingProps,
 } from 'overleaf-editor-core'
-import { historyOTType } from '../../../../../frontend/js/features/ide-react/editor/share-js-history-ot-type'
+import { historyOTType } from '../../../../../../../frontend/js/features/ide-react/editor/share-js-history-ot-type'
 
 describe('CodeMirror EditorFacade', function () {
   let state: EditorState, view: EditorView

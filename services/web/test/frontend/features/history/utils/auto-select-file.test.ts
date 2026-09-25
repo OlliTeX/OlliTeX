@@ -1,10 +1,10 @@
 import { expect } from 'chai'
-import type { FileDiff } from '../../../../../frontend/js/features/history/services/types/file'
-import { autoSelectFile } from '../../../../../frontend/js/features/history/utils/auto-select-file'
-import type { User } from '../../../../../frontend/js/features/history/services/types/shared'
-import { LoadedUpdate } from '../../../../../frontend/js/features/history/services/types/update'
-import { fileFinalPathname } from '../../../../../frontend/js/features/history/utils/file-diff'
-import { getUpdateForVersion } from '../../../../../frontend/js/features/history/utils/history-details'
+import type { FileDiff } from '../../../../../../../frontend/js/features/history/services/types/file'
+import { autoSelectFile } from '../../../../../../../frontend/js/features/history/utils/auto-select-file'
+import type { User } from '../../../../../../../frontend/js/features/history/services/types/shared'
+import { LoadedUpdate } from '../../../../../../../frontend/js/features/history/services/types/update'
+import { fileFinalPathname } from '../../../../../../../frontend/js/features/history/utils/file-diff'
+import { getUpdateForVersion } from '../../../../../../../frontend/js/features/history/utils/history-details'
 
 describe('autoSelectFile', function () {
   const historyUsers: User[] = [

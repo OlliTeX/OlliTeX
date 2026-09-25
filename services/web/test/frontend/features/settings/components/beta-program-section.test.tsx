@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { screen, render } from '@testing-library/react'
-import BetaProgramSection from '../../../../../frontend/js/features/settings/components/beta-program-section'
-import { UserProvider } from '../../../../../frontend/js/shared/context/user-context'
+import BetaProgramSection from '../../../../../../../frontend/js/features/settings/components/beta-program-section'
+import { UserProvider } from '../../../../../../../frontend/js/shared/context/user-context'
 
 function renderSectionWithUserProvider() {
   render(<BetaProgramSection />, {

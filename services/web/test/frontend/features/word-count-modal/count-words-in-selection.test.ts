@@ -10,8 +10,8 @@
  * tests).
  */
 import { expect } from 'chai'
-import { countWordsInSelection } from '../../../../frontend/js/features/word-count-modal/utils/count-words-in-selection'
-import { createSegmenters } from '../../../../frontend/js/features/word-count-modal/utils/segmenters'
+import { countWordsInSelection } from '../../../../../../frontend/js/features/word-count-modal/utils/count-words-in-selection'
+import { createSegmenters } from '../../../../../../frontend/js/features/word-count-modal/utils/segmenters'
 
 function makeSegmenters() {
   try {

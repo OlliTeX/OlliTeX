@@ -1,8 +1,8 @@
-import PdfSynctexControls from '../../../../frontend/js/features/pdf-preview/components/pdf-synctex-controls'
-import { GlobalToasts } from '../../../../frontend/js/features/ide-react/components/global-toasts'
+import PdfSynctexControls from '../../../../../../frontend/js/features/pdf-preview/components/pdf-synctex-controls'
+import { GlobalToasts } from '../../../../../../frontend/js/features/ide-react/components/global-toasts'
 import { cloneDeep } from 'lodash'
-import { useDetachCompileContext as useCompileContext } from '../../../../frontend/js/shared/context/detach-compile-context'
-import { useFileTreeData } from '../../../../frontend/js/shared/context/file-tree-data-context'
+import { useDetachCompileContext as useCompileContext } from '../../../../../../frontend/js/shared/context/detach-compile-context'
+import { useFileTreeData } from '../../../../../../frontend/js/shared/context/file-tree-data-context'
 import { useEffect } from 'react'
 import {
   EditorProviders,

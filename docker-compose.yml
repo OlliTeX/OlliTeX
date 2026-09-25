@@ -3,7 +3,7 @@ services:
     restart: always
     # Server Pro users:
     # image: quay.io/sharelatex/sharelatex-pro
-    image: sharelatex/sharelatex
+    image: ollitex/ollitex
     container_name: sharelatex
     depends_on:
       mongo:

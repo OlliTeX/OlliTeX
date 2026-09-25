@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react'
 import { expect } from 'chai'
 import sinon from 'sinon'
-import useAsync from '../../../../frontend/js/shared/hooks/use-async'
+import useAsync from '../../../../../../frontend/js/shared/hooks/use-async'
 import { debugConsole } from '@/utils/debugging'
 
 function deferred() {

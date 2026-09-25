@@ -23,13 +23,13 @@ import {
   notificationTPDSFileLimit,
   notificationsInstitution,
 } from '../fixtures/notifications-data'
-import Common from '../../../../../frontend/js/features/project-list/components/notifications/groups/common'
-import Institution from '../../../../../frontend/js/features/project-list/components/notifications/groups/institution'
+import Common from '../../../../../../../frontend/js/features/project-list/components/notifications/groups/common'
+import Institution from '../../../../../../../frontend/js/features/project-list/components/notifications/groups/institution'
 import ConfirmEmail, {
   getEmailDeletionDate,
-} from '../../../../../frontend/js/features/project-list/components/notifications/groups/confirm-email'
-import ReconfirmationInfo from '../../../../../frontend/js/features/project-list/components/notifications/groups/affiliation/reconfirmation-info'
-import { ProjectListProvider } from '../../../../../frontend/js/features/project-list/context/project-list-context'
+} from '../../../../../../../frontend/js/features/project-list/components/notifications/groups/confirm-email'
+import ReconfirmationInfo from '../../../../../../../frontend/js/features/project-list/components/notifications/groups/affiliation/reconfirmation-info'
+import { ProjectListProvider } from '../../../../../../../frontend/js/features/project-list/context/project-list-context'
 import { SplitTestProvider } from '@/shared/context/split-test-context'
 import {
   Notification,
@@ -37,8 +37,8 @@ import {
 } from '../../../../../types/project/dashboard/notification'
 import { DeepPartial } from '../../../../../types/utils'
 import { Project } from '../../../../../types/project/dashboard/api'
-import GroupsAndEnterpriseBanner from '../../../../../frontend/js/features/project-list/components/notifications/groups-and-enterprise-banner'
-import GroupSsoSetupSuccess from '../../../../../frontend/js/features/project-list/components/notifications/groups/group-sso-setup-success'
+import GroupsAndEnterpriseBanner from '../../../../../../../frontend/js/features/project-list/components/notifications/groups-and-enterprise-banner'
+import GroupSsoSetupSuccess from '../../../../../../../frontend/js/features/project-list/components/notifications/groups/group-sso-setup-success'
 import localStorage from '@/infrastructure/local-storage'
 import { location } from '@/shared/components/location'
 import {

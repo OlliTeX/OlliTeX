@@ -5,17 +5,17 @@ HERE=$(shell pwd)
 export MONOREPO_REVISION := $(shell git rev-parse HEAD)
 export BRANCH_NAME ?= $(shell git rev-parse --abbrev-ref HEAD)
 export BRANCH_NAME_TAG_SAFE ?= $(subst /,--,$(BRANCH_NAME))
-export OVERLEAF_BASE_BRANCH ?= sharelatex/sharelatex-base:$(BRANCH_NAME_TAG_SAFE)
-export OVERLEAF_BASE_LATEST ?= sharelatex/sharelatex-base
-export OVERLEAF_BASE_TAG ?= sharelatex/sharelatex-base:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
-export OVERLEAF_BRANCH ?= sharelatex/sharelatex:$(BRANCH_NAME_TAG_SAFE)
-export OVERLEAF_LATEST ?= sharelatex/sharelatex
-export OVERLEAF_TAG ?= sharelatex/sharelatex:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
-export OVERLEAF_PANDOC_BRANCH ?= sharelatex/sharelatex-pandoc:$(BRANCH_NAME_TAG_SAFE)
-export OVERLEAF_PANDOC_LATEST ?= sharelatex/sharelatex-pandoc
-export OVERLEAF_PANDOC_TAG ?= sharelatex/sharelatex-pandoc:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
-export GIT_BRIDGE_BRANCH ?= sharelatex/git-bridge:$(BRANCH_NAME_TAG_SAFE)
-export GIT_BRIDGE_TAG ?= sharelatex/git-bridge:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export OVERLEAF_BASE_BRANCH ?= ollitex/base:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_BASE_LATEST ?= ollitex/base
+export OVERLEAF_BASE_TAG ?= ollitex/base:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export OVERLEAF_BRANCH ?= ollitex/ollitex:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_LATEST ?= ollitex/ollitex
+export OVERLEAF_TAG ?= ollitex/ollitex:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export OVERLEAF_PANDOC_BRANCH ?= ollitex/pandoc:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_PANDOC_LATEST ?= ollitex/pandoc
+export OVERLEAF_PANDOC_TAG ?= ollitex/pandoc:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export GIT_BRIDGE_BRANCH ?= ollitex/git-bridge:$(BRANCH_NAME_TAG_SAFE)
+export GIT_BRIDGE_TAG ?= ollitex/git-bridge:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
 
 # Optional extra --cache-from references (overridable). The branch tags only
 # exist LOCALLY (they are never pushed to Docker Hub), so pulling them as cache

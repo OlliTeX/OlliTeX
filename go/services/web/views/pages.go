@@ -439,7 +439,7 @@ func NotFoundPage(w http.ResponseWriter, d PageData)   { StatusPage(w, d, 404, n
 
 // Error500Page — general/500 (pinned live P3.1: nonce-policy CSP like the
 // React layouts, PP header, deterministic 681-byte body, ETag W/"2a9-..").
-const error500HTML = `<!DOCTYPE html><html lang="en"><head><title>Something went wrong</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/stylesheets/main-style-78c09375767178f0ab97.css"></head><body class="full-height"><main class="content content-alt full-height" id="main-content"><div class="container full-height"><div class="error-container full-height"><div class="error-details"><p class="error-status">Something went wrong, sorry.</p>If the problem persists, please contact us at
+const error500HTML = `<!DOCTYPE html><html lang="en"><head><title>Something went wrong</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/stylesheets/main-style-083f9c49a3108304237a.css" id="main-stylesheet"></head><body class="full-height"><main class="content content-alt full-height" id="main-content"><div class="container full-height"><div class="error-container full-height"><div class="error-details"><p class="error-status">Something went wrong, sorry.</p>If the problem persists, please contact us at
 <a href="mailto:__ADMINEMAIL__" target="_blank">__ADMINEMAIL__</a>.<p class="error-actions"><a class="error-btn" href="/">Home</a></p></div></div></div></main></body></html>`
 
 func Error500Page(w http.ResponseWriter, d PageData) {

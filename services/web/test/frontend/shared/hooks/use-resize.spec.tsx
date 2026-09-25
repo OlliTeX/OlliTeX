@@ -1,7 +1,7 @@
 import {
   usePersistedResize,
   useResize,
-} from '../../../../frontend/js/shared/hooks/use-resize'
+} from '../../../../../../frontend/js/shared/hooks/use-resize'
 
 function Template({
   mousePos,

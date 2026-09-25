@@ -2,7 +2,7 @@ import { foldEffect, foldState } from '@codemirror/language'
 import { EditorSelection, EditorState } from '@codemirror/state'
 import { DecorationSet, EditorView } from '@codemirror/view'
 import { expect } from 'chai'
-import { duplicateSelection } from '../../../../../frontend/js/features/source-editor/commands/ranges'
+import { duplicateSelection } from '../../../../../../../frontend/js/features/source-editor/commands/ranges'
 
 type Position = {
   from: number

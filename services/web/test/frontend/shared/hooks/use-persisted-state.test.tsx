@@ -2,7 +2,7 @@ import sinon from 'sinon'
 import { expect } from 'chai'
 import { useEffect } from 'react'
 import { render, screen } from '@testing-library/react'
-import usePersistedState from '../../../../frontend/js/shared/hooks/use-persisted-state'
+import usePersistedState from '../../../../../../frontend/js/shared/hooks/use-persisted-state'
 import localStorage from '@/infrastructure/local-storage'
 
 describe('usePersistedState', function () {

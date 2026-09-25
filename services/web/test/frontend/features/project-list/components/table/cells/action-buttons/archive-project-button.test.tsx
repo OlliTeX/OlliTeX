@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { ArchiveProjectButtonTooltip } from '../../../../../../../../frontend/js/features/project-list/components/table/cells/action-buttons/archive-project-button'
+import { ArchiveProjectButtonTooltip } from '../../../../../../../../../../frontend/js/features/project-list/components/table/cells/action-buttons/archive-project-button'
 import {
   archiveableProject,
   archivedProject,

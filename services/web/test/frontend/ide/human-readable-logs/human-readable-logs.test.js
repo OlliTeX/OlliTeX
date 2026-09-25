@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import HumanReadableLogs from '../../../../frontend/js/ide/human-readable-logs/HumanReadableLogs'
+import HumanReadableLogs from '../../../../../../frontend/js/ide/human-readable-logs/HumanReadableLogs'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { some } from 'lodash'

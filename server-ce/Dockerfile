@@ -1,16 +1,37 @@
 # syntax=docker/dockerfile:1-labs
 # ---------------------------------------------
-# Overleaf Community Edition (overleaf/overleaf)
+# Ollitex Community Edition (overleaf/overleaf)
 # ---------------------------------------------
+# Build-system re-arch (2026-09): the 12 Go microservice binaries are now
+# compiled IN DOCKER on the ollitex Go builder (glibc + cgo-sqlite) instead of
+# copied from the host (`COPY bin/`). The app base is ubuntu:26.04 (node 24 +
+# runit + my_init). The Node services (clsi, document-updater, history-v1, …)
+# and the webpack/pug front-end build still run here, on the base's node 24.
 
-ARG OVERLEAF_BASE_TAG=sharelatex/sharelatex-base:latest
+ARG OVERLEAF_BASE_TAG=ollitex/base:latest
+
+# ---- Stage 1: compile the 12 Go services (ollitex Go builder, host cache) ----
+FROM ollitex/golang-builder-amd64:1.27.1 AS gobuilder
+WORKDIR /src
+COPY go.mod go.sum ./
+COPY go/ ./go/
+COPY cmd/ ./cmd/
+RUN --mount=type=cache,id=ol-go-mod,target=/gocache/mod \
+    --mount=type=cache,id=ol-go-build,target=/gocache/build \
+    set -e; mkdir -p /usr/local/bin/go-services; \
+    for s in linked-url-proxy webdavinterface dropboxinterface githubinterface datamanipulator filestore notifications chat docstore web seaweed-migrate configdb; do \
+      CGO_ENABLED=1 GOOS=linux go build -o /usr/local/bin/go-services/$s ./cmd/$s; \
+    done; \
+    echo "built go-services: $(ls /usr/local/bin/go-services | tr '\n' ' ')"
+
+# ---- Stage 2 (final): the app (ubuntu:26.04 base: node 24 + runit + my_init) ----
 FROM $OVERLEAF_BASE_TAG
 
 WORKDIR /overleaf
 
 # Add required source files for yarn install
 # -------------------------------------------
-COPY --parents libraries/*/package.json .yarn/patches/ services/*/package.json tools/migrations/ package.json yarn.lock .yarnrc.yml .pnp.register.mjs /overleaf/
+COPY --parents libraries/*/package.json .yarn/patches/ services/*/package.json tools/migrations/ package.json frontend/package.json yarn.lock .yarnrc.yml .pnp.register.mjs /overleaf/
 COPY server-ce/genScript.js server-ce/services.js /overleaf/
 
 # Pre-install yarn via corepack so it is available at runtime for all users
@@ -30,8 +51,12 @@ RUN --mount=type=cache,target=/root/.cache \
     --mount=type=tmpfs,target=/tmp node genScript install | bash
 
 # Add the actual source files
-# ---------------------------
-COPY --parents libraries/ services/ tools/migrations/ docs/RELEASE_NOTES.md /overleaf/
+# P7 step 5/6: the web app source (frontend/), locales/, and static public/ now
+# live at the MONOREPO ROOT (not under services/web/). webpack (workdir
+# /overleaf/services/web) reads `../../frontend/` -> /overleaf/frontend and emits
+# bundles into `../public` -> /overleaf/public; the Node+Go runtimes read
+# /overleaf/locales. So all three root dirs are copied alongside services/.
+COPY --parents libraries/ services/ tools/migrations/ docs/RELEASE_NOTES.md frontend/ locales/ public/ /overleaf/
 
 # Pre-stage the PnP cache zips for the three git-sourced codemirror dev deps
 # (byte-identical to the zips shipped in the official 6.3.0 image; checksums
@@ -89,8 +114,14 @@ RUN mkdir -p /etc/overleaf/env.d && chown www-data:www-data /etc/overleaf/env.d 
 # `make go-build` (offline box — no golang stage in the image) and shipped
 # whole; the runit scripts exec /usr/local/bin/go-services/<svc>
 # unconditionally.
-COPY bin/ /usr/local/bin/go-services/
-RUN chmod 755 /usr/local/bin/go-services/* 2>/dev/null || true
+# Go microservice binaries (chat, docstore, filestore, notifications,
+# linked-url-proxy, datamanipulator, webdavinterface, dropboxinterface,
+# githubinterface, web, seaweed-migrate, configdb) — the CANONICAL
+# implementations. Now compiled in the `gobuilder` stage above (ollitex Go
+# builder, host-persisted Go cache) — no host `make go-build` / `bin/` needed.
+# The runit scripts exec /usr/local/bin/go-services/<svc> unconditionally.
+COPY --from=gobuilder /usr/local/bin/go-services /usr/local/bin/go-services
+RUN chmod 755 /usr/local/bin/go-services/*
 
 # Configure nginx
 # ---------------

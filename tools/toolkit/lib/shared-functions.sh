@@ -22,7 +22,7 @@ function read_config() {
   source "$TOOLKIT_ROOT/config/overleaf.rc"
 
   # Defaults for anything the user did not set.
-  : "${OLLITEX_IMAGE:=sharelatex/sharelatex:$IMAGE_VERSION}"
+  : "${OLLITEX_IMAGE:=ollitex/ollitex:$IMAGE_VERSION}"
   export OLLITEX_IMAGE
   IMAGE="$OLLITEX_IMAGE"
   export IMAGE

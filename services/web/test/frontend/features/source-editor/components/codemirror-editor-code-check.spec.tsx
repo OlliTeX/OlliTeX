@@ -1,6 +1,6 @@
 import { mockScope } from '../helpers/mock-scope'
 import { EditorProviders } from '../../../helpers/editor-providers'
-import CodeMirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import CodeMirrorEditor from '../../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { TestContainer } from '../helpers/test-container'
 
 describe('code check', { scrollBehavior: false }, function () {

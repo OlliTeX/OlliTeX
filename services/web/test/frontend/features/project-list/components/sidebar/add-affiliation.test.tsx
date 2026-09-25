@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
 import { renderWithProjectListContext } from '../../helpers/render-with-context'
-import AddAffiliation from '../../../../../../frontend/js/features/project-list/components/add-affiliation'
+import AddAffiliation from '../../../../../../../../frontend/js/features/project-list/components/add-affiliation'
 import { Affiliation } from '../../../../../../types/affiliation'
 import getMeta from '@/utils/meta'
 

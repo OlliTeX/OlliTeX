@@ -1,4 +1,4 @@
-import FileTreeDoc from '../../../../../frontend/js/features/file-tree/components/file-tree-doc'
+import FileTreeDoc from '../../../../../../../frontend/js/features/file-tree/components/file-tree-doc'
 import { EditorProviders } from '../../../helpers/editor-providers'
 import { makeEditorManagerProviderWithStaleDocs } from '../../ide-react/helpers/editor-manager-provider-with-stale-docs'
 import { FileTreeProvider } from '../helpers/file-tree-provider'

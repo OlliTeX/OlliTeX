@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { formatCurrency } from '../../../../frontend/js/shared/utils/currency'
+import { formatCurrency } from '../../../../../../frontend/js/shared/utils/currency'
 
 /*
   Users can select any language we support, regardless of the country where they are located.

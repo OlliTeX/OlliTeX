@@ -1,6 +1,6 @@
 import { expect } from 'chai'
-import { ssoAvailableForDomain } from '../../../../../frontend/js/features/settings/utils/sso'
-import { DomainInfo } from '../../../../../frontend/js/features/settings/components/emails/add-email/input'
+import { ssoAvailableForDomain } from '../../../../../../../frontend/js/features/settings/utils/sso'
+import { DomainInfo } from '../../../../../../../frontend/js/features/settings/components/emails/add-email/input'
 
 const baseDomain: DomainInfo = {
   hostname: 'example.edu',

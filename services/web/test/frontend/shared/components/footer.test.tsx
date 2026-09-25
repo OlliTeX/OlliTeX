@@ -1,5 +1,5 @@
 import React from 'react'
-import ThinFooter from '../../../../frontend/js/shared/components/footer/thin-footer'
+import ThinFooter from '../../../../../../frontend/js/shared/components/footer/thin-footer'
 
 describe('<ThinFooter />', function () {
     it('renders raw HTML image tags in footer items without a URL', function () {

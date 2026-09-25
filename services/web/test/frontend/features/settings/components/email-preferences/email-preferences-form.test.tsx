@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { fireEvent, screen, render } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
-import EmailPreferencesForm from '../../../../../../frontend/js/features/settings/components/email-preferences/email-preferences-form'
+import EmailPreferencesForm from '../../../../../../../../frontend/js/features/settings/components/email-preferences/email-preferences-form'
 
 describe('<EmailPreferencesForm />', function () {
   beforeEach(function () {

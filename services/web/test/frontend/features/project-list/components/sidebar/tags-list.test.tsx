@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { assert, expect } from 'chai'
 import fetchMock from 'fetch-mock'
-import TagsList from '../../../../../../frontend/js/features/project-list/components/sidebar/tags-list'
+import TagsList from '../../../../../../../../frontend/js/features/project-list/components/sidebar/tags-list'
 import { projectsData } from '../../fixtures/projects-data'
 import { renderWithProjectListContext } from '../../helpers/render-with-context'
 

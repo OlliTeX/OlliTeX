@@ -5,7 +5,7 @@ import {
   makeProjectProvider,
   USER_ID,
 } from '../../../helpers/editor-providers'
-import CodeMirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import CodeMirrorEditor from '../../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { TestContainer } from '../helpers/test-container'
 import { docId } from '../helpers/mock-doc'
 import { FC } from 'react'

@@ -5,7 +5,7 @@ import {
   editMessage,
   deleteMessage,
   confirmMessage,
-} from '../../../../../frontend/js/features/chat/utils/message-list-utils'
+} from '../../../../../../../frontend/js/features/chat/utils/message-list-utils'
 import { User, UserId } from '@ol-types/user'
 import {
   Message,

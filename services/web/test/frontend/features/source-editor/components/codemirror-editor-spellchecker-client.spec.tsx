@@ -3,7 +3,7 @@ import {
   EditorProviders,
   makeProjectProvider,
 } from '../../../helpers/editor-providers'
-import CodeMirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import CodeMirrorEditor from '../../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { TestContainer } from '../helpers/test-container'
 import forEach from 'mocha-each'
 import PackageVersions from '../../../../../app/src/infrastructure/PackageVersions'

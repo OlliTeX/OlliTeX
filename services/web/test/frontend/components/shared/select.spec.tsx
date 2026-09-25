@@ -5,7 +5,7 @@ import OLFormControl from '@/shared/components/ol/ol-form-control'
 import {
   Select,
   SelectProps,
-} from '../../../../frontend/js/shared/components/select'
+} from '../../../../../../frontend/js/shared/components/select'
 
 const testData = [1, 2, 3].map(index => ({
   key: index,

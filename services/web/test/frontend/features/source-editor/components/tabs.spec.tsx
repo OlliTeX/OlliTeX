@@ -1,7 +1,7 @@
 import React, { FC, useEffect, useRef, useState } from 'react'
 import { EditorProviders } from '../../../helpers/editor-providers'
 import { makeEditorManagerProviderWithStaleDocs } from '../../ide-react/helpers/editor-manager-provider-with-stale-docs'
-import { TabsContainer } from '../../../../../frontend/js/features/source-editor/components/tabs/tabs-container'
+import { TabsContainer } from '../../../../../../../frontend/js/features/source-editor/components/tabs/tabs-container'
 import {
   FileTreeDocumentFindResult,
   FileTreeFileRefFindResult,

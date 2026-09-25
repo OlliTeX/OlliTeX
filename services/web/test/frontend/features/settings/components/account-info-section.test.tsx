@@ -1,8 +1,8 @@
 import { expect } from 'chai'
 import { fireEvent, screen, render } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
-import AccountInfoSection from '../../../../../frontend/js/features/settings/components/account-info-section'
-import { UserProvider } from '../../../../../frontend/js/shared/context/user-context'
+import AccountInfoSection from '../../../../../../../frontend/js/features/settings/components/account-info-section'
+import { UserProvider } from '../../../../../../../frontend/js/shared/context/user-context'
 import getMeta from '@/utils/meta'
 
 function renderSectionWithUserProvider() {

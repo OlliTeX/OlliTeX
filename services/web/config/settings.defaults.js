@@ -1364,7 +1364,7 @@ function buildSettings() {
     toastGenerators: [
       Path.resolve(
         __dirname,
-        '../frontend/js/features/pdf-preview/components/synctex-toasts'
+        '../../../frontend/js/features/pdf-preview/components/synctex-toasts'
       ),
       // python-runner module (ported from ayakaleaf-pro): "files saved" /
       // error toasts for browser-side Python execution output files.

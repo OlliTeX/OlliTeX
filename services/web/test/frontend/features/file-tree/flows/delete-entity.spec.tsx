@@ -1,4 +1,4 @@
-import FileTreeRoot from '../../../../../frontend/js/features/file-tree/components/file-tree-root'
+import FileTreeRoot from '../../../../../../../frontend/js/features/file-tree/components/file-tree-root'
 import { EditorProviders } from '../../../helpers/editor-providers'
 import { SocketIOMock } from '@/ide/connection/SocketIoShim'
 import type { Socket } from '@/features/ide-react/connection/types/socket'

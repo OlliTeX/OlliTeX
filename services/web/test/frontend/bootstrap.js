@@ -46,7 +46,7 @@ chai.use(require('chai-as-promised'))
 const { resetMeta } = require('./helpers/reset-meta')
 resetMeta()
 // i18n requires access to 'ol-i18n' as defined above
-require('../../frontend/js/i18n')
+require('../../../../frontend/js/i18n')
 
 const moment = require('moment')
 moment.updateLocale('en', {

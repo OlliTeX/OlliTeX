@@ -1,1 +1,1 @@
-import '../../../frontend/stylesheets/main-style.scss'
+import '../../../../../frontend/stylesheets/main-style.scss'

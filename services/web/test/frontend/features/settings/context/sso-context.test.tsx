@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import {
   SSOProvider,
   useSSOContext,
-} from '../../../../../frontend/js/features/settings/context/sso-context'
+} from '../../../../../../../frontend/js/features/settings/context/sso-context'
 import fetchMock from 'fetch-mock'
 
 const mockOauthProviders = {

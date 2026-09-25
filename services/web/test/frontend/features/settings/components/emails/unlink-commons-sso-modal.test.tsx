@@ -8,8 +8,8 @@ import {
   within,
 } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
-import UnlinkCommonsSSOModal from '../../../../../../frontend/js/features/settings/components/emails/unlink-commons-sso-modal'
-import { location } from '../../../../../../frontend/js/shared/components/location'
+import UnlinkCommonsSSOModal from '../../../../../../../../frontend/js/features/settings/components/emails/unlink-commons-sso-modal'
+import { location } from '../../../../../../../../frontend/js/shared/components/location'
 
 describe('<UnlinkCommonsSSOModal/>', function () {
   beforeEach(function () {

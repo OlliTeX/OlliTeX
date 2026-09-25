@@ -14,7 +14,7 @@ import { expect, use } from 'chai'
 import {
   typstToggleBold,
   typstToggleItalic,
-} from '../../../../../../frontend/js/features/source-editor/extensions/toolbar/commands'
+} from '../../../../../../../../frontend/js/features/source-editor/extensions/toolbar/commands'
 
 import { CodemirrorTestSession, viewHelpers } from '../../helpers/codemirror'
 

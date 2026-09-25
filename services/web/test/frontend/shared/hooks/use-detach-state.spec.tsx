@@ -1,5 +1,5 @@
 import { FC } from 'react'
-import useDetachState from '../../../../frontend/js/shared/hooks/use-detach-state'
+import useDetachState from '../../../../../../frontend/js/shared/hooks/use-detach-state'
 import { EditorProviders } from '../../helpers/editor-providers'
 import { detachChannel, testDetachChannel } from '../../helpers/detach-channel'
 

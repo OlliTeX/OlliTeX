@@ -5,7 +5,7 @@ import {
   EditorProviders,
   makeEditorPropertiesProvider,
 } from '../../../helpers/editor-providers'
-import CodemirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
+import CodemirrorEditor from '../../../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { mockScope } from '../helpers/mock-scope'
 import forEach from 'mocha-each'
 import { FileTreePathContext } from '@/features/file-tree/contexts/file-tree-path'

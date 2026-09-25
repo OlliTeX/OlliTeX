@@ -1,7 +1,7 @@
 import { screen, within, fireEvent, waitFor } from '@testing-library/react'
 import { expect } from 'chai'
 import { useEffect } from 'react'
-import ProjectListTable from '../../../../../../frontend/js/features/project-list/components/table/project-list-table'
+import ProjectListTable from '../../../../../../../../frontend/js/features/project-list/components/table/project-list-table'
 import { useProjectListContext } from '@/features/project-list/context/project-list-context'
 import { currentProjects } from '../../fixtures/projects-data'
 import fetchMock from 'fetch-mock'

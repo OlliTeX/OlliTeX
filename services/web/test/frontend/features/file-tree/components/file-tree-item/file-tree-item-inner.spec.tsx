@@ -1,5 +1,5 @@
-import FileTreeitemInner from '../../../../../../frontend/js/features/file-tree/components/file-tree-item/file-tree-item-inner'
-import FileTreeContextMenu from '../../../../../../frontend/js/features/file-tree/components/file-tree-context-menu'
+import FileTreeitemInner from '../../../../../../../../frontend/js/features/file-tree/components/file-tree-item/file-tree-item-inner'
+import FileTreeContextMenu from '../../../../../../../../frontend/js/features/file-tree/components/file-tree-context-menu'
 import { EditorProviders } from '../../../../helpers/editor-providers'
 import { FileTreeProvider } from '../../helpers/file-tree-provider'
 

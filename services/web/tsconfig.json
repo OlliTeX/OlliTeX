@@ -17,7 +17,7 @@
     "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./frontend/js/*"],
+      "@/*": ["../../frontend/js/*"],
       "@shared/*": ["./shared/*"],
       "@modules/*": ["./modules/*"],
       "@overleaf/o-error": ["../../libraries/o-error"],
@@ -41,13 +41,13 @@
     ]
   },
   "include": [
-    "frontend/js/**/*.*",
+    "../../frontend/js/**/*.*",
     "shared/**/*.*",
     "modules/**/frontend/js/**/*.*",
     "modules/*/shared/**/*.*",
     "test/frontend/**/*.*",
     "modules/**/test/frontend/**/*.*",
-    "frontend/stories/**/*.*",
+    "../../frontend/stories/**/*.*",
     "modules/**/stories/**/*.*",
     ".storybook/*.*",
     "cypress",

@@ -20,7 +20,7 @@ function getAbsolutePath(value: string): any {
 
 // Make sure that babel-macros are re-evaluated after changing the modules config
 // Import this after setting process.env.OVERLEAF_CONFIG
-const invalidateBabelCacheIfNeeded = require('../frontend/macros/invalidate-babel-cache-if-needed')
+const invalidateBabelCacheIfNeeded = require('../../../frontend/macros/invalidate-babel-cache-if-needed')
 invalidateBabelCacheIfNeeded()
 
 export default defineMain({
@@ -31,9 +31,9 @@ export default defineMain({
   staticDirs: [path.join(rootDir, 'public')],
 
   stories: [
-    path.join(rootDir, 'frontend/stories/**/*.stories.{js,jsx,ts,tsx}'),
+    path.join(rootDir, '../../frontend/stories/**/*.stories.{js,jsx,ts,tsx}'),
     path.join(rootDir, 'modules/**/stories/**/*.stories.{js,jsx,ts,tsx}'),
-    path.join(rootDir, 'frontend/stories/**/*.mdx'),
+    path.join(rootDir, '../../frontend/stories/**/*.mdx'),
     path.join(rootDir, 'modules/**/stories/**/*.mdx'),
   ],
 
@@ -120,7 +120,7 @@ export default defineMain({
         alias: {
           ...storybookConfig.resolve?.alias,
           // custom prefixes for import paths
-          '@': path.join(rootDir, 'frontend/js/'),
+          '@': path.join(rootDir, '../../frontend/js/'),
           '@shared': path.join(rootDir, 'shared/'),
           '@modules': path.join(rootDir, 'modules/'),
           '@ol-types': path.join(rootDir, 'types/'),
