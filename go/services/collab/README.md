@@ -40,7 +40,7 @@ Hocuspocus-compatible y-protocols WebSocket server:
 
 `make go-run-collab` (dev) or `./bin/collab` (after `make go-build`).
 
-Env: `COLLAB_LISTEN` (:3450), `MONGO_CONNECTION_STRING`/`OVERLEAF_MONGO_URL`,
+Env: `COLLAB_LISTEN` (:3450), `COLLAB_KEEP_VERSIONS` (0 = keep-all history; N = retain most-recent N), `COLLAB_COMPACT_EVERY` (0 = compact on room unload; N = also every N flushes), `MONGO_CONNECTION_STRING`/`OVERLEAF_MONGO_URL`,
 `OLLITEX_DB_NAME`, `OVERLEAF_REDIS_HOST/PORT/PASS`, `COLLAB_DATA_DIR`
 (/data/collab-docs), `COLLAB_ALLOWED_ORIGINS`, `COLLAB_MAX_CONNECTIONS`,
 `COLLAB_MAX_PEERS_PER_ROOM`, `COOKIE_NAME`.

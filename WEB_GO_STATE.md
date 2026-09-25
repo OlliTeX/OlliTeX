@@ -320,6 +320,17 @@ subtest (MemoryPersistence semantics) — the Mongo test clears rooms per
 factory call. `Service` now takes `Options.Store` (dev default unchanged =
 FilePersistence; S4 wires Mongo in production).
   Remaining S2 slice: restore/history endpoints on Go web (next).
+**RETENTION KNOBS (added this turn)** — `Service.KeepVersions` (0 = keep-all
+default; N = retain most-recent N updates, oldest folded into one record) +
+`Service.CompactEvery` (0 = compact-on-unload only = ygo default; N = also
+after every N flushes). Wired to ygo's `CompactableAdapter` (server auto-calls
+it; `LegacyAdapter` forwards to `MongoStore.Compact` with the `KeepVersions`
+policy). Env: `COLLAB_KEEP_VERSIONS`, `COLLAB_COMPACT_EVERY` (default 0/0 =
+unchanged behavior). New hermetic test `TestKeepVersionsWiring` pins the
+adapter→store `keep` pass-through. This is the bound that keeps the
+single-doc log under Mongo's 16 MB cap for long-lived rooms (set
+`COLLAB_KEEP_VERSIONS` > 0 + rely on snapshots for older history if a room
+outgrows the cap). — **DONE**
 - **Supersedes** the remaining "make OT services real" work (ARC-1/ARC-2 OT
   persistence machinery) and the D16 support-LLM real-time port: with a CRDT
   the transform/meshing layer no longer exists — history **is** the update

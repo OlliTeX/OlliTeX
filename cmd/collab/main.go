@@ -25,6 +25,12 @@
 //	                       of ygo: cookie auth + "*" = CSWSH risk; prefer the
 //	                       public origin)
 //	COLLAB_MAX_CONNECTIONS / COLLAB_MAX_PEERS_PER_ROOM (0 = unlimited)
+//	COLLAB_KEEP_VERSIONS     history retention for server auto-compaction
+//	                         (0 = keep-all — default; N = retain most recent
+//	                         N updates, oldest folded into one record)
+//	COLLAB_COMPACT_EVERY     how often the server compacts a room
+//	                         (0 = on room unload only — default; N = also after
+//	                         every N persistence flushes)
 package main
 
 import (
@@ -88,10 +94,14 @@ func main() {
 	}
 	maxConn, _ := strconv.Atoi(env("COLLAB_MAX_CONNECTIONS", "0"))
 	maxPeers, _ := strconv.Atoi(env("COLLAB_MAX_PEERS_PER_ROOM", "0"))
+	keepVersions, _ := strconv.Atoi(env("COLLAB_KEEP_VERSIONS", "0"))
+	compactEvery, _ := strconv.Atoi(env("COLLAB_COMPACT_EVERY", "0"))
 
 	svc, err := collab.New(collab.Options{
 		Auth:            auth,
 		DataDir:         env("COLLAB_DATA_DIR", "/data/collab-docs"),
+		KeepVersions:    keepVersions,
+		CompactEvery:    compactEvery,
 		AllowedOrigins:  origins,
 		MaxConnections:  maxConn,
 		MaxPeersPerRoom: maxPeers,

@@ -59,8 +59,18 @@ type Options struct {
 	// Store — the versioned persistence for room state. S2 production =
 	// MongoStore (NewMongoStore); dev/test = nil, which defaults to ygo's
 	// FilePersistence under DataDir.
-	Store           persistence.VersionedPersistence
-	DataDir         string // used only when Store == nil (FilePersistence root)
+	Store   persistence.VersionedPersistence
+	DataDir string // used only when Store == nil (FilePersistence root)
+	// KeepVersions — history-retention policy for the server's automatic
+	// compaction (ygo CompactableAdapter): 0 = keep ALL history (default);
+	// >0 = when the server calls Compact, fold the oldest updates and retain
+	// the most recent N. The compaction mechanics are conformance tested
+	// (CompactTrimsOldest); this knob is the operator-facing policy.
+	KeepVersions int
+	// CompactEvery — how often the ygo server triggers Compact per room:
+	// 0 = on room unload only (ygo default); >0 = also after every N
+	// persistence flushes. 0 keeps the current (safe) behavior.
+	CompactEvery    int
 	AllowedOrigins  []string
 	MaxConnections  int
 	MaxPeersPerRoom int
@@ -94,8 +104,15 @@ func New(opts Options) (*Service, error) {
 		}
 	}
 	// The ygo WS server takes the two-method PersistenceAdapter; the versioned
-	// store speaks the fuller interface, so bridge with LegacyAdapter.
-	srv := ws.NewServerWithPersistence(persistence.NewLegacyAdapter(store))
+	// store speaks the fuller interface, so bridge with LegacyAdapter. The
+	// adapter already implements the server's optional CompactableAdapter and
+	// forwards to store.Compact(ctx, room, KeepVersions). KeepVersions is the
+	// retention policy (0 = keep-all, the safe default); CompactEvery sets how
+	// often the server triggers compaction (0 = on room unload only).
+	adapter := persistence.NewLegacyAdapter(store)
+	adapter.KeepVersions = opts.KeepVersions
+	srv := ws.NewServerWithPersistence(adapter)
+	srv.CompactEvery = opts.CompactEvery
 	srv.Authorize = func(r *http.Request) (ws.ConnectionConfig, bool) {
 		uid, err := opts.Auth.Identity(r)
 		if err != nil || uid == "" {
