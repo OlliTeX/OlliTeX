@@ -108,6 +108,18 @@ func main() {
 	keepVersions := configres.Int(cfgStore, "COLLAB_KEEP_VERSIONS", "COLLAB_KEEP_VERSIONS", 0)
 	compactEvery := configres.Int(cfgStore, "COLLAB_COMPACT_EVERY", "COLLAB_COMPACT_EVERY", 0)
 
+	// Seed source (S4 contract): a room adopts the project's CURRENT
+	// main-file content through the exact blob path the web's file proxy
+	// uses (history-v1 hash store: projects doc → rootFolder fileRefs →
+	// {base}/projects/{hid}/blobs/{hash}, basic-auth staging:) — see
+	// seedsource.go. The projects reader is the same Mongo client as the
+	// auth gate (one connection).
+	seed := collab.NewSeedSource(m,
+		env("WEB_V1_HISTORY_URL", "http://127.0.0.1:3100/api"),
+		env("V1_HISTORY_USER", "staging"),
+		env("V1_HISTORY_PASSWORD", ""),
+		&http.Client{Timeout: 15 * time.Second})
+
 	svc, err := collab.New(collab.Options{
 		Auth:            auth,
 		DataDir:         env("COLLAB_DATA_DIR", "/data/collab-docs"),
@@ -116,6 +128,7 @@ func main() {
 		AllowedOrigins:  origins,
 		MaxConnections:  maxConn,
 		MaxPeersPerRoom: maxPeers,
+		SeedFn:          seed.SeedText, // S4: rooms seed from live project content
 	})
 	if err != nil {
 		log.Fatalf("init: %v", err)

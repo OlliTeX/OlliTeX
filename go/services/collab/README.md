@@ -43,11 +43,11 @@ Hocuspocus-compatible y-protocols WebSocket server:
 Env: `COLLAB_LISTEN` (:3450), `COLLAB_KEEP_VERSIONS` (0 = keep-all history; N = retain most-recent N) and `COLLAB_COMPACT_EVERY` (0 = compact on room unload; N = also every N flushes) — both settable in the /hub admin too (config-DB value wins over env; binds on service start — D23), `MONGO_CONNECTION_STRING`/`OVERLEAF_MONGO_URL`,
 `OLLITEX_DB_NAME`, `OVERLEAF_REDIS_HOST/PORT/PASS`, `COLLAB_DATA_DIR`
 (/data/collab-docs), `COLLAB_ALLOWED_ORIGINS`, `COLLAB_MAX_CONNECTIONS`,
-`COLLAB_MAX_PEERS_PER_ROOM`, `COOKIE_NAME`.
+`COLLAB_MAX_PEERS_PER_ROOM`, `COOKIE_NAME`. The SEED SOURCE (S4 contract) is wired in `cmd/collab`: a room adopts the project's CURRENT main-file content through the web's pinned blob path — env `WEB_V1_HISTORY_URL` (default `http://127.0.0.1:3100/api`), `V1_HISTORY_USER` (default `staging`), `V1_HISTORY_PASSWORD` — see `seedsource.go` (main.tex → first .tex → empty; 404 blob = empty seed; any other failure = fail-closed).
 
 ## Gates
 
-`make go-test-collab` — build + vet + gofmt + `go test -race` (13 tests).
+`make go-test-collab` — build + vet + gofmt + `go test -race` (incl. the seed-source suite: selection rule, pinned blob path + basic auth, fail-closed matrix, ObjectID hid, full WS seed e2e).
 
 ## Slice status (ARC-9)
 

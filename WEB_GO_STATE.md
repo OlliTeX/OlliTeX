@@ -410,6 +410,37 @@ Inert until the next image re-bake + cycle (live WS/seed/REST verification
 is the next step, on the `ol-e2e` stack per the P7-constraint that the
 canonical dev verification uses the isolated `ol-e2e-mongo-1`).
 
+**S4 prep (b) — seed source LIVE + the dead-include build fix (this commit)**:
+the room's initial content now has a REAL source (`go/services/collab/
+seedsource.go`, wired in `cmd/collab` as `Options.SeedFn`): a room adopts
+the project's CURRENT main-file content through the EXACT blob path the web
+file proxy pins (historically-v1 hash store: `projects` doc → `rootFolder`
+tree walk `fileRef`'s → `{WEB_V1_HISTORY_URL}/projects/{hid}/blobs/{hash}`,
+basic-auth `staging:` — the same contract, same env names as the web). Main-
+file selection is deterministic and test-pinned: `main.tex` (the template
+contract) → first `.tex` → empty. Failure semantics: no project doc →
+`ErrSeedProject`; no `.tex` / 404 blob → honest empty seed (a state, not a
+failure); 5xx/transport → **fail-closed** (never seed a room from a failed
+read). Both `overleaf.history.id` shapes (string + ObjectID) are pinned.
+Suite: `TestSeedSource*` (hermetic httptest) + `TestSeedSourceWiredIntoService`
+(production path — a real WS peer receives the seeded blob text over initial
+sync, exactly one persisted version). This is the D19/seed design closed:
+**the server is the single source of initial room content**, clients join
+empty; existing projects backfill for free because their current main.tex
+lives in the same blob store (no one-time migration job needed).
+
+**BUILD FIX (this commit)**: the image re-bake exposed a DORMANT landmine
+laid by P7 step-4 (`c6101120f9` retired the admin-tools Node backend, incl.
+`app/views/active-projects.pug`) — `admin/index.pug:70` still `include`d it,
+and `genScript compile` runs `precompile-pug` in the background with
+`wait $pid` → the missing include made the image build exit 1 (the prior
+builds only passed because the layer was cached — any context change
+re-ran it). The dead "Active Projects" tab (header + pane) is removed from
+`admin/index.pug` — consistent with the step-4 retirement (the live surface
+for admin is the Go serveradmin//hub admin; the hub already has
+`active-projects-section.tsx`). `yarn precompile-pug` verified GREEN
+(37 templates compiled).
+
 **S3 remaining (NOW the S4-flip step)**: (a) awareness/presence cursors
 (the item-1 presence layer over `y-protocols/awareness` — needs the editor
 integration + browser/e2e to do responsibly); (b) the hard cut — the IDE's
