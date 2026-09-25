@@ -136,13 +136,36 @@ Gate per slice: `make go-test-history-v1` + live A/B vs Node oracle.
    then flip runit `document-updater-overleaf` (owner-gated).
 
 ### ARC-3 · Config-DB single source of truth (D6)
-10. Extend the curated key set to the full `seeds.go` env map (email creds,
-    OAuth secrets ×5, sandboxed images, git-bridge host/port, typst/pandoc,
-    limits, misc) — SQLite is now the sole source; **remove the old docker env
-    params** for each migrated key (de-couple).
-11. **AES-256-GCM field encryption** in `configstore`, key =
-    `CONFIG_DB_ENCRYPTION_KEY` (boot env, never stored in the DB); `configdb`
-    CLI gets `--encrypt`.
+**Slice A ✅ (this doc's commit):** encryption + registry + CLI + toolkit all
+green.
+
+- **(done) AES-256-GCM field encryption** in `configstore` (`crypto.go`): key =
+  `CONFIG_DB_ENCRYPTION_KEY` (boot env, hex-64/base64-44, never stored in the
+  DB); values written under a key are stored as `enc:v1:<b64(nonce||ct||tag)>`;
+  legacy plaintext rows still read (pass-through), re-set encrypts; tamper &
+  wrong-key = hard errors. 7 new tests.
+- **(done) Full registry** = single source for the key space:
+  `go/libraries/configschema` — **149 params** across 11 groups (core/boot/
+  services/email/integrations/compilation/limits/security/test, …), each typed
+  (string/bool/int) + `[secret]` flag + default + description. Uniqueness/
+  shape tests gate it.
+- **(done) CLI extended** (`cmd/configdb`): `list --all` (registry table),
+  `get --reveal` (registered secrets **masked** by default), `set` type-checked
+  against the registry, `import-env FILE` (bootstrap from a KEY=VALUE file;
+  unknown keys skipped), `init` (generates + prints the encryption key when
+  absent; seeds from the process env without clobbering), `doctor`
+  (key/db/read-back health). 5 new tests; old contract tests untouched
+  (green).
+- **(done) Toolkit emergency path** (`tools/toolkit/bin/config`): drives the
+  same CLI **with no web service / /hub required**; routes to the running
+  OlliTeX container (`OLLITEX_CONTAINER` or image auto-detect) or falls back
+  to the host `go run ./cmd/configdb`; end-to-end verified (init → import-env
+  → masked get → doctor, clean rc's). NOTE: a re-bake (ARC-6/D9) is required
+  before the container route has the new binary.
+- Remaining (slices B–D):
+  10. **Web wiring**: `core.LoadConfig` + `/api/hub/config` honor the registry
+      (DB value > env > default) group by group (email first), so the web
+      process actually reads the migrated keys from SQLite.
 12. **Retire the Mongo `site_settings` duality** — single SQLite source; /hub
     sections read/write the SQLite store.
 13. **Surface the unsurfaced site-level params** as new /hub admin field cards

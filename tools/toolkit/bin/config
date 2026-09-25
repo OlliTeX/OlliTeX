@@ -1,0 +1,85 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+#### Detect Toolkit Project Root ####
+# if realpath is not available, create a semi-equivalent function
+command -v realpath >/dev/null 2>&1 || realpath() {
+  [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+TOOLKIT_ROOT="$(realpath "$SCRIPT_DIR/..")"
+if [[ ! -d "$TOOLKIT_ROOT/bin" ]] || [[ ! -d "$TOOLKIT_ROOT/config" ]]; then
+  echo "ERROR: could not find root of overleaf-toolkit project (inferred project root as '$TOOLKIT_ROOT')"
+  exit 1
+fi
+REPO_ROOT="$(realpath "$TOOLKIT_ROOT/../..")"
+
+CONTAINER="${OLLITEX_CONTAINER:-}"
+if [[ -z "$CONTAINER" ]]; then
+  CONTAINER="$(docker ps --format '{{.Names}}\t{{.Image}}' 2>/dev/null | awk -F'\t' '$2 ~ /ollitex/ {print $1; exit}' || true)"
+fi
+
+function usage() {
+    echo "Usage: bin/config <command> [args...]"
+    echo ""
+    echo "OlliTeX config — the single source of truth is the SQLite config DB"
+    echo "(only CONFIG_DB_ENCRYPTION_KEY lives outside it). This is the"
+    echo "emergency/offline path: it drives the configdb CLI directly, with no"
+    echo "web service / /hub required."
+    echo ""
+    echo "Commands (passed 1:1 to configdb):"
+    echo "  list                      stored keys"
+    echo "  list --all                the full registry (groups, kinds, [secret], status)"
+    echo "  get KEY [--reveal]        value (registered secrets masked without --reveal)"
+    echo "  set KEY VALUE [SOURCE]    upsert (type-checked against the registry)"
+    echo "  delete KEY                remove (idempotent)"
+    echo "  export                    whole store as JSON"
+    echo "  backup [DEST]             JSON backup"
+    echo "  restore SRC               load a backup"
+    echo "  import-env FILE           bootstrap: import known keys from a KEY=VALUE file"
+    echo "  init                      configure encryption key + seed from process env"
+    echo "  doctor                    key/db/read-back health"
+    echo "  help                      configdb help"
+    echo ""
+    echo "Routing:"
+    echo "  * running OlliTeX container (OLLITEX_CONTAINER or auto-detect) -> docker exec"
+    echo "  * otherwise the host Go toolchain: go run ./cmd/configdb"
+    echo ""
+    echo "Env:"
+    echo "  OLLITEX_CONTAINER   container name (auto-detected by image otherwise)"
+    echo "  CONFIG_DB_PATH      config DB file (resolved by configdb)"
+    echo "  CONFIG_DB_ENCRYPTION_KEY   32-byte key (hex-64/base64-44); 'bin/config init'"
+    echo "                              prints a fresh one when none is configured"
+    echo ""
+}
+
+function __main__() {
+    if [[ $# -eq 0 ]] || [[ "${1:-}" == "help" || "${1:-}" == "-h" || "${1:-}" == "--help" \
+           || "${1:-}" == "config:help" ]]; then
+        usage
+        return 0
+    fi
+
+    local container_ok=0
+    if [[ -n "$CONTAINER" ]] && command -v docker >/dev/null 2>&1 \
+       && docker exec "$CONTAINER" test -x /usr/local/bin/go-services/configdb >/dev/null 2>&1; then
+        container_ok=1
+    fi
+
+    if [[ "$container_ok" == "1" ]]; then
+        exec docker exec -i "$CONTAINER" /usr/local/bin/go-services/configdb "$@"
+    fi
+
+    if command -v go >/dev/null 2>&1 && [[ -f "$REPO_ROOT/cmd/configdb/main.go" ]]; then
+        ( cd "$REPO_ROOT" && exec go run ./cmd/configdb "$@" )
+        return $?
+    fi
+
+    echo "ERROR: no route to the configdb CLI: no running OlliTeX container with the binary" >&2
+    echo "       and no usable host 'go' toolchain at $REPO_ROOT" >&2
+    return 1
+}
+
+__main__ "$@"

@@ -21,8 +21,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
+	"ollitex/go/libraries/configschema"
 	"ollitex/go/libraries/configstore"
 )
 
@@ -57,7 +60,8 @@ func run(args []string, out io.Writer) error {
 	switch cmd {
 	case "help", "-h", "--help":
 		return usage(out)
-	case "list", "get", "set", "delete", "export", "backup", "restore":
+	case "list", "get", "set", "delete", "export", "backup", "restore",
+		"import-env", "init", "doctor":
 		return dispatch(cmd, rest, out)
 	default:
 		return fmt.Errorf("unknown command %q (see: configdb help)", cmd)
@@ -73,6 +77,9 @@ func dispatch(cmd string, args []string, out io.Writer) error {
 
 	switch cmd {
 	case "list":
+		if len(args) > 0 && (args[0] == "--all" || args[0] == "--registry") {
+			return listRegistry(s, out)
+		}
 		keys, err := s.Keys()
 		if err != nil {
 			return err
@@ -83,15 +90,33 @@ func dispatch(cmd string, args []string, out io.Writer) error {
 		return nil
 
 	case "get":
-		if len(args) != 1 {
+		key, reveal := "false", ""
+		if len(args) >= 1 && !strings.HasPrefix(args[0], "-") {
+			key = args[0]
+		}
+		if len(args) == 0 || key == "" {
 			return fmt.Errorf("get requires KEY")
 		}
-		v, err := s.Get(args[0])
+		for _, a := range args[1:] {
+			if a == "--reveal" || a == "--unmask" {
+				reveal = "true"
+			}
+		}
+		secret := configschema.IsSecret(key)
+		v, err := s.Get(key)
 		if err != nil {
 			if errors.Is(err, configstore.ErrMissing) {
-				return fmt.Errorf("key %q not present", args[0])
+				return fmt.Errorf("key %q not present", key)
 			}
 			return err
+		}
+		if secret && !strings.EqualFold(reveal, "true") {
+			if v == "" {
+				fmt.Fprintln(out, "<empty>")
+			} else {
+				fmt.Fprintln(out, strings.Repeat("•", 8))
+			}
+			return nil
 		}
 		fmt.Fprintln(out, v)
 		return nil
@@ -99,6 +124,9 @@ func dispatch(cmd string, args []string, out io.Writer) error {
 	case "set":
 		if len(args) < 2 {
 			return fmt.Errorf("set requires KEY VALUE [SOURCE]")
+		}
+		if err := validateKind(args[0], args[1]); err != nil {
+			return err
 		}
 		src := "cli:configdb"
 		if len(args) >= 3 {
@@ -154,6 +182,163 @@ func dispatch(cmd string, args []string, out io.Writer) error {
 		}
 		fmt.Fprintf(out, "restored %d keys\n", n)
 		return nil
+
+	case "import-env":
+		if len(args) < 1 {
+			return fmt.Errorf("import-env requires FILE (a KEY=VALUE env file)")
+		}
+		return importEnvFile(s, args[0], out)
+
+	case "init":
+		return initStore(s, out)
+
+	case "doctor":
+		return doctor(s, out)
+	}
+	return nil
+}
+
+// validateKind type-checks VALUE against the registry kind of KEY (unknown
+// keys pass — the store accepts arbitrary keys for forward-compat).
+func validateKind(key, value string) error {
+	p, ok := configschema.Find(key)
+	if !ok {
+		return nil
+	}
+	switch p.Kind {
+	case configschema.KBool:
+		if _, err := strconv.ParseBool(value); err != nil {
+			return fmt.Errorf("%s is a bool and %q does not parse (use true/false/1/0)", key, value)
+		}
+	case configschema.KInt:
+		if _, err := strconv.Atoi(value); err != nil {
+			return fmt.Errorf("%s is an int and %q does not parse", key, value)
+		}
+	}
+	return nil
+}
+
+func listRegistry(s *configstore.ConfigStore, out io.Writer) error {
+	fmt.Fprintln(out, "GROUP           KEY                                     KIND    STATUS")
+	for _, p := range configschema.Registry {
+		status := "default"
+		masked := ""
+		if v, err := s.Get(p.Key); err == nil {
+			status = "set"
+			if p.Secret && v != "" {
+				masked = " (masked)"
+			}
+		}
+		sec := ""
+		if p.Secret {
+			sec = "  [secret]"
+		}
+		fmt.Fprintf(out, "%-14s %-38s %-6s %s%s%s\n", p.Group, p.Key, string(p.Kind), status, masked, sec)
+	}
+	return nil
+}
+
+func parseEnvFile(path string) (map[string]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("import-env read %s: %w", path, err)
+	}
+	m := map[string]string{}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.TrimPrefix(line, "export ")
+		eq := strings.IndexByte(line, '=')
+		if eq <= 0 {
+			continue
+		}
+		k := strings.TrimSpace(line[:eq])
+		v := strings.TrimSpace(line[eq+1:])
+		v = strings.Trim(v, `"'`)
+		if k != "" {
+			m[k] = v
+		}
+	}
+	return m, nil
+}
+
+func importEnvFile(s *configstore.ConfigStore, path string, out io.Writer) error {
+	m, err := parseEnvFile(path)
+	if err != nil {
+		return err
+	}
+	imported, skipped := 0, 0
+	for k, v := range m {
+		if !configschema.Known(k) {
+			skipped++
+			continue
+		}
+		if err := s.Set(k, v, "cli:import-env"); err != nil {
+			return err
+		}
+		imported++
+	}
+	fmt.Fprintf(out, "imported %d of %d keys from %s (%d unknown/skipped)\n", imported, len(m), path, skipped)
+	return nil
+}
+
+func initStore(s *configstore.ConfigStore, out io.Writer) error {
+	if raw := os.Getenv(configstore.EncryptionKeyEnv); raw != "" {
+		if _, err := configstore.ParseKey(raw); err != nil {
+			return fmt.Errorf("encryption key present but invalid: %w", err)
+		}
+		fmt.Fprintln(out, "encryption: CONFIG_DB_ENCRYPTION_KEY present and valid")
+	} else {
+		key, err := configstore.GenerateKey()
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, "encryption: NO key configured. Generated a new one — put it in the container environment as:")
+		fmt.Fprintf(out, "  %s=%s\n", configstore.EncryptionKeyEnv, key)
+		fmt.Fprintln(out, "(the key is NEVER stored in the DB; values written while it is active are field-encrypted)")
+	}
+	imported := 0
+	for _, p := range configschema.Registry {
+		v, ok := os.LookupEnv(p.Key)
+		if !ok || v == "" {
+			continue
+		}
+		if _, err := s.Get(p.Key); err == nil {
+			continue // never clobber an existing DB value
+		}
+		if err := s.Set(p.Key, v, "cli:init-env"); err != nil {
+			return err
+		}
+		imported++
+	}
+	keys, err := s.Keys()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "db ready: %s (now %d keys; seeded %d from the process env, existing values untouched)\n", dbPath(), len(keys), imported)
+	return nil
+}
+
+func doctor(s *configstore.ConfigStore, out io.Writer) error {
+	if raw := os.Getenv(configstore.EncryptionKeyEnv); raw == "" {
+		fmt.Fprintln(out, "encryption: NOT configured (plain-text store)")
+	} else if _, err := configstore.ParseKey(raw); err != nil {
+		fmt.Fprintf(out, "encryption: CONFIG_DB_ENCRYPTION_KEY present but INVALID (%v)\n", err)
+	} else {
+		fmt.Fprintln(out, "encryption: configured (AES-256-GCM field encryption active)")
+	}
+	keys, err := s.Keys()
+	if err != nil {
+		fmt.Fprintf(out, "db: %s (UNREADABLE: %v — encrypted values need the key)\n", dbPath(), err)
+		return nil
+	}
+	fmt.Fprintf(out, "db: %s (%d keys)\n", dbPath(), len(keys))
+	if m, err := s.All(); err == nil {
+		fmt.Fprintf(out, "read-back: OK (%d values readable)\n", len(m))
+	} else {
+		fmt.Fprintf(out, "read-back: FAILED (%v)\n", err)
 	}
 	return nil
 }
@@ -163,15 +348,21 @@ func usage(w io.Writer) error {
 
 Usage:
   configdb list                      list configured keys
-  configdb get KEY                   print the value of KEY
-  configdb set KEY VALUE [SOURCE]    upsert KEY
+  configdb list --all                the FULL registry (groups, kinds, status, [secret])
+  configdb get KEY [--reveal]        print the value of KEY (secrets masked without --reveal)
+  configdb set KEY VALUE [SOURCE]    upsert KEY (type-checked against the registry)
   configdb delete KEY                remove KEY (idempotent)
-  configdb export                    print the whole store as JSON
+  configdb export                    print the whole store as JSON (secrets decrypted, NOT masked)
   configdb backup [DEST]             write a JSON backup (default ./configdb-backup-<ts>.json)
   configdb restore SRC               load a JSON backup into the store
+  configdb import-env FILE           import known keys from a KEY=VALUE env file (bootstrap)
+  configdb init                      (un)configure the encryption key + seed from process env
+  configdb doctor                    key/db/read-back health
   configdb help                      this help
 
 DB path: $CONFIG_DB_PATH, or $OVERLEAF_HOME/configdb/configdb.sqlite3, or ./configdb/configdb.sqlite3.
+Encryption: $CONFIG_DB_ENCRYPTION_KEY (hex-64 or base64-44, 32 bytes) — field encryption of stored
+values (AES-256-GCM); the key itself is never stored in the DB.
 `)
 	return err
 }

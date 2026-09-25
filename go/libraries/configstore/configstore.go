@@ -35,14 +35,34 @@ var ErrMissing = fmt.Errorf("configstore: key not present")
 
 // ConfigStore is a SQLite-backed key/value configuration store.
 type ConfigStore struct {
-	db *sql.DB
+	db  *sql.DB
+	key []byte // nil == store created before/without encryption (legacy plaintext)
 }
 
 // New opens (creating if needed) the SQLite database at dbFile and ensures
 // the `config` table exists. The parent directory is created if absent
 // (0o755). It returns an error rather than panicking or returning a nil store
 // (matching the gitbridge/db.go convention).
+//
+// If CONFIG_DB_ENCRYPTION_KEY is set (hex-64/base64-44), new writes are
+// field-encrypted (AES-256-GCM) and reads decrypt them; a malformed key is a
+// hard error. Legacy plaintext rows read unchanged (see crypto.go).
 func New(dbFile string) (*ConfigStore, error) {
+	key, err := KeyFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return newWithKey(dbFile, key)
+}
+
+// NewWithKey opens the store with an explicit encryption key (nil ==
+// plaintext, as before). Programs/tests use this; the web and CLI use New
+// (key from CONFIG_DB_ENCRYPTION_KEY).
+func NewWithKey(dbFile string, key []byte) (*ConfigStore, error) {
+	return newWithKey(dbFile, key)
+}
+
+func newWithKey(dbFile string, key []byte) (*ConfigStore, error) {
 	parent := filepath.Dir(dbFile)
 	if info, err := os.Stat(parent); err == nil && !info.IsDir() {
 		return nil, fmt.Errorf("configstore: %s exists and is not a directory", parent)
@@ -79,7 +99,7 @@ func New(dbFile string) (*ConfigStore, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("configstore: create table: %w", err)
 	}
-	return &ConfigStore{db: conn}, nil
+	return &ConfigStore{db: conn, key: key}, nil
 }
 
 // Close closes the underlying connection.
@@ -95,7 +115,7 @@ func (s *ConfigStore) Get(key string) (string, error) {
 		}
 		return "", fmt.Errorf("configstore: get %q: %w", key, err)
 	}
-	return v, nil
+	return Open(s.key, v)
 }
 
 // Has reports whether key is present in the store.
@@ -109,7 +129,16 @@ func (s *ConfigStore) Has(key string) bool {
 
 // Set stores (inserts or updates) key -> value. source records where the
 // change came from (e.g. "hub:/hub-admin", "cli:restore"), for auditing.
+// When the store was created with an encryption key, the value is sealed
+// before hitting the database (see crypto.go).
 func (s *ConfigStore) Set(key, value, source string) error {
+	if s.key != nil {
+		sev, err := Seal(s.key, value)
+		if err != nil {
+			return fmt.Errorf("configstore: set %q: %w", key, err)
+		}
+		value = sev
+	}
 	now := time.Now().UnixMilli()
 	_, err := s.db.Exec(
 		"INSERT INTO config (key, value, source, updated_at) VALUES (?,?,?,?)\n"+
@@ -167,7 +196,11 @@ func (s *ConfigStore) All() (map[string]string, error) {
 		if err := rows.Scan(&k, &v); err != nil {
 			return nil, fmt.Errorf("configstore: all scan: %w", err)
 		}
-		m[k] = v
+		dv, err := Open(s.key, v)
+		if err != nil {
+			return nil, fmt.Errorf("configstore: all decode %q: %w", k, err)
+		}
+		m[k] = dv
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("configstore: all rows: %w", err)
