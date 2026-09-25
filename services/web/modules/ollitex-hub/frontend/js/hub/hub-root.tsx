@@ -66,6 +66,7 @@ const TITLES: Record<string, { title: string; subtitle?: string }> = {
   library: { title: 'Reference library', subtitle: 'Your personal bibliography, citable from any project.' },
   overview: { title: 'Overview & activity', subtitle: 'Instance health, storage, and recent activity.' },
   'site.general.health': { title: 'Hub health', subtitle: 'Live diagnostics: server core, endpoint probes, and captured client errors.' },
+  'site.general.emailtemplates': { title: 'Email templates', subtitle: 'The outbound e-mails OlliTeX sends — customize per field, with reset to the shipped defaults.' },
 }
 
 export default function HubRoot() {

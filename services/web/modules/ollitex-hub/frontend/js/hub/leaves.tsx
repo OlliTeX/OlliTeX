@@ -12,6 +12,7 @@ import KeybindingsSection from '../sections/workspace/keybindings-section'
 import GitIntegrationSection from '../sections/workspace/git-integration-section'
 import LlmSettingsSection from '../sections/workspace/llm-settings-section'
 import AppearanceSection from '../sections/appearance-section'
+import EmailTemplatesSection from '../sections/email-templates-section'
 import AdminInstanceSection from '../sections/admin/admin-instance-section'
 import AdminSiteSection from '../sections/admin/admin-site-section'
 import SiteSettingsIndexSection from '../sections/admin/site/index-section'
@@ -114,6 +115,9 @@ export function renderLeaf(node: HubNode): React.ReactNode {
       return <AdminTemplatesSection key={node.id} />
     case 'site.general.appearance':
       return <AppearanceSection key={node.id} />
+    case 'site.general.emailtemplates':
+      // owner item 3 (remember.md): /hub-managed e-mail templates
+      return <EmailTemplatesSection key={node.id} />
     case 'site.general.enclose':
       // Owner review B16: native map of all Mantine site-settings sections
       // (replaces the legacy /admin/panel embed).

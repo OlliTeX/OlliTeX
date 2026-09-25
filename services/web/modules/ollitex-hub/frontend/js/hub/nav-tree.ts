@@ -118,6 +118,7 @@ export const HUB_NAV: HubNode[] = [
         children: [
           { id: 'site.general.misc', label: 'Miscellaneous', icon: 'tune', render: 'site-sec', siteId: 'misc' },
           { id: 'site.general.appearance', label: 'Appearance', icon: 'palette' },
+          { id: 'site.general.emailtemplates', label: 'Email templates', icon: 'mail' },
           { id: 'site.general.signup', label: 'Sign-up', icon: 'person_add', render: 'site-sec', siteId: 'signup' },
           { id: 'site.general.managetpl', label: 'Manage templates', icon: 'tag' },
           {

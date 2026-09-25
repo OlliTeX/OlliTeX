@@ -63,6 +63,7 @@ describe('hub nav tree (rail)', () => {
       'overview',
       'site.general.misc',
       'site.general.appearance',
+      'site.general.emailtemplates',
       'site.general.signup',
       'site.general.managetpl',
       'site.general.projects.all',
