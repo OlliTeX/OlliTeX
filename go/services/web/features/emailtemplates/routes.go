@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"regexp"
 	"time"
 
@@ -90,6 +91,23 @@ func ctx2(cxt *core.Cxt) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(cxt.Req.Context(), 5*time.Second)
 }
 
+// RenderFor — the call-site entry point: resolve the slot's current
+// effective templates (app-store override-or-default) and interpolate.
+// a may be nil (no app context → defaults only).
+func RenderFor(a *core.App, slot string, vars map[string]string) (RenderResult, error) {
+	store := StoreFor(a)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	ov, err := store.GetOverride(ctx, slot)
+	if err != nil {
+		// a storage failure must not block the mail path: fall back to
+		// defaults (availability-first, same policy as the consent
+		// feature's local-write-first rule).
+		ov = Override{}
+	}
+	return Render(Registry, map[string]Override{slot: ov}, slot, vars)
+}
+
 // hList — GET handler.
 func hList(a *core.App, store Store) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
@@ -151,7 +169,7 @@ func hPut(a *core.App, store Store) func(*core.Cxt, *core.Res) {
 		name := cxt.Params["1"]
 		slot, okSlot := Lookup(name)
 		if !okSlot {
-			res.JSON(404, []byte(`{"error":"unknown email template "`+jsEsc(name)+`"}`))
+			res.JSON(404, []byte(`{"error":"unknown email template `+jsEsc(name)+`"}`))
 			return
 		}
 		raw, _ := io.ReadAll(io.LimitReader(cxt.Req.Body, 1<<20))
@@ -205,6 +223,7 @@ func hPut(a *core.App, store Store) func(*core.Cxt, *core.Res) {
 			return
 		}
 		if err := store.SetOverride(ctx, name, next); err != nil {
+			log.Printf("emailtemplates: save override %s: %v", name, err)
 			res.JSON(500, []byte(`{"error":"`+jsEsc(name)+`: save failed"}`))
 			return
 		}
@@ -219,7 +238,7 @@ func hReset(a *core.App, store Store) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		name := cxt.Params["1"]
 		if _, okSlot := Lookup(name); !okSlot {
-			res.JSON(404, []byte(`{"error":"unknown email template "`+jsEsc(name)+`"}`))
+			res.JSON(404, []byte(`{"error":"unknown email template `+jsEsc(name)+`"}`))
 			return
 		}
 		if !a.RequireSiteAdmin(cxt, res) {

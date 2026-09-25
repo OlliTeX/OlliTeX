@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
+	"os"
 	"strings"
 	"time"
 
@@ -205,9 +207,13 @@ func sendTestAlert(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 			res.JSON(400, []byte(`{"message":"Invalid email address"}`))
 			return
 		}
-		subject := "[Overleaf] Instance stats alert test"
-		html := "<p>This is a test email from the Instance Statistics alert configuration.</p>"
-		text := "This is a test email from the Instance Statistics alert configuration."
+		tmpl, tmErr := emailtemplates.RenderFor(a, "instance-stats-test", map[string]string{"app": istAppName()})
+		if tmErr != nil {
+			log.Printf("instancestats: mail render: %v", tmErr)
+			res.SendStatus(500)
+			return
+		}
+		subject, text, html := tmpl.Subject, tmpl.Text, tmpl.HTML
 		if mail != nil {
 			for _, to := range emails {
 				if err := mail.Send(to, subject, text, html); err != nil {
@@ -220,4 +226,13 @@ func sendTestAlert(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 		b := core.JSON(map[string]any{"ok": true, "sentTo": emails})
 		res.JSON(200, b)
 	}
+}
+
+// istAppName — the brand variable for the mail templates (the feature's
+// Node parity: OVERLEAF_APP_NAME env, OlliTeX default).
+func istAppName() string {
+	if v := os.Getenv("OVERLEAF_APP_NAME"); v != "" {
+		return v
+	}
+	return "OlliTeX"
 }

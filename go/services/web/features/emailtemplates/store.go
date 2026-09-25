@@ -12,16 +12,16 @@ import (
 // Collection — the Mongo collection holding admin overrides.
 const Collection = "emailtemplateoverrides"
 
-// Override — the admin's per-slot overrides (any field unset "" = default).
+// Override — the admin's per-slot overrides (any field "" = default).
 //
-// Document shape: {_id: "<slot>", subject?, text?, html?, updatedAt,
-// updatedBy} — only the overridden fields are stored.
+// Document shape (flat): {_id: "<slot>", subject?, text?, html?,
+// updatedAt, updatedBy} — only the overridden fields are stored.
 type Override struct {
-	Subject   string `bson:"subject,omitempty"`
-	Text      string `bson:"text,omitempty"`
-	HTML      string `bson:"html,omitempty"`
-	UpdatedAt string `bson:"updatedAt,omitempty"` // RFC3339
-	UpdatedBy string `bson:"updatedBy,omitempty"`
+	Subject   string `bson:"subject"`
+	Text      string `bson:"text"`
+	HTML      string `bson:"html"`
+	UpdatedAt string `bson:"updatedAt"`
+	UpdatedBy string `bson:"updatedBy"`
 }
 
 // overrideField — an override's field ("" = use the default).
@@ -99,7 +99,43 @@ func NewMongoStore(db *mongo.Database, coll string) *MongoStore {
 	return &MongoStore{db: db, coll: coll}
 }
 
-// LoadAll — every override ("" slots omitted).
+// decodeOverrideDoc — manual field extraction (robust against nested
+// decode surprises; the document is flat by construction).
+func decodeOverrideDoc(raw any) (string, Override, bool) {
+	ov := Override{}
+	id := ""
+	switch m := raw.(type) {
+	case bson.M:
+		id, _ = m["_id"].(string)
+		ov.Subject, _ = m["subject"].(string)
+		ov.Text, _ = m["text"].(string)
+		ov.HTML, _ = m["html"].(string)
+		ov.UpdatedAt, _ = m["updatedAt"].(string)
+		ov.UpdatedBy, _ = m["updatedBy"].(string)
+	case bson.D:
+		for _, e := range m {
+			switch string(e.Key) {
+			case "_id":
+				id, _ = e.Value.(string)
+			case "subject":
+				ov.Subject, _ = e.Value.(string)
+			case "text":
+				ov.Text, _ = e.Value.(string)
+			case "html":
+				ov.HTML, _ = e.Value.(string)
+			case "updatedAt":
+				ov.UpdatedAt, _ = e.Value.(string)
+			case "updatedBy":
+				ov.UpdatedBy, _ = e.Value.(string)
+			}
+		}
+	default:
+		return "", Override{}, false
+	}
+	return id, ov, true
+}
+
+// LoadAll — every override ("" fields = defaults).
 func (s *MongoStore) LoadAll(ctx context.Context) (map[string]Override, error) {
 	if s.db == nil {
 		return map[string]Override{}, nil
@@ -109,19 +145,17 @@ func (s *MongoStore) LoadAll(ctx context.Context) (map[string]Override, error) {
 		return nil, err
 	}
 	defer cur.Close(ctx)
-	out := map[string]Override{}
-	for cur.Next(ctx) {
-		var d struct {
-			ID   string `bson:"_id"`
-			Body Override
-		}
-		if err := cur.Decode(&d); err != nil || d.ID == "" {
+	var docs []any
+	if derr := cur.All(ctx, &docs); derr != nil {
+		return nil, derr
+	}
+	out := make(map[string]Override, len(docs))
+	for _, raw := range docs {
+		id, ov, okDoc := decodeOverrideDoc(raw)
+		if !okDoc || id == "" {
 			continue
 		}
-		out[d.ID] = d.Body
-	}
-	if err := cur.Err(); err != nil {
-		return nil, err
+		out[id] = ov
 	}
 	return out, nil
 }
@@ -144,9 +178,9 @@ func (s *MongoStore) SetOverride(ctx context.Context, slot string, ov Override) 
 	if ov.UpdatedBy != "" {
 		doc["updatedBy"] = ov.UpdatedBy
 	}
-	_, err := s.db.Collection(s.coll).ReplaceOne(ctx,
+	_, err := s.db.Collection(s.coll).UpdateOne(ctx,
 		bson.M{"_id": slot}, bson.M{"$set": doc},
-		options.Replace().SetUpsert(true))
+		options.Update().SetUpsert(true))
 	return err
 }
 

@@ -60,6 +60,7 @@ import (
 	"time"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/views"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -356,30 +357,29 @@ func invSubjectLines(subject string) string {
 	return out
 }
 
-func invSlotf(tpl, name, owner, url, site string) string {
-	tpl = strings.ReplaceAll(tpl, "\x01URL\x02", url)
-	tpl = strings.ReplaceAll(tpl, "\x01NAME\x02", name)
-	tpl = strings.ReplaceAll(tpl, "\x01OWNER\x02", owner)
-	tpl = strings.ReplaceAll(tpl, "\x01SITE\x02", site)
-	return tpl
-}
-
 // invSendMail — the projectInvite mail, byte-mirroring the Node template
 // (captured from the live sink): same From/To/Reply-To/Subject shape,
 // same text + html parts, the invite URL (and 48-hex token) inline in the
 // "View project:" line so the e2e gate can recover tokens the way the UI
 // does.
 func invSendMail(a *core.App, to, senderMail, name, ownerMail, url, site string) error {
-	_ = a
+	// the /hub-managed template ("project-invite") — the owner-rebranded
+	// default is byte-identical to the pre-move invMailText/invMailHTML at
+	// app=OlliTeX, so envelope + parts + MIME stay pinned.
+	tmpl, tmErr := emailtemplates.RenderFor(a, "project-invite", map[string]string{
+		"app": "OlliTeX", "project": name, "owner": ownerMail, "url": url, "site": site,
+	})
+	if tmErr != nil {
+		return tmErr
+	}
 	m := core.NewMail()
-	text := invSlotf(invMailText, name, ownerMail, url, site)
-	html := invSlotf(invMailHTML, name, ownerMail, url, site)
+	text, html := tmpl.Text, tmpl.HTML
 	boundary := "----ol-inv-" + invRandToken()[:16]
 	msg := strings.Join([]string{
 		"From: " + m.From,
 		"To: " + to,
 		"Reply-To: " + senderMail,
-		invSubjectLines(`"` + name + `" — shared by ` + ownerMail),
+		invSubjectLines(tmpl.Subject),
 		"MIME-Version: 1.0",
 		"Content-Type: multipart/alternative;\n boundary=" + boundary,
 		"",

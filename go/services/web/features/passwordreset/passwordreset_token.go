@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
 	"regexp"
 	"strings"
 	"time"
@@ -48,19 +50,22 @@ func generateAndEmailResetToken(cxt *core.Cxt, a *core.App, mail *core.Mail, tok
 	if err != nil {
 		return "none", nil
 	}
-	// send the reset email (CE: EmailBuilder passwordResetRequested)
+	// send the reset email (CE: EmailBuilder passwordResetRequested) —
+	// now through the /hub-managed template registry (emailtemplates
+	// "password-reset"; owner-rebranded default identical at app=OlliTeX)
 	siteURL := cxt.SiteURL
 	if siteURL == "" {
 		siteURL = "http://localhost"
 	}
 	link := siteURL + "/user/password/set?passwordResetToken=" + token + "&email=" + url.QueryEscape(email)
-	subject := "Password Reset - " + appName()
-	text := "We got a request to reset your " + appName() + " password.\n\nReset password: " + link + "\n\nIf you ignore this message, your password won't be changed.\nIf you didn't request a password reset, let us know."
-	html := "<p>We got a request to reset your " + appName() + " password.</p>" +
-		"<p><a href=\"" + link + "\">Reset password</a></p>" +
-		"<p>If you ignore this message, your password won't be changed.<br>If you didn't request a password reset, let us know.</p>"
 	if mail != nil {
-		_ = mail.Send(email, subject, text, html) // delivery failure → Node would 500; battery compares healthy sinks
+		tmpl, tmErr := emailtemplates.RenderFor(a, "password-reset",
+			map[string]string{"app": appName(), "link": link})
+		if tmErr != nil {
+			log.Printf("webgo: password-reset mail render: %v", tmErr)
+		} else {
+			_ = mail.Send(email, tmpl.Subject, tmpl.Text, tmpl.HTML) // delivery failure → Node would 500; battery compares healthy sinks
+		}
 	}
 	return "primary", nil
 }

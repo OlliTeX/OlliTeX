@@ -15,6 +15,7 @@ import (
 	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
 )
 
 var (
@@ -258,7 +259,7 @@ func updateSiteSettings(a *core.App) func(*core.Cxt, *core.Res) {
 // ---------- POST /admin/site-settings/email/test ----------
 
 var (
-	rateMu     sync.Mutex
+	rateMu      sync.Mutex
 	rateBuckets = map[string][]int64{}
 	rateMax     = 5
 	rateWindow  = int64(60 * 1000)
@@ -363,14 +364,16 @@ func emailTest(a *core.App) func(*core.Cxt, *core.Res) {
 			via += " host=" + hp + " port=" + strconv.Itoa(port)
 		}
 		now := time.Now().UTC().Format(time.RFC3339)
-		subject := "[Overleaf] E-mail configuration test"
-		text := "This is a test e-mail sent from the Overleaf admin console " +
-			"(Manage Site → E-mail).\n\nSent at: " + now + "\nVia: " + via + "."
-		html := "<p>This is a test e-mail sent from the Overleaf admin console " +
-			"(Manage Site → E-mail).</p>" +
-			"<p>Sent at: " + now + " via <code>" + via + "</code></p>"
+		// the /hub-managed template ("mail-config-test"; the owner-rebranded
+		// default keeps the original's hardcoded brand position, now OlliTeX)
+		tmpl, tmErr := emailtemplates.RenderFor(a, "mail-config-test",
+			map[string]string{"app": "OlliTeX", "sentAt": now, "via": via})
+		if tmErr != nil {
+			res.JSON(500, errBody("mail template render failed"))
+			return
+		}
 		m := &core.Mail{Host: host, Port: port, Secure: asBool(ObjGetD(email, "secure")), From: from, Timeout: 20}
-		if serr := m.Send(to, subject, text, html); serr != nil {
+		if serr := m.Send(to, tmpl.Subject, tmpl.Text, tmpl.HTML); serr != nil {
 			detail := asStrOrErr(serr.Error())
 			res.JSON(502, errBody("Test e-mail failed to send: "+truncate(detail, 200)))
 			return

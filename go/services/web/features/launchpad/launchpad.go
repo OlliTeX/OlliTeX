@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/features/templates"
 	"ollitex/go/services/web/views"
 )
@@ -337,16 +338,15 @@ func hSendTestEmail(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 		if site == "" {
 			site = "http://" + cxt.Req.Host
 		}
-		subject := "A Test Email from " + appName
-		text := "Hi,\n\nThis is a test Email from " + appName +
-			"\n\nOpen " + appName + ": " + site +
-			"\n\nRegards,\nThe " + appName + " Team - " + site + "\n"
-		html := "<p>Hi,</p>" +
-			"<p>This is a test Email from " + appName + "</p>" +
-			`<p><a href="` + site + `">Open ` + appName + `</a></p>` +
-			"<p>Regards,<br/>The " + appName + " Team - " + site + "</p>"
+		// the /hub-managed template ("test-mail"); owner-rebranded default is
+		// byte-identical to the pre-move inline strings at app=appName.
+		tmpl, tmErr := emailtemplates.RenderFor(a, "test-mail", map[string]string{"app": appName, "site": site})
+		if tmErr != nil {
+			render500(cxt, res)
+			return
+		}
 		if mail != nil {
-			if serr := mail.Send(in.Email, subject, text, html); serr != nil {
+			if serr := mail.Send(in.Email, tmpl.Subject, tmpl.Text, tmpl.HTML); serr != nil {
 				render500(cxt, res)
 				return
 			}

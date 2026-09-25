@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
 	"os"
 	"strconv"
 	"strings"
@@ -117,24 +118,18 @@ func createAndMail(ctx context.Context, a *core.App, mail *core.Mail, tok *core.
 		site = "http://localhost"
 	}
 	link := site + "/user/activate?token=" + linkToken + "&user_id=" + id.Hex()
-	subject := "Activate your " + appName() + " Account"
-	text := "Hi,\n\n" +
-		"Congratulations, you've just had an account created for you on " + appName() +
-		" with the email address '" + email + "'.\n\n" +
-		"Click here to set your password and log in:\n\n" +
-		"Set password: " + link + "\n\n" +
-		"If you have any questions or problems, please contact " + adminEmail() + "\n\n" +
-		"Regards,\nThe " + appName() + " Team - " + site + "\n"
-	html := `<p>Hi,</p>` +
-		`<p>Congratulations, you've just had an account created for you on ` + appName() +
-		` with the email address '` + email + `'.</p>` +
-		`<p>Click here to set your password and log in:</p>` +
-		`<p><a href="` + link + `">Set password</a></p>` +
-		`<p>If you have any questions or problems, please contact ` + adminEmail() + `</p>` +
-		`<p>Regards,<br/>The ` + appName() + ` Team - ` + site + `</p>`
-
+	// activation mail — now via the /hub-managed template ("activate-"
+	// "account"; owner-rebranded default byte-identical at app=appName())
 	if mail != nil {
-		if serr := mail.Send(email, subject, text, html); serr != nil {
+		tmpl, tmErr := emailtemplates.RenderFor(a, "activate-account", map[string]string{
+			"app": appName(), "email": email, "link": link,
+			"adminEmail": adminEmail(), "site": site,
+		})
+		if tmErr != nil {
+			_, _ = coll.DeleteOne(ctx, bson.M{"_id": id})
+			return "mailfail"
+		}
+		if serr := mail.Send(email, tmpl.Subject, tmpl.Text, tmpl.HTML); serr != nil {
 			_, _ = coll.DeleteOne(ctx, bson.M{"_id": id})
 			return "mailfail"
 		}

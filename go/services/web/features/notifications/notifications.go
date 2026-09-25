@@ -78,6 +78,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/features/templates"
 	"ollitex/go/services/web/views"
 )
@@ -666,14 +667,15 @@ func hTestEmail(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 		if site == "" {
 			site = "http://" + cxt.Req.Host
 		}
-		subject := "A Test Email from " + appName
-		text := "Hi,\n\nThis is a test Email from " + appName + "\n\nOpen " + appName + ": " + site + "\n\nRegards,\nThe " + appName + " Team - " + site + "\n"
-		html := "<p>Hi,</p>" +
-			"<p>This is a test Email from " + appName + "</p>" +
-			`<p><a href="` + site + `">Open ` + appName + `</a></p>` +
-			"<p>Regards,<br/>The " + appName + " Team - " + site + "</p>"
+		// the /hub-managed template ("test-mail"; the default is byte-identical
+		// to the pre-move inline strings at app=ntfAppName())
+		tmpl, tmErr := emailtemplates.RenderFor(a, "test-mail", map[string]string{"app": appName, "site": site})
+		if tmErr != nil {
+			ntfErr500(cxt, res)
+			return
+		}
 		if mail != nil {
-			if serr := mail.Send(emailStr, subject, text, html); serr != nil {
+			if serr := mail.Send(emailStr, tmpl.Subject, tmpl.Text, tmpl.HTML); serr != nil {
 				ntfErr500(cxt, res)
 				return
 			}

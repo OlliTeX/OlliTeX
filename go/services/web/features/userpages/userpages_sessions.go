@@ -5,12 +5,23 @@ import (
 	"fmt"
 	"log"
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/views"
+	"os"
 	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+// usAppName — the mail-template brand variable (Node parity helper shape:
+// OVERLEAF_APP_NAME env, OlliTeX default).
+func usAppName() string {
+	if v := os.Getenv("OVERLEAF_APP_NAME"); v != "" {
+		return v
+	}
+	return "OlliTeX"
+}
 
 // ---------- shared small helpers ----------
 
@@ -251,21 +262,18 @@ func postClear(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 		// 3) purge other sessions (keep current).
 		purgeSessions(a.Redis, uid, cxt.Sess.SessID)
 
-		// 4) security alert mail (Node: send, log on error, never 500).
+		// 4) security alert mail (Node: send, log on error, never 500) — via
+		// the /hub-managed template ("sessions-cleared"; the owner-rebranded
+		// default is byte-identical to the pre-move strings).
 		now := time.Now().UTC()
-		subject := "Overleaf security note: active sessions cleared"
-		desc := fmt.Sprintf("active sessions were cleared on your account %s", email)
-		text := "Hi there,\n\nActive sessions cleared\n\n" +
-			now.Format("Monday 2 January 2006") + " at " + now.Format("15:04") + "\n\n" +
-			desc + "\n\n" +
-			"Quick guide: " + siteURL() + "/learn/how-to/Keeping_your_account_secure\n\n" +
-			"Thanks,\nOlliTeX Team\n"
-		html := "<html><body><h1>Active sessions cleared</h1>" +
-			"<p>" + now.Format("Monday 2 January 2006") + " at " + now.Format("15:04") + "</p>" +
-			"<p>" + desc + "</p>" +
-			"<p><a href=\"" + siteURL() + "/learn/how-to/Keeping_your_account_secure\">quick guide</a></p>" +
-			"</body></html>"
-		if err := mail.Send(email, subject, text, html); err != nil {
+		datetime := now.Format("Monday 2 January 2006") + " at " + now.Format("15:04")
+		guideURL := siteURL() + "/learn/how-to/Keeping_your_account_secure"
+		tmpl, tmErr := emailtemplates.RenderFor(a, "sessions-cleared", map[string]string{
+			"app": usAppName(), "datetime": datetime, "email": email, "guideUrl": guideURL,
+		})
+		if tmErr != nil {
+			log.Printf("webgo: sessions-clear mail render: %v", tmErr)
+		} else if err := mail.Send(email, tmpl.Subject, tmpl.Text, tmpl.HTML); err != nil {
 			// Node logs the SMTP failure and still 201s (pinned: mail never
 			// breaks the response).
 			log.Printf("webgo: sessions-clear mail to %s: %v", email, err)

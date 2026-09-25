@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"ollitex/go/services/web/features/emailtemplates"
 	"os"
 	"regexp"
 	"sort"
@@ -253,47 +254,40 @@ func legacyInternal63b(cxt *core.Cxt, res *core.Res, msg string) {
 type mailBox63b struct {
 	mail *core.Mail
 	tok  *core.OneTimeTokens
+	app  *core.App // for the /hub-managed mail template store (emailtemplates)
 }
 
 func newMailBox63b(a *core.App) *mailBox63b {
-	return &mailBox63b{mail: core.NewMail(), tok: core.NewOneTimeTokens(a.Mongo)}
+	return &mailBox63b{mail: core.NewMail(), tok: core.NewOneTimeTokens(a.Mongo), app: a}
 }
 
-// 'registered' template (subject pinned: "Activate your <appName> Account").
+// 'registered' template (now the /hub-managed "activate-account" slot;
+// owner-rebranded default byte-identical at app=mailAppName63b()).
 func (fm *mailBox63b) sendRegistered63b(cxt *core.Cxt, to, link string) error {
 	app := mailAppName63b()
-	text := "Hi,\n\n" +
-		"Congratulations, you've just had an account created for you on " + app +
-		" with the email address '" + to + "'.\n\n" +
-		"Click here to set your password and log in:\n\n" +
-		"Set password: " + link + "\n\n" +
-		"If you have any questions or problems, please contact " + adminEmail63b() + "\n\n" +
-		"Regards,\nThe " + app + " Team - " + siteURL63b(cxt) + "\n"
-	html := `<p>Hi,</p>` +
-		`<p>Congratulations, you've just had an account created for you on ` + app +
-		` with the email address '` + to + `'.</p>` +
-		`<p>Click here to set your password and log in:</p>` +
-		`<p><a href="` + link + `">Set password</a></p>` +
-		`<p>If you have any questions or problems, please contact ` + adminEmail63b() +
-		`</p>` +
-		`<p>Regards,<br/>The ` + app + ` Team - ` + siteURL63b(cxt) + `</p>`
-	return fm.mail.Send(to, "Activate your "+app+" Account", text, html)
+	tmpl, tmErr := emailtemplates.RenderFor(fm.app, "activate-account", map[string]string{
+		"app": app, "email": to, "link": link,
+		"adminEmail": adminEmail63b(), "site": siteURL63b(cxt),
+	})
+	if tmErr != nil {
+		return tmErr
+	}
+	return fm.mail.Send(to, tmpl.Subject, tmpl.Text, tmpl.HTML)
 }
 
-// 'securityAlert' template (subject pinned: "Overleaf security note: <action>").
+// security alert (now the /hub-managed "security-note" slot; the
+// owner-rebranded default keeps the pinned subject at app="OlliTeX":
+// the Node port hardcoded "Overleaf" there, owner item 3 rebrands it).
 func (fm *mailBox63b) sendSecurityAlert63b(cxt *core.Cxt, to, action, actionDescribed string) error {
 	_ = cxt
-	text := "Hi,\n\n" +
-		action + ".\n\n" +
-		actionDescribed + ".\n\n" +
-		"This is just a security notification — no action is required.\n" +
-		"If you did not do this, please contact " + adminEmail63b() + " immediately.\n"
-	html := `<p>Hi,</p>` +
-		`<p>` + action + `.</p>` +
-		`<p>` + actionDescribed + `.</p>` +
-		`<p>This is just a security notification — no action is required.</p>` +
-		`<p>If you did not do this, please contact ` + adminEmail63b() + ` immediately.</p>`
-	return fm.mail.Send(to, "Overleaf security note: "+action, text, html)
+	tmpl, tmErr := emailtemplates.RenderFor(fm.app, "security-note", map[string]string{
+		"app": "OlliTeX", "action": action, "description": actionDescribed,
+		"adminEmail": adminEmail63b(),
+	})
+	if tmErr != nil {
+		return tmErr
+	}
+	return fm.mail.Send(to, tmpl.Subject, tmpl.Text, tmpl.HTML)
 }
 
 // ---------- body parsing (Node express semantics) ----------

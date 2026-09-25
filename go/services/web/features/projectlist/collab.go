@@ -51,6 +51,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/views"
 )
 
@@ -776,8 +777,10 @@ func declineReqHandler(a *core.App) func(*core.Cxt, *core.Res) {
 				name := asStr(dget(*doc, "name"))
 				reqMail, okM := colLoadUserMail(a, cxt, target)
 				if okM && reqMail.email != "" {
-					subj := "Your access request to " + name + " was declined - OlliTeX"
-					colSendMail(reqMail.email, subj, subj)
+					tmpl, tmErr := emailtemplates.RenderFor(a, "collab-access-declined", map[string]string{"app": "OlliTeX", "project": name})
+					if tmErr == nil {
+						colSendMail(reqMail.email, tmpl.Subject, tmpl.Text)
+					}
 				}
 			}
 		}
@@ -837,8 +840,10 @@ func grantReqHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			name := asStr(dget(*doc, "name"))
 			reqMail, okM := colLoadUserMail(a, cxt, target)
 			if okM && reqMail.email != "" {
-				subj := "Your access request to " + name + " was granted - OlliTeX"
-				colSendMail(reqMail.email, subj, subj)
+				tmpl, tmErr := emailtemplates.RenderFor(a, "collab-access-granted", map[string]string{"app": "OlliTeX", "project": name})
+				if tmErr == nil {
+					colSendMail(reqMail.email, tmpl.Subject, tmpl.Text)
+				}
 			}
 		}
 		res.NoContent()
@@ -937,12 +942,16 @@ func transferOwnerHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		// 5) confirmation mails to BOTH sides (Node _sendEmails).
 		if !skipEmails {
 			prevMail, _ := colLoadUserMail(a, cxt, ownerHex)
-			subj := "Project ownership transfer - OlliTeX"
+			tmpl, tmErr := emailtemplates.RenderFor(a, "ownership-transfer", map[string]string{"app": "OlliTeX"})
+			subj, subjText := "", ""
+			if tmErr == nil {
+				subj, subjText = tmpl.Subject, tmpl.Text
+			}
 			if prevMail.email != "" {
-				colSendMail(prevMail.email, subj, subj)
+				colSendMail(prevMail.email, subj, subjText)
 			}
 			if toMail.email != "" {
-				colSendMail(toMail.email, subj, subj)
+				colSendMail(toMail.email, subj, subjText)
 			}
 		}
 		res.NoContent()

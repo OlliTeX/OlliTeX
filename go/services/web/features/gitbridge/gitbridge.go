@@ -51,6 +51,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/features/projectlist"
 )
 
@@ -664,13 +665,15 @@ func (p *pats) patCreate(cxt *core.Cxt, res *core.Res) {
 	// separately generated ID would break delete-by-id / list _id parity.
 	id := ins.InsertedID.(primitive.ObjectID)
 	if email != "" && p.mail != nil {
-		go func() {
-			_ = p.mail.SendExact(email, "",
-				"Overleaf security note: new Git authentication token generated\n\n"+
-					"A new Git authentication token has been generated for your account "+email+". "+
-					"If you did not do this, disable the token in your account settings and "+
-					"change your password as soon as possible.")
-		}()
+		// the /hub-managed template ("git-token"; the owner-rebranded default
+		// keeps the pinned "Overleaf security note" position, now OlliTeX)
+		tmpl, tmErr := emailtemplates.RenderFor(p.app, "git-token", map[string]string{"app": "OlliTeX", "email": email})
+		if tmErr == nil {
+			body := tmpl.Subject + "\n\n" + tmpl.Text // wire: SendExact(email, "", BODY)
+			go func() {
+				_ = p.mail.SendExact(email, "", body)
+			}()
+		}
 	}
 	// Node createToken return order: _id, accessToken, accessTokenPartial, createdAt, expiresAt.
 	res.JSON(200, oj(
@@ -730,9 +733,9 @@ func (g *gb) getDoc(cxt *core.Cxt, res *core.Res, uid string) {
 		return
 	}
 	var ver struct {
-		Version   int64    `json:"version"`
-		Timestamp string   `json:"timestamp"`
-		V2Authors []any    `json:"v2Authors"`
+		Version   int64  `json:"version"`
+		Timestamp string `json:"timestamp"`
+		V2Authors []any  `json:"v2Authors"`
 	}
 	if err := gbFetchJSON(cxt.Req.Context(), projectHistoryBase()+"/project/"+projID+"/version", &ver); err != nil {
 		res.SendStatus(400)
