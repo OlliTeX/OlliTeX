@@ -1465,12 +1465,12 @@ function buildSettings() {
   // The Node-web module boot is therefore defanged: this list is intentionally
   // EMPTY. The module Node backends (app/ + index.*) are retired junk — kept only
   // where live code depends on them:
-  //  - modules/notifications: LIVE cron chain (crontab-notifications →
-  //    scripts/process_notifications.mjs → app/src/ProcessNotifications.mjs) until
-  //    the dispatch job is migrated to Go
   //  - modules/server-ce-scripts: LIVE ops (server-ce/bin/grunt, init_scripts)
   //  - modules/authentication: saml/oidc/ldap handshakes (P2 family; retired
   //    together with the Node web core — D1)
+  // (2026-09-25: modules/notifications fully retired — the dispatch cron is the
+  //  Go cronmail service (ARC-8), its 5 tests + app tree deleted; the one live
+  //  consumer now imports frontend/types/api/notifications.d.ts.)
   // Frontends under modules/*/frontend stay live (webpack entries, CI vitest,
   // @modules imports) and are NOT affected by this list.
   moduleImportSequence: [],

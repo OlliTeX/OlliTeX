@@ -5,7 +5,7 @@ import { debugConsole } from '@/utils/debugging'
 import type {
   GlobalNotificationPreferencesSchema,
   NotificationPreferencesSchema,
-} from '../../../../../services/web/modules/notifications/app/src/types.js'
+} from '../../../../types/api/notifications'
 import { sendMB } from '@/infrastructure/event-tracking'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
 import { type PermissionsLevel } from '@/features/ide-react/types/permissions'

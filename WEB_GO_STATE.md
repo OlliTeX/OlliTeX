@@ -43,7 +43,7 @@ and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
 | D14 | **git-bridge**: confirmed already Go (`gitbridge-go:latest`). **DELETE `services/git-bridge`** (Java) + clean the Java `build-git-bridge` Makefile target | APPROVED |
 | D15 | **Procedural**: stop appending to `WEB_GO_PLAN.md`; maintain this file as the state doc | APPROVED |
 | D16 | **`services/clsi`, `clsi_typst`, `project-history`, `real-time`** are being converted to Go **by support LLMs** (parallel; "ready soon") — do NOT re-port; integrate + audit when they land | AWARE (no action) |
-| D17 | **Notifications email-dispatch cron → Go** (kills last `modules/notifications/app` runtime dependency) | APPROVED — **DONE this commit** (see §4 ARC-8) |
+| D17 | **Notifications email-dispatch cron → Go** (kills last `modules/notifications/app` runtime dependency) | APPROVED — **DONE** (ARC-8 + ARC-8a severance; zero Node runtime hooks left in services/web) |
 | D18 | **Toolkit placement**: `tools/toolkit` → repo-root **`toolkit/`** (visible root position), all references updated | APPROVED — **DONE this commit** |
 
 ---
@@ -273,6 +273,43 @@ ProcessNotifications.mjs`) is replaced by a byte-exact Go service:
   ARC-4 junk-sweep candidates (queue path is dead: no live Node web consumer
   ever ran it in this stack — the producers are chat Go + the legacy
   scheduler writing straight to `emailNotifications`).
+
+### ARC-8a · Notifications Node tree severed (D17 tail) — **DONE (this commit)**
+The cron swap (ARC-8) left one live consumer on the Node tree: the frontend
+hook's type import. That consumer is now cut, the rest of the tree deleted:
+
+- `services/web/types/api/notifications.d.ts` (self-contained, 2 schemas,
+  unchanged content) → **`frontend/types/api/notifications.d.ts`** — seeds
+  the Phase-2 `frontend/types` home; the hook
+  (`frontend/js/features/ide-settings/hooks/use-project-notification-preferences.ts`)
+  now imports `../../../../types/api/notifications` (stays inside the
+  frontend workspace — no cross-tree path).
+- **Deleted** `services/web/modules/notifications/**` (17 files: app tree,
+  5 unit tests, index stub, README, 1 untracked pug artifact) +
+  `services/web/scripts/process_notifications.mjs` (superseded by cronmail).
+- **Producer audit (safety evidence):** the only LIVE `emailNotifications`
+  producer is the Go chat service (`go/services/chat` `UpsertEmailNotification`,
+  emailType `projectNotification`) — contract verified against cronmail's
+  claim/send; the tracked-changes producer chain (
+  `ScheduleProjectChangeNotifications.mjs` +
+  `ProjectNotificationQueueConsumer.mjs`) had **no live callers** at HEAD
+  (zero call-sites repo-wide; the Bull consumer was never registered because
+  Node-web boot is defanged) — functionally dead before this slice. The Go
+  renderer still supports `trackedChangesNotification` for any future
+  producer.
+- Comments updated to post-severance truth: `settings.defaults.js`
+  (moduleImportSequence live-set), `types/api/README.md`,
+  `web-go-p614-flip` origin note.
+- **Gates:** frontend tsc **586=586 set-identical** (stash A/B: +0/−0);
+  backend tsc **94→39** (+0 added; −55 all inside the deleted tree);
+  CI-exact vitest set **identical** (17F/1P/3t, pre-existing alias failures
+  unchanged); webpack **0 module-not-found**, 23 errors all the pre-existing
+  mini-css-extract class (local-invocation quirk), none reference touched
+  files; `go build ./go/... ./cmd/...` OK.
+
+**Net:** services/web now has **zero** Node runtime hooks — every
+`modules/*` app tree is either retired junk (D1 sweep, Phase 5) or one of
+two kept-alive exceptions (server-ce-scripts ops, authentication P2 family).
 
 ### ARC-4 · Removals (D1/D2/D3/D14)
 15. **Junk-page removal** (§5) + e2e adaptations.

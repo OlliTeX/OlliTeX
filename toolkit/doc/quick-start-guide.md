@@ -9,10 +9,10 @@
 
 ## Install
 
-OlliTeX ships in the `tools/toolkit` directory of the repository:
+OlliTeX ships in the `toolkit` directory of the repository:
 
 ```sh
-$ cd <repo>/tools/toolkit
+$ cd <repo>/toolkit
 ```
 
 For the rest of this guide, all commands run from that directory.

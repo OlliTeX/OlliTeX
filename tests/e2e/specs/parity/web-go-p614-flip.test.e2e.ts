@@ -35,7 +35,7 @@
  *    the user's email; delivery verified in the A/B battery — no spec pins
  *    the mail body).
  *
- * Declared routes covered (services/web/modules/notifications, 7):
+ * Declared routes covered (Go web — ex services/web/modules/notifications, 7):
  *   GET    /notifications/preferences
  *   POST   /notifications/preferences
  *   GET    /notifications/preferences/project/:projectId

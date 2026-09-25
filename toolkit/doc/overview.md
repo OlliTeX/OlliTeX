@@ -38,7 +38,7 @@ The toolkit uses [Docker](https://www.docker.com) and [Docker Compose](https://d
 
 ## How do I get the Toolkit?
 
-The toolkit ships inside the OlliTeX repository (this directory, `tools/toolkit`).
+The toolkit ships inside the OlliTeX repository (this directory, `toolkit`).
 
 If you want to get started right now, we recommend you take a look at the
 [Quick-Start Guide](./quick-start-guide.md).
