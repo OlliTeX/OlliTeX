@@ -73,6 +73,34 @@ and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
     **no HTTP controller, no main**.
   - `GO_SERVICES_INTEGRATION.md` = the audit record (verified-vs-claimed + flip
     gates). Both Makefile gate targets added.
+- **P7 step-4 (module Node backends retired)** — this turn:
+  - 203 `services/web/modules/**` Node-backend files deleted: 21 module `app/`
+    trees, 26 `index.*` boot stubs (incl. `sandboxed-compiles` whole module),
+    21 dead node-app test files, 3 non-workspace `package.json`.
+    **Kept alive (verified live):** `notifications` app+tests (cron chain via
+    `server-ce/cron/notification-email-dispatch.sh` →
+    `scripts/process_notifications.mjs`), `server-ce-scripts` (grunt/ops
+    tooling), `authentication/{ldap,saml,oidc}` (D1 scope), ALL module
+    frontends (webpack/CI/settings entries), live module `types/` dirs
+    (admin-tools, git-bridge, template-gallery — imported **relatively** by
+    live frontends; my first import-recon was blind to relative paths and
+    nearly deleted them — caught by tsc A/B), `template-gallery/
+    app/src/CleanHtml.mjs` (single live leaf import).
+  - Node web defanged (shadow runtime, D1-retires): `moduleImportSequence: []`
+    (settings.defaults.js), `getHubTheme`/`readAdminSettings` local stubs
+    (ProjectController.mjs / ExpressLocals.mjs).
+  - `types/backend/express/request.d.ts`: added `user?: User` to the Request
+    augmentation (documented middleware property, never typed anywhere;
+    surfaced 3× in PermissionsController once baseline parse quirks went away
+    — real fix, backend tsc 96→94, **0 new**).
+  - Gates (Node 24.21.0, owner-installed nvm v24): **frontend tsc 586=586
+    identical set**; backend tsc 94 < 96, 0 new; CI-exact vitest A/B =
+    **identical failing set** (17 pre-existing local-env `@`-alias failures,
+    present at clean baseline too — not a regression; host Node 22 vs 24 both
+    fail identically); `go build` exit 0; webpack inputs net-unchanged
+    (frontends untouched, restorations byte-identical to HEAD).
+  - **Open (owner note):** the 17 vitest `@/…` alias failures exist at clean
+    baseline on this host — pre-dates this arc; CI may differ.
 
 ---
 

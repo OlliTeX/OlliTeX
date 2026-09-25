@@ -18,7 +18,11 @@ import Settings from '@overleaf/settings'
 import AuthorizationManager from '../Authorization/AuthorizationManager.mjs'
 import InactiveProjectManager from '../InactiveData/InactiveProjectManager.mjs'
 import ProjectUpdateHandler from './ProjectUpdateHandler.mjs'
-import { getHubTheme } from '../../../../modules/ollitex-hub/app/src/HubTheme.mjs'
+// P6.1/P6.20 (Go web owns the hub theme) + P7 step-4: the ollitex-hub Node module
+// app is retired junk — the live web is the Go binary (features/hub). Local stub
+// keeps this legacy Node-web source self-consistent (the Node web does not run;
+// see server-ce/runit/web-overleaf/run).
+const getHubTheme = async () => null
 import ProjectGetter from './ProjectGetter.mjs'
 import PrivilegeLevels from '../Authorization/PrivilegeLevels.mjs'
 import SessionManager from '../Authentication/SessionManager.mjs'

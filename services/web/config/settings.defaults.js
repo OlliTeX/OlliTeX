@@ -1459,45 +1459,21 @@ function buildSettings() {
     railModals: [],
   },
 
-  moduleImportSequence: [
-    'history-v1',
-    'launchpad',
-    'server-ce-scripts',
-    'notifications', // [IV]: notification preferences + email pipeline (CE)
-    // 'user-activate' is DELISTED: its router hijacked GET /admin/user ->
-    // /admin/register (mounted before admin-tools). admin-tools supersedes it
-    // (owns /admin/user, /admin/user/create and /user/activate), so the legacy
-    // module's routes must not mount first.
-    'sandboxed-compiles',
-    'symbol-palette',
-    'reference-picker',
-    'track-changes',
-    'authentication/ldap',
-    'authentication/saml',
-    'authentication/oidc',
-    'admin-tools', // import after authentication
-    'registration-page', // import after authentication
-    'template-gallery',
-    'git-bridge',
-    'github-sync',
-    'webdav', // [III]: WebDAV/Nextcloud mirroring (must be before zotero per provider-module order)
-    'dropbox', // [III]: Dropbox project mirror sync
-    'zotero',
-    'mendeley', // Mendeley reference connector (2026-09-07)
-    'orcid-picker', // Import-from-ORCID picker (P2, BIB_ORCID_TEMPLATES_PLAN.md)
-    'bib-editor',
-    'tex-autoformatter', // autoformat toolbar button (N-C port, 2026-08-31)
-    'page-shells', // UI-R10 W8: /admin/panel + /user/mysettings shells importing the upstream pages
-    'instance-stats', // N-D (2026-09-01): /admin/instance-stats dashboards (gated by settings.instanceStats.enabled)
-    'ce-ui', // module hygiene (R11-12): fork CSS/components outside upstream directories (see modules/ce-ui)
-    'llm', // overleaf-lab: LLM chat / compliance / inline completion / ask-AI integrations
-    // overleaf-lab (grammar port): imports the LLM module's admin-settings
-    // reader at module load, so it must be imported AFTER 'llm'.
-    'languagetool',
-    'latex-editor', // [IVc]: MathLive-based LaTeX equation editor module
-    'ollitex-hub', // Option B (owner 2026-09-06): /hub/admin + /hub/workspace unified pages
-    'typst', // typst: create-from-UI + compiler dispatch; gated by Settings.typst.enabled
-  ],
+  // P6.20 COMPLETE (2026-09-21): every route-owning module under
+  // services/web/modules/ has a Go-web representation (go/services/web/features/*),
+  // and the live :4000 web IS the Go binary (server-ce/runit/web-overleaf/run).
+  // The Node-web module boot is therefore defanged: this list is intentionally
+  // EMPTY. The module Node backends (app/ + index.*) are retired junk — kept only
+  // where live code depends on them:
+  //  - modules/notifications: LIVE cron chain (crontab-notifications →
+  //    scripts/process_notifications.mjs → app/src/ProcessNotifications.mjs) until
+  //    the dispatch job is migrated to Go
+  //  - modules/server-ce-scripts: LIVE ops (server-ce/bin/grunt, init_scripts)
+  //  - modules/authentication: saml/oidc/ldap handshakes (P2 family; retired
+  //    together with the Node web core — D1)
+  // Frontends under modules/*/frontend stay live (webpack entries, CI vitest,
+  // @modules imports) and are NOT affected by this list.
+  moduleImportSequence: [],
   viewIncludes: {},
 
   csp: {

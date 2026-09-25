@@ -17,7 +17,13 @@ import AdminAuthorizationHelper from '../Features/Helpers/AdminAuthorizationHelp
 import { addOptionalCleanupHandlerAfterDrainingConnections } from './GracefulShutdown.mjs'
 import { sanitizeSessionUserForFrontEnd } from './FrontEndUser.mjs'
 import { expressify } from '@overleaf/promise-utils'
-import { readAdminSettings } from '../../../modules/languagetool/app/src/adminConfig.mjs' // [VI] fix: 3 levels up (app/src/infrastructure -> web/) // overleaf-lab (grammar port)
+// [P7 step-4] the languagetool Node module app is retired junk — the live web is
+// the Go binary (features/languagetool + llmsettings). Local stub keeps this
+// legacy Node-web source self-consistent (the Node web does not run; see
+// server-ce/runit/web-overleaf/run). Returns the empty admin-settings shape so
+// downstream fallbacks (!== true checks + env fallbacks) behave exactly as the
+// original no-file path.
+const readAdminSettings = async () => ({})
 
 const {
   canRedirectToAdminDomain,
