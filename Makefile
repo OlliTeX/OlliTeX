@@ -219,10 +219,14 @@ go-build: ## Build all Go service binaries into ./bin
 	$(GO) build -o bin/seaweed-migrate ./cmd/seaweed-migrate  ## fs <-> SeaweedFS(S3) conversion + health tool
 	$(GO) build -o bin/configdb ./cmd/configdb  ## operator CLI for the SQLite config DB (P7-post)
 	$(GO) build -o bin/cronmail ./cmd/cronmail  ## scheduled notification-email dispatch (replaces the Node process_notifications cron)
+	$(GO) build -o bin/collab ./cmd/collab  ## Yjs/Ygo collaboration service (ARC-9, D19)
 
 .PHONY: go-test-cronmail
 go-test-cronmail: ## cronmail gate (byte-exact oracle templates + claim/loop semantics)
 	$(GO) build -buildvcs=false ./go/services/cronmail/... ./cmd/cronmail/ && $(GO) vet -buildvcs=false ./go/services/cronmail/... ./cmd/cronmail/ && test -z "$$(gofmt -l go/services/cronmail cmd/cronmail)" && $(GO) test -count=1 -race -buildvcs=false ./go/services/cronmail/...
+.PHONY: go-test-collab
+go-test-collab: ## collab gate (ARC-9: auth gate + CRDT convergence + persistence)
+	$(GO) build -buildvcs=false ./go/services/collab/... ./cmd/collab/ && $(GO) vet -buildvcs=false ./go/services/collab/... ./cmd/collab/ && test -z "$$(gofmt -l go/services/collab cmd/collab)" && $(GO) test -count=1 -race -buildvcs=false ./go/services/collab/...
 .PHONY: go-run-linked-url-proxy
 go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
 	$(GO) run ./cmd/linked-url-proxy
@@ -254,5 +258,9 @@ go-run-notifications: ## Run the notifications Go service (dev)
 .PHONY: go-run-chat
 go-run-chat: ## Run the chat Go service (dev)
 	$(GO) run ./cmd/chat
+
+.PHONY: go-run-collab
+go-run-collab: ## Run the Yjs/Ygo collaboration service (ARC-9, dev)
+	$(GO) run ./cmd/collab
 
 .DEFAULT_GOAL := help

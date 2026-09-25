@@ -4,7 +4,7 @@
 > (historical record only — do NOT append to it; it grew to ~210KB). Everything
 > current lives here. Update this file as the durable state doc, not as a log.
 >
-> Last updated: 2026-09-25. Branch `main`. Repo root `module ollitex`, Go 1.27,
+> Last updated: 2026-09-25 (ARC-9 S1 done). Branch `main`. Repo root `module ollitex`, Go 1.27,
 > yarn 4.18.0 (PnP). Live e2e stack = `ol-e2e-overleaf-1` (nginx :7420).
 
 ---
@@ -45,6 +45,8 @@ and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
 | D16 | **`services/clsi`, `clsi_typst`, `project-history`, `real-time`** are being converted to Go **by support LLMs** (parallel; "ready soon") — do NOT re-port; integrate + audit when they land | AWARE (no action) |
 | D17 | **Notifications email-dispatch cron → Go** (kills last `modules/notifications/app` runtime dependency) | APPROVED — **DONE** (ARC-8 + ARC-8a severance; zero Node runtime hooks left in services/web) |
 | D18 | **Toolkit placement**: `tools/toolkit` → repo-root **`toolkit/`** (visible root position), all references updated | APPROVED — **DONE this commit** |
+| D19 | **Collaboration pivot — Option B (Yjs/Ygo, HARD CUT)**: the document model becomes Yjs; server = **ygo** (`github.com/reearth/ygo`, Re:Earth's pure-Go CRDT stack — Hocuspocus-compatible WS server, Redis-Streams cluster relay, versioned persistence + snapshots, awareness; MIT; v1.50.0 pinned). The 2014 substrate (real-time Node + socket.io fork + ShareJS + OT client/editor-core) is **retired junk after the flip — no OT legacy reader** (owner hard-cut call 2026-09-25). Support-LLM real-time port: irrelevant (their own copy). Existing OT history is **not portable** — new projects seed Y.Text from current file content; OT history drops. | APPROVED — **IN PROGRESS (ARC-9)** |
+| D16* | `clsi`/`clsi_typst`/`project-history` still support-LLM territory; **`real-time` is SUPERSEDED** by D19 (pivot, not port) | SUPERSEDED (real-time) |
 
 ---
 
@@ -273,6 +275,33 @@ ProcessNotifications.mjs`) is replaced by a byte-exact Go service:
   ARC-4 junk-sweep candidates (queue path is dead: no live Node web consumer
   ever ran it in this stack — the producers are chat Go + the legacy
   scheduler writing straight to `emailNotifications`).
+
+### ARC-9 · Yjs/Ygo collaboration pivot (D19, HARD CUT) — **START HERE**
+Replaces the OT collaboration substrate (real-time Node + socket.io 0.9 fork +
+ShareJS + overleaf-editor-core client + OT history) with the Yjs document
+model: browser `yjs` + `y-websocket` + `y-indexeddb` + CodeMirror binding;
+server = **ygo** (`github.com/reearth/ygo@v1.50.0`, MIT, Hocuspocus-compatible
+WS server with auth hooks / rate limits, `VersionedPersistence` conformance
+suite, file/sqlite/memory backends, Redis pub-sub + Streams cluster relay,
+awareness, snapshots/compaction, `cmd/ygo-server` reference).
+
+**S1 — DONE** — `go/services/collab` service embedding the ygo WS server (13 tests green under -race; `make go-test-collab`; Dockerfile gobuilder list; ygo@v1.50.0 pinned in go.mod/go.sum, additions-only diff):
+- `Authorize` hook = OlliTeX session (cookie → Redis session store, shared
+  `core` primitives) + project access (owner/collab = read-write,
+  readOnly = **read-only peer** via ygo `ConnectionConfig`);
+- room = projectId, path `/collab/{projectId}`;
+- persistence = ygo `FilePersistence` (versioned update log + snapshots +
+  `MaterializeAt` restore) rooted under the data dir; Mongo adapter = S2;
+- `cmd/collab` + `make go-test-collab` (auth gate, convergence, persistence
+  round-trip, awareness) + Dockerfile build list;
+- S2: Mongo `VersionedPersistence` adapter + restore/history endpoints on Go
+  web; S3: client editor page (yjs stack, hard cut of OT editor);
+  S4: flip — real-time Node + OT substrate → junk, runit + nginx + image
+  + new Yjs e2e (convergence / offline reload / history restore).
+- **Supersedes** the remaining "make OT services real" work (ARC-1/ARC-2 OT
+  persistence machinery) and the D16 support-LLM real-time port: with a CRDT
+  the transform/meshing layer no longer exists — history **is** the update
+  log ygo already versions.
 
 ### ARC-8a · Notifications Node tree severed (D17 tail) — **DONE (this commit)**
 The cron swap (ARC-8) left one live consumer on the Node tree: the frontend
