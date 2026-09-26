@@ -276,8 +276,17 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
       async addComment(pos: number, text: string, content: string) {
         const threadId = RangesTracker.generateId() as ThreadId
 
+        // D40 P2: the REST POST is the canonical create (the Yjs engine makes
+        // submitOp a no-op — document-container.ts); carry the doc + pinned
+        // range so the server's room record is anchor-complete.
         await postJSON(`/project/${projectId}/thread/${threadId}/messages`, {
-          body: { content },
+          body: {
+            content,
+            doc: currentDocument.doc_id,
+            ranges: [
+              { start: pos, end: pos + text.length },
+            ],
+          },
         })
 
         sendEvent('rp-new-comment', {

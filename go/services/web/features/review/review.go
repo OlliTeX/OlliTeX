@@ -175,11 +175,12 @@ type reviewUser struct {
 }
 
 type messageOut struct {
-	Content   string     `json:"content"`
-	ID        string     `json:"id"`
-	Timestamp string     `json:"timestamp"`
-	User      reviewUser `json:"user"`
-	UserID    string     `json:"user_id"`
+	Content   string           `json:"content"`
+	ID        string           `json:"id"`
+	Timestamp string           `json:"timestamp"`
+	User      reviewUser       `json:"user"`
+	UserID    string           `json:"user_id"`
+	Ranges    []map[string]any `json:"ranges,omitempty"`
 }
 
 // threadRecord — pinned Thread shape + documented superset (doc/author/created).
@@ -382,13 +383,17 @@ func (h *Handlers) threadRecord(ctx context.Context, pid, self string, st persis
 	}
 	for _, m := range msgs {
 		uid := uidOf(m.Author)
-		o.Messages = append(o.Messages, messageOut{
+		mo := messageOut{
 			Content:   m.Text,
 			ID:        m.ID,
 			Timestamp: isoMS(m.Created),
 			User:      h.userShape(ctx, uid, self),
 			UserID:    uid,
-		})
+		}
+		if len(m.Ranges) > 0 {
+			mo.Ranges = m.Ranges
+		}
+		o.Messages = append(o.Messages, mo)
 	}
 	if th.State == collab.ThreadStateResolved {
 		o.Resolved = true
@@ -445,9 +450,10 @@ func (h *Handlers) messageAdd(cxt *core.Cxt, res *core.Res) {
 		return
 	}
 	var body struct {
-		Content string `json:"content"`
-		ID      string `json:"id"`
-		Doc     string `json:"doc"`
+		Content string           `json:"content"`
+		ID      string           `json:"id"`
+		Doc     string           `json:"doc"`
+		Ranges  []map[string]any `json:"ranges"` // P1 plain ranges (pos+len pins from the panel)
 	}
 	if err := decodeBody(cxt.Req.Body, &body); err != nil || strings.TrimSpace(body.Content) == "" {
 		badBody(res)
@@ -487,6 +493,7 @@ func (h *Handlers) messageAdd(cxt *core.Cxt, res *core.Res) {
 		msg, _, _, merr := collab.AddComment(ctx, st, pid, collab.Comment{
 			ID: body.ID, ThreadID: threadID, File: file, Text: body.Content,
 			State: "opened", Author: author, Created: now, Edited: now,
+			Ranges: body.Ranges,
 		})
 		if merr != nil {
 			if created {

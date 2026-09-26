@@ -167,7 +167,7 @@ func TestThreadFirstMessageCreatesThread(t *testing.T) {
 	tid := "thr_0123456789abc"
 
 	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "owner",
-		`{"content":"why here?","doc":"main.tex"}`, map[string]string{"2": tid})
+		`{"content":"why here?","doc":"main.tex","ranges":[{"start":1,"end":5}]}`, map[string]string{"2": tid})
 	s := serve(t, c, h.messageAdd)
 	if s.code != 201 {
 		t.Fatalf("create code=%d body=%s", s.code, s.body)
@@ -188,6 +188,17 @@ func TestThreadFirstMessageCreatesThread(t *testing.T) {
 	}
 	if !strings.HasSuffix(m.Timestamp, ".000Z") {
 		t.Fatalf("timestamp %q not ISO-ms", m.Timestamp)
+	}
+
+	// ranges (P1 plain ranges, d1) are persisted on the message record
+	var withRanges threadRecord
+	_ = json.Unmarshal([]byte(s.body), &withRanges)
+	if len(withRanges.Messages[0].Ranges) != 1 {
+		t.Fatalf("ranges not persisted: %+v", withRanges.Messages[0])
+	}
+	rng, _ := withRanges.Messages[0].Ranges[0]["start"].(float64)
+	if rng != 1 {
+		t.Fatalf("range start = %v", withRanges.Messages[0].Ranges[0])
 	}
 
 	// GET threads → Record<threadId, Thread>
