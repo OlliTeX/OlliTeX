@@ -10,31 +10,31 @@
 //	GET    /admin/user/:userId/info   -> {activationLink, canManageTemplates}
 //
 // Node contracts reproduced exactly (each pinned):
-//  - gate: global chain (anon GET -> 302 /login; anon non-GET -> 403
-//    'Forbidden'; member non-GET token-less -> 403) then
-//    ensureUserIsSiteAdmin (member -> 302 /restricted?from=...,
-//    Accept-negotiated body via core.Res.Redirect).
-//  - row field order + JSON.stringify undefined-omit semantics (a user
-//    with a missing last_name / isAdmin / signUpDate drops the key,
-//    while canManageTemplates/inactive/deleted/authMethods/allow* are
-//    always present); dates are ISO-ms UTC.
-//  - search filter short-circuit quirk: exclusion requires
-//    email-no-match AND firstName-no-match AND lastName-no-match; a
-//    MISSING first/last name evaluates the clause to undefined (not -1)
-//    and therefore CANNOT be excluded (pinned: the 28 no-lastName users
-//    pass ANY search; a NULL name throws -> 500 page).
-//  - sort: by 'name' -> stable (lastName,firstName,email) case-insensitive
-//    with missing->'\uffff', ALWAYS ascending (Node ignores sort.order);
-//    else lodash orderBy on the key with undefined values LAST in asc /
-//    FIRST in desc (pinned sequences), strings lowercased; bad by/order
-//    -> OError 500 HTML page.
-//  - inactive = !lastActive || lastActive < (now - 1 calendar year).
-//  - info: activationLink from a live password token (use/password,
-//    data.user_id, expiresAt > now, usedAt absent, peekCount < MAX_PEEKS=4)
-//    else null; canManageTemplates = user flags (missing user / bad id ->
-//    false, both pinned 200).
-//  - urlencoded bodies: qs bracket nesting (filters[admin]=true) + string
-//    truthiness.
+//   - gate: global chain (anon GET -> 302 /login; anon non-GET -> 403
+//     'Forbidden'; member non-GET token-less -> 403) then
+//     ensureUserIsSiteAdmin (member -> 302 /restricted?from=...,
+//     Accept-negotiated body via core.Res.Redirect).
+//   - row field order + JSON.stringify undefined-omit semantics (a user
+//     with a missing last_name / isAdmin / signUpDate drops the key,
+//     while canManageTemplates/inactive/deleted/authMethods/allow* are
+//     always present); dates are ISO-ms UTC.
+//   - search filter short-circuit quirk: exclusion requires
+//     email-no-match AND firstName-no-match AND lastName-no-match; a
+//     MISSING first/last name evaluates the clause to undefined (not -1)
+//     and therefore CANNOT be excluded (pinned: the 28 no-lastName users
+//     pass ANY search; a NULL name throws -> 500 page).
+//   - sort: by 'name' -> stable (lastName,firstName,email) case-insensitive
+//     with missing->'\uffff', ALWAYS ascending (Node ignores sort.order);
+//     else lodash orderBy on the key with undefined values LAST in asc /
+//     FIRST in desc (pinned sequences), strings lowercased; bad by/order
+//     -> OError 500 HTML page.
+//   - inactive = !lastActive || lastActive < (now - 1 calendar year).
+//   - info: activationLink from a live password token (use/password,
+//     data.user_id, expiresAt > now, usedAt absent, peekCount < MAX_PEEKS=4)
+//     else null; canManageTemplates = user flags (missing user / bad id ->
+//     false, both pinned 200).
+//   - urlencoded bodies: qs bracket nesting (filters[admin]=true) + string
+//     truthiness.
 package adminusers
 
 import (
@@ -122,23 +122,23 @@ type fld struct {
 
 // urow — one formatted user (Node `_formatUserInfo` order).
 type urow struct {
-	id            string
-	email         fld
-	firstName     fld
-	lastName      fld
-	isAdmin       fld
-	canMgmtTmpl   bool
-	loginCount    fld
-	signUpDate    fld
-	lastActive    fld
-	lastLoggedIn  fld
-	authMethods   []string
-	allowUpdDet   bool
-	allowUpdAdm   bool
-	suspended     any
-	inactive      bool
-	deletedAt     fld
-	deleted       bool
+	id           string
+	email        fld
+	firstName    fld
+	lastName     fld
+	isAdmin      fld
+	canMgmtTmpl  bool
+	loginCount   fld
+	signUpDate   fld
+	lastActive   fld
+	lastLoggedIn fld
+	authMethods  []string
+	allowUpdDet  bool
+	allowUpdAdm  bool
+	suspended    any
+	inactive     bool
+	deletedAt    fld
+	deleted      bool
 }
 
 func fstr(s string) fld { return fld{kind: fStr, s: s} }
@@ -214,8 +214,13 @@ func esc(s string) string {
 }
 
 func jsonStr(s string) string { return `"` + esc(s) + `"` }
-func jsonBool(b bool) string  { if b { return "true" }; return "false" }
-func jsonInt(n int64) string  { return strconv.FormatInt(n, 10) }
+func jsonBool(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+func jsonInt(n int64) string { return strconv.FormatInt(n, 10) }
 func jsonArr(ss []string) string {
 	var b strings.Builder
 	b.WriteByte('[')
@@ -652,7 +657,7 @@ func jsonBodyFilters(body []byte) (filters, sortSpec, error) {
 	var f filters
 	var s sortSpec
 	if trimmed == "" {
-		return f, s, nil // {} 
+		return f, s, nil // {}
 	}
 	var anyv any
 	if err := json.Unmarshal([]byte(trimmed), &anyv); err != nil {

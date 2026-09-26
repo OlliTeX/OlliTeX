@@ -242,4 +242,3 @@ func dbxStr(m dbxBody, key string) (string, bool) {
 	}
 	return *s, true
 }
-

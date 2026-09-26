@@ -156,4 +156,3 @@ func pad32(s string) string {
 	}
 	return s + strings.Repeat("x", 32-len(s))
 }
-
