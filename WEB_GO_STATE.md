@@ -943,6 +943,15 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     clean; `go test -race` green across `go/services/web/...` + `cmd/web/...`.
     Diagnostic hardening kept: `internalErr` logs `review: 500: <err>` on
     stderr (500s must be diagnosable live).
+  - **d10 (2026-09-26, D40-surface read path)**: `GET /project/:pid/doc/:doc/changes`
+    — the D40 surface read path for tracked changes. The Node world served the
+    change list from the OT snapshot (dead in this fork), so the REST surface
+    gains the list endpoint (d8: REST is the shipping contract). Room-scoped
+    (P1 single content doc), creation order, role read (below → 404), wire
+    record {id, kind, file, start, end, content, author, created,
+    timestamp_ms, state}. E2E R5b asserts created change present w/ state
+    transition. (Editor-side capture + panel Changes-tab re-wire build on
+    this route — next D40 slice.)
   - **P2 REMAINING** = editor-side tracked-change creation (the D40-d5 pending
     piece).
   **P3** relative-position anchoring + concurrent-lifecycle races. **P4** legacy OT

@@ -226,6 +226,17 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
   expect(acc2.status).toBe(200)
   expect(acc2.json.accepted).toBe(0)
 
+  // R5b (d10): the D40-surface read path — GET the room's changes list;
+  // the created change is present with its post-accept state.
+  const list = await apiJSON(page, 'GET', `/project/${pid}/doc/${doc}/changes`)
+  expect(list.status).toBe(200)
+  expect(Array.isArray(list.json)).toBe(true)
+  const entry = (list.json as any[]).find((x) => x.id === cid)
+  expect(entry, 'd10: created change in list').toBeTruthy()
+  expect(entry.state).toBe('accepted')
+  expect(entry.kind).toBe('insert')
+  expect(typeof entry.timestamp_ms).toBe('number')
+
   // R6: track-changes state map (panel body {on_for, on_for_guests}, d5 pin)
   const tc = await apiJSON(page, 'POST', `/project/${pid}/track_changes`, {
     on_for: { e2e_probe_user: true },

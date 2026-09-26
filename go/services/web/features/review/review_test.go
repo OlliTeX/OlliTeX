@@ -138,6 +138,7 @@ func TestRoutesRegistered(t *testing.T) {
 		"DELETE|/project/[a-fA-F0-9]{24}/thread/.+/messages/.+",
 		"DELETE|/project/[a-fA-F0-9]{24}/thread/.+/own-messages/.+",
 		"POST|/project/[a-fA-F0-9]{24}/doc/.+/changes",
+		"GET|/project/[a-fA-F0-9]{24}/doc/.+/changes",
 		"POST|/project/[a-fA-F0-9]{24}/doc/.+/changes/accept",
 		"POST|/project/[a-fA-F0-9]{24}/track_changes",
 	}
@@ -501,6 +502,53 @@ func TestChangesGates(t *testing.T) {
 		`{bad json`, map[string]string{"2": "main.tex"})
 	if s := serve(t, c, h.changesCreate); s.code != http.StatusBadRequest {
 		t.Fatalf("bad body: %d %s", s.code, s.body)
+	}
+}
+
+// TestChangesList — d10 read path: GET the room's tracked-change records
+// (creation order, wire superset incl. state + author + timestamp_ms).
+func TestChangesList(t *testing.T) {
+	_, h, _ := setup(t)
+	c := cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/changes", "owner",
+		`{"content":"inserted text","start":6,"end":6}`, map[string]string{"2": "main.tex"})
+	s := serve(t, c, h.changesCreate)
+	if s.code != 201 {
+		t.Fatalf("create: %d %s", s.code, s.body)
+	}
+	var ch map[string]any
+	_ = json.Unmarshal([]byte(s.body), &ch)
+	id, _ := ch["change_id"].(string)
+
+	c = cxt(http.MethodGet, "/project/"+testPID+"/doc/main.tex/changes", "owner",
+		"", map[string]string{"2": "main.tex"})
+	s = serve(t, c, h.changesList)
+	if s.code != 200 {
+		t.Fatalf("list: %d %s", s.code, s.body)
+	}
+	var list []map[string]any
+	if err := json.Unmarshal([]byte(s.body), &list); err != nil {
+		t.Fatalf("list json: %v (%s)", err, s.body)
+	}
+	if len(list) != 1 {
+		t.Fatalf("list len = %d: %s", len(list), s.body)
+	}
+	if list[0]["id"] != id || list[0]["kind"] != "insert" || list[0]["state"] != "pending" {
+		t.Fatalf("entry = %v", list[0])
+	}
+	if list[0]["start"].(float64) != 6 || list[0]["timestamp_ms"].(float64) <= 0 {
+		t.Fatalf("entry fields = %v", list[0])
+	}
+
+	// role gate: read role (ReadOnly) passes; below-role (Deny) → 404
+	c = cxt(http.MethodGet, "/project/"+testPID+"/doc/main.tex/changes", "viewer",
+		"", map[string]string{"2": "main.tex"})
+	if s := serve(t, c, h.changesList); s.code != 200 {
+		t.Fatalf("viewer list: %d %s", s.code, s.body)
+	}
+	c = cxt(http.MethodGet, "/project/"+testPID+"/doc/main.tex/changes", "stranger",
+		"", map[string]string{"2": "main.tex"})
+	if s := serve(t, c, h.changesList); s.code != http.StatusNotFound {
+		t.Fatalf("stranger list: %d %s", s.code, s.body)
 	}
 }
 

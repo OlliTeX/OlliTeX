@@ -73,6 +73,7 @@ var (
 	msgOwnDelPattern = regexp.MustCompile(`^/project/(` + hex24 + `)/thread/(` + idRe + `)/own-messages/(` + idRe + `)$`)
 	changesPat       = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes$`)
 	changesAcceptPat = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes/accept$`)
+	changesListPat   = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes$`)
 	trackChangesPat  = regexp.MustCompile(`^/project/(` + hex24 + `)/track_changes$`)
 )
 
@@ -158,6 +159,7 @@ func Feature(a *core.App) core.Feature {
 		{Method: http.MethodDelete, Pattern: msgDelPattern, Handler: h.messageDelete},
 		{Method: http.MethodDelete, Pattern: msgOwnDelPattern, Handler: h.ownMessageDelete},
 		{Method: http.MethodPost, Pattern: changesPat, Handler: h.changesCreate},
+		{Method: http.MethodGet, Pattern: changesListPat, Handler: h.changesList},
 		{Method: http.MethodPost, Pattern: changesAcceptPat, Handler: h.changesAccept},
 		{Method: http.MethodPost, Pattern: trackChangesPat, Handler: h.trackChanges},
 	}}
@@ -181,6 +183,21 @@ type messageOut struct {
 	User      reviewUser       `json:"user"`
 	UserID    string           `json:"user_id"`
 	Ranges    []map[string]any `json:"ranges,omitempty"`
+}
+
+// changeOut — d10 tracked-change wire record (D40-surface read path; the
+// Node world exposed these via the OT snapshot, dead in this fork).
+type changeOut struct {
+	ID          string     `json:"id"`
+	Kind        string     `json:"kind"` // insert | delete
+	File        string     `json:"file"`
+	Start       int        `json:"start"`
+	End         int        `json:"end"`
+	Content     string     `json:"content"`
+	Author      reviewUser `json:"author,omitempty"`
+	Created     int64      `json:"created"`
+	TimestampMS int64      `json:"timestamp_ms"`
+	State       string     `json:"state"` // pending | accepted | rejected
 }
 
 // threadRecord — pinned Thread shape + documented superset (doc/author/created).
@@ -863,6 +880,40 @@ func (h *Handlers) changesAccept(cxt *core.Cxt, res *core.Res) {
 		ProjectID string `json:"project_id"`
 		Accepted  int    `json:"accepted"`
 	}{pid, accepted})
+}
+
+// changesList — GET /project/:pid/doc/:doc/changes (d10 — the D40-surface
+// read path; the Node world served these from the OT snapshot, dead in this
+// fork). Room-scoped list (P1 single content doc), creation order, full
+// lifecycle state; role read (below → 404, collabhistory convention).
+func (h *Handlers) changesList(cxt *core.Cxt, res *core.Res) {
+	pid := strings.ToLower(cxt.Params["1"])
+	self, ok := h.gate(cxt, res, pid, collab.ReadOnly)
+	if !ok {
+		return
+	}
+	var out []changeOut
+	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		all, err := collab.ListChanges(ctx, st, pid)
+		if err != nil {
+			return err
+		}
+		out = make([]changeOut, 0, len(all))
+		for _, ch := range all {
+			out = append(out, changeOut{
+				ID: ch.ID, Kind: ch.Kind, File: ch.File,
+				Start: ch.Start, End: ch.End, Content: ch.Content,
+				Author:  h.userShape(ctx, uidOf(ch.Author), self),
+				Created: ch.Created, TimestampMS: ch.Created,
+				State: ch.State,
+			})
+		}
+		return nil
+	}); err != nil {
+		internalErr(res, err)
+		return
+	}
+	okJSON(res, http.StatusOK, out)
 }
 
 // firstName — resolve-thread pinned user shape uses first_name only.
