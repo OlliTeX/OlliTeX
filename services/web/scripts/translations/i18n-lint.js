@@ -26,9 +26,16 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = Path.dirname(fileURLToPath(import.meta.url))
 const WEB_ROOT = Path.resolve(HERE, '../..')
-const EN_PATH = Path.join(WEB_ROOT, 'locales/en.json')
+// 2026-09-26 (D40 bake-4 repair): the P7 reorg (6fdddc5971) relocated
+// locales/ AND frontend/ to the repo root but missed this linter — its
+// paths scanned nothing (ENOENT is swallowed by walk()) or ENOENT'd on
+// en.json, so the repo-root ci gate (`make all`) was red while the
+// direction was half-skewed. HERE = services/web/scripts/translations;
+// the repo root is four levels up.
+const REPO_ROOT = Path.resolve(HERE, '../../../..')
+const EN_PATH = Path.join(REPO_ROOT, 'locales/en.json')
 const EXTRACTED_PATH = Path.join(
-  WEB_ROOT,
+  REPO_ROOT,
   'frontend/extracted-translations.json'
 )
 
@@ -84,7 +91,7 @@ function scanDir(dir, files = []) {
  */
 const LITERAL = /(?:\bt|translate)\(\s*(['"`])([A-Za-z0-9_.\-]+)\1(?!\s*,\s*(['"`]))/g
 const SOURCE_DIRS = [
-  Path.join(WEB_ROOT, 'frontend'),
+  Path.join(REPO_ROOT, 'frontend'),
   Path.join(WEB_ROOT, 'modules'),
   Path.join(WEB_ROOT, 'app'),
 ]
