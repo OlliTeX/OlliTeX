@@ -220,6 +220,7 @@ go-build: ## Build all Go service binaries into ./bin
 	$(GO) build -o bin/configdb ./cmd/configdb  ## operator CLI for the SQLite config DB (P7-post)
 	$(GO) build -o bin/cronmail ./cmd/cronmail  ## scheduled notification-email dispatch (replaces the Node process_notifications cron)
 	$(GO) build -o bin/collab ./cmd/collab  ## Yjs/Ygo collaboration service (ARC-9, D19)
+	$(GO) build -o bin/realtime ./cmd/realtime  ## socket.io 0.9 event-bus service (D28a: replaces the Node real-time service)
 
 .PHONY: go-test-cronmail
 go-test-cronmail: ## cronmail gate (byte-exact oracle templates + claim/loop semantics)
@@ -227,6 +228,9 @@ go-test-cronmail: ## cronmail gate (byte-exact oracle templates + claim/loop sem
 .PHONY: go-test-collab
 go-test-collab: ## collab gate (ARC-9: auth gate + CRDT convergence + persistence)
 	$(GO) build -buildvcs=false ./go/services/collab/... ./cmd/collab/ && $(GO) vet -buildvcs=false ./go/services/collab/... ./cmd/collab/ && test -z "$$(gofmt -l go/services/collab cmd/collab)" && $(GO) test -count=1 -race -buildvcs=false ./go/services/collab/...
+.PHONY: go-test-realtime
+go-test-realtime: ## real-time bus gate (D28a: wire pins + join flow + presence + drain + ws e2e)
+	$(GO) build -buildvcs=false ./go/services/realtime/... ./cmd/realtime/ && $(GO) vet -buildvcs=false ./go/services/realtime/... ./cmd/realtime/ && test -z "$$(gofmt -l go/services/realtime cmd/realtime)" && $(GO) test -count=1 -race -buildvcs=false ./go/services/realtime/...
 .PHONY: go-run-linked-url-proxy
 go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
 	$(GO) run ./cmd/linked-url-proxy
