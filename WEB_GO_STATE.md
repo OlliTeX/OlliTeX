@@ -14,12 +14,14 @@
 The Node→Go 1:1 port is complete for the **web** surface (Go `bin/web` on :4000
 canonical, Go `bin/web-api` on :3000) and the P6/P7 cutover + build-system
 rearchitecture (ubuntu:26.04) + P7-post items (1 SQLite config-DB, 2 GDPR
-consent, 3 /hub email templates, 4 go-i18n evaluation) all landed. Now in flight:
-turning the two remaining Node microservices (**history-v1**, **document-updater**)
-into real Go services (API/logic already ported+green in-repo; **storage/service
-layers are the gap**), refactoring **SQLite config-DB into the single source of
-truth** for site-wide settings (decoupling/removing the old docker env params),
-and a wave of **removals** (retire Node web, junk pages, Java git-bridge).
+consent, 3 /hub email templates, 4 go-i18n evaluation) all landed. **S4 FLIP
+F1 (IDE hard cut OT→Yjs client side) is now COMPLETE and live-verified**
+(A1–A5 browser battery green on the fresh image, 2026-09-26 — see the F1
+entry in §2 and D36/D37 above). Remaining flip work: F2 OT sweep + F3 e2e-
+suite promotion + D28a bus-to-Go. Also in flight: turning the two remaining
+Node microservices (**history-v1**, **document-updater**) into real Go
+services (API/logic already ported+green in-repo; **storage/service
+layers are the gap**) and the follow-on dependency-refresh arc (D27)..
 
 ---
 
@@ -508,6 +510,39 @@ collab service. Changes:
   under Yjs) shareDocState init.
 GATED: tsc **586 baseline held** (zero new — diffed vs stashed baseline),
 frontend engine vitest **14/14**, webpack production **compiled successfully**.
+
+**F1 STATUS: COMPLETE — live browser E2E GREEN (2026-09-26, image
+`ollitex/ollitex:main` = 7a64d71cbc99 @ commit `bf045526fb`).** Battery
+`tests/e2e/tmp-f1-e2e.mjs <pid>` on `ol-e2e-overleaf-1`: A1 editor boots with
+seeded (v1) content ✓; A2 D25 review placeholder visible ✓; A3 local typing
+committed (history v1→…v25) ✓; A4 external-peer push RELAYED and MIRRORED into
+the open live editor (text grew, marker present) ✓; A5 history chain (26
+versions, newest first, content per-version readable) ✓; zero page/console
+errors. Two production root causes found + fixed during bring-up: **D36**
+(nginx /collab now forwards `Host $http_host` — the port-kept form ygo's
+same-origin check requires; browser WS was 403-ing) and **D37** (the
+`document-container.ts` join-wait read a non-existent 2.x `.status` property;
+y-websocket 3.x exposes state via `status`/`synced` EVENTS — rewired). TEST-
+HARNESS bug (not production): the A4 push probe sent its update in the OUTER
+'auth' (tag-2) envelope — `y-protocols` requires the update INSIDE the sync
+(tag-0) envelope as sub-message 2, and relative to the SERVER's state vector
+(`encodeStateAsUpdate(doc, serverSv)` — against its own sv it is empty);
+`/tmp/wsprj/push.cjs` fixed and re-verified. Ops follow-through: psintern
+(`compose_cep` `overleafserver`) re-pointed to the same fresh image and
+re-verified (login page boots, form renders, zero JS errors — the earlier
+stale-asset break is healed); orphan container `crazy_einstein` (standalone
+idle mongo:6.0, no compose/data refs) STOPPED (kept, not deleted).
+
+**REMAINING S4-FLIP WORK (F2/F3 + D28a, per the D28 sequence):** F2 — client
+OT file sweep (retire `ide-react/connection/*` socket.io transport, `share-js-doc.ts`,
+`share-js-history-ot-type.ts`, the OT half of the editor path, `editor-
+watchdog-manager.ts`, vendored `sharejs.js`) + Go `features/history` OT-REST
+proxy retirement (superseded by `features/collabhistory`); D28a — move the
+app EVENT BUS from the Node `real-time` socket.io relay to a Go socket.io-
+compatible endpoint (the bus itself STAYS — presence/file-tree/settings —
+only the OT text sync died, D25/D28); F3 — the Yjs e2e above promoted into
+the repo suite (parity + restore + convergence) and the final flip commit
+(with D25's comments/track-changes owner decision recorded).
 
 **S3 remaining (NOW the S4-flip step)**: (a) awareness/presence cursors
 (the item-1 presence layer over `y-protocols/awareness` — needs the editor
