@@ -68,18 +68,28 @@ func scanSharedDirs() {
 		return
 	}
 	for _, f := range readDirNames(publicDir + "/js") {
-		if m := sharedFileRe.FindStringSubmatch(f); m != nil {
+		if m := sharedFileJSRe.FindStringSubmatch(f); m != nil {
 			sharedDirJS[m[1]] = "/js/" + f
 		}
 	}
 	for _, f := range readDirNames(publicDir + "/stylesheets") {
-		if m := sharedFileRe.FindStringSubmatch(f); m != nil {
+		if m := sharedFileCSSRe.FindStringSubmatch(f); m != nil {
 			sharedDirCSS[m[1]] = "/stylesheets/" + f
 		}
 	}
 }
 
-var sharedFileRe = regexp.MustCompile(`^(\d+)-[a-f0-9]{10,}\.js?$`)
+// Extension-split chunk regexes. (The earlier sharedFileRe was `\.js?$`,
+// a pattern that matched ONLY .js files — the CSS branch therefore mapped
+// NOTHING and every SHARED:CSS token silently degraded to no links
+// (sharedMissing only); webpack moved shared CSS into its own chunk files
+// the moment any entry had multiple shared chunks, so the broken CSS map
+// had been serving unstyled pages since that split — owner-reported as the
+// D39 login regression. D39a.)
+var (
+	sharedFileJSRe  = regexp.MustCompile(`^(\d+)-[a-f0-9]{10,}\.js$`)
+	sharedFileCSSRe = regexp.MustCompile(`^(\d+)-[a-f0-9]{10,}\.css$`)
+)
 
 func readDirNames(d string) []string {
 	ents, err := os.ReadDir(d)

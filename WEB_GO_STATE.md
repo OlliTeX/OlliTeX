@@ -832,12 +832,23 @@ user-settings/project-invite* entries have no CSS in the manifest). FIX:
 `\x01SHARED:CSS:pages/auth/login.js\x02` added to loginHTML (parity with
 registerHTML) — the per-generation resolver links the chunk CSS from the
 in-image entry file (D31 machinery). Gates green (views/core -race).
-DEPLOY: image re-bake + overleafserver cycle. **Build note:** first bake FAILED in
-`build-community` — `server-ce/services.js` still listed the retired `real-time` service
-(retired `ee26f0a0b2`); FIXED (entry removed) and re-bake launched (log
-/tmp/ol_build_d39.log). On completion: re-tag `ollitex/ollitex:main` +
-`cycle_overleafserver.sh` + live verify (green filled Login button
-`#098842`, card border visible, health green).
+DEPLOY: image re-bake + overleafserver cycle.
+
+**D39a (2026-09-26, the REAL root cause — supersedes D39's "capture-cap" theory):**
+`core.scanSharedDirs` matched shared-chunk files with `sharedFileRe =
+^(\\d+)-[a-f0-9]{10,}\\.js?$` — a pattern that can ONLY match `.js` files, so the CSS
+map was ALWAYS empty and every `SHARED:CSS` token silently emitted zero links (only
+`sharedMissing` bookkeeping). It went unnoticed because every shared-CSS test fixture
+was written for the JS path and the Node-era parity captures predate webpack's
+per-chunk CSS — until webpack split Mantine's rules into chunk CSS (the 09-26 assets),
+at which point login/register (and every token page) lost all shared styles. FIX:
+extension-split scan (`sharedFileJSRe` .js-only → sharedDirJS; `sharedFileCSSRe`
+.css-only → sharedDirCSS) + regression pin `TestSharedCSSResolution` (fails on the old
+code) + register parity capture re-pinned WITH the now-emitted 9663 shared CSS link at
+its token position (oracle re-bake; the link is the fix, the capture predated it).
+Gates: full `go/services/web/...` build+vet+`-race` green. DEPLOY REQUIRES A RE-BAKE
+(web binary is baked) + cycle + live verify after the D39 fix — the currently-live
+image (07da957c1f lineage) has the login token but STILL the broken CSS resolver.
 
 **D40 (2026-09-26, owner directive 10 — HIGHEST PRIORITY) — Y.Doc-native model for
 comments + tracked changes** — supersedes the D25 "placeholder" decision.
