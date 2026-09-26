@@ -855,10 +855,28 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
 - **Contract to serve = the V1 threads/track-changes API the in-git review panel calls**
   (`frontend/js/features/review-panel/`, e.g. `POST /project/:pid/doc/:docId/changes/accept
   {change_ids}`) NOT the legacy OT-comment shape — the panel is the ship client.
-- Phases: **P1** doc types + domain ops + hermetic tests (go/services/collab, roomdoc.go seam).
+- Phases: **P1** doc types + domain ops + hermetic tests (go/services/collab, roomdoc.go seam) —
+  **GREEN (a03d7385ce)**: review.go + review_test.go, 10 tests incl. order-independence and
+  double-reject idempotency.
   **P2** V1 contract routes on Go web (session+CSRF parity) + re-attach review panel + e2e.
   **P3** relative-position anchoring + concurrent-lifecycle races. **P4** legacy OT
   comments/tracked-changes backfill at first Y-join.
+- **P2 contract (PINNED from the in-git panel — do not invent; `frontend/js/features/review-panel/`):**
+  - `GET   /project/:pid/threads`
+  - `POST  /project/:pid/threads` (thread create; payload pinned at P2 build from threads-context)
+  - `POST  /project/:pid/thread/:threadId/messages` (add message)
+  - `POST  /project/:pid/thread/:threadId/messages/:commentId/edit` (edit message)
+  - `DELETE /project/:pid/thread/:threadId/messages/:commentId` (any owner)
+  - `DELETE /project/:pid/thread/:threadId/own-messages/:commentId` (own-message rule)
+  - `POST  /project/:pid/doc/:docId/thread/:threadId/resolve | /reopen`
+  - `DELETE /project/:pid/doc/:docId/thread/:threadId`
+  - `POST  /project/:pid/doc/:docId/changes/accept` `{change_ids: [...]}`
+  - `POST  /project/:pid/track_changes` (state toggle; payload pinned at P2 build)
+  - NUANCE: the panel rejects changes CLIENT-side (source-editor
+    `changes/reject-changes` does the text edit) then state-syncs — in Yjs the content edit is a
+    plain Y.Text mutation (already CRDT-convergent) + a server state transition; the P1
+    server-applied RejectChange mutation stays as the deterministic path for server-driven/batch
+    flows. P2 maps panel flow → (client text edit + state op) exactly as the panel does.
 
 **D41 (2026-09-26, owner item 11) — history-v1 / document-updater → Yjs verdicts**
 - **history-v1: YES (hybrid b1).** Yjs-native history = the Y.Doc update stream; versions/restore
