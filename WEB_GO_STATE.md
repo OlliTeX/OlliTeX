@@ -940,22 +940,24 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     granularity) PASSED on the BAKED image (47s); `collab-yjs` PASSED. Go
     green-slice: gofmt/vet/build clean; `go test -race` green across
     `go/services/web/...` + `cmd/web/...`.
-  - **DEPLOYED LIVE (2026-09-26, psintern.neuro.uni-bremen.de)**: image
-    `ollitex/ollitex:main` = revision `b362f8e5a7` (label + image-ID match
-    verified post-cycle). **Ops gotcha pinned**: the compose cycle must run
-    from `/data_1/docker/compose_cep/overleafserver/` — the PARENT-level
-    `cycle_overleafserver.sh` targets a DIFFERENT compose project, so its
-    `down` is a no-op and its `up` conflicts on the container name
-    ("already in use by d7e04d…"). Max reachable verification (prod users
-    are LDAP-synced WITHOUT password hashes — 0 hash-bearing accounts;
+  - **DEPLOYED LIVE (2026-09-26, psintern.neuro.uni-bremen.de, FINAL P2)**: image
+    `ollitex/ollitex:main` = revision `7418e76dac` (label + image-ID match
+    verified post-cycle). **Ops gotchas pinned**: (1) the compose cycle must
+    run from `/data_1/docker/compose_cep/overleafserver/` — the PARENT-level
+    `cycle_overleafserver.sh` targets a DIFFERENT compose project (its `down`
+    no-ops, its `up` conflicts on the container name); (2) `docker compose up
+    --force-recreate` does NOT re-fetch a same-NAME image (compose compares
+    by reference, not digest) — after a bake, `stop` + `rm -f` + `up` to pick
+    up the new digest (seen 2026-09-26: e2e stack stayed on the old bundle,
+    R8 failed against the stale client). Max reachable verification (prod
+    users are LDAP-synced WITHOUT password hashes — 0 hash-bearing accounts;
     owner-only authenticated session, the recorded 2026-09-07 platform
     reality): `/` 302 gate, `/status` 200, `/login` 200 + button
     `rgb(9,136,66)` (#098842) + CSS loaded (D39 regression clean), review
-    GET routes 302 (login gate present) / POST routes 403 (CSRF gate —
-    routes LIVE, not 404), login 401 on non-hash accounts = expected auth
-    behavior. Authenticated D40 round-trips: verified on the IDENTICAL
-    image in the e2e stack (full battery green); owner's LDAP session to
-    confirm in-use.
+    GET routes 302 / POST routes 403 (gates present — routes LIVE, not 404)
+    incl. the new `/ranges` + `/changes/users`. Authenticated D40 round-trips:
+    verified on the IDENTICAL image in the e2e stack — full battery R1–R8b
+    GREEN first-attempt x2; owner's LDAP session to confirm in-use.
   - **d10 (2026-09-26, D40-surface read path)**: `GET /project/:pid/doc/:doc/changes`
     — the D40 surface read path for tracked changes. The Node world served the
     change list from the OT snapshot (dead in this fork), so the REST surface
@@ -1008,8 +1010,11 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     P1: single content doc `main.tex` (d4 text-only; multi-doc + sub-char
     positions = P3). **d11b** (same slice): delete spans now carry the
     DELETED text (startState slice, 4 KiB cap) so the server stores it and
-    the panel renders op.d (d11b: `ViewUpdate.startState` in this tree —
-    NOT `stateBefore`, 586=586 proof). E2E R8 (ranges shape + resolve
+    the panel renders op.d. **Explicit kind pin (R8b proof)**: the create
+    surface infers kind from content-emptiness, so content-bearing deletes
+    MUST pin `kind:'delete'` (else they record as insert — the d11b body
+    sets it). d11b gotcha: `ViewUpdate.startState` in this tree — NOT
+    `stateBefore` (586=586 proof). E2E R8 (ranges shape + resolve
     transparency: reopen state visible, panel resolve reflected) + R8b
     (delete record carries op.d text). **P2 REMAINING** = visual pass of
     the rendered tab (the wire it renders is pinned by R8/R8b).
