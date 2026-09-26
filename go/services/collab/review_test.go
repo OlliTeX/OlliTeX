@@ -362,3 +362,114 @@ func TestHistoryIncludesReviews(t *testing.T) {
 		t.Fatalf("head comments = %d (want 1)", n)
 	}
 }
+
+func TestThreadLifecycle(t *testing.T) {
+	ctx := ctx0()
+	store := newMemStore(t)
+	seedRoom(t, store, "room", "hello world")
+
+	th, applied, _, err := AddThread(ctx, store, "room", Thread{
+		ID: "555555555555555555555555", File: "main.tex",
+		Author: map[string]any{"user_id": "u1"}, Created: 10,
+	})
+	if err != nil || !applied || th.State != ThreadStateOpened {
+		t.Fatalf("add thread: applied=%v state=%q err=%v", applied, th.State, err)
+	}
+
+	// Idempotent re-add.
+	if _, applied, _, _ := AddThread(ctx, store, "room", Thread{ID: "555555555555555555555555"}); applied {
+		t.Fatalf("thread re-add must be a no-op")
+	}
+
+	// Messages belong to the thread.
+	msg := Comment{ID: "666666666666666666666666", ThreadID: "555555555555555555555555",
+		File: "main.tex", Text: "why here?", State: "opened", Ranges: []map[string]any{{"start": 1, "end": 5}}}
+	if _, applied, _, err := AddComment(ctx, store, "room", msg); err != nil || !applied {
+		t.Fatalf("add message: %v", err)
+	}
+	if _, applied, _, err := AddCommentReply(ctx, store, "room", msg.ID, map[string]any{"text": "a reply"}); err != nil || !applied {
+		t.Fatalf("reply: %v", err)
+	}
+
+	standalone := Comment{ID: "676767676767676767676767", File: "main.tex", Text: "loose"}
+	if _, applied, _, _ := AddComment(ctx, store, "room", standalone); !applied {
+		t.Fatalf("standalone message")
+	}
+
+	all, _ := ListComments(ctx, store, "room")
+	if len(all) != 2 {
+		t.Fatalf("all comments: %d", len(all))
+	}
+	msgs, _ := MessagesOfThread(ctx, store, "room", "555555555555555555555555")
+	if len(msgs) != 1 || msgs[0].ID != msg.ID {
+		t.Fatalf("thread messages: %+v", msgs)
+	}
+
+	// Resolve → reopen transitions + state validation.
+	if _, applied, _, _ := SetThreadState(ctx, store, "room", "555555555555555555555555", ThreadStateResolved); !applied {
+		t.Fatalf("resolve")
+	}
+	if _, applied, _, _ := SetThreadState(ctx, store, "room", "555555555555555555555555", ThreadStateResolved); applied {
+		t.Fatalf("double resolve must be a no-op")
+	}
+	got, _, _, _ := SetThreadState(ctx, store, "room", "555555555555555555555555", ThreadStateOpened)
+	if got.Resolved != 0 {
+		t.Fatalf("reopen must clear resolved ts: %d", got.Resolved)
+	}
+	if _, _, _, err := SetThreadState(ctx, store, "room", "555555555555555555555555", "bogus"); err == nil {
+		t.Fatalf("bogus state must be rejected")
+	}
+	if _, _, _, err := SetThreadState(ctx, store, "room", "999999999999999999999999", ThreadStateResolved); err != ErrThreadNotFound {
+		t.Fatalf("want ErrThreadNotFound, got %v", err)
+	}
+
+	// Thread deletion cascades to its messages, keeps standalone comments.
+	if applied, _, err := DeleteThread(ctx, store, "room", "555555555555555555555555"); err != nil || !applied {
+		t.Fatalf("delete thread: %v", err)
+	}
+	if applied, _, _ := DeleteThread(ctx, store, "room", "555555555555555555555555"); applied {
+		t.Fatalf("double delete must be a no-op")
+	}
+	rest, _ := ListComments(ctx, store, "room")
+	if len(rest) != 1 || rest[0].ID != standalone.ID {
+		t.Fatalf("cascade left: %+v", rest)
+	}
+	if threads, _ := ListThreads(ctx, store, "room"); len(threads) != 0 {
+		t.Fatalf("threads left: %+v", threads)
+	}
+}
+
+func TestThreadAndConcurrentTextOrderIndependence(t *testing.T) {
+	ctx := ctx0()
+	deltaThread := func() []byte {
+		s := newMemStore(t)
+		seedRoom(t, s, "room", "hello")
+		if _, applied, _, _ := AddThread(ctx, s, "room", Thread{ID: "777777777777777777777777", File: "main.tex"}); !applied {
+			t.Fatalf("thread add")
+		}
+		upd, _, ok, err := s.GetUpdate(ctx, "room", 2)
+		if err != nil || !ok {
+			t.Fatalf("getupdate: %v", err)
+		}
+		return upd
+	}
+	edit := captureDeltaEdit(t, ctx, "hello", "hello two")
+
+	for _, order := range [][2][]byte{{deltaThread(), edit}, {edit, deltaThread()}} {
+		s := newMemStore(t)
+		seedRoom(t, s, "room", "hello")
+		if _, err := s.AppendUpdate(ctx, "room", order[0]); err != nil {
+			t.Fatalf("append0: %v", err)
+		}
+		if _, err := s.AppendUpdate(ctx, "room", order[1]); err != nil {
+			t.Fatalf("append1: %v", err)
+		}
+		if text, _, _ := HeadText(ctx, s, "room"); text != "hello two" {
+			t.Fatalf("text %q", text)
+		}
+		threads, _ := ListThreads(ctx, s, "room")
+		if len(threads) != 1 || threads[0].ID != "777777777777777777777777" {
+			t.Fatalf("threads: %+v", threads)
+		}
+	}
+}

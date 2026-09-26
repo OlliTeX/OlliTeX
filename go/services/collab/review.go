@@ -51,7 +51,31 @@ import (
 const (
 	CommentsType = "comments"
 	ChangesType  = "trackedChanges"
+	ThreadsType  = "threads"
 )
+
+const (
+	ThreadStateOpened   = "opened"
+	ThreadStateResolved = "resolved"
+)
+
+var (
+	// ErrThreadNotFound — no thread with that id in the room.
+	ErrThreadNotFound = errors.New("collab: thread not found")
+)
+
+// Thread — D40 P2 thread record (V1 panel contract unit: a doc-anchored
+// discussion with an ordered message list; messages = Comment records with
+// ThreadID = this id). Exact wire field names are pinned when the web
+// routes are wired (P2); the domain shape here is the storage contract.
+type Thread struct {
+	ID       string
+	File     string         // doc path the thread anchors to
+	State    string         // opened | resolved
+	Author   map[string]any // opener (panel author shape pinned per route in P2)
+	Created  int64
+	Resolved int64 // ms; 0 = never resolved
+}
 
 const (
 	ChangeKindInsert = "insert"
@@ -90,20 +114,22 @@ func NewReviewID(now time.Time) string {
 	return hex.EncodeToString(b)
 }
 
-// Comment — D40 comment record (P1: Node-contract-compatible shape; the
-// exact state values and REST envelope are pinned to the V1 panel contract
-// in P2). Ranges are {start,end} pairs (d1: plain; relative-position
-// anchors land in P3 once the wire carries them).
+// Comment — D40 comment record. P1: standalone comment shape; P2 adds the
+// thread model (ThreadID non-empty = a message of that thread — the V1
+// panel contract is thread-based: thread meta + an ordered message list).
+// Ranges are {start,end} pairs (d1: plain; relative-position anchors land
+// in P3 once the wire carries them).
 type Comment struct {
-	ID      string
-	File    string // doc path (e.g. "main.tex")
-	Text    string
-	State   string
-	Author  map[string]any // user id / email / name / image (panel shape in P2)
-	Ranges  []map[string]any
-	Created int64 // ms since epoch
-	Edited  int64 // ms since epoch
-	Replies []map[string]any
+	ID       string
+	ThreadID string // empty = standalone (P1 / legacy-compat); set = V1 thread message
+	File     string // doc path (e.g. "main.tex")
+	Text     string
+	State    string
+	Author   map[string]any // user id / email / name / image (panel shape in P2)
+	Ranges   []map[string]any
+	Created  int64 // ms since epoch
+	Edited   int64 // ms since epoch
+	Replies  []map[string]any
 }
 
 // TrackedChange — D40 tracked-change record. Kind/Start/End/Content describe
@@ -134,6 +160,7 @@ func jsonKey(v any) (string, error) {
 func mapToComment(m *crdt.YMap) (Comment, error) {
 	var c Comment
 	c.ID = strVal(m, "id")
+	c.ThreadID = strVal(m, "thread_id")
 	c.File = strVal(m, "file")
 	c.Text = strVal(m, "text")
 	c.State = strVal(m, "state")
@@ -428,10 +455,196 @@ func ListComments(ctx context.Context, store persistence.VersionedPersistence, r
 	return out, nil
 }
 
-// --- tracked changes ---
+// --- threads (V1 panel contract unit) ---
+
+func threadToMap(th Thread, m *crdt.YMap, txn *crdt.Transaction) {
+	m.Set(txn, "id", th.ID)
+	m.Set(txn, "file", th.File)
+	m.Set(txn, "state", th.State)
+	if th.Author != nil {
+		if s, err := jsonKey(th.Author); err == nil {
+			m.Set(txn, "author", s)
+		}
+	}
+	m.Set(txn, "created", th.Created)
+	m.Set(txn, "resolved", th.Resolved)
+}
+
+func mapToThread(m *crdt.YMap) (Thread, error) {
+	var th Thread
+	th.ID = strVal(m, "id")
+	th.File = strVal(m, "file")
+	th.State = strVal(m, "state")
+	if raw, ok := m.Get("author"); ok {
+		if err := parseJSONVal(raw, &th.Author); err != nil {
+			return th, err
+		}
+	}
+	th.Created = int64Val(m, "created")
+	th.Resolved = int64Val(m, "resolved")
+	return th, nil
+}
+
+// AddThread — register a thread. Idempotent on id; empty id ⇒ generated.
+func AddThread(ctx context.Context, store persistence.VersionedPersistence, room string, th Thread) (Thread, bool, persistence.Version, error) {
+	if th.ID == "" {
+		th.ID = NewReviewID(time.Now())
+	}
+	if th.State == "" {
+		th.State = ThreadStateOpened
+	}
+	d, err := loadReviewDoc(ctx, store, room)
+	if err != nil {
+		return Thread{}, false, 0, err
+	}
+	if m, _, ok := findRecord(d, ThreadsType, th.ID); ok {
+		ex, err := mapToThread(m)
+		if err != nil {
+			return Thread{}, false, 0, err
+		}
+		lr, _ := store.Load(ctx, room)
+		return ex, false, lr.Version, nil
+	}
+	svBefore := d.StateVector().Clone()
+	m := crdt.NewMapPrelim()
+	d.Transact(func(txn *crdt.Transaction) {
+		threadToMap(th, m, txn)
+		txn.GetArray(ThreadsType).PushType(txn, m)
+	})
+	v, err := appendReviewDelta(ctx, store, room, d, svBefore)
+	if err != nil {
+		return Thread{}, false, 0, err
+	}
+	return th, true, v, nil
+}
+
+// SetThreadState — resolve/reopen (idempotent on target; resolved-timestamp
+// recorded on transition to resolved, cleared on reopen).
+func SetThreadState(ctx context.Context, store persistence.VersionedPersistence, room, id, state string) (Thread, bool, persistence.Version, error) {
+	if state != ThreadStateOpened && state != ThreadStateResolved {
+		return Thread{}, false, 0, fmt.Errorf("collab: thread state must be %q or %q", ThreadStateOpened, ThreadStateResolved)
+	}
+	d, err := loadReviewDoc(ctx, store, room)
+	if err != nil {
+		return Thread{}, false, 0, err
+	}
+	m, _, ok := findRecord(d, ThreadsType, id)
+	if !ok {
+		return Thread{}, false, 0, ErrThreadNotFound
+	}
+	cur, err := mapToThread(m)
+	if err != nil {
+		return Thread{}, false, 0, err
+	}
+	if cur.State == state {
+		lr, _ := store.Load(ctx, room)
+		return cur, false, lr.Version, nil
+	}
+	now := time.Now().UnixMilli()
+	if state == ThreadStateResolved {
+		cur.Resolved = now
+	} else {
+		cur.Resolved = 0
+	}
+	svBefore := d.StateVector().Clone()
+	cur.State = state
+	d.Transact(func(txn *crdt.Transaction) {
+		threadToMap(cur, m, txn)
+	})
+	v, err := appendReviewDelta(ctx, store, room, d, svBefore)
+	if err != nil {
+		return Thread{}, false, 0, err
+	}
+	return cur, true, v, nil
+}
+
+// DeleteThread — remove a thread AND its messages (all comments carrying
+// thread_id = id; standalone comments untouched). Idempotent.
+func DeleteThread(ctx context.Context, store persistence.VersionedPersistence, room, id string) (bool, persistence.Version, error) {
+	d, err := loadReviewDoc(ctx, store, room)
+	if err != nil {
+		return false, 0, err
+	}
+	thIdx := -1
+	for i := 0; i < d.GetArray(ThreadsType).Len(); i++ {
+		if m, ok := d.GetArray(ThreadsType).Get(i).(*crdt.YMap); ok && strVal(m, "id") == id {
+			thIdx = i
+			break
+		}
+	}
+	if thIdx == -1 {
+		lr, _ := store.Load(ctx, room)
+		return false, lr.Version, nil
+	}
+	// Compute the message indices to remove BEFORE the transaction — the
+	// type accessors (Len/Get) acquire outside the txn lock; txn-scoped
+	// mutations (Delete) run inside it.
+	msgIdx := []int{}
+	comments := d.GetArray(CommentsType)
+	for i := 0; i < comments.Len(); i++ {
+		if m, ok := comments.Get(i).(*crdt.YMap); ok && strVal(m, "thread_id") == id {
+			msgIdx = append(msgIdx, i)
+		}
+	}
+	svBefore := d.StateVector().Clone()
+	// Delete messages first (innermost), then the thread — one transaction;
+	// delete from the highest index down so indices stay valid.
+	d.Transact(func(txn *crdt.Transaction) {
+		arr := txn.GetArray(CommentsType)
+		for i := len(msgIdx) - 1; i >= 0; i-- {
+			arr.Delete(txn, msgIdx[i], 1)
+		}
+		txn.GetArray(ThreadsType).Delete(txn, thIdx, 1)
+	})
+	v, err := appendReviewDelta(ctx, store, room, d, svBefore)
+	if err != nil {
+		return false, 0, err
+	}
+	return true, v, nil
+}
+
+// ListThreads — the room's threads in array order.
+func ListThreads(ctx context.Context, store persistence.VersionedPersistence, room string) ([]Thread, error) {
+	d, err := loadReviewDoc(ctx, store, room)
+	if err != nil {
+		return nil, err
+	}
+	a := d.GetArray(ThreadsType)
+	out := make([]Thread, 0, a.Len())
+	for i := 0; i < a.Len(); i++ {
+		m, ok := a.Get(i).(*crdt.YMap)
+		if !ok {
+			continue
+		}
+		th, err := mapToThread(m)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, th)
+	}
+	return out, nil
+}
+
+// MessagesOfThread — the thread's messages in array (panel) order.
+func MessagesOfThread(ctx context.Context, store persistence.VersionedPersistence, room, threadID string) ([]Comment, error) {
+	all, err := ListComments(ctx, store, room)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Comment, 0)
+	for _, c := range all {
+		if c.ThreadID == threadID {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
 
 func commentToMap(c Comment, m *crdt.YMap, txn *crdt.Transaction) {
 	m.Set(txn, "id", c.ID)
+	if c.ThreadID != "" {
+		m.Set(txn, "thread_id", c.ThreadID)
+	}
 	m.Set(txn, "file", c.File)
 	m.Set(txn, "text", c.Text)
 	m.Set(txn, "state", c.State)
