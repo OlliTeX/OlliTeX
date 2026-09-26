@@ -276,23 +276,33 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
     { on_for: { [uid]: true } },
   )
   expect(tcSelf.status).toBe(200)
-  // let the relay → context → editor-manager sync chain settle
-  await page.waitForTimeout(1500)
-  const typed = ` d40-capture-${stamp}`
+  // CONVERGENCE: the relay → context → editor-manager → doc.sync chain is
+  // best-effort (d7) and may land a moment after the POST — wait until a
+  // typed marker IS captured (retry the type until the gate is on). This is
+  // the live-verification of the gate; the pin stays "capture works while
+  // track-changes is on for this session".
   await page.click('.cm-content')
   await page.keyboard.press('Control+End')
-  await page.keyboard.type(typed)
-  await page.waitForTimeout(1500)
-  const listCap = await apiJSON(page, 'GET', `/project/${pid}/doc/${doc}/changes`)
-	 expect(listCap.status).toBe(200)
+  let capturedInserts = ''
+  let lastStatus = 0
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const marker = ` d40-capture-${stamp}a${attempt}`
+    if (attempt > 0) await page.waitForTimeout(1200)
+    await page.keyboard.type(marker)
+    await page.waitForTimeout(1200)
+    const chk = await apiJSON(page, 'GET', `/project/${pid}/doc/${doc}/changes`)
+    lastStatus = chk.status
+    capturedInserts = ((chk.json as any[]) ?? [])
+      .filter((x) => x.kind === 'insert' && typeof x.content === 'string')
+      .map((x) => x.content as string)
+      .join('')
+    if (capturedInserts.includes(`d40-capture-${stamp}`)) break
+  }
+	 expect(lastStatus).toBe(200)
 	 // OT-parity granularity: each kept stroke is its own change record —
 	 // assert LOSSLESS coverage of the typed text (inserts, list order =
 	 // creation order), not a single merged record (grouping is a panel-UX
 	 // concern, not the d5 surface contract).
-	 const capturedInserts = (listCap.json as any[])
-		.filter((x) => x.kind === 'insert' && typeof x.content === 'string')
-		.map((x) => x.content)
-		.join('')
 	 expect(
 		capturedInserts.includes(`d40-capture-${stamp}`),
 		'd11: typed edit captured while track-changes on (inserts=' +
@@ -356,7 +366,9 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
     const view = el && el.cmView ? el.cmView.view : null
     if (!view) throw new Error('R8b: no CM view')
     const len = view.state.doc.length
-    view.dispatch(view.state.replaceRange('', 0, len))
+    // primitive dispatch spec (changes + selection) — this fork's CM state
+    // bridge has no state.replaceRange helper.
+    view.dispatch({ changes: { from: 0, to: len, insert: '' }, selection: { anchor: 0 } })
   })
   await page.waitForTimeout(1500)
   const rangesCap2 = await apiJSON(page, 'GET', `/project/${pid}/ranges`)
