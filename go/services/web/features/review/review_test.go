@@ -141,6 +141,8 @@ func TestRoutesRegistered(t *testing.T) {
 		"GET|/project/[a-fA-F0-9]{24}/doc/.+/changes",
 		"POST|/project/[a-fA-F0-9]{24}/doc/.+/changes/accept",
 		"POST|/project/[a-fA-F0-9]{24}/track_changes",
+		"GET|/project/[a-fA-F0-9]{24}/ranges",
+		"GET|/project/[a-fA-F0-9]{24}/changes/users",
 	}
 	if len(f.Routes) != len(want) {
 		t.Fatalf("routes = %d, want %d", len(f.Routes), len(want))
@@ -658,5 +660,188 @@ func TestTimestampPinned(t *testing.T) {
 	}
 	if !strings.Contains(s.body, "2023-11-14T22:13:20.000Z") { // 1700000000000ms, pinned clock
 		t.Fatalf("timestamp not from pinned clock: %s", s.body)
+	}
+}
+
+// ---------- D40-d12: the panel Changes-tab legacy endpoints ----------
+
+// TestRangesList — GET /project/:pid/ranges must return the panel's
+// Changes-tab wire shape (pinned from use-project-ranges.ts +
+// review-panel-change.tsx / review-panel-overview-file.tsx), built from
+// the room's Y.Doc (insert entries {op:{i,p}}, delete entries {op:{d,p}},
+// comment pointers {op:{t,p:0}, resolved}), role-gated read.
+func TestRangesList(t *testing.T) {
+	_, h, _ := setup(t)
+	ctx := context.Background()
+	if _, _, _, err := collab.AddThread(ctx, h.Store, testPID, collab.Thread{
+		ID: "thr-1", File: "main.tex", State: "opened",
+		Author: map[string]any{"user_id": "owner"},
+	}); err != nil {
+		t.Fatalf("thread: %v", err)
+	}
+	if _, _, _, err := collab.AddComment(ctx, h.Store, testPID, collab.Comment{
+		ThreadID: "thr-1", File: "main.tex", Text: "a question",
+		Author: map[string]any{"user_id": "owner"},
+	}); err != nil {
+		t.Fatalf("comment: %v", err)
+	}
+	if _, _, _, err := collab.SetThreadStateBy(ctx, h.Store, testPID, "thr-1", "resolved", map[string]any{"user_id": "user2"}); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if _, _, _, err := collab.AddThread(ctx, h.Store, testPID, collab.Thread{
+		ID: "thr-2", File: "main.tex", State: "opened",
+		Author: map[string]any{"user_id": "user2"},
+	}); err != nil {
+		t.Fatalf("thread2: %v", err)
+	}
+	if _, _, _, err := collab.AddComment(ctx, h.Store, testPID, collab.Comment{
+		ThreadID: "thr-2", File: "main.tex", Text: "an open question",
+		Author: map[string]any{"user_id": "user2"},
+	}); err != nil {
+		t.Fatalf("comment2: %v", err)
+	}
+	if _, _, _, err := collab.AddChange(ctx, h.Store, testPID, collab.TrackedChange{
+		ID: "chg-i1", Kind: "insert", File: "main.tex", Start: 6, End: 6,
+		Content: "inserted text", Author: map[string]any{"user_id": "owner"},
+	}); err != nil {
+		t.Fatalf("addChange ins: %v", err)
+	}
+	if _, _, _, err := collab.AddChange(ctx, h.Store, testPID, collab.TrackedChange{
+		ID: "chg-d1", Kind: "delete", File: "main.tex", Start: 2, End: 5,
+		Content: "del text", Author: map[string]any{"user_id": "user2"},
+	}); err != nil {
+		t.Fatalf("addChange del: %v", err)
+	}
+
+	c := cxt(http.MethodGet, "/project/"+testPID+"/ranges", "owner", "", map[string]string{})
+	s := serve(t, c, h.rangesList)
+	if s.code != 200 {
+		t.Fatalf("rangesList: %d %s", s.code, s.body)
+	}
+	var arr []map[string]any
+	if err := json.Unmarshal([]byte(s.body), &arr); err != nil {
+		t.Fatalf("json: %v (%s)", err, s.body)
+	}
+	if len(arr) != 1 || arr[0]["id"] != "main.tex" {
+		t.Fatalf("entries = %s", s.body)
+	}
+	rng, _ := arr[0]["ranges"].(map[string]any)
+	if rng == nil {
+		t.Fatalf("no ranges object: %s", s.body)
+	}
+	changes, _ := rng["changes"].([]any)
+	comments, _ := rng["comments"].([]any)
+	if len(changes) != 2 {
+		t.Fatalf("changes len = %d: %s", len(changes), s.body)
+	}
+	if len(comments) != 2 {
+		t.Fatalf("comments len = %d: %s", len(comments), s.body)
+	}
+	// insert entry: {id, op:{i, p}, state, metadata}
+	var insMap, delMap, insMsg, openMsg map[string]any
+	for _, raw := range comments {
+		e := raw.(map[string]any)
+		op := e["op"].(map[string]any)
+		switch op["t"] {
+		case "thr-1":
+			insMsg = e
+		case "thr-2":
+			openMsg = e
+		}
+	}
+	if insMsg == nil || openMsg == nil {
+		t.Fatalf("comment pointers missing: %s", s.body)
+	}
+	if insMsg["resolved"] != true {
+		t.Fatalf("thr-1 should be resolved: %v", insMsg)
+	}
+	if openMsg["resolved"] != false {
+		t.Fatalf("thr-2 should be open: %v", openMsg)
+	}
+	for _, raw := range changes {
+		e := raw.(map[string]any)
+		op := e["op"].(map[string]any)
+		if e["id"] == "chg-i1" {
+			insMap = e
+			if op["i"] != "inserted text" {
+				t.Fatalf("insert op.i = %v", op)
+			}
+			if op["p"].(float64) != 6 {
+				t.Fatalf("insert op.p = %v", op)
+			}
+			md, _ := e["metadata"].(map[string]any)
+			if md == nil || md["user_id"] != "owner" {
+				t.Fatalf("insert metadata = %v", e)
+			}
+		}
+		if e["id"] == "chg-d1" {
+			delMap = e
+			if op["d"] != "del text" {
+				t.Fatalf("delete op.d = %v (d11b: deleted text carried)", op)
+			}
+			if op["p"].(float64) != 2 {
+				t.Fatalf("delete op.p = %v", op)
+			}
+		}
+	}
+	if insMap == nil || delMap == nil {
+		t.Fatalf("change entries missing: %s", s.body)
+	}
+	// role gate: read passes, below → 404
+	if s := serve(t, cxt(http.MethodGet, "/project/"+testPID+"/ranges", "viewer", "", nil), h.rangesList); s.code != 200 {
+		t.Fatalf("viewer ranges: %d %s", s.code, s.body)
+	}
+	if s := serve(t, cxt(http.MethodGet, "/project/"+testPID+"/ranges", "stranger", "", nil), h.rangesList); s.code != http.StatusNotFound {
+		t.Fatalf("stranger ranges: %d %s", s.code, s.body)
+	}
+}
+
+// TestChangesUsers — GET /project/:pid/changes/users returns the distinct
+// authors (comments + changes) in the panel's ChangesUser shape.
+func TestChangesUsers(t *testing.T) {
+	_, h, _ := setup(t)
+	ctx := context.Background()
+	if _, _, _, err := collab.AddThread(ctx, h.Store, testPID, collab.Thread{
+		ID: "thr-1", File: "main.tex", State: "opened",
+		Author: map[string]any{"user_id": "owner"},
+	}); err != nil {
+		t.Fatalf("thread: %v", err)
+	}
+	if _, _, _, err := collab.AddComment(ctx, h.Store, testPID, collab.Comment{
+		ThreadID: "thr-1", File: "main.tex", Text: "hi",
+		Author: map[string]any{"user_id": "owner"},
+	}); err != nil {
+		t.Fatalf("comment: %v", err)
+	}
+	if _, _, _, err := collab.AddChange(ctx, h.Store, testPID, collab.TrackedChange{
+		ID: "chg-1", Kind: "insert", File: "main.tex", Start: 1, End: 1,
+		Content: "x", Author: map[string]any{"user_id": "user2"},
+	}); err != nil {
+		t.Fatalf("addChange: %v", err)
+	}
+	c := cxt(http.MethodGet, "/project/"+testPID+"/changes/users", "owner", "", nil)
+	s := serve(t, c, h.changesUsers)
+	if s.code != 200 {
+		t.Fatalf("changesUsers: %d %s", s.code, s.body)
+	}
+	var arr []map[string]any
+	if err := json.Unmarshal([]byte(s.body), &arr); err != nil {
+		t.Fatalf("json: %v (%s)", err, s.body)
+	}
+	if len(arr) != 2 {
+		t.Fatalf("users len = %d: %s", len(arr), s.body)
+	}
+	byID := map[string]map[string]any{}
+	for _, u := range arr {
+		byID[u["id"].(string)] = u
+	}
+	if byID["owner"]["email"] != "owner@e.test" {
+		t.Fatalf("owner user shape = %v", byID["owner"])
+	}
+	if byID["user2"] == nil || byID["user2"]["email"] != "user2@e.test" {
+		t.Fatalf("user2 user shape = %v", byID)
+	}
+	if s := serve(t, cxt(http.MethodGet, "/project/"+testPID+"/changes/users", "stranger", "", nil), h.changesUsers); s.code != http.StatusNotFound {
+		t.Fatalf("stranger: %d %s", s.code, s.body)
 	}
 }

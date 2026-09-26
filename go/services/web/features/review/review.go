@@ -75,6 +75,8 @@ var (
 	changesAcceptPat = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes/accept$`)
 	changesListPat   = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes$`)
 	trackChangesPat  = regexp.MustCompile(`^/project/(` + hex24 + `)/track_changes$`)
+	rangesPat        = regexp.MustCompile(`^/project/(` + hex24 + `)/ranges$`)
+	changesUsersPat  = regexp.MustCompile(`^/project/(` + hex24 + `)/changes/users$`)
 )
 
 // RoleFor — (user, project) → collab role (collab policy; collabhistory parity).
@@ -162,6 +164,8 @@ func Feature(a *core.App) core.Feature {
 		{Method: http.MethodGet, Pattern: changesListPat, Handler: h.changesList},
 		{Method: http.MethodPost, Pattern: changesAcceptPat, Handler: h.changesAccept},
 		{Method: http.MethodPost, Pattern: trackChangesPat, Handler: h.trackChanges},
+		{Method: http.MethodGet, Pattern: rangesPat, Handler: h.rangesList},
+		{Method: http.MethodGet, Pattern: changesUsersPat, Handler: h.changesUsers},
 	}}
 }
 
@@ -1043,4 +1047,214 @@ func (w webMongo) ProjectByID(ctx context.Context, id string) (bson.D, error) {
 		return nil, err
 	}
 	return d, nil
+}
+
+// ---------- D40-d12: the panel Changes-tab legacy endpoints ------------
+//
+// The panel's historical OT contract for the Changes tab was
+//   GET /project/:pid/ranges          (per-doc review ranges)
+//   GET /project/:pid/changes/users   (authors for entry labels)
+// which the legacy track-changes shadow proxied to the dead OT DU pipeline
+// (the same 500-donor as d8). Per d5/d8 the REST surface IS the shipping
+// contract: both are re-anchored here over the room's Y.Doc, in the EXACT
+// wire shapes the panel renders (use-project-ranges.ts +
+// review-panel-change.tsx / review-panel-overview-file.tsx):
+//
+//   ranges = [{ "id": <content doc>,
+//              "ranges": { "changes":  [ChangeShape...],
+//                          "comments": [CommentShape...] } }]
+//
+//   ChangeShape  = { id, op: {i: <inserted text>, p: <pos>} |
+//                                 {d: <deleted text>,  p: <pos>},
+//                    state?, metadata: {user_id, ts (s), name?} }
+//        — review-panel-change.tsx branches on 'i'/'d' in op and renders
+//          op.i/op.d; overview-file sorts entries by op.p.
+//   CommentShape = { id, op: {t: <threadId>, p: 0}, resolved,
+//                    metadata: {user_id, ts (s), name?} }
+//        — comment CONTENT is resolved by the panel through the threads
+//          surface (threads?.[comment.op.t]; R1–R4 live-verified), so the
+//          ranges entry is a pointer (op.t) + state (resolved).
+//
+// Both gate at ReadOnly (below ⇒ 404, no project-existence leak — the D40
+// rule).
+//
+// P1 scope: the room's single content doc is `main.tex` (d4: text files
+// only; multi-doc anchoring + sub-char positions are P3 relative positions).
+
+type rangesOp struct {
+	I string `json:"i,omitempty"`
+	D string `json:"d,omitempty"`
+	T string `json:"t,omitempty"`
+	P *int   `json:"p"`
+}
+
+type rangesChange struct {
+	ID       string         `json:"id"`
+	Op       rangesOp       `json:"op"`
+	State    string         `json:"state,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+type rangesComment struct {
+	ID       string         `json:"id"`
+	Op       rangesOp       `json:"op"`
+	Resolved bool           `json:"resolved"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+type rangesR struct {
+	Changes  []rangesChange  `json:"changes"`
+	Comments []rangesComment `json:"comments"`
+}
+
+type rangesE struct {
+	ID     string  `json:"id"`
+	Ranges rangesR `json:"ranges"`
+}
+
+type changeUserOut struct {
+	ID        string `json:"id"`
+	Email     string `json:"email,omitempty"`
+	FirstName string `json:"first_name,omitempty"`
+	LastName  string `json:"last_name,omitempty"`
+}
+
+func (h *Handlers) rangesList(cxt *core.Cxt, res *core.Res) {
+	pid := strings.ToLower(cxt.Params["1"])
+	self, ok := h.gate(cxt, res, pid, collab.ReadOnly)
+	if !ok {
+		return
+	}
+	var e rangesE
+	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		e.Ranges.Changes = []rangesChange{}
+		e.Ranges.Comments = []rangesComment{}
+		chs, err := collab.ListChanges(ctx, st, pid)
+		if err != nil {
+			return err
+		}
+		for _, ch := range chs {
+			pos := ch.Start
+			rc := rangesChange{ID: ch.ID, State: ch.State,
+				Op: rangesOp{P: &pos}}
+			if ch.Kind == collab.ChangeKindInsert {
+				rc.Op.I = ch.Content
+			} else {
+				// d11b: delete spans carry the deleted text as content,
+				// so the panel renders a real <del> (op.d).
+				rc.Op.D = ch.Content
+			}
+			if uid := uidOf(ch.Author); uid != "" {
+				rc.Metadata = h.d12Meta(ctx, uid, ch.Created)
+			}
+			e.Ranges.Changes = append(e.Ranges.Changes, rc)
+		}
+		ths, err := collab.ListThreads(ctx, st, pid)
+		if err != nil {
+			return err
+		}
+		for _, th := range ths {
+			msgs, err := collab.MessagesOfThread(ctx, st, pid, th.ID)
+			if err != nil {
+				return err
+			}
+			if len(msgs) == 0 {
+				continue
+			}
+			head := msgs[0]
+			p0 := 0
+			rc := rangesComment{ID: head.ID, Op: rangesOp{T: th.ID, P: &p0},
+				Resolved: th.Resolved != 0}
+			if uid := uidOf(head.Author); uid != "" {
+				rc.Metadata = h.d12Meta(ctx, uid, head.Created)
+			}
+			e.Ranges.Comments = append(e.Ranges.Comments, rc)
+		}
+		return nil
+	}); err != nil {
+		internalErr(res, err)
+		return
+	}
+	_ = self
+	e.ID = "main.tex" // P1 room content doc (see section note)
+	okJSON(res, http.StatusOK, []rangesE{e})
+}
+
+// d12Meta — entry metadata: user_id (changes/users lookup) + ts (SECONDS —
+// OT parity: the panel's FormatTimeBasedOnYear consumes the OT-era shape)
+// + name for one-line display.
+func (h *Handlers) d12Meta(ctx context.Context, uid string, ms int64) map[string]any {
+	md := map[string]any{"user_id": uid}
+	if ms > 0 {
+		md["ts"] = ms / 1000
+	}
+	if h.UserFor != nil {
+		if raw := h.UserFor(ctx, uid); raw != nil {
+			if v, ok := anyField(raw, "name"); ok {
+				md["name"] = v
+			}
+		}
+	}
+	return md
+}
+
+func (h *Handlers) changesUsers(cxt *core.Cxt, res *core.Res) {
+	pid := strings.ToLower(cxt.Params["1"])
+	if _, ok := h.gate(cxt, res, pid, collab.ReadOnly); !ok {
+		return
+	}
+	seen := map[string]bool{}
+	var order []string
+	add := func(a map[string]any) {
+		uid := uidOf(a)
+		if uid == "" || seen[uid] {
+			return
+		}
+		seen[uid] = true
+		order = append(order, uid)
+	}
+	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		if chs, err := collab.ListChanges(ctx, st, pid); err == nil {
+			for _, ch := range chs {
+				add(ch.Author)
+			}
+		}
+		if ths, err := collab.ListThreads(ctx, st, pid); err == nil {
+			for _, th := range ths {
+				add(th.Author)
+				if msgs, err := collab.MessagesOfThread(ctx, st, pid, th.ID); err == nil {
+					for _, m := range msgs {
+						add(m.Author)
+					}
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		internalErr(res, err)
+		return
+	}
+	out := make([]changeUserOut, 0, len(order))
+	ctx := cxt.Req.Context()
+	for _, uid := range order {
+		cu := changeUserOut{ID: uid}
+		if h.UserFor != nil {
+			if raw := h.UserFor(ctx, uid); raw != nil {
+				for _, k := range []string{"email", "first_name", "last_name"} {
+					if v, ok := anyField(raw, k); ok {
+						switch k {
+						case "email":
+							cu.Email = v
+						case "first_name":
+							cu.FirstName = v
+						case "last_name":
+							cu.LastName = v
+						}
+					}
+				}
+			}
+		}
+		out = append(out, cu)
+	}
+	okJSON(res, http.StatusOK, out)
 }

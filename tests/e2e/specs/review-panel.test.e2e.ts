@@ -300,6 +300,73 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
 			')',
 	).toBeTruthy()
 
+  // R8 (d12): the panel Changes-tab legacy endpoints (re-anchored to the
+  // D40 surface) return the panel's exact render shapes: entries with
+  // op:{i|d, p} for changes (captured + the R5 insert) and comment
+  // pointers op:{t} w/ resolved state; changes/users lists the session
+  // author. This is the Changes-tab read path the legacy DU proxy used to
+  // 500 on (d8).
+  const rangesCap = await apiJSON(page, 'GET', `/project/${pid}/ranges`)
+  expect(rangesCap.status).toBe(200)
+  const re = (Array.isArray(rangesCap.json) ? (rangesCap.json as any[])[0] : null)
+  expect(re && re.id === doc, 'd12: ranges entry id = ' + doc).toBeTruthy()
+  const rc = ((re && re.ranges && re.ranges.changes) ?? []) as any[]
+  const rt = ((re && re.ranges && re.ranges.comments) ?? []) as any[]
+  const rcText = rc.map((x) => (x.op && x.op.i) ? String(x.op.i) : '').join('')
+  expect(
+    rcText.includes(`d40-capture-${stamp}`),
+    'd12: captured change visible via panel changes op.i (entries=' +
+      JSON.stringify(rc.map((x) => x && x.op)) + ')',
+  ).toBeTruthy()
+  const tEntry = rt.find((x) => x && x.op && x.op.t === tid)
+  expect(tEntry, 'd12: thread comment pointer present in ranges').toBeTruthy()
+  expect(
+    tEntry.resolved === false,
+    'd12: pointer carries resolved state (R4b left it reopened)',
+  ).toBeTruthy()
+  // the PANEL resolve action (pin: same URL) re-resolves via REST and the
+  // ranges pointer follows (d12 is state-transparent)
+  const rRes = await apiJSON(
+    page,
+    'POST',
+    `/project/${pid}/doc/${doc}/thread/${tid}/resolve`,
+  )
+  expect(rRes.status).toBe(200)
+  const rangesCapR = await apiJSON(page, 'GET', `/project/${pid}/ranges`)
+  const rtR = (((rangesCapR.json as any[] | null)?.[0]?.ranges as any)?.comments ?? []) as any[]
+  const tEntryR = rtR.find((x) => x && x.op && x.op.t === tid)
+  expect(tEntryR && tEntryR.resolved === true, 'd12: resolved state visible').toBeTruthy()
+  const usersCap = await apiJSON(page, 'GET', `/project/${pid}/changes/users`)
+  expect(usersCap.status).toBe(200)
+  expect(
+    Array.isArray(usersCap.json) &&
+      (usersCap.json as any[]).some((u) => u && u.id === uid),
+    'd12: changes/users contains the session author (' +
+      JSON.stringify(usersCap.json) + ')',
+  ).toBeTruthy()
+
+  // R8b (d11b): with track-changes ON, deleting a selected span produces a
+  // delete record that carries the DELETED text (op.d) — the panel's <del>
+  // render (per d5 the delete body gains content; the d12 ranges surface
+  // renders it as op.d).
+  await page.click('.cm-content')
+  await page.keyboard.press('Control+End')
+  await page.keyboard.press('Shift+Home')
+  await page.keyboard.press('Backspace')
+  await page.waitForTimeout(1500)
+  const rangesCap2 = await apiJSON(page, 'GET', `/project/${pid}/ranges`)
+  const rc2 = ((
+    (((rangesCap2.json as any[] | null)?.[0]?.ranges as any)?.changes ?? []) as any[]
+  )
+  const delText = rc2
+    .map((x) => (x && x.op && x.op.d) ? String(x.op.d) : '')
+    .join('')
+  expect(
+    delText.includes(`d40-capture-${stamp}`),
+    'd11b: deleted text carried on the delete record (op.d=' +
+      JSON.stringify(delText.slice(0, 200)) + ')',
+  ).toBeTruthy()
+
   // R7: own-message rule — the session author can delete via the own route
   // (the 403 foreign-author branch is hermetically pinned in the Go suite
   // TestOwnMessageRule).

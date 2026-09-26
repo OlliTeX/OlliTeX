@@ -119,8 +119,22 @@ export const trackedChangesCapture = (
     update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
       spans.push({ from: fromA, to: toA, insert: inserted.toString() })
     })
-    for (const body of spanBodies(spans)) {
-      void fetch(
+    for (const spanBody of spanBodies(spans)) {
+    let body = spanBody as Record<string, unknown>
+    const bStart = body.start as number
+    const bEnd = body.end as number
+    if (bEnd > bStart && (body.content as unknown) === undefined) {
+      // d11b: carry the DELETED text (old-space slice from startState)
+      // so the server stores it and the panel renders op.d. The d5
+      // delete body {start,end} stays shape-compatible (the create
+      // surface accepts content on deletes). Capped at 4 KiB (honest
+      // pin for pathological deletions).
+      body = {
+        ...body,
+        content: update.startState.sliceDoc(bStart, bEnd).slice(0, 4096),
+      }
+    }
+    void fetch(
         `/project/${pid}/doc/${encodeURIComponent(
           currentDoc.doc_id
         )}/changes`,

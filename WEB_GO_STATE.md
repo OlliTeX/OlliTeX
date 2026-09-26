@@ -988,9 +988,31 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     vitest failure set IDENTICAL with/without the slice (stash A/B — 0
     regressions; the 123 FAIL lines are the pinned pre-existing
     local-env alias failures).
-  - **P2 REMAINING** = panel Changes-tab re-wire to the d10 read path (the
-    panel currently reads changes from the dead OT historyOT snapshot —
-    the d5/d8 superseded source; slice after live capture verification).
+  - **P2 tail COMPLETE (d12, 2026-09-26)** — the panel Changes-tab read path
+    (GET /project/:pid/ranges + /changes/users) re-anchored to the D40
+    surface; see d12 below. Remaining P2-scope UI work = visual pass of the
+    rendered tab (R8/R8b pin the wire it renders).
+  - **d12 (2026-09-26, panel Changes-tab re-wire)**: the panel's historical
+    OT endpoints (`GET /project/:pid/ranges` per-doc review ranges +
+    `GET /project/:pid/changes/users` authors) were still owned by the
+    legacy track-changes DU proxy (the d8 500-donor). Per d5/d8 (REST =
+    shipping contract) both re-anchored to the review feature (wins by
+    d8 route order) over the room Y.Doc. Wire shapes pinned from
+    use-project-ranges.ts + review-panel-change.tsx/
+    review-panel-overview-file.tsx: entries `{id, op:{i|d, p}, state?,
+    metadata:{user_id, ts(s), name?}}` (render branches on 'i'/'d'; sorted
+    by op.p) and comment POINTERS `{id, op:{t: threadId, p:0}, resolved,
+    metadata}` (content comes from the threads surface — R1–R4) — the OT
+    `Change<EditOperation>` deep shape is intentionally NOT replayed: the
+    minimal render contract is enough and keeps the d10/d5 surface clean.
+    P1: single content doc `main.tex` (d4 text-only; multi-doc + sub-char
+    positions = P3). **d11b** (same slice): delete spans now carry the
+    DELETED text (startState slice, 4 KiB cap) so the server stores it and
+    the panel renders op.d (d11b: `ViewUpdate.startState` in this tree —
+    NOT `stateBefore`, 586=586 proof). E2E R8 (ranges shape + resolve
+    transparency: reopen state visible, panel resolve reflected) + R8b
+    (delete record carries op.d text). **P2 REMAINING** = visual pass of
+    the rendered tab (the wire it renders is pinned by R8/R8b).
   **P3** relative-position anchoring + concurrent-lifecycle races. **P4** legacy OT
   comments/tracked-changes backfill at first Y-join.
 - **P2 contract (PINNED from the in-git panel — do not invent; `frontend/js/features/review-panel/`):**
