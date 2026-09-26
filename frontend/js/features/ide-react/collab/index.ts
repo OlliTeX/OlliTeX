@@ -8,6 +8,7 @@ export {
 } from "./engine";
 export { TEXT_TYPE as Y_TEXT_TYPE } from "./text-type";
 export { syncExtension } from "./codemirror";
+export { spanBodies, type TrackedChangeBody } from "./capture";
 export {
   attachProviders,
   collabEndpoint,

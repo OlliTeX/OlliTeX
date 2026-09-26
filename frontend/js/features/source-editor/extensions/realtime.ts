@@ -14,13 +14,24 @@
 // (they are inert under the Yjs engine — D25 disables the OT review
 // surfaces).
 
-import { Annotation, type ChangeSpec, type Transaction } from '@codemirror/state'
-import { EditorView, ViewPlugin } from '@codemirror/view'
+import {
+  Annotation,
+  type ChangeSpec,
+  type Extension,
+  Transaction,
+} from '@codemirror/state'
+import { EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view'
 import { EventEmitter } from 'events'
 import type RangesTracker from '@overleaf/ranges-tracker'
 import { debugConsole } from '@/utils/debugging'
+import getMeta from '@/utils/meta'
 import { DocumentContainer } from '@/features/ide-react/editor/document-container'
-import { syncExtension } from '@/features/ide-react/collab'
+import {
+  syncExtension,
+  spanBodies,
+  type LocalChange,
+  type TrackedChangeBody,
+} from '@/features/ide-react/collab'
 
 type Origin = 'remote' | 'undo' | 'reject' | undefined
 
@@ -64,9 +75,71 @@ export const realtime = (
     bridge,
     // The D24 local direction: CM6 change spans → Y.Text.
     syncExtension(currentDoc.sync),
+    // D40 (d5 pending piece — editor-side tracked-change creation): while this
+    // session's track-changes is ON, capture local edits as
+    // server-authoritative change records (d2 propose/apply, d10 read path).
+    trackedChangesCapture(currentDoc),
     ensureBridge,
   ]
 }
+
+// ------------------------------------------------------------------------
+// D40 — editor-side tracked-change capture (source-editor extension).
+//
+// Gated on `currentDoc.track_changes_as` (set by
+// editor-manager-context from the panel's 'toggle-track-changes' intent /
+// the `track_changes` REST state). Every LOCAL edit span becomes one
+// change record on the D40 create surface
+// (POST /project/:pid/doc/:doc/changes, d5/d10): zero-width insert
+// {content, start, end: start} or delete {start, end}. Remote mirrors
+// (userEvent 'input.remote') never capture. Best-effort by design — a
+// capture failure must NEVER block typing (Node parity: review writes are
+// best-effort around the document flow).
+// ------------------------------------------------------------------------
+
+// (The pure span→body contract, `spanBodies`, lives in the collab engine
+// package — ide-react/collab/capture.ts — and is re-exported here for
+// host-side consumers.)
+export { spanBodies, type TrackedChangeBody } from '@/features/ide-react/collab'
+
+const isRemoteMirror = (update: ViewUpdate) =>
+  update.transactions.some(
+    tx => tx.annotation(Transaction.userEvent) === 'input.remote'
+  )
+
+export const trackedChangesCapture = (
+  currentDoc: DocumentContainer
+): Extension =>
+  EditorView.updateListener.of(update => {
+    if (!update.docChanged || isRemoteMirror(update)) return
+    if (currentDoc.track_changes_as == null) return
+    const pid = getMeta('ol-project_id')
+    if (!pid) return
+    const spans: LocalChange[] = []
+    update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+      spans.push({ from: fromA, to: toA, insert: inserted.toString() })
+    })
+    for (const body of spanBodies(spans)) {
+      void fetch(
+        `/project/${pid}/doc/${encodeURIComponent(
+          currentDoc.doc_id
+        )}/changes`,
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': getMeta('ol-csrfToken') ?? '',
+          },
+          body: JSON.stringify(body),
+        }
+      ).catch(e =>
+        debugConsole.warn(
+          '[d40] tracked-change capture failed: ' + String(e)
+        )
+      )
+    }
+  })
 
 // ------------------------------------------------------------------------
 // Compatibility surface (OT-era imports still reference these; all inert

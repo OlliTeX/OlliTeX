@@ -952,8 +952,27 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     timestamp_ms, state}. E2E R5b asserts created change present w/ state
     transition. (Editor-side capture + panel Changes-tab re-wire build on
     this route — next D40 slice.)
-  - **P2 REMAINING** = editor-side tracked-change creation (the D40-d5 pending
-    piece).
+  - **d11 (2026-09-26, editor-side tracked-change capture — d5 pending piece
+    implemented)**: when this session's track-changes is ON (the panel's
+    'toggle-track-changes' intent → editor-manager-context →
+    `DocumentContainer.setTrackChangesUserId` → `track_changes_as` — the
+    D25 DISABLED pin is superseded), every LOCAL CM6 edit span is captured
+    as server-authoritative change records on the d5 create surface
+    (POST /project/:pid/doc/:doc/changes): pure insert → zero-width
+    {content,start,end:start}; pure delete → {start,end}; replace → BOTH,
+    delete first (a record is single-kinded; d2 idempotent apply). Pure
+    span→body contract in `ide-react/collab/capture.ts` (`spanBodies`,
+    5 unit tests in the pinned CollabYjs vitest set); host listener
+    `trackedChangesCapture` in `source-editor/extensions/realtime.ts`
+    (gated on track_changes_as; skips remote mirrors via
+    Transaction.userEvent 'input.remote'; best-effort fetch — failure
+    never blocks typing). Gates: tsc 586=586 (0 new); CollabYjs vitest
+    19/19; services/web vitest failure set IDENTICAL with/without the
+    slice (stash A/B — 0 regressions; the 123 FAIL lines are the pinned
+    pre-existing local-env alias failures).
+  - **P2 REMAINING** = panel Changes-tab re-wire to the d10 read path (the
+    panel currently reads changes from the dead OT historyOT snapshot —
+    the d5/d8 superseded source; slice after live capture verification).
   **P3** relative-position anchoring + concurrent-lifecycle races. **P4** legacy OT
   comments/tracked-changes backfill at first Y-join.
 - **P2 contract (PINNED from the in-git panel — do not invent; `frontend/js/features/review-panel/`):**

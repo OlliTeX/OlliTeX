@@ -118,11 +118,16 @@ export class DocumentContainer extends EventEmitter {
   }
 
   setTrackChangesUserId(userId: string | null): void {
-    if (userId != null) {
-      debugConsole.log(
-        '[doc] tracked changes requested (Yjs engine — DISABLED, D25)'
-      )
-    }
+    // D40 (supersedes the D25 DISABLED pin): this session's track-changes
+    // intent — editor-manager-context mirrors the panel's
+    // 'toggle-track-changes' state here. The capture extension (source-editor
+    // /extensions/realtime.ts) reads this as its gate: non-null ⇒ local edits
+    // are captured as server-authoritative tracked-change records (d2/d10).
+    this.track_changes_as = userId
+    debugConsole.log(
+      '[doc] track-changes:',
+      userId == null ? 'off' : `on for ${userId}`
+    )
   }
 
   setTrackChangesIdSeeds(_id_seeds: unknown): void {
@@ -130,7 +135,7 @@ export class DocumentContainer extends EventEmitter {
   }
 
   getTrackingChanges(): boolean {
-    return false
+    return this.track_changes_as != null
   }
 
   // --------------------------------------------------------------------

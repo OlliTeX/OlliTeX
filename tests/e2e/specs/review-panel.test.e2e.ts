@@ -255,6 +255,44 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
   expect(tc2.json.track_changes?.e2e_probe_user).toBe(true)
   expect(tc2.json.track_changes?.merge_probe).toBe(true)
 
+  // R6b (d11): editor-side capture — enable tracking for THIS session user,
+  // type into the editor, and the captured change lands on the d10 read
+  // path. Gate chain (pinned): POST track_changes → 'toggle-track-changes'
+  // relay → panel context → wantTrackChanges → editor-manager sync →
+  // doc.setTrackChangesUserId → capture extension gate.
+  const uid = await page.evaluate(() => {
+    const m = (window as any).metaAttributesCache
+    if (m && typeof m.get === 'function') {
+      const u = m.get('ol-user')
+      return u && u.id ? String(u.id) : null
+    }
+    return null
+  })
+  expect(uid, 'd11: session user id resolvable in page').toBeTruthy()
+  const tcSelf = await apiJSON(
+    page,
+    'POST',
+    `/project/${pid}/track_changes`,
+    { on_for: { [uid]: true } },
+  )
+  expect(tcSelf.status).toBe(200)
+  // let the relay → context → editor-manager sync chain settle
+  await page.waitForTimeout(1500)
+  const typed = ` d40-capture-${stamp}`
+  await page.click('.cm-content')
+  await page.keyboard.press('Control+End')
+  await page.keyboard.type(typed)
+  await page.waitForTimeout(1500)
+  const listCap = await apiJSON(page, 'GET', `/project/${pid}/doc/${doc}/changes`)
+  expect(listCap.status).toBe(200)
+  const cap = (listCap.json as any[]).find((x) => x.content === typed)
+  expect(
+    cap,
+    'd11: typed edit captured while track-changes on (list=' +
+      JSON.stringify((listCap.json as any[])?.map((x) => x?.content)) +
+      ')',
+  ).toBeTruthy()
+
   // R7: own-message rule — the session author can delete via the own route
   // (the 403 foreign-author branch is hermetically pinned in the Go suite
   // TestOwnMessageRule).
