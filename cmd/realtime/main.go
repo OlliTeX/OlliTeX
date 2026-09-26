@@ -11,7 +11,9 @@
 //	REAL_TIME_REDIS_PORT || REDIS_PORT || 6379
 //	REAL_TIME_REDIS_PASSWORD || REDIS_PASSWORD || ''
 //	WEB_API_HOST || WEB_HOST || 127.0.0.1
-//	WEB_API_PORT || WEB_PORT || 4000 (Go web)
+//	WEB_API_PORT || WEB_PORT || 3000 — the Go web API-PROFILE listener
+//	(exactly the Node real-time default: the private join/flush APIs live on
+//	the api profile, NOT the web profile on :4000)
 //	WEB_API_USER            (default overleaf)
 //	WEB_API_PASSWORD        (default password)
 //	DOCUMENT_UPDATER_HOST || DOCUPDATER_HOST || 127.0.0.1 (:3003)
@@ -97,7 +99,7 @@ func main() {
 	if webHost == "" {
 		webHost = "127.0.0.1"
 	}
-	webPort := 4000
+	webPort := 3000
 	if v, ok := env("WEB_API_PORT", "WEB_PORT"); ok {
 		if n, err := strconv.Atoi(v); err == nil {
 			webPort = n

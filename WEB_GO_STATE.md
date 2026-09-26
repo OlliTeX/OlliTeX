@@ -723,3 +723,37 @@ confirm order or prioritize.**
   `tests/e2e/specs/`.
 - Deploy/build: `server-ce/` (→ `build-images`, D11),
   `/data_1/docker/compose_cep/`.
+
+---
+
+## 10. D28a — real-time event bus in Go (2026-09-26, LIVE)
+
+The Node `services/real-time` socket.io-0.9 relay is replaced by a Go service
+(`go/services/realtime/` + `cmd/realtime`, port 3026, 1:1 wire contract —
+live-captured strings pinned in `protocol_test.go`). The browser socket.io
+0.9.17-overleaf-6 client is unchanged. OT doc transport (`joinDoc` /
+`leaveDoc` / `applyOtUpdate`) is deliberately NOT ported — after the F2 hard
+cut, real-time is purely the collaboration-event bus (presence, cursors,
+join/leave, drain, ops); text sync lives in the Yjs/Ygo collab engine (port
+3450). Doc-granting moved to join time (`grantdocs.go`) since F2 clients
+no longer emit `joinDoc`.
+
+**Flip (this slice):**
+- `server-ce/runit/real-time-overleaf/run` → `go-services/realtime` (Node
+  kept only as an in-image fallback if the binary is absent)
+- `server-ce/Dockerfile` builds `go-services/realtime` alongside the other
+  go-services
+- `cmd/realtime/main.go`: `WEB_API_PORT||WEB_PORT||3000` — the join/flush
+  private API lives on the Go web **api profile** (:3000), exactly like the
+  Node bus default. (A first build defaulted to the :4000 web profile, which
+  correctly 403s CSRF-blocks POST /join — caught by E2E, fixed.)
+- Gate: `make go-test-realtime` (build+vet+gofmt+test -race; wire pins,
+  join flows, presence, drain, ops, full websocket client e2e) — GREEN.
+
+**Live verification (2026-09-26, image `48b64fdbcde9`, e2e stack):**
+- D28a bus battery — B1 IDE boots (bus join) · B2 second tab boots ·
+  B3 `/clients` shows both publicIds · B4 `/count-connected-clients`=2 ·
+  B5 close tab → count drops to 1 — ALL PASS.
+- F1 regression battery — A1 render · A2 D25 placeholder · A3 typing →
+  history v2 · A4 external peer push mirrored · A5 history chain ≥3 —
+  ALL PASS (the bus flip changed only the transport underneath).

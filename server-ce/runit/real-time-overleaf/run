@@ -1,6 +1,15 @@
 #!/bin/bash
 
+# real-time — the Overleaf socket.io 0.9 event bus (D28a: Go since the
+# D28a flip). The Node implementation (services/real-time) stays in the
+# image purely as a fallback: if the Go binary is somehow absent this
+# service execs it, so a build regression cannot take down presence.
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 
+GO_RT=/usr/local/bin/go-services/realtime
+if [ -x "$GO_RT" ]; then
+    exec /sbin/setuser www-data "$GO_RT" >> /var/log/overleaf/real-time.log 2>&1
+fi
+echo "real-time: Go binary missing — Node fallback" >&2
 exec /sbin/setuser www-data /usr/bin/node /overleaf/services/real-time/app.js >> /var/log/overleaf/real-time.log 2>&1
