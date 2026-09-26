@@ -11,7 +11,7 @@ import (
 	"ollitex/go/services/web/core"
 )
 
-func asBool(v any) bool { b, _ := v.(bool); return b }
+func asBool(v any) bool  { b, _ := v.(bool); return b }
 func asStr(v any) string { s, _ := v.(string); return s }
 
 func removeKey(o Obj, key string) Obj {
@@ -143,7 +143,7 @@ func getSection(name string, sections map[string]Obj, c *cipher) Obj {
 	return merged
 }
 
-// maskSecrets — set each secret field to '' (in place) and append
+// maskSecrets — set each secret field to ” (in place) and append
 // <field>Set:boolean in SECRET_FIELDS order.
 func maskSecrets(name string, section Obj) Obj {
 	out := section

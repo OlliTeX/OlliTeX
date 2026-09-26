@@ -106,7 +106,6 @@ func ObjToMap(o Obj) map[string]any {
 	return m
 }
 
-
 func asString(v any) string {
 	s, _ := v.(string)
 	return s

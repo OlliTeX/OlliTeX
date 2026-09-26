@@ -18,8 +18,7 @@ func storageEnvDefaultPath() string {
 	return "/etc/overleaf/env.d/ollitex-storage.sh"
 }
 
-const storageEnvHeader =
-	"# Managed by OlliTeX admin → Site → Storage (2026-09-14). " +
+const storageEnvHeader = "# Managed by OlliTeX admin → Site → Storage (2026-09-14). " +
 	"Do not edit by hand — change it from the hub.\n" +
 	"# ${VAR:-value} form: explicit container/compose env always wins.\n"
 

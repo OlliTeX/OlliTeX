@@ -33,7 +33,7 @@ func TestTCState(t *testing.T) {
 		{`{"on":false}`, false, ""},
 		{`{"on":false,"on_for":{"6aac665553b2cdd8a092b3aa":true}}`, map[string]interface{}{"6aac665553b2cdd8a092b3aa": true}, ""},
 		{`{"on_for_guests":true}`, map[string]interface{}{"__guests__": true}, ""},
-		{`{"on":true,"on_for_guests":false}`, true, ""}, // on=true dominates
+		{`{"on":true,"on_for_guests":false}`, true, ""},                                         // on=true dominates
 		{`{"on":false,"on_for_guests":false}`, map[string]interface{}{"__guests__": false}, ""}, // non-empty object state wins over on:false
 	}
 	for _, c := range cases {

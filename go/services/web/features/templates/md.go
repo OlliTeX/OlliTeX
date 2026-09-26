@@ -36,10 +36,11 @@ func mdInline(s string) string {
 var reHTMLTag = regexp.MustCompile(`<[^>\n]+>`)
 
 // mdToHtml — marked.parse equivalent for this subset:
-//   ""                  → ""
-//   "text"              → "<p>text</p>\n"
-//   "a\n\nb"            → "<p>a</p>\n<p>b</p>\n"
-//   raw HTML tags       → stripped before the pass (marked html→'')
+//
+//	""                  → ""
+//	"text"              → "<p>text</p>\n"
+//	"a\n\nb"            → "<p>a</p>\n<p>b</p>\n"
+//	raw HTML tags       → stripped before the pass (marked html→'')
 func mdToHtml(md string) string {
 	if md == "" {
 		return ""

@@ -252,7 +252,7 @@ func (p *jsonParser) parseString() (string, bool) {
 						hexs2 := p.s[p.i+2 : p.i+6]
 						r2, err2 := strconv.ParseUint(hexs2, 16, 32)
 						if err2 == nil && r2 <= 0xFFFF {
-							b.WriteRune(0x10000 + ((rune(r-0xD800)<<10) | rune(r2-0xDC00)))
+							b.WriteRune(0x10000 + ((rune(r-0xD800) << 10) | rune(r2-0xDC00)))
 							p.i += 6
 						} else {
 							b.WriteRune(rune(r))

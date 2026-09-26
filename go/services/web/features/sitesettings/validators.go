@@ -10,11 +10,12 @@ import (
 
 // type helpers (JSON numbers decode as float64; Go bool/string/[]any/nil)
 
-func isStr(v any) bool     { _, ok := v.(string); return ok }
-func isBool(v any) bool    { _, ok := v.(bool); return ok }
-func isArr(v any) bool     { _, ok := v.([]any); return ok }
-func isNum(v any) bool     { _, ok := v.(float64); return ok }
-func isInt(v any) bool     { f, ok := v.(float64); return ok && f == float64(int64(f)) }
+func isStr(v any) bool  { _, ok := v.(string); return ok }
+func isBool(v any) bool { _, ok := v.(bool); return ok }
+func isArr(v any) bool  { _, ok := v.([]any); return ok }
+func isNum(v any) bool  { _, ok := v.(float64); return ok }
+func isInt(v any) bool  { f, ok := v.(float64); return ok && f == float64(int64(f)) }
+
 // fnum — coerce any numeric Go type to float64 (JSON bodies parse to float64;
 // seed/section values are often int). Returns 0 for non-numbers.
 func fnum(v any) float64 {
@@ -42,19 +43,19 @@ func fnum(v any) float64 {
 	}
 	return 0
 }
-func sval(v any) string    { s, _ := v.(string); return s }
+func sval(v any) string { s, _ := v.(string); return s }
 
 var (
-	reTplKey    = regexp.MustCompile(`^[a-z0-9-]{1,64}$`)
-	reClientId  = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
-	reCidrV4    = regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$`)
-	reCidrV6    = regexp.MustCompile(`^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}\/\d{1,4}$`)
-	reIpV4      = regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
-	reSubdom    = regexp.MustCompile(`^\*\.[a-z0-9-]+(\.[a-z0-9-]+)*$`)
-	reDomain    = regexp.MustCompile(`(?i)^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$`)
-	reLdap      = regexp.MustCompile(`^ldaps?://`)
-	reCompiler  = regexp.MustCompile(`(?i)^[a-z0-9_-]+$`)
-	reBucket    = regexp.MustCompile(`^[a-z0-9][a-z0-9.\-_]{1,62}$`)
+	reTplKey   = regexp.MustCompile(`^[a-z0-9-]{1,64}$`)
+	reClientId = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
+	reCidrV4   = regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$`)
+	reCidrV6   = regexp.MustCompile(`^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}\/\d{1,4}$`)
+	reIpV4     = regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
+	reSubdom   = regexp.MustCompile(`^\*\.[a-z0-9-]+(\.[a-z0-9-]+)*$`)
+	reDomain   = regexp.MustCompile(`(?i)^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$`)
+	reLdap     = regexp.MustCompile(`^ldaps?://`)
+	reCompiler = regexp.MustCompile(`(?i)^[a-z0-9_-]+$`)
+	reBucket   = regexp.MustCompile(`^[a-z0-9][a-z0-9.\-_]{1,62}$`)
 )
 
 func notObj() []string { return []string{"body must be a JSON object"} }
@@ -686,29 +687,29 @@ func checkStrings(m map[string]any, fields []string) []string {
 }
 
 var SECTION_VALIDATORS = map[string]func(any) []string{
-	"templates":         validateTemplatesSection,
-	"zotero":            validateZoteroSection,
-	"mendeley":          validateMendeleySection,
-	"externalUrl":       validateExternalUrlSection,
-	"signup":            validateSignupSection,
-	"sso-saml":          validateSsoSamlSection,
-	"sso-oidc":          validateSsoOidcSection,
-	"sso-ldap":          validateSsoLdapSection,
+	"templates":          validateTemplatesSection,
+	"zotero":             validateZoteroSection,
+	"mendeley":           validateMendeleySection,
+	"externalUrl":        validateExternalUrlSection,
+	"signup":             validateSignupSection,
+	"sso-saml":           validateSsoSamlSection,
+	"sso-oidc":           validateSsoOidcSection,
+	"sso-ldap":           validateSsoLdapSection,
 	"sandboxed-compiles": validateSandboxedCompilesSection,
-	"git-integration":   validateGitIntegrationSection,
-	"typst":             validateTypstSection,
-	"github-sync":       validateGithubSyncSection,
-	"email":             validateEmailSection,
-	"linked-file-types": validateLinkedFileTypesSection,
-	"pandoc":            validatePandocSection,
-	"webdav":            validateWebdavSection,
-	"dropbox":           validateDropboxSection,
-	"misc":              validateMiscSection,
-	"languagetool":      validateLanguagetoolSection,
-	"llm":               validateLlmSection,
-	"branding":          validateBrandingSection,
-	"services":          validateServicesSection,
-	"storage":           validateStorageSection,
+	"git-integration":    validateGitIntegrationSection,
+	"typst":              validateTypstSection,
+	"github-sync":        validateGithubSyncSection,
+	"email":              validateEmailSection,
+	"linked-file-types":  validateLinkedFileTypesSection,
+	"pandoc":             validatePandocSection,
+	"webdav":             validateWebdavSection,
+	"dropbox":            validateDropboxSection,
+	"misc":               validateMiscSection,
+	"languagetool":       validateLanguagetoolSection,
+	"llm":                validateLlmSection,
+	"branding":           validateBrandingSection,
+	"services":           validateServicesSection,
+	"storage":            validateStorageSection,
 }
 
 // small helpers

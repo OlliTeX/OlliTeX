@@ -266,10 +266,11 @@ func tcThreadTail(t *tcThread) string {
 }
 
 // tcSerializeThread — Node final key order (observed live):
-//   thread : messages, resolved?, resolved_at?, resolved_by_user_id?,
-//            resolved_by_user? (only when resolved truthy)
-//   message: id, content, timestamp, user_id, edited_at?, room_id?, user?
-//            (user ABSENT when the user is missing — never null)
+//
+//	thread : messages, resolved?, resolved_at?, resolved_by_user_id?,
+//	         resolved_by_user? (only when resolved truthy)
+//	message: id, content, timestamp, user_id, edited_at?, room_id?, user?
+//	         (user ABSENT when the user is missing — never null)
 func tcSerializeThread(t *tcThread) (string, error) {
 	msgs := make([]string, 0, len(t.Messages))
 	for i := range t.Messages {
@@ -282,12 +283,12 @@ func tcSerializeThread(t *tcThread) (string, error) {
 			}
 		}
 		mj, err := json.Marshal(struct {
-			ID        string            `json:"id"`
-			Content   json.RawMessage `json:"content"`
-			Timestamp int64           `json:"timestamp"`
-			UserID    string          `json:"user_id"`
-			EditedAt  *int64          `json:"edited_at,omitempty"`
-			RoomID    string          `json:"room_id,omitempty"`
+			ID        string           `json:"id"`
+			Content   json.RawMessage  `json:"content"`
+			Timestamp int64            `json:"timestamp"`
+			UserID    string           `json:"user_id"`
+			EditedAt  *int64           `json:"edited_at,omitempty"`
+			RoomID    string           `json:"room_id,omitempty"`
 			User      *json.RawMessage `json:"user,omitempty"`
 		}{m.ID, m.Content, m.Timestamp, m.UserID, m.EditedAt, m.RoomID, user})
 		if err != nil {
@@ -416,7 +417,7 @@ func hSendComment(a *core.App, lim *tcLimitRunner) func(*core.Cxt, *core.Res) {
 		user = &rj
 		mj, err := json.Marshal(struct {
 			ID        string           `json:"id"`
-			Content   json.RawMessage `json:"content"`
+			Content   json.RawMessage  `json:"content"`
 			Timestamp int64            `json:"timestamp"`
 			UserID    string           `json:"user_id"`
 			EditedAt  *int64           `json:"edited_at,omitempty"`

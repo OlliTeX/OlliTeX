@@ -14,9 +14,9 @@ import "strings"
 // observationally exact for the fixture corpus (plain href values).
 
 type tplTok struct {
-	kind  int // 0 text, 1 starttag, 2 endtag
-	name  string
-	href  string
+	kind    int // 0 text, 1 starttag, 2 endtag
+	name    string
+	href    string
 	hasHref bool
 }
 

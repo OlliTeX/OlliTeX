@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	dbxCredsColl  = "dropboxusercredentials"  // live-verified lowercase plural
+	dbxCredsColl  = "dropboxusercredentials" // live-verified lowercase plural
 	dbxStatesColl = "dropboxsyncprojectstates"
 )
 
@@ -162,13 +162,13 @@ func dbxLinkedStates(ctx context.Context, a *core.App, path string) []map[string
 	cur, err := db.Collection(dbxStatesColl).
 		Find(ctx, bson.D{{Key: "path", Value: path}, {Key: "connected", Value: true}},
 			options.Find().SetLimit(300).SetProjection(bson.D{
-					{Key: "projectId", Value: 1},
-					{Key: "path", Value: 1},
-					{Key: "projectName", Value: 1},
-					{Key: "projectPath", Value: 1},
-					{Key: "lastSyncAt", Value: 1},
-					{Key: "lastSyncError", Value: 1},
-				}))
+				{Key: "projectId", Value: 1},
+				{Key: "path", Value: 1},
+				{Key: "projectName", Value: 1},
+				{Key: "projectPath", Value: 1},
+				{Key: "lastSyncAt", Value: 1},
+				{Key: "lastSyncError", Value: 1},
+			}))
 	if err != nil {
 		return nil
 	}

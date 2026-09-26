@@ -19,12 +19,12 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"ollitex/go/services/gitbridge/bridge"
@@ -69,7 +69,7 @@ func dbPath(root string) string {
 	return filepath.Join(root, ".wlgb", "wlgb.db")
 }
 
-// shQuote quotes a word for /bin/sh (single-quote wrap, '' escape).
+// shQuote quotes a word for /bin/sh (single-quote wrap, ” escape).
 const shSafe = " \t\n\r'\"$`\\()|&;*?#\u003c\u003e~!&"
 
 func shQuote(s string) string {
