@@ -846,9 +846,17 @@ extension-split scan (`sharedFileJSRe` .js-only → sharedDirJS; `sharedFileCSSR
 .css-only → sharedDirCSS) + regression pin `TestSharedCSSResolution` (fails on the old
 code) + register parity capture re-pinned WITH the now-emitted 9663 shared CSS link at
 its token position (oracle re-bake; the link is the fix, the capture predated it).
-Gates: full `go/services/web/...` build+vet+`-race` green. DEPLOY REQUIRES A RE-BAKE
-(web binary is baked) + cycle + live verify after the D39 fix — the currently-live
-image (07da957c1f lineage) has the login token but STILL the broken CSS resolver.
+Gates: full `go/services/web/...` build+vet+`-race` green.
+
+**D39b (2026-09-26, the REAL token) + CLOSEOUT** — loginHTML's `SHARED:CSS` token was
+registered in `sharedCSSTokens` but NEVER actually inserted into the login HTML (an early Python
+edit only added the map entry) → re-inserted after the manifest link (`7fc16d7cdb`), parity with
+registerHTML verified. **C CLOSED (2026-09-26)**: also removed the dead `real-time` entry from
+`server-ce/services.js` (it broke every `build-community` bake); canonical bake `b17465cbda0d`
+(lineage `45f0867be2` = D39a+D39b+D40 P1+threads) → `overleafserver` cycled → LIVE VERIFIED:
+`/login` 200, Login button `rgb(9,136,66)` = **#098842 brand green** (radius 8px),
+`/stylesheets/9663-a7a4b91ea9fb30ea5876.css` loaded, `/status` 200, new review API routes
+registered (anon → 302 to login). Owner confirmation = ticket close.
 
 **D40 (2026-09-26, owner directive 10 — HIGHEST PRIORITY) — Y.Doc-native model for
 comments + tracked changes** — supersedes the D25 "placeholder" decision.
@@ -868,21 +876,56 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
   {change_ids}`) NOT the legacy OT-comment shape — the panel is the ship client.
 - Phases: **P1** doc types + domain ops + hermetic tests (go/services/collab, roomdoc.go seam) —
   **GREEN (a03d7385ce)**: review.go + review_test.go, 10 tests incl. order-independence and
-  double-reject idempotency.
-  **P2** V1 contract routes on Go web (session+CSRF parity) + re-attach review panel + e2e.
+  double-reject idempotency; **threads Y.Array + lifecycle GREEN (45f0867be2)** — incl. fixing the
+  YMap-accessor-in-Transact deadlock (read values before mutating).
+  **P2** V1 contract routes on Go web — **GREEN (c850e88f45)**: `go/services/web/features/review`
+  registered in cmd/web (panel's full call set; wire shapes pinned from
+  `services/web/types/review-panel`; resolve/reopen persist `resolved_by_*` actor;
+  8 hermetic suites incl. role gating + own-message 403/200 + cascade).
+  **P2 RE-ALIGNED (ea4179379b / 0464f1a10f / 214f3a8e55)** — re-audited the panel
+  top-to-bottom and fixed three contract mismatches + wired the live-sync seam:
+  - **d5 (contract evidence, recorded):** the Node CE fork NEVER served these
+    routes (`services/web` has only the internal `changes/reject` →
+    document-updater, NO threads/track-changes endpoints) AND the Yjs engine
+    (F1/D25) throws for `historyOTShareDoc` (document-container.ts) — the
+    panel's OT comment paths were DEAD in this fork, so **the REST surface IS
+    the shipping contract**. Pinned shapes that differ from first build:
+    `GET threads` = `Record<threadId, Thread>` (panel `type Threads`), flat
+    `resolved_at`/`resolved_by_user_id`/`resolved_by_user`; thread creation
+    = FIRST message POST for a client-generated threadId (body
+    `{content, id?, doc?, ranges?}` — panel addComment) — no
+    `POST /project/:pid/threads` needed; `track_changes` body =
+    `{on_for?, on_for_guests?}` → explicit map on `project.track_changes`
+    (Node parity: ProjectEditorHandler → editor trackChangesState); NEW
+    server-assisted `POST .../doc/:doc/changes` (editor-side creation
+    pending — the gap D40 remark A asks for).
+  - **d7 (live-sync, owner-visible):** the panel syncs local state via room
+    socket events; in Go the equivalent seam = realtime bus SendRoomMessage
+    (`POST /project/:pid/message/:name`, pinned 'Node
+    HttpApiController.sendMessage → LB emitToRoom'). Review handlers relay all
+    8 pinned events (new-comment, edit-message, delete-message,
+    resolve-thread, reopen-thread, delete-thread, accept-changes,
+    toggle-track-changes) with listener-pinned payloads; `Handlers.Emit`
+    seam + `config.RealtimeURL` (REALTIME_HOST||127.0.0.1 :3026);
+    best-effort (emit failure logs, never 5xx — Node parity).
+  - **P2 REMAINING = live e2e** (Playwright spec: create thread via panel →
+    reply → resolve/reopen → track-changes toggle → change accept), then
+    editor-side tracked-change creation (the D40-d5 pending piece).
   **P3** relative-position anchoring + concurrent-lifecycle races. **P4** legacy OT
   comments/tracked-changes backfill at first Y-join.
 - **P2 contract (PINNED from the in-git panel — do not invent; `frontend/js/features/review-panel/`):**
-  - `GET   /project/:pid/threads`
-  - `POST  /project/:pid/threads` (thread create; payload pinned at P2 build from threads-context)
-  - `POST  /project/:pid/thread/:threadId/messages` (add message)
+  - `GET   /project/:pid/threads` → Record<threadId, Thread> (d5 pin)
+  - `POST  /project/:pid/thread/:threadId/messages` (FIRST message creates the
+    thread — d5 pin; body {content, id?, doc?, ranges?})
   - `POST  /project/:pid/thread/:threadId/messages/:commentId/edit` (edit message)
   - `DELETE /project/:pid/thread/:threadId/messages/:commentId` (any owner)
   - `DELETE /project/:pid/thread/:threadId/own-messages/:commentId` (own-message rule)
   - `POST  /project/:pid/doc/:docId/thread/:threadId/resolve | /reopen`
   - `DELETE /project/:pid/doc/:docId/thread/:threadId`
+  - `POST  /project/:pid/doc/:docId/changes` `{content?,start,end?,kind?,change_id?}` (NEW d5 —
+    server-assisted create; non-empty content → insert)
   - `POST  /project/:pid/doc/:docId/changes/accept` `{change_ids: [...]}`
-  - `POST  /project/:pid/track_changes` (state toggle; payload pinned at P2 build)
+  - `POST  /project/:pid/track_changes` `{on_for?, on_for_guests?}` (d5 pin;
   - NUANCE: the panel rejects changes CLIENT-side (source-editor
     `changes/reject-changes` does the text edit) then state-syncs — in Yjs the content edit is a
     plain Y.Text mutation (already CRDT-convergent) + a server state transition; the P1
@@ -915,8 +958,23 @@ davrot-machine, branch golang-ph; ledger = its HANDOFF.md; B7/B8b done, next B9/
   is Go-side (OperationsBuilder cursor/docLength bookkeeping / OperationsCompressor sibling
   composition). Recorded in project-history.go/HANDOFF.md §"B9 ORACLE GROUND-TRUTH".
 - **Policy (owner question answered):** port writing STAYS with the support LLM for now; owner-
-  side picks up Go B9/B10/B12 after (a) D39 bake+cycle+verify is green and (b) D40 P1 lands —
-  or immediately on owner instruction. No state lost: vendor 27-case table = the Go oracle.
+  side picks up Go B9/B10/B12 after (a) D39 bake+cycle+verify is green and (b) D40 P1 lands
+  (both now done) — or immediately on owner instruction. No state lost: vendor 27-case table = the Go oracle.
+- **B9 DONE (2026-09-26, owner-side takeover):** `internal/updatetranslator` (translate.go/
+  builder.go/translate_test.go) — 1:1 port green against the 27-case vendor oracle (both
+  previously-disputed cases included: `[20]`, `[3,'bar',12,'foo',5]`), coverage 86.6%,
+  `go test -race ./internal/...` all green. 3 oracle-surfaced port fixes recorded in
+  project-history.go/HANDOFF.md (builder retain-string length, v2Authors always-array,
+  historyot origin wire via ToWire + toWireOrigin nil-guard).
+- **B12 DONE (2026-09-26, owner-side):** `internal/types` — 1:1 wire model of vendor
+  mongo-types.ts (ErrorRecord|SyncStartRecord discriminator; ProjectHistoryFailure with
+  optional requestCount; exact mongo keys incl. snake_case `project_id`); 80.2% ≥80 gate.
+- **LockManager coverage DONE (owner-side):** 65.7% → **94.0%** (race-safe suites incl.
+  GetLock-timeout, (*Lock).Extend branches, HealthCheck free/busy/err, mismatch +
+  redis-error paths).
+- **B-track state:** B9/B12/LockManager green (all 16 test pkgs -race clean); **NEXT = B10
+  ChunkTranslator** (647L + 3.1kL test oracle; needs WebApiManager/HistoryStoreManager
+  seams — a dedicated session), then C-phase managers per the HANDOFF worklist.
 
 **OUTSTANDING (owner decision):**
 - psintern (compose_cep) still runs the pre-D28a image with the Node bus
