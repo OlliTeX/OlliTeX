@@ -41,6 +41,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -77,13 +78,33 @@ func main() {
 	})
 
 	mongoURI := env("MONGO_CONNECTION_STRING", env("OVERLEAF_MONGO_URL", "mongodb://127.0.0.1:27017/sharelatex"))
-	m, err := collab.NewMongo(ctx, mongoURI, env("OLLITEX_DB_NAME", "sharelatex"))
+	// ONE Mongo client for the whole service: auth gate, seed source, and
+	// the versioned room store all share it (no per-component connections).
+	mcl, mdb, err := collab.NewMongoClient(ctx, mongoURI, env("OLLITEX_DB_NAME", "sharelatex"))
 	if err != nil {
 		log.Fatalf("mongo: %v", err)
 	}
+	m := collab.NewMongoFrom(mdb)
+	// Versioned room persistence = MongoStore (D19: Mongo is the system of
+	// record — the filesystem fallback is dev/test-only; the prod container
+	// has no writable DATA_DIR for it).
+	store, err := collab.NewMongoStore(ctx, mdb)
+	if err != nil {
+		log.Fatalf("mongo store: %v", err)
+	}
+	defer func() { _ = mcl }() // lifetime = process; released on exit
+
+	// Session cookie signatures: the SAME secret chain as the web (core/config.go):
+	// OVERLEAF_SESSION_SECRET || CRYPTO_RANDOM (+ upcoming/fallback).
+	secretChain := []string{os.Getenv("OVERLEAF_SESSION_SECRET")}
+	if secretChain[0] == "" {
+		secretChain[0] = os.Getenv("CRYPTO_RANDOM")
+	}
+	secretChain = append(secretChain,
+		os.Getenv("SESSION_SECRET_UPCOMING"), os.Getenv("SESSION_SECRET_FALLBACK"))
 
 	auth := &collab.SessionAuth{
-		SessionDoc: collab.RedisSessionDoc(rdb, env("COOKIE_NAME", "")),
+		SessionDoc: collab.RedisSessionDoc(rdb, env("COOKIE_NAME", ""), secretChain...),
 		M:          m,
 		Ctx:        ctx,
 	}
@@ -109,26 +130,37 @@ func main() {
 	compactEvery := configres.Int(cfgStore, "COLLAB_COMPACT_EVERY", "COLLAB_COMPACT_EVERY", 0)
 
 	// Seed source (S4 contract): a room adopts the project's CURRENT
-	// main-file content through the exact blob path the web's file proxy
-	// uses (history-v1 hash store: projects doc → rootFolder fileRefs →
-	// {base}/projects/{hid}/blobs/{hash}, basic-auth staging:) — see
-	// seedsource.go. The projects reader is the same Mongo client as the
-	// auth gate (one connection).
+	// main-file content read from the docstore — the SAME document the web's
+	// editor surface renders (projectlist/docapi.go → Go docstore service):
+	// projects doc → rootDoc_id → GET {WEB_DOCSTORE_URL}/project/{pid}/doc/{docID}
+	// → {lines:[...]} → join("\n"). See seedsource.go. The projects reader
+	// is the same Mongo client as the auth gate (one connection).
 	seed := collab.NewSeedSource(m,
-		env("WEB_V1_HISTORY_URL", "http://127.0.0.1:3100/api"),
-		env("V1_HISTORY_USER", "staging"),
+		env("WEB_DOCSTORE_URL", "http://127.0.0.1:3016"),
+		env("V1_HISTORY_USER", ""), // basic-auth is optional (docstore is internal)
 		env("V1_HISTORY_PASSWORD", ""),
 		&http.Client{Timeout: 15 * time.Second})
 
+	var sl *slog.Logger
+	if os.Getenv("COLLAB_LOG_LEVEL") == "debug" {
+		sl = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	}
+	lifecycle := func(name string) func(room string) {
+		return func(room string) { log.Printf("collab: %s room=%s", name, room) }
+	}
 	svc, err := collab.New(collab.Options{
-		Auth:            auth,
-		DataDir:         env("COLLAB_DATA_DIR", "/data/collab-docs"),
-		KeepVersions:    keepVersions,
-		CompactEvery:    compactEvery,
-		AllowedOrigins:  origins,
-		MaxConnections:  maxConn,
-		MaxPeersPerRoom: maxPeers,
-		SeedFn:          seed.SeedText, // S4: rooms seed from live project content
+		Auth:             auth,
+		Store:            store,
+		Logger:           sl,
+		OnFirstPeer:      lifecycle("first-peer"),
+		OnLastPeer:       lifecycle("last-peer"),
+		OnUnloadDocument: lifecycle("unload-doc"),
+		KeepVersions:     keepVersions,
+		CompactEvery:     compactEvery,
+		AllowedOrigins:   origins,
+		MaxConnections:   maxConn,
+		MaxPeersPerRoom:  maxPeers,
+		SeedFn:           seed.SeedText, // S4: rooms seed from live project content
 	})
 	if err != nil {
 		log.Fatalf("init: %v", err)
@@ -156,7 +188,7 @@ func main() {
 		_ = httpSrv.Shutdown(shutCtx)
 	}()
 
-	log.Printf("listening on %s (rooms under /collab/{projectId}, persistence=%s)", ln.Addr(), env("COLLAB_DATA_DIR", "/data/collab-docs"))
+	log.Printf("listening on %s (rooms under /collab/{projectId}, persistence=mongo/%s)", ln.Addr(), env("OLLITEX_DB_NAME", "sharelatex"))
 	errCh := make(chan error, 1)
 	go func() {
 		if err := httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {

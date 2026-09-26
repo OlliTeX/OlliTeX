@@ -1,40 +1,39 @@
 // ---------------------------------------------------------------------------
 // Seed source (S4 contract) — where a room's initial content COMES FROM.
 //
-// A room (projectId) adopts the project's CURRENT main-file content, read
-// through the exact blob path the web's file proxy uses (live-pinned
-// oracle, projectlist/fileproxy.go):
+// A room (projectId) adopts the project's CURRENT main-file content. The
+// oracle is the web's editor surface: the editor loads its initial doc
+// through the docstore (projectlist/docapi.go → the Go docstore service),
+// so the seed reads the SAME document the editor renders:
 //
 //	projects doc (Mongo "projects")
-//	  → rootFolder tree walk (element fileRefs first, then nested folders —
-//	    the fproxyFindFile order)
-//	  → fileRef {name, hash}  +  project.overleaf.history.id (hid)
-//	  → GET {WEB_V1_HISTORY_URL}/projects/{hid}/blobs/{hash}
-//	     basic-auth V1_HISTORY_USER : V1_HISTORY_PASSWORD
+//	  → rootDoc_id  (ObjectID — the root document of the project tree)
+//	  → GET {WEB_DOCSTORE_URL}/project/{pidHex}/doc/{rootDocID}
+//	     → { _id, lines: [...], rev, version, ranges }
+//	     → seed text = strings.Join(lines, "\n")
 //
-// Main-file selection (deterministic, test-pinned):
-//  1. the first candidate named "main.tex" (the template contract:
-//     every project seeded by POST /project/new carries rootFolder
-//     main.tex — see projectlist/create.go),
-//  2. else the first candidate whose name ends in ".tex",
-//  3. else "" (a project with no text file legitimately starts empty).
+// Documented from the live stack (2026-09: ol-e2e lineage): a project
+// created by POST /project/new carries rootDoc_id + a docstore revision-0
+// document whose lines ARE the rendered template (mainbasic.tex with
+// project name / author / date substituted). rootFolder is left empty in
+// this model — the file tree lives inside the root document.
 //
 // Failure semantics (fail-closed where content is expected):
-//   - no project doc           → error (the auth gate already proved the
-//     caller is a member, so this is anomalous —
-//     surfacing it is correct)
-//   - no main file candidate   → "" (nil error): empty seed is a state, not
-//     a failure
-//   - blob 404                 → "" (nil error): the file exists in the tree
-//     but its blob is absent — same observable as
-//     an empty file for seeding purposes
-//   - other HTTP / transport   → error (never seed a room from a failed read)
+//   - no project doc              → error (the auth gate already proved the
+//     caller is a member, so this is anomalous — surfacing it is correct)
+//   - project has no rootDoc_id   → "" (nil error): nothing to seed is a
+//     state, not a failure (the editor itself has no doc to render)
+//   - docstore 404                → "" (nil error): doc absent (degenerate
+//     project) — same observable as empty for seeding
+//   - other HTTP / transport      → error (never open a room from a failed
+//     content read — an empty room would silently diverge from reality)
 //
-// The body is bounded (maxSeedBytes) — a safety valve; these are text files.
+// The body is bounded (maxSeedBytes) — a safety valve; these are text docs.
 package collab
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -63,9 +62,9 @@ type SeedProjects interface {
 // Constructor: NewSeedSource. All fields are injectable for hermetic tests.
 type SeedSource struct {
 	P    SeedProjects
-	Base string // WEB_V1_HISTORY_URL (default "http://127.0.0.1:3100/api")
-	User string // V1_HISTORY_USER (default "staging")
-	Pass string // V1_HISTORY_PASSWORD (default "")
+	Base string // WEB_DOCSTORE_URL (default "http://127.0.0.1:3016")
+	User string // basic-auth user (docstore parity; internal service, unused)
+	Pass string // basic-auth pass (ditto)
 	HTTP *http.Client
 }
 
@@ -74,10 +73,7 @@ var seedHex24 = regexp.MustCompile(`^[0-9a-f]{24}$`)
 // NewSeedSource wires the production seed source over a projects reader.
 func NewSeedSource(p SeedProjects, base, user, pass string, c *http.Client) *SeedSource {
 	if base == "" {
-		base = "http://127.0.0.1:3100/api"
-	}
-	if user == "" {
-		user = "staging"
+		base = "http://127.0.0.1:3016"
 	}
 	if c == nil {
 		c = http.DefaultClient
@@ -86,7 +82,7 @@ func NewSeedSource(p SeedProjects, base, user, pass string, c *http.Client) *See
 }
 
 // SeedText implements Options.SeedFn for the room named <projectId>: the
-// project's main-file content ("" + nil error when there is none to seed).
+// project's root-document content ("" + nil error when there is none).
 func (s *SeedSource) SeedText(ctx context.Context, room string) (string, error) {
 	if !seedHex24.MatchString(room) {
 		return "", fmt.Errorf("%w: %q", ErrSeedProject, room)
@@ -98,42 +94,43 @@ func (s *SeedSource) SeedText(ctx context.Context, room string) (string, error) 
 	if doc == nil {
 		return "", fmt.Errorf("%w: %s", ErrSeedProject, room)
 	}
-	_, hash := pickSeedFile(docGet(doc, "rootFolder"))
-	if hash == "" {
+	did := rootDocID(doc)
+	if did == "" {
+		// No root document in this project model → nothing to seed.
 		return "", nil
 	}
-	hid := dgetHistoryID(doc)
-	if hid == "" {
-		// No history id → no blob store for this project (degenerate); an
-		// empty seed is the only honest content.
-		return "", nil
-	}
-	body, status, err := fetchSeedBlob(ctx, s, hid, hash)
+	body, status, err := fetchSeedDoc(ctx, s, room, did)
 	if err != nil {
 		return "", err
 	}
 	switch status {
 	case http.StatusOK:
-		return string(body), nil
+		lines, ok := docLines(body)
+		if !ok {
+			return "", errors.New("collab: seed: docstore response has no lines")
+		}
+		return lines, nil
 	case http.StatusNotFound:
 		return "", nil
 	default:
-		return "", fmt.Errorf("collab: seed: blob store returned %d", status)
+		return "", fmt.Errorf("collab: seed: docstore returned %d", status)
 	}
 }
 
-// fetchSeedBlob — GET {Base}/projects/{hid}/blobs/{hash} (basic auth),
-// returning (body, status, transportError). The URL shape mirrors the
-// web's file proxy exactly (no "/api" double-prefix — Base already ends
-// in /api by default; TrimSuffix keeps a bare host working too).
-func fetchSeedBlob(ctx context.Context, s *SeedSource, hid, hash string) ([]byte, int, error) {
+// fetchSeedDoc — GET {Base}/project/{pid}/doc/{did}; returns (body, status,
+// transportError). Basic auth is sent when credentials are configured
+// (parity with the file-proxy style; the docstore is an internal service
+// and does not enforce it today).
+func fetchSeedDoc(ctx context.Context, s *SeedSource, pidHex, did string) ([]byte, int, error) {
 	base := strings.TrimSuffix(s.Base, "/")
 	up, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		base+"/projects/"+hid+"/blobs/"+hash, nil)
+		base+"/project/"+pidHex+"/doc/"+did, nil)
 	if err != nil {
 		return nil, 0, err
 	}
-	up.SetBasicAuth(s.User, s.Pass)
+	if s.User != "" {
+		up.SetBasicAuth(s.User, s.Pass)
+	}
 	resp, err := s.HTTP.Do(up)
 	if err != nil {
 		return nil, 0, err
@@ -144,27 +141,15 @@ func fetchSeedBlob(ctx context.Context, s *SeedSource, hid, hash string) ([]byte
 		return nil, 0, err
 	}
 	if int64(len(body)) > maxSeedBytes {
-		return nil, 0, errors.New("collab: seed: blob exceeds safety bound")
+		return nil, 0, errors.New("collab: seed: doc exceeds safety bound")
 	}
 	return body, resp.StatusCode, nil
 }
 
-// dgetHistoryID — project.overleaf.history.id as a string (ObjectID or
-// stored string both occur in this lineage).
-func dgetHistoryID(doc bson.D) string {
-	ov, ok0 := asMap(docGet(doc, "overleaf"))
-	if !ok0 {
-		return ""
-	}
-	ovh, ok1 := asMap(ov["history"])
-	if !ok1 {
-		return ""
-	}
-	v, ok := ovh["id"]
-	if !ok {
-		return ""
-	}
-	switch t := v.(type) {
+// rootDocID — project.rootDoc_id as a 24-hex string (ObjectID or stored
+// string both occur in this lineage).
+func rootDocID(doc bson.D) string {
+	switch t := docGet(doc, "rootDoc_id").(type) {
 	case string:
 		return t
 	case primitive.ObjectID:
@@ -173,25 +158,19 @@ func dgetHistoryID(doc bson.D) string {
 	return ""
 }
 
-// nestedMap — one level of {"key", {"k", v...}} descent (bson.D → map view).
-func nestedMap(d bson.D, key string) map[string]any {
-	for i := 0; i < len(d); i++ {
-		if d[i].Key != key {
-			continue
-		}
-		switch t := d[i].Value.(type) {
-		case map[string]any:
-			return t
-		case bson.D:
-			m := make(map[string]any, len(t))
-			for _, e := range t {
-				m[e.Key] = e.Value
-			}
-			return m
-		}
-		return nil
+// docLines — docstore GET view → lines joined with "\n" (the editor's
+// rendering: join(lines, newline)).
+func docLines(body []byte) (string, bool) {
+	var m struct {
+		Lines []string `json:"lines"`
 	}
-	return nil
+	if err := json.Unmarshal(body, &m); err != nil {
+		return "", false
+	}
+	if m.Lines == nil {
+		return "", false
+	}
+	return strings.Join(m.Lines, "\n"), true
 }
 
 // docGet — first value for key in a top-level bson.D.
@@ -202,85 +181,4 @@ func docGet(d bson.D, key string) any {
 		}
 	}
 	return nil
-}
-
-// pickSeedFile — the fproxyFindFile walk order (each element's fileRefs
-// BEFORE its nested folders), collecting {name, hash} candidates, then
-// the selection rule (main.tex → first .tex → none).
-func pickSeedFile(root any) (name, hash string) {
-	type cand struct{ name, hash string }
-	var cands []cand
-	var walk func(v any) bool
-	walk = func(v any) bool {
-		m, ok := asMap(v)
-		if !ok {
-			return false
-		}
-		if fr := asArr(m["fileRefs"]); fr != nil {
-			for _, fv := range fr {
-				fm, ok := asMap(fv)
-				if !ok {
-					continue
-				}
-				nm := asString(fm["name"])
-				ha := asString(fm["hash"])
-				if nm != "" && ha != "" {
-					cands = append(cands, cand{nm, ha})
-				}
-			}
-		}
-		if fl := asArr(m["folders"]); fl != nil {
-			for _, sv := range fl {
-				walk(sv)
-			}
-		}
-		return true
-	}
-	if arr := asArr(root); arr != nil {
-		for _, v := range arr {
-			walk(v)
-		}
-	}
-	for _, c := range cands {
-		if c.name == "main.tex" {
-			return c.name, c.hash
-		}
-	}
-	for _, c := range cands {
-		if strings.HasSuffix(c.name, ".tex") {
-			return c.name, c.hash
-		}
-	}
-	return "", ""
-}
-
-func asMap(v any) (map[string]any, bool) {
-	switch t := v.(type) {
-	case map[string]any:
-		return t, true
-	case bson.D:
-		m := make(map[string]any, len(t))
-		for _, e := range t {
-			m[e.Key] = e.Value
-		}
-		return m, true
-	}
-	return nil, false
-}
-
-func asArr(v any) []any {
-	switch t := v.(type) {
-	case []any:
-		return t
-	case primitive.A:
-		return t
-	}
-	return nil
-}
-
-func asString(v any) string {
-	if t, ok := v.(string); ok {
-		return t
-	}
-	return ""
 }

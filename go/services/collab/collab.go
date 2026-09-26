@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"path"
 
@@ -83,6 +84,16 @@ type Options struct {
 	AllowedOrigins  []string
 	MaxConnections  int
 	MaxPeersPerRoom int
+	// Logger — ygo server logger (slog). Nil = ygo's slog.Default()
+	// (Info). Operations may set a Debug-level logger to see dropped sync
+	// frames / persistence decisions (D22: structured ops surface).
+	Logger *slog.Logger
+	// Lifecycle observers (ops; nil = ignored): peer transitions and room
+	// unload. D22: room occupancy is the first real-time signal we can
+	// surface for the collab engine.
+	OnFirstPeer      func(room string)
+	OnLastPeer       func(room string)
+	OnUnloadDocument func(room string)
 }
 
 // Service — the collab service. ServeHTTP implements http.Handler for the
@@ -165,6 +176,18 @@ func New(opts Options) (*Service, error) {
 	srv.AllowedOrigins = opts.AllowedOrigins
 	srv.MaxConnections = opts.MaxConnections
 	srv.MaxPeersPerRoom = opts.MaxPeersPerRoom
+	if opts.Logger != nil {
+		srv.Logger = opts.Logger
+	}
+	if opts.OnFirstPeer != nil {
+		srv.OnFirstPeer = func(ctx context.Context, room string) { opts.OnFirstPeer(room) }
+	}
+	if opts.OnLastPeer != nil {
+		srv.OnLastPeer = func(ctx context.Context, room string) { opts.OnLastPeer(room) }
+	}
+	if opts.OnUnloadDocument != nil {
+		srv.OnUnloadDocument = func(ctx context.Context, room string) { opts.OnUnloadDocument(room) }
+	}
 	return &Service{Server: srv, store: store}, nil
 }
 
@@ -187,7 +210,9 @@ func (s *Service) Shutdown(ctx context.Context) error {
 // SessionAuth — production AuthSource: shared session store + Mongo.
 //
 // Session shape (pinned from the Go web core/session.go contract):
-//   - cookie COOKIE_NAME (default "overleaf.sid"), value "s:<sid>"
+//   - cookie COOKIE_NAME (default "overleaf.sid"), value
+//     percent-encode("s:" + sign(sid, SESSION_SECRET)) — decoded, stripped,
+//     and un-signed exactly as the web does (see mongo.go sessionSid);
 //   - redis key "sess:<sid>" -> JSON session doc
 //   - logged-in sessions carry "passport": {"user": {...}}; the user doc
 //     serializes its _id as a hex string (web-app serialization).

@@ -3,363 +3,312 @@ package collab
 import (
 	"context"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
-	"github.com/reearth/ygo/crdt"
-	"github.com/reearth/ygo/encoding"
-	ysync "github.com/reearth/ygo/sync"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// --- fakes + fixtures ------------------------------------------------------// seedRoomPID — a valid 24-hex room name (= project id) for the seed tests.
-const seedRoomPID = "66a00000000000000000dead"
+// seedRoomPID / seedRoomPID2 — 24-hex project ids (the room names).
+const (
+	seedRoomPID  = "66a00000000000000000dead"
+	seedRoomPID2 = "66a00000000000000000beef"
+)
+
+// seedText — the docstore lines joined (the live-oracle shape: a rendered
+// mainbasic.tex with a trailing blank line).
+const seedDocText = "% OlliTeX — seeded\n\\begin{document}\n42\n\\end{document}\n"
+
+// ooid — 24-hex → ObjectID (test helper; mongo-driver v1 has no Must*).
+func ooid(h string) primitive.ObjectID {
+	o, err := primitive.ObjectIDFromHex(h)
+	if err != nil {
+		panic(err)
+	}
+	return o
+}
 
 type seedFakeProjects struct {
-	doc  bson.D
-	err  error
-	seen []string // every requested room (test introspection)
+	doc bson.D // (nil, nil) when the "doc" field is absent AND noDoc=false
+	err error
 }
 
 func (f *seedFakeProjects) ProjectByID(_ context.Context, id string) (bson.D, error) {
-	f.seen = append(f.seen, id)
 	if f.err != nil {
 		return nil, f.err
+	}
+	if f.doc == nil {
+		return nil, nil
 	}
 	return f.doc, nil
 }
 
-// seedProjectDoc — a project doc in the live shape the web's file proxy
-// reads: rootFolder = array of elements; element = {fileRefs, folders};
-// overleaf.history.id carrying the blob store id (string or ObjectID).
-func seedProjectDoc(root any, hid any) bson.D {
-	return bson.D{
-		{Key: "_id", Value: primitive.NewObjectID()},
-		{Key: "rootFolder", Value: root},
-		{Key: "overleaf", Value: bson.D{
-			{Key: "history", Value: bson.D{{Key: "id", Value: hid}}},
-		}},
+// seedProjectDoc — a projects doc with the given rootDoc_id (ObjectID or
+// string) — the live lineage shape (rootFolder is ABSENT in the docstore
+// model).
+func seedProjectDoc(rootDocID any) bson.D {
+	d := bson.D{
+		{Key: "_id", Value: ooid(seedRoomPID)},
+		{Key: "name", Value: "seed-probe"},
 	}
-}
-
-func fileRef(name, hash string) bson.D {
-	return bson.D{
-		{Key: "_id", Value: primitive.NewObjectID()},
-		{Key: "name", Value: name},
-		{Key: "hash", Value: hash},
+	if rootDocID != nil {
+		d = append(d, bson.E{Key: "rootDoc_id", Value: rootDocID})
 	}
+	return d
 }
 
-// seedBlobServer — a fake of the history-v1 blob API (GET
-// /api/projects/{hid}/blobs/{hash}, basic auth) recording the last
-// request. Bodies by hash; explicit statuses override (404/500 cases).
-type seedBlobServer struct {
-	*httptest.Server
-	lastPath, lastUser, lastPass, lastAuth string
-	bodies                                 map[string]string
-	statusFor                              map[string]int
+// seedDocServer — a fake of the docstore document API:
+// GET /project/{pid}/doc/{did} → {"lines":[...]} (200) or the per-did
+// status (bodies map: did → text; statuses map: did → status code).
+type seedDocServer struct {
+	t         *testing.T
+	base      string
+	gotAuth   http.Header
+	gotPaths  []string
+	statusFor map[string]int
+	ts        *httptest.Server
 }
 
-func newSeedBlobServer(t *testing.T, bodies map[string]string, statuses map[string]int) *seedBlobServer {
+func newSeedDocServer(t *testing.T, body string) *seedDocServer {
 	t.Helper()
-	s := &seedBlobServer{bodies: bodies, statusFor: statuses}
-	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.lastPath = r.URL.Path
-		s.lastUser, s.lastPass, _ = r.BasicAuth()
-		s.lastAuth = r.Header.Get("Authorization")
-		hash := strings.TrimPrefix(r.URL.Path, "/api/projects/hid1/blobs/")
-		if st, ok := s.statusFor[hash]; ok {
+	s := &seedDocServer{t: t, statusFor: map[string]int{}}
+	s.t = t
+	mux := http.NewServeMux()
+	mux.HandleFunc("/project/", func(w http.ResponseWriter, r *http.Request) {
+		s.gotAuth = r.Header.Clone()
+		s.gotPaths = append(s.gotPaths, r.URL.Path)
+		// did = last path segment
+		seg := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
+		if st, ok := s.statusFor[seg]; ok {
 			w.WriteHeader(st)
 			return
 		}
-		if b, ok := s.bodies[hash]; ok {
-			io.WriteString(w, b)
-			return
+		w.Header().Set("Content-Type", "application/json")
+		lines := strings.Split(body, "\n") // TRAILING "" element preserved (live docstore shape)
+		if body == "" {
+			lines = []string{} // zero-line doc
 		}
-		http.NotFound(w, r)
-	}))
+		w.Write([]byte(`{"_id":"` + seg + `","lines":[` + jsonLineList(lines) + `],"rev":1,"version":0,"ranges":{}}`))
+	})
+	srv := httptest.NewServer(mux)
+	s.ts = srv
+	t.Cleanup(srv.Close)
+	s.base = srv.URL
 	return s
 }
 
-func seedSrc(p SeedProjects, srv *seedBlobServer, user, pass string) *SeedSource {
-	// Route through NewSeedSource so the production defaults (staging /
-	// empty password) are what the tests verify.
-	return NewSeedSource(p, srv.URL+"/api", user, pass, srv.Server.Client())
+// Close stops the backing httptest server (for transport-failure tests).
+func (s *seedDocServer) Close() { s.ts.Close() }
+
+func jsonLineList(lines []string) string {
+	var b strings.Builder
+	for i, l := range lines {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(l) + `"`)
+	}
+	return b.String()
 }
 
-// readWSRoomText — joins a room over a real WebSocket (gorilla), performs
-// the y-protocol sync handshake (server step1 → echo our step1 → server
-// delivers step2), and returns the room's Y.Text (TEXT_TYPE). The shared
-// initial-sync probe for seed-path tests.
-func readWSRoomText(t *testing.T, base, room string) string {
-	t.Helper()
-	c, _, err := websocket.DefaultDialer.DialContext(context.Background(), wsURL(base, room), http.Header{})
-	if err != nil {
-		t.Fatalf("dial: %v", err)
-	}
-	defer c.Close()
-	c.SetReadDeadline(time.Now().Add(8 * time.Second))
-	readFrame := func() []byte {
-		t.Helper()
-		_, raw, err := c.ReadMessage()
-		if err != nil {
-			t.Fatalf("read frame: %v", err)
-		}
-		dec := encoding.NewDecoder(raw)
-		msgType, err := dec.ReadVarUint()
-		if err != nil || msgType != 0 {
-			t.Fatalf("frame msgType = %d, %v; want sync(0)", msgType, err)
-		}
-		return dec.RemainingBytes()
-	}
-	doc := crdt.New()
-	echoStep1 := func() {
-		c.WriteMessage(websocket.BinaryMessage, encoding.EncodeBytes(func(enc *encoding.Encoder) {
-			enc.WriteVarUint(0)
-			enc.WriteRaw(ysync.EncodeSyncStep1(doc))
-		}))
-	}
-	inner := readFrame()
-	st, _, err := ysync.ReadSyncMessage(inner)
-	if err != nil || st != ysync.MsgSyncStep1 {
-		t.Fatalf("first sync = type %d, %v; want step1", st, err)
-	}
-	echoStep1()
-	for i := 0; i < 3; i++ {
-		inner = readFrame()
-		st, _, err := ysync.ReadSyncMessage(inner)
-		if err != nil {
-			t.Fatalf("sync frame %d: %v", i, err)
-		}
-		if st == ysync.MsgSyncStep1 {
-			echoStep1()
-			continue
-		}
-		if _, err := ysync.ApplySyncMessage(doc, inner, "client-probe"); err != nil {
-			t.Fatalf("apply %d: %v", st, err)
-		}
-		break
-	}
-	return doc.GetText(TextType).ToString()
+func seedSrc(p SeedProjects, srv *seedDocServer, user, pass string) *SeedSource {
+	return &SeedSource{P: p, Base: srv.base, User: user, Pass: pass, HTTP: http.DefaultClient}
 }
 
-// --- unit tests -------------------------------------------------------------
+// ---- content --------------------------------------------------------------
 
-func TestSeedSourceMainTexPreferred(t *testing.T) {
-	t.Parallel()
-	// notes.tex appears FIRST in walk order; main.tex is nested — the
-	// selection rule must still choose main.tex (the template contract:
-	// POST /project/new seeds rootFolder main.tex).
-	root := []any{
-		bson.D{
-			{Key: "fileRefs", Value: []any{fileRef("notes.tex", "h-notes")}},
-			{Key: "folders", Value: []any{
-				bson.D{{Key: "fileRefs", Value: []any{fileRef("main.tex", "h-main")}}},
-			}},
-		},
-	}
-	srv := newSeedBlobServer(t, map[string]string{"h-main": "MAIN", "h-notes": "NOTES"}, nil)
-	defer srv.Close()
-	p := &seedFakeProjects{doc: seedProjectDoc(root, "hid1")}
-
-	got, err := seedSrc(p, srv, "staging", "secret").SeedText(context.Background(), seedRoomPID)
-	if err != nil {
-		t.Fatalf("SeedText: %v", err)
-	}
-	if got != "MAIN" {
-		t.Fatalf("seed = %q, want main.tex content (MAIN)", got)
-	}
-	// Oracle-pinned wire expectations (the web's file-proxy contract):
-	if srv.lastPath != "/api/projects/hid1/blobs/h-main" {
-		t.Errorf("blob path = %q, want /api/projects/hid1/blobs/h-main", srv.lastPath)
-	}
-	if srv.lastUser != "staging" || srv.lastPass != "secret" {
-		t.Errorf("basic auth = %q:%q, want staging:secret", srv.lastUser, srv.lastPass)
-	}
-	if !strings.HasPrefix(srv.lastAuth, "Basic ") {
-		t.Errorf("Authorization = %q, want Basic …", srv.lastAuth)
-	}
-	if len(p.seen) != 1 || p.seen[0] != seedRoomPID {
-		t.Errorf("projects lookups = %v, want [%s]", p.seen, seedRoomPID)
-	}
-}
-
-func TestSeedSourceFirstTexFallback(t *testing.T) {
-	t.Parallel()
-	// No main.tex anywhere → the first .tex in walk order wins.
-	root := []any{
-		bson.D{{Key: "fileRefs", Value: []any{fileRef("a.tex", "h-a"), fileRef("b.tex", "h-b")}}},
-	}
-	srv := newSeedBlobServer(t, map[string]string{"h-a": "A", "h-b": "B"}, nil)
-	defer srv.Close()
-	p := &seedFakeProjects{doc: seedProjectDoc(root, "hid1")}
-
-	got, err := seedSrc(p, srv, "", "").SeedText(context.Background(), seedRoomPID)
-	if err != nil {
-		t.Fatalf("SeedText: %v", err)
-	}
-	if got != "A" {
-		t.Fatalf("seed = %q, want first .tex (A)", got)
-	}
-	// Web-contract auth defaults: user "staging", empty password.
-	if srv.lastUser != "staging" || srv.lastPass != "" {
-		t.Errorf("default auth = %q:%q, want staging:(empty)", srv.lastUser, srv.lastPass)
-	}
-}
-
-func TestSeedSourceNoTextFileIsEmptySeed(t *testing.T) {
-	t.Parallel()
-	// A project whose content is only non-text (image) legitimately seeds
-	// EMPTY — and must not even fetch a blob.
-	root := []any{bson.D{{Key: "fileRefs", Value: []any{fileRef("image.png", "h-img")}}}}
-	srv := newSeedBlobServer(t, map[string]string{"h-img": "PNG"}, nil)
-	defer srv.Close()
-	p := &seedFakeProjects{doc: seedProjectDoc(root, "hid1")}
-
-	got, err := seedSrc(p, srv, "u", "p").SeedText(context.Background(), seedRoomPID)
-	if err != nil {
-		t.Fatalf("SeedText: %v (no-text-file must be a valid empty seed)", err)
-	}
-	if got != "" {
-		t.Fatalf("seed = %q, want empty", got)
-	}
-	if srv.lastPath != "" {
-		t.Errorf("no blob request expected, got %q", srv.lastPath)
-	}
-}
-
-func TestSeedSourceMalformedRoomIsError(t *testing.T) {
-	t.Parallel()
-	s := &SeedSource{P: &seedFakeProjects{doc: seedProjectDoc(nil, "hid1")},
-		Base: "http://127.0.0.1:1/api", User: "u", Pass: "p", HTTP: http.DefaultClient}
-	if _, err := s.SeedText(context.Background(), "not-a-project"); !errors.Is(err, ErrSeedProject) {
-		t.Fatalf("err = %v, want ErrSeedProject for a malformed room", err)
-	}
-}
-
-func TestSeedSourceBlob404IsEmptySeed(t *testing.T) {
-	t.Parallel()
-	// The fileRef is in the tree but its blob is gone → honest empty seed.
-	root := []any{bson.D{{Key: "fileRefs", Value: []any{fileRef("main.tex", "h-missing")}}}}
-	srv := newSeedBlobServer(t, nil, map[string]int{"h-missing": http.StatusNotFound})
-	defer srv.Close()
-	p := &seedFakeProjects{doc: seedProjectDoc(root, "hid1")}
-
-	got, err := seedSrc(p, srv, "u", "p").SeedText(context.Background(), seedRoomPID)
-	if err != nil {
-		t.Fatalf("404 should be an honest empty seed, got error: %v", err)
-	}
-	if got != "" {
-		t.Fatalf("seed = %q, want empty", got)
-	}
-}
-
-func TestSeedSourceFailureIsFailClosed(t *testing.T) {
-	t.Parallel()
-	root := []any{bson.D{{Key: "fileRefs", Value: []any{fileRef("main.tex", "h-flaky")}}}}
-
-	t.Run("noProjectDoc", func(t *testing.T) {
-		t.Parallel()
-		p := &seedFakeProjects{doc: nil} // ProjectByID: (nil, nil)
-		dummy := &SeedSource{P: p, Base: "http://127.0.0.1:1/api", User: "u", Pass: "p", HTTP: http.DefaultClient}
-		_, err := dummy.SeedText(context.Background(), seedRoomPID)
-		if !errors.Is(err, ErrSeedProject) {
-			t.Fatalf("err = %v, want ErrSeedProject", err)
-		}
-	})
-
-	t.Run("projectLookupError", func(t *testing.T) {
-		t.Parallel()
-		sentinel := errors.New("mongo down")
-		p := &seedFakeProjects{err: sentinel}
-		dummy := &SeedSource{P: p, Base: "http://127.0.0.1:1/api", User: "u", Pass: "p", HTTP: http.DefaultClient}
-		_, err := dummy.SeedText(context.Background(), seedRoomPID)
-		if !errors.Is(err, sentinel) {
-			t.Fatalf("err = %v, want lookup sentinel", err)
-		}
-	})
-
-	t.Run("blob500", func(t *testing.T) {
-		t.Parallel()
-		srv := newSeedBlobServer(t, nil, map[string]int{"h-flaky": http.StatusInternalServerError})
-		defer srv.Close()
-		p := &seedFakeProjects{doc: seedProjectDoc(root, "hid1")}
-		_, err := seedSrc(p, srv, "u", "p").SeedText(context.Background(), seedRoomPID)
-		if err == nil {
-			t.Fatal("non-2xx/non-404 blob status must be an error (fail-closed)")
-		}
-	})
-
-	t.Run("transportError", func(t *testing.T) {
-		t.Parallel()
-		p := &seedFakeProjects{doc: seedProjectDoc(root, "hid1")}
-		s := &SeedSource{P: p, Base: "http://127.0.0.1:1/api", User: "u", Pass: "p",
-			HTTP: &http.Client{Timeout: 150 * time.Millisecond}}
-		_, err := s.SeedText(context.Background(), seedRoomPID)
-		if err == nil {
-			t.Fatal("transport failure must be an error (fail-closed)")
-		}
-	})
-}
-
-func TestSeedSourceObjectIDHistory(t *testing.T) {
-	t.Parallel()
-	// overleaf.history.id as a real ObjectID (both shapes occur in this
-	// lineage) — the blob URL must carry its hex form.
-	hid := primitive.NewObjectID()
-	root := []any{bson.D{{Key: "fileRefs", Value: []any{fileRef("main.tex", "h-oid")}}}}
-	srv := newSeedBlobServer(t, map[string]string{"h-oid": "OID"}, nil)
-	defer srv.Close()
-	// retarget the recorded path prefix to this ObjectID hex (the fake
-	// server keys bodies by the trimmed hash, so the same fixture serves)
-	srv2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		srv.lastPath = r.URL.Path
-		if strings.HasSuffix(r.URL.Path, "/h-oid") {
-			io.WriteString(w, "OID")
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	defer srv2.Close()
-	p := &seedFakeProjects{doc: seedProjectDoc(root, hid)}
-	s := &SeedSource{P: p, Base: srv2.URL + "/api", User: "staging", Pass: "",
-		HTTP: srv2.Client()}
-
+func TestSeedFromDocstoreLines(t *testing.T) {
+	srv := newSeedDocServer(t, seedDocText)
+	p := &seedFakeProjects{doc: seedProjectDoc("66a00000000000000000aaaa")}
+	s := seedSrc(p, srv, "", "")
 	got, err := s.SeedText(context.Background(), seedRoomPID)
 	if err != nil {
 		t.Fatalf("SeedText: %v", err)
 	}
-	if got != "OID" {
-		t.Fatalf("seed = %q, want OID", got)
+	if got != seedDocText {
+		t.Fatalf("seed = %q, want the joined docstore lines %q", got, seedDocText)
 	}
-	want := "/api/projects/" + hid.Hex() + "/blobs/h-oid"
-	if srv.lastPath != want {
-		t.Errorf("blob path = %q, want %q", srv.lastPath, want)
+	// the EXACT path the docstore document API uses (pid hex + doc id)
+	want := "/project/" + seedRoomPID + "/doc/66a00000000000000000aaaa"
+	if len(srv.gotPaths) != 1 || srv.gotPaths[0] != want {
+		t.Fatalf("paths seen = %v, want [%s]", srv.gotPaths, want)
 	}
 }
 
-// TestSeedSourceWiredIntoService — the production path: Service.New with
-// SeedFn = SeedSource.SeedText over a real (temp-dir) store and a real
-// WebSocket client: the first peer must receive the seeded text during
-// initial sync, and exactly ONE version (the seed) must be persisted.
-func TestSeedSourceWiredIntoService(t *testing.T) {
-	auth := &fakeAuth{sessionUID: "ownerA", projRole: map[string]Role{seedRoomPID: ReadWrite}}
-	srv := newSeedBlobServer(t,
-		map[string]string{"h-main": "% OlliTeX — seeded\n\\section{S4}\n"}, nil)
-	defer srv.Close()
-	p := &seedFakeProjects{doc: seedProjectDoc([]any{
-		bson.D{{Key: "fileRefs", Value: []any{fileRef("main.tex", "h-main")}}},
-	}, "hid1")}
-	seed := &SeedSource{P: p, Base: srv.URL + "/api", User: "staging", Pass: "secret",
-		HTTP: srv.Server.Client()}
+func TestSeedEmptyLinesIsEmpty(t *testing.T) {
+	// a doc that exists with zero lines → empty seed (a state, not an error)
+	srv := newSeedDocServer(t, "")
+	p := &seedFakeProjects{doc: seedProjectDoc("66a00000000000000000bbbb")}
+	s := seedSrc(p, srv, "", "")
+	got, err := s.SeedText(context.Background(), seedRoomPID)
+	if err != nil {
+		t.Fatalf("SeedText: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("seed = %q, want empty", got)
+	}
+}
 
-	svc, err := New(Options{Auth: auth, DataDir: t.TempDir(), SeedFn: seed.SeedText})
+func TestSeedNoRootDocIsEmpty(t *testing.T) {
+	// a project doc WITHOUT rootDoc_id has no content to seed
+	srv := newSeedDocServer(t, "should not even be fetched")
+	p := &seedFakeProjects{doc: seedProjectDoc(nil)}
+	s := seedSrc(p, srv, "", "")
+	got, err := s.SeedText(context.Background(), seedRoomPID)
+	if err != nil {
+		t.Fatalf("SeedText: %v", err)
+	}
+	if got != "" || len(srv.gotPaths) != 0 {
+		t.Fatalf("seed=%q paths=%v — no docstore fetch is expected", got, srv.gotPaths)
+	}
+}
+
+// ---- rootDoc_id shapes ------------------------------------------------------
+
+func TestSeedRootDocObjectID(t *testing.T) {
+	did := ooid("66a00000000000000000cccc")
+	srv := newSeedDocServer(t, "x")
+	p := &seedFakeProjects{doc: seedProjectDoc(did)}
+	s := seedSrc(p, srv, "", "")
+	if _, err := s.SeedText(context.Background(), seedRoomPID); err != nil {
+		t.Fatalf("SeedText: %v", err)
+	}
+	if want := "/project/" + seedRoomPID + "/doc/" + did.Hex(); len(srv.gotPaths) != 1 || srv.gotPaths[0] != want {
+		t.Fatalf("paths = %v, want [%s]", srv.gotPaths, want)
+	}
+}
+
+// ---- auth parity ------------------------------------------------------------
+
+func TestSeedBasicAuthWhenConfigured(t *testing.T) {
+	srv := newSeedDocServer(t, "x")
+	p := &seedFakeProjects{doc: seedProjectDoc("66a00000000000000000dddd")}
+	s := seedSrc(p, srv, "staging", "pw")
+	if _, err := s.SeedText(context.Background(), seedRoomPID); err != nil {
+		t.Fatalf("SeedText: %v", err)
+	}
+	if got := srv.gotAuth.Get("Authorization"); !strings.HasPrefix(got, "Basic ") {
+		t.Fatalf("Authorization = %q, want Basic … (parity with the file-proxy style)", got)
+	}
+	// and ABSENT when no user is configured (internal service needs none)
+	srv2 := newSeedDocServer(t, "x")
+	s2 := seedSrc(&seedFakeProjects{doc: seedProjectDoc("66a00000000000000000dddd")}, srv2, "", "")
+	if _, err := s2.SeedText(context.Background(), seedRoomPID); err != nil {
+		t.Fatalf("SeedText: %v", err)
+	}
+	if got := srv2.gotAuth.Get("Authorization"); got != "" {
+		t.Fatalf("Authorization = %q, want absent", got)
+	}
+}
+
+// ---- failure semantics -------------------------------------------------------
+
+func TestSeedMalformedRoomIsError(t *testing.T) {
+	srv := newSeedDocServer(t, "x")
+	s := seedSrc(&seedFakeProjects{}, srv, "", "")
+	for _, bad := range []string{"", "short", "zzz000000000000000000000", "../../etc"} {
+		if _, err := s.SeedText(context.Background(), bad); !errors.Is(err, ErrSeedProject) {
+			t.Fatalf("room %q: err = %v, want ErrSeedProject", bad, err)
+		}
+	}
+	if len(srv.gotPaths) != 0 {
+		t.Fatalf("no docstore fetch is expected, got %v", srv.gotPaths)
+	}
+}
+
+func TestSeedNoProjectDocIsError(t *testing.T) {
+	srv := newSeedDocServer(t, "x")
+	s := seedSrc(&seedFakeProjects{doc: nil}, srv, "", "")
+	if _, err := s.SeedText(context.Background(), seedRoomPID); !errors.Is(err, ErrSeedProject) {
+		t.Fatalf("err = %v, want ErrSeedProject (fail-closed: the gate proved membership)", err)
+	}
+}
+
+func TestSeedProjectReadErrorPropagates(t *testing.T) {
+	sentinel := errors.New("mongo unavailable")
+	s := seedSrc(&seedFakeProjects{err: sentinel}, newSeedDocServer(t, "x"), "", "")
+	if _, err := s.SeedText(context.Background(), seedRoomPID); !errors.Is(err, sentinel) {
+		t.Fatalf("err = %v, want the projects-store error to propagate", err)
+	}
+}
+
+func TestSeedDocstore404IsEmpty(t *testing.T) {
+	srv := newSeedDocServer(t, "unused")
+	did := "66a00000000000000000eeee"
+	srv.statusFor[did] = http.StatusNotFound
+	s := seedSrc(&seedFakeProjects{doc: seedProjectDoc(did)}, srv, "", "")
+	got, err := s.SeedText(context.Background(), seedRoomPID)
+	if err != nil {
+		t.Fatalf("SeedText: %v (404 must read as empty, not error)", err)
+	}
+	if got != "" {
+		t.Fatalf("seed = %q, want empty", got)
+	}
+}
+
+func TestSeedFailureIsFailClosed(t *testing.T) {
+	// 5xx
+	srv := newSeedDocServer(t, "unused")
+	did := "66a00000000000000000ffff"
+	srv.statusFor[did] = http.StatusInternalServerError
+	s := seedSrc(&seedFakeProjects{doc: seedProjectDoc(did)}, srv, "", "")
+	if _, err := s.SeedText(context.Background(), seedRoomPID); err == nil {
+		t.Fatal("docstore 500 must fail the seed (a room seeded from a failed read diverges)")
+	}
+
+	// transport error (server gone)
+	srv.Close()
+	s2 := seedSrc(&seedFakeProjects{doc: seedProjectDoc("66a00000000000000001111")}, srv, "", "")
+	if _, err := s2.SeedText(context.Background(), seedRoomPID); err == nil {
+		t.Fatal("transport failure must fail the seed")
+	}
+}
+
+func TestSeedMalformedDocBodyFails(t *testing.T) {
+	// a 200 that is NOT the lines view → fail (never guess content)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/project/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"unexpected":"shape"}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	s := &SeedSource{P: &seedFakeProjects{doc: seedProjectDoc("66a00000000000000002222")},
+		Base: srv.URL, HTTP: srv.Client()}
+	if _, err := s.SeedText(context.Background(), seedRoomPID); err == nil {
+		t.Fatal("a docstore 200 without lines must fail (content shape is a contract)")
+	}
+}
+
+func TestSeedHex24Shape(t *testing.T) {
+	re := regexp.MustCompile(`^[0-9a-f]{24}$`)
+	if !re.MatchString(seedRoomPID) || !re.MatchString(seedRoomPID2) {
+		t.Fatal("test room ids must be 24-hex (the room-name contract)")
+	}
+}
+
+// TestSeedWiredIntoService — the S4 seam: a REAL service + temp persistence
+// store, with the SeedFn coming from the real SeedSource over a fake
+// projects/docstore pair. A real WS peer connecting to the EMPTY room must
+// receive the docstore content as its initial state, and the persisted
+// history must hold exactly ONE version.
+func TestSeedWiredIntoService(t *testing.T) {
+	body := "wire seed\nline two\n"
+	srv := newSeedDocServer(t, body)
+	p := &seedFakeProjects{doc: seedProjectDoc("66a00000000000000003333")}
+	seed := &SeedSource{P: p, Base: srv.base, HTTP: http.DefaultClient}
+
+	auth := &fakeAuth{sessionUID: "ownerA", projRole: map[string]Role{seedRoomPID: ReadWrite}}
+	svc, err := New(Options{
+		Auth:    auth,
+		DataDir: t.TempDir(),
+		SeedFn:  seed.SeedText,
+	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -371,9 +320,9 @@ func TestSeedSourceWiredIntoService(t *testing.T) {
 	ts := httptest.NewServer(svc)
 	defer ts.Close()
 
-	want := "% OlliTeX — seeded\n\\section{S4}\n"
-	if got := readWSRoomText(t, ts.URL, seedRoomPID); got != want {
-		t.Fatalf("first peer initial text = %q, want seeded blob content %q", got, want)
+	text := readWSRoomText(t, ts.URL, seedRoomPID)
+	if text != "wire seed\nline two\n" { // trailing line preserved (live docstore shape)
+		t.Fatalf("peer initial content = %q, want %q", text, "wire seed\nline two\n")
 	}
 	metas, err := svc.Store().ListVersions(context.Background(), seedRoomPID)
 	if err != nil {

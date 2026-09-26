@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/reearth/ygo/crdt"
+	"github.com/reearth/ygo/encoding"
 	"github.com/reearth/ygo/persistence"
 	ysync "github.com/reearth/ygo/sync"
 	"go.mongodb.org/mongo-driver/bson"
@@ -89,6 +90,63 @@ func newTestService(t *testing.T, auth AuthSource) *Service {
 func wsURL(base, room string) string {
 	u := strings.Replace(base, "http://", "ws://", 1)
 	return u + "/collab/" + path.Join(room)
+}
+
+// readWSRoomText — minimal y-protocol client: dials the room, plays the
+// step1/step1/step2 handshake, and returns the room's text after the
+// server's initial sync. (Shared by the seed + persistence tests.)
+func readWSRoomText(t *testing.T, tsURL, room string) string {
+	t.Helper()
+	c, _, err := websocket.DefaultDialer.DialContext(context.Background(), wsURL(tsURL, room), http.Header{})
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer c.Close()
+	c.SetReadDeadline(time.Now().Add(5 * time.Second))
+	readFrame := func() []byte {
+		t.Helper()
+		_, raw, err := c.ReadMessage()
+		if err != nil {
+			t.Fatalf("read frame: %v", err)
+		}
+		dec := encoding.NewDecoder(raw)
+		msgType, err := dec.ReadVarUint() // outer: 0 = sync
+		if err != nil || msgType != 0 {
+			t.Fatalf("frame msgType = %d, %v; want sync(0)", msgType, err)
+		}
+		return dec.RemainingBytes()
+	}
+	doc := crdt.New()
+	inner := readFrame()
+	st, _, err := ysync.ReadSyncMessage(inner)
+	if err != nil || st != ysync.MsgSyncStep1 {
+		t.Fatalf("first sync = type %d, %v; want step1", st, err)
+	}
+	// y-protocol: reply to the server's step1 with OUR OWN step1 (empty sv);
+	// the server then sends the step2 with everything we lack.
+	c.WriteMessage(websocket.BinaryMessage, encoding.EncodeBytes(func(enc *encoding.Encoder) {
+		enc.WriteVarUint(0)
+		enc.WriteRaw(ysync.EncodeSyncStep1(doc))
+	}))
+	for i := 0; i < 3; i++ {
+		inner = readFrame()
+		st, _, err := ysync.ReadSyncMessage(inner)
+		if err != nil {
+			t.Fatalf("sync frame %d: %v", i, err)
+		}
+		if st == ysync.MsgSyncStep1 {
+			c.WriteMessage(websocket.BinaryMessage, encoding.EncodeBytes(func(enc *encoding.Encoder) {
+				enc.WriteVarUint(0)
+				enc.WriteRaw(ysync.EncodeSyncStep1(doc))
+			}))
+			continue
+		}
+		if _, err := ysync.ApplySyncMessage(doc, inner, "client-probe"); err != nil {
+			t.Fatalf("apply %d: %v", st, err)
+		}
+		break
+	}
+	return doc.GetText(TextType).ToString()
 }
 
 // ---------------------------------------------------------------------------
@@ -427,4 +485,47 @@ func TestRoomIsolation(t *testing.T) {
 			t.Fatal("room isolation violated: roomB loaded roomA content")
 		}
 	}
+}
+
+// TestSessionSidDecode — the live-probe-caught gate: the cookie value on the
+// wire is percent-encode("s:" + sign sid) (cookie-signature HMAC-SHA256);
+// the gate must decode, strip "s:", AND unsign against the secret chain —
+// the web's exact pipeline — or real browser sessions 401.
+func TestSessionSidDecode(t *testing.T) {
+	const secret = "test-secret"
+	// the live case: signed + percent-encoded (":" → "%3A")
+	raw := "sJdI-1Kwsby5YqXiwRhpcz0"
+	wire := percentEncodeWire("s:" + signCookie(raw, secret)) // the real wire shape
+	got := sessionSid(wire, []string{secret})
+	if got != raw {
+		t.Fatalf("signed cookie: got %q want %q (wire=%q)", got, raw, wire)
+	}
+	if got := sessionSid(wire, []string{"wrong-secret"}); got != "" {
+		t.Fatalf("wrong secret must reject, got %q", got)
+	}
+	if got := sessionSid(wire, []string{"a", secret, "b"}); got != raw {
+		t.Fatalf("secret chain: got %q want %q", got, raw)
+	}
+	if got := sessionSid("garbage", []string{secret}); got != "" {
+		t.Fatalf("unsigned garbage must reject, got %q", got)
+	}
+}
+
+// percentEncodeWire — the minimum wire-encoding the web's Set-Cookie path
+// applies (percent-encode of reserved chars); enough to exercise the %3A
+// case that broke live.
+func percentEncodeWire(v string) string {
+	var b []byte
+	for i := 0; i < len(v); i++ {
+		c := v[i]
+		switch {
+		case c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_' || c == '.' || c == '~':
+			b = append(b, c)
+		default:
+			b = append(b, '%')
+			const hexd = "0123456789ABCDEF"
+			b = append(b, hexd[c>>4], hexd[c&0xf])
+		}
+	}
+	return string(b)
 }
