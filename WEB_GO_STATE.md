@@ -750,10 +750,35 @@ no longer emit `joinDoc`.
 - Gate: `make go-test-realtime` (build+vet+gofmt+test -race; wire pins,
   join flows, presence, drain, ops, full websocket client e2e) — GREEN.
 
-**Live verification (2026-09-26, image `48b64fdbcde9`, e2e stack):**
+**Live verification (2026-09-26, final image `fb0e7dc814cf`, e2e stack):**
 - D28a bus battery — B1 IDE boots (bus join) · B2 second tab boots ·
   B3 `/clients` shows both publicIds · B4 `/count-connected-clients`=2 ·
   B5 close tab → count drops to 1 — ALL PASS.
 - F1 regression battery — A1 render · A2 D25 placeholder · A3 typing →
   history v2 · A4 external peer push mirrored · A5 history chain ≥3 —
   ALL PASS (the bus flip changed only the transport underneath).
+
+**D28a COMPLETE (2026-09-26).** Node `services/real-time` hard-cut and
+deleted (commit `ee26f0a0b2`, 18,288 lines), workspace dropped, dev
+compose repointed at the Go binary. Gates green: `make go-test-realtime`,
+tsc services/web = 586 (delta 0), vitest full suite byte-identical
+(86 failed / 4851 passed — pre-existing baseline).
+
+**S4 FLIP COMPLETE (D19)** — F1 client engine (A1–A5) + F2 client OT
+hard-cut (`ccf85fc12a`) + D28/D28a event bus in Go (this section) +
+**F3 promotion**: both batteries are now permanent suite specs
+(`tests/e2e/specs/collab-yjs.test.e2e.ts`, 2-tab CRDT convergence incl.
+a REAL second peer; `tests/e2e/specs/realtime-bus.test.e2e.ts`, presence
+lifecycle) — 2 passed in 56s on the live stack.
+
+**OUTSTANDING (owner decision):**
+- psintern (compose_cep) still runs the pre-D28a image with the Node bus
+  (Node `real-time` no longer exists in the tree — the old image keeps
+  running its baked copy). Applying the new image there = a hard cutover
+  on the external host → needs owner sign-off.
+- MAIN ARC (history-v1 / document-updater live flip): Go ports are
+  hermetic-gate green (`services/history-v1.go/`,
+  `services/document-updater.go/`, HANDOFFs in-tree; live homes under
+  /home/davrot/history_v1). Remaining: real persistors + zip/clone
+  streaming (501-bucket), document-updater Phase 9 (managers/HTTP over
+  live Redis/Mongo), ARC-1b blob migration, then the runit flips.
