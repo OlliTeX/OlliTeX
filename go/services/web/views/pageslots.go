@@ -35,6 +35,7 @@ type PageSlots struct {
 // HTML. EditorPage forwards here (single implementation).
 func ApplyPageSlots(template string, d PageSlots) string {
 	s := template
+	s = resolveAssetSlots(s) // manifest-resolved asset URLs (editor/hub shells)
 	s = strings.ReplaceAll(s, "__NONCE__", d.Nonce)
 	s = strings.ReplaceAll(s, "__PROJNAME__", edHTMLEscape(d.ProjectName))
 	s = strings.ReplaceAll(s, "__TITLE__", edHTMLEscape(d.Title))

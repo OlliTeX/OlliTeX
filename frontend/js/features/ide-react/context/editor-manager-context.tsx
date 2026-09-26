@@ -601,8 +601,8 @@ export const EditorManagerProvider: FC<React.PropsWithChildren> = ({
             ? editorContent
             : document.getSnapshot()
 
-        // Tear down the ShareJsDoc.
-        if (document.doc) document.doc.clearInflightAndPendingOps()
+        // Tear down the collaboration engine (Yjs; no-op if already gone).
+        document.clearInflightAndPendingOps()
 
         // Do not re-join after re-connecting.
         document.leaveAndCleanUp()

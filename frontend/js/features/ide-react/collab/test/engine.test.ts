@@ -17,16 +17,16 @@ describe("collab/providers — network contract", () => {
     expect(wsBaseUrl(undefined)).toBe("ws://127.0.0.1");
   });
 
-  it("collabEndpoint: room = /collab/<projectId> (server contract, D19)", () => {
+  it("collabEndpoint: room = collab/<projectId> (no leading slash — y-websocket 3.x appends `serverUrl + '/' + roomname`, so a leading slash would double-slash and the proxy would not route it)", () => {
     const pid = "652c8c2b9c1a0d4f5e6a7b8c";
     const ep = collabEndpoint(pid, "https://latex.example.edu");
-    expect(ep.room).toBe(`/collab/${pid}`);
+    expect(ep.room).toBe(`collab/${pid}`);
     expect(ep.wsBaseUrl).toBe("wss://latex.example.edu");
   });
 
   it("collabEndpoint: encodes non-hex room ids", () => {
     const ep = collabEndpoint("a b/c", "http://localhost");
-    expect(ep.room).toBe(`/collab/${encodeURIComponent("a b/c")}`);
+    expect(ep.room).toBe(`collab/${encodeURIComponent("a b/c")}`);
   });
 
   it("attachProviders: headless (no browser) → both null", () => {

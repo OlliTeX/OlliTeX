@@ -77,6 +77,84 @@ const (
 	capturedOrigin = "http://127.0.0.1:7420"
 )
 
+// Asset resolution (hash-drift-proof static bundle references, 2026-09-26):
+// in-image webpack builds produce content-hashed asset names that DIFFER
+// between builds (e.g. the runtime chunk hash changes on every rebuild),
+// so baked templates never pin hashed URLs for manifest-listed assets
+// (runtime.js, pages/…/….js, …/….css, marketing.js, tracking.js,
+// bootstrap.js). They carry ASSET slots instead:
+//
+//	interpreted strings: \x01ASSET:<key>\x02  (real 0x01/0x02 bytes)
+//	raw strings:         __ASSET:<key>__
+//
+// both resolved at serve time from core.AssetManifest (loaded in core.New
+// from <PublicDir>/manifest.json; tests set it directly).
+//
+// SHARED slots (the other webpack half of the static set): page entries
+// REQUIRE their generation's shared chunks preloaded (the e.O footer waits
+// for them — the runtime does NOT self-load static chunks), which is why
+// they were in the original page HTML. They are not manifest-listed under
+// stable keys (chunk-id files), so the slot carries the ENTRY key and the
+// serve layer composes the tags from the in-image entry file + directory
+// listing (core.SharedTags — always the image's own consistent generation):
+//
+//	\x01SHARED_JS:<entryKey>\x02  → <script> tags (nonce placeholder inside)
+//	\x01SHARED_CSS:<entryKey>\x02 → <link> tags
+func resolveAssetSlots(s string) string {
+	resolve := func(markerBeg, markerEnd string) string {
+		out := s
+		from := 0
+		for {
+			i := strings.Index(out[from:], markerBeg)
+			if i < 0 {
+				break
+			}
+			i += from
+			end := strings.Index(out[i:], markerEnd)
+			if end < 0 {
+				break
+			}
+			end += i
+			key := out[i+len(markerBeg) : end]
+			if v := core.AssetFor(key); v != "" {
+				out = out[:i] + v + out[end+len(markerEnd):]
+				from = i + len(v)
+			} else {
+				from = end + len(markerEnd) // keep the token visible; skip past it
+			}
+		}
+		return out
+	}
+	resolveShared := func(markerBeg, markerEnd string) string {
+		out := s
+		for {
+			i := strings.Index(out, markerBeg)
+			if i < 0 {
+				break
+			}
+			end := strings.Index(out[i:], markerEnd)
+			if end < 0 {
+				break
+			}
+			end += i
+			key := out[i+len(markerBeg) : end] // JS:<entryKey> | CSS:<entryKey>
+			var v string
+			if strings.HasPrefix(key, "JS:") {
+				v = core.SharedTags(strings.TrimPrefix(key, "JS:"), "js")
+			} else if strings.HasPrefix(key, "CSS:") {
+				v = core.SharedTags(strings.TrimPrefix(key, "CSS:"), "css")
+			}
+			out = out[:i] + v + out[end+len(markerEnd):]
+		}
+		return out
+	}
+	s = resolve("\x01ASSET:", "\x02")
+	s = resolve("__ASSET:", "__")
+	s = resolveShared("\x01SHARED:", "\x02")
+	s = resolveShared("__SHARED:", "__")
+	return s
+}
+
 // AdminNavFragment: the exact Node admin-nav <li> (captured from the Node
 // 404 page render for a site admin; identical across pages).
 const AdminNavFragment = `<li class="dropdown subdued" role="none"><button class="dropdown-toggle" aria-haspopup="true" aria-expanded="false" data-bs-toggle="dropdown" role="menuitem" event-tracking="menu-expand" event-tracking-mb="true" event-tracking-trigger="click" event-segmentation="{&quot;item&quot;:&quot;admin&quot;,&quot;location&quot;:&quot;top-menu&quot;}">Admin</button><ul class="dropdown-menu dropdown-menu-end" role="menu"><li role="none"><a class="dropdown-item" role="menuitem" href="/admin">Manage Site</a></li><li role="none"><a class="dropdown-item" role="menuitem" href="/admin/user">Manage Users</a></li><li role="none"><a class="dropdown-item" role="menuitem" href="/admin/project">Project/Object Lookup</a></li><li role="none"><a class="dropdown-item" role="menuitem" href="/admin/llm/settings">LLM Settings</a></li></ul></li>`
@@ -137,8 +215,14 @@ type PageData struct {
 }
 
 func (p PageData) finalize(html string) string {
-	out := strings.ReplaceAll(html, slotCSRF, p.CSRFToken)
+	out := resolveAssetSlots(html)
+	out = strings.ReplaceAll(out, slotCSRF, p.CSRFToken)
 	out = strings.ReplaceAll(out, slotNonce, p.Nonce)
+	// tag-style nonce tokens (`__NONCE__`, editor/admin family) resolve
+	// here too — asset-surgery rewrites emit that style in Page-family
+	// shells as well; both must hit the per-request nonce or every
+	// nonce-script tag violates the CSP.
+	out = strings.ReplaceAll(out, "__NONCE__", p.Nonce)
 	if p.Path != "" {
 		out = strings.ReplaceAll(out, slotPath, p.Path)
 	} else {
@@ -439,7 +523,7 @@ func NotFoundPage(w http.ResponseWriter, d PageData)   { StatusPage(w, d, 404, n
 
 // Error500Page — general/500 (pinned live P3.1: nonce-policy CSP like the
 // React layouts, PP header, deterministic 681-byte body, ETag W/"2a9-..").
-const error500HTML = `<!DOCTYPE html><html lang="en"><head><title>Something went wrong</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/stylesheets/main-style-083f9c49a3108304237a.css" id="main-stylesheet"></head><body class="full-height"><main class="content content-alt full-height" id="main-content"><div class="container full-height"><div class="error-container full-height"><div class="error-details"><p class="error-status">Something went wrong, sorry.</p>If the problem persists, please contact us at
+const error500HTML = `<!DOCTYPE html><html lang="en"><head><title>Something went wrong</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="\x01ASSET:main-style.css\x02" id="main-stylesheet"></head><body class="full-height"><main class="content content-alt full-height" id="main-content"><div class="container full-height"><div class="error-container full-height"><div class="error-details"><p class="error-status">Something went wrong, sorry.</p>If the problem persists, please contact us at
 <a href="mailto:__ADMINEMAIL__" target="_blank">__ADMINEMAIL__</a>.<p class="error-actions"><a class="error-btn" href="/">Home</a></p></div></div></div></main></body></html>`
 
 func Error500Page(w http.ResponseWriter, d PageData) {
@@ -454,6 +538,7 @@ func Error500Page(w http.ResponseWriter, d PageData) {
 	}
 	d.CSP = cspReact(d.Nonce)
 	body := strings.ReplaceAll(error500HTML, "__ADMINEMAIL__", d.AdminEmail)
+	body = resolveAssetSlots(body)
 	csp := d.CSP
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", csp)

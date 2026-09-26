@@ -63,7 +63,10 @@ server {
 		proxy_http_version 1.1;
 		proxy_set_header Upgrade $http_upgrade;
 		proxy_set_header Connection "upgrade";
-		proxy_set_header Host $host;
+		# D36: $host strips the port → ygo same-origin (Origin host == r.Host)
+		# rejects the browser WS handshake (403). $http_host = raw Host header
+		# WITH port, matching the browser's Origin host.
+		proxy_set_header Host $http_host;
 		proxy_set_header X-Forwarded-Host $host;
 		proxy_set_header X-Forwarded-Proto $scheme;
 		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

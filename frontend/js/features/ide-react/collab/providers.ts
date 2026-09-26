@@ -9,7 +9,11 @@ import type * as Y from "yjs";
 export interface CollabEndpoint {
   // ws://host[:port] — the base for the WebsocketProvider (NO room).
   wsBaseUrl: string;
-  // /collab/<projectId> — the room the provider connects to.
+  // collab/<projectId> — the room the provider connects to. NOTE: NO
+  // leading slash — y-websocket 3.x composes the final URL as
+  // `serverUrl + '/' + roomname` (src/y-websocket.js:459), so a leading
+  // slash here yields `ws://host//collab/…` which the reverse proxy does
+  // NOT route to the collab service (observed 307 on the e2e stack).
   room: string;
 }
 
@@ -21,7 +25,7 @@ export function collabEndpoint(
     base ?? (typeof location !== "undefined" ? location.href : undefined);
   return {
     wsBaseUrl: wsBaseUrl(b),
-    room: `/collab/${encodeURIComponent(projectId)}`,
+    room: `collab/${encodeURIComponent(projectId)}`,
   };
 }
 

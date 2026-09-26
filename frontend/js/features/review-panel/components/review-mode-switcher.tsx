@@ -56,33 +56,13 @@ function ReviewModeDropdownItems() {
       >
         {t('editing')}
       </DropdownMenuItem>
+      {/* D25: tracked changes is OT-native — DISABLED on the Yjs engine
+          (honest placeholder; the feature re-attaches with a Y.Doc-native
+          port, an owner decision). */}
       <DropdownMenuItem
-        disabled={permissionsLevel === 'readOnly'}
-        onClick={() => {
-          if (mode === 'review') {
-            view.focus()
-            return
-          }
-          // SaaS sweep (2026-09-16, owner): track changes is free in OlliTeX.
-          sendMB('editing-mode-change', {
-            role: permissionsLevel,
-            previousMode: mode,
-            newMode: 'review',
-          })
-          if (user?.id) {
-            saveTrackChangesForCurrentUser(true)
-          } else {
-            saveTrackChanges({ on_for_guests: true })
-          }
-          view.focus()
-        }}
-        description={
-          permissionsLevel === 'review' && !trackedWrite
-            ? t('comment_only')
-            : t('edits_become_suggestions')
-        }
+        disabled
+        description="Not available on the Yjs collaboration engine"
         leadingIcon="rate_review"
-        active={trackedWrite && mode === 'review'}
       >
         {t('reviewing')}
       </DropdownMenuItem>

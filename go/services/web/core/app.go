@@ -14,9 +14,165 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"ollitex/go/pbhttp"
 )
+
+// AssetManifest — the in-image webpack manifest (key → hashed asset URL),
+// loaded by New() from <PublicDir>/manifest.json. Tests set it directly.
+// Content hashes differ BETWEEN IN-IMAGE BUILDS, so rendered pages must
+// resolve every manifest-listed asset from here at serve time (the baked
+// templates carry \x01ASSET:<key>\x02 slots — see views.resolveAssetSlots).
+var AssetManifest = map[string]string{}
+
+// AssetFor — manifest key → hashed asset URL ("" when missing).
+func AssetFor(key string) string { return AssetManifest[key] }
+
+// ---- shared-chunk resolution (the other webpack half of the asset set) ----
+//
+// webpack entries statically require their generation's SHARED chunks
+// (the `e.O(0,[<ids>]…)` footer of each entry file) — those are not in
+// manifest.json under stable keys (they are chunk-id files like
+// 1772-<hash>.js), and their filenames are content-hashed like everything
+// else. Baking their filenames breaks on every code change; instead the
+// serve layer resolves them from the in-image files themselves:
+//
+//	SHARED_JS:<entryKey>   → <script> tags for the entry's shared js chunks
+//	SHARED_CSS:<entryKey>  → <link> tags for the entry's shared css chunks
+//
+// ids are read FROM the entry file of the current generation, filenames
+// are matched from the public/ directory listing — so each image always
+// serves ITS OWN consistent shared set. `__NONCE__` placeholders in the
+// emitted script tags are resolved by the page finalizer (nonce step runs
+// after asset resolution).
+var (
+	publicDir      string
+	sharedOnce     sync.Once
+	sharedJSByDoc  = map[string][]string{} // entry key → ordered js urls
+	sharedCSSByDoc = map[string][]string{} // entry key → ordered css urls
+	sharedMissing  []string                // unresolvable (entryKey, id) — ops
+	sharedDirJS    = map[string]string{}   // chunk id → /js/<file>
+	sharedDirCSS   = map[string]string{}   // chunk id → /stylesheets/<file>
+)
+
+// SetPublicDir — tests override the public directory (then SharedTags is
+// recomputed lazily on first use).
+func SetPublicDir(d string) {
+	publicDir = d
+	sharedOnce = sync.Once{}
+}
+
+func scanSharedDirs() {
+	if publicDir == "" {
+		return
+	}
+	for _, f := range readDirNames(publicDir + "/js") {
+		if m := sharedFileRe.FindStringSubmatch(f); m != nil {
+			sharedDirJS[m[1]] = "/js/" + f
+		}
+	}
+	for _, f := range readDirNames(publicDir + "/stylesheets") {
+		if m := sharedFileRe.FindStringSubmatch(f); m != nil {
+			sharedDirCSS[m[1]] = "/stylesheets/" + f
+		}
+	}
+}
+
+var sharedFileRe = regexp.MustCompile(`^(\d+)-[a-f0-9]{10,}\.js?$`)
+
+func readDirNames(d string) []string {
+	ents, err := os.ReadDir(d)
+	if err != nil {
+		return nil
+	}
+	names := make([]string, 0, len(ents))
+	for _, e := range ents {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// SharedTags — the <script>/<link> tags for one page entry's shared chunk
+// set ("" when the entry key is unknown or has no shared chunks). The
+// emitted script tags carry the __NONCE__ placeholder (finalize resolves
+// them — asset resolution precedes nonce substitution in both finalizers).
+func SharedTags(entryKey, kind string) string {
+	sharedOnce.Do(scanSharedDirs)
+	cache, dirMap := sharedJSByDoc, sharedDirJS
+	if kind == "css" {
+		cache, dirMap = sharedCSSByDoc, sharedDirCSS
+	}
+	if v, ok := cache[entryKey]; ok {
+		return buildSharedTags(kind, v)
+	}
+	ids := sharedIDsOfEntry(entryKey)
+	urls := make([]string, 0, len(ids))
+	for _, id := range ids {
+		u, ok := dirMap[id]
+		if !ok {
+			sharedMissing = append(sharedMissing, kind+":"+entryKey+"#"+id)
+			continue
+		}
+		urls = append(urls, u)
+	}
+	cache[entryKey] = urls
+	return buildSharedTags(kind, urls)
+}
+
+// SharedMissing — unresolvable shared tokens (entryKey#id) for ops
+// observability (a non-empty list = a baked view names a generation whose
+// chunk is absent in the image — the page will fail to boot).
+func SharedMissing() []string { return sharedMissing }
+
+func buildSharedTags(kind string, urls []string) string {
+	out := ""
+	for _, u := range urls {
+		if kind == "css" {
+			out += `<link rel="stylesheet" href="` + u + `">`
+		} else {
+			out += `<script type="text/javascript" nonce="__NONCE__" src="` + u + `" defer="defer"></script>`
+		}
+	}
+	return out
+}
+
+var sharedIDsRe = regexp.MustCompile(`\.O\(0,\[([\d,]+)\]`)
+
+// sharedIDsOfEntry — the ordered unique chunk ids the entry file's e.O
+// footer requires (read from the in-image file — always the current
+// generation's own ids).
+func sharedIDsOfEntry(entryKey string) []string {
+	u := AssetFor(entryKey)
+	if u == "" || publicDir == "" {
+		return nil
+	}
+	b, err := os.ReadFile(publicDir + u)
+	if err != nil {
+		sharedMissing = append(sharedMissing, "entry:"+entryKey)
+		return nil
+	}
+	ids := []string{}
+	for _, m := range sharedIDsRe.FindAllStringSubmatch(string(b), -1) {
+		for _, id := range strings.Split(m[1], ",") {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				continue
+			}
+			dup := false
+			for _, e := range ids {
+				if e == id {
+					dup = true
+					break
+				}
+			}
+			if !dup {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
+}
 
 // Route is one registered endpoint (P0/P1 = static paths only; path
 // parameters arrive with the first feature that has them — the P2 login
@@ -92,7 +248,29 @@ func (a *App) SetMongo(m *MongoLazy) { a.Mongo = m }
 
 // New wires the app (callers: cmd/web + tests).
 func New(cfg *Config, rdb *RedisClient) *App {
-	return &App{Cfg: cfg, Redis: rdb, Store: NewSessionStore(rdb, cfg)}
+	a := &App{Cfg: cfg, Redis: rdb, Store: NewSessionStore(rdb, cfg)}
+	// Static-bundle asset map: the in-image webpack manifest is the ONLY
+	// source of truth for content-hashed entry/runtime/CSS URLs (build-to-
+	// build hashes differ — baked templates must never pin them).
+	// NOTE: the manifest also carries non-string values (the `entrypoints`
+	// composition object) — collect string values only.
+	if cfg.PublicDir != "" {
+		publicDir = cfg.PublicDir
+		if b, err := os.ReadFile(filepath.Join(cfg.PublicDir, "manifest.json")); err == nil {
+			var raw map[string]json.RawMessage
+			if json.Unmarshal(b, &raw) == nil {
+				m := make(map[string]string, len(raw))
+				for k, v := range raw {
+					var s string
+					if json.Unmarshal(v, &s) == nil {
+						m[k] = s
+					}
+				}
+				AssetManifest = m
+			}
+		}
+	}
+	return a
 }
 
 // RegisterFeature adds routes (order = Node registration order when it

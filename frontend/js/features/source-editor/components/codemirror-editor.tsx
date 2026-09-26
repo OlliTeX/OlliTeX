@@ -10,12 +10,7 @@ import { CodeMirrorCommandTooltip } from './codemirror-command-tooltip'
 import importOverleafModules from '../../../../macros/import-overleaf-module.macro'
 import { FigureModal } from './figure-modal/figure-modal'
 import { ReviewPanelProviders } from '@/features/review-panel/context/review-panel-providers'
-import { ReviewPanelRoot } from '@/features/review-panel/components/review-panel-root'
-import ReviewPanelTabsHeaderPortal from '@/features/review-panel/components/review-panel-tabs-header-portal'
-import ReviewTooltipMenu from '@/features/review-panel/components/review-tooltip-menu'
-import DeepLink from '@/features/review-panel/components/deep-link'
-import EditorFloatingMenu from '@/features/editor-floating-menu/editor-floating-menu'
-import AddCommentCommand from '@/features/editor-floating-menu/components/add-comment-command'
+import { YjsEngineReviewNote } from '@/features/review-panel/components/yjs-engine-review-note'
 import {
   CodeMirrorStateContext,
   CodeMirrorViewContext,
@@ -95,9 +90,6 @@ function CodeMirrorEditorComponents({
 }: CodeMirrorEditorComponentsProps) {
   useToolbarMenuBarEditorCommands()
   const { features } = useProjectContext()
-  const writefullToolbarMigrationEnabled = useFeatureFlag(
-    'writefull-toolbar-migration'
-  )
   return (
     <ReviewPanelProviders>
       <CodemirrorOutline />
@@ -109,18 +101,12 @@ function CodeMirrorEditorComponents({
 
       <MathPreviewTooltip />
       <EditorContextMenu />
-      <DeepLink />
-      {features.trackChangesVisible &&
-        (writefullToolbarMigrationEnabled ? (
-          <>
-            <AddCommentCommand />
-            <EditorFloatingMenu />
-          </>
-        ) : (
-          <ReviewTooltipMenu />
-        ))}
-      {features.trackChangesVisible && <ReviewPanelTabsHeaderPortal />}
-      {features.trackChangesVisible && <ReviewPanelRoot />}
+      {/* S4 flip (D25): comments + tracked changes are OT-document-native and
+          do NOT survive the OT retirement. Honestly placeholdered here (NOT
+          silently removed — the review-panel code stays in git and is
+          re-attachable once ported to a Y.Doc-native model, an owner
+          decision). */}
+      {features.trackChangesVisible && <YjsEngineReviewNote />}
 
       {sourceEditorComponents.map(
         ({ import: { default: Component }, path }) => (

@@ -42,7 +42,7 @@ export const historyOT = (currentDoc: DocumentContainer) => {
     updateSender,
     trackChangesUserIdState,
     cutCommentsState,
-    shareDocState.init(() => currentDoc?.doc?._doc ?? null),
+    shareDocState.init(() => (currentDoc as any)?.doc?._doc ?? null),
     rangesState.init(() => ({
       trackedChanges,
       comments,

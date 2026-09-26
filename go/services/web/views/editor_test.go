@@ -33,9 +33,9 @@ func renderSample(detached bool) string {
 func TestEditorPageMainChrome(t *testing.T) {
 	s := renderSample(false)
 	for _, want := range []string{
-		`/stylesheets/pages/ide-`,      // main CSS (NOT ide-detached)
-		`id="ide-root"`,                // main body root + loading screen
-		`content="MyProj"`,             // __PROJNAME__ resolved (twitter/og title)
+		`/stylesheets/pages/ide-`, // main CSS (NOT ide-detached)
+		`id="ide-root"`,           // main body root + loading screen
+		`content="MyProj"`,        // __PROJNAME__ resolved (twitter/og title)
 		`>MyProj - OlliTeX, Online LaTeX Editor</title>`, // __TITLE__ resolved
 		`<meta name="ol-csrfToken" content="csrfval">`,
 		`<meta name="ol-detachRole" data-type="string">`, // empty → bare
@@ -45,7 +45,7 @@ func TestEditorPageMainChrome(t *testing.T) {
 		}
 	}
 	for _, bad := range []string{
-		"ide-detached-",           // detached CSS must NOT appear
+		"ide-detached-",             // detached CSS must NOT appear
 		"pdf-preview-detached-root", // detached root must NOT appear
 		"__NONCE__", "__TITLE__", "__PROJNAME__", "__ORIGIN__", "__CURRENTURL__",
 		"\x01EV:", // no slot markers may leak
@@ -63,10 +63,10 @@ func TestEditorPageMainChrome(t *testing.T) {
 func TestEditorPageDetachedChrome(t *testing.T) {
 	s := renderSample(true)
 	for _, want := range []string{
-		`/stylesheets/ide-detached-`,       // detached CSS
-		`id="pdf-preview-detached-root"`,   // detached body root
-		`src="/js/ide-detached-`,           // detached entry chunk
-		`content="MyProj"`,                 // __PROJNAME__ resolved
+		`/stylesheets/ide-detached-`,     // detached CSS
+		`id="pdf-preview-detached-root"`, // detached body root
+		`src="/js/ide-detached-`,         // detached entry chunk
+		`content="MyProj"`,               // __PROJNAME__ resolved
 		`<meta name="ol-detachRole" data-type="string" content="detached">`,
 	} {
 		if !strings.Contains(s, want) {
@@ -74,8 +74,8 @@ func TestEditorPageDetachedChrome(t *testing.T) {
 		}
 	}
 	for _, bad := range []string{
-		`/stylesheets/pages/ide-`,  // main CSS must NOT appear
-		`id="ide-root"`,            // main root must NOT appear
+		`/stylesheets/pages/ide-`, // main CSS must NOT appear
+		`id="ide-root"`,           // main root must NOT appear
 		"__NONCE__", "__TITLE__", "__PROJNAME__", "__ORIGIN__", "__CURRENTURL__",
 		"\x01EV:",
 	} {

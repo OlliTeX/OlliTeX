@@ -12,12 +12,12 @@ import (
 func TestP3CSettingsSlots(t *testing.T) {
 	rec := httptest.NewRecorder()
 	d := PageData{
-		CSRFToken:  "csrf-token-xyz",
-		Nonce:      "nonce",
-		Origin:     "http://127.0.0.1:7420/",
-		UserEmail:  "e2e-user@e2e.test",
-		UserID:     "6aa4b8b573ef0e5094f4cbc0",
-		UserMetaJSON: `{"id":"6aa4b8b573ef0e5094f4cbc0","isAdmin":false,"email":"e2e-user@e2e.test","first_name":"Zoe","last_name":"P33","alphaProgram":false,"betaProgram":true,"labsProgram":false,"features":{},"refProviders":{"mendeley":false,"zotero":false,"papers":false}}`,
+		CSRFToken:      "csrf-token-xyz",
+		Nonce:          "nonce",
+		Origin:         "http://127.0.0.1:7420/",
+		UserEmail:      "e2e-user@e2e.test",
+		UserID:         "6aa4b8b573ef0e5094f4cbc0",
+		UserMetaJSON:   `{"id":"6aa4b8b573ef0e5094f4cbc0","isAdmin":false,"email":"e2e-user@e2e.test","first_name":"Zoe","last_name":"P33","alphaProgram":false,"betaProgram":true,"labsProgram":false,"features":{},"refProviders":{"mendeley":false,"zotero":false,"papers":false}}`,
 		SamlBeta:       "true",
 		HasPassword:    true,
 		ShowAiFeatures: true,
@@ -52,9 +52,9 @@ func TestP3CSettingsSlotsEmpty(t *testing.T) {
 	rec := httptest.NewRecorder()
 	d := PageData{
 		CSRFToken: "t", Nonce: "n",
-		Origin:     "/",
-		UserEmail:  "x@y.test",
-		UserID:     "deadbeef0000000000000001",
+		Origin:       "/",
+		UserEmail:    "x@y.test",
+		UserID:       "deadbeef0000000000000001",
 		UserMetaJSON: `{"id":"deadbeef0000000000000001","isAdmin":false,"email":"x@y.test","first_name":"","last_name":"","alphaProgram":false,"betaProgram":false,"labsProgram":false,"features":{},"refProviders":{"mendeley":false,"zotero":false,"papers":false}}`,
 	}
 	SettingsPage(rec, d)

@@ -66,11 +66,27 @@ COPY --parents libraries/ services/ tools/migrations/ docs/RELEASE_NOTES.md fron
 # is never triggered).
 COPY .yarn/cache /overleaf/.yarn/cache
 
+# GENERATION INTEGRITY (2026-09-26, F1 flip): the webpack/babel bundle
+# caches are mounted as **tmpfs**, not persistent caches: a persistent cache
+# carries module-state from whichever build dirtied it last (local + image
+# lines intermixed) — a replay can restore an OLD generation of chunk files
+# whose internal chunk IDs do not exist in the freshly built runtime
+# (observed: login entry requiring chunk 1772/7189 against a runtime whose
+# ID space has no such IDs → entry silently never executes → dead editor
+# AND login). tmpfs = every compile starts from an empty cache, so each
+# image always carries ONE self-consistent webpack generation, and the
+# baked slot-resolver (public/manifest.json at serve time) needs nothing
+# else. (Plain `rm -rf` on the mount point itself fails with "Device or
+# resource busy" — a mounted dir cannot be removed, only its contents, and
+# the contents of a persistent cache would just be re-served next time.)
+RUN rm -rf /overleaf/public/js /overleaf/public/minjs /overleaf/public/stylesheets \
+    /overleaf/public/manifest.json
+
 RUN --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/root/.yarn/berry/cache,id=server-ce-yarn-cache \
     --mount=type=cache,target=/usr/local/share/.cache/yarn,id=server-ce-yarn-fallback-cache \
-    --mount=type=cache,target=/overleaf/services/web/node_modules/.cache,id=server-ce-webpack-cache \
-    --mount=type=cache,target=/overleaf/services/web/.cache,id=server-ce-babel-cache \
+    --mount=type=tmpfs,target=/overleaf/services/web/node_modules/.cache \
+    --mount=type=tmpfs,target=/overleaf/services/web/.cache \
     --mount=type=tmpfs,target=/tmp \
     node genScript compile | bash
 

@@ -99,6 +99,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: dashSlashPat, Handler: dashRedir("/hub#/projects.all")},
 			{Method: "GET", Path: "/user/projects", Handler: handler(a)},
 			{Method: "GET", Pattern: entPat, Handler: entitiesHandler(a)},
+			{Method: "GET", Pattern: metaPat, Handler: metadataHandler(a)},
 			{Method: "GET", Pattern: memPat, Handler: membersHandler(a)},
 			{Method: "GET", Pattern: arPat, Handler: accessRequestsHandler(a)},
 			{Method: "POST", Pattern: renPat, Handler: renameHandler(a)},

@@ -60,24 +60,13 @@ const ReviewModeOptions: React.FC = () => {
         >
           {t('editing')}
         </DropdownMenuItem>
+        {/* D25: tracked changes is OT-native — DISABLED on the Yjs engine
+            (honest placeholder, re-attachable after a Y.Doc-native port). */}
         <DropdownMenuItem
           as="button"
-          disabled={permissionsLevel === 'readOnly' || !user.id}
-          onClick={() => {
-            if (mode === 'review') {
-              return
-            }
-            // SaaS sweep (2026-09-16, owner): OlliTeX is fully open source and
-            // has no paid tier — track changes is free, no upgrade modal.
-            sendMB('editing-mode-change', {
-              role: permissionsLevel,
-              previousMode: mode,
-              newMode: mode,
-            })
-            window.dispatchEvent(new Event('toggle-track-changes'))
-          }}
+          disabled
+          description="Not available on the Yjs collaboration engine"
           leadingIcon="rate_review"
-          active={trackedWrite && mode === 'review'}
         >
           {t('reviewing')}
         </DropdownMenuItem>
