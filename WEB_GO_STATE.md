@@ -819,6 +819,21 @@ parity risk and zero behavior gain; per D27's own "don't churn mid-endgame"
 verdict, **DEFERRED** (post-endgame, only if the owner wants the shape
 change). All other terminal-state bullets hold (see §10).
 
+**D39 (2026-09-26, LIVE BUG — owner report "login CSS missing / locking")** —
+ROOT CAUSE: the 2026-09-26 06:56 cold-webpack rebuild moved Mantine's
+compiled CSS-in-JS rules OUT of `main-style-*.css` INTO a shared chunk CSS
+(`9663-a7a4b91ea9fb30ea5876.css`). The baked login view (pages_data.go
+loginHTML) had no `SHARED:CSS:` token, so that chunk CSS was never linked:
+100% of Mantine class rules unapplied in-browser (UA-default rendering =
+the "missing CSS"/"locking" perception). Audit of ALL baked views: login
+was the only missing one (register/password-reset HAVE the token; ide/detached
+carry per-entry CSS already linked; token-access/sharing-updates/
+user-settings/project-invite* entries have no CSS in the manifest). FIX:
+`\x01SHARED:CSS:pages/auth/login.js\x02` added to loginHTML (parity with
+registerHTML) — the per-generation resolver links the chunk CSS from the
+in-image entry file (D31 machinery). Gates green (views/core -race).
+DEPLOY: image re-bake + overleafserver cycle (in progress).
+
 **OUTSTANDING (owner decision):**
 - psintern (compose_cep) still runs the pre-D28a image with the Node bus
   (Node `real-time` no longer exists in the tree — the old image keeps
