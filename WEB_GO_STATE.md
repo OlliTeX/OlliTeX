@@ -935,14 +935,27 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     `primitive.D` / `primitive.M` / `map[string]any` / `bool`. (Same driver
     quirk applies to every `any` struct-field decode in this tree — audit
     others on suspicion.)
-  - **P2 GREEN (2026-09-26)**: `review-panel.test.e2e.ts` (R1 boot record-GET,
-    R2 first-message thread create 201, R3 reply, R4 resolve/reopen w/ actor,
-    R5 change create + bulk-accept idempotency, R6 on_for/on_for_guests
-    persist+MERGE, R7 own-message authorship) PASSED live (43s); `collab-yjs`
-    PASSED (no D25 placeholder + record GET). Go green-slice: gofmt/vet/build
-    clean; `go test -race` green across `go/services/web/...` + `cmd/web/...`.
-    Diagnostic hardening kept: `internalErr` logs `review: 500: <err>` on
-    stderr (500s must be diagnosable live).
+    - **P2 GREEN (2026-09-26, FINAL)**: `review-panel.test.e2e.ts` (R1–R7 +
+    R5b d10 read path + R6b d11 editor-side typed capture, OT-parity
+    granularity) PASSED on the BAKED image (47s); `collab-yjs` PASSED. Go
+    green-slice: gofmt/vet/build clean; `go test -race` green across
+    `go/services/web/...` + `cmd/web/...`.
+  - **DEPLOYED LIVE (2026-09-26, psintern.neuro.uni-bremen.de)**: image
+    `ollitex/ollitex:main` = revision `b362f8e5a7` (label + image-ID match
+    verified post-cycle). **Ops gotcha pinned**: the compose cycle must run
+    from `/data_1/docker/compose_cep/overleafserver/` — the PARENT-level
+    `cycle_overleafserver.sh` targets a DIFFERENT compose project, so its
+    `down` is a no-op and its `up` conflicts on the container name
+    ("already in use by d7e04d…"). Max reachable verification (prod users
+    are LDAP-synced WITHOUT password hashes — 0 hash-bearing accounts;
+    owner-only authenticated session, the recorded 2026-09-07 platform
+    reality): `/` 302 gate, `/status` 200, `/login` 200 + button
+    `rgb(9,136,66)` (#098842) + CSS loaded (D39 regression clean), review
+    GET routes 302 (login gate present) / POST routes 403 (CSRF gate —
+    routes LIVE, not 404), login 401 on non-hash accounts = expected auth
+    behavior. Authenticated D40 round-trips: verified on the IDENTICAL
+    image in the e2e stack (full battery green); owner's LDAP session to
+    confirm in-use.
   - **d10 (2026-09-26, D40-surface read path)**: `GET /project/:pid/doc/:doc/changes`
     — the D40 surface read path for tracked changes. The Node world served the
     change list from the OT snapshot (dead in this fork), so the REST surface
