@@ -12,7 +12,6 @@ import NavDropdownLinkItem from './nav-dropdown-link-item'
 import { useDsNavStyle } from '@/features/project-list/components/use-is-ds-nav'
 import { CaretRight, SignOut } from '@phosphor-icons/react'
 import ThemeToggle from '@/features/project-list/components/sidebar/theme-toggle'
-import { OfflineDocBackup } from '@/features/ide-react/editor/offline-doc-backup'
 import { ConnectionOutageTracker } from '@/features/ide-react/editor/connection-outage-tracker'
 
 /**
@@ -214,7 +213,6 @@ export function AccountMenuItems({
           method="POST"
           action="/logout"
           onSubmit={() => {
-            OfflineDocBackup.clearAll()
             ConnectionOutageTracker.clearAll()
           }}
         >

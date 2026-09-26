@@ -19,9 +19,9 @@
 //  * BUS (presence, file-tree, settings, references) — unchanged: still the
 //    project socket via the real-time relay (joinProjectResponse & co).
 //
-// The Socket / EditorWatchdogManager constructor args are retained for
-// constructor-signature compatibility (open-documents.ts) and are no
-// longer used for text synchronization.
+// The Socket constructor arg is retained for constructor-signature
+// compatibility (open-documents.ts) and is no longer used for text
+// synchronization.
 
 import type { EditorView } from '@codemirror/view'
 import RangesTracker from '@overleaf/ranges-tracker'
@@ -29,7 +29,6 @@ import getMeta from '@/utils/meta'
 import { debugConsole } from '@/utils/debugging'
 import { Socket } from '@/features/ide-react/connection/types/socket'
 import { IdeEventEmitter } from '@/features/ide-react/create-ide-event-emitter'
-import EditorWatchdogManager from '@/features/ide-react/connection/editor-watchdog-manager'
 import {
   createEngine,
   YjsEngine,
@@ -82,7 +81,6 @@ export class DocumentContainer extends EventEmitter {
   constructor(
     docId: string,
     _socket?: Socket,
-    _globalEditorWatchdogManager?: EditorWatchdogManager,
     private readonly ideEventEmitter?: IdeEventEmitter,
     private readonly detachDoc?: (docId: string, doc: DocumentContainer) => void
   ) {

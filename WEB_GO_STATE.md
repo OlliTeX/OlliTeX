@@ -533,11 +533,7 @@ re-verified (login page boots, form renders, zero JS errors — the earlier
 stale-asset break is healed); orphan container `crazy_einstein` (standalone
 idle mongo:6.0, no compose/data refs) STOPPED (kept, not deleted).
 
-**REMAINING S4-FLIP WORK (F2/F3 + D28a, per the D28 sequence):** F2 — client
-OT file sweep (retire `ide-react/connection/*` socket.io transport, `share-js-doc.ts`,
-`share-js-history-ot-type.ts`, the OT half of the editor path, `editor-
-watchdog-manager.ts`, vendored `sharejs.js`) + Go `features/history` OT-REST
-proxy retirement (superseded by `features/collabhistory`); D28a — move the
+**REMAINING S4-FLIP WORK (F3 + D28a, per the D28 sequence):** ~~F2~~ **F2 ✅ COMPLETE (2026-09-26)** — client OT sweep: deleted `share-js-doc.ts`, `share-js-history-ot-type.ts`, `offline-doc-backup.ts`, `editor/types/document.ts`, `editor-watchdog-manager.ts`, vendored `sharejs.js` + 5 OT unit-test files; callers re-pointed (event types → `DocumentContainer`, watchdog plumbing removed, OT offline-recovery path retired → fail-closed OutOfSyncModal, D25). KEPT (verified live-consumed): `features/history` REST (history-UI backend over `history-v1` — NOT the retired OT proxy) and the socket.io EVENT BUS stack (D28; D28a will move the bus to Go). Gates: tsc 586 = baseline (delta 0), full vitest failure set byte-identical pre/post (86 pre-existing env failures), collab 14/14, realtime 3/3. NEXT — D28a —
 app EVENT BUS from the Node `real-time` socket.io relay to a Go socket.io-
 compatible endpoint (the bus itself STAYS — presence/file-tree/settings —
 only the OT text sync died, D25/D28); F3 — the Yjs e2e above promoted into

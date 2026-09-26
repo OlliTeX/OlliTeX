@@ -1,6 +1,6 @@
 import { Project } from '../../../../services/web/types/project'
 import { PermissionsLevel } from '@/features/ide-react/types/permissions'
-import { ShareJsDoc } from '@/features/ide-react/editor/share-js-doc'
+import type { DocumentContainer } from '@/features/ide-react/editor/document-container'
 import { GotoLineOptions } from '@/features/ide-react/types/goto-line-options'
 import { GotoOffsetOptions } from '@/features/ide-react/context/editor-manager-context'
 import { CursorPosition } from '@/features/ide-react/types/cursor-position'
@@ -8,7 +8,7 @@ import { FileTreeFindResult } from '@/features/ide-react/types/file-tree'
 
 export type IdeEvents = {
   'project:joined': [{ project: Project; permissionsLevel: PermissionsLevel }]
-  'document:closed': [doc: ShareJsDoc]
+  'document:closed': [doc: DocumentContainer]
   'doc:changed': [{ doc_id: string }]
   'doc:saved': [{ doc_id: string }]
   'ide:opAcknowledged': [{ doc_id: string; op: any }]

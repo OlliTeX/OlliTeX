@@ -81,9 +81,19 @@ const eng = createEngine(projectId, {
 // teardown: eng.destroy(); view.destroy();
 ```
 
-Retired at the flip (junk/): `editor/share-js-doc.ts`,
-`editor/share-js-history-ot-type.ts`, `editor/history-ot.ts` (OT half),
-`connection/connection-manager.ts` (socket.io half),
-`source-editor/extensions/realtime.ts` (OT EditorFacade),
-`frontend/js/vendor/libs/sharejs.js`, the `real-time` service, and the
-document-updater OT path (ARC-1/ARC-2 verdicts).
+S4/D25 OT sweep (F2, deleted via `git rm` — recoverable from git history):
+`editor/share-js-doc.ts`, `editor/share-js-history-ot-type.ts`,
+`editor/offline-doc-backup.ts` (replaced by `y-indexeddb`),
+`editor/types/document.ts`, `connection/editor-watchdog-manager.ts`
+(replaced by the engine reconnect), and the vendored
+`frontend/js/vendor/libs/sharejs.js`, plus their OT unit tests.
+KEPT (not OT text sync): the app EVENT BUS connection stack —
+`connection/connection-manager.ts`, `SocketIoShim`, `use-socket-listener`,
+`socket-diagnostics`, lost-connection alerts (D28: the bus survives; moving
+it to Go is the D28a arc). The OT half of `source-editor/extensions`
+(`history-ot.ts`, `realtime.ts` attach no-op stubs, track-changes/comments
+extensions) stays as dormant code per D25 (comments/track-changes disabled
+with an honest placeholder; re-attachable; owner decision pending).
+The Go `features/history` REST also stays: it is the live history-UI
+backend (updates/labels/diff/restore) proxied to `history-v1` (ARC-1b
+blob migration precedes its retirement).

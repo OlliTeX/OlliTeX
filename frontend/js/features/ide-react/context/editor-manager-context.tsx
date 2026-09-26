@@ -10,7 +10,6 @@ import {
 } from 'react'
 import { sendMB } from '@/infrastructure/event-tracking'
 import { OpenDocuments } from '@/features/ide-react/editor/open-documents'
-import EditorWatchdogManager from '@/features/ide-react/connection/editor-watchdog-manager'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
 import { useConnectionContext } from '@/features/ide-react/context/connection-context'
 import { debugConsole } from '@/utils/debugging'
@@ -26,7 +25,6 @@ import {
 } from '@/features/ide-react/util/find-doc-entity-by-id'
 import { useModalsContext } from '@/features/ide-react/context/modals-context'
 import { IdeEvents } from '@/features/ide-react/create-ide-event-emitter'
-import { OfflineDocBackup } from '@/features/ide-react/editor/offline-doc-backup'
 import { ConnectionOutageTracker } from '@/features/ide-react/editor/connection-outage-tracker'
 import { useTranslation } from 'react-i18next'
 import customLocalStorage from '@/infrastructure/local-storage'
@@ -88,7 +86,7 @@ export const EditorManagerProvider: FC<React.PropsWithChildren> = ({
   const { t } = useTranslation()
   const { reportError, eventEmitter, projectId, setOutOfSync } =
     useIdeReactContext()
-  const { socket, closeConnection, connectionState, isConnected } =
+  const { socket, closeConnection, connectionState } =
     useConnectionContext()
   const { view, setView, setOpenFile } = useLayoutContext()
   const {
@@ -134,35 +132,10 @@ export const EditorManagerProvider: FC<React.PropsWithChildren> = ({
 
   const [ignoringExternalUpdates, setIgnoringExternalUpdates] = useState(false)
 
-  const { createDebugDiff, debugTimers } = useDebugDiffTracker(
-    projectId,
-    currentDocument
-  )
-
-  const [globalEditorWatchdogManager] = useState(
-    () =>
-      new EditorWatchdogManager({
-        onTimeoutHandler: (meta: Record<string, any>) => {
-          let diffSize: number | null = null
-          createDebugDiff()
-            .then(calculatedDiffSize => {
-              diffSize = calculatedDiffSize
-            })
-            .finally(() => {
-              sendMB('losing-edits', {
-                ...meta,
-                diffSize,
-                timers: debugTimers.current,
-              })
-              reportError('losing-edits', {
-                ...meta,
-                diffSize,
-                timers: debugTimers.current,
-              })
-            })
-        },
-      })
-  )
+  // debugTimers is exposed on the editor-manager context (consumed by
+  // unsaved-docs-context); the OT watchdog that consumed createDebugDiff
+  // was retired in the S4/D25 OT sweep.
+  const { debugTimers } = useDebugDiffTracker(projectId, currentDocument)
 
   // Store the most recent document error and consume it in an effect, which
   // prevents circular dependencies in useCallbacks
@@ -182,9 +155,7 @@ export const EditorManagerProvider: FC<React.PropsWithChildren> = ({
     }
   }, [genericModalVisible])
 
-  const [openDocs] = useState(
-    () => new OpenDocuments(socket, globalEditorWatchdogManager, eventEmitter)
-  )
+  const [openDocs] = useState(() => new OpenDocuments(socket, eventEmitter))
 
   const currentDocumentIdStorageKey = `doc.open_id.${projectId}`
 
@@ -614,33 +585,10 @@ export const EditorManagerProvider: FC<React.PropsWithChildren> = ({
         setErrorState(true)
         // Ensure that the editor is locked
         setOutOfSync(true)
-        // A failure while there are recoverable offline edits is a failed sync,
-        // so report it through the same event as the recovery path and let the
-        // listener show the modal. Otherwise fall back to the out of sync modal.
-        const backupRecord = OfflineDocBackup.readRecoverable(
-          projectId,
-          document.doc_id
-        )
+        // S4/D25: the OT offline-recovery path is retired (text sync runs on
+        // the Yjs engine); fail-closed with the out-of-sync modal.
         ConnectionOutageTracker.recordTeardown(projectId)
-        if (backupRecord) {
-          if (!isConnected) {
-            // Still offline, so nothing has been rejected yet: this is the
-            // fatal op timeout running out while the outage is ongoing. Keep
-            // the backup and let recovery on the next load report the outcome,
-            // rather than declaring a failed sync mid-outage.
-            return
-          }
-          eventEmitter.emit('ide:unableToSyncOfflineChanges', {
-            docId: document.doc_id,
-            editorContent: editorContent || '',
-            baseContent: backupRecord.snapshot,
-            docName: document.docName,
-            reloadAfterClose: true,
-          })
-          OfflineDocBackup.remove(projectId, document.doc_id)
-        } else {
-          showOutOfSyncModal(editorContent || '')
-        }
+        showOutOfSyncModal(editorContent || '')
 
         // Do not forceReopen the document.
         return
@@ -669,7 +617,6 @@ export const EditorManagerProvider: FC<React.PropsWithChildren> = ({
     setOutOfSync,
     t,
     projectId,
-    isConnected,
   ])
 
   useEffect(() => {

@@ -11,7 +11,7 @@ import {
 } from 'react'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
 import { useConnectionContext } from '@/features/ide-react/context/connection-context'
-import { ShareJsDoc } from '@/features/ide-react/editor/share-js-doc'
+import type { DocumentContainer } from '@/features/ide-react/editor/document-container'
 import { useFileTreeData } from '@/shared/context/file-tree-data-context'
 import { findDocEntityById } from '@/features/ide-react/util/find-doc-entity-by-id'
 import { IdeEvents } from '@/features/ide-react/create-ide-event-emitter'
@@ -104,7 +104,7 @@ export const ReferencesProvider: FC<React.PropsWithChildren> = ({
   )
 
   const indexReferencesIfDocModified = useCallback(
-    (doc: ShareJsDoc, shouldBroadcast: boolean) => {
+    (doc: DocumentContainer, shouldBroadcast: boolean) => {
       // avoid reindexing references if the bib file has not changed since the
       // last time they were indexed
       const docId = doc.doc_id

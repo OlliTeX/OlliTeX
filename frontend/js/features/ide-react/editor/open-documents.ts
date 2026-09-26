@@ -7,7 +7,6 @@ import {
 import { debugConsole } from '@/utils/debugging'
 import { Socket } from '@/features/ide-react/connection/types/socket'
 import { IdeEventEmitter } from '@/features/ide-react/create-ide-event-emitter'
-import EditorWatchdogManager from '@/features/ide-react/connection/editor-watchdog-manager'
 
 export class OpenDocuments {
   private openDocs = new Map<string, DocumentContainer>()
@@ -15,7 +14,6 @@ export class OpenDocuments {
   // eslint-disable-next-line no-useless-constructor
   constructor(
     private readonly socket: Socket,
-    private readonly globalEditorWatchdogManager: EditorWatchdogManager,
     private readonly events: IdeEventEmitter
   ) {}
 
@@ -83,7 +81,6 @@ export class OpenDocuments {
     const doc = new DocumentContainer(
       docId,
       this.socket,
-      this.globalEditorWatchdogManager,
       this.events,
       this.detachDoc.bind(this)
     )
