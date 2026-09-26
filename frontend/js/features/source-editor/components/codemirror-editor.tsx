@@ -10,7 +10,6 @@ import { CodeMirrorCommandTooltip } from './codemirror-command-tooltip'
 import importOverleafModules from '../../../../macros/import-overleaf-module.macro'
 import { FigureModal } from './figure-modal/figure-modal'
 import { ReviewPanelProviders } from '@/features/review-panel/context/review-panel-providers'
-import { YjsEngineReviewNote } from '@/features/review-panel/components/yjs-engine-review-note'
 import {
   CodeMirrorStateContext,
   CodeMirrorViewContext,
@@ -19,7 +18,6 @@ import MathPreviewTooltip from './math-preview-tooltip'
 import { getVisualEditorComponent } from '../utils/visual-editor'
 import EditorContextMenu from './editor-context-menu'
 import { useToolbarMenuBarEditorCommands } from '@/features/source-editor/hooks/use-toolbar-menu-editor-commands'
-import { useProjectContext } from '@/shared/context/project-context'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
 import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
 import { useEditorPropertiesContext } from '@/features/ide-react/context/editor-properties-context'
@@ -89,7 +87,6 @@ function CodeMirrorEditorComponents({
   VisualEditor,
 }: CodeMirrorEditorComponentsProps) {
   useToolbarMenuBarEditorCommands()
-  const { features } = useProjectContext()
   return (
     <ReviewPanelProviders>
       <CodemirrorOutline />
@@ -101,12 +98,11 @@ function CodeMirrorEditorComponents({
 
       <MathPreviewTooltip />
       <EditorContextMenu />
-      {/* S4 flip (D25): comments + tracked changes are OT-document-native and
-          do NOT survive the OT retirement. Honestly placeholdered here (NOT
-          silently removed — the review-panel code stays in git and is
-          re-attachable once ported to a Y.Doc-native model, an owner
-          decision). */}
-      {features.trackChangesVisible && <YjsEngineReviewNote />}
+      {/* S4 flip (D25) — SUPERSEDED by D40 (owner directive 10, 2026-09-26):
+          comments + tracked changes are re-attached on the Y.Doc-native model
+          (room-doc domain ops + Go web REST, go/services/web/features/review).
+          The honest placeholder is retired — the review surface is live again
+          (WEB_GO_STATE.md D40 d5/d7). */}
 
       {sourceEditorComponents.map(
         ({ import: { default: Component }, path }) => (

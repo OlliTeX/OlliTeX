@@ -60,13 +60,26 @@ const ReviewModeOptions: React.FC = () => {
         >
           {t('editing')}
         </DropdownMenuItem>
-        {/* D25: tracked changes is OT-native — DISABLED on the Yjs engine
-            (honest placeholder, re-attachable after a Y.Doc-native port). */}
+        {/* D40: re-attached on the Y.Doc-native model (2026-09-26). The
+            toggle routes through saveTrackChanges → Go web `track_changes`
+            REST (D40 d5); the listener itself is still gated on
+            features.trackChanges && write, exactly like Node CE. */}
         <DropdownMenuItem
           as="button"
-          disabled
-          description="Not available on the Yjs collaboration engine"
+          disabled={!write || !user.id}
+          onClick={() => {
+            if (mode === 'review') {
+              return
+            }
+            sendMB('editing-mode-change', {
+              role: permissionsLevel,
+              previousMode: mode,
+              newMode: 'review',
+            })
+            window.dispatchEvent(new Event('toggle-track-changes'))
+          }}
           leadingIcon="rate_review"
+          active={write && mode === 'review'}
         >
           {t('reviewing')}
         </DropdownMenuItem>

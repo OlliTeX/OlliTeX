@@ -5,8 +5,8 @@
  * event bus (port 3026 — see realtime-bus.test.e2e.ts).
  *
  *   A1 editor boots with the seeded (v1) LaTeX content
- *   A2 the D25 honest placeholder is present (comments/track-changes are
- *      out of scope for the Yjs engine — owner decision)
+ *   A2 D40: the D25 placeholder is retired — the review REST surface is live
+ *      (anon threads GET → auth redirect, not 404; logged-in → record shape)
  *   A3 local typing commits a new history version (local direction)
  *   A4 a REAL second client's edit converges into the first client's open
  *      editor (CRDT merge over the Go collab service — the pivot core)
@@ -37,9 +37,15 @@ test('Yjs editor — render, D25 placeholder, local+remote convergence, history'
   expect(seeded).toMatch(/begin\{document\}/)
   expect(seeded).toMatch(/end\{document\}/)
 
-  // A2: D25 honest placeholder (comments/track-changes not in the Yjs engine scope)
+  // A2: D40 re-attach — the D25 placeholder is retired; the review REST
+  // surface is live (pinned contract: GET threads = Record<threadId, Thread>)
   const notes = await page.locator('.yjs-engine-review-note').count()
-  expect(notes).toBeGreaterThan(0)
+  expect(notes).toBe(0)
+  const threadsResp = await page.request.get(`/project/${pid}/threads`)
+  expect(threadsResp.status()).toBe(200)
+  const threadsRecord = (await threadsResp.json()) as Record<string, any>
+  expect(typeof threadsRecord).toBe('object') // record (not an array)
+  expect(Array.isArray(threadsRecord)).toBe(false)
 
   const history = async () => {
     const t = await page.request.get(`/project/${pid}/collab/history`)
