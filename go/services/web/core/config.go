@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -36,6 +37,13 @@ type Config struct {
 	AllowPublicAccess bool     // OVERLEAF_ALLOW_PUBLIC_ACCESS === 'true' (disables the global login gate)
 
 	CacheStaticAssets bool // server-ce: true
+
+	// RealtimeURL — the real-time bus :3026 (socketIO + ops HTTP API) base
+	// for project-room event relays (D40 review events: new-comment,
+	// resolve-thread, toggle-track-changes, ...). Node: web →
+	// real-time HttpApiController.sendMessage (POST /project/:pid/message/:name)
+	// → emitToRoom (pinned: go/services/realtime/bus.go SendRoomMessage).
+	RealtimeURL string // OVERLEAF_REALTIME_URL || http://localhost:3026
 
 	// backends
 	RedisAddr     string // REDIS_HOST:REDIS_PORT (default 127.0.0.1:6379)
@@ -186,6 +194,7 @@ func LoadConfig() (*Config, error) {
 		ExpoHostname:      os.Getenv("EXPOSE_HOSTNAME") == "true",
 		AllowPublicAccess: os.Getenv("OVERLEAF_ALLOW_PUBLIC_ACCESS") == "true",
 		CacheStaticAssets: os.Getenv("CACHE_STATIC_ASSETS") != "false",
+		RealtimeURL:       fmt.Sprintf("http://%s:3026", env("REALTIME_HOST", "127.0.0.1")),
 		RedisAddr:         redisHost + ":" + redisPort,
 		RedisPassword:     redisPass,
 		RedisDB:           env("REDIS_DB", ""),

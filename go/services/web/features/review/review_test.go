@@ -53,6 +53,18 @@ type served struct {
 	body string
 }
 
+type eventRec struct {
+	name string
+	args []any
+}
+
+type recEmit struct{ events *[]eventRec }
+
+func (r *recEmit) Fn(ctx context.Context, pid, name string, args []any) error {
+	*r.events = append(*r.events, eventRec{name: name, args: args})
+	return nil
+}
+
 func serve(t *testing.T, c *core.Cxt, fn func(*core.Cxt, *core.Res)) served {
 	t.Helper()
 	rec := httptest.NewRecorder()
@@ -478,6 +490,85 @@ func TestChangesGates(t *testing.T) {
 		`{bad json`, map[string]string{"2": "main.tex"})
 	if s := serve(t, c, h.changesCreate); s.code != http.StatusBadRequest {
 		t.Fatalf("bad body: %d %s", s.code, s.body)
+	}
+}
+
+// TestRelayEvents — the panel's local state syncs via room events; the
+// handlers must relay the pinned event + payload for every mutation
+// (listener signatures pinned from threads-context.tsx /
+// ranges-context.tsx / track-changes-state-context.tsx).
+func TestRelayEvents(t *testing.T) {
+	var evs []eventRec
+	h := &Handlers{
+		Store:   persistence.NewMemoryPersistence(),
+		RoleFor: fakeRole{"owner|" + testPID: collab.ReadWrite}.Fn,
+		TrackStateFor: func(ctx context.Context, pid string) (map[string]bool, error) {
+			return map[string]bool{}, nil
+		},
+		TrackStateSet: func(ctx context.Context, pid string, m map[string]bool) error { return nil },
+		UserFor: func(ctx context.Context, uid string) map[string]any {
+			return map[string]any{"name": "Owner One", "email": "owner@e.test"}
+		},
+		Emit: (&recEmit{events: &evs}).Fn,
+		Now:  func() int64 { return 1700000000000 },
+	}
+	tid := "thr_evt1234567890"
+
+	serve(t, cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "owner",
+		`{"content":"hi"}`, map[string]string{"2": tid}), h.messageAdd)
+	serve(t, cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/thread/"+tid+"/resolve", "owner", "",
+		map[string]string{"2": "main.tex", "3": tid, "4": "resolve"}), h.threadResolve)
+	serve(t, cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/thread/"+tid+"/reopen", "owner", "",
+		map[string]string{"2": "main.tex", "3": tid, "4": "reopen"}), h.threadResolve)
+	srv := serve(t, cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/changes", "owner",
+		`{"content":"x","start":1,"end":1}`, map[string]string{"2": "main.tex"}), h.changesCreate)
+	var ch map[string]any
+	_ = json.Unmarshal([]byte(srv.body), &ch)
+	servedID, _ := ch["change_id"].(string)
+	serve(t, cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/changes/accept", "owner",
+		`{"change_ids":["`+servedID+`"]}`, map[string]string{"2": "main.tex"}), h.changesAccept)
+	serve(t, cxt(http.MethodPost, "/project/"+testPID+"/track_changes", "owner",
+		`{"on_for":{"owner":true}}`, nil), h.trackChanges)
+	serve(t, cxt(http.MethodDelete, "/project/"+testPID+"/doc/main.tex/thread/"+tid, "owner", "",
+		map[string]string{"2": "main.tex", "3": tid}), h.threadDelete)
+
+	names := []string{}
+	for _, e := range evs {
+		names = append(names, e.name)
+	}
+	want := []string{"new-comment", "resolve-thread", "reopen-thread", "accept-changes", "toggle-track-changes", "delete-thread"}
+	if len(evs) != len(want) {
+		t.Fatalf("events = %v", names)
+	}
+	for i, w := range want {
+		if evs[i].name != w {
+			t.Fatalf("event[%d] = %v, want %s (all=%v)", i, evs[i].name, w, names)
+		}
+	}
+	// payload pins
+	nc := evs[0].args
+	if nc[0] != tid {
+		t.Fatalf("new-comment args = %v", nc)
+	}
+	cm, _ := nc[1].(map[string]any)
+	if cm["content"] != "hi" || cm["timestamp"] != int64(1700000000000) {
+		t.Fatalf("new-comment comment = %v", cm)
+	}
+	if evs[1].args[0] != tid {
+		t.Fatalf("resolve-thread args = %v", evs[1].args)
+	}
+	ru, _ := evs[1].args[1].(map[string]any)
+	if ru["id"] != "owner" || ru["first_name"] != "Owner" || ru["email"] != "owner@e.test" {
+		t.Fatalf("resolve-thread user = %v", ru)
+	}
+	if evs[3].args[0] != "main.tex" {
+		t.Fatalf("accept-changes doc = %v", evs[3].args)
+	}
+	if evs[4].args[0].(map[string]bool)["owner"] != true {
+		t.Fatalf("toggle-track-changes state = %v", evs[4].args)
+	}
+	if evs[5].args[0] != tid {
+		t.Fatalf("delete-thread args = %v", evs[5].args)
 	}
 }
 

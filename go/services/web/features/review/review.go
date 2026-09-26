@@ -42,8 +42,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -87,6 +89,14 @@ type TrackStateFor func(ctx context.Context, projectID string) (map[string]bool,
 // TrackStateSet — (projectID, map) error (the whole explicit map).
 type TrackStateSet func(ctx context.Context, projectID string, m map[string]bool) error
 
+// Emit — relay a project-room event to the realtime bus (panel socket
+// listeners update local state from these; pinned listener signatures in
+// threads-context.tsx / ranges-context.tsx / track-changes-state-context.tsx).
+// nil = no broadcast (hermetic tests). Best-effort: a failed relay is
+// logged, not surfaced (Node parity: socket emit failures don't fail the
+// request).
+type Emit func(ctx context.Context, pid, name string, args []any) error
+
 // Handlers — zero App + Store/RoleFor/... = hermetic tests (same doctrine as
 // collabhistory).
 type Handlers struct {
@@ -96,6 +106,7 @@ type Handlers struct {
 	UserFor       UserFor
 	TrackStateFor TrackStateFor
 	TrackStateSet TrackStateSet
+	Emit          Emit
 	// Now — injectable clock (unix-ms at call time; default time.Now).
 	Now func() int64
 }
@@ -136,6 +147,7 @@ func Feature(a *core.App) core.Feature {
 			return bsonDToAny(d)
 		}
 		h.TrackStateFor, h.TrackStateSet = prodTrack(a)
+		h.Emit = prodEmit(a.Cfg.RealtimeURL)
 	}
 	return core.Feature{Name: "review", Routes: []core.Route{
 		{Method: http.MethodGet, Pattern: threadsPattern, Handler: h.threadsList},
@@ -233,6 +245,43 @@ func uidOf(m map[string]any) string {
 func anyField(m map[string]any, key string) (string, bool) {
 	s, ok := m[key].(string)
 	return s, ok
+}
+
+// relay — best-effort room event (logs on failure; Node parity: a socket
+// emit failure never 5xx's the request).
+func (h *Handlers) relay(ctx context.Context, pid, name string, args []any) {
+	if h.Emit == nil {
+		return
+	}
+	if err := h.Emit(ctx, pid, name, args); err != nil {
+		fmt.Fprintf(os.Stderr, "review: relay %s failed: %v\n", name, err)
+	}
+}
+
+// userName / userEmail — flat user fields for relay payloads (resolve-thread
+// pinned shape {email, first_name, id}).
+func (h *Handlers) userName(ctx context.Context, uid string) string {
+	if h.UserFor == nil {
+		return ""
+	}
+	if raw := h.UserFor(ctx, uid); raw != nil {
+		if v, ok := anyField(raw, "name"); ok {
+			return v
+		}
+	}
+	return ""
+}
+
+func (h *Handlers) userEmail(ctx context.Context, uid string) string {
+	if h.UserFor == nil {
+		return ""
+	}
+	if raw := h.UserFor(ctx, uid); raw != nil {
+		if v, ok := anyField(raw, "email"); ok {
+			return v
+		}
+	}
+	return ""
 }
 
 func (h *Handlers) userShape(ctx context.Context, uid, self string) reviewUser {
@@ -435,7 +484,7 @@ func (h *Handlers) messageAdd(cxt *core.Cxt, res *core.Res) {
 		if file == "" {
 			file = body.Doc
 		}
-		_, _, _, merr := collab.AddComment(ctx, st, pid, collab.Comment{
+		msg, _, _, merr := collab.AddComment(ctx, st, pid, collab.Comment{
 			ID: body.ID, ThreadID: threadID, File: file, Text: body.Content,
 			State: "opened", Author: author, Created: now, Edited: now,
 		})
@@ -446,6 +495,16 @@ func (h *Handlers) messageAdd(cxt *core.Cxt, res *core.Res) {
 			return merr
 		}
 		rec = h.threadRecord(ctx, pid, uid, st, *th)
+		// pinned listener (threads-context.tsx 'new-comment'):
+		// (threadId, {content, id, timestamp:ms, user})
+		h.relay(ctx, pid, "new-comment", []any{threadID, map[string]any{
+			"content":   body.Content,
+			"id":        msg.ID,
+			"timestamp": now,
+			"user": map[string]any{
+				"id": uid, "name": h.userName(ctx, uid), "email": h.userEmail(ctx, uid),
+			},
+		}})
 		return nil
 	})
 	if err != nil {
@@ -501,6 +560,8 @@ func (h *Handlers) messageEdit(cxt *core.Cxt, res *core.Res) {
 		internal(res)
 		return
 	}
+	// pinned listener 'edit-message': (threadId, commentId, content)
+	h.relay(cxt.Req.Context(), pid, "edit-message", []any{threadID, cid, body.Content})
 	okJSON(res, http.StatusOK, messageOut{
 		Content: body.Content, ID: out.ID, Timestamp: isoMS(out.Edited),
 		User: h.userShape(cxt.Req.Context(), uidOf(out.Author), uid), UserID: uidOf(out.Author),
@@ -521,6 +582,7 @@ func (h *Handlers) messageDelete(cxt *core.Cxt, res *core.Res) {
 		internal(res)
 		return
 	}
+	h.relay(cxt.Req.Context(), pid, "delete-message", []any{cxt.Params["2"], cid})
 	okJSON(res, http.StatusOK, map[string]any{})
 }
 
@@ -566,6 +628,7 @@ func (h *Handlers) ownMessageDelete(cxt *core.Cxt, res *core.Res) {
 		internal(res)
 		return
 	}
+	h.relay(cxt.Req.Context(), pid, "delete-message", []any{threadID, cid})
 	okJSON(res, http.StatusOK, map[string]any{})
 }
 
@@ -600,6 +663,17 @@ func (h *Handlers) threadResolve(cxt *core.Cxt, res *core.Res) {
 		internal(res)
 		return
 	}
+	// pinned listeners: 'resolve-thread' (threadId, {email, first_name, id})
+	// and 'reopen-thread' (threadId).
+	if action == "resolve" {
+		h.relay(cxt.Req.Context(), pid, "resolve-thread", []any{threadID, map[string]any{
+			"email":      h.userEmail(cxt.Req.Context(), uid),
+			"first_name": firstName(h.userName(cxt.Req.Context(), uid)),
+			"id":         uid,
+		}})
+	} else {
+		h.relay(cxt.Req.Context(), pid, "reopen-thread", []any{threadID})
+	}
 	okJSON(res, http.StatusOK, rec)
 }
 
@@ -616,6 +690,8 @@ func (h *Handlers) threadDelete(cxt *core.Cxt, res *core.Res) {
 		internal(res)
 		return
 	}
+	// pinned listener 'delete-thread': (threadId)
+	h.relay(cxt.Req.Context(), pid, "delete-thread", []any{threadID})
 	okJSON(res, http.StatusOK, map[string]any{})
 }
 
@@ -661,6 +737,14 @@ func (h *Handlers) trackChanges(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 	}
+	// pinned listener 'toggle-track-changes': (false | TrackChangesStateData)
+	var state any
+	if len(m) > 0 {
+		state = m
+	} else {
+		state = false
+	}
+	h.relay(cxt.Req.Context(), pid, "toggle-track-changes", []any{state})
 	okJSON(res, http.StatusOK, struct {
 		ProjectID    string          `json:"project_id"`
 		TrackChanges map[string]bool `json:"track_changes"`
@@ -756,10 +840,56 @@ func (h *Handlers) changesAccept(cxt *core.Cxt, res *core.Res) {
 		internal(res)
 		return
 	}
+	// pinned listener 'accept-changes' (ranges-context.tsx): (docId, entryIds)
+	h.relay(cxt.Req.Context(), pid, "accept-changes", []any{cxt.Params["2"], body.ChangeIDs})
 	okJSON(res, http.StatusOK, struct {
 		ProjectID string `json:"project_id"`
 		Accepted  int    `json:"accepted"`
 	}{pid, accepted})
+}
+
+// firstName — resolve-thread pinned user shape uses first_name only.
+func firstName(full string) string {
+	sp := strings.Fields(full)
+	if len(sp) == 0 {
+		return ""
+	}
+	return sp[0]
+}
+
+// ---------- production seam: room-event relay (realtime bus :3026) ----------
+
+// prodEmit — Node web → real-time HttpApiController.sendMessage → LB
+// emitToRoom, pinned as bus SendRoomMessage (POST /project/:pid/message/:name,
+// body = args array).
+func prodEmit(baseURL string) Emit {
+	if baseURL == "" {
+		baseURL = "http://127.0.0.1:3026"
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	return func(ctx context.Context, pid, name string, args []any) error {
+		b, err := json.Marshal(args)
+		if err != nil {
+			return err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+			strings.TrimSuffix(baseURL, "/")+"/project/"+pid+"/message/"+name,
+			strings.NewReader(string(b)))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
+		if resp.StatusCode >= 300 {
+			return fmt.Errorf("realtime bus %s: %s", req.URL.Path, resp.Status)
+		}
+		return nil
+	}
 }
 
 // ---------- production seam: track-changes map on the projects doc ----------
