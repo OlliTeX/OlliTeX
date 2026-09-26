@@ -1,9 +1,10 @@
 package review
 
-// review_test.go — D40 P2: hermetic tests for the V1 threads / track-changes
-// REST surface (go/services/web/features/review). Contract = the in-git
-// review panel (services/web/types/review-panel shapes + the panel's calls);
-// domain semantics = the D40 decision record (WEB_GO_STATE.md).
+// review_test.go — D40 P2: hermetic tests for the review-panel REST surface
+// (go/services/web/features/review). Contract = the in-git review panel
+// (threads-context.tsx / ranges-context.tsx / track-changes-state-context.tsx
+// + services/web/types/review-panel shapes, D40-d5 pin). Domain semantics =
+// go/services/collab/review.go + WEB_GO_STATE.md decision record.
 
 import (
 	"context"
@@ -52,7 +53,7 @@ type served struct {
 	body string
 }
 
-func serve(t *testing.T, h *Handlers, c *core.Cxt, fn func(*core.Cxt, *core.Res)) served {
+func serve(t *testing.T, c *core.Cxt, fn func(*core.Cxt, *core.Res)) served {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	fn(c, &core.Res{W: rec})
@@ -60,300 +61,452 @@ func serve(t *testing.T, h *Handlers, c *core.Cxt, fn func(*core.Cxt, *core.Res)
 	return served{rec.Code, string(b)}
 }
 
-func setup(t *testing.T) (persistence.VersionedPersistence, *Handlers) {
+type trackMap struct {
+	m map[string]bool
+}
+
+func (tm *trackMap) get(ctx context.Context, pid string) (map[string]bool, error) {
+	if tm == nil || tm.m == nil {
+		return map[string]bool{}, nil
+	}
+	return tm.m, nil
+}
+
+func (tm *trackMap) set(ctx context.Context, pid string, m map[string]bool) error {
+	tm.m = m
+	return nil
+}
+
+func setup(t *testing.T) (persistence.VersionedPersistence, *Handlers, *trackMap) {
 	t.Helper()
 	st := persistence.NewMemoryPersistence()
-	seedRoom(t, st)
+	if _, err := collab.SeedTextContent(context.Background(), st, testPID, "hello world this is a document"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
 	roles := fakeRole{
 		"owner|" + testPID:    collab.ReadWrite,
 		"user2|" + testPID:    collab.ReadWrite,
 		"viewer|" + testPID:   collab.ReadOnly,
 		"stranger|" + testPID: collab.Deny,
 	}
-	track := true
+	tm := &trackMap{m: map[string]bool{}}
 	h := &Handlers{
 		Store:   st,
 		RoleFor: roles.Fn,
 		UserFor: func(ctx context.Context, uid string) map[string]any {
-			if uid == "owner" {
+			switch uid {
+			case "owner":
 				return map[string]any{"name": "Owner One", "email": "owner@e.test"}
+			case "user2":
+				return map[string]any{"name": "User Two", "email": "user2@e.test"}
+			default:
+				return map[string]any{"name": "User " + uid}
 			}
-			return map[string]any{"name": "User Two", "email": "user@e.test"}
 		},
-		TrackFor:    func(ctx context.Context, uid string) (bool, error) { return track, nil },
-		SetTrackFor: func(ctx context.Context, uid string, enabled bool) error { track = enabled; return nil },
-		Now:         func() int64 { return 1700000000000 },
+		TrackStateFor: tm.get,
+		TrackStateSet: tm.set,
+		Now:           func() int64 { return 1700000000000 },
 	}
-	return st, h
+	return st, h, tm
 }
 
-func seedRoom(t *testing.T, st persistence.VersionedPersistence) {
-	t.Helper()
-	if _, err := collab.SeedTextContent(context.Background(), st, testPID, "hello world this is a document"); err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-}
+// ---------- route table ----------
 
 func TestRoutesRegistered(t *testing.T) {
 	f := Feature(nil)
 	if f.Name != "review" {
 		t.Fatalf("name = %q", f.Name)
 	}
-	if len(f.Routes) != 10 {
-		t.Fatalf("routes = %d, want 10", len(f.Routes))
+	want := []string{
+		"GET|/project/[a-fA-F0-9]{24}/threads",
+		"POST|/project/[a-fA-F0-9]{24}/doc/.+/thread/.+/(resolve|reopen)",
+		"DELETE|/project/[a-fA-F0-9]{24}/doc/.+/thread/.+",
+		"POST|/project/[a-fA-F0-9]{24}/thread/.+/messages",
+		"POST|/project/[a-fA-F0-9]{24}/thread/.+/messages/.+/edit",
+		"DELETE|/project/[a-fA-F0-9]{24}/thread/.+/messages/.+",
+		"DELETE|/project/[a-fA-F0-9]{24}/thread/.+/own-messages/.+",
+		"POST|/project/[a-fA-F0-9]{24}/doc/.+/changes",
+		"POST|/project/[a-fA-F0-9]{24}/doc/.+/changes/accept",
+		"POST|/project/[a-fA-F0-9]{24}/track_changes",
+	}
+	if len(f.Routes) != len(want) {
+		t.Fatalf("routes = %d, want %d", len(f.Routes), len(want))
+	}
+	seen := map[string]bool{}
+	for _, r := range f.Routes {
+		key := r.Method + "|" + r.Pattern.String()
+		if _, dup := seen[key]; dup {
+			t.Fatalf("duplicate route %s", key)
+		}
+		seen[key] = true
+		if r.Pattern == nil {
+			t.Fatalf("route %s without pattern", key)
+		}
 	}
 }
 
-func TestThreadCreateListEnvelope(t *testing.T) {
-	_, h := setup(t)
-	c := cxt(http.MethodPost, "/project/"+testPID+"/threads", "owner",
-		`{"content":"why here?","doc":"main.tex","ranges":[{"start":1,"end":5}]}`, nil)
-	s := serve(t, h, c, h.threadCreate)
+// ---------- thread lifecycle (panel paths) ----------
+
+// TestThreadFirstMessageCreatesThread — panel addComment: POST the first
+// message to a client-generated thread id; the thread appears in the GET
+// record keyed by that id with the pinned message shape.
+func TestThreadFirstMessageCreatesThread(t *testing.T) {
+	_, h, _ := setup(t)
+	tid := "thr_0123456789abc"
+
+	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "owner",
+		`{"content":"why here?","doc":"main.tex"}`, map[string]string{"2": tid})
+	s := serve(t, c, h.messageAdd)
 	if s.code != 201 {
 		t.Fatalf("create code=%d body=%s", s.code, s.body)
 	}
-	var created map[string]any
-	if err := json.Unmarshal([]byte(s.body), &created); err != nil {
-		t.Fatalf("create body not json: %v", err)
+	var rec threadRecord
+	if err := json.Unmarshal([]byte(s.body), &rec); err != nil {
+		t.Fatalf("record not json: %v", err)
 	}
-	if created["doc"] != "main.tex" || created["state"] != "opened" {
-		t.Fatalf("envelope: %v", created)
+	if rec.Doc != "main.tex" {
+		t.Fatalf("doc = %q", rec.Doc)
 	}
-	au, _ := created["author"].(map[string]any)
-	if au["id"] != "owner" || au["isSelf"] != true || au["email"] != "owner@e.test" {
-		t.Fatalf("author shape: %v", au)
+	if len(rec.Messages) != 1 || rec.Messages[0].Content != "why here?" {
+		t.Fatalf("messages = %+v", rec.Messages)
 	}
-	// created = millisecond ISO of the fixed clock.
-	if created["created"] != "2023-11-14T22:13:20.000Z" {
-		t.Fatalf("created = %v (want fixed ISO)", created["created"])
+	m := rec.Messages[0]
+	if m.UserID != "owner" || !m.User.IsSelf || m.User.Name != "Owner One" {
+		t.Fatalf("user shape = %+v", m.User)
 	}
-	msgs, _ := created["messages"].([]any)
-	if len(msgs) != 1 {
-		t.Fatalf("messages: %v", created["messages"])
-	}
-	m0, _ := msgs[0].(map[string]any)
-	if m0["content"] != "why here?" || m0["user_id"] != "owner" {
-		t.Fatalf("message: %v", m0)
-	}
-	u0, _ := m0["user"].(map[string]any)
-	for _, k := range []any{"avatar_text", "email", "hue", "id", "isSelf", "name"} {
-		if _, ok := u0[k.(string)]; !ok {
-			t.Fatalf("user shape missing %v: %v", k, u0)
-		}
-	}
-	if created["resolved"] != nil {
-		t.Fatalf("unresolved thread must omit resolved: %v", created["resolved"])
+	if !strings.HasSuffix(m.Timestamp, ".000Z") {
+		t.Fatalf("timestamp %q not ISO-ms", m.Timestamp)
 	}
 
-	// GET lists it (in the envelope the panel consumes).
-	c2 := cxt(http.MethodGet, "/project/"+testPID+"/threads", "owner", "", nil)
-	s2 := serve(t, h, c2, h.threadsList)
-	if s2.code != 200 {
-		t.Fatalf("list code=%d", s2.code)
+	// GET threads → Record<threadId, Thread>
+	c = cxt(http.MethodGet, "/project/"+testPID+"/threads", "owner", "", nil)
+	s = serve(t, c, h.threadsList)
+	if s.code != 200 {
+		t.Fatalf("list code=%d body=%s", s.code, s.body)
 	}
-	var list struct {
-		Threads []map[string]any `json:"threads"`
+	var recs map[string]threadRecord
+	if err := json.Unmarshal([]byte(s.body), &recs); err != nil {
+		t.Fatalf("list not record: %v", err)
 	}
-	if err := json.Unmarshal([]byte(s2.body), &list); err != nil {
-		t.Fatalf("list body: %v", err)
+	got, ok := recs[tid]
+	if !ok {
+		t.Fatalf("thread %s missing from %s", tid, s.body)
 	}
-	if len(list.Threads) != 1 || list.Threads[0]["id"] != created["id"] {
-		t.Fatalf("list: %s", s2.body)
+	if len(got.Messages) != 1 || got.Messages[0].Content != "why here?" {
+		t.Fatalf("listed record = %+v", got)
+	}
+	if got.Resolved {
+		t.Fatalf("fresh thread resolved: %+v", got)
 	}
 }
 
-func TestMessageReplyEditDelete(t *testing.T) {
-	_, h := setup(t)
-	// create thread (owner) + a reply from user2.
-	th := serve(t, h, cxt(http.MethodPost, "/p", "owner", `{"content":"q?","doc":"main.tex"}`, nil), h.threadCreate)
-	threadID, _ := extractID(t, th.body)
-	reply := serve(t, h, cxt(http.MethodPost, "/p", "user2", `{"content":"a!"}`, map[string]string{
-		"2": threadID,
-	}), h.messageAdd)
-	if reply.code != 201 {
-		t.Fatalf("reply code=%d body=%s", reply.code, reply.body)
+// TestThreadReplySecondMessage — a reply does not duplicate the thread.
+func TestThreadReplySecondMessage(t *testing.T) {
+	st, h, _ := setup(t)
+	tid := "thr_reply12345678"
+	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "owner",
+		`{"content":"first","doc":"main.tex"}`, map[string]string{"2": tid})
+	if s := serve(t, c, h.messageAdd); s.code != 201 {
+		t.Fatalf("first: %d %s", s.code, s.body)
 	}
-	cid, _ := extractID(t, reply.body)
-
-	// edit by its author — content updates (200), unknown ids → 404.
-	edit := serve(t, h, cxt(http.MethodPost, "/p", "user2", `{"content":"a? (edited)"}`, map[string]string{
-		"2": threadID, "3": cid,
-	}), h.messageEdit)
-	if edit.code != 200 {
-		t.Fatalf("edit code=%d body=%s", edit.code, edit.body)
+	c = cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "user2",
+		`{"content":"second"}`, map[string]string{"2": tid})
+	s := serve(t, c, h.messageAdd)
+	if s.code != 201 {
+		t.Fatalf("reply: %d %s", s.code, s.body)
 	}
-	var edited map[string]any
-	json.Unmarshal([]byte(edit.body), &edited)
-	if edited["content"] != "a? (edited)" {
-		t.Fatalf("edited: %v", edited)
+	var rec threadRecord
+	_ = json.Unmarshal([]byte(s.body), &rec)
+	if len(rec.Messages) != 2 || rec.Messages[1].User.ID != "user2" || rec.Messages[1].User.Name != "User Two" {
+		t.Fatalf("reply record = %+v", rec)
 	}
-	badEdit := serve(t, h, cxt(http.MethodPost, "/p", "user2", `{"content":"x"}`, map[string]string{
-		"2": threadID, "3": "0000000000000",
-	}), h.messageEdit)
-	if badEdit.code != 404 {
-		t.Fatalf("edit unknown = %d (want 404)", badEdit.code)
-	}
-
-	// own-message rule: the non-author is forbidden; the author succeeds.
-	foreign := serve(t, h, cxt(http.MethodDelete, "/p", "owner", "", map[string]string{
-		"2": threadID, "3": cid,
-	}), h.ownMessageDelete)
-	if foreign.code != 403 {
-		t.Fatalf("own-delete foreign = %d (want 403)", foreign.code)
-	}
-	own := serve(t, h, cxt(http.MethodDelete, "/p", "user2", "", map[string]string{
-		"2": threadID, "3": cid,
-	}), h.ownMessageDelete)
-	if own.code != 200 {
-		t.Fatalf("own-delete own = %d (want 200)", own.code)
+	ths, _ := collab.ListThreads(context.Background(), st, testPID)
+	if len(ths) != 1 || ths[0].ID != tid {
+		t.Fatalf("threads = %+v", ths)
 	}
 }
 
-func TestThreadResolveReopen(t *testing.T) {
-	_, h := setup(t)
-	th := serve(t, h, cxt(http.MethodPost, "/p", "owner", `{"content":"q?","doc":"main.tex"}`, nil), h.threadCreate)
-	threadID, _ := extractID(t, th.body)
-
-	resol := serve(t, h, cxt(http.MethodPost, "/p", "user2", "", map[string]string{
-		"2": "main.tex", "3": threadID, "4": "resolve",
-	}), h.threadResolve)
-	if resol.code != 200 {
-		t.Fatalf("resolve code=%d body=%s", resol.code, resol.body)
+// TestResolveReopenEnvelope — pinned resolved fields (flat, per
+// comment-thread.ts) + the actor persisted server-side (D40 decision).
+func TestResolveReopenEnvelope(t *testing.T) {
+	_, h, _ := setup(t)
+	tid := "thr_resolve12345"
+	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "owner",
+		`{"content":"c","doc":"main.tex"}`, map[string]string{"2": tid})
+	if s := serve(t, c, h.messageAdd); s.code != 201 {
+		t.Fatalf("seed thread: %d %s", s.code, s.body)
 	}
-	var rt map[string]any
-	json.Unmarshal([]byte(resol.body), &rt)
-	if rt["state"] != "resolved" || rt["resolved"] != true {
-		t.Fatalf("resolved envelope: %v", rt)
+	s := serve(t, cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/thread/"+tid+"/resolve", "owner", "",
+		map[string]string{"2": "main.tex", "3": tid, "4": "resolve"}), h.threadResolve)
+	if s.code != 200 {
+		t.Fatalf("resolve: %d %s", s.code, s.body)
 	}
-	info, _ := rt["resolvedInfo"].(map[string]any)
-	if info == nil || info["resolved_by_user_id"] != "user2" {
-		t.Fatalf("resolvedBy: %v", rt)
+	var rec threadRecord
+	_ = json.Unmarshal([]byte(s.body), &rec)
+	if !rec.Resolved || rec.ResolvedByUID != "owner" {
+		t.Fatalf("resolve record = %+v", rec)
 	}
-	// idempotent resolve.
-	if r2 := serve(t, h, cxt(http.MethodPost, "/p", "owner", "", map[string]string{
-		"2": "main.tex", "3": threadID, "4": "resolve",
-	}), h.threadResolve); r2.code != 200 {
-		t.Fatalf("idempotent resolve = %d", r2.code)
+	if rec.ResolvedAt == "" || !strings.Contains(rec.ResolvedAt, "T") || !strings.HasSuffix(rec.ResolvedAt, "Z") {
+		t.Fatalf("resolved_at = %q (want ISO-8601)", rec.ResolvedAt)
 	}
-
-	reopen := serve(t, h, cxt(http.MethodPost, "/p", "owner", "", map[string]string{
-		"2": "main.tex", "3": threadID, "4": "reopen",
-	}), h.threadResolve)
-	if reopen.code != 200 {
-		t.Fatalf("reopen code=%d", reopen.code)
-	}
-	var ro map[string]any
-	json.Unmarshal([]byte(reopen.body), &ro)
-	if ro["state"] != "opened" || ro["resolvedInfo"] != nil {
-		t.Fatalf("reopened envelope: %v", ro)
+	if rec.ResolvedByUser.Name != "Owner One" || rec.ResolvedByUser.Email != "owner@e.test" {
+		t.Fatalf("resolved_by_user = %+v", rec.ResolvedByUser)
 	}
 
-	// unknown thread → 404 (existence not leaked).
-	if r3 := serve(t, h, cxt(http.MethodPost, "/p", "owner", "", map[string]string{
-		"2": "main.tex", "3": "0000000000000", "4": "resolve",
-	}), h.threadResolve); r3.code != 404 {
-		t.Fatalf("resolve unknown = %d (want 404)", r3.code)
+	// reopen by another writer → resolved omitted, actor cleared
+	s = serve(t, cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/thread/"+tid+"/reopen", "user2", "",
+		map[string]string{"2": "main.tex", "3": tid, "4": "reopen"}), h.threadResolve)
+	if s.code != 200 {
+		t.Fatalf("reopen: %d %s", s.code, s.body)
+	}
+	var rec2 threadRecord
+	_ = json.Unmarshal([]byte(s.body), &rec2)
+	if rec2.Resolved {
+		t.Fatalf("reopen record = %+v", rec2)
 	}
 }
 
-func TestThreadDeleteCascade(t *testing.T) {
-	_, h := setup(t)
-	th := serve(t, h, cxt(http.MethodPost, "/p", "owner", `{"content":"q?","doc":"main.tex"}`, nil), h.threadCreate)
-	threadID, _ := extractID(t, th.body)
-	rep := serve(t, h, cxt(http.MethodPost, "/p", "user2", `{"content":"a!"}`, map[string]string{
-		"2": threadID,
-	}), h.messageAdd)
-	_, cid := extractID(t, rep.body)
-	_ = cid
-
-	del := serve(t, h, cxt(http.MethodDelete, "/p", "owner", "", map[string]string{
-		"2": "main.tex", "3": threadID,
-	}), h.threadDelete)
-	if del.code != 200 {
-		t.Fatalf("delete code=%d", del.code)
+// TestThreadGates — read role can list but not write; deny → 404 (existence
+// not leaked); anonymous → 404.
+func TestThreadRoleGates(t *testing.T) {
+	_, h, _ := setup(t)
+	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/thr_gate123456789/messages", "viewer",
+		`{"content":"x"}`, map[string]string{"2": "thr_gate123456789"})
+	if s := serve(t, c, h.messageAdd); s.code != http.StatusNotFound {
+		t.Fatalf("read-only add: %d %s", s.code, s.body)
 	}
-	list := serve(t, h, cxt(http.MethodGet, "/p", "owner", "", nil), h.threadsList)
-	if !strings.Contains(list.body, `"threads":[]`) {
-		t.Fatalf("after delete: %s", list.body)
+	c = cxt(http.MethodPost, "/project/"+testPID+"/thread/thr_gate123456789/messages", "stranger",
+		`{"content":"x"}`, map[string]string{"2": "thr_gate123456789"})
+	if s := serve(t, c, h.messageAdd); s.code != http.StatusNotFound {
+		t.Fatalf("deny add: %d %s", s.code, s.body)
+	}
+	c = cxt(http.MethodPost, "/project/"+testPID+"/thread/thr_gate123456789/messages", "",
+		`{"content":"x"}`, map[string]string{"2": "thr_gate123456789"})
+	if s := serve(t, c, h.messageAdd); s.code != http.StatusNotFound {
+		t.Fatalf("anon add: %d %s", s.code, s.body)
+	}
+	// read-only list still works
+	c = cxt(http.MethodGet, "/project/"+testPID+"/threads", "viewer", "", nil)
+	if s := serve(t, c, h.threadsList); s.code != http.StatusOK {
+		t.Fatalf("read-only list: %d %s", s.code, s.body)
 	}
 }
 
-func TestChangesAccept(t *testing.T) {
-	st, h := setup(t)
-	// register a pending change directly in the domain (the editor flow
-	// creates these at type-time; the accept route is what the panel calls).
-	ctx := context.Background()
-	if _, _, _, err := collab.AddChange(ctx, st, testPID, collab.TrackedChange{
-		ID: "555555555555555555555555", Kind: collab.ChangeKindInsert, Start: 5, End: 11, Content: " world",
-	}); err != nil {
-		t.Fatalf("addchange: %v", err)
+// TestMessageEdit — pinned edit route; unknown message → 404.
+func TestMessageEdit(t *testing.T) {
+	st, h, _ := setup(t)
+	tid := "thr_edit123456789"
+	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "owner",
+		`{"id":"msg_123456789","content":"before","doc":"main.tex"}`, map[string]string{"2": tid})
+	if s := serve(t, c, h.messageAdd); s.code != 201 {
+		t.Fatalf("seed: %d %s", s.code, s.body)
 	}
-	acc := serve(t, h, cxt(http.MethodPost, "/p", "owner",
-		`{"change_ids":["555555555555555555555555"]}`, map[string]string{"2": "main.tex"}), h.changesAccept)
-	if acc.code != 200 {
-		t.Fatalf("accept code=%d body=%s", acc.code, acc.body)
+	c = cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages/msg_123456789/edit", "owner",
+		`{"content":"after"}`, map[string]string{"2": tid, "3": "msg_123456789"})
+	s := serve(t, c, h.messageEdit)
+	if s.code != 200 || !strings.Contains(s.body, `"after"`) {
+		t.Fatalf("edit: %d %s", s.code, s.body)
+	}
+	msgs, _ := collab.MessagesOfThread(context.Background(), st, testPID, tid)
+	if len(msgs) != 1 || msgs[0].Text != "after" {
+		t.Fatalf("domain msg = %+v", msgs)
+	}
+	c = cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages/msg_nope/edit", "owner",
+		`{"content":"x"}`, map[string]string{"2": tid, "3": "msg_nope"})
+	if s := serve(t, c, h.messageEdit); s.code != http.StatusNotFound {
+		t.Fatalf("edit missing: %d %s", s.code, s.body)
+	}
+}
+
+// TestOwnMessageRule — own-messages route enforces authorship (403 on
+// foreign authors); the plain messages route stays open at write role.
+func TestOwnMessageRule(t *testing.T) {
+	_, h, _ := setup(t)
+	tid := "thr_own1234567890"
+	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "owner",
+		`{"id":"msg_own123","content":"mine","doc":"main.tex"}`, map[string]string{"2": tid})
+	if s := serve(t, c, h.messageAdd); s.code != 201 {
+		t.Fatalf("seed: %d %s", s.code, s.body)
+	}
+	c = cxt(http.MethodDelete, "/project/"+testPID+"/thread/"+tid+"/own-messages/msg_own123", "user2", "",
+		map[string]string{"2": tid, "3": "msg_own123"})
+	if s := serve(t, c, h.ownMessageDelete); s.code != http.StatusForbidden {
+		t.Fatalf("foreign own-delete: %d %s", s.code, s.body)
+	}
+	c = cxt(http.MethodDelete, "/project/"+testPID+"/thread/"+tid+"/messages/msg_own123", "user2", "",
+		map[string]string{"2": tid, "3": "msg_own123"})
+	if s := serve(t, c, h.messageDelete); s.code != http.StatusOK {
+		t.Fatalf("write-role plain delete: %d %s", s.code, s.body)
+	}
+}
+
+// TestDeleteThread — cascades messages; gone from the list.
+func TestDeleteThread(t *testing.T) {
+	st, h, _ := setup(t)
+	tid := "thr_del1234567890"
+	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "owner",
+		`{"content":"x","doc":"main.tex"}`, map[string]string{"2": tid})
+	if s := serve(t, c, h.messageAdd); s.code != 201 {
+		t.Fatalf("seed: %d %s", s.code, s.body)
+	}
+	c = cxt(http.MethodDelete, "/project/"+testPID+"/doc/main.tex/thread/"+tid, "owner", "",
+		map[string]string{"2": "main.tex", "3": tid})
+	if s := serve(t, c, h.threadDelete); s.code != http.StatusOK {
+		t.Fatalf("delete: %d %s", s.code, s.body)
+	}
+	msgs, _ := collab.MessagesOfThread(context.Background(), st, testPID, tid)
+	if len(msgs) != 0 {
+		t.Fatalf("messages survived: %d", len(msgs))
+	}
+	if s := serve(t, cxt(http.MethodGet, "/project/"+testPID+"/threads", "owner", "", nil), h.threadsList); strings.Contains(s.body, tid) {
+		t.Fatalf("thread still listed: %s", s.body)
+	}
+}
+
+// ---------- track changes ----------
+
+// TestTrackChangesOnFor — panel body {on_for, on_for_guests} → explicit map
+// (Node parity: project.track_changes) + echo + merge semantics.
+func TestTrackChangesOnFor(t *testing.T) {
+	_, h, tm := setup(t)
+	c := cxt(http.MethodPost, "/project/"+testPID+"/track_changes", "owner",
+		`{"on_for":{"owner":true},"on_for_guests":true}`, nil)
+	s := serve(t, c, h.trackChanges)
+	if s.code != 200 {
+		t.Fatalf("track: %d %s", s.code, s.body)
 	}
 	var out struct {
-		Accepted int `json:"accepted"`
+		ProjectID    string          `json:"project_id"`
+		TrackChanges map[string]bool `json:"track_changes"`
 	}
-	if err := json.Unmarshal([]byte(acc.body), &out); err != nil || out.Accepted != 1 {
-		t.Fatalf("accepted: %s", acc.body)
+	if err := json.Unmarshal([]byte(s.body), &out); err != nil {
+		t.Fatalf("body: %v", err)
 	}
-	// idempotency: a second accept counts nothing new.
-	acc2 := serve(t, h, cxt(http.MethodPost, "/p", "owner",
-		`{"change_ids":["555555555555555555555555"]}`, map[string]string{"2": "main.tex"}), h.changesAccept)
-	var out2 struct {
-		Accepted int `json:"accepted"`
+	if out.ProjectID != testPID || !out.TrackChanges["owner"] || !out.TrackChanges["__guests__"] {
+		t.Fatalf("out = %+v", out)
 	}
-	json.Unmarshal([]byte(acc2.body), &out2)
-	if out2.Accepted != 0 {
-		t.Fatalf("second accept: %s", acc2.body)
+	if got, _ := tm.get(context.Background(), testPID); !got["owner"] || !got["__guests__"] {
+		t.Fatalf("persisted map = %v", got)
 	}
-}
-
-func TestTrackChangesToggle(t *testing.T) {
-	_, h := setup(t)
-	if s := serve(t, h, cxt(http.MethodPost, "/p", "owner", `{}`, nil), h.trackChanges); s.code != 200 {
-		t.Fatalf("track code=%d", s.code)
+	// merge: toggle user2 on, owner stays on
+	c = cxt(http.MethodPost, "/project/"+testPID+"/track_changes", "owner",
+		`{"on_for":{"user2":true}}`, nil)
+	s = serve(t, c, h.trackChanges)
+	if s.code != 200 {
+		t.Fatalf("track2: %d %s", s.code, s.body)
 	}
-	off := serve(t, h, cxt(http.MethodPost, "/p", "owner", `{"enabled":false}`, nil), h.trackChanges)
-	if !strings.Contains(off.body, `"enabled":false`) {
-		t.Fatalf("off: %s", off.body)
+	if got, _ := tm.get(context.Background(), testPID); !got["owner"] || !got["user2"] || !got["__guests__"] {
+		t.Fatalf("merged map = %v", got)
 	}
-	on := serve(t, h, cxt(http.MethodPost, "/p", "owner", `{"enabled":true}`, nil), h.trackChanges)
-	if !strings.Contains(on.body, `"enabled":true`) {
-		t.Fatalf("on: %s", on.body)
+	// read role is enough (panel saves as member)
+	c = cxt(http.MethodPost, "/project/"+testPID+"/track_changes", "viewer",
+		`{"on_for":{"viewer":true}}`, nil)
+	if s := serve(t, c, h.trackChanges); s.code != 200 {
+		t.Fatalf("viewer track: %d %s", s.code, s.body)
 	}
 }
 
-func TestRoleGating(t *testing.T) {
-	_, h := setup(t)
-	// stranger (Deny): even a read leaks nothing.
-	if s := serve(t, h, cxt(http.MethodGet, "/p", "stranger", "", nil), h.threadsList); s.code != 404 {
-		t.Fatalf("stranger list = %d (want 404)", s.code)
-	}
-	// viewer (ReadOnly): reads OK, writes denied.
-	if s := serve(t, h, cxt(http.MethodGet, "/p", "viewer", "", nil), h.threadsList); s.code != 200 {
-		t.Fatalf("viewer list = %d (want 200)", s.code)
-	}
-	if s := serve(t, h, cxt(http.MethodPost, "/p", "viewer", `{"content":"x","doc":"m"}`, nil), h.threadCreate); s.code != 404 {
-		t.Fatalf("viewer create = %d (want 404)", s.code)
-	}
-	// anonymous: 404 (CSRF 403 sits upstream at core for POST).
-	if s := serve(t, h, cxt(http.MethodGet, "/p", "", "", nil), h.threadsList); s.code != 404 {
-		t.Fatalf("anon list = %d (want 404)", s.code)
-	}
-}
+// ---------- changes ----------
 
-func extractID(t *testing.T, body string) (string, string) {
-	t.Helper()
-	var m map[string]any
-	if err := json.Unmarshal([]byte(body), &m); err != nil {
-		t.Fatalf("extract: %v", err)
+func TestChangesCreateAccept(t *testing.T) {
+	st, h, _ := setup(t)
+	c := cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/changes", "owner",
+		`{"content":"inserted text","start":6,"end":6}`, map[string]string{"2": "main.tex"})
+	s := serve(t, c, h.changesCreate)
+	if s.code != 201 {
+		t.Fatalf("create: %d %s", s.code, s.body)
 	}
-	id, _ := m["id"].(string)
+	var ch map[string]any
+	_ = json.Unmarshal([]byte(s.body), &ch)
+	if ch["kind"] != "insert" || ch["state"] != "pending" || ch["content"] != "inserted text" {
+		t.Fatalf("change = %v", ch)
+	}
+	id, _ := ch["change_id"].(string)
 	if id == "" {
-		t.Fatalf("no id in %s", body)
+		t.Fatalf("no change_id: %s", s.body)
 	}
-	return id, id
+
+	// delete kind inferred from empty content
+	c = cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/changes", "owner",
+		`{"start":0,"end":5}`, map[string]string{"2": "main.tex"})
+	s = serve(t, c, h.changesCreate)
+	if s.code != 201 {
+		t.Fatalf("create del: %d %s", s.code, s.body)
+	}
+	var ch2 map[string]any
+	_ = json.Unmarshal([]byte(s.body), &ch2)
+	if ch2["kind"] != "delete" {
+		t.Fatalf("change2 = %v", ch2)
+	}
+
+	// accept (bulk, panel body {change_ids})
+	c = cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/changes/accept", "owner",
+		`{"change_ids":["`+id+`","nope_1234567890"]}`, map[string]string{"2": "main.tex"})
+	s = serve(t, c, h.changesAccept)
+	if s.code != 200 {
+		t.Fatalf("accept: %d %s", s.code, s.body)
+	}
+	var acc map[string]any
+	_ = json.Unmarshal([]byte(s.body), &acc)
+	if acc["accepted"] != float64(1) {
+		t.Fatalf("accepted = %v", acc)
+	}
+	chs, _ := collab.ListChanges(context.Background(), st, testPID)
+	if len(chs) != 2 {
+		t.Fatalf("changes = %+v", chs)
+	}
+	for _, x := range chs {
+		if x.ID == id && x.State != "accepted" {
+			t.Fatalf("state = %q", x.State)
+		}
+	}
+}
+
+func TestChangesGates(t *testing.T) {
+	_, h, _ := setup(t)
+	c := cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/changes", "viewer",
+		`{"content":"x","start":0,"end":1}`, map[string]string{"2": "main.tex"})
+	if s := serve(t, c, h.changesCreate); s.code != http.StatusNotFound {
+		t.Fatalf("viewer create: %d %s", s.code, s.body)
+	}
+	c = cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/changes/accept", "viewer",
+		`{"change_ids":["a"]}`, map[string]string{"2": "main.tex"})
+	if s := serve(t, c, h.changesAccept); s.code != http.StatusNotFound {
+		t.Fatalf("viewer accept: %d %s", s.code, s.body)
+	}
+	c = cxt(http.MethodPost, "/project/"+testPID+"/doc/main.tex/changes", "owner",
+		`{bad json`, map[string]string{"2": "main.tex"})
+	if s := serve(t, c, h.changesCreate); s.code != http.StatusBadRequest {
+		t.Fatalf("bad body: %d %s", s.code, s.body)
+	}
+}
+
+func TestMessageAddBadBody(t *testing.T) {
+	_, h, _ := setup(t)
+	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/thr_bad123456789/messages", "owner",
+		`{"content":"   "}`, map[string]string{"2": "thr_bad123456789"})
+	if s := serve(t, c, h.messageAdd); s.code != http.StatusBadRequest {
+		t.Fatalf("blank content: %d %s", s.code, s.body)
+	}
+	c = cxt(http.MethodPost, "/project/"+testPID+"/thread/thr_bad123456789/messages", "owner",
+		`not json`, map[string]string{"2": "thr_bad123456789"})
+	if s := serve(t, c, h.messageAdd); s.code != http.StatusBadRequest {
+		t.Fatalf("bad json: %d %s", s.code, s.body)
+	}
+}
+
+// TestTimestampPinned — the pinned clock renders in both message + thread
+// timestamps (ISO-ms, JS Date parseable).
+func TestTimestampPinned(t *testing.T) {
+	_, h, _ := setup(t)
+	tid := "thr_ts1234567890"
+	c := cxt(http.MethodPost, "/project/"+testPID+"/thread/"+tid+"/messages", "owner",
+		`{"content":"c"}`, map[string]string{"2": tid})
+	s := serve(t, c, h.messageAdd)
+	if s.code != 201 {
+		t.Fatalf("seed: %d %s", s.code, s.body)
+	}
+	if !strings.Contains(s.body, "2023-11-14T22:13:20.000Z") { // 1700000000000ms, pinned clock
+		t.Fatalf("timestamp not from pinned clock: %s", s.body)
+	}
 }

@@ -1,29 +1,40 @@
-// Package review — D40 P2: the V1 threads / track-changes REST surface on Go
-// web, over the room-doc domain ops (go/services/collab/review.go).
+// Package review — D40 P2: the review-panel REST surface on Go web, over the
+// room-doc domain ops (go/services/collab/review.go).
 //
-// Contract = the in-git review panel (frontend/js/features/review-panel,
-// pinned from its calls + services/web/types/review-panel/*):
+// Contract = the IN-GIT review panel (frontend/js/features/review-panel),
+// pinned 1:1 from its calls + services/web/types/review-panel (D40-d5: the
+// Node fork never served these routes — the panel's OT-op paths are dead on
+// the Yjs engine, document-container.ts throws for historyOTShareDoc — so
+// the REST surface IS the contract; the shapes below are what the panel
+// consumes):
 //
-//	GET    /project/:pid/threads                                  (read>=)
-//	POST   /project/:pid/threads                                  {content, doc?/doc_id?, ranges?}
-//	POST   /project/:pid/thread/:threadId/messages                {content}
-//	POST   /project/:pid/thread/:threadId/messages/:cid/edit      {content}
+//	REST URL (panel pins)                                   Go handler
+//	GET    /project/:pid/threads                     → Record<threadId, Thread>
+//	POST   /project/:pid/thread/:threadId/messages   → thread record (201; the
+//	       body {content, id?, doc?}                 first message creates the
+//	POST   /project/:pid/thread/:threadId/messages/:cid/edit
 //	DELETE /project/:pid/thread/:threadId/messages/:cid
-//	DELETE /project/:pid/thread/:threadId/own-messages/:cid       (actor must own the message)
+//	DELETE /project/:pid/thread/:threadId/own-messages/:cid
 //	POST   /project/:pid/doc/:doc/thread/:threadId/resolve
 //	POST   /project/:pid/doc/:doc/thread/:threadId/reopen
-//	DELETE /project/:pid/doc/:doc/thread/:threadId                (cascades to messages)
-//	POST   /project/:pid/doc/:doc/changes/accept                  {change_ids: [...]}
-//	POST   /project/:pid/track_changes                            {enabled: bool}
+//	DELETE /project/:pid/doc/:doc/thread/:threadId
+//	POST   /project/:pid/doc/:doc/changes            → create change (server-
+//	POST   /project/:pid/doc/:doc/changes/accept     → assisted; editor-side
+//	POST   /project/:pid/track_changes               → creation pending)
 //
-// Wire shapes (pinned from services/web/types/review-panel): message =
-// {content, id, timestamp, user, user_id}; thread = {id, doc, state, author,
-// created, messages, [resolved, resolved_at, resolved_by_user_id,
-// resolved_by_user]}. Dates = millisecond-precision ISO strings.
+// Thread record (comment-thread.ts, keyed by thread id):
+//	{ messages: [{content,id,timestamp,user{avatar_text,email,hue,id,isSelf,
+//	   name},user_id}], resolved?, resolved_at?, resolved_by_user_id?,
+//	   resolved_by_user? } — `doc`/`author`/`created` ride along as a
+//	documented superset (the overview + e2e need the doc association).
 //
-// Auth = core CSRF (anonymous POST → 403 upstream) + session user + project
-// role (collabhistory convention: 404 below the required role — project
-// existence not leaked). Room = project id (same namespace as collabhistory).
+// track_changes (track-changes-state-context.ts): body {on_for?, on_for_guests?}
+// → persisted as the project's explicit `track_changes` map (Node parity:
+// project.track_changes → editor trackChangesState).
+//
+// Auth = core CSRF (anonymous POST → 403 upstream) + session + project role
+// (collabhistory convention: 404 below the required role — project existence
+// not leaked). Room = project id (same namespace as collabhistory).
 
 package review
 
@@ -58,6 +69,7 @@ var (
 	msgEditPattern   = regexp.MustCompile(`^/project/(` + hex24 + `)/thread/(` + idRe + `)/messages/(` + idRe + `)/edit$`)
 	msgDelPattern    = regexp.MustCompile(`^/project/(` + hex24 + `)/thread/(` + idRe + `)/messages/(` + idRe + `)$`)
 	msgOwnDelPattern = regexp.MustCompile(`^/project/(` + hex24 + `)/thread/(` + idRe + `)/own-messages/(` + idRe + `)$`)
+	changesPat       = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes$`)
 	changesAcceptPat = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes/accept$`)
 	trackChangesPat  = regexp.MustCompile(`^/project/(` + hex24 + `)/track_changes$`)
 )
@@ -68,22 +80,22 @@ type RoleFor func(ctx context.Context, uid, projectID string) collab.Role
 // UserFor — (uid) → user doc fields (name/email/profile_picture_url/...).
 type UserFor func(ctx context.Context, uid string) map[string]any
 
-// TrackFor — (uid) → the per-user track-changes preference (default ON;
-// P2 assumption recorded in WEB_GO_STATE.md D40 — owner-confirm the key).
-type TrackFor func(ctx context.Context, uid string) (bool, error)
+// TrackStateFor — (projectID) → the project's explicit track-changes map
+// (uid → bool, `__guests__` included); empty = off.
+type TrackStateFor func(ctx context.Context, projectID string) (map[string]bool, error)
 
-// SetTrackFor — (uid, enabled) error.
-type SetTrackFor func(ctx context.Context, uid string, enabled bool) error
+// TrackStateSet — (projectID, map) error (the whole explicit map).
+type TrackStateSet func(ctx context.Context, projectID string, m map[string]bool) error
 
-// Handlers — zero App + Store/RoleFor/UserFor = hermetic tests (same doctrine
-// as collabhistory).
+// Handlers — zero App + Store/RoleFor/... = hermetic tests (same doctrine as
+// collabhistory).
 type Handlers struct {
-	App         *core.App
-	Store       persistence.VersionedPersistence
-	RoleFor     RoleFor
-	UserFor     UserFor
-	TrackFor    TrackFor
-	SetTrackFor SetTrackFor
+	App           *core.App
+	Store         persistence.VersionedPersistence
+	RoleFor       RoleFor
+	UserFor       UserFor
+	TrackStateFor TrackStateFor
+	TrackStateSet TrackStateSet
 	// Now — injectable clock (unix-ms at call time; default time.Now).
 	Now func() int64
 }
@@ -106,7 +118,7 @@ func Feature(a *core.App) core.Feature {
 				return collab.Deny
 			}
 			auth := &collab.SessionAuth{Ctx: ctx, M: webMongo{db: db}}
-			role, _ := auth.ProjectRole(uid, pid)
+			role, _ := auth.ProjectRole(uid, strings.ToLower(pid))
 			return role
 		}
 		h.UserFor = func(ctx context.Context, uid string) map[string]any {
@@ -121,23 +133,19 @@ func Feature(a *core.App) core.Feature {
 				}
 				return nil
 			}
-			m := map[string]any{}
-			for _, e := range d {
-				m[e.Key] = e.Value
-			}
-			return m
+			return bsonDToAny(d)
 		}
-		h.TrackFor, h.SetTrackFor = prodTrack(a)
+		h.TrackStateFor, h.TrackStateSet = prodTrack(a)
 	}
 	return core.Feature{Name: "review", Routes: []core.Route{
 		{Method: http.MethodGet, Pattern: threadsPattern, Handler: h.threadsList},
-		{Method: http.MethodPost, Pattern: threadsPattern, Handler: h.threadCreate},
 		{Method: http.MethodPost, Pattern: threadActionPat, Handler: h.threadResolve},
 		{Method: http.MethodDelete, Pattern: threadDelPattern, Handler: h.threadDelete},
 		{Method: http.MethodPost, Pattern: msgAddPattern, Handler: h.messageAdd},
 		{Method: http.MethodPost, Pattern: msgEditPattern, Handler: h.messageEdit},
 		{Method: http.MethodDelete, Pattern: msgDelPattern, Handler: h.messageDelete},
 		{Method: http.MethodDelete, Pattern: msgOwnDelPattern, Handler: h.ownMessageDelete},
+		{Method: http.MethodPost, Pattern: changesPat, Handler: h.changesCreate},
 		{Method: http.MethodPost, Pattern: changesAcceptPat, Handler: h.changesAccept},
 		{Method: http.MethodPost, Pattern: trackChangesPat, Handler: h.trackChanges},
 	}}
@@ -162,21 +170,16 @@ type messageOut struct {
 	UserID    string     `json:"user_id"`
 }
 
-type resolvedBy struct {
-	ResolvedAt     string     `json:"resolved_at"`
-	ResolvedByUID  string     `json:"resolved_by_user_id"`
-	ResolvedByUser reviewUser `json:"resolved_by_user"`
-}
-
-type threadOut struct {
-	ID       string       `json:"id"`
-	Doc      string       `json:"doc"`
-	State    string       `json:"state"`
-	Author   reviewUser   `json:"author"`
-	Created  string       `json:"created"`
-	Messages []messageOut `json:"messages"`
-	Resolved bool         `json:"resolved,omitempty"`
-	ResInfo  *resolvedBy  `json:"resolvedInfo,omitempty"`
+// threadRecord — pinned Thread shape + documented superset (doc/author/created).
+type threadRecord struct {
+	Doc            string       `json:"doc"`
+	Author         reviewUser   `json:"author,omitempty"`
+	Created        string       `json:"created,omitempty"`
+	Messages       []messageOut `json:"messages"`
+	Resolved       bool         `json:"resolved,omitempty"`
+	ResolvedAt     string       `json:"resolved_at,omitempty"`
+	ResolvedByUID  string       `json:"resolved_by_user_id,omitempty"`
+	ResolvedByUser reviewUser   `json:"resolved_by_user,omitempty"`
 }
 
 // ---------- helpers ----------
@@ -188,7 +191,15 @@ func oid(id string) primitive.ObjectID {
 	return primitive.NilObjectID
 }
 
-// isoMS — millisecond-precision ISO (the vendor `ms` Date string shape).
+func bsonDToAny(d bson.D) map[string]any {
+	m := make(map[string]any, len(d))
+	for _, e := range d {
+		m[e.Key] = e.Value
+	}
+	return m
+}
+
+// isoMS — millisecond-precision ISO (JS Date JSON shape).
 func isoMS(ms int64) string {
 	return time.UnixMilli(ms).UTC().Format("2006-01-02T15:04:05.000Z")
 }
@@ -208,25 +219,33 @@ func uidOf(m map[string]any) string {
 			return s
 		}
 	}
-	if v, ok := m["id"]; ok {
+	if v, ok := m["author"]; ok {
 		if s, ok := v.(string); ok {
 			return s
 		}
+		if m2, ok := v.(map[string]any); ok {
+			return uidOf(m2)
+		}
 	}
 	return ""
+}
+
+func anyField(m map[string]any, key string) (string, bool) {
+	s, ok := m[key].(string)
+	return s, ok
 }
 
 func (h *Handlers) userShape(ctx context.Context, uid, self string) reviewUser {
 	u := reviewUser{ID: uid, IsSelf: uid == self, Hue: hue(uid)}
 	if h.UserFor != nil {
 		if raw := h.UserFor(ctx, uid); raw != nil {
-			if v, ok := raw["name"].(string); ok {
+			if v, ok := anyField(raw, "name"); ok {
 				u.Name = v
 			}
-			if v, ok := raw["email"].(string); ok {
+			if v, ok := anyField(raw, "email"); ok {
 				u.Email = v
 			}
-			if v, ok := raw["profile_picture_url"].(string); ok {
+			if v, ok := anyField(raw, "profile_picture_url"); ok {
 				u.AvatarText = v
 			}
 		}
@@ -234,15 +253,30 @@ func (h *Handlers) userShape(ctx context.Context, uid, self string) reviewUser {
 	return u
 }
 
+func (h *Handlers) authorOf(cxt *core.Cxt, uid string) map[string]any {
+	m := map[string]any{"user_id": uid}
+	if h.UserFor != nil {
+		if raw := h.UserFor(cxt.Req.Context(), uid); raw != nil {
+			for _, k := range []string{"name", "email"} {
+				if v, ok := anyField(raw, k); ok {
+					m[k] = v
+				}
+			}
+		}
+	}
+	return m
+}
+
 // ---------- store seam (collabhistory pattern) ----------
 
-func (h *Handlers) run(ctx context.Context, fn func(persistence.VersionedPersistence) error) error {
+func (h *Handlers) run(cxt *core.Cxt, fn func(context.Context, persistence.VersionedPersistence) error) error {
 	if h.Store != nil {
-		return fn(h.Store)
+		return fn(cxt.Req.Context(), h.Store)
 	}
 	if h.App == nil || h.App.Mongo == nil {
 		return errors.New("review: no store configured")
 	}
+	ctx := cxt.Req.Context()
 	db, err := h.App.Mongo.DB(ctx)
 	if err != nil {
 		return err
@@ -251,7 +285,7 @@ func (h *Handlers) run(ctx context.Context, fn func(persistence.VersionedPersist
 	if err != nil {
 		return err
 	}
-	return fn(st)
+	return fn(ctx, st)
 }
 
 // ---------- gate (collabhistory convention) ----------
@@ -278,19 +312,21 @@ func internal(res *core.Res) {
 	res.JSON(http.StatusInternalServerError, []byte(`{"message":"internal error"}`))
 }
 func forbidden(res *core.Res) { res.JSON(http.StatusForbidden, []byte(`{"message":"forbidden"}`)) }
+func okJSON(res *core.Res, code int, v any) {
+	b, _ := json.Marshal(v)
+	res.JSON(code, b)
+}
 
-func decodeJSON(r io.Reader, dst any) error {
+func decodeBody(r io.Reader, dst any) error {
 	return json.NewDecoder(io.LimitReader(r, 1<<20)).Decode(dst)
 }
 
 // ---------- threads ----------
 
-func (h *Handlers) threadEnvelope(ctx context.Context, pid, self string, st persistence.VersionedPersistence, th collab.Thread) threadOut {
+func (h *Handlers) threadRecord(ctx context.Context, pid, self string, st persistence.VersionedPersistence, th collab.Thread) threadRecord {
 	msgs, _ := collab.MessagesOfThread(ctx, st, pid, th.ID)
-	o := threadOut{
-		ID:       th.ID,
+	o := threadRecord{
 		Doc:      th.File,
-		State:    th.State,
 		Author:   h.userShape(ctx, uidOf(th.Author), self),
 		Created:  isoMS(th.Created),
 		Messages: make([]messageOut, 0, len(msgs)),
@@ -311,228 +347,118 @@ func (h *Handlers) threadEnvelope(ctx context.Context, pid, self string, st pers
 		if by == nil {
 			by = th.Author
 		}
-		o.ResInfo = &resolvedBy{
-			ResolvedAt:     isoMS(th.Resolved),
-			ResolvedByUID:  uidOf(by),
-			ResolvedByUser: h.userShape(ctx, uidOf(by), self),
-		}
+		o.ResolvedAt = isoMS(th.Resolved)
+		uidBy := uidOf(by)
+		o.ResolvedByUID = uidBy
+		o.ResolvedByUser = h.userShape(ctx, uidBy, self)
 	}
 	return o
 }
 
+// threadsList — GET /project/:pid/threads → Record<threadId, Thread> (the
+// panel `setData(data)` shape; threads-context.tsx `type Threads`).
 func (h *Handlers) threadsList(cxt *core.Cxt, res *core.Res) {
-	pid := cxt.Params["1"]
+	pid := strings.ToLower(cxt.Params["1"])
 	uid, ok := h.gate(cxt, res, pid, collab.ReadOnly)
 	if !ok {
 		return
 	}
-	var out []threadOut
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
-		ths, err := collab.ListThreads(cxt.Req.Context(), st, pid)
+	out := map[string]threadRecord{}
+	err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		ths, err := collab.ListThreads(ctx, st, pid)
 		if err != nil {
 			return err
 		}
-		out = make([]threadOut, 0, len(ths))
 		for _, th := range ths {
-			out = append(out, h.threadEnvelope(cxt.Req.Context(), pid, uid, st, th))
-		}
-		return nil
-	}); err != nil {
-		internal(res)
-		return
-	}
-	b, _ := json.Marshal(struct {
-		Threads []threadOut `json:"threads"`
-	}{out})
-	res.JSON(http.StatusOK, b)
-}
-
-func (h *Handlers) authorFrom(cxt *core.Cxt, uid string) map[string]any {
-	m := map[string]any{"user_id": uid}
-	if h.UserFor != nil {
-		if raw := h.UserFor(cxt.Req.Context(), uid); raw != nil {
-			for _, k := range []string{"name", "email"} {
-				if v, ok := raw[k].(string); ok {
-					m[k] = v
-				}
+			if th.ID == "" {
+				continue
 			}
-		}
-	}
-	return m
-}
-
-func (h *Handlers) threadCreate(cxt *core.Cxt, res *core.Res) {
-	pid := cxt.Params["1"]
-	uid, ok := h.gate(cxt, res, pid, collab.ReadWrite)
-	if !ok {
-		return
-	}
-	var body struct {
-		Content string           `json:"content"`
-		Doc     string           `json:"doc"`
-		DocID   string           `json:"doc_id"`
-		Ranges  []map[string]any `json:"ranges"`
-		Thread  string           `json:"thread_id"`
-	}
-	if err := decodeJSON(cxt.Req.Body, &body); err != nil {
-		badBody(res)
-		return
-	}
-	if strings.TrimSpace(body.Content) == "" {
-		badBody(res)
-		return
-	}
-	doc := body.Doc
-	if doc == "" {
-		doc = body.DocID
-	}
-	now := h.nowMS()
-	author := h.authorFrom(cxt, uid)
-	var created collab.Thread
-	var firstMessage collab.Comment
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
-		th, applied, _, err := collab.AddThread(cxt.Req.Context(), st, pid, collab.Thread{
-			ID: body.Thread, File: doc, State: collab.ThreadStateOpened, Author: author, Created: now,
-		})
-		if err != nil {
-			return err
-		}
-		created = th
-		if applied {
-			m, applied2, _, err := collab.AddComment(cxt.Req.Context(), st, pid, collab.Comment{
-				ThreadID: th.ID, File: doc, Text: body.Content, State: "opened",
-				Author: author, Ranges: body.Ranges, Created: now, Edited: now,
-			})
-			if err != nil {
-				return err
-			}
-			if applied2 {
-				firstMessage = m
-			}
+			out[th.ID] = h.threadRecord(ctx, pid, uid, st, th)
 		}
 		return nil
-	}); err != nil {
-		internal(res)
-		return
-	}
-	b, _ := json.Marshal(h.threadCreateOut(uid, created.ID, doc, now, created.State, firstMessage, author))
-	res.JSON(http.StatusCreated, b)
-}
-
-// threadCreateOut — the created-thread envelope (first message included; no
-// DB round-trip needed for the 201 body).
-func (h *Handlers) threadCreateOut(uid string, threadID, doc string, now int64, state string, first collab.Comment, author map[string]any) threadOut {
-	o := threadOut{
-		ID:       threadID,
-		Doc:      doc,
-		State:    state,
-		Author:   h.userShape(context.Background(), uidOf(author), uid),
-		Created:  isoMS(now),
-		Messages: make([]messageOut, 0, 1),
-	}
-	if first.ID != "" {
-		o.Messages = append(o.Messages, messageOut{
-			Content:   first.Text,
-			ID:        first.ID,
-			Timestamp: isoMS(first.Created),
-			User:      h.userShape(context.Background(), uidOf(author), uid),
-			UserID:    uidOf(author),
-		})
-	}
-	return o
-}
-
-// ---------- thread actions ----------
-
-func (h *Handlers) threadResolve(cxt *core.Cxt, res *core.Res) {
-	pid, threadID, action := cxt.Params["1"], cxt.Params["3"], cxt.Params["4"]
-	uid, ok := h.gate(cxt, res, pid, collab.ReadWrite)
-	if !ok {
-		return
-	}
-	state := collab.ThreadStateResolved
-	if action == "reopen" {
-		state = collab.ThreadStateOpened
-	}
-	var out threadOut
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
-		th, _, _, err := collab.SetThreadStateBy(cxt.Req.Context(), st, pid, threadID, state, h.authorFrom(cxt, uid))
-		if err != nil {
-			return err
-		}
-		out = h.threadEnvelope(cxt.Req.Context(), pid, uid, st, th)
-		return nil
-	}); err != nil {
-		if errors.Is(err, collab.ErrThreadNotFound) {
-			notFound(res)
-			return
-		}
-		internal(res)
-		return
-	}
-	b, _ := json.Marshal(out)
-	res.JSON(http.StatusOK, b)
-}
-
-func (h *Handlers) threadDelete(cxt *core.Cxt, res *core.Res) {
-	pid, threadID := cxt.Params["1"], cxt.Params["3"]
-	if _, ok := h.gate(cxt, res, pid, collab.ReadWrite); !ok {
-		return
-	}
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
-		_, _, err := collab.DeleteThread(cxt.Req.Context(), st, pid, threadID)
-		return err
-	}); err != nil {
-		internal(res)
-		return
-	}
-	res.JSON(http.StatusOK, []byte(`{}`))
-}
-
-// ---------- messages ----------
-
-func (h *Handlers) messageAdd(cxt *core.Cxt, res *core.Res) {
-	pid, threadID := cxt.Params["1"], cxt.Params["2"]
-	uid, ok := h.gate(cxt, res, pid, collab.ReadWrite)
-	if !ok {
-		return
-	}
-	var body struct {
-		Content string `json:"content"`
-		ID      string `json:"comment_id"`
-	}
-	if err := decodeJSON(cxt.Req.Body, &body); err != nil || strings.TrimSpace(body.Content) == "" {
-		badBody(res)
-		return
-	}
-	now := h.nowMS()
-	author := h.authorFrom(cxt, uid)
-	var out collab.Comment
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
-		m, applied, _, err := collab.AddComment(cxt.Req.Context(), st, pid, collab.Comment{
-			ID: body.ID, ThreadID: threadID, Text: body.Content, Author: author, Created: now, Edited: now,
-		})
-		if err != nil {
-			return err
-		}
-		if !applied {
-			return errors.New("review: message already exists")
-		}
-		out = m
-		return nil
-	}); err != nil {
-		internal(res)
-		return
-	}
-	b, _ := json.Marshal(messageOut{
-		Content: body.Content, ID: out.ID, Timestamp: isoMS(now),
-		User: h.userShape(cxt.Req.Context(), uid, uid), UserID: uid,
 	})
-	res.JSON(http.StatusCreated, b)
+	if err != nil {
+		internal(res)
+		return
+	}
+	okJSON(res, http.StatusOK, out)
 }
 
+// messageAdd — POST /project/:pid/thread/:threadId/messages.
+// Panel addComment/addMessage: body {content, id?, doc?}. The FIRST message
+// for a thread creates the thread (the panel generates the thread id via
+// RangesTracker.generateId and posts the message directly).
+func (h *Handlers) messageAdd(cxt *core.Cxt, res *core.Res) {
+	pid := strings.ToLower(cxt.Params["1"])
+	threadID := cxt.Params["2"]
+	uid, ok := h.gate(cxt, res, pid, collab.ReadWrite)
+	if !ok {
+		return
+	}
+	var body struct {
+		Content string `json:"content"`
+		ID      string `json:"id"`
+		Doc     string `json:"doc"`
+	}
+	if err := decodeBody(cxt.Req.Body, &body); err != nil || strings.TrimSpace(body.Content) == "" {
+		badBody(res)
+		return
+	}
+	now := h.nowMS()
+	author := h.authorOf(cxt, uid)
+	var rec threadRecord
+	var created bool
+	err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		ths, lerr := collab.ListThreads(ctx, st, pid)
+		if lerr != nil {
+			return lerr
+		}
+		var th *collab.Thread
+		for i := range ths {
+			if ths[i].ID == threadID {
+				th = &ths[i]
+				break
+			}
+		}
+		if th == nil {
+			nt, _, _, aerr := collab.AddThread(ctx, st, pid, collab.Thread{
+				ID: threadID, File: body.Doc, State: collab.ThreadStateOpened,
+				Author: author, Created: now,
+			})
+			if aerr != nil {
+				return aerr
+			}
+			th = &nt
+			created = true
+		}
+		file := th.File
+		if file == "" {
+			file = body.Doc
+		}
+		_, _, _, merr := collab.AddComment(ctx, st, pid, collab.Comment{
+			ID: body.ID, ThreadID: threadID, File: file, Text: body.Content,
+			State: "opened", Author: author, Created: now, Edited: now,
+		})
+		if merr != nil {
+			if created {
+				return errors.New("message failed after thread creation: " + merr.Error())
+			}
+			return merr
+		}
+		rec = h.threadRecord(ctx, pid, uid, st, *th)
+		return nil
+	})
+	if err != nil {
+		internal(res)
+		return
+	}
+	okJSON(res, http.StatusCreated, rec)
+}
+
+// messageEdit — POST /project/:pid/thread/:threadId/messages/:cid/edit.
 func (h *Handlers) messageEdit(cxt *core.Cxt, res *core.Res) {
-	pid, threadID, cid := cxt.Params["1"], cxt.Params["2"], cxt.Params["3"]
+	pid := strings.ToLower(cxt.Params["1"])
+	threadID, cid := cxt.Params["2"], cxt.Params["3"]
 	uid, ok := h.gate(cxt, res, pid, collab.ReadWrite)
 	if !ok {
 		return
@@ -540,13 +466,13 @@ func (h *Handlers) messageEdit(cxt *core.Cxt, res *core.Res) {
 	var body struct {
 		Content string `json:"content"`
 	}
-	if err := decodeJSON(cxt.Req.Body, &body); err != nil || strings.TrimSpace(body.Content) == "" {
+	if err := decodeBody(cxt.Req.Body, &body); err != nil || strings.TrimSpace(body.Content) == "" {
 		badBody(res)
 		return
 	}
 	var out collab.Comment
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
-		msgs, err := collab.MessagesOfThread(cxt.Req.Context(), st, pid, threadID)
+	err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		msgs, err := collab.MessagesOfThread(ctx, st, pid, threadID)
 		if err != nil {
 			return err
 		}
@@ -560,53 +486,56 @@ func (h *Handlers) messageEdit(cxt *core.Cxt, res *core.Res) {
 		if !found {
 			return collab.ErrCommentNotFound
 		}
-		m, _, _, err := collab.EditCommentText(cxt.Req.Context(), st, pid, cid, body.Content)
+		m, _, _, err := collab.EditCommentText(ctx, st, pid, cid, body.Content)
 		if err != nil {
 			return err
 		}
 		out = m
 		return nil
-	}); err != nil {
-		if errors.Is(err, collab.ErrCommentNotFound) {
+	})
+	if err != nil {
+		if errors.Is(err, collab.ErrCommentNotFound) || errors.Is(err, collab.ErrThreadNotFound) {
 			notFound(res)
 			return
 		}
 		internal(res)
 		return
 	}
-	b, _ := json.Marshal(messageOut{
+	okJSON(res, http.StatusOK, messageOut{
 		Content: body.Content, ID: out.ID, Timestamp: isoMS(out.Edited),
 		User: h.userShape(cxt.Req.Context(), uidOf(out.Author), uid), UserID: uidOf(out.Author),
 	})
-	res.JSON(http.StatusOK, b)
 }
 
 func (h *Handlers) messageDelete(cxt *core.Cxt, res *core.Res) {
-	pid, cid := cxt.Params["1"], cxt.Params["3"]
+	pid := strings.ToLower(cxt.Params["1"])
+	_ = cxt.Params["2"]
+	cid := cxt.Params["3"]
 	if _, ok := h.gate(cxt, res, pid, collab.ReadWrite); !ok {
 		return
 	}
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
-		_, _, err := collab.DeleteComment(cxt.Req.Context(), st, pid, cid)
+	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		_, _, err := collab.DeleteComment(ctx, st, pid, cid)
 		return err
 	}); err != nil {
 		internal(res)
 		return
 	}
-	res.JSON(http.StatusOK, []byte(`{}`))
+	okJSON(res, http.StatusOK, map[string]any{})
 }
 
-// ownMessageDelete — the panel's own-message rule: only the message author
-// (or a write-role user) may delete via /own-messages/.
+// ownMessageDelete — panel's own-message rule: only the author may use the
+// own-message route (others use the plain messages route at write role).
 func (h *Handlers) ownMessageDelete(cxt *core.Cxt, res *core.Res) {
-	pid, cid := cxt.Params["1"], cxt.Params["3"]
+	pid := strings.ToLower(cxt.Params["1"])
+	threadID, cid := cxt.Params["2"], cxt.Params["3"]
 	uid, ok := h.gate(cxt, res, pid, collab.ReadWrite)
 	if !ok {
 		return
 	}
 	owner := ""
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
-		msgs, err := collab.MessagesOfThread(cxt.Req.Context(), st, pid, cxt.Params["2"])
+	err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		msgs, err := collab.MessagesOfThread(ctx, st, pid, threadID)
 		if err != nil {
 			return err
 		}
@@ -617,46 +546,208 @@ func (h *Handlers) ownMessageDelete(cxt *core.Cxt, res *core.Res) {
 			}
 		}
 		return collab.ErrCommentNotFound
-	}); err != nil {
-		if errors.Is(err, collab.ErrCommentNotFound) {
+	})
+	if err != nil {
+		if errors.Is(err, collab.ErrCommentNotFound) || errors.Is(err, collab.ErrThreadNotFound) {
 			notFound(res)
 			return
 		}
 		internal(res)
 		return
 	}
-	if owner != uid {
+	if owner != "" && owner != uid {
 		forbidden(res)
 		return
 	}
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
-		_, _, err := collab.DeleteComment(cxt.Req.Context(), st, pid, cid)
+	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		_, _, err := collab.DeleteComment(ctx, st, pid, cid)
 		return err
 	}); err != nil {
 		internal(res)
 		return
 	}
-	res.JSON(http.StatusOK, []byte(`{}`))
+	okJSON(res, http.StatusOK, map[string]any{})
+}
+
+// threadResolve — POST .../doc/:doc/thread/:id/resolve | /reopen (200 = the
+// updated thread record, the pinned shape).
+func (h *Handlers) threadResolve(cxt *core.Cxt, res *core.Res) {
+	pid := strings.ToLower(cxt.Params["1"])
+	threadID := cxt.Params["3"]
+	action := cxt.Params["4"]
+	uid, ok := h.gate(cxt, res, pid, collab.ReadWrite)
+	if !ok {
+		return
+	}
+	state := collab.ThreadStateResolved
+	if action == "reopen" {
+		state = collab.ThreadStateOpened
+	}
+	var rec threadRecord
+	err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		th, _, _, err := collab.SetThreadStateBy(ctx, st, pid, threadID, state, h.authorOf(cxt, uid))
+		if err != nil {
+			return err
+		}
+		rec = h.threadRecord(ctx, pid, uid, st, th)
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, collab.ErrThreadNotFound) {
+			notFound(res)
+			return
+		}
+		internal(res)
+		return
+	}
+	okJSON(res, http.StatusOK, rec)
+}
+
+func (h *Handlers) threadDelete(cxt *core.Cxt, res *core.Res) {
+	pid := strings.ToLower(cxt.Params["1"])
+	threadID := cxt.Params["3"]
+	if _, ok := h.gate(cxt, res, pid, collab.ReadWrite); !ok {
+		return
+	}
+	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		_, _, err := collab.DeleteThread(ctx, st, pid, threadID)
+		return err
+	}); err != nil {
+		internal(res)
+		return
+	}
+	okJSON(res, http.StatusOK, map[string]any{})
 }
 
 // ---------- track changes ----------
 
+// trackChanges — POST /project/:pid/track_changes with the panel body
+// {on_for?, on_for_guests?} (track-changes-state-context.ts). Normalizes to
+// the explicit map (Node parity: project.track_changes → editor
+// trackChangesState) and persists the whole map on the project.
+func (h *Handlers) trackChanges(cxt *core.Cxt, res *core.Res) {
+	pid := strings.ToLower(cxt.Params["1"])
+	if _, ok := h.gate(cxt, res, pid, collab.ReadOnly); !ok {
+		return
+	}
+	var body struct {
+		OnFor       map[string]json.RawMessage `json:"on_for"`
+		OnForGuests *bool                      `json:"on_for_guests"`
+	}
+	ctx := cxt.Req.Context()
+	m := map[string]bool{}
+	if h.TrackStateFor != nil {
+		if cur, err := h.TrackStateFor(ctx, pid); err == nil {
+			m = cur
+		}
+	}
+	touched := false
+	if err := decodeBody(cxt.Req.Body, &body); err == nil {
+		for uid, raw := range body.OnFor {
+			var b bool
+			if json.Unmarshal(raw, &b) == nil {
+				m[uid] = b
+				touched = true
+			}
+		}
+		if body.OnForGuests != nil {
+			m["__guests__"] = *body.OnForGuests
+			touched = true
+		}
+	}
+	if touched && h.TrackStateSet != nil {
+		if err := h.TrackStateSet(ctx, pid, m); err != nil {
+			internal(res)
+			return
+		}
+	}
+	okJSON(res, http.StatusOK, struct {
+		ProjectID    string          `json:"project_id"`
+		TrackChanges map[string]bool `json:"track_changes"`
+	}{pid, m})
+}
+
+// ---------- changes ----------
+
+// changesCreate — POST /project/:pid/doc/:doc/changes. Server-assisted
+// change creation (D40-d5: editor-side creation is pending; the panel flow
+// for CURRENT-doc changes is client-transaction + REST state-sync per the
+// D40 block note — this route serves the deterministic server path, e2e, and
+// the pre-editor-integration flow). Body {content?, start, end?, kind?,
+// change_id?}: non-empty content → insert; else delete.
+func (h *Handlers) changesCreate(cxt *core.Cxt, res *core.Res) {
+	pid := strings.ToLower(cxt.Params["1"])
+	doc := cxt.Params["2"]
+	uid, ok := h.gate(cxt, res, pid, collab.ReadWrite)
+	if !ok {
+		return
+	}
+	var body struct {
+		Content  string `json:"content"`
+		Start    int    `json:"start"`
+		End      int    `json:"end"`
+		Kind     string `json:"kind"`
+		ChangeID string `json:"change_id"`
+	}
+	if err := decodeBody(cxt.Req.Body, &body); err != nil {
+		badBody(res)
+		return
+	}
+	if body.End < body.Start {
+		body.End = body.Start
+	}
+	kind := body.Kind
+	if kind == "" {
+		if strings.TrimSpace(body.Content) != "" {
+			kind = collab.ChangeKindInsert
+		} else {
+			kind = collab.ChangeKindDelete
+		}
+	}
+	now := h.nowMS()
+	var out collab.TrackedChange
+	err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		ch, _, _, err := collab.AddChange(ctx, st, pid, collab.TrackedChange{
+			ID: body.ChangeID, Kind: kind, File: doc,
+			Start: body.Start, End: body.End, Content: body.Content,
+			Author: h.authorOf(cxt, uid), Created: now, State: collab.ChangeStatePending,
+		})
+		if err != nil {
+			return err
+		}
+		out = ch
+		return nil
+	})
+	if err != nil {
+		internal(res)
+		return
+	}
+	okJSON(res, http.StatusCreated, map[string]any{
+		"change_id": out.ID,
+		"kind":      out.Kind,
+		"start":     out.Start,
+		"end":       out.End,
+		"content":   out.Content,
+		"state":     out.State,
+	})
+}
+
 func (h *Handlers) changesAccept(cxt *core.Cxt, res *core.Res) {
-	pid := cxt.Params["1"]
+	pid := strings.ToLower(cxt.Params["1"])
 	if _, ok := h.gate(cxt, res, pid, collab.ReadWrite); !ok {
 		return
 	}
 	var body struct {
 		ChangeIDs []string `json:"change_ids"`
 	}
-	if err := decodeJSON(cxt.Req.Body, &body); err != nil || len(body.ChangeIDs) == 0 {
+	if err := decodeBody(cxt.Req.Body, &body); err != nil || len(body.ChangeIDs) == 0 {
 		badBody(res)
 		return
 	}
 	accepted := 0
-	if err := h.run(cxt.Req.Context(), func(st persistence.VersionedPersistence) error {
+	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
 		for _, id := range body.ChangeIDs {
-			if _, applied, _, err := collab.AcceptChange(cxt.Req.Context(), st, pid, id); err == nil && applied {
+			if _, applied, _, err := collab.AcceptChange(ctx, st, pid, id); err == nil && applied {
 				accepted++
 			}
 		}
@@ -665,77 +756,57 @@ func (h *Handlers) changesAccept(cxt *core.Cxt, res *core.Res) {
 		internal(res)
 		return
 	}
-	b, _ := json.Marshal(struct {
+	okJSON(res, http.StatusOK, struct {
 		ProjectID string `json:"project_id"`
 		Accepted  int    `json:"accepted"`
 	}{pid, accepted})
-	res.JSON(http.StatusOK, b)
 }
 
-func (h *Handlers) trackChanges(cxt *core.Cxt, res *core.Res) {
-	pid := cxt.Params["1"]
-	uid, ok := h.gate(cxt, res, pid, collab.ReadOnly)
-	if !ok {
-		return
-	}
-	var body struct {
-		Enabled *bool `json:"enabled"`
-	}
-	if err := decodeJSON(cxt.Req.Body, &body); err == nil && body.Enabled != nil && h.SetTrackFor != nil {
-		if err := h.SetTrackFor(cxt.Req.Context(), uid, *body.Enabled); err != nil {
-			internal(res)
-			return
-		}
-	}
-	val := true
-	if h.TrackFor != nil {
-		v, err := h.TrackFor(cxt.Req.Context(), uid)
-		if err == nil {
-			val = v
-		}
-	}
-	b, _ := json.Marshal(struct {
-		Enabled bool `json:"enabled"`
-	}{val})
-	res.JSON(http.StatusOK, b)
-}
+// ---------- production seam: track-changes map on the projects doc ----------
 
-// ---------- production track-changes persistence (users doc) ----------
-
-func prodTrack(a *core.App) (TrackFor, SetTrackFor) {
-	tr := func(ctx context.Context, uid string) (bool, error) {
+func prodTrack(a *core.App) (TrackStateFor, TrackStateSet) {
+	trFn := func(ctx context.Context, pid string) (map[string]bool, error) {
 		db, err := a.Mongo.DB(ctx)
 		if err != nil {
-			return true, err
+			return nil, err
 		}
 		var doc struct {
-			Settings bson.M `bson:"settings"`
+			TrackChanges any `bson:"track_changes"`
 		}
-		err = db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid(uid)}}).Decode(&doc)
+		err = db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid(pid)}}).Decode(&doc)
 		if err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
-				return true, nil // default ON (panel default)
+				return map[string]bool{}, nil
 			}
-			return true, err
+			return nil, err
 		}
-		if v, ok := doc.Settings["track_changes"]; ok {
-			if b, ok := v.(bool); ok {
-				return b, nil
+		m := map[string]bool{}
+		switch v := doc.TrackChanges.(type) {
+		case map[string]any:
+			for k, av := range v {
+				if b, ok := av.(bool); ok {
+					m[k] = b
+				}
+			}
+		case bool:
+			if v {
+				m["__all__"] = true
 			}
 		}
-		return true, nil
+		return m, nil
 	}
-	set := func(ctx context.Context, uid string, enabled bool) error {
+	setFn := func(ctx context.Context, pid string, m map[string]bool) error {
 		db, err := a.Mongo.DB(ctx)
 		if err != nil {
 			return err
 		}
-		_, err = db.Collection("users").UpdateOne(ctx,
-			bson.D{{Key: "_id", Value: oid(uid)}},
-			bson.D{{Key: "$set", Value: bson.D{{Key: "settings.track_changes", Value: enabled}}}})
+		bm := map[string]bool(m)
+		_, err = db.Collection("projects").UpdateOne(ctx,
+			bson.D{{Key: "_id", Value: oid(pid)}},
+			bson.D{{Key: "$set", Value: bson.D{{Key: "track_changes", Value: bm}}}})
 		return err
 	}
-	return tr, set
+	return trFn, setFn
 }
 
 type webMongo struct{ db *mongo.Database }
@@ -759,6 +830,7 @@ func (w webMongo) ProjectByID(ctx context.Context, id string) (bson.D, error) {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, nil
 		}
+		return nil, err
 	}
-	return d, err
+	return d, nil
 }
