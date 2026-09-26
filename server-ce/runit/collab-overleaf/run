@@ -21,6 +21,9 @@ export COLLAB_LISTEN=127.0.0.1:3450
 # REDIS_HOST/PORT/PASS. Retention knobs resolve config-DB → env →
 # default via the shared configres contract (D23). COLLAB_ALLOWED_ORIGINS
 # is left UNSET on purpose: ygo then enforces its default same-origin
-# check (Origin host == HTTP Host), which the same-origin nginx pass
-# (Host forwarded as $host) satisfies exactly.
+# check (Origin host == HTTP Host). D36: that check compares against the
+# request Host, so the nginx /collab pass MUST forward the raw Host header
+# WITH port — overleaf.conf.template uses `proxy_set_header Host $http_host`
+# (the `$host` variable strips the request port and broke every browser WS
+# handshake with a 403).
 exec /sbin/setuser www-data /usr/local/bin/go-services/collab >> /var/log/overleaf/collab.log 2>&1
