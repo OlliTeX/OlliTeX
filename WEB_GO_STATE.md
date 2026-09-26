@@ -966,10 +966,15 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     `trackedChangesCapture` in `source-editor/extensions/realtime.ts`
     (gated on track_changes_as; skips remote mirrors via
     Transaction.userEvent 'input.remote'; best-effort fetch — failure
-    never blocks typing). Gates: tsc 586=586 (0 new); CollabYjs vitest
-    19/19; services/web vitest failure set IDENTICAL with/without the
-    slice (stash A/B — 0 regressions; the 123 FAIL lines are the pinned
-    pre-existing local-env alias failures).
+    never blocks typing). **Live-verified on the baked image
+    (b362f8e5a7)**: R6b typed-edit → change records visible on the d10
+    read path. **Granularity pin (OT parity)**: per-keystroke records
+    (each local CM txn span = one record; e2e asserts lossless coverage,
+    not merged records — grouping is panel-UX, not the d5 surface).
+    Gates: tsc 586=586 (0 new); CollabYjs vitest 19/19; services/web
+    vitest failure set IDENTICAL with/without the slice (stash A/B — 0
+    regressions; the 123 FAIL lines are the pinned pre-existing
+    local-env alias failures).
   - **P2 REMAINING** = panel Changes-tab re-wire to the d10 read path (the
     panel currently reads changes from the dead OT historyOT snapshot —
     the d5/d8 superseded source; slice after live capture verification).

@@ -284,14 +284,21 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
   await page.keyboard.type(typed)
   await page.waitForTimeout(1500)
   const listCap = await apiJSON(page, 'GET', `/project/${pid}/doc/${doc}/changes`)
-  expect(listCap.status).toBe(200)
-  const cap = (listCap.json as any[]).find((x) => x.content === typed)
-  expect(
-    cap,
-    'd11: typed edit captured while track-changes on (list=' +
-      JSON.stringify((listCap.json as any[])?.map((x) => x?.content)) +
-      ')',
-  ).toBeTruthy()
+	 expect(listCap.status).toBe(200)
+	 // OT-parity granularity: each kept stroke is its own change record —
+	 // assert LOSSLESS coverage of the typed text (inserts, list order =
+	 // creation order), not a single merged record (grouping is a panel-UX
+	 // concern, not the d5 surface contract).
+	 const capturedInserts = (listCap.json as any[])
+		.filter((x) => x.kind === 'insert' && typeof x.content === 'string')
+		.map((x) => x.content)
+		.join('')
+	 expect(
+		capturedInserts.includes(`d40-capture-${stamp}`),
+		'd11: typed edit captured while track-changes on (inserts=' +
+			JSON.stringify(capturedInserts.slice(0, 200)) +
+			')',
+	).toBeTruthy()
 
   // R7: own-message rule — the session author can delete via the own route
   // (the 403 foreign-author branch is hermetically pinned in the Go suite
