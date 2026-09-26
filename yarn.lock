@@ -6961,50 +6961,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@overleaf/real-time@workspace:services/real-time":
-  version: 0.0.0-use.local
-  resolution: "@overleaf/real-time@workspace:services/real-time"
-  dependencies:
-    "@overleaf/fetch-utils": "workspace:*"
-    "@overleaf/logger": "workspace:*"
-    "@overleaf/metrics": "workspace:*"
-    "@overleaf/o-error": "workspace:*"
-    "@overleaf/promise-utils": "workspace:*"
-    "@overleaf/redis-wrapper": "workspace:*"
-    "@overleaf/settings": "workspace:*"
-    "@overleaf/validation-tools": "workspace:*"
-    "@types/node": "npm:^24.5.2"
-    async: "npm:^3.2.5"
-    base64id: "npm:0.1.0"
-    bunyan: "npm:^1.8.15"
-    chai: "npm:^4.3.6"
-    chai-as-promised: "npm:^7.1.1"
-    connect-redis: "npm:^6.1.3"
-    cookie-parser: "npm:^1.4.6"
-    cookie-signature: "npm:^1.1.0"
-    eslint: "npm:^10.4.0"
-    express: "npm:4.22.1"
-    express-session: "npm:^1.17.1"
-    lodash: "npm:^4.18.1"
-    mocha: "npm:^11.1.0"
-    mocha-junit-reporter: "npm:^2.2.1"
-    mocha-multi-reporters: "npm:^1.5.1"
-    overleaf-editor-core: "workspace:*"
-    proxy-addr: "npm:^2.0.7"
-    sinon: "npm:^9.2.4"
-    sinon-chai: "npm:3.7.0"
-    socket.io: "github:overleaf/socket.io#0.9.19-overleaf-12"
-    socket.io-client: "https://github.com/overleaf/socket.io-client/archive/refs/tags/0.9.17-overleaf-6.tar.gz"
-    timekeeper: "npm:0.0.4"
-    typescript: "npm:^5.0.4"
-    uid-safe: "npm:^2.1.5"
-    vitest: "npm:4.1.5"
-    ws: "npm:^8.21.0"
-    zod: "npm:^4.0.0"
-    zod-validation-error: "npm:^4.0.1"
-  languageName: unknown
-  linkType: soft
-
 "@overleaf/redis-wrapper@workspace:*, @overleaf/redis-wrapper@workspace:libraries/redis-wrapper":
   version: 0.0.0-use.local
   resolution: "@overleaf/redis-wrapper@workspace:libraries/redis-wrapper"
@@ -13979,13 +13935,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"base64id@npm:0.1.0":
-  version: 0.1.0
-  resolution: "base64id@npm:0.1.0"
-  checksum: 10c0/26f8551a0af51737ae3570cdda02b36cf33683fb85f759c62278535e044027462971fbd74efb57f52604f6ddf7d3168c4d4833807bacfee5628664d820c63d23
-  languageName: node
-  linkType: hard
-
 "base64url@npm:3.x.x":
   version: 3.0.1
   resolution: "base64url@npm:3.0.1"
@@ -15596,7 +15545,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cookie-signature@npm:^1.1.0, cookie-signature@npm:^1.2.1":
+"cookie-signature@npm:^1.2.1":
   version: 1.2.2
   resolution: "cookie-signature@npm:1.2.2"
   checksum: 10c0/54e05df1a293b3ce81589b27dddc445f462f6fa6812147c033350cd3561a42bc14481674e05ed14c7bd0ce1e8bb3dc0e40851bad75415733711294ddce0b7bc6
@@ -26893,13 +26842,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"policyfile@npm:0.0.4":
-  version: 0.0.4
-  resolution: "policyfile@npm:0.0.4"
-  checksum: 10c0/cebf04e1630973f12b4e5d52596f2c49265852628779d62e63506e37bbbbc7d5f579f152bf441ef4f6589d8d3dd6c0af5ef8509581dcdaf50cb5828aae39ceb7
-  languageName: node
-  linkType: hard
-
 "possible-typed-array-names@npm:^1.0.0":
   version: 1.1.0
   resolution: "possible-typed-array-names@npm:1.1.0"
@@ -27726,7 +27668,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"proxy-addr@npm:^2.0.7, proxy-addr@npm:~2.0.7":
+"proxy-addr@npm:~2.0.7":
   version: 2.0.7
   resolution: "proxy-addr@npm:2.0.7"
   dependencies:
@@ -28610,13 +28552,6 @@ __metadata:
   dependencies:
     redis-errors: "npm:^1.0.0"
   checksum: 10c0/ee16ac4c7b2a60b1f42a2cdaee22b005bd4453eb2d0588b8a4939718997ae269da717434da5d570fe0b05030466eeb3f902a58cf2e8e1ca058bf6c9c596f632f
-  languageName: node
-  linkType: hard
-
-"redis@npm:0.7.3":
-  version: 0.7.3
-  resolution: "redis@npm:0.7.3"
-  checksum: 10c0/d454fb39bd88cb70bb01f54a1c15853f98850b21f116984a6f4a7a16d9b5a73e984681ad569707e30f1651472fb66b6a659a1d97ae9900b5cb789ac678bbf5af
   languageName: node
   linkType: hard
 
@@ -30077,7 +30012,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"sinon-chai@npm:3.7.0, sinon-chai@npm:^3.7.0":
+"sinon-chai@npm:^3.7.0":
   version: 3.7.0
   resolution: "sinon-chai@npm:3.7.0"
   peerDependencies:
@@ -30207,27 +30142,6 @@ __metadata:
   version: 1.6.1
   resolution: "smol-toml@npm:1.6.1"
   checksum: 10c0/511a78722f99c7616fdb46af708de3d7e81434b5a3d58061166da73f28bfc6cae4f0cd04683f60515b9c490cd10152fce72287c960b337419c0299cc1f0f2a22
-  languageName: node
-  linkType: hard
-
-"socket.io-client@https://github.com/overleaf/socket.io-client/archive/refs/tags/0.9.17-overleaf-6.tar.gz":
-  version: 0.9.17-overleaf-6
-  resolution: "socket.io-client@https://github.com/overleaf/socket.io-client/archive/refs/tags/0.9.17-overleaf-6.tar.gz"
-  checksum: 10c0/d2178a6922872c4aac7987be9ba7036eb1911ff6a0a156dd274b49fc2a3f52c0b812b9f1a485bb69b74ce492a4ab636dc2e458517df39c2f818a8b29b79f88fa
-  languageName: node
-  linkType: hard
-
-"socket.io@github:overleaf/socket.io#0.9.19-overleaf-12":
-  version: 0.9.19-overleaf-12
-  resolution: "socket.io@https://github.com/overleaf/socket.io.git#commit=7814a16800a7accb646bd34ed0995cd474fb82f6"
-  dependencies:
-    base64id: "npm:0.1.0"
-    policyfile: "npm:0.0.4"
-    redis: "npm:0.7.3"
-  dependenciesMeta:
-    redis:
-      optional: true
-  checksum: 10c0/feead8399e46de39eddddfbc08180d43cc62ba8c2bd9bff648292f514f0bcfc3fac0c5bb0e818faad25d13279f0486ab19e936b336614369b1c8ce22849a9325
   languageName: node
   linkType: hard
 
@@ -31747,13 +31661,6 @@ __metadata:
   version: 2.0.0
   resolution: "tildify@npm:2.0.0"
   checksum: 10c0/57961810a6915f47bdba7da7fa66a5f12597a0495fa016785de197b02e7ba9994ffebb30569294061bbf6d9395c6b1319d830076221e5a3f49f1318bc749565c
-  languageName: node
-  linkType: hard
-
-"timekeeper@npm:0.0.4":
-  version: 0.0.4
-  resolution: "timekeeper@npm:0.0.4"
-  checksum: 10c0/902dfe2b633c827a2e3cb4ed2c0e383108b2a10a998467c30605c29ae36fb4d3ad573e3a4ca4c7bf5d682f402efc38408704550d54e9224aa1028be1dbb929ba
   languageName: node
   linkType: hard
 
@@ -33889,21 +33796,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ws@npm:*, ws@npm:^8.18.0, ws@npm:^8.18.3, ws@npm:^8.21.0, ws@npm:^8.5.0":
-  version: 8.21.0
-  resolution: "ws@npm:8.21.0"
-  peerDependencies:
-    bufferutil: ^4.0.1
-    utf-8-validate: ">=5.0.2"
-  peerDependenciesMeta:
-    bufferutil:
-      optional: true
-    utf-8-validate:
-      optional: true
-  checksum: 10c0/ef4a243476283fc49bc7550966c4af4aa0eef56273837211e700de3b664e08604a760cdddcb5ba43c049140e74ccfec5b0ee0bb439e08c2adf9138902fdde5f9
-  languageName: node
-  linkType: hard
-
 "ws@npm:^7.0.0":
   version: 7.5.13
   resolution: "ws@npm:7.5.13"
@@ -33916,6 +33808,21 @@ __metadata:
     utf-8-validate:
       optional: true
   checksum: 10c0/e223726bbda5768ed58ec9252d04eda7018ef380ea122bb94e595a4d7a02b5baeb423933936576fddb8fa51b642375f7ae814bf0f6f5d9a3ce290566578a8c5a
+  languageName: node
+  linkType: hard
+
+"ws@npm:^8.18.0, ws@npm:^8.18.3, ws@npm:^8.5.0":
+  version: 8.21.0
+  resolution: "ws@npm:8.21.0"
+  peerDependencies:
+    bufferutil: ^4.0.1
+    utf-8-validate: ">=5.0.2"
+  peerDependenciesMeta:
+    bufferutil:
+      optional: true
+    utf-8-validate:
+      optional: true
+  checksum: 10c0/ef4a243476283fc49bc7550966c4af4aa0eef56273837211e700de3b664e08604a760cdddcb5ba43c049140e74ccfec5b0ee0bb439e08c2adf9138902fdde5f9
   languageName: node
   linkType: hard
 

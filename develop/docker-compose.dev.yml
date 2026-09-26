@@ -52,15 +52,11 @@ services:
       - ../services/project-history/config:/overleaf/services/project-history/config
 
   real-time:
-    command: ["node", "--watch", "app.js"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9237:9229"
-    volumes:
-      - ../services/real-time/app:/overleaf/services/real-time/app
-      - ../services/real-time/app.js:/overleaf/services/real-time/app.js
-      - ../services/real-time/config:/overleaf/services/real-time/config
+    # D28a: Go bus — static binary, no hot-mounts. After changing
+    # go/services/realtime (or cmd/realtime): (cd server-ce && make all)
+    # then `docker compose -f docker-compose.yml -f docker-compose.dev.yml
+    # up -d real-time`.
+    command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/realtime"]
 
   web:
     command: ["node", "--watch", "app.mjs", "--watch-locales"]

@@ -219,7 +219,6 @@
     "services/idp",
     "services/latexqc",
     "services/project-history",
-    "services/real-time",
     "services/templates",
     "services/third-party-datastore",
     "services/third-party-references",
