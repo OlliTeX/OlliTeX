@@ -908,9 +908,43 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     toggle-track-changes) with listener-pinned payloads; `Handlers.Emit`
     seam + `config.RealtimeURL` (REALTIME_HOST||127.0.0.1 :3026);
     best-effort (emit failure logs, never 5xx — Node parity).
-  - **P2 REMAINING = live e2e** (Playwright spec: create thread via panel →
-    reply → resolve/reopen → track-changes toggle → change accept), then
-    editor-side tracked-change creation (the D40-d5 pending piece).
+  - **d8 (2026-09-26, e2e root cause #1 — ROUTE ORDER)**: the legacy P6.12
+    `features/trackchanges` (Node-module shadow proxying chat :3010 / DU :3003 —
+    the dead OT pipeline) registers the SAME 11 panel routes and was registered
+    FIRST (main.go) → first-match dispatch let it swallow every D40 route; its
+    pinned-downstream-failure path renders the HTML 500 page (the exact symptom:
+    500 + `general/500` body + NO Go log line; GET /threads "passing" was the
+    legacy reader, not review). **Decision**: `review.Feature(app)` now registers
+    BEFORE `trackchanges.Feature(app)` — review owns all 11 overlapping routes
+    (the D40/d5 panel contract is the shipping contract); legacy keeps only the
+    non-overlapping `/ranges` + `/changes/users` fallbacks. Evidence of the
+    pre-existing flip-gate drift (NOT a D40 regression): `web-go-p614-flip`
+    (notifications, zero D40 surface) fails the same "Go :4010 never came up"
+    harness leg — the whole flip-gate family probes the pre-P7 shadow port +
+    Node-web baseline legs (retired by D1/P7), so it is stale machinery, not a
+    live contract. The legacy flip specs for track-changes (web-go-p612-flip)
+    are superseded both mechanically (:4010) and contractually (D40 d5/d8):
+    retiring/rewriting the 53-spec flip family is a separate housekeeping arc,
+    not part of the D40 green slice.
+  - **d9 (2026-09-26, e2e root cause #2 — primitive.D)**: mongo-driver decodes
+    an `any`-typed struct field holding a BSON document as **`primitive.D`**
+    (not `map[string]any`) — `prodTrack`'s read switch missed it → the
+    `track_changes` merge silently dropped the stored map on every write after
+    the first (live mongo showed `{merge_probe:true}` only after the first call
+    stored `{e2e_probe_user,__guests__}`). Fixed: switch now handles
+    `primitive.D` / `primitive.M` / `map[string]any` / `bool`. (Same driver
+    quirk applies to every `any` struct-field decode in this tree — audit
+    others on suspicion.)
+  - **P2 GREEN (2026-09-26)**: `review-panel.test.e2e.ts` (R1 boot record-GET,
+    R2 first-message thread create 201, R3 reply, R4 resolve/reopen w/ actor,
+    R5 change create + bulk-accept idempotency, R6 on_for/on_for_guests
+    persist+MERGE, R7 own-message authorship) PASSED live (43s); `collab-yjs`
+    PASSED (no D25 placeholder + record GET). Go green-slice: gofmt/vet/build
+    clean; `go test -race` green across `go/services/web/...` + `cmd/web/...`.
+    Diagnostic hardening kept: `internalErr` logs `review: 500: <err>` on
+    stderr (500s must be diagnosable live).
+  - **P2 REMAINING** = editor-side tracked-change creation (the D40-d5 pending
+    piece).
   **P3** relative-position anchoring + concurrent-lifecycle races. **P4** legacy OT
   comments/tracked-changes backfill at first Y-join.
 - **P2 contract (PINNED from the in-git panel — do not invent; `frontend/js/features/review-panel/`):**

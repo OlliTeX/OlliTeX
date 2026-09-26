@@ -213,6 +213,15 @@ func main() {
 	// (DROPBOX_ENABLED=true in the e2e env; authz via the shared P4 chain).
 	app.RegisterFeature(dropbox.Feature(app))
 
+	// D40 (owner CRITICAL): Y.Doc-native comments / tracked-changes. The
+	// review feature implements the panel-exact REST contract (D40-d5) on the
+	// per-room Y.Doc — it MUST precede the legacy P6.12 track-changes module
+	// shadow (chat :3010 / DU :3003 OT pipeline — dead in this fork): route
+	// dispatch is first-match in registration order, so review wins the 11
+	// overlapping routes (D40-d8). Non-overlapping legacy routes (/ranges,
+	// /changes/users) keep their legacy handlers as fallback.
+	app.RegisterFeature(review.Feature(app))
+
 	// P6.12 surface: track-changes module (11 routes under /project/:id/...
 	// — track_changes state, accept-changes, ranges, changes/users, threads,
 	// comment send/edit/delete, thread resolve/reopen/delete)
@@ -231,7 +240,6 @@ func main() {
 	// GET  /project/:pid/collab/history, /collab/history/:v, GET /collab/doc,
 	// POST /collab/history/:v/restore. Role-gated (owner/collab RW, readOnly RO).
 	app.RegisterFeature(collabhistory.Feature(app))
-	app.RegisterFeature(review.Feature(app))
 
 	// P6.15 surface: LanguageTool proxy (languages, check, admin connection
 	// check).

@@ -357,10 +357,20 @@ func (h *Handlers) gate(cxt *core.Cxt, res *core.Res, pid string, want collab.Ro
 }
 
 func notFound(res *core.Res) { res.JSON(http.StatusNotFound, []byte(`{"message":"not found"}`)) }
-func badBody(res *core.Res)  { res.JSON(http.StatusBadRequest, []byte(`{"message":"invalid body"}`)) }
-func internal(res *core.Res) {
+func badBody(res *core.Res) {
+	res.JSON(http.StatusBadRequest, []byte(`{"message":"invalid body"}`))
+}
+
+// internalErr — 500 + root cause on stderr (500s must be diagnosable live;
+// Node parity: server logs the cause, the client gets a terse body).
+func internalErr(res *core.Res, err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "review: 500: %v\n", err)
+	}
 	res.JSON(http.StatusInternalServerError, []byte(`{"message":"internal error"}`))
 }
+
+func internal(res *core.Res)  { internalErr(res, nil) }
 func forbidden(res *core.Res) { res.JSON(http.StatusForbidden, []byte(`{"message":"forbidden"}`)) }
 func okJSON(res *core.Res, code int, v any) {
 	b, _ := json.Marshal(v)
@@ -432,7 +442,7 @@ func (h *Handlers) threadsList(cxt *core.Cxt, res *core.Res) {
 		return nil
 	})
 	if err != nil {
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	okJSON(res, http.StatusOK, out)
@@ -515,7 +525,7 @@ func (h *Handlers) messageAdd(cxt *core.Cxt, res *core.Res) {
 		return nil
 	})
 	if err != nil {
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	okJSON(res, http.StatusCreated, rec)
@@ -564,7 +574,7 @@ func (h *Handlers) messageEdit(cxt *core.Cxt, res *core.Res) {
 			notFound(res)
 			return
 		}
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	// pinned listener 'edit-message': (threadId, commentId, content)
@@ -586,7 +596,7 @@ func (h *Handlers) messageDelete(cxt *core.Cxt, res *core.Res) {
 		_, _, err := collab.DeleteComment(ctx, st, pid, cid)
 		return err
 	}); err != nil {
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	h.relay(cxt.Req.Context(), pid, "delete-message", []any{cxt.Params["2"], cid})
@@ -621,7 +631,7 @@ func (h *Handlers) ownMessageDelete(cxt *core.Cxt, res *core.Res) {
 			notFound(res)
 			return
 		}
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	if owner != "" && owner != uid {
@@ -632,7 +642,7 @@ func (h *Handlers) ownMessageDelete(cxt *core.Cxt, res *core.Res) {
 		_, _, err := collab.DeleteComment(ctx, st, pid, cid)
 		return err
 	}); err != nil {
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	h.relay(cxt.Req.Context(), pid, "delete-message", []any{threadID, cid})
@@ -667,7 +677,7 @@ func (h *Handlers) threadResolve(cxt *core.Cxt, res *core.Res) {
 			notFound(res)
 			return
 		}
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	// pinned listeners: 'resolve-thread' (threadId, {email, first_name, id})
@@ -694,7 +704,7 @@ func (h *Handlers) threadDelete(cxt *core.Cxt, res *core.Res) {
 		_, _, err := collab.DeleteThread(ctx, st, pid, threadID)
 		return err
 	}); err != nil {
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	// pinned listener 'delete-thread': (threadId)
@@ -740,7 +750,7 @@ func (h *Handlers) trackChanges(cxt *core.Cxt, res *core.Res) {
 	}
 	if touched && h.TrackStateSet != nil {
 		if err := h.TrackStateSet(ctx, pid, m); err != nil {
-			internal(res)
+			internalErr(res, err)
 			return
 		}
 	}
@@ -810,7 +820,7 @@ func (h *Handlers) changesCreate(cxt *core.Cxt, res *core.Res) {
 		return nil
 	})
 	if err != nil {
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	okJSON(res, http.StatusCreated, map[string]any{
@@ -844,7 +854,7 @@ func (h *Handlers) changesAccept(cxt *core.Cxt, res *core.Res) {
 		}
 		return nil
 	}); err != nil {
-		internal(res)
+		internalErr(res, err)
 		return
 	}
 	// pinned listener 'accept-changes' (ranges-context.tsx): (docId, entryIds)
@@ -919,6 +929,18 @@ func prodTrack(a *core.App) (TrackStateFor, TrackStateSet) {
 		}
 		m := map[string]bool{}
 		switch v := doc.TrackChanges.(type) {
+		case primitive.D:
+			for _, e := range v {
+				if b, ok := e.Value.(bool); ok {
+					m[e.Key] = b
+				}
+			}
+		case primitive.M:
+			for k, av := range v {
+				if b, ok := av.(bool); ok {
+					m[k] = b
+				}
+			}
 		case map[string]any:
 			for k, av := range v {
 				if b, ok := av.(bool); ok {

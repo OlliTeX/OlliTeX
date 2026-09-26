@@ -34,7 +34,7 @@ async function apiJSON(
   body?: any,
 ): Promise<{ status: number; json: any }> {
   return page.evaluate(
-    async (method, url, body) => {
+    async ({ method, url, body }) => {
       const csrf = document.querySelector('meta[name="ol-csrfToken"]')?.content ?? ''
       const res = await fetch(url, {
         method,
@@ -53,9 +53,7 @@ async function apiJSON(
       }
       return { status: res.status, json }
     },
-    method,
-    url,
-    body,
+    { method, url, body },
   )
 }
 
@@ -87,6 +85,12 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
   const boxSel = '.review-panel-add-comment-editor'
   let createdViaUI = false
   try {
+    // open the review panel (sidebar toggle) + the comment box flow
+    const panelBtn = page.getByRole('button', { name: 'Review panel' })
+    if ((await panelBtn.count()) > 0) {
+      await panelBtn.first().click({ timeout: 5_000 })
+      await page.waitForTimeout(500)
+    }
     await page.click('.cm-content')
     await page.keyboard.press('Control+End')
     await page.evaluate(() =>
