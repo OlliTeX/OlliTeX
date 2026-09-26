@@ -832,7 +832,62 @@ user-settings/project-invite* entries have no CSS in the manifest). FIX:
 `\x01SHARED:CSS:pages/auth/login.js\x02` added to loginHTML (parity with
 registerHTML) — the per-generation resolver links the chunk CSS from the
 in-image entry file (D31 machinery). Gates green (views/core -race).
-DEPLOY: image re-bake + overleafserver cycle (in progress).
+DEPLOY: image re-bake + overleafserver cycle. **Build note:** first bake FAILED in
+`build-community` — `server-ce/services.js` still listed the retired `real-time` service
+(retired `ee26f0a0b2`); FIXED (entry removed) and re-bake launched (log
+/tmp/ol_build_d39.log). On completion: re-tag `ollitex/ollitex:main` +
+`cycle_overleafserver.sh` + live verify (green filled Login button
+`#098842`, card border visible, health green).
+
+**D40 (2026-09-26, owner directive 10 — HIGHEST PRIORITY) — Y.Doc-native model for
+comments + tracked changes** — supersedes the D25 "placeholder" decision.
+- ONE Y.Doc per room (existing `persistence.VersionedPersistence` store) gains first-class
+  top-level types next to `content` (Y.Text): `comments` (Y.Array of record maps: id, file,
+  ranges, text, author, created, edited, replies, state) + `trackedChanges` (Y.Array: id,
+  type insert|delete, ranges, content, author, state pending|accepted|rejected).
+- **d1 (taken as default, owner may veto):** ranges = plain {start,end} in P1 (Node-contract
+  compatible); sticky anchors via RelativePosition (ygo) are the P3 upgrade.
+- **d2 (taken as default):** SERVER-AUTHORITATIVE lifecycle — web REST (Go web, same seam as
+  collabhistory) proposes; collab-package domain ops apply exactly once; idempotent on record
+  id (already-applied accept/reject = no-op). Deterministic e2e oracle; matches D19.
+- d3: comment emails via existing cronmail/emailtemplates seam (assumed yes).
+- d4: P1 text files only (assumed yes).
+- **Contract to serve = the V1 threads/track-changes API the in-git review panel calls**
+  (`frontend/js/features/review-panel/`, e.g. `POST /project/:pid/doc/:docId/changes/accept
+  {change_ids}`) NOT the legacy OT-comment shape — the panel is the ship client.
+- Phases: **P1** doc types + domain ops + hermetic tests (go/services/collab, roomdoc.go seam).
+  **P2** V1 contract routes on Go web (session+CSRF parity) + re-attach review panel + e2e.
+  **P3** relative-position anchoring + concurrent-lifecycle races. **P4** legacy OT
+  comments/tracked-changes backfill at first Y-join.
+
+**D41 (2026-09-26, owner item 11) — history-v1 / document-updater → Yjs verdicts**
+- **history-v1: YES (hybrid b1).** Yjs-native history = the Y.Doc update stream; versions/restore
+  already live (collabhistory REST + ygo versioned store + D23 retention). **diff** = Y.Text
+  snapshots at two versions + go-diff (in-tree via otc). Multi-file hybrid: text in Y.Doc
+  versions; file-tree ops (add/rename/delete/binary) stay in the Go web API with their own
+  version log; the history contract composes both streams into the Node-parity answer.
+  Full file-tree-in-Y.Doc (+ ygo blobs) = optional stretch, NOT the critical path.
+  The OT engine behind it is transitional; retires after the last OT doc migrates (D40 P4).
+- **document-updater: RETIRE (as OT applier) + salvage non-OT duties.** Apply/rebase-into-
+  docstore is exactly what ygo persistence replaces — nothing to convert. Non-OT duties
+  (limits ≈ web limiter.go; notifications ≈ cronmail; preview job = audit at execution) salvage
+  as small Go worker/cron slices. **Main-arc re-scope:** terminal state = Yjs-native history
+  (reusing history-v1.go's engine-agnostic HTTP/dispatch/security layer) +
+  document-updater retirement + otc junked post-migration — NOT flipping the OT-engine ports live.
+
+**D42 (2026-09-26) — project-history B-track handoff policy** (parallel Go port,
+`/data_1/image_mining/the_diff/project-history.go`, module `project-history`; live checkout
+davrot-machine, branch golang-ph; ledger = its HANDOFF.md; B7/B8b done, next B9/B10/B12)
+- **B9 oracle blocker RESOLVED:** the two disputed vendor expectations ("insertions at the start
+  and end" → `[20]`; "non-linear offset order" → `[3,'bar',12,'foo',5]`) verified as GROUND
+  TRUTH by running the vendor's own 27-case suite in the overleaf monorepo (byte-identical
+  sources, real OEC): `yarn workspace @overleaf/project-history exec mocha --loader=esmock
+  --exit test/unit/js/UpdateTranslator/UpdateTranslatorTests.js` → **27 passing**; the mismatch
+  is Go-side (OperationsBuilder cursor/docLength bookkeeping / OperationsCompressor sibling
+  composition). Recorded in project-history.go/HANDOFF.md §"B9 ORACLE GROUND-TRUTH".
+- **Policy (owner question answered):** port writing STAYS with the support LLM for now; owner-
+  side picks up Go B9/B10/B12 after (a) D39 bake+cycle+verify is green and (b) D40 P1 lands —
+  or immediately on owner instruction. No state lost: vendor 27-case table = the Go oracle.
 
 **OUTSTANDING (owner decision):**
 - psintern (compose_cep) still runs the pre-D28a image with the Node bus

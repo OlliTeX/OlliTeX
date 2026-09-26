@@ -3,9 +3,6 @@ module.exports = [
     name: 'web',
   },
   {
-    name: 'real-time',
-  },
-  {
     name: 'document-updater',
   },
   {
