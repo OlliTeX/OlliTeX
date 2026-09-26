@@ -69,12 +69,13 @@ var (
 // ThreadID = this id). Exact wire field names are pinned when the web
 // routes are wired (P2); the domain shape here is the storage contract.
 type Thread struct {
-	ID       string
-	File     string         // doc path the thread anchors to
-	State    string         // opened | resolved
-	Author   map[string]any // opener (panel author shape pinned per route in P2)
-	Created  int64
-	Resolved int64 // ms; 0 = never resolved
+	ID         string
+	File       string         // doc path the thread anchors to
+	State      string         // opened | resolved
+	Author     map[string]any // opener (panel author shape pinned per route in P2)
+	Created    int64
+	Resolved   int64          // ms; 0 = never resolved
+	ResolvedBy map[string]any // actor of the last resolve (V1 resolved_by_* wire fields; cleared on reopen)
 }
 
 const (
@@ -466,6 +467,11 @@ func threadToMap(th Thread, m *crdt.YMap, txn *crdt.Transaction) {
 			m.Set(txn, "author", s)
 		}
 	}
+	if th.ResolvedBy != nil {
+		if s, err := jsonKey(th.ResolvedBy); err == nil {
+			m.Set(txn, "resolved_by", s)
+		}
+	}
 	m.Set(txn, "created", th.Created)
 	m.Set(txn, "resolved", th.Resolved)
 }
@@ -477,6 +483,11 @@ func mapToThread(m *crdt.YMap) (Thread, error) {
 	th.State = strVal(m, "state")
 	if raw, ok := m.Get("author"); ok {
 		if err := parseJSONVal(raw, &th.Author); err != nil {
+			return th, err
+		}
+	}
+	if raw, ok := m.Get("resolved_by"); ok {
+		if err := parseJSONVal(raw, &th.ResolvedBy); err != nil {
 			return th, err
 		}
 	}
@@ -521,6 +532,13 @@ func AddThread(ctx context.Context, store persistence.VersionedPersistence, room
 // SetThreadState — resolve/reopen (idempotent on target; resolved-timestamp
 // recorded on transition to resolved, cleared on reopen).
 func SetThreadState(ctx context.Context, store persistence.VersionedPersistence, room, id, state string) (Thread, bool, persistence.Version, error) {
+	return SetThreadStateBy(ctx, store, room, id, state, nil)
+}
+
+// SetThreadStateBy — like SetThreadState, persisting the acting user for the
+// V1 resolved_by_user_* wire fields (recorded on resolve, cleared on reopen;
+// nil actor = keep the recorded one).
+func SetThreadStateBy(ctx context.Context, store persistence.VersionedPersistence, room, id, state string, resolvedBy map[string]any) (Thread, bool, persistence.Version, error) {
 	if state != ThreadStateOpened && state != ThreadStateResolved {
 		return Thread{}, false, 0, fmt.Errorf("collab: thread state must be %q or %q", ThreadStateOpened, ThreadStateResolved)
 	}
@@ -543,8 +561,12 @@ func SetThreadState(ctx context.Context, store persistence.VersionedPersistence,
 	now := time.Now().UnixMilli()
 	if state == ThreadStateResolved {
 		cur.Resolved = now
+		if resolvedBy != nil {
+			cur.ResolvedBy = resolvedBy
+		}
 	} else {
 		cur.Resolved = 0
+		cur.ResolvedBy = nil
 	}
 	svBefore := d.StateVector().Clone()
 	cur.State = state

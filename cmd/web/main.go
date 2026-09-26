@@ -49,6 +49,7 @@ import (
 	"ollitex/go/services/web/features/passwordreset"
 	"ollitex/go/services/web/features/projectlist"
 	"ollitex/go/services/web/features/registrationpage"
+	"ollitex/go/services/web/features/review"
 	"ollitex/go/services/web/features/serveradmin"
 	"ollitex/go/services/web/features/sitesettings"
 	"ollitex/go/services/web/features/staticpages"
@@ -230,6 +231,7 @@ func main() {
 	// GET  /project/:pid/collab/history, /collab/history/:v, GET /collab/doc,
 	// POST /collab/history/:v/restore. Role-gated (owner/collab RW, readOnly RO).
 	app.RegisterFeature(collabhistory.Feature(app))
+	app.RegisterFeature(review.Feature(app))
 
 	// P6.15 surface: LanguageTool proxy (languages, check, admin connection
 	// check).
