@@ -16,7 +16,7 @@ its own 1:1 mapping table.
 | `linked-url-proxy` | 3066 | `services/linked-url-proxy` | linked-URL import/preview |
 | `notifications` | 3042 | `services/notifications` | notification centre API |
 | `webdavinterface` | internal (token-protected) | `services/webdav-interface` | webdav sync + sync engine |
-| `gitbridge` | 8000 | `services/git-bridge` | the Git Bridge (JGit → `git` CLI port; `GIT_BRIDGE_PORT`) |
+| `gitbridge` | 8000 | Go service (Java `services/git-bridge` deleted, D14) | the Git Bridge (JGit → `git` CLI port; `GIT_BRIDGE_PORT`) |
 | `web` | 4000 Node / 4010 Go | `services/web` | the monolithic web backend (the P1…P6 cutover) |
 
 Two cross-cutting packages at the `go/` level support these services:

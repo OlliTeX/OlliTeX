@@ -1,0 +1,27 @@
+{
+  "port": 8000,
+  "bindIp": "0.0.0.0",
+  "idleTimeout": 30000,
+  "rootGitDirectory": "/data/git-bridge",
+  "allowedCorsOrigins": "https://localhost",
+  "apiBaseUrl": "http://sharelatex:3000/api/v0/",
+  "postbackBaseUrl": "http://git-bridge:8000",
+  "serviceName": "Overleaf",
+  "oauth2Server": "http://sharelatex",
+  "userPasswordEnabled": false,
+  "repoStore": {
+    "maxFileNum": 2000,
+    "maxFileSize": 52428800
+  },
+  "swapStore": {
+    "type": "noop"
+  },
+  "swapJob": {
+    "minProjects": 50,
+    "lowGiB": 128,
+    "highGiB": 256,
+    "intervalMillis": 3600000,
+    "compressionMethod": "gzip"
+  },
+  "sqliteHeapLimitBytes": 0
+}

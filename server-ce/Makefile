@@ -14,8 +14,6 @@ export OVERLEAF_TAG ?= ollitex/ollitex:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISI
 export OVERLEAF_PANDOC_BRANCH ?= ollitex/pandoc:$(BRANCH_NAME_TAG_SAFE)
 export OVERLEAF_PANDOC_LATEST ?= ollitex/pandoc
 export OVERLEAF_PANDOC_TAG ?= ollitex/pandoc:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
-export GIT_BRIDGE_BRANCH ?= ollitex/git-bridge:$(BRANCH_NAME_TAG_SAFE)
-export GIT_BRIDGE_TAG ?= ollitex/git-bridge:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
 
 # Optional extra --cache-from references (overridable). The branch tags only
 # exist LOCALLY (they are never pushed to Docker Hub), so pulling them as cache
@@ -25,7 +23,6 @@ export GIT_BRIDGE_TAG ?= ollitex/git-bridge:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_R
 CACHE_FROM_BASE ?=
 CACHE_FROM_COMMUNITY ?=
 CACHE_FROM_PANDOC ?=
-CACHE_FROM_GIT_BRIDGE ?=
 
 
 all: build-base build-community build-pandoc
@@ -85,19 +82,8 @@ build-pandoc:
 	  --network=host \
 	  $(MONOREPO_ROOT)
 
-# [V] git-bridge (Java/Maven service) built from source in-repo via its own
-# multi-stage builder-container Dockerfile (no host Java toolchain needed).
-build-git-bridge:
-	docker build \
-	  --build-arg BUILDKIT_INLINE_CACHE=1 \
-	  --progress=plain \
-	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
-	  $(CACHE_FROM_GIT_BRIDGE) \
-	  --file $(MONOREPO_ROOT)/services/git-bridge/Dockerfile \
-	  --tag $(GIT_BRIDGE_TAG) \
-	  --tag $(GIT_BRIDGE_BRANCH) \
-	  --network=host \
-	  $(MONOREPO_ROOT)/services/git-bridge
+# [V] git-bridge (D14): the Java service was deleted 2026-09-26 — the 1:1
+# Go replacement builds via go/services/gitbridge/build.sh (ollitex/git-bridge).
 
 push:
 	docker push $(OVERLEAF_BASE_TAG)
@@ -127,5 +113,5 @@ shellcheck_fix:
 
 .PHONY: all \
 	build-base build-community \
-	build-pandoc build-git-bridge \
+	build-pandoc \
 	shellcheck shellcheck_fix

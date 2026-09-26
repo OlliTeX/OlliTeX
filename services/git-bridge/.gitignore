@@ -1,6 +1,0 @@
-# Build output
-/out/
-target/
-
-# Local configuration files
-conf/runtime.json

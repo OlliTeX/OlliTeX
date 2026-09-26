@@ -57,14 +57,16 @@ services:
     image: redis:7.2.1
 
   git-bridge:
-    image: quay.io/sharelatex/git-bridge:latest
+    # D14 (2026-09-26): Go git-bridge (go/services/gitbridge) — Java service
+    # deleted. Rollback: sharelatex/git-bridge:ext-6.3.0-port + ['/server-pro-start.sh'].
+    image: ollitex/git-bridge:latest
     environment:
-      GIT_BRIDGE_API_BASE_URL: "http://sharelatex:3000/api/v0/" # "http://sharelatex/api/v0/" for version 4.1.6 and earlier
-      GIT_BRIDGE_OAUTH2_SERVER: "http://sharelatex"
-      GIT_BRIDGE_POSTBACK_BASE_URL: "http://git-bridge:8000"
-      GIT_BRIDGE_ROOT_DIR: "/data/git-bridge"
+      LOG_LEVEL: "INFO"
     user: root
-    command: ["/server-pro-start.sh"]
+    command: ['git_bridge', 'serve', '/conf/runtime.json']
+    volumes:
+      - ./gitbridge-runtime.json:/conf/runtime.json:ro
+      - gb-data:/data/git-bridge
 
   e2e:
     build:
@@ -156,3 +158,7 @@ services:
       - "bash"
       - "-c"
       - "ulimit -n 1024 && exec bash /run.sh"
+
+
+volumes:
+  gb-data:

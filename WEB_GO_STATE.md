@@ -42,7 +42,7 @@ layers are the gap**) and the follow-on dependency-refresh arc (D27)..
 | D11 | **`server-ce` → `build-images`** rename + update `compose_cep/overleafserver/compose.yaml` | APPROVED |
 | D12 | **SeaweedFS services → toolkit** + update image names | APPROVED |
 | D13 | **Storybook**: expose as much web UI as possible | APPROVED |
-| D14 | **git-bridge**: confirmed already Go (`gitbridge-go:latest`). **DELETE `services/git-bridge`** (Java) + clean the Java `build-git-bridge` Makefile target | APPROVED |
+| D14 | **git-bridge**: confirmed already Go (`gitbridge-go:latest`). **DELETE `services/git-bridge`** (Java) + clean the Java `build-git-bridge` Makefile target | **DONE 2026-09-26**: 564 tracked files deleted; Makefile Java target + GIT_BRIDGE vars removed; develop/ + server-ce/test/ compose re-pointed to the Go image (ollitex/git-bridge:latest, `git_bridge serve /conf/runtime.json` + runtime.json mounts; Java rollback commented). All compose configs validate. |
 | D15 | **Procedural**: stop appending to `WEB_GO_PLAN.md`; maintain this file as the state doc | APPROVED |
 | D16 | **`services/clsi`, `clsi_typst`, `project-history`, `real-time`** are being converted to Go **by support LLMs** (parallel; "ready soon") — do NOT re-port; integrate + audit when they land | AWARE (no action) |
 | D17 | **Notifications email-dispatch cron → Go** (kills last `modules/notifications/app` runtime dependency) | APPROVED — **DONE** (ARC-8 + ARC-8a severance; zero Node runtime hooks left in services/web) |
@@ -154,9 +154,10 @@ layers are the gap**) and the follow-on dependency-refresh arc (D27)..
   `image: gitbridge-go:latest`, `command: ["git_bridge","serve","/conf/runtime.json"]`
   (rollback line references the old Java `compose.yaml.java.orig`). ⇒
   `services/git-bridge` (Java, `pom.xml`) is legacy → delete (D14).
-  - **Leftover to clean:** `server-ce/Makefile:90 build-git-bridge` builds the
-    **Java** image from `services/git-bridge/Dockerfile` and is in the `build`
-    aggregate (`:130`) — must be removed/rewired to the Go image path.
+  - **Leftover to clean (D14)**: `server-ce/Makefile:90 build-git-bridge` built
+    the **Java** image from `services/git-bridge/Dockerfile` (SUPERSEDED —
+    D14 executed 2026-09-26: tree deleted, Makefile target + vars removed,
+    develop/ + server-ce/test/ re-pointed to the Go bridge).
 - **`/hub` settings are dual-sourced today:**
   - **Mongo `site_settings` collection** (backing nearly all site sections;
     seeded from env via `go/services/web/features/sitesettings/seeds.go`) —
