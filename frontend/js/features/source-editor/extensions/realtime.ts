@@ -128,9 +128,12 @@ export const trackedChangesCapture = (
       // so the server stores it and the panel renders op.d. The d5
       // delete body {start,end} stays shape-compatible (the create
       // surface accepts content on deletes). Capped at 4 KiB (honest
-      // pin for pathological deletions).
+      // pin for pathological deletions). **Explicit kind**: the create
+      // surface infers kind from content-emptiness, so a delete WITH
+      // content must pin kind: 'delete' or it would record as insert.
       body = {
         ...body,
+        kind: 'delete',
         content: update.startState.sliceDoc(bStart, bEnd).slice(0, 4096),
       }
     }

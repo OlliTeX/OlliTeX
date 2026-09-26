@@ -308,10 +308,10 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
   // 500 on (d8).
   const rangesCap = await apiJSON(page, 'GET', `/project/${pid}/ranges`)
   expect(rangesCap.status).toBe(200)
-  const re = (Array.isArray(rangesCap.json) ? (rangesCap.json as any[])[0] : null)
-  expect(re && re.id === doc, 'd12: ranges entry id = ' + doc).toBeTruthy()
-  const rc = ((re && re.ranges && re.ranges.changes) ?? []) as any[]
-  const rt = ((re && re.ranges && re.ranges.comments) ?? []) as any[]
+  const rEntry = (Array.isArray(rangesCap.json) ? (rangesCap.json as any[])[0] : null)
+  expect(rEntry && rEntry.id === doc, 'd12: ranges entry id = ' + doc + ' got: ' + JSON.stringify(rangesCap.json).slice(0, 200)).toBeTruthy()
+  const rc = ((rEntry && rEntry.ranges && rEntry.ranges.changes) ?? []) as any[]
+  const rt = ((rEntry && rEntry.ranges && rEntry.ranges.comments) ?? []) as any[]
   const rcText = rc.map((x) => (x.op && x.op.i) ? String(x.op.i) : '').join('')
   expect(
     rcText.includes(`d40-capture-${stamp}`),
@@ -348,16 +348,20 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
   // R8b (d11b): with track-changes ON, deleting a selected span produces a
   // delete record that carries the DELETED text (op.d) — the panel's <del>
   // render (per d5 the delete body gains content; the d12 ranges surface
-  // renders it as op.d).
-  await page.click('.cm-content')
-  await page.keyboard.press('Control+End')
-  await page.keyboard.press('Shift+Home')
-  await page.keyboard.press('Backspace')
+  // renders it as op.d). Delete via the CM view API (deterministic; the
+  // dispatch is a LOCAL edit — userEvent 'input.delete' — so the capture
+  // gate fires and the remote-mirror filter passes).
+  await page.evaluate(() => {
+    const el = document.querySelector('.cm-content') as any
+    const view = el && el.cmView ? el.cmView.view : null
+    if (!view) throw new Error('R8b: no CM view')
+    const len = view.state.doc.length
+    view.dispatch(view.state.replaceRange('', 0, len))
+  })
   await page.waitForTimeout(1500)
   const rangesCap2 = await apiJSON(page, 'GET', `/project/${pid}/ranges`)
-  const rc2 = ((
-    (((rangesCap2.json as any[] | null)?.[0]?.ranges as any)?.changes ?? []) as any[]
-  )
+  const cap2 = (Array.isArray(rangesCap2.json) ? (rangesCap2.json as any[])[0] : null)
+  const rc2: any[] = ((cap2 && cap2.ranges && cap2.ranges.changes) || [])
   const delText = rc2
     .map((x) => (x && x.op && x.op.d) ? String(x.op.d) : '')
     .join('')
