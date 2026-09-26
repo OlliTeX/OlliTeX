@@ -10,10 +10,17 @@ func TestEventLoopMonitor(t *testing.T) {
 	t.Run("with a logger provided", func(t *testing.T) {
 		oldRD := RegisterDestructor
 		var called bool
-		RegisterDestructor = func(func()) { called = true }
+		var stopFn []func()
+		RegisterDestructor = func(f func()) { called = true; stopFn = append(stopFn, f) }
 		defer func() {
+			// Stop the tick goroutine (and drain its in-flight tick) BEFORE
+			// restoring the globals it reads — otherwise it leaks and races
+			// every later test that swaps `recorder`/`NowMS`.
+			for _, f := range stopFn {
+				f()
+			}
+			WaitLoopMonitors() // deterministic drain before global restore
 			RegisterDestructor = oldRD
-			Close() // stop the interval goroutine (Node: clearInterval)
 		}()
 
 		EventLoopMonitor(&warnLogger{}, 0, 0)

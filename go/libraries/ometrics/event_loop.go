@@ -1,6 +1,7 @@
 package ometrics
 
 import (
+	"sync"
 	"time"
 )
 
@@ -27,16 +28,41 @@ func EventLoopMonitor(logger WarnLogger, interval, logThreshold int) {
 	}
 	previous := NowMS()
 	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
+	stopped := make(chan struct{})
+	loopWait.Add(1)
 	go func() {
-		for range ticker.C {
-			now := NowMS()
-			offset := now - previous - int64(interval)
-			if int64(logThreshold) < offset {
-				logger.Warn(map[string]any{"offset": offset}, "slow event loop")
+		defer loopWait.Done()
+		// select-based exit: Go 1.27 no longer wakes a `range` receiver
+		// parked on a stopped Ticker (empirically verified with a minimal
+		// repro), so the destructor signals via the stop channel.
+		for {
+			select {
+			case <-stopped:
+				return
+			case tick, ok := <-ticker.C:
+				if !ok {
+					return
+				}
+				now := NowMS()
+				offset := now - previous - int64(interval)
+				_ = tick
+				if int64(logThreshold) < offset {
+					logger.Warn(map[string]any{"offset": offset}, "slow event loop")
+				}
+				previous = now
+				recorder.Timing("event-loop-millsec", float64(offset), nil)
 			}
-			previous = now
-			recorder.Timing("event-loop-millsec", float64(offset), nil)
 		}
 	}()
-	RegisterDestructor(func() { ticker.Stop() })
+	RegisterDestructor(func() { close(stopped); ticker.Stop() })
 }
+
+// loopWait guards every started monitor tick-goroutine: tests (and shutdown
+// paths) can Wait on it to guarantee a tick has fully drained before touching
+// the package globals the loop reads (recorder / NowMS) — a fixed sleep does
+// not provide that guarantee under -race scheduling.
+var loopWait sync.WaitGroup
+
+// WaitLoopMonitors blocks until every started event-loop ticker goroutine has
+// exited (called AFTER its destructor/ticker.Stop()).
+func WaitLoopMonitors() { loopWait.Wait() }

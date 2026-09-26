@@ -109,15 +109,15 @@ func TestFileChecker_IntervalRechecks(t *testing.T) {
 	defer c.Stop()
 
 	// start() checks immediately -> default (empty).
-	waitFor(t, func() bool { return lastLevel(logger) == "warn" }, 300*time.Millisecond)
+	waitFor(t, func() bool { return lastLevel(logger) == "warn" }, 3000*time.Millisecond)
 
 	// Flip to a future end time; a periodic check must raise to trace.
 	st.set(itoa(nowMS+90000), nil)
-	waitFor(t, func() bool { return lastLevel(logger) == "trace" }, 700*time.Millisecond)
+	waitFor(t, func() bool { return lastLevel(logger) == "trace" }, 3000*time.Millisecond)
 
 	// Flip back to the past; a periodic check must return to the default.
 	st.set(itoa(pastMS), nil)
-	waitFor(t, func() bool { return lastLevel(logger) == "warn" }, 700*time.Millisecond)
+	waitFor(t, func() bool { return lastLevel(logger) == "warn" }, 3000*time.Millisecond)
 
 	if logger.levelCalls[0] != "warn" {
 		t.Fatalf("expected first interval check to set the default level")
@@ -216,6 +216,8 @@ func lastStubLogger(c Checker) *stubLogger {
 }
 
 func lastLevel(l *stubLogger) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if len(l.levelCalls) == 0 {
 		return ""
 	}

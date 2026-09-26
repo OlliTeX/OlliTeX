@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -12,6 +13,10 @@ import (
 // records calls, returns per-method behaviour (value / error).
 type fakePersistor struct {
 	name string
+
+	// mu guards the call-record slices (the migration copier appends from a
+	// background goroutine while tests poll them).
+	mu sync.Mutex
 
 	hasFile bool
 
@@ -45,11 +50,15 @@ func newFakePersistor(hasFile bool) *fakePersistor {
 }
 
 func (f *fakePersistor) SendFile(bucket, key, source string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.sendFileCalls = append(f.sendFileCalls, bucket+"/"+key)
 	return nil
 }
 
 func (f *fakePersistor) SendStream(bucket, key string, source io.Reader, opts Opts) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.sendStreamCalls = append(f.sendStreamCalls, bucket+"/"+key)
 	if f.sendStreamErr != nil {
 		return f.sendStreamErr
@@ -58,6 +67,8 @@ func (f *fakePersistor) SendStream(bucket, key string, source io.Reader, opts Op
 }
 
 func (f *fakePersistor) GetObjectStream(bucket, key string, opts Opts) (io.ReadCloser, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.getStreamCalls = append(f.getStreamCalls, bucket+"/"+key)
 	if f.getStreamOverrideErr != nil {
 		return nil, f.getStreamOverrideErr
@@ -98,6 +109,8 @@ func (f *fakePersistor) GetObjectMd5Hash(bucket, key string, opts Opts) (string,
 }
 
 func (f *fakePersistor) CopyObject(bucket, from, to string, opts Opts) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.copyObjectCalls = append(f.copyObjectCalls, bucket+"/"+from+"→"+to)
 	if f.copyErr != nil {
 		return f.copyErr
@@ -109,6 +122,8 @@ func (f *fakePersistor) CopyObject(bucket, from, to string, opts Opts) error {
 }
 
 func (f *fakePersistor) DeleteObject(bucket, key string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.deleteObjectCalls = append(f.deleteObjectCalls, bucket+"/"+key)
 	if f.deleteErr != nil {
 		return f.deleteErr
@@ -215,13 +230,13 @@ func TestMigrationGetObjectStreamCopyOnMiss(t *testing.T) {
 	io.ReadAll(stream)
 	stream.Close()
 
-	if len(fallback.getStreamCalls) != 1 {
-		t.Errorf("fallback should be read once: %v", fallback.getStreamCalls)
+	if got := fallback.getStreamCallsLocked(); len(got) != 1 {
+		t.Errorf("fallback should be read once: %v", got)
 	}
 	// the background copy must land on primary (bucket/key) — poll a moment.
-	waitUntil(func() bool { return len(primary.sendStreamCalls) == 1 }, t)
-	if primary.sendStreamCalls[0] != migBucket+"/"+migKey {
-		t.Errorf("sendStream call: %v", primary.sendStreamCalls)
+	waitUntil(func() bool { return len(primary.sendStreamCallsLocked()) == 1 }, t)
+	if got := primary.sendStreamCallsLocked(); got[0] != migBucket+"/"+migKey {
+		t.Errorf("sendStream call: %v", got)
 	}
 }
 
@@ -431,4 +446,16 @@ func waitUntil(cond func() bool, t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatalf("condition not met within 1s")
+}
+
+func (f *fakePersistor) sendStreamCallsLocked() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.sendStreamCalls
+}
+
+func (f *fakePersistor) getStreamCallsLocked() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.getStreamCalls
 }

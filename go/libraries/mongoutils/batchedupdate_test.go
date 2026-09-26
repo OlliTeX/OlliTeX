@@ -52,7 +52,7 @@ func newLiveCollection(t *testing.T, name string) *mongo.Collection {
 }
 
 // captureStderr swaps os.Stderr for a pipe for the duration of the test.
-func captureStderr(t *testing.T) *bytes.Buffer {
+func captureStderr(t *testing.T) *captureBuf {
 	t.Helper()
 	old := os.Stderr
 	r, w, err := os.Pipe()
@@ -60,9 +60,21 @@ func captureStderr(t *testing.T) *bytes.Buffer {
 		t.Fatal(err)
 	}
 	os.Stderr = w
-	buf := &bytes.Buffer{}
+	buf := &captureBuf{b: &bytes.Buffer{}}
 	done := make(chan struct{})
-	go func() { _, _ = buf.ReadFrom(r); close(done) }()
+	go func() {
+		// chunked reads: the capture lock must only be held while appending
+		// (a ReadFrom holding it would deadlock the test's String() poll).
+		tmp := make([]byte, 32*1024)
+		for {
+			n, rerr := r.Read(tmp)
+			buf.Write(tmp[:n])
+			if rerr != nil {
+				break
+			}
+		}
+		close(done)
+	}()
 	t.Cleanup(func() {
 		w.Close()
 		os.Stderr = old
@@ -255,10 +267,17 @@ func TestBatchedUpdateEmptyCollection(t *testing.T) {
 	if updated != 0 {
 		t.Fatalf("updated: got %d want 0", updated)
 	}
-	time.Sleep(50 * time.Millisecond) // let the pipe reader settle
-	out := buf.String()
+	// Wait for the async pipe reader to deliver the warning (a fixed sleep
+	// is flaky under full-suite load).
 	const want = "The collection batch_empty appears to be empty."
-	if !strings.Contains(out, want) {
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(buf.String(), want) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if out := buf.String(); !strings.Contains(out, want) {
 		t.Fatalf("stderr warning:\n got: %q\nwant to contain: %q", out, want)
 	}
 }
@@ -294,3 +313,23 @@ func TestBatchedUpdateSingleFlight(t *testing.T) {
 }
 
 var _ = fmt.Sprintf
+
+// captureBuf — a mutex-guarded bytes.Buffer for the stderr capture pipe:
+// the reader goroutine appends while the test polls String() concurrently
+// (bytes.Buffer is not safe for concurrent use).
+type captureBuf struct {
+	mu sync.Mutex
+	b  *bytes.Buffer
+}
+
+func (c *captureBuf) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.b.Write(p)
+}
+
+func (c *captureBuf) String() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.b.String()
+}

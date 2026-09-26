@@ -1,6 +1,9 @@
 package ologger
 
-import "reflect"
+import (
+	"reflect"
+	"sync"
+)
 
 // call records one (attributes, message, args...) call on a stub level.
 type call struct {
@@ -11,6 +14,7 @@ type call struct {
 
 // stubLogger implements Logger, capturing calls per level for assertions.
 type stubLogger struct {
+	mu          sync.Mutex
 	name        string
 	serializers map[string]Serializer
 	streams     []StreamConfig
@@ -28,21 +32,41 @@ func newStubLogger(name string) *stubLogger {
 }
 
 func (l *stubLogger) Debug(a any, m any, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.debugCalls = append(l.debugCalls, call{a, m, args})
 }
 func (l *stubLogger) Info(a any, m any, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.infoCalls = append(l.infoCalls, call{a, m, args})
 }
 func (l *stubLogger) Error(a any, m any, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.errorCalls = append(l.errorCalls, call{a, m, args})
 }
 func (l *stubLogger) Warn(a any, m any, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.warnCalls = append(l.warnCalls, call{a, m, args})
 }
-func (l *stubLogger) Fatal(a any, m any)       { l.fatalCalls = append(l.fatalCalls, call{a, m, nil}) }
-func (l *stubLogger) Level(level string)       { l.levelCalls = append(l.levelCalls, level) }
-func (l *stubLogger) AddStream(s StreamConfig) { l.streams = append(l.streams, s) }
-func (l *stubLogger) Name() string             { return l.name }
+func (l *stubLogger) Fatal(a any, m any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.fatalCalls = append(l.fatalCalls, call{a, m, nil})
+}
+func (l *stubLogger) Level(level string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.levelCalls = append(l.levelCalls, level)
+}
+func (l *stubLogger) AddStream(s StreamConfig) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.streams = append(l.streams, s)
+}
+func (l *stubLogger) Name() string { return l.name }
 func (l *stubLogger) Serializers() map[string]Serializer {
 	if l.serializers == nil {
 		l.serializers = map[string]Serializer{}

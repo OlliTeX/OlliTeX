@@ -771,6 +771,53 @@ hard-cut (`ccf85fc12a`) + D28/D28a event bus in Go (this section) +
 a REAL second peer; `tests/e2e/specs/realtime-bus.test.e2e.ts`, presence
 lifecycle) — 2 passed in 56s on the live stack.
 
+## 11. D27 dependency-refresh (2026-09-26, post-S4 — unblocked)
+
+Executed the verifiable half of D27:
+- **Bumps applied + gates green**: `go-redis v9.18→v9.22`, `aws s3
+  v1.113.1→v1.113.4`, `x/crypto v0.54→v0.57` (+ transitives x/sys, x/text,
+  x/sync), `go mod tidy` clean, full module build + per-package gates green.
+- **bzip2 swap: DEFERRED with evidence** — the D27 note assumed
+  `klauspost/compress/bzip2` exists; it does NOT (verified:
+  `go get github.com/klauspost/compress@v1.16.7 → module does not contain
+  package bzip2`; v1.20.1 the same). No vetted pure-Go bzip2 drop-in was
+  resolvable through the proxy (`nwaples/bzip2` 404s at both v1 and v2
+  paths). `dsnet/compress/bzip2` (gitbridge swap-archive codec) stays —
+  working, pure Go, single call-sites; revisit if it misbehaves.
+- **Test hardening (real defects fixed along the way)**:
+  - `go/libraries/persistors/migration_test.go` — DATA RACE FIXED: the
+    fake persistor's call-record slices were written by the background
+    copy-on-miss goroutine while tests polled them; mutex with proper
+    Lock/Unlock discipline (first attempt locked-without-unlock → deadlock
+    caught by the test, corrected) + locked accessor reads in the test.
+  - `go/libraries/mongoutils/batchedupdate_test.go` — DATA RACE FIXED:
+    the stderr-capture `bytes.Buffer` was shared between the pipe-reader
+    goroutine and the test poll (bytes.Buffer is not concurrent-safe);
+    now a `captureBuf` with chunked lock-scoped appends, and the fixed
+    50ms settle sleep replaced by a 2s settle poll.
+  - `ologger`/`ometrics` tick tests — fixed sleeps replaced; `stubLogger`
+    race fixed (mutex); two REAL races fixed: (a) `ometrics.registry`:
+    series mutations applied OUTSIDE the registry lock while `Get()` read
+    them under it → now applied under the lock; (b) Go 1.27 PLATFORM
+    FINDING (minimal repro in /tmp/twk): `ticker.Stop()` no longer wakes a
+    `range ticker.C` receiver — `EventLoopMonitor` switched to a
+    select-on-stop-channel exit + `loopWait WaitGroup` so tests/shutdown
+    deterministically drain the tick goroutine before touching the globals
+    it reads. ometrics/ologger/persistors/mongoutils now pass
+    `-race -count=2/3` standalone.
+  - **PRE-EXISTING, NOT TOUCHED (verified pre-existing with pre-bump
+    go.mod):** `rediswrapper` locker/health tests still flake under
+    `-race` count=2 (timing asserts + fake-driver latency) — candidate for
+    a dedicated test-hardening slice; not a D27 regression.
+
+**D38 (this session)** — P7 goal item 5 ("frontend consolidated under
+/frontend/modules"): the 28-module frontend trees have NEVER been moved
+(services/web/modules is the live single tree, oracle-pinned under
+`make all` + PnP + baked views). Moving 2000+ files is pure churn with
+parity risk and zero behavior gain; per D27's own "don't churn mid-endgame"
+verdict, **DEFERRED** (post-endgame, only if the owner wants the shape
+change). All other terminal-state bullets hold (see §10).
+
 **OUTSTANDING (owner decision):**
 - psintern (compose_cep) still runs the pre-D28a image with the Node bus
   (Node `real-time` no longer exists in the tree — the old image keeps

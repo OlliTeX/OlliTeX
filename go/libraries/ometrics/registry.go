@@ -150,8 +150,8 @@ func (m *Metric) withSeries(labels map[string]any, apply func(*series)) {
 		m.series[key] = s
 	}
 	m.lastAccess = time.Now()
+	apply(s) // under the lock — Get() reads series fields while holding m.mu
 	m.mu.Unlock()
-	apply(s)
 }
 
 // Reset clears all recorded label-sets (prom-client `reset()`).

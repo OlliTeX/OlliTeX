@@ -511,24 +511,40 @@ func TestEventLoopTick(t *testing.T) {
 	var stopFn []func()
 	RegisterDestructor = func(f func()) { stopFn = append(stopFn, f) }
 	recorder = DefaultRecorder{}
-	defer func() {
-		RegisterDestructor = oldRD
-		recorder = oldRec
-		for _, s := range stopFn {
-			s()
-		}
-	}()
 
 	oldNow := NowMS
 	nowVal := int64(0)
 	NowMS = func() int64 { nowVal += 300; return nowVal }
-	defer func() { NowMS = oldNow }()
+	// Cleanup order matters: stop the tick goroutine and drain its
+	// in-flight iteration BEFORE restoring the globals it reads
+	// dynamically (a restore racing an in-flight tick is a data race).
+	defer func() {
+		t.Logf("DBG stopFn=%d regdtr=%p", len(stopFn), RegisterDestructor)
+		for _, s := range stopFn {
+			s()
+		}
+		t.Logf("DBG after stop Fn")
+		WaitLoopMonitors()
+		t.Logf("DBG drained") // deterministic drain — no in-flight tick may touch
+		// the globals we restore next.
+		RegisterDestructor = oldRD
+		recorder = oldRec
+		NowMS = oldNow
+	}()
 
 	logger := &recordingWarn{}
 	EventLoopMonitor(logger, 1, 100)
-	time.Sleep(8 * time.Millisecond)
 
+	// Poll for the timer to record (a fixed sleep is flaky under
+	// full-suite load: the 1ms tick timer can fire late under -race).
 	metricName := BuildPromKey("timer_" + "event-loop-millsec")
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if summaryTotalCount(metricName) >= 1 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 	if got := summaryTotalCount(metricName); got < 1 {
 		t.Fatalf("%s count = %v, want >= 1", metricName, got)
 	}
