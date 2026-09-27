@@ -399,3 +399,87 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
     'R7: own message still present after delete',
   ).toBeTruthy()
 })
+
+// R9 — D40-P3: relative-position anchoring in the LIVE loop.
+//
+// A comment range is created over a span of the doc (server-side anchors
+// are minted at creation, D40-P3). A LOCAL client edit inserts text BEFORE
+// that span (relayed as a sync update to the room head). The anchored
+// comment range must then resolve to the SHIFTED live position in the
+// panel's /ranges surface — not the stale creation-time coordinate —
+// and the thread record must carry the anchor metadata (the `a` field),
+// proving the live resolution comes from the anchored range, not the
+// plain fallback.
+test('D40-P3 anchors — comment range follows the text after edit (R9)', async ({
+  page,
+}) => {
+  await loginRobust(page, ADMIN.email, ADMIN.password)
+  const pid = await createBlankProject(page)
+  await page.goto('/project/' + pid, { waitUntil: 'load' })
+  await page.waitForSelector('.cm-content', { timeout: 60_000 })
+
+  const stamp = Date.now().toString(36)
+  const threadId = 'd40p3e' + stamp + 'th'.padEnd(14, '0').slice(0, 8)
+
+  // create the comment over the span [6,11) = "world" of the blank template
+  // (the blank project's main.tex starts with "hello world ..." — assert
+  // the span's text first so the assumption is pinned, not guessed).
+  const doc0 = await apiJSON(page, 'GET', `/project/${pid}/doc/main.tex`)
+  const text0 = String((doc0.json as any)?.content ?? '')
+  expect(text0.slice(6, 11), 'R9: seed text assumption (world)').toBe('world')
+
+  const mk = await apiJSON(
+    page,
+    'POST',
+    `/project/${pid}/thread/${threadId}/messages`,
+    {
+      content: `d40p3-${stamp} anchor me`,
+      doc: 'main.tex',
+      ranges: [{ start: 6, end: 11 }],
+    },
+  )
+  expect(mk.status, 'R9: comment create').toBe(201)
+  await page.waitForTimeout(1500)
+
+  // the thread record carries the anchored range (P3 auto-anchor)
+  const rec1 = await apiJSON(page, 'GET', `/project/${pid}/threads`)
+  expect(rec1.status).toBe(200)
+  const th1 = (rec1.json as any)[threadId]
+  expect(th1, 'R9: thread missing').toBeTruthy()
+  const msg1 = th1.messages[0]
+  expect(Array.isArray(msg1.ranges)).toBe(true)
+  expect(msg1.ranges[0].a, 'R9: range must carry P3 anchor metadata').toBeTruthy()
+  expect(Number(msg1.ranges[0].start)).toBe(6) // creation-time coordinate
+  expect(Number(msg1.ranges[0].end)).toBe(11)
+
+  // LOCAL edit: insert 4 chars at position 0 (before the range) via the CM
+  // view (deterministic primitive dispatch; this is a real client edit the
+  // relay syncs to the room head — exactly the P3 shift case)
+  await page.evaluate(() => {
+    const el = document.querySelector('.cm-content') as any
+    const view = el && el.cmView ? el.cmView.view : null
+    if (!view) throw new Error('R9: no CM view')
+    view.dispatch({
+      changes: { from: 0, to: 0, insert: '>>> ' },
+      selection: { anchor: 4 },
+    })
+  })
+  await page.waitForTimeout(2500) // relay → context → room head
+
+  // the panel's /ranges surface must resolve the comment to the SHIFTED live
+  // position: start 6 → 10 (4 inserted before), end 11 → 15 — anchored "world"
+  const rangesRes = await apiJSON(page, 'GET', `/project/${pid}/ranges`)
+  expect(rangesRes.status).toBe(200)
+  const entry = Array.isArray(rangesRes.json) ? (rangesRes.json as any[])[0] : null
+  expect(entry, 'R9: /ranges entry missing').toBeTruthy()
+  const comments: any[] = entry.ranges?.comments ?? []
+  const mine = comments.find((c) => c?.op?.t === threadId || c?.id === msg1.id)
+  expect(mine, 'R9: comment pointer missing from /ranges').toBeTruthy()
+  expect(Number(mine.op.p), 'R9: live comment start (shifted)').toBe(10)
+
+  // the thread surface also resolves live (the record still carries both the
+  // plain creation-time coordinate AND the anchor)
+  const rec2 = await apiJSON(page, 'GET', `/project/${pid}/threads`)
+  const th2 = (rec2.json as any)[threadId]
+  expect(th2.messages[0].ranges[0].a, 'R9: anchor survived sync').toBeTruthy()
+})

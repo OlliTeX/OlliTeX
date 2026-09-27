@@ -1153,6 +1153,19 @@ func (h *Handlers) rangesList(cxt *core.Cxt, res *core.Res) {
 		if err != nil {
 			return err
 		}
+		// P3: the pointer position (op.p) is the LIVE start of the thread's
+		// first message range — resolved from its P3 anchors in ONE shared
+		// load (batch), falling back to the plain P1 coordinate (and 0 when
+		// the message carries no range).
+		type commentSeed struct {
+			id       string
+			threadID string
+			resolved bool
+			uid      string
+			ms       int64
+			ranges   []map[string]any
+		}
+		seeds := []commentSeed{}
 		for _, th := range ths {
 			msgs, err := collab.MessagesOfThread(ctx, st, pid, th.ID)
 			if err != nil {
@@ -1162,11 +1175,35 @@ func (h *Handlers) rangesList(cxt *core.Cxt, res *core.Res) {
 				continue
 			}
 			head := msgs[0]
+			seeds = append(seeds, commentSeed{
+				id: head.ID, threadID: th.ID, resolved: th.Resolved != 0,
+				uid: uidOf(head.Author), ms: head.Created, ranges: head.Ranges,
+			})
+		}
+		flat := make([]map[string]any, 0)
+		offsets := make(map[string]int)
+		for _, sd := range seeds {
+			if len(sd.ranges) > 0 {
+				offsets[sd.id] = len(flat)
+				flat = append(flat, sd.ranges...)
+			}
+		}
+		var live []map[string]any
+		if len(flat) > 0 {
+			live, err = collab.ResolveLiveRanges(ctx, st, pid, flat)
+			if err != nil {
+				return err
+			}
+		}
+		for _, sd := range seeds {
 			p0 := 0
-			rc := rangesComment{ID: head.ID, Op: rangesOp{T: th.ID, P: &p0},
-				Resolved: th.Resolved != 0}
-			if uid := uidOf(head.Author); uid != "" {
-				rc.Metadata = h.d12Meta(ctx, uid, head.Created)
+			if off, ok := offsets[sd.id]; ok && live != nil && off < len(live) {
+				p0 = intOfAny(live[off]["start"])
+			}
+			rc := rangesComment{ID: sd.id, Op: rangesOp{T: sd.threadID, P: &p0},
+				Resolved: sd.resolved}
+			if sd.uid != "" {
+				rc.Metadata = h.d12Meta(ctx, sd.uid, sd.ms)
 			}
 			e.Ranges.Comments = append(e.Ranges.Comments, rc)
 		}
@@ -1257,4 +1294,16 @@ func (h *Handlers) changesUsers(cxt *core.Cxt, res *core.Res) {
 		out = append(out, cu)
 	}
 	okJSON(res, http.StatusOK, out)
+}
+
+func intOfAny(v any) int {
+	switch n := v.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	}
+	return 0
 }

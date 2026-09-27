@@ -200,10 +200,11 @@ func TestHealthCheckExecErrored(t *testing.T) {
 }
 
 func TestHealthCheckTimedOut(t *testing.T) {
-	t.Parallel()
-	old := HealthCheckTimeout
-	HealthCheckTimeout = 50 * time.Millisecond
-	defer func() { HealthCheckTimeout = old }()
+	// NO t.Parallel: this test mutates the package-level HealthCheckTimeout
+	// (via the locked setter) and must not race other in-package tests
+	// reading it (D27b).
+	old := setHealthCheckTimeout(50 * time.Millisecond)
+	defer setHealthCheckTimeout(old)
 
 	d := &fakeDriver{setDelays: []time.Duration{5 * time.Second}} // block past the timeout
 	client := &Client{Driver: d}

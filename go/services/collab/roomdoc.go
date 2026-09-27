@@ -12,7 +12,12 @@ package collab
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
+	"math/rand"
+	"os"
+	"sync"
+	"time"
 
 	"github.com/reearth/ygo/crdt"
 	"github.com/reearth/ygo/persistence"
@@ -34,7 +39,36 @@ var (
 // newServerDoc — server-side transactions use a dedicated client id so
 // server writes (seed, restore) carry a stable, recognizable origin distinct
 // from any browser client.
-func newServerDoc() *crdt.Doc { return crdt.New(crdt.WithClientID(1)) }
+//
+// D40-P3 (client-ID identity): the id is UNIQUE PER PROCESS (pid + time +
+// rand mixed), chosen ONCE. Yjs item identity is (clientID, clock): two
+// concurrent server writers claiming the SAME client id assign colliding
+// clocks and the merge overwrites fields of each other's records (verified
+// by bisect: empty record ids under concurrent review writes). A per-process
+// id keeps the single-recognizable-origin property WITHOUT the identity
+// collision; intra-process write windows are additionally serialized by
+// writeMu in review.go (single-actor-per-room semantics).
+var processClientID = func() uint64 {
+	const limit = uint64(1) << 53 // ygo encodes ids as 53-bit varuint
+	var b [8]byte
+	binary.LittleEndian.PutUint32(b[:4], uint32(os.Getpid()))
+	binary.LittleEndian.PutUint32(b[4:], uint32(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) // Go 1.20+: auto-seeded anyway; explicit for clarity
+	x := (binary.LittleEndian.Uint64(b[:]) ^ uint64(r.Int63())) & (limit - 1)
+	if x == 0 {
+		x = 7
+	}
+	return x
+}()
+
+func newServerDoc() *crdt.Doc { return crdt.New(crdt.WithClientID(crdt.ClientID(processClientID))) }
+
+// writeMu — serializes the review domain's read-modify-write windows
+// (load head → transact → append) in-process, so concurrent review writers
+// observe each other's head (idempotent ops no-op correctly, no
+// overlapping-clock id assignments). Cross-process writes from OTHER
+// processes use a different client id and merge CRDT-correctly.
+var writeMu sync.Mutex
 
 // ClientEdit — emulates ONE browser-client edit end-to-end (load head, rewrite
 // content to `to`, append the delta as a single version). It is used by the

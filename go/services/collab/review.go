@@ -136,6 +136,11 @@ type Comment struct {
 // TrackedChange — D40 tracked-change record. Kind/Start/End/Content describe
 // the change relative to the CONTENT (Y.Text) — in P1 all tracked changes
 // bind to the room's single content doc (d4: text files only).
+//
+// Start/End are the CREATION-TIME plain coordinates (P1). P3 carries
+// AnchorStart/AnchorEnd (Yjs-compatible RelativePositions, anchors.go) so
+// read paths can resolve the LIVE position — the plain coords remain the
+// documented fallback for pre-P3 records (plain-coord drift).
 type TrackedChange struct {
 	ID      string
 	Kind    string // insert | delete
@@ -146,6 +151,10 @@ type TrackedChange struct {
 	Author  map[string]any
 	Created int64
 	State   string // pending | accepted | rejected
+
+	// P3 stable anchors ("" = pre-P3 record; resolve to plain coords).
+	AnchorStart string
+	AnchorEnd   string
 }
 
 // --- record encode/decode ---
@@ -200,6 +209,8 @@ func mapToChange(m *crdt.YMap) (TrackedChange, error) {
 	}
 	ch.Created = int64Val(m, "created")
 	ch.State = strVal(m, "state")
+	ch.AnchorStart = strVal(m, "anchor_start")
+	ch.AnchorEnd = strVal(m, "anchor_end")
 	return ch, nil
 }
 
@@ -292,6 +303,9 @@ func findRecord(d *crdt.Doc, typeName, id string) (*crdt.YMap, int, bool) {
 // record with the same id exists it is returned unchanged, applied=false,
 // and nothing is appended. Empty id ⇒ generated (NewReviewID).
 func AddComment(ctx context.Context, store persistence.VersionedPersistence, room string, c Comment) (Comment, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	if c.ID == "" {
 		c.ID = NewReviewID(time.Now())
 	}
@@ -306,6 +320,25 @@ func AddComment(ctx context.Context, store persistence.VersionedPersistence, roo
 		}
 		lr, _ := store.Load(ctx, room)
 		return ex, false, lr.Version, nil
+	}
+	// P3: anchor each plain range AT CREATION (additive `a` sub-record;
+	// records keep their plain coords for pre-P3 readers). Best-effort:
+	// a failed anchor keeps the P1 plain-only range (documented drift).
+	if len(c.Ranges) > 0 {
+		anchored := make([]map[string]any, 0, len(c.Ranges))
+		for _, r := range c.Ranges {
+			nr := map[string]any{}
+			for k, v := range r {
+				nr[k] = v
+			}
+			if _, has := nr["a"]; !has {
+				if ar, err := MakeRangeAnchors(ctx, store, room, intOrZero(nr["start"]), intOrZero(nr["end"])); err == nil {
+					nr["a"] = map[string]any{"s": ar.Start, "e": ar.End}
+				}
+			}
+			anchored = append(anchored, nr)
+		}
+		c.Ranges = anchored
 	}
 	svBefore := d.StateVector().Clone()
 	m := crdt.NewMapPrelim()
@@ -323,6 +356,9 @@ func AddComment(ctx context.Context, store persistence.VersionedPersistence, roo
 // SetCommentState — transition a comment's state (opened/resolved — values
 // pinned to the panel contract in P2). Idempotent on the target state.
 func SetCommentState(ctx context.Context, store persistence.VersionedPersistence, room, id, state string) (Comment, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	d, err := loadReviewDoc(ctx, store, room)
 	if err != nil {
 		return Comment{}, false, 0, err
@@ -355,6 +391,9 @@ func SetCommentState(ctx context.Context, store persistence.VersionedPersistence
 // EditCommentText — set the comment text (edited=now). Idempotent on equal
 // text.
 func EditCommentText(ctx context.Context, store persistence.VersionedPersistence, room, id, text string) (Comment, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	d, err := loadReviewDoc(ctx, store, room)
 	if err != nil {
 		return Comment{}, false, 0, err
@@ -387,6 +426,9 @@ func EditCommentText(ctx context.Context, store persistence.VersionedPersistence
 // AddCommentReply — append one reply record to a comment (panel shape in P2;
 // P1 stores the caller's JSON-serialisable reply map verbatim).
 func AddCommentReply(ctx context.Context, store persistence.VersionedPersistence, room, id string, reply map[string]any) (Comment, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	d, err := loadReviewDoc(ctx, store, room)
 	if err != nil {
 		return Comment{}, false, 0, err
@@ -414,6 +456,9 @@ func AddCommentReply(ctx context.Context, store persistence.VersionedPersistence
 
 // DeleteComment — remove a comment record. Idempotent (absent ⇒ no-op).
 func DeleteComment(ctx context.Context, store persistence.VersionedPersistence, room, id string) (bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	d, err := loadReviewDoc(ctx, store, room)
 	if err != nil {
 		return false, 0, err
@@ -498,6 +543,9 @@ func mapToThread(m *crdt.YMap) (Thread, error) {
 
 // AddThread — register a thread. Idempotent on id; empty id ⇒ generated.
 func AddThread(ctx context.Context, store persistence.VersionedPersistence, room string, th Thread) (Thread, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	if th.ID == "" {
 		th.ID = NewReviewID(time.Now())
 	}
@@ -532,6 +580,8 @@ func AddThread(ctx context.Context, store persistence.VersionedPersistence, room
 // SetThreadState — resolve/reopen (idempotent on target; resolved-timestamp
 // recorded on transition to resolved, cleared on reopen).
 func SetThreadState(ctx context.Context, store persistence.VersionedPersistence, room, id, state string) (Thread, bool, persistence.Version, error) {
+	// NO writeMu here: SetThreadStateBy acquires it (non-reentrant — a
+	// wrapper-level lock would self-deadlock). D40-P3.
 	return SetThreadStateBy(ctx, store, room, id, state, nil)
 }
 
@@ -539,6 +589,9 @@ func SetThreadState(ctx context.Context, store persistence.VersionedPersistence,
 // V1 resolved_by_user_* wire fields (recorded on resolve, cleared on reopen;
 // nil actor = keep the recorded one).
 func SetThreadStateBy(ctx context.Context, store persistence.VersionedPersistence, room, id, state string, resolvedBy map[string]any) (Thread, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	if state != ThreadStateOpened && state != ThreadStateResolved {
 		return Thread{}, false, 0, fmt.Errorf("collab: thread state must be %q or %q", ThreadStateOpened, ThreadStateResolved)
 	}
@@ -583,6 +636,9 @@ func SetThreadStateBy(ctx context.Context, store persistence.VersionedPersistenc
 // DeleteThread — remove a thread AND its messages (all comments carrying
 // thread_id = id; standalone comments untouched). Idempotent.
 func DeleteThread(ctx context.Context, store persistence.VersionedPersistence, room, id string) (bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	d, err := loadReviewDoc(ctx, store, room)
 	if err != nil {
 		return false, 0, err
@@ -689,6 +745,9 @@ func commentToMap(c Comment, m *crdt.YMap, txn *crdt.Transaction) {
 // it — Yjs reality: the edit is in the shared text; the change record is the
 // pending marker). Idempotent on id.
 func AddChange(ctx context.Context, store persistence.VersionedPersistence, room string, ch TrackedChange) (TrackedChange, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	if ch.ID == "" {
 		ch.ID = NewReviewID(time.Now())
 	}
@@ -710,6 +769,13 @@ func AddChange(ctx context.Context, store persistence.VersionedPersistence, room
 		lr, _ := store.Load(ctx, room)
 		return ex, false, lr.Version, nil
 	}
+	// P3: anchor the plain coordinates AT CREATION (head content) so the
+	// record survives later edits (read paths resolve to live positions).
+	// Best-effort: a failed anchor keeps the P1 plain-only record (the
+	// documented drift), never blocks the change creation itself.
+	if ar, err := MakeRangeAnchors(ctx, store, room, ch.Start, ch.End); err == nil {
+		ch.AnchorStart, ch.AnchorEnd = ar.Start, ar.End
+	}
 	svBefore := d.StateVector().Clone()
 	m := crdt.NewMapPrelim()
 	d.Transact(func(txn *crdt.Transaction) {
@@ -729,6 +795,12 @@ func changeToMap(ch TrackedChange, m *crdt.YMap, txn *crdt.Transaction) {
 	m.Set(txn, "file", ch.File)
 	m.Set(txn, "start", ch.Start)
 	m.Set(txn, "end", ch.End)
+	if ch.AnchorStart != "" {
+		m.Set(txn, "anchor_start", ch.AnchorStart)
+	}
+	if ch.AnchorEnd != "" {
+		m.Set(txn, "anchor_end", ch.AnchorEnd)
+	}
 	m.Set(txn, "content", ch.Content)
 	if ch.Author != nil {
 		if s, err := jsonKey(ch.Author); err == nil {
@@ -754,6 +826,9 @@ func changeRangeOK(t *crdt.YText, ch TrackedChange) bool {
 // AcceptChange — pending → accepted. NO content mutation (the edit stands).
 // Idempotent: an already-accepted/rejected change returns unchanged.
 func AcceptChange(ctx context.Context, store persistence.VersionedPersistence, room, id string) (TrackedChange, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	d, err := loadReviewDoc(ctx, store, room)
 	if err != nil {
 		return TrackedChange{}, false, 0, err
@@ -793,6 +868,9 @@ func AcceptChange(ctx context.Context, store persistence.VersionedPersistence, r
 // current text) fail with ErrChangeRange and leave the change PENDING —
 // the caller re-resolves it (P3 anchors remove the drift class).
 func RejectChange(ctx context.Context, store persistence.VersionedPersistence, room, id string) (TrackedChange, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)
+
 	d, err := loadReviewDoc(ctx, store, room)
 	if err != nil {
 		return TrackedChange{}, false, 0, err
@@ -852,5 +930,61 @@ func ListChanges(ctx context.Context, store persistence.VersionedPersistence, ro
 		}
 		out = append(out, ch)
 	}
+	// P3: resolve anchored records to LIVE positions (one doc load; the
+	// change's creation-time plain coords remain the documented fallback
+	// for records predating anchors).
+	if anyAnchored(out) {
+		for i := range out {
+			if out[i].AnchorStart == "" && out[i].AnchorEnd == "" {
+				continue
+			}
+			st, en, err := resolveAnchorsIn(d, out[i].AnchorStart, out[i].AnchorEnd, out[i].Start, out[i].End)
+			if err != nil {
+				return nil, err
+			}
+			out[i].Start, out[i].End = st, en
+		}
+	}
 	return out, nil
+}
+
+func anyAnchored(chs []TrackedChange) bool {
+	for i := range chs {
+		if chs[i].AnchorStart != "" || chs[i].AnchorEnd != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveAnchorsIn — ResolveRangeAnchors against an ALREADY-LOADED head
+// doc (ListChanges shares its single load across all records).
+func resolveAnchorsIn(d *crdt.Doc, arStart, arEnd string, plainStart, plainEnd int) (int, int, error) {
+	start, end := plainStart, plainEnd
+	if arStart != "" {
+		rp, err := decodeAnchor(arStart)
+		if err != nil {
+			return 0, 0, err
+		}
+		abs, ok := crdt.ToAbsolutePosition(d, rp)
+		if !ok {
+			return 0, 0, ErrAnchorResolve
+		}
+		start = abs.Index
+	}
+	if arEnd != "" {
+		rp, err := decodeAnchor(arEnd)
+		if err != nil {
+			return 0, 0, err
+		}
+		abs, ok := crdt.ToAbsolutePosition(d, rp)
+		if !ok {
+			return 0, 0, ErrAnchorResolve
+		}
+		end = abs.Index
+	}
+	if end < start {
+		end = start
+	}
+	return start, end, nil
 }

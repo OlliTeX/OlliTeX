@@ -1018,8 +1018,69 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     transparency: reopen state visible, panel resolve reflected) + R8b
     (delete record carries op.d text). **P2 REMAINING** = visual pass of
     the rendered tab (the wire it renders is pinned by R8/R8b).
-  **P3** relative-position anchoring + concurrent-lifecycle races. **P4** legacy OT
-  comments/tracked-changes backfill at first Y-join.
+  **P3 — RELATIVE-POSITION ANCHORING + CONCURRENT-LIFECYCLE RACES (2026-09-26, IN SLICE)**:
+  - **P3 core (this build)**:
+    - `go/services/collab/anchors.go` — ygo `crdt.RelativePosition` (Yjs-wire-compatible)
+      mint + resolve: `MakeRangeAnchors` / `ResolveRangeAnchors` (engine-pinned
+      clamp) / `ResolveLiveRanges` (P1 plain-only records pass through — the
+      documented plain-coord fallback). Anchors = URL-safe base64 of the
+      encoded RelativePosition. Data shapes: comment range records gain
+      `a:{s,e}`; tracked changes gain `anchor_start`/`anchor_end` (wire-pinned
+      from `libraries/ot` + the yjs y-protocols relative-position contract).
+    - **Auto-anchoring** in the domain: `AddComment` mints anchors for each
+      plain range (best-effort); `AddChange` mints `anchor_start/end`;
+      `ListChanges` resolves anchored changes to LIVE positions over the
+      already-loaded room doc (no extra loads).
+    - **d13 web** (review.go): the d12 comment pointers now resolve live
+      (`op.p` = current start of the anchored range, or plain fallback) via
+      `ResolveLiveRanges` — the panel's /ranges surface shows COMMENT
+      positions that FOLLOW THE TEXT.
+    - **Engine semantics (honest oracle, pinned in anchors_test.go; LOCAL
+      edits = the D24 edit shape; full rewrite is a degenerate case that
+      deletes anchor items)**: anchor "world" = [6,11) of
+      "hello world this is a document": insert-before → (9,14) shifted;
+      insert-inside → (6,13) grows over the insertion; insert-after → (6,11)
+      unchanged; delete-before → (3,8) shifted; delete-inside → engine's
+      nearest-surviving-boundary resolution (6,11 "wo th") — deterministic,
+      range never vanishes.
+    - **CLIENT-ID IDENTITY BUG (root-caused by bisect, THE P3 race fix):**
+      `newServerDoc()` used `crdt.WithClientID(1)` for EVERY server doc —
+      concurrent server writers (review endpoints from request goroutines,
+      the sync bus) sharing one Yjs client id assign colliding (clientID,
+      clock) item identities and the merge clobbers record fields (bisect
+      repro: concurrent SetThreadStateBy ×8 + AcceptChange ×6 left a
+      change record with EMPTY id/kind while the merge alone was
+      provably commutative — because isolated docs each had RANDOM
+      client ids). Fix (roomdoc.go): per-process unique 53-bit-varuint-safe
+      client id (pid^time^rand, chosen once) + `writeMu` serializing the
+      review read-modify-write windows in-process (single-actor-per-room
+      semantics; cross-process ids differ → CRDT-correct merge). Gotcha
+      pinned: ygo rejects ids > 53 bits (varuint overflow); `SetThreadState`
+      (wrapper) must NOT take writeMu — it delegates to the locked
+      `SetThreadStateBy` (non-reentrant → deadlock proven by -run hang).
+    - **Tests (anchors_test.go, all -race green)**: 5 engine-semantics pins +
+      clamp + `TestAddChange_AutoAnchor_LiveList` +
+      `TestAddComment_AutoAnchor_LiveRanges` + `TestConcurrentLifecycle_P3`
+      (8 state + 6 comment + 6 accept concurrent; idempotency + state/
+      resolved invariants) + `TestConcurrentReviewWrites_RecordIntegrity`
+      (10 rounds of the client-id bisect scenario — permanent regression).
+  - **D27b (full-suite race sweep, this slice)**: `go/libraries/rediswrapper`
+    (HealthCheckTimeout + MaxRedisRequestLength guarded by mutexed
+    accessors; the health `contextObject` now a locked object that
+    SNAPSHOTS into every oerror.Info — no error holds the live map while
+    the leaked timeout-runner goroutine still mutates it) +
+    `go/libraries/streamutils` (fakeRes buffer/finished/failNext locked —
+    production timeout path writes the sink from its goroutine while tests
+    poll). Both suites -race green ×3; these were LATENT (t.Parallel tests
+    mutating package globals + non-thread-safe fakes) and surfaced only in
+    the full `-race ./go/...` run.
+  - **E2E R9 (pending bake)**: comment over "world" → CM dispatch inserts
+    4 chars at 0 → /ranges comment pointer `op.p` MUST be 10 (live-shifted,
+    not 6/0) + thread record carries the `a` anchor before/after (proves
+    live resolution, not the plain fallback).
+  - **P3 REMAINING**: bake #7 (server-ce make all) + e2e R9 + full D40
+    battery + psintern cycle + this ledger entry = P3 COMPLETE.
+  **P4** legacy OT comments/tracked-changes backfill at first Y-join (after P3).
 - **P2 contract (PINNED from the in-git panel — do not invent; `frontend/js/features/review-panel/`):**
   - `GET   /project/:pid/threads` → Record<threadId, Thread> (d5 pin)
   - `POST  /project/:pid/thread/:threadId/messages` (FIRST message creates the

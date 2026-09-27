@@ -180,10 +180,10 @@ func TestRedisLockerTryLockContended(t *testing.T) {
 }
 
 func TestRedisLockerTryLockOverlongAutoRelease(t *testing.T) {
-	t.Parallel()
-	old := MaxRedisRequestLength
-	MaxRedisRequestLength = 10
-	defer func() { MaxRedisRequestLength = old }()
+	// NO t.Parallel (D27b): mutates the shared MaxRedisRequestLength global;
+	// concurrent locker tests read it.
+	old := setMaxRedisRequestLength(10)
+	defer setMaxRedisRequestLength(old)
 
 	d := &fakeDriver{setDelays: []time.Duration{50 * time.Millisecond}} // > 10ms budget
 	metrics := &recordingMetrics{}

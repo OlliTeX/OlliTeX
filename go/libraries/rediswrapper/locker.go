@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -65,7 +66,27 @@ func (NullLogger) Error(map[string]any, string) {}
 // SET taking longer than this auto-releases: the lock's TTL may have
 // expired and the key is no longer ours. A var (not const) so the port's
 // own test-suite can shrink it.
-var MaxRedisRequestLength int64 = 5000 // ms
+var (
+	// D27b (race-isolation): guarded because a t.Parallel test shrinks it
+	// while other locker tests run concurrently — unguarded global
+	// read/write was a data race in the full-suite -race run.
+	MaxRedisRequestLengthMu sync.Mutex
+	MaxRedisRequestLength   int64 = 5000 // ms
+)
+
+func getMaxRedisRequestLength() int64 {
+	MaxRedisRequestLengthMu.Lock()
+	defer MaxRedisRequestLengthMu.Unlock()
+	return MaxRedisRequestLength
+}
+
+func setMaxRedisRequestLength(v int64) int64 {
+	MaxRedisRequestLengthMu.Lock()
+	defer MaxRedisRequestLengthMu.Unlock()
+	old := MaxRedisRequestLength
+	MaxRedisRequestLength = v
+	return old
+}
 
 // unlockScript / extendScript mirror the Node lua strings byte-for-byte.
 const (
@@ -170,7 +191,7 @@ func (l *RedisLocker) TryLock(ctx context.Context, id string) (bool, string, err
 	}
 	if ack == "OK" {
 		l.Metrics.Inc(l.MetricsPrefix + "-not-blocking")
-		if time.Since(start).Milliseconds() > MaxRedisRequestLength {
+		if time.Since(start).Milliseconds() > getMaxRedisRequestLength() {
 			// the key may no longer belong to us: release and fail
 			if _, relErr := l.releaseLock(ctx, id, lockValue); relErr != nil {
 				return false, "", relErr

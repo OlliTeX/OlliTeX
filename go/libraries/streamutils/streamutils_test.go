@@ -246,7 +246,7 @@ func TestIncrementalResponseFailLogsAndEnds(t *testing.T) {
 	if got := res.written(); got != "error: mylabel\n" {
 		t.Fatalf("fail update %q", got)
 	}
-	if !res.finished {
+	if !res.isFinished() {
 		t.Fatalf("response must be finished by Fail")
 	}
 }
@@ -269,7 +269,7 @@ func TestIncrementalResponseFailWhileAbortedSkipsUpdate(t *testing.T) {
 	if got := res.written(); got != "error: l: aborting after 20ms\n" {
 		t.Fatalf("only the timeout line expected, got %q", got)
 	}
-	if !res.finished {
+	if !res.isFinished() {
 		t.Fatalf("Fail must end the response (Go: Done gate; Node: unconditional end)")
 	}
 }
@@ -279,7 +279,7 @@ func TestIncrementalResponseSendUpdateWriteFails(t *testing.T) {
 	res := newFakeRes()
 	ir := NewIncrementalResponse(res, time.Hour, "l", map[string]any{"info": "x"}, logs)
 	defer ir.End()
-	res.failNext = true
+	res.setFailNext(true)
 	ir.SendUpdate("progress: 50%")
 	// Pin: warn "l: failed to send progress update" with {err, …info}.
 	if len(logs.warnings) != 1 || logs.warnings[0].msg != "l: failed to send progress update" {
@@ -401,6 +401,10 @@ func (l *logRecorder) snapshot() []fieldsAndMsg {
 }
 
 type fakeRes struct {
+	mu sync.RWMutex
+	// D27b (race-isolation): the production timeout path writes to this
+	// sink from its own goroutine while the test polls written() —
+	// bytes.Buffer is not concurrent-safe, so every access is locked.
 	buf      bytes.Buffer
 	finished bool
 	failNext bool
@@ -409,6 +413,8 @@ type fakeRes struct {
 func newFakeRes() *fakeRes { return &fakeRes{} }
 
 func (r *fakeRes) Write(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.failNext {
 		return 0, errors.New("write failed")
 	}
@@ -416,11 +422,28 @@ func (r *fakeRes) Write(p []byte) (int, error) {
 }
 
 func (r *fakeRes) Finish() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.finished = true
 	return nil
 }
 
-func (r *fakeRes) written() string { return r.buf.String() }
+func (r *fakeRes) written() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.buf.String()
+}
+func (r *fakeRes) isFinished() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.finished
+}
+
+func (r *fakeRes) setFailNext(v bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.failNext = v
+}
 
 func waitUntil(cond func() bool, timeout time.Duration, t *testing.T) {
 	t.Helper()
