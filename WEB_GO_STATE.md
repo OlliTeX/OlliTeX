@@ -1118,8 +1118,9 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
   - library: /library, /library/trashed → hub library section
   - admin: /admin/user, /admin/llm/settings, /admin/project → hub admin
     sections (adminRedir; /admin/panel → /hub#/overview)
-  - marketing: /blog, /contact, /latex, /learn → marketingRedirect
-    (staticpages — SEPARATE family, not a hub shim; do not lump in)
+  - marketing: /blog, /contact, /latex, /learn → **REMOVED** 2026-09-27
+    (owner: they 301'd to SaaS overleaf.com — not wanted here; now 404;
+    staticpages marketingRedirect + marketingBase deleted)
   - editor: /editor/<id> ≡ /project/<id> (editorPagePattern dual); hub
     open-links now emit /editor/<id> (4 sites, this session)
   RETIREMENT SLICE (when green-lit): remove the hub-shim families → 404
