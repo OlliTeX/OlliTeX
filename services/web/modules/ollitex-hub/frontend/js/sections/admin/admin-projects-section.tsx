@@ -404,7 +404,8 @@ export default function AdminProjectsSection({
                         <Menu.Item
                           icon={<Icon name="open_in_new" size={16} />}
                           component="a"
-                          href={`/project/${pid(p)}`}
+                          // canonical editor surface (2026-09-27 owner directive)
+                          href={`/editor/${pid(p)}`}
                           target="_blank"
                           rel="noreferrer"
                         >

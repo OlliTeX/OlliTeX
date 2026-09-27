@@ -1106,6 +1106,28 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
   legacy `/project` (dash) → hub 301s stay as dead-URL safety; the owner
   dropped the requirement, so removal is allowed but deferred (irreversible
   while deep links/bookmarks exist).
+- **Legacy-page retirement inventory (owner, 2026-09-27: "at some point we
+  should retire them" — users/admins use /hub for settings, users, projects;
+  owner NOT insisting the /project→hub redirects survive).** Shim route
+  family as it exists (Go web, verified in-tree):
+  - dashboard: /project {,/owned,/shared,/archived,/trashed,/untagged,
+    /tags/:tag} → /hub#/projects.* (projectlist dashRedir table)
+  - user: /user/llm-settings, /user/notification-preferences → hub
+    (userpages); /user/settings also a dropbox success target
+  - templates: /templates/manage → /hub#/site.general.managetpl
+  - library: /library, /library/trashed → hub library section
+  - admin: /admin/user, /admin/llm/settings, /admin/project → hub admin
+    sections (adminRedir; /admin/panel → /hub#/overview)
+  - marketing: /blog, /contact, /latex, /learn → marketingRedirect
+    (staticpages — SEPARATE family, not a hub shim; do not lump in)
+  - editor: /editor/<id> ≡ /project/<id> (editorPagePattern dual); hub
+    open-links now emit /editor/<id> (4 sites, this session)
+  RETIREMENT SLICE (when green-lit): remove the hub-shim families → 404
+  (hub owns those surfaces); keep editorPagePattern dual (deep-link
+  safety); decision then: 404 vs /hub#<section> bounce for legacy URLs
+  (bookmarks) — owner dropped the keep-requirement, so 404 is allowed;
+  update e2e specs driving /user/llm-settings & /admin pages; post-login
+  landing (/project → hub) moves with it.
 - **P2 contract (PINNED from the in-git panel — do not invent; `frontend/js/features/review-panel/`):**
   - `GET   /project/:pid/threads` → Record<threadId, Thread> (d5 pin)
   - `POST  /project/:pid/thread/:threadId/messages` (FIRST message creates the

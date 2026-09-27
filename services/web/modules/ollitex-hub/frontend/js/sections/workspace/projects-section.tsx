@@ -479,7 +479,9 @@ export default function ProjectsSection({
     return visible.slice(start, start + PAGE_SIZE)
   }, [visible, page])
 
-  const openProject = (id: string) => window.location.assign(`/project/${id}`)
+  // 2026-09-27 (owner: retire /project for the editor surface): /editor/<id>
+  // renders the same editor page (editorPagePattern serves both).
+  const openProject = (id: string) => window.location.assign(`/editor/${id}`)
 
   const act = async (key: string, fn: () => Promise<unknown>, okMsg?: string) => {
     setBusy(key)
@@ -629,7 +631,8 @@ export default function ProjectsSection({
       setNewOpen(false)
       setNewName('')
       if (data?.project_id) {
-        window.location.assign(`/project/${data.project_id}`)
+        // canonical editor surface (2026-09-27 owner directive)
+        window.location.assign(`/editor/${data.project_id}`)
         return
       }
       await load(view, tagId)
