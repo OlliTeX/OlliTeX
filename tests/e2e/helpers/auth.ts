@@ -149,7 +149,7 @@ export async function createBlankProject(
     .first()
   await createBtn.click({ force: true, timeout: 15_000 })
   const navigated = await page
-    .waitForURL(/\/project\/[0-9a-f]{24}/, { timeout: 20_000 })
+    .waitForURL(/\/(project|editor)\/[0-9a-f]{24}/, { timeout: 20_000 })
     .then(() => true)
     .catch(() => false)
   if (navigated) {
@@ -173,10 +173,12 @@ export async function createBlankProject(
     if (res2.status() !== 200) {
       throw new Error(`project creation failed (ui + api ${res.status()}/${res2.status()})`)
     }
-    await page.goto(`/project/${(await res2.json()).projectId}`)
+    await page.goto(`/editor/${(await res2.json()).project_id}`)
   } else {
-    await page.goto(`/project/${(await res.json()).projectId}`)
+    await page.goto(`/editor/${(await res.json()).project_id}`)
   }
-  await page.waitForURL(/\/project\/[0-9a-f]{24}/, { timeout: 30_000 })
+  // 2026-09-27 (owner /editor canonical): the editor route is /editor/<id>
+  // (the hub navigates there; /project/<id> still renders the same page).
+  await page.waitForURL(/\/(project|editor)\/[0-9a-f]{24}/, { timeout: 30_000 })
   return new URL(page.url()).pathname.split('/')[2]
 }

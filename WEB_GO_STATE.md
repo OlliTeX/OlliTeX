@@ -1125,6 +1125,29 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
   - Live next: psintern runs the Node TC service — a legacy-commented
     project opened in the Yjs editor shows the backfilled thread + messages
     (recorded at bake/deploy time).
+  - **VERIFIED LIVE (bake #12 `86b8070c`, e2e stack 2026-09-27):**
+    - D40 battery 3/3 GREEN on the P4 image (R1–R9 battery 3 spec files,
+      collab-yjs core, 1.3m) — no regression.
+    - Oracle project (e2e-admin-owned, planted legacy corpus: docstore
+      `ranges` comments+changes + real Go-chat store rooms/messages):
+      first Y-join → backfill fired → `GET /project/{pid}/threads` 200 =
+      the legacy thread (id preserved) with its message ("needs
+      citations") → **comment record carries BOTH the honest point range
+      `{start:6,end:6}` AND the P3-minted anchor pair** (a:{s,e}) — the
+      anchoring machinery absorbed the legacy position; `GET /ranges`
+      shows the legacy comment pointer + change (op.i " [edited]", state
+      accepted); `/changes/users` lists both legacy authors. **Idempotent
+      on rejoin ×2: counts stable 1 thread / 1 message / 1 comment /
+      1 change — no duplicates.**
+    - **e2e helper fix (auth.ts, required by the owner /editor canonical
+      flip)**: `createBlankProject` now accepts the `/editor/<id>`
+      landing (was hard-wired to `/project/<id>`) and reads the Go
+      create response's `project_id` (was reading legacy `projectId` —
+      the hub flip made the UI path land on /editor/ so the fallback
+      fired and dead-landed on /project/undefined). Without this fix the
+      whole D40 battery red-lights on the post-flip image.
+    - psintern deployed (overleafserver cycled to `86b8070c`, image id
+      verified; admin.test login → /hub green).
   - Debugging lesson (pinned): the NoOp fake's docstore body was MALFORMED
     JSON (one closing brace short) — `docLines` fails on unmarshal error =
     the mysterious "seed: docstore response has no lines"; the identical
