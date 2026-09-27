@@ -1087,13 +1087,53 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     P3 image → bake #8 `8c6a4aa1` deployed to psintern (overleafserver
     cycled, container image == image id) with the owner-live-fixes
     (commit `c8091ca3e7`: /user/password/reset shared-CSS hook + render pin;
+        (commit `c8091ca3e7`: /user/password/reset shared-CSS hook + render pin;
     login stale "E2E SAML IdP" SSO meta removed — it auto-redirected
     anonymous logins into a dead /saml/login 404 = live lockout; live
     verified: sso:[] and the 9663 stylesheet now linked on /reset).
     R9 spec (room-head probe) committed in the R9-green commit line above.
-    **P4 = next D40 slice.**
-  **P4** legacy OT comments/tracked-changes backfill at first Y-join (NEXT slice —
-  after P3 COMPLETE, recorded above).
+    **P4 COMPLETE (recorded below).**
+  **P4 COMPLETE (2026-07-21 session, ledger day of bake #11)**: legacy OT
+  comments/tracked-changes backfill at first Y-join — `go/services/collab/`:
+  - `legacybackfill.go` (NEW): `MaterializeLegacy` (pure total map: legacy
+    thread → `Thread` (state/resolved/**resolved_by** from the TC chat wire),
+    message → `Comment` (author map from `user_id`, ms epoch → `created`/
+    `edited`), pointer → comment point range `{s,e}` (the ONE position the
+    pointer carries — honest minimal range), change op → `TrackedChange`
+    (insert op.i / delete op.d + position; unknown state → pending)) +
+    `LegacySource.Load` (docstore `ranges.comments/changes` on the project
+    root doc — reuses the SeedSource resolution & fetch; TC chat
+    `GET /project/{pid}/threads` — the **threadId-keyed RECORD** wire pinned
+    from `trackchanges/handlers.go tcGetThreads`; base = `WEB_CHAT_URL` /
+    node-parity `CHAT_HOST:3010`) + `Backfill` writer through the P3
+    idempotent, auto-anchoring `AddThread/AddComment/AddChange` chain.
+    Best-effort everywhere: chat down → pointers/changes still backfill,
+    threads skipped + `Skipped` note; pointers without thread content →
+    skipped (never content-less comments); `Backfill` failures NEVER un-seed
+    the room (cmd/collab wiring logs + returns nil).
+  - `collab.go`: `Options.LegacyBackfill` hook fired ONCE at first seed,
+    AFTER the v1 append (writers land at head+1, +2 … — e2e-visible
+    immediately; seeding/`TextType` untouched).
+  - Hermetic suite (6, all PASS; `gofmt`/`vet`/build clean; `-race` ×3
+    green): materialize pins (states/author/ranges/geometry/resolved_by),
+    state-defaults + dangling-pointer pin, Load via httptest fakes (docstore
+    + TC chat; corpus + `Skipped`), chat-down skips-threads-only, full hook
+    chain `TestBackfill_OnFirstSeed_P4` (seed → backfill → `HeadText` +
+    `ListThreads/ListComments/ListChanges` — comment carries the pointer's
+    `{s,e}`), `TestBackfill_RoomWithoutLegacy_NoOp` (fresh project: exact
+    seed, zero records, hook green).
+  - Live next: psintern runs the Node TC service — a legacy-commented
+    project opened in the Yjs editor shows the backfilled thread + messages
+    (recorded at bake/deploy time).
+  - Debugging lesson (pinned): the NoOp fake's docstore body was MALFORMED
+    JSON (one closing brace short) — `docLines` fails on unmarshal error =
+    the mysterious "seed: docstore response has no lines"; the identical
+    body in a sibling test file passed, which made it look environmental.
+    Validate fixture bytes with `od -c` + a standalone JSON parse.
+  - Backlog (NOT P4): absence-notification / presence fan-out (chat UX) —
+    needs realtime bus + notifprefs; the chat records themselves now live in
+    the room Y.Doc (P2+), so a follow-on slice could subscribe to awareness
+    + a `notif` type.
 - **Editor-surface directive (owner, 2026-09-27): "please retire /project —
   only use /editor" + "not insisting on keeping the old→/hub redirects".**
   `/editor/<id>` and `/project/<id>` already render the same OlliTeX editor

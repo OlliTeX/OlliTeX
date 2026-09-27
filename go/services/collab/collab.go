@@ -80,7 +80,14 @@ type Options struct {
 	// returned text is inserted as the room's version 1. A returned "" seeds
 	// nothing; an error fails the room load (fail-closed). Nil = no seeding
 	// (rooms stay empty until a client writes).
-	SeedFn          func(ctx context.Context, room string) (string, error)
+	SeedFn func(ctx context.Context, room string) (string, error)
+	// LegacyBackfill — D40 P4: materialize the legacy (OT-era) threads/
+	// comments/tracked-changes into the room's review records at FIRST
+	// seed (best-effort; legacy failures are logged by the implementer and
+	// NEVER fail the room load — a seed that succeeded stands on its own).
+	// Nil = no backfill (rooms get review records only through the D40
+	// surface). Called once, after the seed is persisted as version 1.
+	LegacyBackfill  func(ctx context.Context, room string, store persistence.VersionedPersistence) error
 	AllowedOrigins  []string
 	MaxConnections  int
 	MaxPeersPerRoom int
@@ -158,7 +165,17 @@ func New(opts Options) (*Service, error) {
 				txn.GetText(TextType).Insert(txn, 0, text, nil)
 			})
 			_, aerr := store.AppendUpdate(ctx, room, doc.EncodeStateAsUpdate())
-			return aerr
+			if aerr != nil {
+				return aerr
+			}
+			// D40 P4: legacy corpus → review records (after v1 exists; the
+			// writers idempotently append as v2+; best-effort by contract).
+			if opts.LegacyBackfill != nil {
+				if berr := opts.LegacyBackfill(ctx, room, store); berr != nil {
+					return berr // implementer policy (P4 wiring logs + continues)
+				}
+			}
+			return nil
 		}
 	}
 	srv.Authorize = func(r *http.Request) (ws.ConnectionConfig, bool) {

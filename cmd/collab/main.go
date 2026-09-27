@@ -52,6 +52,7 @@ import (
 	"time"
 
 	gredis "github.com/redis/go-redis/v9"
+	"github.com/reearth/ygo/persistence"
 
 	"ollitex/go/libraries/configres"
 	"ollitex/go/services/collab"
@@ -161,6 +162,33 @@ func main() {
 		MaxConnections:   maxConn,
 		MaxPeersPerRoom:  maxPeers,
 		SeedFn:           seed.SeedText, // S4: rooms seed from live project content
+		// D40 P4: legacy (OT-era) threads/comments/tracked-changes → the
+		// room's review records, at first seed only (the OnLoadDocument hook
+		// runs once per room lifetime). BEST-EFFORT: legacy data is an
+		// enrichment, never a blocker — a failed backfill is logged and the
+		// seeded (v1) room stands. The legacy corpus lives in the docstore
+		// (ranges) + the Node TC chat service (thread messages) — same env
+		// bases as the web's trackchanges proxy (downstream.go).
+		LegacyBackfill: func(ctx context.Context, room string, st persistence.VersionedPersistence) error {
+			src := collab.NewLegacySource(seed)
+			data, lerr := src.Load(ctx, room)
+			if lerr != nil {
+				log.Printf("collab: legacy-backfill room=%s load error (skipped): %v", room, lerr)
+				return nil
+			}
+			if len(data.Threads) == 0 && len(data.Pointers) == 0 && len(data.Changes) == 0 {
+				if len(data.Skipped) > 0 {
+					log.Printf("collab: legacy-backfill room=%s nothing to backfill (skipped: %s)", room, strings.Join(data.Skipped, "; "))
+				}
+				return nil
+			}
+			stats := collab.Backfill(ctx, st, room, data, "main.tex") // P1 content doc
+			log.Printf("collab: legacy-backfill room=%s %s", room, stats.String())
+			if len(data.Skipped) > 0 {
+				log.Printf("collab: legacy-backfill room=%s skipped: %s", room, strings.Join(data.Skipped, "; "))
+			}
+			return nil // best-effort contract (never un-seed on legacy failure)
+		},
 	})
 	if err != nil {
 		log.Fatalf("init: %v", err)
