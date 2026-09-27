@@ -5,8 +5,9 @@
 //	                   external home pug is absent in this build; Node oracle
 //	                   2026-09-22: 302 "Found. Redirecting to /login"),
 //	                   anonymous: global gate (401 accept-json / 302 html)
-//	GET /learn* etc. → 301 https://www.overleaf.com<originalUrl> (CE marketing
-//	                    passthrough; pinned)
+//	GET /learn /blog /latex /contact → REMOVED 2026-09-27 (owner directive:
+//	they 301'd to SaaS overleaf.com content — not wanted on this
+//	self-hosted instance; now unknown/404)
 //
 // The external home/about/privacy views are ABSENT in this build (the pug
 // files do not ship), so Node's anonymous '/' already 302s to /login — the
@@ -14,14 +15,11 @@
 package staticpages
 
 import (
-	"net/http"
 	"regexp"
 	"strings"
 
 	"ollitex/go/services/web/core"
 )
-
-const marketingBase = "https://www.overleaf.com"
 
 // homeRe — /home (case-insensitive + Express trailing-slash tolerant; U9 oracle).
 var homeRe = regexp.MustCompile(`^/(?i:home)/?$`)
@@ -60,12 +58,11 @@ func Feature(a *core.App) core.Feature {
 			// every webRouter route (anonymous → the global gate, pinned U10.2).
 			{Method: "GET", Path: "/university", Handler: universityIndex},
 			{Method: "GET", Pattern: uniPageRe, Handler: universityPage},
-			// LOGIN-REQUIRED (pinned: the gate runs before these — anonymous
-			// /learn → 302 /login; logged-in → the 301 below).
-			{Method: "GET", Path: "/learn", Handler: marketingRedirect},
-			{Method: "GET", Path: "/blog", Handler: marketingRedirect},
-			{Method: "GET", Path: "/latex", Handler: marketingRedirect},
-			{Method: "GET", Path: "/contact", Handler: marketingRedirect},
+			// 2026-09-27 (owner directive): /learn /blog /latex /contact
+			// REMOVED — they 301'd to SaaS overleaf.com content on a
+			// self-hosted instance (identity leak + SaaS leakage the owner
+			// does not want). Unknown now (404). The Node oracle had
+			// these at router.mjs:1370; parity is superseded by the directive.
 		},
 	}
 }
@@ -89,23 +86,6 @@ func home(a *core.App) func(*core.Cxt, *core.Res) {
 func homeToLogin(cxt *core.Cxt, res *core.Res) {
 	res.Redirect(cxt.Req, 302, "/login")
 }
-
-// marketingRedirect — router.mjs:1370 passthrough (/learn*, /blog*, /latex*,
-// /for/*, /contact* → 301 www.overleaf.com + verbatim originalUrl).
-func marketingRedirect(cxt *core.Cxt, res *core.Res) {
-	r := cxt.Req
-	// Node's `req.originalUrl` = the path as addressed (including any prefix
-	// nginx preserved — under the flip the path is unprefixed).
-	orig := r.URL.Path
-	if r.URL.RawQuery != "" {
-		orig += "?" + r.URL.RawQuery
-	}
-	res.W.Header().Set("Location", marketingBase+orig)
-	res.W.WriteHeader(301)
-	_, _ = res.W.Write([]byte("Moved Permanently. Redirecting to " + marketingBase + orig))
-}
-
-var _ = http.StatusOK
 
 // universityIndex — Node UniversityController.getIndexPage:
 // res.redirect('/i/university').
