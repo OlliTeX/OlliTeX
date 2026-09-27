@@ -35,14 +35,20 @@ services:
       MAILTRAP_PASSWORD: "password-for-mailtrap"
 
   mongo:
-    image: mongo:8.0.11
+    # 2026-09-26 (owner): bump past the stale 8.0.11 pin — same DB as the
+    # rest of the tree (tests/e2e T9 anchor): mongo 8.3 + the GLIBC hwcaps
+    # workaround for the SHSTK segfault (SERVER-121912) on this host
+    # kernel; toolkit applies the same to the prod mongo
+    # (toolkit/lib/docker-compose.mongo.yml).
+    image: mongo:8.3
+    environment:
+      GLIBC_TUNABLES: glibc.cpu.hwcaps=-SHSTK
+      MONGO_INITDB_DATABASE: sharelatex
     command: "--replSet overleaf"
     volumes:
       - ../bin/shared/mongodb-init-replica-set.js:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js
       - ../bin/shared/mongodb-docker-entrypoint-wait.sh:/mongodb-docker-entrypoint-wait.sh
     entrypoint: /mongodb-docker-entrypoint-wait.sh
-    environment:
-      MONGO_INITDB_DATABASE: sharelatex
     extra_hosts:
       # Required when using the automatic database setup for initializing the replica set.
       # This override is not needed when running the setup after starting up mongo.
@@ -54,7 +60,9 @@ services:
       retries: 30
 
   redis:
-    image: redis:7.2.1
+    # 2026-09-26 (owner): pin aligned with the rest of the tree (tests/e2e
+    # T9 anchor: redis 8.6-alpine) — replaces the stale 7.2.1.
+    image: redis:8.6-alpine
 
   git-bridge:
     # D14 (2026-09-26): Go git-bridge (go/services/gitbridge) — Java service
