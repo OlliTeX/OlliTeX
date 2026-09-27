@@ -1074,13 +1074,38 @@ comments + tracked changes** — supersedes the D25 "placeholder" decision.
     poll). Both suites -race green ×3; these were LATENT (t.Parallel tests
     mutating package globals + non-thread-safe fakes) and surfaced only in
     the full `-race ./go/...` run.
-  - **E2E R9 (pending bake)**: comment over "world" → CM dispatch inserts
+  - **E2E R9 (GREEN 2026-09-27)**: comment over "world" → CM dispatch inserts
     4 chars at 0 → /ranges comment pointer `op.p` MUST be 10 (live-shifted,
     not 6/0) + thread record carries the `a` anchor before/after (proves
-    live resolution, not the plain fallback).
-  - **P3 REMAINING**: bake #7 (server-ce make all) + e2e R9 + full D40
-    battery + psintern cycle + this ledger entry = P3 COMPLETE.
-  **P4** legacy OT comments/tracked-changes backfill at first Y-join (after P3).
+    live resolution, not the plain fallback). Probe = the ROOM-HEAD text
+    `GET /project/:pid/collab/doc` (`collab.HeadText {version,content}`) —
+    NOT the OT docstore surface `doc/:doc` (that's a separate route and
+    302/HTML for the e2e probe; first two R9 failures were the wrong probe).
+  - **P3 COMPLETE (2026-09-27)**: commit `6e5320ea60` (anchors + client-id
+    race fix + D27b full-suite `-race ./go/...` EXIT=0) → bake #7 `7bd54ef1`
+    → e2e: D40 battery R1–R9 + R6b/R8b + collab-yjs core ALL GREEN on the
+    P3 image → bake #8 `8c6a4aa1` deployed to psintern (overleafserver
+    cycled, container image == image id) with the owner-live-fixes
+    (commit `c8091ca3e7`: /user/password/reset shared-CSS hook + render pin;
+    login stale "E2E SAML IdP" SSO meta removed — it auto-redirected
+    anonymous logins into a dead /saml/login 404 = live lockout; live
+    verified: sso:[] and the 9663 stylesheet now linked on /reset).
+    R9 spec (room-head probe) committed in the R9-green commit line above.
+    **P4 = next D40 slice.**
+  **P4** legacy OT comments/tracked-changes backfill at first Y-join (NEXT slice —
+  after P3 COMPLETE, recorded above).
+- **Editor-surface directive (owner, 2026-09-27): "please retire /project —
+  only use /editor" + "not insisting on keeping the old→/hub redirects".**
+  `/editor/<id>` and `/project/<id>` already render the same OlliTeX editor
+  page (`editorpages.editorPagePattern` accepts both, case-insensitive —
+  P5.1a). The hub's project links were still opening `/project/<id>`:
+  projects-section.tsx open-project (new-tab href ×2 + post-import
+  `window.location`) now emit `/editor/<id>` (2026-09-27, live after bake
+  #9). Scope kept to the EDITOR entry links only — download/zip, pdf, and
+  the template-open routes are separate route families (untouched). The
+  legacy `/project` (dash) → hub 301s stay as dead-URL safety; the owner
+  dropped the requirement, so removal is allowed but deferred (irreversible
+  while deep links/bookmarks exist).
 - **P2 contract (PINNED from the in-git panel — do not invent; `frontend/js/features/review-panel/`):**
   - `GET   /project/:pid/threads` → Record<threadId, Thread> (d5 pin)
   - `POST  /project/:pid/thread/:threadId/messages` (FIRST message creates the

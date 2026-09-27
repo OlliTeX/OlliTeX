@@ -232,7 +232,9 @@ function GithubImportModal({
       })
       onClose()
       if (data?.projectId) {
-        window.location.href = `/project/${data.projectId}`
+        // 2026-09-27 (owner): the editor surface is /editor/<id> — /project/
+        // <id> still renders the same page but all new links use /editor.
+        window.location.href = `/editor/${data.projectId}`
         return
       }
     } catch (err: any) {
@@ -865,7 +867,7 @@ export default function ProjectsSection({
                     <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
                       <Button
                         component="a"
-                        href={isTrashedView ? undefined : `/project/${id}`}
+                        href={isTrashedView ? undefined : `/editor/${id}`}
                         target="_blank"
                         rel="noreferrer"
                         variant="subtle"
@@ -945,7 +947,7 @@ export default function ProjectsSection({
                         <Menu.Dropdown>
                           {isTrashedView ? null : (
                             <>
-                              <Menu.Item leftSection={<Icon name="open_in_new" size={16} />} component="a" href={`/project/${id}`} target="_blank" rel="noreferrer">
+                              <Menu.Item leftSection={<Icon name="open_in_new" size={16} />} component="a" href={`/editor/${id}`} target="_blank" rel="noreferrer">
                                 Open
                               </Menu.Item>
                               <Menu.Item leftSection={<Icon name="content_copy" size={16} />} onClick={() => void doClone(p)}>

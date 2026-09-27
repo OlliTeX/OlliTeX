@@ -419,14 +419,38 @@ test('D40-P3 anchors — comment range follows the text after edit (R9)', async 
   await page.waitForSelector('.cm-content', { timeout: 60_000 })
 
   const stamp = Date.now().toString(36)
-  const threadId = 'd40p3e' + stamp + 'th'.padEnd(14, '0').slice(0, 8)
+  const threadId = 'd40p3e' + stamp.slice(0, 6) + 'th0000'
+  const SENTINCE = 'hello world this is a document'
 
-  // create the comment over the span [6,11) = "world" of the blank template
-  // (the blank project's main.tex starts with "hello world ..." — assert
-  // the span's text first so the assumption is pinned, not guessed).
-  const doc0 = await apiJSON(page, 'GET', `/project/${pid}/doc/main.tex`)
-  const text0 = String((doc0.json as any)?.content ?? '')
-  expect(text0.slice(6, 11), 'R9: seed text assumption (world)').toBe('world')
+  // self-contained: the blank project's main.tex may be EMPTY, so R9 sets a
+  // known document first (CM dispatch = the same mechanism R8b uses — proven
+  // in this stack), then waits until the SERVER side has it (the comment
+  // creation mints anchors against the room head — it must already contain
+  // the sentence or the mint clamps to the shorter text).
+  await page.evaluate((sentence) => {
+    const el = document.querySelector('.cm-content') as any
+    const view = el && el.cmView ? el.cmView.view : null
+    if (!view) throw new Error('R9: no CM view')
+    const len = view.state.doc.length
+    view.dispatch({ changes: { from: 0, to: len, insert: sentence }, selection: { anchor: 0 } })
+  }, SENTINCE)
+
+  // The room-head source of truth (D40 anchors mint against the Y.Doc, NOT
+  // the OT docstore surface doc/:doc) — poll the collab room head text until
+  // it holds the sentence.
+  let serverHas = ''
+  for (let i = 0; i < 30; i++) {
+    serverHas = await page.evaluate(async (u: string) => {
+      const r = await fetch(u, { credentials: 'same-origin' })
+      if (!r.ok) return ''
+      const j = await r.json()
+      return (j !== null && typeof j.content === 'string') ? j.content : ''
+    }, `/project/${pid}/collab/doc`).catch(() => '')
+    if (serverHas.includes(SENTINCE)) break
+    await new Promise((res) => setTimeout(res, 500))
+  }
+  expect(serverHas, `R9: room head must hold the seeded text before anchoring; got ${JSON.stringify(serverHas).slice(0, 120)}`).toContain(SENTINCE)
+  expect(serverHas.slice(6, 11), 'R9: seed span (world)').toBe('world')
 
   const mk = await apiJSON(
     page,
@@ -439,9 +463,9 @@ test('D40-P3 anchors — comment range follows the text after edit (R9)', async 
     },
   )
   expect(mk.status, 'R9: comment create').toBe(201)
-  await page.waitForTimeout(1500)
+  await page.waitForTimeout(1000)
 
-  // the thread record carries the anchored range (P3 auto-anchor)
+// the thread record carries the anchored range (P3 auto-anchor)
   const rec1 = await apiJSON(page, 'GET', `/project/${pid}/threads`)
   expect(rec1.status).toBe(200)
   const th1 = (rec1.json as any)[threadId]
@@ -467,15 +491,31 @@ test('D40-P3 anchors — comment range follows the text after edit (R9)', async 
   await page.waitForTimeout(2500) // relay → context → room head
 
   // the panel's /ranges surface must resolve the comment to the SHIFTED live
-  // position: start 6 → 10 (4 inserted before), end 11 → 15 — anchored "world"
-  const rangesRes = await apiJSON(page, 'GET', `/project/${pid}/ranges`)
-  expect(rangesRes.status).toBe(200)
-  const entry = Array.isArray(rangesRes.json) ? (rangesRes.json as any[])[0] : null
-  expect(entry, 'R9: /ranges entry missing').toBeTruthy()
-  const comments: any[] = entry.ranges?.comments ?? []
-  const mine = comments.find((c) => c?.op?.t === threadId || c?.id === msg1.id)
+  // position: start 6 → 10 (4 inserted before), end 11 → 15 — anchored "world".
+  // Convergence retry (R6b lesson): the relay→context→room-head chain is
+  // best-effort and timing-sensitive; poll until the live position lands.
+  let liveP = -1
+  let mine: any = null
+  let rangesOK = false
+  for (let i = 0; i < 30; i++) {
+    await new Promise((res) => setTimeout(res, 500))
+    const rangesRes = await apiJSON(page, 'GET', `/project/${pid}/ranges`)
+    if (rangesRes.status !== 200) continue
+    const entry = Array.isArray(rangesRes.json) ? (rangesRes.json as any[])[0] : null
+    if (!entry || !entry.ranges || !Array.isArray(entry.ranges.comments)) continue
+    const found = entry.ranges.comments.find(
+      (c: any) => c?.op?.t === threadId || c?.id === msg1.id,
+    )
+    if (!found) continue
+    mine = found
+    liveP = Number(found.op?.p ?? -1)
+    if (liveP === 10) {
+      rangesOK = true
+      break
+    }
+  }
   expect(mine, 'R9: comment pointer missing from /ranges').toBeTruthy()
-  expect(Number(mine.op.p), 'R9: live comment start (shifted)').toBe(10)
+  expect(rangesOK, `R9: live comment start must shift to 10 (got op.p=${liveP})`).toBeTruthy()
 
   // the thread surface also resolves live (the record still carries both the
   // plain creation-time coordinate AND the anchor)
