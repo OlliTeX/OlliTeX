@@ -6,12 +6,15 @@ package historyv1
 import (
 	"archive/zip"
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"ollitex/go/libraries/oerror"
@@ -406,7 +409,10 @@ func (s *Service) createProjectBlob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	blob := s.Blob.ForProject(pid)
-	if actual := otc.BlobHashFromBuffer(data); actual != hash {
+	// Node blobHashFromFile = raw sha1 hex of the payload (NOT the git blob
+	// hash). Case-insensitive hex compare (both sides lowercased).
+	h1 := sha1.Sum(data)
+	if actual := hex.EncodeToString(h1[:]); strings.ToLower(actual) != strings.ToLower(hash) {
 		conflict(w, "File hash mismatch")
 		return
 	}
