@@ -176,6 +176,8 @@ services:
       # docstore (G2 STOR-1: S3-only archive; fs retired — see cmd/docstore/main.go)
       BACKEND: s3
       BUCKET_NAME: docstore-archive
+      # H1 flip: Go history-v1 owns :3100 (Node history-v1 stands down)
+      HISTORY_V1_GO: "1"
       AWS_S3_ENDPOINT: http://s3:8333
       AWS_S3_PATH_STYLE: 'true'
       AWS_ACCESS_KEY_ID: e2e

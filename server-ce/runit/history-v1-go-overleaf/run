@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# history-v1 (GO 1:1 port) — owns :3100 when HISTORY_V1_GO=1 (the flip that
+# retires the Node history-v1 service). Inert (sleep) when the flip is off so
+# the two implementations can never collide; this is the default everywhere.
+source /etc/overleaf/env.sh
+if [ "${HISTORY_V1_GO:-0}" != "1" ]; then
+    exec sleep infinity
+fi
+export LISTEN_ADDRESS=127.0.0.1
+
+exec /sbin/setuser www-data /usr/local/bin/go-services/historyv1 >> /var/log/overleaf/history-v1-go.log 2>&1
