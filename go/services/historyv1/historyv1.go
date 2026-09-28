@@ -168,6 +168,8 @@ func New(cfg Config, mongo *mongo.Database, persistor persistors.Persistor, pgPo
 	cfg.Defaults()
 	hist := NewHistoryStore(persistor, cfg.ChunkBucket)
 	cs := NewChunkStores(cfg, mongo, hist, NewMongoBuffer())
+	blob := &BlobStores{db: mongo, pers: persistor, PG: pgPool}
+	cs.Blob = blob
 	if pgPool != nil {
 		cs.PG = &pgChunkBackend{pg: pgPool}
 	}
@@ -176,7 +178,7 @@ func New(cfg Config, mongo *mongo.Database, persistor persistors.Persistor, pgPo
 		Mongo:     mongo,
 		Persistor: persistor,
 		History:   hist,
-		Blob:      &BlobStores{db: mongo, pers: persistor, PG: pgPool},
+		Blob:      blob,
 		Chunks:    cs,
 		Ext:       NewMongoBuffer(),
 	}
