@@ -106,9 +106,9 @@ func getPersistor(settings Settings, adapters Adapters) (Persistor, error) {
 		}
 		return NewPerProjectEncryptedS3Persistor(*settings.S3SSEC, adapters.S3)
 	case "fs":
-		return NewFSPersistor(FSSettings{
-			UseSubdirectories: settings.UseSubdirectories,
-		})
+		// G2 (STOR-1, owner-approved S3-only durable backend): the fs
+		// backend is retired — fail with an actionable error.
+		return nil, NewSettingsError("fs backend is retired (G2 STOR-1, S3-only durable backend) — use s3, s3SSEC or gcs", nil)
 	case "gcs":
 		if settings.GCS == nil {
 			return nil, NewSettingsError("no gcs settings provided", nil)

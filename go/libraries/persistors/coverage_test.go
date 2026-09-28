@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -395,80 +393,6 @@ func TestApplyDeleteObjectsMd5Fallback(t *testing.T) {
 }
 
 // --- FS branches ---------------------------------------------------------------
-
-func TestFSListSubdirectories(t *testing.T) {
-	tmpDir := t.TempDir()
-	location := tmpDir + "/bucket"
-	layout := map[string]string{
-		"a/b.txt":   "one",
-		"a/c/d.txt": "two two",
-		"a/.hidden": "secret",
-		"top.txt":   "top",
-	}
-	for rel, contents := range layout {
-		p := location + "/" + rel
-		if err := mkdirAllParent(p); err != nil {
-			t.Fatal(err)
-		}
-		if err := writeFile(p, contents); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	f, err := NewFSPersistor(FSSettings{UseSubdirectories: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keys, err := f.ListDirectoryKeys(location, "a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(keys) != 2 {
-		t.Fatalf("keys = %v (dotfile must be excluded)", keys)
-	}
-
-	stats, err := f.ListDirectoryStats(location, "a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(stats) != 2 {
-		t.Fatalf("stats = %v", stats)
-	}
-
-	size, err := f.DirectorySize(location, "a", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if size != int64(len("one")+len("two two")) {
-		t.Fatalf("size = %d", size)
-	}
-
-	// missing directory → no files (Node glob semantics)
-	keys, err = f.ListDirectoryKeys(location, "missing")
-	if err != nil || len(keys) != 0 {
-		t.Fatalf("missing dir: %v, %v", keys, err)
-	}
-}
-
-func TestFSCopyObjectMissingSource(t *testing.T) {
-	_, _, p := setupFsScenario(t, false)
-	err := p.CopyObject("loc", "does/not/exist", "target", Opts{})
-	if err == nil {
-		t.Fatal("want error copying a missing file")
-	}
-}
-
-func TestFSSendFileMissingSource(t *testing.T) {
-	_, location, p := setupFsScenario(t, false)
-	err := p.SendFile(location, "a/b.tex", "/no/such/source")
-	if err == nil {
-		t.Fatal("want error for missing source file")
-	}
-}
-
-// --- GCS branches --------------------------------------------------------------
-
 func TestGCSSendFile(t *testing.T) {
 	gcs := newFakeGCS()
 	p := newGcsTest(t, gcsSettings(), gcs)
@@ -747,11 +671,3 @@ func TestCachedPerProjectSendStreamCarriesSSEC(t *testing.T) {
 }
 
 // tiny fs helpers
-
-func mkdirAllParent(p string) error {
-	return os.MkdirAll(filepath.Dir(p), 0o755)
-}
-
-func writeFile(p, contents string) error {
-	return os.WriteFile(p, []byte(contents), 0o644)
-}

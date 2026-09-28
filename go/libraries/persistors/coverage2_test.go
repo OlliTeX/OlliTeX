@@ -15,10 +15,12 @@ import (
 // --- factory -----------------------------------------------------------------
 
 func TestFactoryFallbackUnknownBackend(t *testing.T) {
+	f := newFakeS3(t)
 	_, err := Create(Settings{
-		Backend:  "fs",
+		Backend:  "s3",
+		S3:       &S3Settings{Key: "k", Secret: "s"},
 		Fallback: &FallbackSettings{Backend: "magic"},
-	}, Adapters{})
+	}, Adapters{S3: func(bucket string) (S3Client, error) { return f, nil }})
 	if err == nil || !strings.Contains(err.Error(), "unknown backend") {
 		t.Fatalf("want unknown backend, got %v", err)
 	}
@@ -341,29 +343,6 @@ func TestGCSStreamReadError(t *testing.T) {
 		}
 	}
 	stream.Close()
-}
-
-// --- FS branches -----------------------------------------------------------------
-
-func TestFSSendStreamTempWriteFailure(t *testing.T) {
-	tmpDir, _, p := setupFsScenario(t, false)
-	notADir := tmpDir + "/not-a-dir"
-
-	err := p.SendStream(notADir, "a/b.tex", strings.NewReader("x"), Opts{})
-	if err == nil {
-		t.Fatal("want error writing under a file path")
-	}
-	if !strings.Contains(err.Error(), "failed to write stream") {
-		t.Fatalf("message: %v", err)
-	}
-}
-
-func TestFSGetObjectStreamOpenError(t *testing.T) {
-	_, _, p := setupFsScenario(t, false)
-	_, err := p.GetObjectStream("/loc", "missing-key", Opts{})
-	if err == nil {
-		t.Fatal("want error")
-	}
 }
 
 // --- migration copy branches -------------------------------------------------------

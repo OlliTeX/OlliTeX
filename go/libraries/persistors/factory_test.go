@@ -38,16 +38,14 @@ func TestFactoryUnknownBackend(t *testing.T) {
 	}
 }
 
-func TestFactoryFS(t *testing.T) {
-	p, err := Create(Settings{Backend: "fs", UseSubdirectories: true}, Adapters{})
-	if err != nil {
-		t.Fatal(err)
+func TestFactoryFSRetired(t *testing.T) {
+	// G2 (STOR-1): fs is retired -> actionable error, not a backend.
+	_, err := Create(Settings{Backend: "fs", UseSubdirectories: true}, Adapters{})
+	if err == nil {
+		t.Fatal("want retired-backend error")
 	}
-	if _, ok := p.(*FSPersistor); !ok {
-		t.Fatalf("want *FSPersistor, got %T", p)
-	}
-	if settings, err := NewFSPersistor(FSSettings{UseSubdirectories: false}); err == nil {
-		_ = settings
+	if !strings.Contains(err.Error(), "retired") {
+		t.Fatalf("error should mention retirement: %v", err)
 	}
 }
 
@@ -144,11 +142,15 @@ func TestFactoryFallback(t *testing.T) {
 }
 
 func TestObjectPersistorEntry(t *testing.T) {
-	p, err := ObjectPersistor(Settings{Backend: "fs"}, Adapters{})
+	f := newFakeS3(t)
+	p, err := ObjectPersistor(Settings{
+		Backend: "s3",
+		S3:      &S3Settings{Key: "k", Secret: "s"},
+	}, Adapters{S3: func(bucket string) (S3Client, error) { return f, nil }})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := p.(*FSPersistor); !ok {
-		t.Fatalf("want *FSPersistor, got %T", p)
+	if _, ok := p.(*S3Persistor); !ok {
+		t.Fatalf("want *S3Persistor, got %T", p)
 	}
 }
