@@ -1,0 +1,38 @@
+#!/bin/bash
+# 2026-09-27 (PG-1, owner goal G1): run history-v1 knex migrations at boot.
+# - postgres:18-alpine is the tree-wide PG anchor (owner: "14 is dead").
+# - knex migrate:latest is idempotent (no-op when already applied), so this
+#   is safe on every boot.
+# - No DATABASE_URL in the environment (stack without a PG service) => skip,
+#   matching the pre-PG behavior where history-v1 connects lazily.
+# - 12 attempts x 10s: tolerates a slightly slower PG start, then fail-fast
+#   (a broken schema must not be covered up by a silently degraded boot).
+set -euo pipefail
+
+source /etc/container_environment.sh 2>/dev/null || true
+source /etc/overleaf/env.sh 2>/dev/null || true
+
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "890: DATABASE_URL unset — skipping history-v1 migrations (no PG plane)."
+  exit 0
+fi
+
+cd /overleaf/services/history-v1
+LOG_FILE=/var/lib/overleaf/data/history/migrations.log
+mkdir -p "$(dirname "$LOG_FILE")"
+
+attempt=0
+until [ "$attempt" -ge 12 ]; do
+  # HOME=/tmp: yarn (as www-data) must not read /root/.yarnrc.yml (EACCES); env HOME=/tmp
+  # verified green (exit 0, "Already up to date").
+  if env HOME=/tmp /sbin/setuser www-data yarn run --silent migrate 2>&1 | tee -a "$LOG_FILE"; then
+    echo "890: history-v1 migrations complete."
+    exit 0
+  fi
+  attempt=$((attempt + 1))
+  echo "890: migration attempt $attempt failed (see $LOG_FILE); retrying in 10s"
+  sleep 10
+done
+
+echo "890: history-v1 migrations FAILED after $attempt attempts — aborting boot (fail-fast)."
+exit 1

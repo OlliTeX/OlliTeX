@@ -74,6 +74,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+      sw-init:
+        condition: service_completed_successfully
     ports:
       - '127.0.0.1:7420:80'
     environment:
@@ -144,6 +148,40 @@ services:
       REDIS_HOST: redis
       OVERLEAF_REDIS_HOST: redis
       OVERLEAF_FILESTORE_MIGRATION_LEVEL: '2'
+      # ---- PG plane (G1, 2026-09-27 owner: tree-wide anchor postgres:18-alpine) ----
+      # history-v1 (Node knex) + future Go history-v1 port connect via this;
+      # migrations run at boot (server-ce init 890).
+      DATABASE_URL: postgres://overleaf:overleaf@postgres:5432/overleaf-history-v1
+      # ---- S3 plane (G2/STOR-1: SeaweedFS = the only durable binary backend) ----
+      # Bucket names are PLAIN (Go s3x PathEscapes the bucket; a "/buckets/x"
+      # name would mis-route). Node persistor keys map onto the same buckets.
+      OVERLEAF_FILESTORE_BACKEND: s3
+      OVERLEAF_FILESTORE_S3_ENDPOINT: http://s3:8333
+      OVERLEAF_FILESTORE_S3_PATH_STYLE: 'true'
+      OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID: e2e
+      OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY: e2e-secret
+      OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME: templatefiles
+      OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET: projectblobs
+      OVERLEAF_HISTORY_BLOBS_BUCKET: globalblobs
+      # monolith history-v1 persistor (server-ce custom-env mapping:
+      # persistor.backend <- OVERLEAF_HISTORY_BACKEND etc.)
+      OVERLEAF_HISTORY_BACKEND: s3
+      OVERLEAF_HISTORY_S3_ENDPOINT: http://s3:8333
+      OVERLEAF_HISTORY_S3_PATH_STYLE: 'true'
+      OVERLEAF_HISTORY_S3_ACCESS_KEY_ID: e2e
+      OVERLEAF_HISTORY_S3_SECRET_ACCESS_KEY: e2e-secret
+      OVERLEAF_HISTORY_CHUNKS_BUCKET: chunks
+      OVERLEAF_HISTORY_ZIPS_BUCKET: zips
+      PERSISTOR_BACKEND: s3
+      AWS_S3_ENDPOINT: http://s3:8333
+      AWS_S3_PATH_STYLE: 'true'
+      AWS_ACCESS_KEY_ID: e2e
+      AWS_SECRET_ACCESS_KEY: e2e-secret
+      OVERLEAF_EDITOR_ANALYTICS_BUCKET: analytics
+      OVERLEAF_EDITOR_BLOBS_BUCKET: globalblobs
+      OVERLEAF_EDITOR_CHUNKS_BUCKET: chunks
+      OVERLEAF_EDITOR_PROJECT_BLOBS_BUCKET: projectblobs
+      OVERLEAF_EDITOR_ZIPS_BUCKET: zips
       # ---- plain-HTTP test surface (no proxy) ----
       OVERLEAF_BEHIND_PROXY: 'false'
       OVERLEAF_SITE_URL: http://127.0.0.1:7420
@@ -196,7 +234,76 @@ services:
       start_period: 120s
     networks: [e2e]
 
+  # ---- PG plane (G1, 2026-09-27 owner-pinned image: "14 is dead") ----
+  postgres:
+    image: postgres:18-alpine
+    networks: [e2e]
+    environment:
+      POSTGRES_USER: overleaf
+      POSTGRES_PASSWORD: overleaf
+      POSTGRES_DB: overleaf-history-v1
+    ports:
+      - '127.0.0.1:5432:5432'   # debugging only
+    volumes:
+      - pg-data:/var/lib/postgresql   # PG18+ layout: mount at /var/lib/postgresql (not /data)
+    healthcheck:
+      test: pg_isready --host=localhost --quiet
+      interval: 1s
+      retries: 20
+
+  # ---- SeaweedFS (G2/STOR-1) — 1:1 mirror of the known-good compose_cep
+  #      services (chrislusf/seaweedfs:latest; same commands/flags/aliases).
+  #      NO host port mappings: the host already runs the production seaweed
+  #      on 8333/8888/9333; these are reachable only inside the e2e network.
+  sw-master:
+    image: chrislusf/seaweedfs:latest
+    command: master -ip=master -ip.bind=0.0.0.0 -metricsPort=9327
+    volumes:
+      - sw-master-data:/data
+    networks:
+      e2e:
+        aliases: [master]
+  sw-filer:
+    image: chrislusf/seaweedfs:latest
+    command: filer -master="master:9333" -ip=filer -ip.bind=0.0.0.0
+    volumes:
+      - sw-filer-data:/data
+    depends_on:
+      - sw-master
+    networks:
+      e2e:
+        aliases: [filer]
+  sw-volume:
+    image: chrislusf/seaweedfs:latest
+    command: volume -mserver="master:9333" -ip=volume -ip.bind=0.0.0.0 -port=8080 -dir=/data -max=0
+    volumes:
+      - sw-volume-data:/data
+    depends_on:
+      - sw-master
+    networks:
+      e2e:
+        aliases: [volume]
+  sw-s3:
+    image: chrislusf/seaweedfs:latest
+    command: s3 -filer="filer:8888" -ip.bind=0.0.0.0
+    depends_on:
+      - sw-filer
+    networks:
+      e2e:
+        aliases: [s3]
+  # One-shot gate: wait for S3, create the buckets idempotently (S3 PutBucket
+  # works on filer-backed SeaweedFS; object PUT to a missing bucket 403s),
+  # then overleaf may start (the Go filestore fails fast on missing buckets).
+  sw-init:
+    image: curlimages/curl:latest
+    entrypoint: sh
+    command: ["-c", "while :; do if curl -sf -o /dev/null http://s3:8333/; then ok=1; for b in templatefiles projectblobs globalblobs chunks zips analytics; do code=$$(curl -s -o /dev/null -w '%{http_code}' -X PUT http://s3:8333/$$b); case $$code in 200|409) : ;; *) ok=0 ;; esac; done; [ $$ok -eq 1 ] && exit 0; fi; sleep 2; done"]
+    depends_on:
+      - sw-s3
+    networks: [e2e]
+
   git-bridge:
+
     # P7 cutover (2026-09-24): the 1:1 Go git-bridge (go/services/gitbridge)
     # replaces the Java sharelatex/git-bridge. Image = ollitex/git-bridge
     # (ubuntu:26.04 + git) with the cmd/gitbridge Go binary, config-agnostic. Config is mounted from
@@ -222,6 +329,10 @@ volumes:
   mongo-data:
   ol-data:
   gb-data:
+  pg-data:
+  sw-master-data:
+  sw-filer-data:
+  sw-volume-data:
 
 networks:
   e2e:

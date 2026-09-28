@@ -1266,3 +1266,10 @@ davrot-machine, branch golang-ph; ledger = its HANDOFF.md; B7/B8b done, next B9/
   /home/davrot/history_v1). Remaining: real persistors + zip/clone
   streaming (501-bucket), document-updater Phase 9 (managers/HTTP over
   live Redis/Mongo), ARC-1b blob migration, then the runit flips.
+---
+
+## PG-1+S3-1 verification + battery verdict (2026-09-28)
+
+**Battery verdict (after the 890 bake + cold-boot proof):** `smoke` **PASSED** (1.9m) on the new PG+S3 stack (login → project → editor → compile → PDF, canonical Go web). `web-go-u101-history` **FAILED** — triaged; TWO pre-existing lineage findings, **not regressions of this slice**:
+*   (i) **u101 3-leg spec is obsolete in the P7 lineage**: it probes a Go web shadow on `127.0.0.1:4010` (`web-go-overleaf`) which the Dockerfile parks in `/etc/service.disabled` after P7 (canonical `web-overleaf` already execs `go-services/web`; `web-go-*` = manual-A/B-only). Its pre-flight passes in no current image → needs a P7-era re-pin (leg batteries against canonical :4000 / :3000 api) like other post-P7 specs.
+*   (ii) **open defect — create→history init (canonical Go-web lineage):** battery run directly against canonical :4000 passes all history READ checks on a fresh project, but **`POST /project/:id/labels` → 500**: PH → history-v1 `GET …/versions/1/history` → 404; history-v1 log `NotPersistedError: chunk for <pid> not persisted yet` (history_store.js:110); **PG `chunks` = 0 rows even after a direct `POST :3054/project` → 200** (direct probe in-container). Fresh projects never receive a seeded v1 chunk in history-v1 in the current stack → label creation (and any version-history write) 404s. All backends reachable; PG/S3/Mongo/redis healthy. Pre-P7 (Node-web) the U10.1 gate was green → the seeding regression is in the Go-web create lineage. **Fix = separate slice; blocks the G2 fs-removal gate** (that gate requires the history battery green on this stack).

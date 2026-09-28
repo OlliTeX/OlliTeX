@@ -119,7 +119,7 @@ services:
       - mongo:127.0.0.1
 
   postgres:
-    image: postgres:14
+    image: postgres:18-alpine  # 2026-09-27 (owner): 14 is dead; pin the tree-wide PG anchor
     # Throw-away test data in tmpfs: the image declares a VOLUME here, which would otherwise leave an anonymous volume behind after every run.
     tmpfs:
       - /var/lib/postgresql/data
