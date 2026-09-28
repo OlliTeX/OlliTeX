@@ -58,13 +58,18 @@ func main() {
 	}
 	db := client.Database(dbName)
 
-	// S3 persistor (G2 STOR-1: the fs persistor is retired in-tree)
+	// S3 persistor (G2 STOR-1: the fs persistor is retired in-tree) with the
+	// s3x gateway adapter (basic-auth SeaweedFS) wired in as the client
+	// factory — without it persistors refuse to issue any request.
+	factory := func(bucket string) (persistors.S3Client, error) {
+		return historyv1.NewS3xAdapter(cfg.PersistorEndpoint, cfg.PersistorKey, cfg.PersistorSecret), nil
+	}
 	pers := persistors.NewS3Persistor(persistors.S3Settings{
 		Key:       cfg.PersistorKey,
 		Secret:    cfg.PersistorSecret,
 		Endpoint:  cfg.PersistorEndpoint,
 		PathStyle: cfg.PersistorPathStyle,
-	}, nil)
+	}, factory)
 
 	// PG18 seam (numeric-id projects): optional
 	var pgPool *pgxpool.Pool
