@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"ollitex/go/libraries/oerror"
 	"ollitex/go/libraries/otc"
 )
 
@@ -53,7 +54,7 @@ func (s *Service) initializeProject(w http.ResponseWriter, r *http.Request) {
 			conflict(w)
 			return
 		}
-		s.Cfg.Log("initializeProject error: %v", err)
+		s.Cfg.Log("initializeProject error: %s", oerror.GetFullStack(err))
 		renderErr(w, 500)
 		return
 	}
@@ -273,7 +274,7 @@ func (s *Service) getChanges(w http.ResponseWriter, r *http.Request) {
 			jsonRes(w, 400, map[string]any{"error": "Version out of bounds: " + itoaVersion(since)})
 			return
 		}
-		s.Cfg.Log("getChanges error: %v", err)
+		s.Cfg.Log("\1 error: %s", oerror.GetFullStack(err))
 		renderErr(w, 500)
 		return
 	}
