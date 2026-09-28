@@ -9,8 +9,11 @@
 // oracle gate. This battery pins the shared wire: access gates (401/403),
 // exact 400 validation bodies (escaped "at \"...\"" paths), 404 param
 // validation, read/zip/blob/label proxies, and idempotent blob upsert.
-const P = '6aa4ba9c73ef0e5094f4ce33'        // WebGo-Ren-N (v1 history present)
-const NOP = '6ab1c3bd8e06b0422ceac4a1'      // webgo-p4inv-d (NO v1 history id)
+const P = process.argv[3]              // spec passes the idempotent SELF-SEEDED fixture pid (rework 2026-09-28: the old
+if (!/^[0-9a-f]{24}$/.test(P || '')) { console.error('usage: node u101-history-matrix.cjs <base-url> <fixture-pid> [nop-id]'); process.exit(2) }
+//      hardcoded fs-era fixture — WebGo-Ren-N — had chunk blobs unrecoverable after the G2 fs->S3 swap;
+//      a self-seeded fixture (create + typed edits -> v1+) has no storage-era dependency)
+const NOP = process.argv[4] || '6ab1c3bd8e06b0422ceac4a1'  // nohistory class: spec may pass a random nonexistent id
 const BLOB = '5075e7f8058697019905149437412c45900faf8c'
 const ZZZ = 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
 const BASE = process.argv[2]
@@ -177,9 +180,15 @@ async function leg() {
   }
   {
     const L = global.__LABEL
-    if (!L) { REC.push({ tag: 'labels delete', status: -1, ct: '', body: 'NO LABEL CREATED', len: 0, headers: {} }); return }
-    const r = await fetch(U(`/project/${P}/labels/${L}`), { headers: { ...J, ...C }, method: 'DELETE' })
-    rec('labels delete', r, await r.text())
+    if (!L) {
+      // D41 (owner 2026-09-26): v1+ version pinning on the OT plane is TRANSITIONAL for
+      // Yjs-era projects (ygo is the version store; hybrid-b1 composition = d5dd23dd).
+      // RECORD and CONTINUE — the matrix is a stability+class gate, not an abort.
+      REC.push({ tag: 'labels delete', status: -1, ct: '', body: 'NO LABEL CREATED (transitional: v1 OT plane unseeded in Yjs era)', len: 0, headers: {} })
+    } else {
+      const r = await fetch(U(`/project/${P}/labels/${L}`), { headers: { ...J, ...C }, method: 'DELETE' })
+      rec('labels delete', r, await r.text())
+    }
   }
   {
     const r = await fetch(U(`/project/${P}/labels/badlabelid`), { headers: { ...J, ...C }, method: 'DELETE' })

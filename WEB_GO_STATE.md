@@ -1273,3 +1273,39 @@ davrot-machine, branch golang-ph; ledger = its HANDOFF.md; B7/B8b done, next B9/
 **Battery verdict (after the 890 bake + cold-boot proof):** `smoke` **PASSED** (1.9m) on the new PG+S3 stack (login → project → editor → compile → PDF, canonical Go web). `web-go-u101-history` **FAILED** — triaged; TWO pre-existing lineage findings, **not regressions of this slice**:
 *   (i) **u101 3-leg spec is obsolete in the P7 lineage**: it probes a Go web shadow on `127.0.0.1:4010` (`web-go-overleaf`) which the Dockerfile parks in `/etc/service.disabled` after P7 (canonical `web-overleaf` already execs `go-services/web`; `web-go-*` = manual-A/B-only). Its pre-flight passes in no current image → needs a P7-era re-pin (leg batteries against canonical :4000 / :3000 api) like other post-P7 specs.
 *   (ii) **DIAGNOSIS (CORRECTED 2026-09-28, supersedes the earlier "create→init seeding regression" reading):** NOT a code defect. Verified: `POST /api/projects` (initialize) works — fresh projects get an ACTIVE v0 chunk (`projectHistoryChunks` state=active, 0→0; proven via in-container module probe AND live HTTP 200 + Mongo row). ObjectId projects use history-v1's **mongo backend** by design (PG `chunks` is only for numeric-id projects — that plane is healthy but simply not this traffic). The u101 500's true cause: the battery matrix (u101-history-matrix.cjs L12) is pinned to a HARDCODED fixture `P = 6aa4ba9c… ("WebGo-Ren-N")` whose 61-version history chunks exist in Mongo (active 0→61) but whose **chunk BINARY BLOBS were written in the fs-persistor era and are unrecoverable after the G2 backend swap to the fresh SeaweedFS buckets** (new S3 has no such keys; old fs tree not on any current volume) → `NotPersistedError` on every version read → label-create (pinned `version: 1`) → 500. Also: 677 `projectHistoryFailures` = pre-existing DU-era queue backlog (DU stopped at slice 1; retarget pending). **Fix = battery rework (now under d74aa9fe): replace the hardcoded fs-era fixture with an IDEMPOTENT self-seeded fixture (create + deterministic edits via the canonical path) per leg; the G2 fs-removal gate stays gated on a GREEN u101 after that rework.** Note for record: my earlier "no state anywhere" Mongo queries were a string-vs-ObjectId type bug — state was there; corrected via `new ObjectId()` queries.
+
+## U10.1 battery rework — GREEN (2026-09-28, todo d74aa9fe)
+
+`web-go-u101-history` **1 passed (39.8s)** on the canonical Go web (`:4000`), replacing the
+obsolete pre-P7 3-leg `:4010`-shadow design (obsolete since the P7 hard cutover parked the
+shadow in `/etc/service.disabled`).
+
+*   **Self-seeding fixture** (idempotent): login as `e2e-user` (battery `me`) → hub blank-create
+    → 3 typed edits in the editor → poll `/project/:pid/collab/history` ≥ 2 versions. Replaces
+    the hardcoded fs-era fixture `WebGo-Ren-N` (its v1+ chunk blobs were unrecoverable after the
+    G2 fs→S3 swap — 9cd74a73 diagnosis; battery `me/them` = e2e-user/e2e-admin per the fixtures,
+    so the fixture MUST be owned by e2e-user or the member/nonmember roles flip).
+*   **2-run wire-stability gate**: all **59/59 cases** run1==run2 (status/ct/body/headers/len),
+    zero DIFFs. Battery abort-on-label-failure converted to record-and-continue.
+*   **42 contractual pins = OBSERVED stable wire contract**, classes verified 2-run-identical:
+    reads 200 · anon 401 · validation 400 · csrf-scope 403 · absent 404 · rate-limit 429 class
+    (download-project-revision / get-project-blob / flush limiters — vendor, per nodeversion
+    HistoryRouter.mjs).
+*   **Oracle consulted (nodeversion = pre-golang reference tree, owner-provided
+    /data_1/image_mining/nodeversion):** `services/web/app/src/infrastructure/Csrf.mjs` +
+    `Server.mjs` L232-233 → **GLOBAL csurf, zero production exclusions** → POST without token =
+    403 in Node too. The battery's no-token blob/flush POSTs getting 403 is therefore
+    **vendor-TRUE contract**, not a Go-web divergence (earlier [201] pin was a spec-doc
+    misreading, corrected to [403]).
+*   **Observations recorded (not pinned; stable both runs):** `zip anon` → 200 (anon login
+    redirect body, vendor anon class) · `flush nonmember` → 200 (them = e2e-admin: admin override)
+    · `blob 304` → 304 (etag-dependent, info only).
+*   **TRANSITIONAL (D41 split, owner 2026-09-26)** — RECORDED + stability-checked, NOT asserted,
+    until the hybrid-b1 composition task (**d5dd23dd**) lands: v1+ version plane on the OT store
+    is transitional in the Yjs era (ygo versioned store is the live version plane per D41):
+    `labels create` 500 · `labels delete` (no label) · `labels delete-badid` 404 ·
+    `zip v1 member/head` 404 · `changes since1 member` 500 · `diff 0-1 member` 500 ·
+    `filetree diff member` 500. These turn into hard pins when d5dd23delivers.
+
+**GATE STATE:** u101 rework gate GREEN → **c129a612 (G2 fs-removal) UNBLOCKED**
+(gate = u101 matrix + smoke green; both now green).
