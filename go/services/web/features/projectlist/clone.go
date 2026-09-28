@@ -187,12 +187,9 @@ func clCopyBlob(cxt *core.Cxt, src, target, hash string) bool {
 	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }
 
-// clFlushProject is the duplicate engine's first step (flush OT to mongo).
-// Best-effort here (the service is up in e2e; Node would 500, which the
-// healthy stack never reaches).
-func clFlushProject(cxt *core.Cxt, src string) {
-	fireHTTP(cxt, "POST", strings.TrimSuffix(cduBase(), "/")+"/project/"+src+"/flush", nil)
-}
+// clFlushProject removed (D41): it was the DU OT-flush warm-up; the
+// duplicate engine reads the docstore directly, so there is nothing to
+// flush before a clone.
 
 type cloneOwner struct {
 	FirstName string `json:"first_name"`
@@ -278,8 +275,10 @@ func cloneProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 
 		// ---- duplicate engine (non-admin e2e path) ----
+		// D41 (owner RETIRE document-updater): Node's first step (flush OT to
+		// mongo via DU) is moot — this engine copies straight from the docstore
+		// (clDocLines / clCopyBlob), which is the content source of truth.
 		srcHex := oid.Hex()
-		clFlushProject(cxt, srcHex)
 
 		// source entries (array order preserved)
 		var srcDocs []primitive.D

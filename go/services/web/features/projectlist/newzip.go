@@ -72,7 +72,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -660,28 +659,6 @@ func nzipWriteStructure(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, root 
 	return res.MatchedCount == 1
 }
 
-// nzipUpdateStructure — DU project-structure POST with source:null (zip
-// flow — contrast P4.13a's 'upload').
-func nzipUpdateStructure(pj, uid string, version int64, historyID string, updates bson.A) bool {
-	if len(updates) < 1 {
-		return true
-	}
-	body, _ := json.Marshal(map[string]any{
-		"updates":          upJSONArray(updates),
-		"userId":           uid,
-		"version":          version,
-		"projectHistoryId": historyID,
-		"source":           nil,
-	})
-	resp, err := upHTTP.Post(upDUBase()+"/project/"+pj, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	return resp.StatusCode >= 200 && resp.StatusCode < 300
-}
-
 // nzipSetRootDoc — setRootDocFromName + setRootDoc over the final tree.
 func nzipSetRootDoc(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, rootDocName string) bool {
 	if a.Mongo == nil {
@@ -805,8 +782,7 @@ func nzipFailCleanup(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, uid, ip 
 	pid := pj.Hex()
 	hist := strings.TrimSuffix(crHistoryBase(), "/")
 	ds := strings.TrimSuffix(crDocstoreBase(), "/")
-	fireHTTP(cxt, "DELETE", cduBase()+"/project/"+pid, nil)
-	fireHTTP(cxt, "POST", cduBase()+"/project/"+pid+"/flush", nil)
+	// D41 slice-2: DU project delete+flush removed (DU retired).
 	fireHTTP(cxt, "POST", hist+"/project/"+pid+"/flush", nil)
 	fireHTTP(cxt, "POST", ds+"/project/"+pid+"/archive", nil)
 
@@ -1018,17 +994,8 @@ func newzipHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 
-		var updates bson.A
-		for _, d := range docs {
-			updates = append(updates, upAddOpDoc(d.id.Hex(), d.path, strings.Join(d.ln, "\n"), false))
-		}
-		for _, f := range files {
-			updates = append(updates, upAddOpFile(f.id.Hex(), f.path, f.hash, false))
-		}
-		if len(updates) > 0 && !nzipUpdateStructure(pj.Hex(), uid, 1, pj.Hex(), updates) {
-			cleanup()
-			return
-		}
+		// D41 slice-2: DU structure op removed — nzipWriteStructure (mongo)
+		// above is the tree of record; DU versioning defers to the Yjs hybrid.
 
 		if hasRoot {
 			if !nzipSetRootDoc(a, cxt, pj, rootRel) {

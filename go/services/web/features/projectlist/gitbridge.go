@@ -16,7 +16,6 @@ package projectlist
 import (
 	"context"
 	"net/http"
-	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -172,33 +171,23 @@ func GBDeleteEntityAtPath(ctx context.Context, a *core.App, pj primitive.ObjectI
 		subDocs = []entElement{{idHex: elemHex, name: leaf}}
 	}
 
-	// Node deleteEntity sequence (ProjectEntityUpdateHandler.deleteEntity,
-	// pinned A/B: the DU structure delete op is what makes project-history
-	// record a deletion version — the doc DELETE docstore/DU calls alone do
-	// not; verified: without it, v1-history keeps stale versions).
+	// Node deleteEntity sequence (ProjectEntityUpdateHandler.deleteEntity).
+	// D41 slice-2 (DU retirement): the Node original's DU calls are removed —
+	// DU flush (step 1), the DU structure delete op (step 3), and the DU doc
+	// DELETE (step 4). The data plane remains: mongo $pull +$inc (+$unset
+	// rootDoc_id) and the docstore doc soft-delete via entPatchDoc (docs
+	// only). Node's pinned side effect — the DU structure op queuing a
+	// deletion version in project-history — defers to the D41 Yjs hybrid
+	// version-plane contract (deferred work item d5dd23dd).
 
-	// 1. flushProjectToMongo before the mongo write (DU POST /flush).
-	_ = fireHTTP(cxt, http.MethodPost, cduBase()+"/project/"+pj.Hex()+"/flush", nil)
-
-	// 2. mongo $pull + $inc version (+ $unset rootDoc_id).
+	// 1. mongo $pull + $inc version (+ $unset rootDoc_id).
 	if !mongoPullEntity(ctx, a, pj, parentEl, eid, uid, uidObj, rootDoc) {
 		return false
 	}
 
-	// 3. DU structure op: rename-{doc|file} with newPathname '' (= delete)
-	//    → project-history queues the deletion version.
-	kind := "file"
-	if parentEl == mp+".docs" {
-		kind = "doc"
-	}
-	upds := bson.A{upDelOp(kind, eid.Hex(), "/"+trimSlash(fullPath))}
-	_ = upUpdateStructure(pj.Hex(), strings.ToLower(uid), upVersion(doc)+1, upHistoryID(doc), upds, "git-bridge")
-
-	// 4. doc cleanup (docs only): docstore PATCH {deleted,deletedAt,name} +
-	//    DU doc DELETE (whose finally flushes project-history).
+	// 2. doc cleanup (docs only): docstore PATCH {deleted,deletedAt,name}.
 	for _, d := range subDocs {
 		_ = entPatchDoc(pj.Hex(), d.idHex, d.name)
-		_ = fireHTTP(cxt, http.MethodDelete, cduBase()+"/project/"+pj.Hex()+"/doc/"+d.idHex, nil)
 	}
 	return true
 }

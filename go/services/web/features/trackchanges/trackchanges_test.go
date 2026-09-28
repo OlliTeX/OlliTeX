@@ -128,3 +128,46 @@ func TestJSONStrEscapes(t *testing.T) {
 		}
 	}
 }
+
+// D41 (owner RETIRE document-updater): /ranges is now docstore-direct.
+// tcRangesWire is the DU-free replacement for DU's getProjectRanges body —
+// oracle-pinned from the e2e contract (R9 + review-panel d12):
+//
+//	GET /project/:pid/ranges → 200 [{id: <docId>, ranges: {changes,comments}}]
+//
+// with the `ranges` key DROPPED when the docstore document has none (Node
+// JSON undefined semantics: docs.push({id, ranges}) → JSON.stringify drops
+// the undefined key).
+func TestRangesWire_D41(t *testing.T) {
+	docID := `"6aac665553b2cdd8a092b3a1"`
+	t1 := `{"_id":` + docID + `,"lines":["a"],"rev":3,"version":0,"ranges":{"changes":[{"id":"c1","op":{"i":" [edited]","pos":6},"state":"pending"}],"comments":[{"id":"cm1","op":{"threadId":"th1","pos":6}}]}}`
+	code, body, err := tcRangesWire([]byte(t1))
+	if err || code != 200 {
+		t.Fatalf("code=%d err=%v", code, err)
+	}
+	want1 := `[{"id":` + docID + `,"ranges":{"changes":[{"id":"c1","op":{"i":" [edited]","pos":6},"state":"pending"}],"comments":[{"id":"cm1","op":{"threadId":"th1","pos":6}}]}}]`
+	if string(body) != want1 {
+		t.Fatalf("got %s\nwant %s", body, want1)
+	}
+
+	// ranges absent on the document → key DROPPED (Node parity), id kept.
+	noR := `{"_id":` + docID + `,"lines":[],"rev":0}`
+	code, body, err = tcRangesWire([]byte(noR))
+	if err || code != 200 || string(body) != `[{"id":`+docID+`}]` {
+		t.Fatalf("absent-ranges: code=%d err=%v body=%s", code, err, body)
+	}
+
+	// ranges present but empty object → key KEPT (defined ≠ undefined).
+	empty := `{"_id":` + docID + `,"ranges":{}}`
+	code, body, err = tcRangesWire([]byte(empty))
+	if err || code != 200 || string(body) != `[{"id":`+docID+`,"ranges":{}}]` {
+		t.Fatalf("empty-ranges: code=%d err=%v body=%s", code, err, body)
+	}
+
+	// malformed / missing _id → Node 500.
+	for _, bad := range []string{`{}`, `{"lines":[]}`, `not json`} {
+		if _, _, err = tcRangesWire([]byte(bad)); !err {
+			t.Fatalf("%s: expected wire error", bad)
+		}
+	}
+}

@@ -31,7 +31,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"net/http"
 	"regexp"
 	"strconv"
 	"time"
@@ -111,7 +110,7 @@ func internalExpireProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		}
 		// deletedProject found → destructive expiry (best-effort: Node destroys
 		// docstore + history + project + record). NOT gated (destructive).
-		fireHTTP(c, http.MethodDelete, cduBase()+"/project/"+oid.Hex(), nil)
+		// D41 slice-2: Node's DU project destroy removed (DU retired).
 		_, _ = projects.DeleteOne(ctx, bson.D{{Key: "_id", Value: oid}})
 		_, _ = deleted.DeleteOne(ctx, bson.D{{Key: "deleterData.deletedProjectId", Value: oid}})
 		r.W.Header().Set("X-Powered-By", "Express")

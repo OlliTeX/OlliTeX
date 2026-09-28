@@ -96,6 +96,14 @@ export async function loginRobust(
     if (cooldowns[attempt] > 0) await page.waitForTimeout(cooldowns[attempt])
     await page.goto('/login', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(700)
+    const formReady = await page
+      .waitForSelector('#email', { timeout: 8_000 })
+      .then(() => true)
+      .catch(() => false)
+    if (!formReady) {
+      // Throttle/CAPTCHA page (no form): burn the cooldown, try again.
+      continue
+    }
     await page.fill('#email', email)
     await page.fill('#password', password)
     await page.click('button[type=submit]')

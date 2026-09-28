@@ -32,7 +32,7 @@
 //
 // The 200-applied upsert reuses the proven P4 upload primitives (upClassify,
 // upDocstorePut->rev, upPutBlob, upPushDoc/upPushFile, upSwapFileToDoc/
-// upSwapDocToFile/upReplaceFile, upUpdateStructure) but responds in the TPDS
+// upSwapDocToFile/upReplaceFile) but responds in the TPDS
 // wire (status/projectId/entityId/entityType/folderId/rev-string or the GitHub
 // entityId/rev-number), not the upload wire.
 package projectlist
@@ -141,7 +141,7 @@ func syncUpsert(a *core.App, uidHex string, pd *primitive.D, pid primitive.Objec
 
 	if kind == "doc" {
 		if tgt.existingDoc != nil {
-			if !upDUSetDoc(pid.Hex(), tgt.existingDoc.idHex, lines, uidl, upTrackChanges(entFld(docD, "track_changes"), uidl), "github") {
+			if _, ok := upDocstorePut(pid.Hex(), tgt.existingDoc.idHex, lines); !ok {
 				return "", "", "", 0, false, false
 			}
 			return tgt.existingDoc.idHex, folderID, "doc", 0, false, true
@@ -151,21 +151,16 @@ func syncUpsert(a *core.App, uidHex string, pd *primitive.D, pid primitive.Objec
 		if !dok {
 			return "", "", "", 0, false, false
 		}
-		p := tgt.fsPath + "/" + name
 		if tgt.existingFile != nil {
 			if !upSwapFileToDoc(a, pid.Hex(), tgt.mongoPath, tgt.existingFile.idHex, newDocID.Hex(), name, r2, uidl, now) {
 				return "", "", "", 0, false, false
 			}
-			if !upUpdateStructure(pid.Hex(), uidl, upVersion(docD)+1, upHistoryID(docD), bson.A{upDelOp("file", tgt.existingFile.idHex, p), upAddOpDoc(newDocID.Hex(), p, strings.Join(lines, "\n"), upRangsup(docD))}, "github") {
-				return "", "", "", 0, false, false
-			}
+			// D41 slice-2: DU structure op removed (mongo tree write above is the record).
 		} else {
 			if !upPushDoc(a, pid.Hex(), tgt.mongoPath, name, newDocID.Hex(), r2, uidl, now) {
 				return "", "", "", 0, false, false
 			}
-			if !upUpdateStructure(pid.Hex(), uidl, upVersion(docD)+1, upHistoryID(docD), bson.A{upAddOpDoc(newDocID.Hex(), p, strings.Join(lines, "\n"), upRangsup(docD))}, "github") {
-				return "", "", "", 0, false, false
-			}
+			// D41 slice-2: DU structure op removed (mongo $push above is the record).
 		}
 		return newDocID.Hex(), folderID, "doc", r2, true, true
 	}
@@ -176,15 +171,12 @@ func syncUpsert(a *core.App, uidHex string, pd *primitive.D, pid primitive.Objec
 		return "", "", "", 0, false, false
 	}
 	newFileID := primitive.NewObjectID()
-	p := tgt.fsPath + "/" + name
 	switch {
 	case tgt.existingFile != nil:
 		if !upReplaceFile(a, pid.Hex(), tgt.mongoPath, newFileID.Hex(), hash, uidl, now, tgt.fileIdx) {
 			return "", "", "", 0, false, false
 		}
-		if !upUpdateStructure(pid.Hex(), uidl, upVersion(docD)+1, hist, bson.A{upDelOp("file", tgt.existingFile.idHex, p), upAddOpFile(newFileID.Hex(), p, hash, upRangsup(docD))}, "github") {
-			return "", "", "", 0, false, false
-		}
+		// D41 slice-2: DU structure op removed ($set+$inc above is the record).
 	case tgt.existingDoc != nil:
 		newFile := bson.D{
 			{Key: "name", Value: name}, {Key: "created", Value: now}, {Key: "rev", Value: 0},
@@ -194,16 +186,12 @@ func syncUpsert(a *core.App, uidHex string, pd *primitive.D, pid primitive.Objec
 		if !upSwapDocToFile(a, pid.Hex(), tgt.mongoPath, tgt.existingDoc.idHex, newFile, uidl, now) {
 			return "", "", "", 0, false, false
 		}
-		if !upUpdateStructure(pid.Hex(), uidl, upVersion(docD)+1, hist, bson.A{upDelOp("doc", tgt.existingDoc.idHex, p), upAddOpFile(newFileID.Hex(), p, hash, upRangsup(docD))}, "github") {
-			return "", "", "", 0, false, false
-		}
+		// D41 slice-2: DU structure op removed (swap above is the record).
 	default:
 		if !upPushFile(a, pid.Hex(), tgt.mongoPath, name, newFileID.Hex(), hash, uidl, now) {
 			return "", "", "", 0, false, false
 		}
-		if !upUpdateStructure(pid.Hex(), uidl, upVersion(docD)+1, hist, bson.A{upAddOpFile(newFileID.Hex(), p, hash, upRangsup(docD))}, "github") {
-			return "", "", "", 0, false, false
-		}
+		// D41 slice-2: DU structure op removed ($push above is the record).
 	}
 	return newFileID.Hex(), folderID, "file", 0, true, true
 }
@@ -400,9 +388,9 @@ func syncDeleteEntity(a *core.App, uidHex string, pd *primitive.D, pid primitive
 	if kind == "doc" {
 		entPatchDoc(pid.Hex(), eid, name)
 	}
-	if hist := upHistoryID(*pd); hist != "" {
-		upUpdateStructure(pid.Hex(), strings.ToLower(uidHex), upVersion(*pd)+1, hist, bson.A{upDelOp(kind, eid, fullPath)}, "github")
-	}
+	// D41 slice-2: DU delete structure op removed ($pull+$inc above are the tree
+	// write; entPatchDoc owns the doc delete; DU versioning defers to the Yjs
+	// hybrid contract).
 	return kind, eid, true
 }
 

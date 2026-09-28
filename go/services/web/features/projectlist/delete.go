@@ -122,13 +122,17 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid primitive.ObjectID, proje
 	hist := strings.TrimSuffix(crHistoryBase(), "/")
 	ds := strings.TrimSuffix(crDocstoreBase(), "/")
 
-	// 2. document-updater flush+delete, with Node's exact fallback chain.
-	if !fireHTTP(cxt, "DELETE", cduBase()+"/project/"+pid, nil) {
-		fireHTTP(cxt, "POST", cduBase()+"/project/"+pid+"/flush", nil)
-		if !fireHTTP(cxt, "POST", hist+"/project/"+pid+"/flush", nil) {
-			fireHTTP(cxt, "POST", hist+"/project/"+pid+"/resync", []byte(`{"force":true}`))
-		}
-		fireHTTP(cxt, "DELETE", cduBase()+"/project/"+pid, nil)
+	// 2. D41 (owner RETIRE document-updater): Node's chain
+	//    "DU flush+delete — on failure { DU flush → project-history flush →
+	//     on failure project-history resync(force) → DU flush+delete retry }"
+	//    reduces, with the DU steps removed, to the history-side "try harder"
+	//    path — flush the project-history service (pending OT updates that may
+	//    still queue there during the OT→Yjs retention window, D41 hybrid)
+	//    then force-resync if that fails. No DU doc remains to delete; the
+	//    collab room (Y.Doc) unloads with the project, and docstore archival
+	//    (step 3) is the content side effect.
+	if !fireHTTP(cxt, "POST", hist+"/project/"+pid+"/flush", nil) {
+		fireHTTP(cxt, "POST", hist+"/project/"+pid+"/resync", []byte(`{"force":true}`))
 	}
 
 	// 3. docstore archive (best-effort; no-op persistor backend in this build).

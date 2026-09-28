@@ -935,10 +935,7 @@ func transferOwnerHandler(a *core.App) func(*core.Cxt, *core.Res) {
 				}
 			}
 		}
-		// 4) background flush to the document updater (Node TpdsProjectFlusher;
-		// needs overleaf.history.id — real projects only — best-effort, pinned
-		// by the state gate, not by service state).
-		_ = fireHTTP(cxt, "POST", cduBase()+"/project/"+proj.Hex()+"/flush", nil)
+		// 4) (D41 slice-2: Node's DU flush removed — DU retired.)
 		// 5) confirmation mails to BOTH sides (Node _sendEmails).
 		if !skipEmails {
 			prevMail, _ := colLoadUserMail(a, cxt, ownerHex)

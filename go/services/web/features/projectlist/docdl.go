@@ -119,9 +119,12 @@ func docDownloadHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 
-		base := cduBase()
+		// D41 slice-2: doc content from docstore directly (Node fetched it via
+		// document-updater `?fromVersion=-1` = current; docstore GET doc is
+		// the same current view — {lines:[...]} parse below unchanged).
+		base := crDocstoreBase()
 		up, err := http.NewRequestWithContext(req.Context(), http.MethodGet,
-			base+"/project/"+pidHex+"/doc/"+didHex+"?fromVersion=-1", nil)
+			base+"/project/"+pidHex+"/doc/"+didHex, nil)
 		if err != nil {
 			res.PlainText(500, "Internal Server Error")
 			return

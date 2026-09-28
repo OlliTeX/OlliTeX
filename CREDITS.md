@@ -94,6 +94,17 @@ Mellino](https://github.com/xvan) (@xvan), ported to this tree on 2026-09-12
 (owner item) together with the matching /hub → Site settings → SSO · OIDC
 "Claim mapping" fields.
 
+## Go service internals (shutdown choreography, scheduling, config hardening)
+
+The Go backend service mains and shared Go library helpers take inspiration from
+[J. Ackermann\'s Golang port of Overleaf](https://github.com/das7pad/overleaf-go) (Jakob
+Ackermann / das7pad, AGPL-3.0): ordered graceful-shutdown choreography (stop accepting →
+drain in-flight → deadline-bound flush → force close) with pending-operation tracking, a
+jittered periodic scheduler with adaptive backoff, fail-fast configuration validation at
+boot, and the create-if-missing / wait-for-marker integration-test bootstrap pattern.
+Idea-level inspiration only — all implementations in this repository are independent,
+no code from that project is included.
+
 ## Inspiration
 
 The local-first, self-hosted approach to LaTeX editing was inspired by

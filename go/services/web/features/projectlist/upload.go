@@ -274,13 +274,6 @@ func upGitBlobHash(b []byte) string {
 
 // ---------- DU / v1-history / docstore clients --------------------------------
 
-func upDUBase() string {
-	if v := os.Getenv("WEB_DOCUMENT_UPDATER_URL"); v != "" {
-		return v
-	}
-	return "http://127.0.0.1:3003"
-}
-
 func upV1HBase() string {
 	if v := os.Getenv("WEB_V1_HISTORY_URL"); v != "" {
 		return v
@@ -318,19 +311,6 @@ func upPutBlob(historyID, hash string, data []byte) bool {
 	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }
 
-func upDUSetDoc(pj, docID string, lines []string, uid string, track bool, source string) bool {
-	body, _ := json.Marshal(map[string]any{
-		"lines": lines, "source": source, "user_id": uid, "trackChanges": track,
-	})
-	resp, err := upHTTP.Post(upDUBase()+"/project/"+pj+"/doc/"+docID, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	return resp.StatusCode >= 200 && resp.StatusCode < 300
-}
-
 func upDocstorePut(pj, docID string, lines []string) (int64, bool) {
 	body, _ := json.Marshal(map[string]any{
 		"lines": lines, "version": 0, "ranges": map[string]any{},
@@ -355,38 +335,6 @@ func upDocstorePut(pj, docID string, lines []string) (int64, bool) {
 }
 
 // ---------- DU structure ops (key order + key presence pinned) ----------------
-
-func upAddOpDoc(id, path, lines string, hrs bool) bson.D {
-	return bson.D{
-		{Key: "type", Value: "add-doc"},
-		{Key: "id", Value: id},
-		{Key: "pathname", Value: path},
-		{Key: "docLines", Value: lines},
-		{Key: "ranges", Value: bson.D{}},
-		{Key: "historyRangesSupport", Value: hrs},
-		{Key: "createdBlob", Value: true},
-	}
-}
-
-func upAddOpFile(id, path, hash string, hrs bool) bson.D {
-	return bson.D{
-		{Key: "type", Value: "add-file"},
-		{Key: "id", Value: id},
-		{Key: "pathname", Value: path},
-		{Key: "historyRangesSupport", Value: hrs},
-		{Key: "hash", Value: hash},
-		{Key: "createdBlob", Value: true},
-	}
-}
-
-func upDelOp(kind, id, path string) bson.D {
-	return bson.D{
-		{Key: "type", Value: "rename-" + kind},
-		{Key: "id", Value: id},
-		{Key: "pathname", Value: path},
-		{Key: "newPathname", Value: ""},
-	}
-}
 
 // upJSONObj — bson.D (ordered) → map for encoding/json (json.Marshal of
 // bson.D serializes as an ARRAY — driver D has no encoding/json shape).
@@ -436,26 +384,6 @@ func upJSONArray(a bson.A) []map[string]any {
 	return out
 }
 
-func upUpdateStructure(pj, uid string, version int64, historyID string, updates bson.A, source string) bool {
-	if len(updates) < 1 {
-		return true
-	}
-	body, _ := json.Marshal(map[string]any{
-		"updates":          upJSONArray(updates),
-		"userId":           uid,
-		"version":          version,
-		"projectHistoryId": historyID,
-		"source":           source,
-	})
-	resp, err := upHTTP.Post(upDUBase()+"/project/"+pj, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	return resp.StatusCode >= 200 && resp.StatusCode < 300
-}
-
 // ---------- project-doc helpers ------------------------------------------------
 
 func upTrackChanges(d any, uid string) bool {
@@ -466,17 +394,6 @@ func upTrackChanges(d any, uid string) bool {
 		for _, e := range v {
 			if e.Key == uid {
 				return e.Value == true
-			}
-		}
-	}
-	return false
-}
-
-func upRangsup(d primitive.D) bool {
-	if ov, ok := entFld(d, "overleaf").(primitive.D); ok {
-		if h, ok := entFld(ov, "history").(primitive.D); ok {
-			if v := entFld(h, "rangesSupportEnabled"); v != nil {
-				return v == true
 			}
 		}
 	}
@@ -945,8 +862,10 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 	now := time.Now()
 	uidl := strings.ToLower(uid)
 	if tgt.existingDoc != nil {
-		// doc re-upload: DU setDocument (DU flushes docstore + project).
-		if !upDUSetDoc(pj, tgt.existingDoc.idHex, lines, uidl, track, source) {
+		// doc re-upload: docstore PUT (D41 slice-2: DU retired as doc-write
+		// path; content is docstore-direct, version plane defers to the Yjs
+		// hybrid contract).
+		if _, ok := upDocstorePut(pj, tgt.existingDoc.idHex, lines); !ok {
 			fail500()
 			return
 		}
@@ -964,16 +883,8 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 		if !upSwapFileToDoc(a, pj, tgt.mongoPath, tgt.existingFile.idHex, newDocID.Hex(), name, rev, uidl, now) {
 			fail500()
 			return
-		}
-		path := tgt.fsPath + "/" + name
-		updates := bson.A{
-			upDelOp("file", tgt.existingFile.idHex, path),
-			upAddOpDoc(newDocID.Hex(), path, strings.Join(lines, "\n"), upRangsup(doc)),
-		}
-		if !upUpdateStructure(pj, uidl, upVersion(doc)+1, upHistoryID(doc), updates, source) {
-			fail500()
-			return
-		}
+		} // D41 slice-2: DU structure op removed — the mongo swap (upSwapFileToDoc)
+		// already wrote the tree; DU's version creation defers to the Yjs hybrid.
 		res.JSON(200, upJSONDoc(newDocID.Hex()))
 		return
 	}
@@ -988,14 +899,7 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 		fail500()
 		return
 	}
-	path := tgt.fsPath + "/" + name
-	updates := bson.A{
-		upAddOpDoc(newDocID.Hex(), path, strings.Join(lines, "\n"), upRangsup(doc)),
-	}
-	if !upUpdateStructure(pj, uidl, upVersion(doc)+1, upHistoryID(doc), updates, source) {
-		fail500()
-		return
-	}
+	// D41 slice-2: DU add-doc structure op removed ($push docs done above).
 	res.JSON(200, upJSONDoc(newDocID.Hex()))
 }
 
@@ -1019,15 +923,7 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 			fail500()
 			return
 		}
-		path := tgt.fsPath + "/" + name
-		updates := bson.A{
-			upDelOp("file", tgt.existingFile.idHex, path),
-			upAddOpFile(newFileID.Hex(), path, hash, upRangsup(doc)),
-		}
-		if !upUpdateStructure(pj, uidl, upVersion(doc)+1, hist, updates, source) {
-			fail500()
-			return
-		}
+		// D41 slice-2: DU structure op removed ($set new id + $inc done above).
 		res.JSON(200, upJSONFile(newFileID.Hex(), hash))
 		return
 	}
@@ -1046,15 +942,7 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 			fail500()
 			return
 		}
-		path := tgt.fsPath + "/" + name
-		updates := bson.A{
-			upDelOp("doc", tgt.existingDoc.idHex, path),
-			upAddOpFile(newFileID.Hex(), path, hash, upRangsup(doc)),
-		}
-		if !upUpdateStructure(pj, uidl, upVersion(doc)+1, hist, updates, source) {
-			fail500()
-			return
-		}
+		// D41 slice-2: DU structure op removed (upSwapDocToFile done above).
 		res.JSON(200, upJSONFile(newFileID.Hex(), hash))
 		return
 	}
@@ -1064,14 +952,7 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 		fail500()
 		return
 	}
-	path := tgt.fsPath + "/" + name
-	updates := bson.A{
-		upAddOpFile(newFileID.Hex(), path, hash, upRangsup(doc)),
-	}
-	if !upUpdateStructure(pj, uidl, upVersion(doc)+1, hist, updates, source) {
-		fail500()
-		return
-	}
+	// D41 slice-2: DU add-file structure op removed ($push fileRefs done above).
 	res.JSON(200, upJSONFile(newFileID.Hex(), hash))
 }
 

@@ -5,7 +5,8 @@
 // document-updater (Node) on :3003):
 //   track_changes : validate → project.updateOne → emit → 204
 //   accept        : DU accept (first) → emit → 204                 [write chain]
-//   ranges        : DU ranges.docs                                  [read chain]
+//   ranges        : docstore-direct (D41: DU retired — the docstore root
+//                   document's `ranges` field IS the DU wire)             [read chain]
 //   changes/users : docstore ids → formatPersonalInfo each          [read chain]
 //   threads       : chat threads → injectUserInfoIntoThreads        [read chain]
 //   send          : chat send → user → emit → 204                   [read chain]
@@ -24,6 +25,7 @@
 package trackchanges
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"sort"
@@ -31,6 +33,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -174,20 +177,95 @@ func hGetAllRanges(a *core.App, lim *tcLimitRunner) func(*core.Cxt, *core.Res) {
 		if !ok {
 			return
 		}
-		b, ok := tcCall(cxt.Req.Context(), "GET", tcDuBase()+"/project/"+pid+"/ranges", "")
+		// D41 (owner RETIRE document-updater): the DU `/project/:pid/ranges`
+		// handler was a Redis passthrough (docsInProject set → per-doc
+		// ranges cache) over the SAME docstore document this read uses — the
+		// docstore root document's `ranges` field IS the wire the frontend
+		// consumes (use-project-ranges.ts `{id, ranges:{changes,comments}}`;
+		// oracle: e2e R9 + review-panel d12 pins). Docstore-direct, DU-free.
+		// DU semantics preserved:
+		//   no rootDoc in the project          → 200 []            (empty set)
+		//   docstore transport/non-200 failure  → 500 page         (Node 500)
+		ctx := cxt.Req.Context()
+		rootDocID, haveRoot, perr := tcProjectRootDoc(a, ctx, pid)
+		if perr != nil {
+			tcErr500(cxt, res)
+			return
+		}
+		if !haveRoot {
+			res.JSON(200, []byte(`[]`))
+			return
+		}
+		b, ok := tcCall(ctx, "GET", tcDocstoreBase()+"/project/"+pid+"/doc/"+rootDocID, "")
 		if !ok {
 			tcErr500(cxt, res)
 			return
 		}
-		var wrap struct {
-			Docs json.RawMessage `json:"docs"`
-		}
-		if err := json.Unmarshal(b, &wrap); err != nil || wrap.Docs == nil {
+		code, body, wrErr := tcRangesWire(b)
+		if wrErr {
 			tcErr500(cxt, res)
 			return
 		}
-		res.JSON(200, []byte(wrap.Docs))
+		res.JSON(code, body)
 	}
+}
+
+// tcRangesWire — the DU-free replacement wire for DU's getProjectRanges
+// output. Input = the docstore document JSON (GET /project/:pid/doc/:did →
+// `{_id, lines, rev, version, ranges?}`); output = the `/ranges` body the
+// frontend consumes (oracle: e2e R9 + review-panel d12 pins — an ARRAY of
+// `{id, ranges}`, ranges key DROPPED when absent, Node JSON semantics):
+//
+//	[{"id":<_id>,"ranges":<verbatim>}]   or   [{"id":<_id>}]   or   []
+//
+// The docset is the single root document (this fork's project model; DU's
+// Redis docset held the same one doc). Malformed document → error (Node
+// 500).
+func tcRangesWire(docstoreBody []byte) (int, []byte, bool) {
+	var doc struct {
+		ID     json.RawMessage `json:"_id"`
+		Ranges json.RawMessage `json:"ranges"`
+	}
+	if err := json.Unmarshal(docstoreBody, &doc); err != nil || doc.ID == nil {
+		return 0, nil, true
+	}
+	if doc.Ranges == nil {
+		out := []byte(`[{"id":`)
+		out = append(out, doc.ID...)
+		out = append(out, '}', ']')
+		return 200, out, false
+	}
+	out := []byte(`[{"id":`)
+	out = append(out, doc.ID...)
+	out = append(out, []byte(`,"ranges":`)...)
+	out = append(out, doc.Ranges...)
+	out = append(out, '}', ']')
+	return 200, out, false
+}
+
+// tcProjectRootDoc — the project document's rootDoc_id (this fork's single
+// root document; the file tree lives inside it). (hex, false, nil) = no
+// rootDoc set; ("", false, err) = Mongo failure.
+func tcProjectRootDoc(a *core.App, ctx context.Context, pidHex string) (string, bool, error) {
+	opt, err := primitive.ObjectIDFromHex(strings.ToLower(pidHex))
+	if err != nil {
+		return "", false, nil
+	}
+	db, err := a.Mongo.DB(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	var doc bson.M
+	if err := db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: opt}}).Decode(&doc); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	if v, ok := doc["rootDoc_id"].(primitive.ObjectID); ok {
+		return v.Hex(), true, nil
+	}
+	return "", false, nil
 }
 
 func hGetChangesUsers(a *core.App, lim *tcLimitRunner) func(*core.Cxt, *core.Res) {
@@ -526,13 +604,9 @@ func hResolveThread(a *core.App, lim *tcLimitRunner) func(*core.Cxt, *core.Res) 
 			return
 		}
 		tcEmitRoom(a, pid, "resolve-thread", []interface{}{tid, userRaw})
-		duBody, _ := json.Marshal(struct {
-			UserID string `json:"user_id"`
-		}{uid})
-		if b, okD := tcCall(cxt.Req.Context(), "POST", tcDuBase()+"/project/"+pid+"/doc/"+cxt.Params["2"]+"/comment/"+tid+"/resolve", string(duBody)); !okD || b == nil {
-			tcErr500(cxt, res)
-			return
-		}
+		// D41 S2b-lite: DU comment-state mirror removed — chat service (above)
+		// owns the thread/comment state (D41); DU's copy defers to the Yjs
+		// hybrid contract (d5dd23dd).
 		tc204(res)
 	}
 }
@@ -547,20 +621,15 @@ func hReopenThread(a *core.App, lim *tcLimitRunner) func(*core.Cxt, *core.Res) {
 		}
 		pid := cxt.Params["1"]
 		tid := cxt.Params["3"]
-		uid := tcUID(cxt)
 		b, ok := tcCall(cxt.Req.Context(), "POST", tcChatBase()+"/project/"+pid+"/thread/"+tid+"/reopen", "")
 		if !ok || b == nil {
 			tcErr500(cxt, res)
 			return
 		}
 		tcEmitRoom(a, pid, "reopen-thread", []interface{}{tid})
-		duBody, _ := json.Marshal(struct {
-			UserID string `json:"user_id"`
-		}{uid})
-		if b, okD := tcCall(cxt.Req.Context(), "POST", tcDuBase()+"/project/"+pid+"/doc/"+cxt.Params["2"]+"/comment/"+tid+"/reopen", string(duBody)); !okD || b == nil {
-			tcErr500(cxt, res)
-			return
-		}
+		// D41 S2b-lite: DU comment-state mirror removed — chat service (above)
+		// owns the thread/comment state (D41); DU's copy defers to the Yjs
+		// hybrid contract (d5dd23dd).
 		tc204(res)
 	}
 }
@@ -575,20 +644,15 @@ func hDeleteThread(a *core.App, lim *tcLimitRunner) func(*core.Cxt, *core.Res) {
 		}
 		pid := cxt.Params["1"]
 		tid := cxt.Params["3"]
-		uid := tcUID(cxt)
 		b, ok := tcCall(cxt.Req.Context(), "DELETE", tcChatBase()+"/project/"+pid+"/thread/"+tid, "")
 		if !ok || b == nil {
 			tcErr500(cxt, res)
 			return
 		}
 		tcEmitRoom(a, pid, "delete-thread", []interface{}{tid})
-		duBody, _ := json.Marshal(struct {
-			UserID string `json:"user_id"`
-		}{uid})
-		if b, okD := tcCall(cxt.Req.Context(), "DELETE", tcDuBase()+"/project/"+pid+"/doc/"+cxt.Params["2"]+"/comment/"+tid, string(duBody)); !okD || b == nil {
-			tcErr500(cxt, res)
-			return
-		}
+		// D41 S2b-lite: DU comment-state mirror removed — chat service (above)
+		// owns the thread/comment state (D41); DU's copy defers to the Yjs
+		// hybrid contract (d5dd23dd).
 		tc204(res)
 	}
 }

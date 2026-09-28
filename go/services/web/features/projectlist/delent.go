@@ -206,9 +206,9 @@ func delEntityHandler(a *core.App, kind string) func(cxt *core.Cxt, res *core.Re
 			return
 		}
 
-		// Node refreshes before the guards (dead in this stack; tolerated).
-		fireHTTP(cxt, http.MethodPost, cduBase()+"/project/"+pidHex+"/flush", nil)
-
+		// D41 (owner RETIRE document-updater): Node's pre-guard DU refresh is a
+		// no-op in the Yjs world (the docstore is the content source of
+		// truth) — removed.
 		roots := entParseTree(dget(*doc, "rootFolder"))
 		if len(roots) == 0 {
 			res.JSON(500, []byte("internal error"))
@@ -259,8 +259,9 @@ func delEntityHandler(a *core.App, kind string) func(cxt *core.Cxt, res *core.Re
 				views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(path, "/")))
 				return
 			}
-			// document-updater deleteDoc (dead; best-effort; Node tolerates).
-			fireHTTP(cxt, http.MethodDelete, cduBase()+"/project/"+pidHex+"/doc/"+d.idHex, nil)
+			// D41: Node's per-doc DU deleteDoc cache-drop is removed with DU;
+			// the docstore PATCH above (deleted:true) IS the content side
+			// effect, and a re-created doc is a fresh docstore document.
 		}
 
 		res.NoContent()

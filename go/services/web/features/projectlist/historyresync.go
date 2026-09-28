@@ -31,7 +31,6 @@ package projectlist
 
 import (
 	"context"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -132,8 +131,9 @@ func resyncHistoryHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			return
 		}
 
-		// --- history-enabled → best-effort DU resync → 204 (NOT gated; heavy) ---
-		fireHTTP(c, http.MethodPost, strings.TrimSuffix(cduBase(), "/")+"/project/"+oid.Hex()+"/history/resync", rsyncDUBody(hid, body.M))
+		// --- history-enabled → 204 (D41 slice-2: Node's best-effort DU resync
+		// removed — DU retired; project-history owns its own state) ---
+		_ = hid
 		// Node res.sendStatus(204): empty body, weak ETag over "No Content", XPB.
 		r.W.Header().Set("X-Powered-By", "Express")
 		r.W.Header().Set("ETag", core.EtagWeakBody("No Content"))

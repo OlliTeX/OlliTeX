@@ -781,7 +781,8 @@ func internalProjectGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 //	                          no nosniff, global CSP)
 //
 // 200 side effects (best-effort, Node's documented order):
-//  1. flushProjectToMongoAndDelete = DELETE {document-updater}/project/{pid}
+//  1. (D41 slice-2: Node's flushProjectToMongoAndDelete = DU DELETE removed —
+//     DU retired; docstore archival below is the content side effect)
 //  2. DocstoreManager.archiveProject = POST {docstore}/project/{pid}/archive
 //  3. markAsInactive = Mongo projects.updateOne({_id}, {active:false})
 //
@@ -816,8 +817,7 @@ func internalDeactivateHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		oid, _ := primitive.ObjectIDFromHex(pidHex)
 		pid := oid.Hex()
 
-		// 1. document-updater flush+delete (best-effort; healthy stack → 2xx).
-		fireHTTP(c, http.MethodDelete, cduBase()+"/project/"+pid, nil)
+		// 1. (D41 slice-2: Node's DU flush+delete removed — DU retired.)
 		// 2. docstore archive (best-effort; no-op persistor in this build).
 		fireHTTP(c, http.MethodPost, strings.TrimSuffix(crDocstoreBase(), "/")+"/project/"+pid+"/archive", nil)
 		// 3. markAsInactive = projects.active = false.

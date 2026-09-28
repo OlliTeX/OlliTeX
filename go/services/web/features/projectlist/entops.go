@@ -393,48 +393,6 @@ func entGateAuth(a *core.App, cxt *core.Cxt, res *core.Res, projectId string) (s
 	return uid, doc, true
 }
 
-// ---------- service calls (DocUpdater / docstore) ----------
-
-func entFlushDU(cxt *core.Cxt, pidHex string) {
-	// Best-effort (Node fetchNothing-and-warn; delete flow precedent).
-	if cxt == nil {
-		return
-	}
-	fireHTTP(cxt, "POST", cduBase()+"/project/"+pidHex+"/flush", nil)
-}
-
-func entSendStructure(pidHex, historyID, uid string, updates []json.RawMessage, version int64, source string) bool {
-	if len(updates) == 0 {
-		return true // Node: `if (updates.length < 1) return` — NO DU call.
-	}
-	// Node body {updates, userId, version, projectHistoryId, source} —
-	// projectHistoryId undefined (no-history project) → key dropped.
-	var histPart string
-	if historyID != "" {
-		histPart = `"projectHistoryId":"` + historyID + `",`
-	}
-	b := "{" +
-		`"updates":[` + strings.Join(rawList(updates), ",") + `],` +
-		`"userId":"` + entJSONEsc(uid) + `","version":` + itoa(version) + `,` +
-		histPart +
-		`"source":"` + entJSONEsc(source) + `"}`
-	resp, err := crHTTP.Post(upDUBase()+"/project/"+pidHex, "application/json", strings.NewReader(b))
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	return resp.StatusCode >= 200 && resp.StatusCode < 300
-}
-
-func rawList(rs []json.RawMessage) []string {
-	out := make([]string, 0, len(rs))
-	for _, r := range rs {
-		out = append(out, string(r))
-	}
-	return out
-}
-
 func itoa(n int64) string { return fmt.Sprintf("%d", n) }
 
 func entJSONEsc(s string) string {
@@ -444,47 +402,9 @@ func entJSONEsc(s string) string {
 
 // _getUpdates op shapes (key order pinned; undefined keys dropped — Node
 // JSON.stringify of {key: undefined} omits the key).
-func entRenOp(kind, id, oldPath, newPath string) json.RawMessage {
-	return json.RawMessage(fmt.Sprintf(
-		`{"type":"rename-%s","id":"%s","pathname":"%s","newPathname":"%s"}`,
-		kind, id, entJSONEsc(oldPath), entJSONEsc(newPath)))
-}
-
-func entAddDocOp(id, pth, docLines string, hRS bool) json.RawMessage {
-	return json.RawMessage(fmt.Sprintf(
-		`{"type":"add-doc","id":"%s","pathname":"%s","docLines":"%s","ranges":{},"historyRangesSupport":%v,"createdBlob":true}`,
-		id, entJSONEsc(pth), entJSONEsc(docLines), hRS))
-}
-
-func entAddFileOp(id, pth, hash, metadataJSON string, hRS bool) json.RawMessage {
-	// {type, id, pathname, docLines?, ranges?, historyRangesSupport, hash,
-	// metadata?, createdBlob:true} — duplicateFile entity has no
-	// docLines/ranges; metadata only for linked files.
-	metaPart := ""
-	if metadataJSON != "" {
-		metaPart = `,"metadata":` + metadataJSON
-	}
-	return json.RawMessage(fmt.Sprintf(
-		`{"type":"add-file","id":"%s","pathname":"%s","historyRangesSupport":%v,"hash":"%s"%s,"createdBlob":true}`,
-		id, entJSONEsc(pth), hRS, entJSONEsc(hash), metaPart))
-}
 
 // entHistoryRangesSupport — Node `_.get(project, 'overleaf.history.
 // rangesSupportEnabled', false)`.
-func entHistoryRangesSupport(pj *primitive.D) bool {
-	dn, ok := pjEntSub(*pj, "overleaf")
-	if !ok {
-		return false
-	}
-	hd, ok := pjEntSub(dn, "history")
-	if !ok {
-		return false
-	}
-	if b, ok := dget(hd, "rangesSupportEnabled").(bool); ok {
-		return b
-	}
-	return false
-}
 
 // pjEntSub navigates two levels of possibly-array-wrapped subdocs
 // (the go driver materializes BSON subdocs as primitive.D and
@@ -515,20 +435,6 @@ func entHistoryID(pj *primitive.D) string {
 		return o.Hex()
 	}
 	return ""
-}
-
-func entVersion(pj *primitive.D) int64 {
-	switch t := dget(*pj, "version").(type) {
-	case int32:
-		return int64(t)
-	case int64:
-		return t
-	case int:
-		return int64(t)
-	case float64:
-		return int64(t)
-	}
-	return 0
 }
 
 // ---------- web locker (Node RedisWebLocker) ----------
@@ -743,7 +649,7 @@ func entRenameHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		page500 := func() { views.Error500Page(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/"))) }
 
 		done := entLockRun(a, pidHex, res, cxt, func() bool {
-			entFlushDU(cxt, pidHex)
+			// D41 slice-2: DU flush removed (DU retired).
 			loc, found := entFindEnt(pj, entityHex, segOf(kind))
 			if !found {
 				page()
@@ -768,13 +674,8 @@ func entRenameHandler(a *core.App) func(*core.Cxt, *core.Res) {
 				page500()
 				return false
 			}
-			if kind == "doc" || kind == "file" {
-				histID := entHistoryID(pj)
-				version := entVersion(pj) + 1 // post-write (Node newProject)
-				_ = entSendStructure(pidHex, histID, uid, []json.RawMessage{
-					entRenOp(kind, entityHex, loc.fs, endPath),
-				}, version, entBodySource(bm))
-			}
+			// D41 slice-2: DU rename structure op removed (entMongoRename above is
+			// the tree write; DU versioning defers to the Yjs hybrid).
 			// Node EditorController.renameEntity: emitToRoom(projectId,
 			// 'reciveEntityRename', entityId, newName) on success (all kinds).
 			if a != nil {
@@ -823,13 +724,6 @@ func entCountAll(pj *primitive.D) int {
 	return walk(rf)
 }
 
-func entBodySource(bm map[string]any) string {
-	if s, ok := bm["source"].(string); ok {
-		return s
-	}
-	return "editor"
-}
-
 func parentFS(loc *entLoc) string {
 	idx := strings.LastIndex(loc.fs, "/")
 	return loc.fs[:idx]
@@ -857,7 +751,7 @@ func entMoveHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		page500 := func() { views.Error500Page(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/"))) }
 
 		done := entLockRun(a, pidHex, res, cxt, func() bool {
-			entFlushDU(cxt, pidHex)
+			// D41 slice-2: DU flush removed (DU retired).
 			loc, found := entFindEnt(pj, entityHex, segOf(kind))
 			if !found {
 				page()
@@ -935,14 +829,8 @@ func entMoveHandler(a *core.App) func(*core.Cxt, *core.Res) {
 				page500()
 				return false
 			}
-			// DU: one rename op (id unchanged) for doc|file moves.
-			if kind == "doc" || kind == "file" {
-				histID := entHistoryID(pj)
-				version := entVersion(pj) + 2 // push + pull
-				_ = entSendStructure(pidHex, histID, uid, []json.RawMessage{
-					entRenOp(kind, entityHex, loc.fs, newFS),
-				}, version, entBodySource(bm))
-			}
+			// D41 slice-2: DU move structure op removed (push+pull above are the
+			// tree write; DU versioning defers to the Yjs hybrid).
 			// Node EditorController.moveEntity: emitToRoom(projectId,
 			// 'reciveEntityMove', entityId, folderId) on success.
 			if a != nil {
@@ -1022,10 +910,8 @@ func entDuplicateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 					page500()
 					return false
 				}
-				histID := entHistoryID(pj)
-				_ = entSendStructure(pidHex, histID, uid, []json.RawMessage{
-					entAddDocOp(newDocID.Hex(), parentFS(loc)+"/"+newName, strings.Join(lines, "\n"), entHistoryRangesSupport(pj)),
-				}, entVersion(pj)+1, "editor")
+				// D41 slice-2: DU add-doc op removed (entDocstoreUpdate + push
+				// above already hold the doc; DU versioning defers to the Yjs hybrid).
 				// Node EditorController.addDoc (via addDoc promise):
 				// emitToRoom(projectId, 'reciveNewDoc', folderId, doc,
 				// source, userId) — payload [folderId, {name,_id},
@@ -1048,12 +934,6 @@ func entDuplicateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		now := time.Now()
 		hash := asStr(entFld(loc.elem, "hash"))
 		linkedJSON, hasLinked := entLinkedFileJSON(entFld(loc.elem, "linkedFileData"))
-		// DU op metadata for linked files (Node
-		// buildFileMetadataForHistory): {importedAt: created, ...
-		// linkedFileData}, dropping build_id/clsiServerId for
-		// project_output_file. Gate fixtures use unlinked (null) files →
-		// "" (key dropped on the wire).
-		fileMeta := entLinkedMetadata(hasLinked, linkedJSON, now)
 		done := entLockRun(a, pidHex, res, cxt, func() bool {
 			parentMongo := parentMongoOf(loc)
 			if !entMongoPushParent(cxt, a, oid, parentMongo, "fileRefs", bson.D{
@@ -1074,9 +954,8 @@ func entDuplicateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 				page500()
 				return false
 			}
-			_ = entSendStructure(pidHex, entHistoryID(pj), uid, []json.RawMessage{
-				entAddFileOp(newFileID.Hex(), parentFS(loc)+"/"+newName, hash, fileMeta, entHistoryRangesSupport(pj)),
-			}, entVersion(pj)+1, "editor")
+			// D41 slice-2: DU add-file op removed (file blob is shared; the
+			// mongo push above is the tree write).
 			return true
 		})
 		if !done {
