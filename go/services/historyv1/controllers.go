@@ -416,7 +416,7 @@ func (s *Service) createProjectBlob(w http.ResponseWriter, r *http.Request) {
 		conflict(w, "File hash mismatch")
 		return
 	}
-	if _, err := blob.PutFile(ctx, data); err != nil {
+	if _, err := blob.PutWithHash(ctx, strings.ToLower(hash), data); err != nil {
 		s.Cfg.Log("createProjectBlob: %v", err)
 		renderErr(w, 500)
 		return

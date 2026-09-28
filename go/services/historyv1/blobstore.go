@@ -15,6 +15,7 @@ package historyv1
 
 import (
 	"bytes"
+	"strings"
 
 	"context"
 	"encoding/hex"
@@ -194,6 +195,17 @@ func (b *BlobStore) PutFile(ctx context.Context, data []byte) (*otc.Blob, error)
 		sLen = &n
 	}
 	return b.put(ctx, otc.BlobHashFromBuffer(data), int64(len(data)), data, sLen)
+}
+
+// PutWithHash — controller path: the URL-validated hash (Node stores the
+// params.hash from the URL, verified equal to the sha1 of the payload).
+func (b *BlobStore) PutWithHash(ctx context.Context, hash string, data []byte) (*otc.Blob, error) {
+	var sLen *int64
+	if utf8.Valid(data) {
+		n := int64(runeCount(string(data)))
+		sLen = &n
+	}
+	return b.put(ctx, strings.ToLower(hash), int64(len(data)), data, sLen)
 }
 
 func (b *BlobStore) putBuffer(ctx context.Context, data []byte, isText bool) (*otc.Blob, error) {
