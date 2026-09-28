@@ -63,6 +63,10 @@ type Options struct {
 	// FilePersistence under DataDir.
 	Store   persistence.VersionedPersistence
 	DataDir string // used only when Store == nil (FilePersistence root)
+	// VersionLog — optional d5dd23dd S1 actor/origin side log: when set,
+	// the service wraps its store so every AppendUpdate mirrors its
+	// (uid, origin) metadata into the log (fail-soft; see versionlog.go).
+	VersionLog Log
 	// KeepVersions — history-retention policy for the server's automatic
 	// compaction (ygo CompactableAdapter): 0 = keep ALL history (default);
 	// >0 = when the server calls Compact, fold the oldest updates and retain
@@ -130,6 +134,8 @@ func New(opts Options) (*Service, error) {
 			return nil, err
 		}
 	}
+	// d5dd23dd S1: actor/origin side log (no-op when opts.VersionLog is nil).
+	store = Wrap(store, opts.VersionLog)
 	// The ygo WS server takes the two-method PersistenceAdapter; the versioned
 	// store speaks the fuller interface, so bridge with LegacyAdapter. The
 	// adapter already implements the server's optional CompactableAdapter and

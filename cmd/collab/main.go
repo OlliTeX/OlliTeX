@@ -93,6 +93,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("mongo store: %v", err)
 	}
+	// d5dd23dd S1: per-version actor/origin side log (ydocVersionMeta) —
+	// the /updates composition layer reads author/origin per version from
+	// it. Fail-soft by contract; a failed index build only loses metadata.
+	vlog, verr := collab.NewMongoVersionLog(ctx, mdb)
+	if verr != nil {
+		log.Printf("collab: version-log index failed (metadata disabled): %v", verr)
+		vlog = nil
+	}
+	_ = vlog                   // wired via Options.VersionLog below
 	defer func() { _ = mcl }() // lifetime = process; released on exit
 
 	// Session cookie signatures: the SAME secret chain as the web (core/config.go):
@@ -152,6 +161,7 @@ func main() {
 	svc, err := collab.New(collab.Options{
 		Auth:             auth,
 		Store:            store,
+		VersionLog:       vlog,
 		Logger:           sl,
 		OnFirstPeer:      lifecycle("first-peer"),
 		OnLastPeer:       lifecycle("last-peer"),

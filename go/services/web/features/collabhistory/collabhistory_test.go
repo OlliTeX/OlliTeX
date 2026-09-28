@@ -226,3 +226,33 @@ func TestEmptyRoomShapes(t *testing.T) {
 		t.Fatalf("doc-empty = %d %s", got.code, got.body)
 	}
 }
+
+// d5dd23dd S1 — restore attributes the new version to the session user with
+// the Node-parity origin; plain seed/edit versions carry no actor.
+func TestRestoreAttributionLogsActor(t *testing.T) {
+	st, h := setupStore(t)
+	ctx := context.Background()
+	log := collab.NewMemVersionLog()
+	h.VLog = log
+
+	if _, err := collab.SeedTextContent(ctx, st, testPID, "one\n"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if _, err := collab.ClientEdit(ctx, st, testPID, "one\n", "one\ntwo\n"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	// restore to v1 → new head v3 (owner session)
+	got := serve(t, h, cxt("POST", "/project/"+testPID+"/collab/history/1/restore", "owner", map[string]string{"2": "1"}), h.restore)
+	if got.code != 200 || !strings.Contains(got.body, `"version":3`) {
+		t.Fatalf("restore = %d %s", got.code, got.body)
+	}
+
+	all, err := log.Range(ctx, testPID, 0, 10)
+	if err != nil || len(all) != 1 {
+		t.Fatalf("log range = %v err=%v (want exactly the restore record)", all, err)
+	}
+	m := all[0]
+	if m.V != 3 || m.UID != "owner" || m.Origin != "file-restore" {
+		t.Fatalf("v3 meta = %+v (want uid=owner origin=file-restore)", m)
+	}
+}

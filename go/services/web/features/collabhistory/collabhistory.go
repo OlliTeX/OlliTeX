@@ -32,6 +32,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"ollitex/go/services/collab"
@@ -54,6 +55,38 @@ type Handlers struct {
 	App     *core.App
 	Store   persistence.VersionedPersistence // optional; wins over App.Mongo
 	RoleFor RoleFor
+	// VLog — d5dd23dd S1: version-metadata side log (nil = today's behavior).
+	// Test injection point; the App.Mongo path resolves a lazily-cached
+	// Mongo-backed log (versionLog).
+	VLog     collab.Log
+	vlogMu   sync.Mutex
+	vlogMemo collab.Log
+}
+
+// versionLog — test-injected (VLog) or lazily built over App.Mongo (nil
+// best-effort on any failure — metadata disabled, store behavior unchanged).
+func (h *Handlers) versionLog(ctx context.Context) collab.Log {
+	if h.VLog != nil {
+		return h.VLog
+	}
+	if h.App == nil || h.App.Mongo == nil {
+		return nil
+	}
+	h.vlogMu.Lock()
+	defer h.vlogMu.Unlock()
+	if h.vlogMemo != nil {
+		return h.vlogMemo
+	}
+	db, err := h.App.Mongo.DB(ctx)
+	if err != nil {
+		return nil
+	}
+	lg, err := collab.NewMongoVersionLog(ctx, db)
+	if err != nil {
+		return nil
+	}
+	h.vlogMemo = lg
+	return lg
 }
 
 var (
@@ -144,10 +177,15 @@ func vParam(cxt *core.Cxt) (persistence.Version, bool) {
 	return persistence.Version(v), true
 }
 
-// run executes fn with the versioned store (injected or app Mongo-backed).
-func (h *Handlers) run(cxt *core.Cxt, fn func(context.Context, persistence.VersionedPersistence) error) error {
+// run executes fn with the versioned store (injected or app-Mongo-backed)
+// + the S1 actor/origin ctx enrichment (nil = plain).
+func (h *Handlers) run(cxt *core.Cxt, enrich func(context.Context) context.Context, fn func(context.Context, persistence.VersionedPersistence) error) error {
+	if enrich == nil {
+		enrich = func(ctx context.Context) context.Context { return ctx }
+	}
+	lg := h.versionLog(cxt.Req.Context())
 	if h.Store != nil {
-		return fn(cxt.Req.Context(), h.Store)
+		return fn(enrich(cxt.Req.Context()), collab.Wrap(h.Store, lg))
 	}
 	if h.App == nil || h.App.Mongo == nil {
 		return errors.New("collabhistory: no mongo available")
@@ -162,7 +200,7 @@ func (h *Handlers) run(cxt *core.Cxt, fn func(context.Context, persistence.Versi
 	if err != nil {
 		return err
 	}
-	return fn(ctx, st)
+	return fn(enrich(ctx), collab.Wrap(st, lg))
 }
 
 // ---------- handlers ----------
@@ -178,7 +216,7 @@ func (h *Handlers) list(cxt *core.Cxt, res *core.Res) {
 		return
 	}
 	var metas []persistence.VersionMeta
-	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+	if err := h.run(cxt, nil, func(ctx context.Context, st persistence.VersionedPersistence) error {
 		var e error
 		metas, e = st.ListVersions(ctx, pid)
 		return e
@@ -212,7 +250,7 @@ func (h *Handlers) at(cxt *core.Cxt, res *core.Res) {
 		content string
 		found   bool
 	)
-	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+	if err := h.run(cxt, nil, func(ctx context.Context, st persistence.VersionedPersistence) error {
 		_, m, f, e := st.GetUpdate(ctx, pid, v)
 		if e != nil {
 			return e
@@ -255,7 +293,14 @@ func (h *Handlers) restore(cxt *core.Cxt, res *core.Res) {
 		return
 	}
 	var newHead persistence.Version
-	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+	if err := h.run(cxt, func(ctx context.Context) context.Context {
+		// d5dd23dd S1: attribute the restore version to the session user
+		// with the Node-parity origin kind (shared.ts: file-restore).
+		if cxt.Sess != nil {
+			ctx = collab.WithActor(ctx, cxt.Sess.UserIDHex())
+		}
+		return collab.WithOrigin(ctx, "file-restore")
+	}, func(ctx context.Context, st persistence.VersionedPersistence) error {
 		var e error
 		newHead, e = collab.RestoreToVersion(ctx, st, pid, v)
 		return e
@@ -282,7 +327,7 @@ func (h *Handlers) doc(cxt *core.Cxt, res *core.Res) {
 		content string
 		head    persistence.Version
 	)
-	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+	if err := h.run(cxt, nil, func(ctx context.Context, st persistence.VersionedPersistence) error {
 		var e error
 		content, head, e = collab.HeadText(ctx, st, pid)
 		return e

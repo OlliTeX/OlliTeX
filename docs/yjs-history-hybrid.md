@@ -27,6 +27,7 @@ implementer):
 | Legacy service | Node DU `services/document-updater` (:3003) | residual live surface = 2: `POST .../change/accept` (trackchanges) + realtime `rt.FlushAPI` (documented "parity call; a no-op in practice") |
 | Model | `go/libraries/otc` (89 files) | exactly 2 live consumers (H1, PH-appfactory) after stage-1 reduction |
 | Web history UI | `features/history` = dual proxy (v1Base :3100/api + v2Base :3054) → editor panel hits `/project/:pid/updates` (frontend/js/features/history/services/api.ts) | LIVE, u101-gated |
+| Node legacy services | `services/document-updater` (Node :3003 — down, runit registered), `services/history-v1` (Node :3100 — standby via `HISTORY_V1_GO=1` flag), `services/project-history` (Node :3054 — standby via `PROJECT_HISTORY_GO=1` flag) | LIVE in image (standby pairs); Go owns the ports |
 
 ## Slice plan (b1)
 
@@ -55,16 +56,17 @@ implementer):
   the deterministic server-applied path uses an ordinary Y.Text mutation);
   drop the realtime `FlushAPI` (documented no-op parity shell); remove the
   `document-updater-overleaf` runit service, image build entry, env/compose
-  references; move `services/document-updater` (Node) → `junk/`; e2e battery
-  with DU **absent**.
-- **S5 — PH retirement + otc junk.** `features/history` v2Base consumers
-  retargeted (S1/S2 done) → PH service + its appfactory retargeted or
-  retired; then the 9 pure symbols
-  (EmptyHash, HexHashRxString, BlobHashFromBuffer, BlobHashFromString,
-  GetStringLengthOfBuffer, ContainsNonBmpChars, Clean, IsClean, IsCleanDebug,
-  MaxStringLength — 10 listed in the prior failure note; "9" counts the
-  non-Hash pair) are localized into their consumers and `go/libraries/otc`
-  → `junk/` (35ed23bd stage 2 complete).
+  references; **RETIRE THE NODE CODE (owner directive 2026-09-28):** move
+  `services/document-updater` → `junk/`; e2e battery with DU **absent**.
+- **S5 — Node H1/PH retirement + otc junk (owner directive 2026-09-28).**
+  `features/history` v1Base/v2Base consumers retargeted (S1/S2/S3 done) →
+  **RETIRE THE NODE CODE:** remove the `history-v1-overleaf` &
+  `project-history-overleaf` standby runit pairs (and the `HISTORY_V1_GO` /
+  `PROJECT_HISTORY_GO` flip flags — Go becomes sole owner), image build
+  entries, env/compose references; move `services/history-v1` +
+  `services/project-history` → `junk/`. Then the Go OT plane (go H1 + go PH
+  + `go/libraries/otc`, pure surface already in `otpure`) → `junk/`
+  (35ed23bd stage 2 complete).
 - **S6 — terminal gates + ledger.** Full e2e battery (DU absent, OT plane
   retired), `make all` image rebuild + live-cycle verification, audit.
 
@@ -94,3 +96,13 @@ implementer):
    swap the backend, never the bytes.
 4. **Do NOT** flip the OT engine ports "live" (owner decision): the OT code
    stays addressable until S5 removes its consumers; no runtime A/B.
+5. **Author attribution.** Node-parity `/updates` rows carry `_user`/
+   `_userView` objects {first_name, last_name, email, id}. Investigate
+   whether the Yjs version stream persists author per version (ygo
+   `VersionMeta`?); if not, the composition layer needs a small author log
+   (room+version → uid) appended at the WS mutation site — design in S1.
+6. **Node retirement directive (owner, 2026-09-28, live reminder).** When
+   the cutover is fully complete, ALL THREE Node trees —
+   `services/document-updater`, `services/history-v1`, `services/
+   project-history` — are retired (runit entries, Dockerfile COPY/config
+   entries, env flips, toolkit defaults, trees → `junk/`).
