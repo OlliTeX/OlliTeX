@@ -78,9 +78,10 @@ type FSTConfig struct {
 	GlobalBlobs   string
 	UploadFolder  string
 
-	// Backend: '' | 'fs' | 's3' — 1:1 with OVERLEAF_FILESTORE_BACKEND (CE
-	// settings.js: 's3' vs default 'fs'). In s3 mode TemplateFiles/
-	// ProjectBlobs/GlobalBlobs are BUCKET NAMES, not directories.
+	// Backend — overwrite OVERLEAF_FILESTORE_BACKEND. G2 (STOR-1, owner-approved
+	// S3-only durable backend): only 's3' is accepted ('' and the CE-default 'fs'
+	// are rejected with a clear error). In s3 mode TemplateFiles/ProjectBlobs/
+	// GlobalBlobs are BUCKET NAMES, not directories.
 	Backend string
 	// S3Endpoint: OVERLEAF_FILESTORE_S3_ENDPOINT || AWS_S3_ENDPOINT (Node
 	// s3.endpoint). Empty → s3 mode requires it (the service fails fast).
@@ -127,30 +128,29 @@ type FSTHandlers struct {
 	Handler   *fseHandler
 }
 
-// NewFSTHandlers wires the handlers over the chosen store backend. It
-// returns an error only in s3 mode, when the gateway is unreachable or a
-// required bucket cannot be ensured — booting a filestore that cannot write
-// would only 5xx the very first request, so fail at startup instead.
+// NewFSTHandlers wires the handlers over the S3 store backend. G2 (STOR-1):
+// the fs backend is retired — BACKEND must be 's3'. It returns an error when
+// the gateway is unreachable or a required bucket cannot be ensured — booting
+// a filestore that cannot write would only 5xx the very first request, so
+// fail at startup instead.
 func NewFSTHandlers(cfg FSTConfig) (*FSTHandlers, error) {
 	cfg.withDefaults()
-	var store Store
-	if cfg.Backend == "s3" {
-		s3s := newS3Store(cfg.S3Endpoint, cfg.S3Key, cfg.S3Secret)
-		// 1:1 with the Node s3 branch of CE settings.js: three buckets
-		// (template_files, project_blobs, global_blobs) — create them
-		// idempotently so a fresh SeaweedFS works without pre-seeding.
-		for _, b := range []string{cfg.TemplateFiles, cfg.ProjectBlobs, cfg.GlobalBlobs} {
-			if b == "" {
-				continue
-			}
-			if err := s3s.ensureBucket(b); err != nil {
-				return nil, fmt.Errorf("filestore: s3 bucket %q unavailable: %w", b, err)
-			}
-		}
-		store = s3s
-	} else {
-		store = &fseStore{useSubdirectories: cfg.UseSubdirectories}
+	if cfg.Backend != "s3" {
+		return nil, fmt.Errorf("filestore: OVERLEAF_FILESTORE_BACKEND=%q is not supported: the fs backend is retired (G2 STOR-1, S3-only durable backend) — set OVERLEAF_FILESTORE_BACKEND=s3", cfg.Backend)
 	}
+	s3s := newS3Store(cfg.S3Endpoint, cfg.S3Key, cfg.S3Secret)
+	// 1:1 with the Node s3 branch of CE settings.js: three buckets
+	// (template_files, project_blobs, global_blobs) — create them
+	// idempotently so a fresh SeaweedFS works without pre-seeding.
+	for _, b := range []string{cfg.TemplateFiles, cfg.ProjectBlobs, cfg.GlobalBlobs} {
+		if b == "" {
+			continue
+		}
+		if err := s3s.ensureBucket(b); err != nil {
+			return nil, fmt.Errorf("filestore: s3 bucket %q unavailable: %w", b, err)
+		}
+	}
+	store := Store(s3s)
 	writer := &fseWriter{uploadFolder: cfg.UploadFolder}
 	conv := &fseConverter{converter: cfg.Converter, prefix: cfg.ConvertPrefix, enable: cfg.EnableConversions}
 	return &FSTHandlers{
@@ -339,6 +339,12 @@ func (h *FSTHandlers) runFile(w http.ResponseWriter, r *http.Request, bucket, ke
 				_, _ = io.CopyN(w, rr, rng.end-rng.start+1)
 				return
 			}
+		}
+		// Non-seekable stream (S3 gateway body): materialise, then write the
+		// slice — same 200 + Content-Range + sliced body the fs path returned.
+		if all, rerr := io.ReadAll(rc); rerr == nil && int(rng.end) < len(all) {
+			_, _ = w.Write(all[rng.start : rng.end+1])
+			return
 		}
 	}
 	_, _ = io.Copy(w, rc)
