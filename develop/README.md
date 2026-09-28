@@ -60,7 +60,6 @@ each service:
 | `clsi`             | 9230 |
 | `chat`             | 9231 |
 | `docstore`         | 9233 |
-| `document-updater` | 9234 |
 | `filestore`        | 9235 |
 | `notifications`    | 9236 |
 | `real-time`        | 9237 |

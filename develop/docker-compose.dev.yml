@@ -15,41 +15,7 @@ services:
       - ../services/clsi/app.js:/overleaf/services/clsi/app.js
       - ../services/clsi/config:/overleaf/services/clsi/config
 
-  document-updater:
-    command: ["node", "--watch", "app.js"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9234:9229"
-    volumes:
-      - ../services/document-updater/app:/overleaf/services/document-updater/app
-      - ../services/document-updater/app.js:/overleaf/services/document-updater/app.js
-      - ../services/document-updater/config:/overleaf/services/document-updater/config
 
-  history-v1:
-    command: ["node", "--watch", "app.js"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9239:9229"
-    volumes:
-      - ../services/history-v1/api:/overleaf/services/history-v1/api
-      - ../services/history-v1/app.js:/overleaf/services/history-v1/app.js
-      - ../services/history-v1/config:/overleaf/services/history-v1/config
-      - ../services/history-v1/storage:/overleaf/services/history-v1/storage
-      - ../services/history-v1/knexfile.js:/overleaf/services/history-v1/knexfile.js
-      - ../services/history-v1/migrations:/overleaf/services/history-v1/migrations
-
-  project-history:
-    command: ["node", "--watch", "app.js"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9240:9229"
-    volumes:
-      - ../services/project-history/app:/overleaf/services/project-history/app
-      - ../services/project-history/app.js:/overleaf/services/project-history/app.js
-      - ../services/project-history/config:/overleaf/services/project-history/config
 
   real-time:
     # D28a: Go bus — static binary, no hot-mounts. After changing

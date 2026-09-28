@@ -8,7 +8,7 @@
 # (`COPY bin/`). The app base is alpine:3.24 (node 24 + runit + my_init) since
 # the 2026-09-28 cutover (owner: alpine if it works; gate green + smaller
 # image: 6.43GB vs 6.7GB); the ubuntu base file is retired in junk/. The Node
-# services (clsi, document-updater, history-v1, …) and the webpack/pug
+# services (clsi, …) and the webpack/pug
 # front-end build still run here, on the base's node 24.
 
 ARG OVERLEAF_BASE_TAG=ollitex/base:latest
@@ -184,10 +184,9 @@ COPY server-ce/init_preshutdown_scripts/ /etc/my_init.pre_shutdown.d/
 # -----------------------
 COPY server-ce/config/settings.js /etc/overleaf/settings.js
 
-# Copy history-v1 files
-# -----------------------
-COPY server-ce/config/production.json /overleaf/services/history-v1/config/production.json
-COPY server-ce/config/custom-environment-variables.json /overleaf/services/history-v1/config/custom-environment-variables.json
+# (historical: Node history-v1 config COPY — retired with the Node
+# history-v1/project-history/document-updater trees; Go services own
+# :3100/:3054 now and carry their own config.)
 
 # Copy grunt thin wrapper
 # -----------------------
