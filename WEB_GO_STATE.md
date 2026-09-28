@@ -1309,3 +1309,46 @@ shadow in `/etc/service.disabled`).
 
 **GATE STATE:** u101 rework gate GREEN → **c129a612 (G2 fs-removal) UNBLOCKED**
 (gate = u101 matrix + smoke green; both now green).
+
+## G2 — fs persistor retirement (STOR-1, owner-approved S3-only durable backend) — GREEN 2026-09-28
+
+Durable storage is now S3-only (SeaweedFS in standard composes / AWS_* or
+OVERLEAF_FILESTORE_* envs). Working-set FS deliberately KEPT: CLSI
+compiles/cache/output, ghif workdir, upload staging (TMP_DIR uploads/dumpFolder),
+TLP caches.
+
+- **G2-1 (c2ceeed0)** Go filestore: `persistor.go` = Store-interface-only
+  (fseStore removed); `server.go` rejects `''`/`'fs'` fail-fast; `runFile`
+  non-seekable-stream range fallback (vendor 200+Content-Range+sliced-body kept);
+  tests over fakeS3 httptest stub.
+- **G2-2 (de7a7a4b)** Go `libraries/persistors`: `case "fs"` → actionable
+  SettingsError; fpersistor.* deleted; TestFactoryFSRetired; 89.9% coverage.
+- **G2-3 (dc1e148f)** Go docstore: `archive.go` (fsArchiver) deleted;
+  cmd/docstore BACKEND must be `s3`; tests re-pointed to the stub S3 gateway
+  (VERBATIM `<pid>/<did>` S3 keys = Node S3Persistor semantics); e2e + develop
+  composes: `BACKEND: s3` + `BUCKET_NAME: docstore-archive`.
+- **G2-4 (aeb306f9)** Node `@overleaf/object-persistor`: FSPersistor.js +
+  its tests deleted; factory `case 'fs'` → actionable SettingsError;
+  202 mocha passing · tsc exit 0 · eslint clean.
+- **G2-5a (6c7e888b)** CE config: `server-ce/config/settings.js` +
+  `tests/e2e/stack/settings.js` no longer default filestore to fs (default now
+  the s3 config); `server-ce/config/production.json` persistor backend fs→s3.
+- **G2-5b (29c05dbb1d)** hub storage section S3-only: PUT `backend:'fs'` → 422
+  (retired) in Go + Node legacy managers; env-line generation writes s3 only;
+  e2e hub-storage-admin pin updated to the retirement contract.
+- **KEPT on purpose:** `cmd/seaweed-migrate` (fs↔s3 bridge for the psintern
+  prod cutover — prod `overleafserver` still runs the pre-G2 image);
+  `Dockerfile-base` durable dir mkdirs (template_files etc. = working/cache);
+  `libraries/object-persistor` MigrationPersistor (backend-agnostic fallback).
+
+**Final gate (image `ollitex/ollitex:main-29c05dbb1d…`, e2e stack recreated,
+overleaf container image-id verified == tagged build):**
+`smoke` (login→project→editor→compile→PDF) PASSED · `u101` history matrix
+PASSED (59-case 2-run stability, 42 stable pins, 8 transitional v1+ OT-plane
+cases recorded — owned by d5dd23dd) · `hub-storage-admin` PASSED (fs retired)
+— 4 passed in 51.2s.
+
+**Prod cutover notes (owner steps, psintern):** prod history-v1 needs the
+AWS_S3_* envs (key/secret/endpoint/pathStyle) before the G2 image ships there
+(production.json now defaults persistor to s3); fs→S3 blob migration available
+via `go-services/seaweed-migrate`.
