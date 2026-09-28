@@ -338,60 +338,104 @@ func originObject(origin, path string, ts int64) (map[string]any, bool) {
 // composeYjsUpdates — the Node-parity /updates body from the Yjs plane.
 // ok=false when the room has no versions (caller falls back to the legacy
 // V2 path). before: optional version cursor (vendor `before`; excluded).
+// S3a: superseded by composeMerged (which also merges the tree-op log);
+// kept as the ylog==nil fast path (and the S1.2 test oracle).
 func composeYjsUpdates(ctx context.Context, st persistence.VersionedPersistence, vlog collab.Log, room, rootPath string, before *int) (body []byte, ok bool, err error) {
-	lr, err := st.Load(ctx, room)
-	if err != nil {
-		return nil, false, err
-	}
-	if lr.Version == 0 {
-		return nil, false, nil
-	}
+	return composeMerged(ctx, st, vlog, nil, room, rootPath, before)
+}
+
+// composeMerged — the S3a unified /updates body: the room's text versions
+// and the tree-op log (yops) merged into ONE sequence (ts order; ties:
+// room before yops), a unified 1..N index assigned, then fed NEWEST-FIRST
+// to the vendor summarizer (which carries project_ops, stamps atV, and
+// keeps the S1.2 row/meta/origin rules intact — text and file rows never
+// merge, vendor S6).
+func composeMerged(ctx context.Context, st persistence.VersionedPersistence, vlog collab.Log, ylog YopLog, room, rootPath string, before *int) (body []byte, ok bool, err error) {
 	lvs, err := st.ListVersions(ctx, room)
 	if err != nil {
 		return nil, false, err
 	}
-	// vendor direction: newest-first (the merge core compares the TAIL = the
-	// more recent row against the incoming OLDER update; output rows stay
-	// newest-first, matching the OT summarized plane and the panel).
-	sort.Slice(lvs, func(i, j int) bool { return lvs[i].Version > lvs[j].Version })
+	var yops []YopMeta
+	if ylog != nil {
+		if yops, err = ylog.List(ctx, room); err != nil {
+			return nil, false, err
+		}
+	}
+	if len(lvs) == 0 && len(yops) == 0 {
+		return nil, false, nil // nothing in the Yjs plane → legacy fallback
+	}
 	vmetas := map[uint64]collab.VersionMeta{}
-	if vlog != nil {
-		if metas, rerr := vlog.Range(ctx, room, 0, uint64(lr.Version)); rerr == nil {
+	if vlog != nil && len(lvs) > 0 {
+		var maxV uint64
+		for _, lv := range lvs {
+			if uint64(lv.Version) > maxV {
+				maxV = uint64(lv.Version)
+			}
+		}
+		if metas, rerr := vlog.Range(ctx, room, 0, maxV); rerr == nil {
 			for _, m := range metas {
 				vmetas[m.V] = m
 			}
 		}
 	}
-	updates := []map[string]any{}
+	feed := mergedFeed{}
 	for _, lv := range lvs {
 		v := int(lv.Version)
-		if before != nil && v >= *before {
-			continue
-		}
-		meta, _ := vmetas[uint64(v)]
+		metaInfo, _ := vmetas[uint64(v)]
 		ts := lv.UpdatedAt.UTC().UnixMilli()
 		users := []any{}
-		if meta.UID != "" {
-			users = []any{meta.UID} // injectUserDetails resolves (or nulls) it
+		if metaInfo.UID != "" {
+			users = []any{metaInfo.UID}
 		}
 		m := map[string]any{"users": users, "start_ts": ts, "end_ts": ts}
-		if o, has := originObject(meta.Origin, rootPath, ts); has {
+		if o, has := originObject(metaInfo.Origin, rootPath, ts); has {
 			m["origin"] = o
 		}
 		pathnames := []string{}
 		if rootPath != "" {
 			pathnames = []string{rootPath}
 		}
+		feed = append(feed, mergedFeedItem{Ts: ts, Source: 0, V: v, Meta: m, Path: pathnames})
+	}
+	for _, yo := range yops {
+		ts := yo.At.UTC().UnixMilli()
+		users := []any{}
+		if yo.UID != "" {
+			users = []any{yo.UID}
+		}
+		m := map[string]any{"users": users, "start_ts": ts, "end_ts": ts}
+		feed = append(feed, mergedFeedItem{Ts: ts, Source: 1, V: int(yo.V), Meta: m, Ops: []map[string]any{projectOpsWire(yo)}})
+	}
+	// unified index in ts order (ties: room before yops)
+	sort.Slice(feed, func(i, j int) bool {
+		if feed[i].Ts != feed[j].Ts {
+			return feed[i].Ts < feed[j].Ts
+		}
+		if feed[i].Source != feed[j].Source {
+			return feed[i].Source < feed[j].Source
+		}
+		return feed[i].V < feed[j].V
+	})
+	updates := []map[string]any{}
+	for i, item := range feed {
+		v := i + 1 // unified index (1-based)
+		if before != nil && v >= *before {
+			continue
+		}
+		opswire := []map[string]any{}
+		opswire = append(opswire, item.Ops...)
 		updates = append(updates, map[string]any{
 			"v":           v,
-			"meta":        m,
-			"pathnames":   pathnames,
-			"project_ops": []map[string]any{},
+			"meta":        item.Meta,
+			"pathnames":   item.Path,
+			"project_ops": opswire,
 		})
 	}
+	// vendor direction: NEWEST-FIRST feed (S1.2 rule)
+	for i, j := 0, len(updates)-1; i < j; i, j = i+1, j-1 {
+		updates[i], updates[j] = updates[j], updates[i]
+	}
 	rows := summarizeYjs(updates, map[int][]map[string]any{}, []map[string]any{})
-	// Envelope — same shape/key order as the legacy V2 proxy body
-	// (observed: {"nextBeforeTimestamp":0,"updates":[...]}).
 	out := map[string]any{"nextBeforeTimestamp": 0, "updates": rows}
 	b, err := json.Marshal(out)
 	if err != nil {
