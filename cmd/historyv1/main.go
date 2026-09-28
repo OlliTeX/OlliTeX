@@ -17,6 +17,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -47,13 +48,9 @@ func main() {
 		log.Printf("historyv1: mongo ping failed (%v) — proceeding (lazy) ", err)
 	}
 	dbName := "sharelatex"
-	if i := indexOf(cfg.MongoURI, "/"); i >= 0 {
-		rest := cfg.MongoURI[i+1:]
-		if j := indexOfAny(rest, "?"); j >= 0 {
-			rest = rest[:j]
-		}
-		if rest != "" {
-			dbName = rest
+	if u, err := url.Parse(cfg.MongoURI); err == nil {
+		if n := strings.TrimPrefix(u.Path, "/"); n != "" {
+			dbName = n
 		}
 	}
 	db := client.Database(dbName)
