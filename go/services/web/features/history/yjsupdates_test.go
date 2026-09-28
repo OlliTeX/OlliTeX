@@ -17,31 +17,70 @@ import (
 
 const fixPID = "6abaab4caa405ee17acffd08"
 
-// findFixture — projects doc with rootDoc_id → docs doc with a name.
+// findFixture — projects doc: rootDoc_id + a rootFolder tree holding the
+// doc entity (the LIVE shape — the mongo `docs` collection is OT content,
+// nameless).
 func findFixture(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error) {
-	switch coll {
-	case "projects":
-		return bson.D{
-			{Key: "_id", Value: id},
-			{Key: "rootDoc_id", Value: primitive.ObjectID{0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc}},
-		}, nil
-	case "docs":
-		return bson.D{{Key: "_id", Value: id}, {Key: "name", Value: "mainbasic.tex"}}, nil
+	if coll != "projects" {
+		return bson.D{}, nil
 	}
-	return bson.D{}, nil
+	rootDoc := primitive.ObjectID{0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc}
+	return bson.D{
+		{Key: "_id", Value: id},
+		{Key: "rootDoc_id", Value: rootDoc},
+		{Key: "rootFolder", Value: bson.A{
+			bson.D{
+				{Key: "name", Value: "rootFolder"},
+				{Key: "_id", Value: primitive.ObjectID{0xA, 0xB}},
+				{Key: "docs", Value: bson.A{bson.D{
+					{Key: "name", Value: "mainbasic.tex"},
+					{Key: "_id", Value: rootDoc},
+				}}},
+				{Key: "folders", Value: bson.A{}},
+			},
+		}},
+	}, nil
 }
 
 func TestRootDocPathname(t *testing.T) {
 	if got := rootDocPathname(context.Background(), findFixture, fixPID); got != "mainbasic.tex" {
 		t.Fatalf("pathname = %q, want mainbasic.tex", got)
 	}
+	// nested folder: the entity sits one folder level down
+	nested := func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error) {
+		if coll != "projects" {
+			return bson.D{}, nil
+		}
+		rootDoc := primitive.ObjectID{0x7}
+		return bson.D{
+			{Key: "_id", Value: id},
+			{Key: "rootDoc_id", Value: rootDoc},
+			{Key: "rootFolder", Value: bson.A{bson.D{
+				{Key: "name", Value: "rootFolder"},
+				{Key: "docs", Value: bson.A{}},
+				{Key: "folders", Value: bson.A{bson.D{
+					{Key: "name", Value: "src"},
+					{Key: "docs", Value: bson.A{bson.D{
+						{Key: "name", Value: "chapters/main.tex"},
+						{Key: "_id", Value: rootDoc},
+					}}},
+					{Key: "folders", Value: bson.A{}},
+				}},
+				}}},
+			}}, nil
+	}
+	if got := rootDocPathname(context.Background(), nested, fixPID); got != "chapters/main.tex" {
+		t.Fatalf("nested pathname = %q, want chapters/main.tex", got)
+	}
+	// rootDoc not in the tree -> "" (the row goes vendor-invisible)
+	notree := func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error) {
+		return bson.D{{Key: "_id", Value: id}, {Key: "rootDoc_id", Value: primitive.ObjectID{0x9}}, {Key: "rootFolder", Value: bson.A{}}}, nil
+	}
+	if got := rootDocPathname(context.Background(), notree, fixPID); got != "" {
+		t.Fatalf("want empty, got %q", got)
+	}
 	if got := rootDocPathname(context.Background(), nil, fixPID); got != "" {
 		t.Fatalf("nil seek = %q, want empty", got)
-	}
-	if got := rootDocPathname(context.Background(), func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error) {
-		return bson.D{}, nil
-	}, fixPID); got != "" {
-		t.Fatalf("missing project = %q, want empty", got)
 	}
 }
 

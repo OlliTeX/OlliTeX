@@ -400,9 +400,13 @@ func composeYjsUpdates(ctx context.Context, st persistence.VersionedPersistence,
 	return b, true, nil
 }
 
-// rootDocPathname — the room's seeded text file path: projects doc →
-// rootDoc_id → docs collection "name". "" when unavailable (rows then
-// carry empty pathnames — vendor: invisible, an honest state).
+// rootDocPathname — the room's seeded text file path: the project doc's
+// rootFolder entity tree (rootFolder[].docs[].{name,_id}, plus nested
+// folders) walked for the entity with _id == rootDoc_id. "" when
+// unavailable (rows then carry empty pathnames — vendor: invisible, an
+// honest state). NOTE: in this stack the mongo `docs` collection is the OT
+// content doc (lines/rev) and has no name — the FILE NAME lives in the
+// project doc's rootFolder tree (verified live: rootFolder[0].docs[0]).
 func rootDocPathname(ctx context.Context, findOne func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error), pid string) string {
 	if findOne == nil {
 		return ""
@@ -415,34 +419,126 @@ func rootDocPathname(ctx context.Context, findOne func(ctx context.Context, coll
 	if err != nil || len(proj) == 0 {
 		return ""
 	}
-	var rootDoc primitive.ObjectID
+	var rootDoc string // hex form — compared against tree entity ids
+	var rootFolder any
 	for _, e := range proj {
-		if e.Key == "rootDoc_id" {
+		switch e.Key {
+		case "rootDoc_id":
 			switch v := e.Value.(type) {
 			case primitive.ObjectID:
-				rootDoc = v
+				rootDoc = v.Hex()
 			case string:
-				if o, oerr := primitive.ObjectIDFromHex(v); oerr == nil {
-					rootDoc = o
+				rootDoc = v
+			}
+		case "rootFolder":
+			rootFolder = e.Value
+		}
+	}
+	if rootDoc == "" || rootFolder == nil {
+		return ""
+	}
+	want := strings.ToLower(rootDoc)
+	var walk func(v any) string
+	walk = func(v any) string {
+		ent, ok := v.(primitive.D)
+		if !ok {
+			if dm, dok := v.(primitive.M); dok {
+				ent = dmToD(dm)
+			} else {
+				return ""
+			}
+		}
+		// docs: direct children
+		if docs := entArrAny(ent, "docs"); docs != nil {
+			for _, de := range docs {
+				m, ok := de.(primitive.D)
+				if !ok {
+					continue
+				}
+				if oid, dok := entField(m, "_id"); dok && strings.ToLower(oid) == want {
+					if s, ok := entField(m, "name"); ok {
+						return strings.TrimPrefix(s, "/")
+					}
 				}
 			}
 		}
-	}
-	if rootDoc == primitive.NilObjectID {
-		return ""
-	}
-	doc, err := findOne(ctx, "docs", rootDoc)
-	if err != nil || len(doc) == 0 {
-		return ""
-	}
-	for _, e := range doc {
-		if e.Key == "name" {
-			if s, ok := e.Value.(string); ok {
-				return s
+		// folders: nested entity roots
+		if folders := entArrAny(ent, "folders"); folders != nil {
+			for _, f := range folders {
+				if r := walk(f); r != "" {
+					return r
+				}
 			}
+		}
+		return ""
+	}
+	switch rf := rootFolder.(type) {
+	case []any:
+		for _, e := range rf {
+			if r := walk(e); r != "" {
+				return r
+			}
+		}
+	case bson.A:
+		for _, e := range rf {
+			if r := walk(e); r != "" {
+				return r
+			}
+		}
+	case []primitive.D:
+		for _, e := range rf {
+			if r := walk(primitive.D(e)); r != "" {
+				return r
+			}
+		}
+	case primitive.D:
+		if r := walk(rf); r != "" {
+			return r
 		}
 	}
 	return ""
+}
+
+func dmToD(m primitive.M) primitive.D {
+	out := make(primitive.D, 0, len(m))
+	for k, v := range m {
+		out = append(out, bson.E{Key: k, Value: v})
+	}
+	return out
+}
+
+func entField(d primitive.D, key string) (string, bool) {
+	for _, e := range d {
+		if e.Key == key {
+			if s, ok := e.Value.(string); ok {
+				return s, true
+			}
+			if o, ok := e.Value.(primitive.ObjectID); ok {
+				return o.Hex(), true
+			}
+		}
+	}
+	return "", false
+}
+
+func entArrAny(d primitive.D, key string) []any {
+	for _, e := range d {
+		if e.Key == key {
+			switch v := e.Value.(type) {
+			case []any:
+				return v
+			case bson.A:
+				return []any(v)
+			case []primitive.D:
+				out := make([]any, len(v))
+				for i, x := range v {
+					out[i] = x
+				}
+				return out
+			}
+		}
+	}
+	return nil
 }
 
 // MongoDocSeeker — adapts a lazy *mongo.Database to the findOne seam so

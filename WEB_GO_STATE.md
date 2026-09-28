@@ -1631,3 +1631,8 @@ S3 retire: DU tree → junk (or gate runit off), remove DU from compose/Dockerfi
 - **Fallback:** room v0 (unseeded) or range extending beyond room (OT-era) → the legacy V2 pass-through unchanged (malformed from/to also falls through to the Node 400s).
 - **Tests (6 new, green):** dmp insert over [2,3), from-zero whole-insert, zero-width range → single u part, filetree edited/unchanged shapes (editable-field absence pinned), version-log meta (attributed/unattributed/nil-vlog), roomCovers fallback boundaries, vRange rejects (missing → Node 400 fallthrough, non-numeric, inverted).
 - **Gates:** history+PH+dmp slice 37 pkgs ok; `go vet` clean; full `go test -race -p 4` **119 pkgs / 0 FAIL**. Live gate = the battery under the rebuilt binary (next).
+
+## d5dd23dd S1.2b — root-doc pathname via project-doc rootFolder (LIVE bugfix)
+- **Bug found live:** the S1.2 `rootDocPathname` read the mongo `docs` collection for the filename — but in this stack `docs` is the OT content doc (lines/rev, NO name). The FILE NAME lives in the **project doc's `rootFolder` entity tree** (`rootFolder[].docs[].{name,_id}`, nested `folders`). Verified live: `rootFolder[0].docs[0] = {name:'main.tex'}`. With the wrong look-up, rows carried empty pathnames → the vendor "empty update invisible" rule silently dropped every update row → `/updates` returned `{"updates":[]}` for Yjs rooms (root cause of the first live probe failure).
+- **Fix:** `rootDocPathname` now walks `rootFolder` (docs direct + nested folders) for the entity `_id == rootDoc_id`, returns its `name` (leading `/` trimmed). Same `findOne` seam, testable; added nested-folder + not-in-tree cases to the tests.
+- **Gate:** full `go test -race -p 4` **119 pkgs / 0 FAIL**. Live re-prove next.
