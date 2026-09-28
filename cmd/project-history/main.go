@@ -19,18 +19,17 @@ import (
 	"syscall"
 	"time"
 
-	"ollitex/go/services/project-history/internal/appfactory"
-	"ollitex/go/services/project-history/internal/config"
+	ph "ollitex/go/services/project-history"
 )
 
 func main() {
 	log.SetPrefix("project-history: ")
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
-	cfg := config.Load()
+	cfg := ph.Load()
 	ctx := context.Background()
 
-	app, err := appfactory.Build(ctx, cfg)
+	app, err := ph.Build(ctx, cfg)
 	if err != nil {
 		log.Fatalf("cannot start: %v (vendor: fatal on connect failure)", err)
 	}
