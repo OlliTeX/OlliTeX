@@ -59,9 +59,10 @@ test('API round trip: GET then PUT(s3) then PUT(fs-back) the storage section', a
   const bad2 = await a('PUT', '/admin/site-settings/storage', { templateFilesBucket: 'Bad Name!' })
   expect(bad2.status(), 'bad bucket rejected').toBe(422)
 
-  // rollback to fs (the documented rollback path)
+  // G2 STOR-1: fs is retired — the old rollback-to-fs path is now a 422,
+  // and the stored section keeps its s3 values.
   const put2 = await a('PUT', '/admin/site-settings/storage', { backend: 'fs', s3Endpoint: '', s3AccessKeyId: '', s3Secret: '', templateFilesBucket: '', projectBlobsBucket: '', globalBlobsBucket: '', docstoreArchiveBucket: '' })
-  expect(put2.status(), `PUT fs-back (got ${put2.status()}: ${(await put2.text().catch(() => '')).slice(0, 160)})`).toBeLessThan(300)
+  expect(put2.status(), `fs retired (got ${put2.status()}: ${(await put2.text().catch(() => '')).slice(0, 160)})`).toBe(422)
   const g3 = (await (await a('GET', '/admin/site-settings')).json().catch(() => ({}))).storage
-  expect(g3.backend, 'back to fs').toBe('fs')
+  expect(g3.backend, 'still s3').toBe('s3')
 })

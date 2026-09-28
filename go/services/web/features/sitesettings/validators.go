@@ -660,8 +660,8 @@ func validateStorageSection(value any) []string {
 		return notObj()
 	}
 	var errs []string
-	if v, p := m["backend"]; p && v != "" && v != "fs" && v != "s3" {
-		errs = append(errs, fmt.Sprintf("backend must be 'fs' or 's3' (got '%v')", v))
+	if v, p := m["backend"]; p && v != "" && v != "s3" {
+		errs = append(errs, fmt.Sprintf("backend must be 's3' — the 'fs' backend is retired (G2 STOR-1, S3-only durable) (got '%v')", v))
 	}
 	errs = append(errs, checkStrings(m, []string{
 		"s3Endpoint", "s3AccessKeyId", "s3Secret",

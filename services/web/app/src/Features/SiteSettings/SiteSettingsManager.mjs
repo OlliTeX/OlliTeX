@@ -1343,10 +1343,11 @@ export function validateServicesSection(value) {
 export function validateStorageSection(value) {
   const errors = []
   if (typeof value !== 'object' || value === null) return ['body must be a JSON object']
-  // backend: 'fs' (flat local files) or 's3' (SeaweedFS / S3 gateway); empty
-  // means "keep the server default" (recorded, not written to env.sh).
-  if (value.backend !== undefined && !['', 'fs', 's3'].includes(value.backend)) {
-    errors.push(`backend must be 'fs' or 's3' (got '${value.backend}')`)
+  // backend: 's3' (SeaweedFS / S3 gateway) — the only durable option since
+  // G2 STOR-1 (fs retired); empty means "keep the server default"
+  // (recorded, not written to env.sh).
+  if (value.backend !== undefined && !['', 's3'].includes(value.backend)) {
+    errors.push(`backend must be 's3' — the 'fs' backend is retired (G2 STOR-1) (got '${value.backend}')`)
   }
   errors.push(...checkStrings(value, [
     's3Endpoint', 's3AccessKeyId', 's3Secret',

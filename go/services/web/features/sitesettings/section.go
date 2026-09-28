@@ -191,7 +191,7 @@ func storageSectionOut(name string, sections map[string]Obj, c *cipher) Obj {
 		out = append(out, kv)
 	}
 	if b := asStr(ObjGetD(base, "backend")); b == "" {
-		out = ObjSet(out, "backend", "fs")
+		out = ObjSet(out, "backend", "s3") // G2 STOR-1: fs retired — S3 is the default
 	} else {
 		out = ObjSet(out, "backend", b)
 	}

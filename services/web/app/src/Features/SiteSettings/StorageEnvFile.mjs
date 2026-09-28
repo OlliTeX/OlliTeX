@@ -60,7 +60,8 @@ export function buildStorageEnvLines(section) {
     const l = envLine(name, value)
     if (l) lines.push(l)
   }
-  const backend = section.backend === 's3' ? 's3' : section.backend === 'fs' ? 'fs' : ''
+  // G2 STOR-1: fs retired — only 's3' maps to env lines
+  const backend = section.backend === 's3' ? 's3' : ''
 
   // ----- filestore (CE + Go services) -----
   if (backend) add('OVERLEAF_FILESTORE_BACKEND', backend)

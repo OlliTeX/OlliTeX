@@ -44,11 +44,9 @@ func buildStorageEnvLines(section Obj) []string {
 		}
 	}
 	backend := ""
-	switch asStr(ObjGetD(section, "backend")) {
-	case "s3":
+	// G2 STOR-1: the fs backend is retired — only 's3' is written.
+	if asStr(ObjGetD(section, "backend")) == "s3" {
 		backend = "s3"
-	case "fs":
-		backend = "fs"
 	}
 	add("OVERLEAF_FILESTORE_BACKEND", backend)
 	add("OVERLEAF_FILESTORE_S3_ENDPOINT", asStr(ObjGetD(section, "s3Endpoint")))
