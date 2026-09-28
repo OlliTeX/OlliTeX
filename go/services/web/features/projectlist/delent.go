@@ -40,6 +40,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/history"
 	"ollitex/go/services/web/views"
 )
 
@@ -68,6 +69,7 @@ func delParamVA(key string) []byte {
 // subtree (self included when a doc) + root-doc flag.
 type delLoc struct {
 	parentPath string
+	fsPath     string // S3c: the element's FS path (for the tree-op log)
 	subDocs    []entElement
 	rootDoc    bool
 }
@@ -83,29 +85,29 @@ func delSubtreeDocs(f entFolder) []entElement {
 // delFind mirrors ProjectLocator.findElement: element arrays checked before
 // recursive folders, folders in index order; doc→docs, file→fileRefs,
 // folder→folders.
-func delFind(f *entFolder, fpath, kind, eid, rootDocHex string) *delLoc {
+func delFind(f *entFolder, fpath, pfs, kind, eid, rootDocHex string) *delLoc {
 	switch kind {
 	case "doc":
 		for _, d := range f.docs {
 			if d.idHex == eid {
-				return &delLoc{parentPath: fpath + ".docs", subDocs: []entElement{d}, rootDoc: rootDocHex != "" && rootDocHex == eid}
+				return &delLoc{parentPath: fpath + ".docs", fsPath: pfs + d.name, subDocs: []entElement{d}, rootDoc: rootDocHex != "" && rootDocHex == eid}
 			}
 		}
 	case "file":
 		for i := range f.files {
 			if f.files[i].idHex == eid {
-				return &delLoc{parentPath: fpath + ".fileRefs"}
+				return &delLoc{parentPath: fpath + ".fileRefs", fsPath: pfs + f.files[i].name}
 			}
 		}
 	case "folder":
 		for i := range f.fold {
 			if f.fold[i].idHex == eid {
-				return &delLoc{parentPath: fpath + ".folders", subDocs: delSubtreeDocs(f.fold[i])}
+				return &delLoc{parentPath: fpath + ".folders", fsPath: pfs + f.fold[i].name, subDocs: delSubtreeDocs(f.fold[i])}
 			}
 		}
 	}
 	for i := range f.fold {
-		if r := delFind(&f.fold[i], fpath+".folders."+strconv.Itoa(i), kind, eid, rootDocHex); r != nil {
+		if r := delFind(&f.fold[i], fpath+".folders."+strconv.Itoa(i), pfs+f.fold[i].name+"/", kind, eid, rootDocHex); r != nil {
 			return r
 		}
 	}
@@ -224,7 +226,7 @@ func delEntityHandler(a *core.App, kind string) func(cxt *core.Cxt, res *core.Re
 			}
 		}
 		rootDocHex := oidHex(dget(*doc, "rootDoc_id"))
-		loc := delFind(&roots[0], "rootFolder.0", kind, eidHex, rootDocHex)
+		loc := delFind(&roots[0], "rootFolder.0", "", kind, eidHex, rootDocHex)
 		if loc == nil {
 			views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(path, "/")))
 			return
@@ -263,6 +265,9 @@ func delEntityHandler(a *core.App, kind string) func(cxt *core.Cxt, res *core.Re
 			// the docstore PATCH above (deleted:true) IS the content side
 			// effect, and a re-created doc is a fresh docstore document.
 		}
+
+		// S3c: deleted entity = removed op (its FS path).
+		yopsAppend(a, ctx, pidHex, history.YopRemove, loc.fsPath, "", uid)
 
 		res.NoContent()
 	}

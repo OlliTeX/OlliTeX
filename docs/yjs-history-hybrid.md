@@ -120,3 +120,16 @@ implementer):
 **Slices:** S3a = yops log + /updates merge + op-shape tests → S3b = filetree/diff replay → S3c = handler recording sites (live) → then S4/S5 (DU + Node retirements, owner directive) → otc junk.
 
 **Status:** design recorded; S3a not started. S2 done+live (2026-09-28, see WEB_GO_STATE.md ledger).
+
+### S3c — recording sites (implemented, 2026-09-28)
+`yopsAppend` (best-effort, never breaks the mutation) wired at the Go web mutation sites:
+- add doc/folder (entadd) → `add`
+- rename (entops) → `rename` (old → new)
+- move (entops) → `move` (old → new)
+- duplicate doc/file (entops) → `add` (new name at parent)
+- delete doc/file/folder (delent) → `remove` (FS path threaded through `delFind`)
+- upload new doc / new file (upload) → `add`
+
+**S3 scope notes (honest gaps, recorded):**
+- Re-upload over an existing doc/file (content replace) and doc↔file swaps change CONTENT, not the tree → no `yops` row; the replaced doc's text lives in docstore (OT content), so its change is not a Yjs room version yet. These will surface when the seed-text plane widens or the content doc joins the room (post-S3).
+- Folder deletes record the folder's path (subtree doc cleanup is a content-side effect; the panel shows the folder row).

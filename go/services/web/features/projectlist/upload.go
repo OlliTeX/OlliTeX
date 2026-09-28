@@ -76,6 +76,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/history"
 	"ollitex/go/services/web/views"
 )
 
@@ -900,6 +901,8 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 		return
 	}
 	// D41 slice-2: DU add-doc structure op removed ($push docs done above).
+	// S3c: new doc from upload = added op.
+	yopsAppend(a, cxt.Req.Context(), pj, history.YopAdd, strings.TrimPrefix(tgt.fsPath, "/")+"/"+name, "", uid)
 	res.JSON(200, upJSONDoc(newDocID.Hex()))
 }
 
@@ -953,6 +956,9 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 		return
 	}
 	// D41 slice-2: DU add-file structure op removed ($push fileRefs done above).
+	// S3c: new file from upload = added op (hash known → the wire carries it
+	// as the overleaf file hash when the op is shaped at read time).
+	yopsAppend(a, cxt.Req.Context(), pj, history.YopAdd, strings.TrimPrefix(tgt.fsPath, "/")+"/"+name, "", uid)
 	res.JSON(200, upJSONFile(newFileID.Hex(), hash))
 }
 

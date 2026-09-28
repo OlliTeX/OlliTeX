@@ -67,6 +67,7 @@ import (
 	"time"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/history"
 	"ollitex/go/services/web/views"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -465,6 +466,9 @@ func addEntityHandler(a *core.App, kind string) func(*core.Cxt, *core.Res) {
 			views.Error500Page(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
 			return
 		}
+
+		// S3c: new entity = added op (docs and folders are both tree ops).
+		yopsAppend(a, cxt.Req.Context(), cxt.Params["1"], history.YopAdd, fsPath+"/"+name, "", uid)
 
 		if isDoc {
 			res.JSON(200, []byte(`{"name":`+jstr(name)+`,"_id":"`+newDocID.Hex()+`"}`))

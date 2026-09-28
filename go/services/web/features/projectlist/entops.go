@@ -98,6 +98,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/history"
 	"ollitex/go/services/web/views"
 )
 
@@ -681,6 +682,8 @@ func entRenameHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			if a != nil {
 				entEmitEvent(a, pidHex, "reciveEntityRename", `"`+entJSONEsc(entityHex)+`","`+entJSONEsc(name)+`"`)
 			}
+			// S3c: tree-op log (renamed row in /updates + filetree/diff replay).
+			yopsAppend(a, cxt.Req.Context(), pidHex, history.YopRename, strings.TrimPrefix(loc.fs, "/"), strings.TrimPrefix(endPath, "/"), uid)
 			return true
 		})
 		if !done {
@@ -836,6 +839,10 @@ func entMoveHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			if a != nil {
 				entEmitEvent(a, pidHex, "reciveEntityMove", `"`+entJSONEsc(entityHex)+`","`+entJSONEsc(folderStr)+`"`)
 			}
+			// S3c: tree-op log (moved = renamed wire: old → new path).
+			yopsAppend(a, cxt.Req.Context(), pidHex, history.YopMove,
+				strings.TrimPrefix(loc.fs, "/"),
+				strings.TrimPrefix(folderStr, "/")+"/"+name, uid)
 			return true
 		})
 		if !done {
@@ -921,6 +928,9 @@ func entDuplicateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 					entEmitEvent(a, pidHex, "reciveNewDoc",
 						`"`+entJSONEsc(folderHex)+`",{"name":"`+entJSONEsc(newName)+`","_id":"`+newDocID.Hex()+`"},"editor","`+entJSONEsc(uid)+`"`)
 				}
+				// S3c: the duplicate is a new file at parent+newName (added op).
+				yopsAppend(a, cxt.Req.Context(), pidHex, history.YopAdd,
+					strings.TrimPrefix(parentFS(loc), "/")+"/"+newName, "", uid)
 				return true
 			})
 			if !done {
@@ -968,6 +978,9 @@ func entDuplicateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		folderJSON := fmt.Sprintf(`"%s"`, entJSONEsc(oidHex(entFld(*loc.folder, "_id"))))
 		entEmitEvent(a, pidHex, "reciveNewFile",
 			strings.Join([]string{folderJSON, createdJSON, `"editor"`, linkedJSONWire(hasLinked, linkedJSON), fmt.Sprintf("%q", uid)}, ","))
+		// S3c: the file duplicate is a new file at parent+newName (added op).
+		yopsAppend(a, cxt.Req.Context(), pidHex, history.YopAdd,
+			strings.TrimPrefix(parentFS(loc), "/")+"/"+newName, "", uid)
 		res.JSON(200, []byte(createdJSON))
 	}
 }
