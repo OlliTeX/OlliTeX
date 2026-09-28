@@ -51,7 +51,6 @@ func LocaleOf(userLang, acceptLang string) string {
 	return normalizeLocale(al)
 }
 
-
 // normalizeLocale — primary subtag, lowercased, trimmed ("de-AT" → "de").
 func normalizeLocale(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
@@ -60,6 +59,7 @@ func normalizeLocale(s string) string {
 	}
 	return s
 }
+
 // T — resolve key for locale with vars. ok=false means "fell back"
 // (unknown locale, unknown key, or nil receiver). The returned string is
 // the resolved text, or the key itself when the key is unknown.
