@@ -12,8 +12,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -23,15 +21,23 @@ import (
 func testConfig(t *testing.T) Config {
 	t.Helper()
 	return Config{
-		Backend: "fs",
-		Bucket:  t.TempDir(),
+		Backend: "s3",
+		Bucket:  "test-archive",
 	}
 }
+
+var lastTestStub *stubS3 // set by newTestServer (archive assertions inspect the stub objects)
 
 func newTestServer(t *testing.T, cfg Config, store Store) *httptest.Server {
 	t.Helper()
 	cfg.Defaults()
-	srv := NewServer(cfg, store, NewFSArchiver())
+	stub := newStubS3()
+	stub.buckets[cfg.Bucket] = map[string][]byte{}
+	lastTestStub = stub
+	ts3 := httptest.NewServer(http.HandlerFunc(stub.serve))
+	t.Cleanup(ts3.Close)
+	sa := NewS3Archiver(ts3.URL, "", "")
+	srv := NewServer(cfg, store, sa)
 	ts := httptest.NewServer(srv.Router())
 	t.Cleanup(ts.Close)
 	return ts
@@ -363,17 +369,16 @@ func TestArchiveRoundTrip(t *testing.T) {
 		t.Fatalf("archive doc: %d %q", resp.StatusCode, body)
 	}
 
-	// FS file exists flat: <bucket>/<pid>_<did>
-	archFile := filepath.Join(cfg.Bucket, p1+"_"+d1)
-	st, err := os.Stat(archFile)
-	if err != nil {
-		t.Fatalf("archive file missing: %v (%s)", err, archFile)
+	// S3 object exists under the VERBATIM key <pid>/<did> (Node S3Persistor
+	// semantics; the flat <pid>_<did> fs layout retired with G2 STOR-1)
+	archKey := p1 + "/" + d1
+	data, ok := lastTestStub.buckets[cfg.Bucket][archKey]
+	if !ok {
+		t.Fatalf("archive object missing in S3 stub (key %q; have %v)", archKey, lastTestStub.buckets[cfg.Bucket])
 	}
-	data, _ := os.ReadFile(archFile)
 	if !strings.Contains(string(data), `"schema_v":1`) || !strings.Contains(string(data), `"lines":["a","b"]`) {
 		t.Fatalf("archive payload: %q", data)
 	}
-	_ = st
 
 	// peek reports archived
 	resp, body = get(t, durl+"/peek")
@@ -414,9 +419,10 @@ func TestArchiveRoundTrip(t *testing.T) {
 	if resp.StatusCode != 204 {
 		t.Fatalf("destroy: %d %q", resp.StatusCode, body)
 	}
-	if _, err := os.Stat(archFile); !os.IsNotExist(err) {
-		// destroy deletes <bucket>/<pid>_* files
-		t.Fatalf("archive file still present after destroy")
+	// destroy sweeps the <pid>/* objects (S3 prefix delete; the old flat
+	// <pid>_* fs sweep retired with G2)
+	if _, still := lastTestStub.buckets[cfg.Bucket][archKey]; still {
+		t.Fatalf("archive object still present after destroy")
 	}
 	resp, body = get(t, ts.URL+"/project/"+p1+"/doc")
 	if resp.StatusCode != 200 || body != "[]" {

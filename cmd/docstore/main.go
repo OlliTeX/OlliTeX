@@ -114,25 +114,23 @@ func main() {
 		log.Fatalf("docstore: mongo: %v", err)
 	}
 
-	// Archive backend selection 1:1 with DocArchiveManager/PersistorManager:
-	// BACKEND '' → unconfigured Node (AbstractPersistor no-op → archive
-	// disabled); 'fs' → FSPersistor; 's3' → S3Persistor (here: the local
-	// SeaweedFS S3 gateway, anonymous by default).
-	var archiver docstore.Archiver = docstore.NewFSArchiver()
-	if cfg.Backend == "s3" {
-		sa := docstore.NewS3Archiver(
-			envOrChain([]string{"AWS_S3_ENDPOINT", "OVERLEAF_FILESTORE_S3_ENDPOINT"}, "http://127.0.0.1:8333"),
-			envOrChain([]string{"AWS_ACCESS_KEY_ID", "AWS_KEY"}, ""),
-			envOrChain([]string{"AWS_SECRET_ACCESS_KEY", "AWS_SECRET"}, ""),
-		)
-		if ini, ok := sa.(docstore.BucketInitializer); ok {
-			if err := ini.EnsureBucket(ctx, cfg.Bucket); err != nil {
-				log.Fatalf("docstore: s3 bucket %q unusable: %v", cfg.Bucket, err)
-			}
-		}
-		archiver = sa
+	// Archive backend selection (G2 STOR-1, owner-approved S3-only durable
+	// backend): 's3' → the local SeaweedFS S3 gateway (anonymous by default).
+	// The Node-era fs backend is retired — any other value fails fast.
+	if cfg.Backend != "s3" {
+		log.Fatalf("docstore: BACKEND=%q is not supported: the fs archive backend is retired (G2 STOR-1, S3-only durable backend) — set BACKEND=s3 (AWS_S3_ENDPOINT or OVERLEAF_FILESTORE_S3_ENDPOINT, BUCKET_NAME/AWS_BUCKET)", cfg.Backend)
 	}
-	srv := docstore.NewServer(cfg, store, archiver)
+	sa := docstore.NewS3Archiver(
+		envOrChain([]string{"AWS_S3_ENDPOINT", "OVERLEAF_FILESTORE_S3_ENDPOINT"}, "http://127.0.0.1:8333"),
+		envOrChain([]string{"AWS_ACCESS_KEY_ID", "AWS_KEY"}, ""),
+		envOrChain([]string{"AWS_SECRET_ACCESS_KEY", "AWS_SECRET"}, ""),
+	)
+	if ini, ok := sa.(docstore.BucketInitializer); ok {
+		if err := ini.EnsureBucket(ctx, cfg.Bucket); err != nil {
+			log.Fatalf("docstore: s3 bucket %q unusable: %v", cfg.Bucket, err)
+		}
+	}
+	srv := docstore.NewServer(cfg, store, docstore.Archiver(sa))
 	httpSrv := &http.Server{
 		Addr:    net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
 		Handler: srv.Router(),

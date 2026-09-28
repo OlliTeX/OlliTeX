@@ -68,7 +68,7 @@ type Config struct {
 	// Archive (object-persistor fs backend)
 	ArchiveOnSoftDelete         bool   // ARCHIVE_ON_SOFT_DELETE === 'true'
 	KeepSoftDeletedDocsArchived bool   // KEEP_SOFT_DELETED_DOCS_ARCHIVED === 'true'
-	Backend                     string // BACKEND ('' | 'fs' | …)
+	Backend                     string // BACKEND — must be 's3' (fs archive retired, G2 STOR-1)
 	Bucket                      string // BUCKET_NAME || AWS_BUCKET || 'bucket'
 
 	// Health check
