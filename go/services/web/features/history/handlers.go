@@ -179,14 +179,90 @@ func (h *svc) yjsUpdates(cxt *core.Cxt) (body []byte, ok bool, err error) {
 	return composeYjsUpdates(ctx, st, vlog, pid, rootDocPathname(ctx, seek, pid), before)
 }
 
-// docDiff adds the doc_id objectId validation (Node docDiffSchema:
-// params {Project_id, doc_id} — bad doc_id -> 404 JSON Validation error).
+// docDiff — S2 Yjs-first (D41-b1): Node docDiffSchema adds the doc_id
+// objectId validation (bad doc_id -> 404 JSON Validation error); the body
+// renders the room's Y.Text at the range endpoints and runs the
+// Node-oracle dmp pipeline; unseeded room / OT-era range → the legacy V2
+// pass-through (the Node route does NOT inject user details here —
+// proxyToHistoryApi, raw ids stay raw).
 func (h *svc) docDiff(cxt *core.Cxt, res *core.Res) {
 	if did := cxt.Params["2"]; did != "" && !validOID.MatchString(did) {
 		res.JSON(404, []byte(`{"error":"Validation error: Invalid Mongo ObjectId at \"params.doc_id\"","statusCode":404}`))
 		return
 	}
+	h.yjsDiff(cxt, res, true)
+}
+
+// filetreeDiff — S2 Yjs-first: single-file (root doc) FileDiff over the
+// room; tree ops (added/removed/renamed) arrive with the S3 ops stream.
+func (h *svc) filetreeDiff(cxt *core.Cxt, res *core.Res) {
+	h.yjsDiff(cxt, res, false)
+}
+
+// yjsDiff — the shared Yjs-first diff dispatcher (doc or filetree shape).
+func (h *svc) yjsDiff(cxt *core.Cxt, res *core.Res, doc bool) {
+	if _, _, ok := h.gate(cxt, res, "read"); !ok {
+		return
+	}
+	from, to, okR := vRange(cxt.Req.URL.Query().Get)
+	if !okR {
+		// malformed/inverted range: the legacy proxy's Node 400s are the
+		// byte-pinned behavior — fall through unchanged.
+		h.proxy(cxt, res)
+		return
+	}
+	if h.a != nil && h.a.Mongo != nil {
+		if body, served := h.yjsDiffBody(cxt, from, to, doc); served {
+			res.JSON(200, body)
+			return
+		}
+	}
 	h.proxy(cxt, res)
+}
+
+// yjsDiffBody — composed when the room covers the range; served=false
+// otherwise (empty room / OT-era range / no store) for the legacy passthrough.
+func (h *svc) yjsDiffBody(cxt *core.Cxt, from, to int, doc bool) (body []byte, served bool) {
+	ctx := cxt.Req.Context()
+	db, err := h.a.Mongo.DB(ctx)
+	if err != nil {
+		return nil, false
+	}
+	st, err := collab.NewMongoStore(ctx, db)
+	if err != nil {
+		return nil, false
+	}
+	room := strings.ToLower(cxt.Params["1"])
+	covered, err := roomCovers(ctx, st, room, from, to)
+	if err != nil || !covered {
+		return nil, false
+	}
+	var vlog collab.Log
+	if vl, verr := collab.NewMongoVersionLog(ctx, db); verr == nil {
+		vlog = vl
+	}
+	root := rootDocPathname(ctx, MongoDocSeeker(db), room)
+	var out map[string]any
+	if doc {
+		out, err = yjsDocDiff(ctx, st, room, from, to, func(ctx context.Context, v int) map[string]any {
+			return vlogMetaFor(ctx, vlog, room, root, v)
+		})
+	} else {
+		before, eB := textAt(ctx, st, room, from-1)
+		after, eA := textAt(ctx, st, room, to-1)
+		if eB != nil || eA != nil {
+			return nil, false
+		}
+		out = yjsFiletreeDiff(root, before != after)
+	}
+	if err != nil {
+		return nil, false
+	}
+	b, merr := json.Marshal(out)
+	if merr != nil {
+		return nil, false
+	}
+	return b, true
 }
 
 // proxy (diff / filetree/diff — raw proxyToHistoryApi).

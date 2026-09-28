@@ -12,7 +12,7 @@ package updatecompressor
 
 import (
 	"errors"
-	"ollitex/go/services/project-history/internal/dmp"
+	"ollitex/go/libraries/dmp"
 	"ollitex/go/services/project-history/internal/historyot"
 )
 
