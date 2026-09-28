@@ -95,6 +95,21 @@ async function leg() {
   await login('e2e-admin@e2e.test', 'Ol-Fixture-9x7K', them)
   const NJ = { 'content-type': 'application/json', accept: 'application/json', cookie: them.ck, 'x-csrf-token': them.tok }
 
+  // hygiene (UNRECORDED): the Go V1/PH label plane is write-capable (the Node-era
+  // baseline was read-only in this environment), so every leg must start from an
+  // identical state — remove labels persisted by the previous leg before reading.
+  {
+    const rg = await fetch(U(`/project/${P}/labels`), { headers: J }).catch(() => null)
+    if (rg && rg.status === 200) {
+      try {
+        const ls = JSON.parse(await rg.text())
+        for (const l of (Array.isArray(ls) ? ls : [])) {
+          if (l && l.id) await fetch(U(`/project/${P}/labels/${l.id}`), { headers: { ...J, ...C }, method: 'DELETE' }).catch(() => {})
+        }
+      } catch (e) { /* hygiene only — never fail the gate on it */ }
+    }
+  }
+
   // ---- updates
   {
     const r = await fetch(U(`/project/${P}/updates`), { headers: J })

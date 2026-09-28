@@ -78,6 +78,9 @@ func (c *client) execLocked(cmd string, args ...string) (any, error) {
 	for _, a := range all {
 		buf = append(buf, '$')
 		buf = append(buf, []byte(strconv.Itoa(len(a)))...)
+		buf = append(buf, '\r', '\n') // RESP: $<len>\r\n<data>\r\n (the CRLF after the
+		// length is mandatory — without it the server rejects the request and
+		// drops the connection).
 		buf = append(buf, a...)
 		buf = append(buf, '\r', '\n')
 	}

@@ -54,10 +54,10 @@ func (r Range) End() int   { return r.Pos + r.Length }
 
 // TrackedChangeRaw — raw `{range: {pos, length}, tracking: {type, userId, ts}}`.
 type TrackedChangeRaw struct {
-	Range    Range
-	Type     string // "insert" | "delete" | "none"
-	UserID   string
-	Ts       string // ISO string (raw wire)
+	Range  Range
+	Type   string // "insert" | "delete" | "none"
+	UserID string
+	Ts     string // ISO string (raw wire)
 }
 
 // CommentRaw — raw `{id, ranges: [{pos, length}], resolved}`.

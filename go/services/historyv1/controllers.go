@@ -291,9 +291,16 @@ func (s *Service) getChanges(w http.ResponseWriter, r *http.Request) {
 // historyReadErr — Node catch clauses: Chunk.NotFoundError → 404; Chunk
 // VersionNotFound/BeforeTimestamp — 404 in the version/timestamp handlers;
 // anything else → 500 (render.js default text).
+// historyReadErr — Node catch clauses: Chunk.NotFoundError → 404; the Node
+// class family is inheritance-based (VersionNotFound/BeforeTimestampNotFound/
+// NotPersisted all EXTEND NotFoundError in overleaf-editor-core/chunk.js),
+// so every family member 404s — a 1:1 port must match all four.
 func (s *Service) historyReadErr(w http.ResponseWriter, err error) {
 	var cnf *otc.ChunkNotFoundError
-	if errors.As(err, &cnf) {
+	var vnf *otc.ChunkVersionNotFoundError
+	var bnf *otc.ChunkBeforeTimestampNotFoundError
+	var npf *otc.ChunkNotPersistedError
+	if errors.As(err, &cnf) || errors.As(err, &vnf) || errors.As(err, &bnf) || errors.As(err, &npf) {
 		notFound(w)
 		return
 	}

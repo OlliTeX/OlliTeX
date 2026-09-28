@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 
@@ -204,12 +205,28 @@ func (a labelsAdapter) InsertMany(ctx context.Context, docs []map[string]any) er
 	return a.c.InsertMany(ctx, docs)
 }
 func (a labelsAdapter) InsertOne(ctx context.Context, doc map[string]any) (any, error) {
+	// Vendor (Node) mongoose generates `_id` on insert and returns the created
+	// doc (label carries a usable `id`); the C1 phmongo seam discards the
+	// driver's InsertedID, so generate it up front (1:1 with mongoose) and
+	// return the stored id.
+	if doc["_id"] == nil {
+		doc["_id"] = primitive.NewObjectID()
+	}
+	id := doc["_id"]
 	if err := a.c.InsertOne(ctx, doc, phmongo.InsertOneOpts{}); err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return id, nil
 }
 func (a labelsAdapter) DeleteOne(ctx context.Context, filter map[string]any) error {
+	// Node mongoose coerces a 24-hex string `_id` to ObjectId in query filters;
+	// the raw Go driver does not — labels store ObjectID ids, so coerce to keep
+	// the vendor delete-matching 1:1 (0-match would otherwise 204 silently).
+	if id, ok := filter["_id"].(string); ok {
+		if oid, err := primitive.ObjectIDFromHex(id); err == nil {
+			filter["_id"] = oid
+		}
+	}
 	_, err := a.c.DeleteOne(ctx, filter)
 	return err
 }
@@ -750,9 +767,9 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 			return err != nil && (strings.Contains(errString(err), "Invalid") || strings.Contains(errString(err), "SyntaxError") || strings.Contains(errString(err), "FileContentEmpty"))
 		},
 		Inc:      func(string, int, map[string]any) {},
-		LogDebug: func(map[string]any, string) {},
-		LogWarn:  func(map[string]any, string) {},
-		LogErr:   func(map[string]any, string) {},
+		LogDebug: slog{"debug"}.fn(),
+		LogWarn:  slog{"warn"}.fn(),
+		LogErr:   slog{"error"}.fn(),
 		Now:      time.Now,
 	}
 
@@ -957,10 +974,10 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 			}
 			return err
 		},
-		LogWarn:            func(map[string]any, string) {},
+		LogWarn:            slog{"warn"}.fn(),
 		LogDebug:           func(map[string]any, string) {},
-		LogErr:             func(map[string]any, string) {},
-		LogErrLvl:          func(map[string]any, string) {},
+		LogErr:             slog{"error"}.fn(),
+		LogErrLvl:          slog{"error"}.fn(),
 		RedisReadBatchSize: 500,
 	}
 	_ = d
@@ -994,6 +1011,18 @@ func errString(e error) string {
 		return ""
 	}
 	return e.Error()
+}
+
+// slog — production log seam (vendor logger.<level> { info }, msg → stdout;
+// the vendor writes to the service logger; the runit service captures stdout
+// to /var/log/overleaf/project-history-go.log).
+type slog struct{ level string }
+
+func (l slog) fn() func(map[string]any, string) {
+	return func(info map[string]any, msg string) {
+		j, _ := json.Marshal(info)
+		fmt.Fprintf(os.Stderr, "project-history %s: %s %s\n", l.level, msg, string(j))
+	}
 }
 
 // redisRawOf — the parsed update carries its queue raw JSON (ParseDocUpdates
