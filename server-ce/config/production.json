@@ -1,7 +1,6 @@
 {
   "persistor": {
-    "backend": "fs",
-    "useSubdirectories": true
+    "backend": "s3"
   },
   "basicHttpAuth": {
     "password": "password"

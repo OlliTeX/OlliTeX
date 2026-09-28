@@ -485,19 +485,28 @@ switch (process.env.OVERLEAF_FILESTORE_BACKEND) {
     }
     break
   default:
+    // G2 STOR-1 (owner-approved): the fs filestore backend is retired — the
+    // default is the same S3 config as `case 's3'` (no fs/default paths).
     settings.filestore = {
-      backend: 'fs',
+      backend: 's3',
       stores: {
-        template_files: Path.join(DATA_DIR, 'template_files'),
-
-        // NOTE: The below paths are hard-coded in server-ce/config/production.json, so hard code them here as well.
-        // We can use DATA_DIR after switching history-v1 from 'config' to '@overleaf/settings'.
-        project_blobs:
-          process.env.OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET ||
-          '/var/lib/overleaf/data/history/overleaf-project-blobs',
-        global_blobs:
-          process.env.OVERLEAF_HISTORY_BLOBS_BUCKET ||
-          '/var/lib/overleaf/data/history/overleaf-global-blobs',
+        template_files:
+          process.env.OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME,
+        project_blobs: process.env.OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET,
+        global_blobs: process.env.OVERLEAF_HISTORY_BLOBS_BUCKET,
+      },
+      s3: {
+        key:
+          process.env.OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID ||
+          process.env.AWS_ACCESS_KEY_ID,
+        secret:
+          process.env.OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY ||
+          process.env.AWS_SECRET_ACCESS_KEY,
+        endpoint: process.env.OVERLEAF_FILESTORE_S3_ENDPOINT,
+        pathStyle: process.env.OVERLEAF_FILESTORE_S3_PATH_STYLE === 'true',
+        region:
+          process.env.OVERLEAF_FILESTORE_S3_REGION ||
+          process.env.AWS_DEFAULT_REGION,
       },
     }
 }
