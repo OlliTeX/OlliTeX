@@ -1352,3 +1352,74 @@ cases recorded — owned by d5dd23dd) · `hub-storage-admin` PASSED (fs retired)
 AWS_S3_* envs (key/secret/endpoint/pathStyle) before the G2 image ships there
 (production.json now defaults persistor to s3); fs→S3 blob migration available
 via `go-services/seaweed-migrate`.
+
+## H1 — Go history-v1 service (4b0c99a9, 1:1 port + PG18 seam + runit flip) — GREEN 2026-09-28
+
+**Scope:** Node `services/history-v1` (:3100, basic-auth `/api`) is now served by
+`go/services/historyv1` + `cmd/historyv1`; flip is env-gated (`HISTORY_V1_GO=1`,
+e2e only for now) and default-inert everywhere: runit `history-v1-go-overleaf`
+owns :3100 when the flip is on, Node `history-v1-overleaf` stands down on the
+same env (default off → zero behavior change in any unflipped deployment).
+Dockerfile go-services build loop now includes `historyv1`.
+
+**Slices (all GATE-green: gofmt · go vet · go build -buildvcs=false · go test -race
+from the repo root; e2e gates after the final image):**
+- H1-1 (c33e0119) service port: `historyv1.go` (Config/FromEnv 1:1 env map, 20
+  routes, basic-auth, OError-style rendering), `projectkey.go` (format/pad 1:1,
+  pinned), `historystore.go` (gzipped raw history in the S3 persistor,
+  `<projectKey>/<pad9 chunkID>`), `blobstore.go` (meta: Mongo
+  `blobs`/`shardedBlobs` for 24-hex ids, PG `project_blobs` for numeric ids;
+  data: S3 `projectblobs`), `chunkstore.go` (Mongo chunk meta 1:1,
+  pending/active + transactions, 11000→ChunkVersionConflictError),
+  `chunkstore_pg.go` (PG18 seam: chunks/pending_chunks/old_chunks 1:1,
+  FOR UPDATE close-check, 23505→conflict, pgx v5), `controllers.go` (all 21
+  handler semantics 1:1), unit pins.
+- H1-2 (cf47ffcdb5) BlobStores shared across Service+ChunkStores (numeric ids
+  were falling through to Mongo → initialize 500).
+- H1-3 (195ff21b) **root cause of initialize 500:** `NewS3Persistor(settings,
+  nil)` leaves no client factory → every persistor request failed
+  ("upload to S3 failed"). Added `s3x.DoRaw` + the `persistors.S3Client`
+  s3x adapter (basic-auth gateway; presign honestly unsupported).
+- H1-4 (4b229242) createProjectBlob validates the payload with raw sha1
+  (Node `blobHashFromFile`), not the git blob hash.
+- H1-5 (038ec13f) createProjectBlob stores the URL-validated hash (Node stores
+  `params.hash`).
+- H1-6 (73beb8e7) Mongo db-name parsed as a real URL — the first-slash parse
+  broke the `mongodb://` scheme (mongo-path projects 500'd with
+  InvalidNamespace; numeric/PG path never touched Mongo, which masked it).
+- diag commits (e603d2ed, f3ed9be, 97403d21): controller error logs carry the
+  full oerror stack + info (cause) — permanent diagnosability.
+
+**Deliberate deviations (documented; none exercised in this stack's gates):**
+createZip → honest 500 (zipStore presign unavailable over the basic-auth
+gateway); clone → final 200 (Node IncrementalResponse is transport-only);
+readOnly secondary-preference dropped (single-node Mongo); Extender = NullExtender
+(the DU-era redis change-buffer seam is absent in this stack — the 1:1 empty
+buffer behavior). POST /projects/:id (no such Node route) → 405 vs Node 404
+(method-mismatch nuance, unobserved by gates).
+
+**Wire checks (in-container, live Go V1 vs Node controller oracle):**
+init 200 {projectId} / 409 · latest/history 200 {chunk:{history,startVersion}}
+/ 404 · raw {start,end,endTimestamp} · changes since0 200 {changes:[],hasMore:false}
+/ since>latest 400 {error:"Version out of bounds: N"} / since<0 400 · blob PUT
+201 (sha1) / 409 "File hash mismatch" / 413 · GET 200/206 (Range) / 404 · HEAD
+· copy 204 duplicate / 201 fresh / 404 missing-source · blob-stats (with
+blobHashes) correct text/binary split · DELETE 204 · PG seam: numeric projects
+full round-trip on `overleaf-history-v1` PG18 (initialize, chunks, pending→
+confirm, project_blobs insert/find, stats) — Node PG backend retired from the
+runtime path.
+
+**Final gate (image `ollitex/ollitex:main-73beb8e7…`, e2e overleaf recreated
+with `--env-file .env.test`, container image-id == tagged build):**
+`smoke` + `u101` history matrix (all 59 wire lines OK — 2-run identical,
+including the previously-transitional read pins now served by Go V1) +
+`hub-storage-admin` — **4 passed (49.2s)**. TRANSITIONAL (recorded, not
+asserted, D41 — owned by d5dd23dd hybrid): labels create, zip v1, diff 0-1,
+filetree diff, changes since1 via V2 — all stable 500 classes (V2 project-history
+still reads the version plane it composes).
+
+**Prod cutover (owner steps, psintern):** the Go historyv1 needs, in addition
+to the G2 S3 envs: `MONGO_CONNECTION_STRING` (or MONGO_HOST), the history S3
+creds, and (for numeric-id projects) `DATABASE_URL`/`HISTORY_CONNECTION_STRING`
+pointing at the PG18 durable store. Node history-v1 code remains in the image
+(flip-off default) until the owner flips `HISTORY_V1_GO=1` on prod.
