@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 
+	i18nlib "ollitex/go/libraries/i18n"
 	"ollitex/go/pbhttp"
 )
 
@@ -250,6 +251,11 @@ type App struct {
 	// View renderers (P0: general/404 + general/500; login in P0-views).
 	Render404Web fnPage // web profile unknown-route view (general/404)
 	Render500    fnPage // error page (general/500)
+
+	// I18n — Go-side catalog bundle (go/libraries/i18n). Nil = English-only
+	// mode = today's bytes (default; e2e stacks stay byte-identical).
+	// Wired in cmd/web when WEB_I18N_LOCALES_DIR is set.
+	I18n *i18nlib.Bundle
 }
 
 func (a *App) SetRender404(f fnPage) { a.Render404Web = f }

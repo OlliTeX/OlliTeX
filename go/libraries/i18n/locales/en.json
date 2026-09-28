@@ -1,0 +1,9 @@
+{
+  "email.sessions-cleared.subject": "{{app}} security note: active sessions cleared",
+  "email.sessions-cleared.text": "Hi there,\n\nActive sessions cleared\n\n{{datetime}}\n\nactive sessions were cleared on your account {{email}}\n\nQuick guide: {{guideUrl}}\n\nThanks,\n{{app}} Team\n",
+  "rel.time-days": {
+    "zero": "today",
+    "one": "yesterday",
+    "other": "recent days"
+  }
+}

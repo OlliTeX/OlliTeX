@@ -21,6 +21,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 
+	i18nlib "ollitex/go/libraries/i18n"
 	"ollitex/go/mongoh"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/adminusers"
@@ -133,6 +134,15 @@ func main() {
 
 	app := core.New(cfg, rdb)
 	app.SetMongo(core.NewMongoLazy(cfg.MongoURI))
+	// i18n (docs/go-i18n-evaluation.md §4): optional catalog dir. Nil by
+	// default = English-only = today's bytes (byte-pinned e2e contract).
+	if dir := os.Getenv("WEB_I18N_LOCALES_DIR"); dir != "" {
+		if b, i18nErr := i18nlib.NewBundleFromJSONDir(dir); i18nErr == nil {
+			app.I18n = b
+		} else {
+			log.Printf("webgo: i18n catalog %q: %v (English-only mode)", dir, i18nErr)
+		}
+	}
 	app.RegisterFeature(status.Feature)
 	app.RegisterFeature(healthcheck.New(app))
 	app.RegisterFeature(devcsrf.Feature)

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"time"
 
+	i18nlib "ollitex/go/libraries/i18n"
 	"ollitex/go/services/web/core"
 )
 
@@ -106,6 +107,71 @@ func RenderFor(a *core.App, slot string, vars map[string]string) (RenderResult, 
 		ov = Override{}
 	}
 	return Render(Registry, map[string]Override{slot: ov}, slot, vars)
+}
+
+// RenderForLocale — RenderFor plus the catalog dimension (i18n canary,
+// docs/go-i18n-evaluation.md §4 step 1): the locale resolves from the
+// recipient's user.language, then Accept-Language. Policy:
+//   - bundle nil OR locale empty/en → EXACT RenderFor behavior
+//     (admin override > default) — English bytes unchanged;
+//   - non-default locale + bundle → a field present in the catalog
+//     ("email.<slot>.<field>") replaces the default for that field;
+//     admin overrides still WIN per-field (instance intent beats
+//     catalog), then default.
+//
+// The renderer's {{var}} interpolation applies afterwards — identical
+// to the English pipeline (sentinel-delim catalog passthrough).
+func RenderForLocale(a *core.App, slot string, vars map[string]string, userLang, acceptLang string) (RenderResult, error) {
+	loc := i18nlib.LocaleOf(userLang, acceptLang)
+	tfunc := i18nlib.TFunc(nil)
+	if a != nil && a.I18n != nil {
+		tfunc = a.I18n.T
+	}
+	store := StoreFor(a)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	ov, err := store.GetOverride(ctx, slot)
+	if err != nil {
+		ov = Override{} // availability-first (same policy as RenderFor)
+	}
+	return renderLocalized(ov, slot, vars, loc, tfunc)
+}
+
+// renderLocalized — the pure core (testable without an app): per-field
+// resolution with the catalog dimension (override > catalog(non-en) >
+// default) + the shared interpolator.
+func renderLocalized(ov Override, slot string, vars map[string]string, loc string, tfunc i18nlib.TFunc) (RenderResult, error) {
+	tpl, ok := lookup(Registry, slot)
+	if !ok {
+		return RenderResult{}, ErrUnknownSlot
+	}
+	useCatalog := tfunc != nil && loc != "" && loc != "en"
+	fields := []string{"subject", "text", "html"}
+	got := map[string]string{}
+	for _, f := range fields {
+		v := overrideField(ov, f)
+		if v == "" {
+			if useCatalog {
+				if s, cok := tfunc(loc, "email."+slot+"."+f, nil); cok {
+					v = s
+				}
+			}
+			if v == "" {
+				v = defaultField(tpl, f)
+			}
+		}
+		got[f] = v
+	}
+	if err := checkVars(tpl, got); err != nil {
+		return RenderResult{}, err
+	}
+	driven := tpl.HTML == ""
+	return RenderResult{
+		Subject:     interpolate(got["subject"], vars),
+		Text:        interpolate(got["text"], vars),
+		HTML:        interpolate(got["html"], vars),
+		HTMLDerived: driven,
+	}, nil
 }
 
 // hList — GET handler.

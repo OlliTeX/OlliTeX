@@ -1,0 +1,9 @@
+{
+  "email.sessions-cleared.subject": "{{app}} Sicherheitshinweis: aktive Sitzungen wurden entfernt",
+  "email.sessions-cleared.text": "Hallo,\n\nAktive Sitzungen entfernt\n\n{{datetime}}\n\nAuf Ihrem Konto {{email}} wurden die aktiven Sitzungen entfernt.\n\nKurzanleitung: {{guideUrl}}\n\nVielen Dank,\nIhr Team von {{app}}\n",
+  "rel.time-days": {
+    "zero": "heute",
+    "one": "gestern",
+    "other": "vor Kurzem"
+  }
+}

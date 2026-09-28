@@ -268,9 +268,13 @@ func postClear(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 		now := time.Now().UTC()
 		datetime := now.Format("Monday 2 January 2006") + " at " + now.Format("15:04")
 		guideURL := siteURL() + "/learn/how-to/Keeping_your_account_secure"
-		tmpl, tmErr := emailtemplates.RenderFor(a, "sessions-cleared", map[string]string{
+		// i18n canary (§4 step 1): recipient language (user.language, then
+		// Accept-Language) → German catalog when wired; nil bundle keeps
+		// today's English bytes exactly.
+		userLang, _ := doc["language"].(string)
+		tmpl, tmErr := emailtemplates.RenderForLocale(a, "sessions-cleared", map[string]string{
 			"app": usAppName(), "datetime": datetime, "email": email, "guideUrl": guideURL,
-		})
+		}, userLang, cxt.Req.Header.Get("Accept-Language"))
 		if tmErr != nil {
 			log.Printf("webgo: sessions-clear mail render: %v", tmErr)
 		} else if err := mail.Send(email, tmpl.Subject, tmpl.Text, tmpl.HTML); err != nil {
