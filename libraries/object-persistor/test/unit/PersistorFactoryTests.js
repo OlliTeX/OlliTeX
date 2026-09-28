@@ -6,18 +6,9 @@ const StreamPromises = require('node:stream/promises')
 const MODULE_PATH = '../../src/PersistorFactory.js'
 
 describe('PersistorManager', function () {
-  let PersistorFactory, FSPersistor, S3Persistor, Settings, GcsPersistor
+  let PersistorFactory, S3Persistor, Settings, GcsPersistor
 
   beforeEach(function () {
-    FSPersistor = class {
-      constructor(settings) {
-        this.settings = settings
-      }
-
-      wrappedMethod() {
-        return 'FSPersistor'
-      }
-    }
     S3Persistor = class {
       wrappedMethod() {
         return 'S3Persistor'
@@ -33,7 +24,6 @@ describe('PersistorManager', function () {
     const requires = {
       './GcsPersistor': GcsPersistor,
       './S3Persistor': { S3Persistor },
-      './FSPersistor': FSPersistor,
       '@overleaf/logger': {
         info() {},
         err() {},
@@ -57,25 +47,15 @@ describe('PersistorManager', function () {
     expect(PersistorFactory(Settings).wrappedMethod()).to.equal('S3Persistor')
   })
 
-  it('should implement the FS wrapped method when FS is configured', function () {
+  it('retires the fs backend with an actionable error (G2 STOR-1)', function () {
     Settings.backend = 'fs'
-
-    expect(PersistorFactory(Settings)).to.respondTo('wrappedMethod')
-    expect(PersistorFactory(Settings).wrappedMethod()).to.equal('FSPersistor')
-  })
-
-  it('should forward useSubdirectories=true to FSPersistor', function () {
-    Settings.backend = 'fs'
-    Settings.useSubdirectories = true
-
-    expect(PersistorFactory(Settings).settings.useSubdirectories).to.be.true
-  })
-
-  it('should forward useSubdirectories=false to FSPersistor', function () {
-    Settings.backend = 'fs'
-    Settings.useSubdirectories = false
-
-    expect(PersistorFactory(Settings).settings.useSubdirectories).to.be.false
+    try {
+      PersistorFactory(Settings)
+    } catch (err) {
+      expect(err.message).to.contain('retired')
+      return
+    }
+    expect('should have caught an error').not.to.exist
   })
 
   it('should throw an error when the backend is not configured', function () {

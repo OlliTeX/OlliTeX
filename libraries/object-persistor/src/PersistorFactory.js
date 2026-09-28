@@ -14,13 +14,13 @@ function getPersistor(backend, settings) {
       } = require('./PerProjectEncryptedS3Persistor')
       return new PerProjectEncryptedS3Persistor(settings.s3SSEC)
     }
-    case 'fs': {
-      const FSPersistor = require('./FSPersistor')
-      return new FSPersistor({
-        useSubdirectories: settings.useSubdirectories,
-        paths: settings.paths,
-      })
-    }
+    case 'fs':
+      // G2 STOR-1 (owner-approved): the durable backend is S3-only — the
+      // filesystem persistor is retired. Fail with an actionable error
+      // (mirrors go/libraries/persistors factory).
+      throw new SettingsError(
+        'the "fs" backend is retired (G2 STOR-1, S3-only durable backend) — use s3, s3SSEC or gcs'
+      )
     case 'gcs': {
       const GcsPersistor = require('./GcsPersistor')
       return new GcsPersistor(settings.gcs)

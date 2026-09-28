@@ -8,7 +8,6 @@ Contains a workaround within the GCS backend to allow lifecycle rules to keep ob
 
 - S3
 - GCS
-- Filesystem (FS)
 
 ## Getting started
 
@@ -248,12 +247,12 @@ An object with the relevant configuration should be passed to the main function 
 
 ### Common parameters
 
-- `backend` (required): String specifying the primary persistor to use as the storage backend. Must be one of `s3`, `gcs` or `fs`.
+- `backend` (required): String specifying the primary persistor to use as the storage backend. Must be `s3` or `gcs` (`s3SSEC` for per-project-encrypted S3). The `fs` backend was retired in G2 STOR-1 (owner-approved S3-only durable backend) and now fails with an actionable error.
 - `signedUrlExpiryInMs`: Time before expiry (in milliseconds) of signed URLs
 
-### FS-specific parameters
+### FS backend (retired)
 
-- `useSubdirectories`: If true, files will be stored in subdirectories on the filesystem. By default, the directory structure is flattened and slashes in the object keys are replaced with underscores.
+The filesystem backend (`fs`) was retired in G2 STOR-1 — the durable backend is S3-only (SeaweedFS in the standard compose). Config with `backend: "fs"` fails fast with an actionable error.
 
 #### Notes
 
