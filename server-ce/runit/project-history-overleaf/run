@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# project-history (NODE V2) — retired when PROJECT_HISTORY_GO=1 (the flip that
+# promotes the Go port). Gated down to sleep so the two implementations can
+# never both own :3054; this service is the default everywhere the flip is
+# off (the 1:1 guarantee: both implementations exist, one serves).
+if [ "${PROJECT_HISTORY_GO:-0}" == "1" ]; then
+    exec sleep infinity
+fi
+
 NODE_PARAMS=""
 if [ "$DEBUG_NODE" == "true" ]; then
     echo "running debug - project-history"

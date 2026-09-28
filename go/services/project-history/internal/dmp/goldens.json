@@ -1,0 +1,215 @@
+{
+  "cases": [
+    {
+      "name": "empty-both-empty",
+      "before": "",
+      "updated": ""
+    },
+    {
+      "name": "empty-b0",
+      "before": "",
+      "updated": "b"
+    },
+    {
+      "name": "empty-b3",
+      "before": "",
+      "updated": "aaa bbb ccc ddd eee fff"
+    },
+    {
+      "name": "ident-b3",
+      "before": "aaa bbb ccc ddd eee fff",
+      "updated": "aaa bbb ccc ddd eee fff"
+    },
+    {
+      "name": "word",
+      "before": "the quick brown fox",
+      "updated": "the quick brown dog"
+    },
+    {
+      "name": "mid",
+      "before": "aaa bbb ccc ddd eee",
+      "updated": "aaa ccc ddd eee"
+    },
+    {
+      "name": "repl",
+      "before": "The quick brown fox jumps over the lazy dog.",
+      "updated": "The quick brown cat jumps over the lazy dog."
+    },
+    {
+      "name": "ins-0",
+      "before": "hello world",
+      "updated": "HELLO world"
+    },
+    {
+      "name": "ins-5",
+      "before": "hello world",
+      "updated": "hello WORLD"
+    },
+    {
+      "name": "ins-10",
+      "before": "hello world",
+      "updated": "world hello"
+    },
+    {
+      "name": "suffix",
+      "before": "the lazy dog",
+      "updated": "the lazy dog sleeps"
+    },
+    {
+      "name": "del-mid",
+      "before": "aaa bbb ccc ddd",
+      "updated": "aaa ccc ddd"
+    },
+    {
+      "name": "diff-1",
+      "before": "b",
+      "updated": "c"
+    },
+    {
+      "name": "diff-2",
+      "before": "b",
+      "updated": "d"
+    },
+    {
+      "name": "ins-1",
+      "before": "b b",
+      "updated": "b c"
+    },
+    {
+      "name": "ins-2",
+      "before": "b b",
+      "updated": "b bc"
+    },
+    {
+      "name": "ins-3",
+      "before": "b b",
+      "updated": "bbc"
+    },
+    {
+      "name": "ins-4",
+      "before": "b b",
+      "updated": "bbb"
+    },
+    {
+      "name": "del-all",
+      "before": "hello world",
+      "updated": ""
+    },
+    {
+      "name": "fox-dog",
+      "before": "fox",
+      "updated": "dog"
+    },
+    {
+      "name": "utf16-accents",
+      "before": "Über naïveté café ç",
+      "updated": "Über naïveté caphé ç"
+    },
+    {
+      "name": "utf16-emoji",
+      "before": "a 🎉 b 🎊 c",
+      "updated": "a 🎉 b 🎈 c"
+    },
+    {
+      "name": "multiline",
+      "before": "line1\nline2\nline3\nline4\n",
+      "updated": "line1\nline2-changed\nline3\nline5\nline6\n"
+    },
+    {
+      "name": "deadline-bail",
+      "before": "abcdefghijklmnopqrstuvwxyz0123456789",
+      "updated": "abcdefghijklmnopqrstuvwxz9876543210ZYXWV",
+      "timeout": 0.0001
+    },
+    {
+      "name": "b0-vs-b99",
+      "before": "b",
+      "updated": "a1a2a3a4a5a6a7a8a9b1b2b3b4b5b6b7b8b9c1c2c3c4c5c6c7c8c9"
+    },
+    {
+      "name": "line-1",
+      "timeout": 1,
+      "before": "The quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nsecond line here\nthird line unchanged\n",
+      "updated": "The quick brown dog leaps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nsecond line CHANGED\nthird line unchanged\n"
+    },
+    {
+      "name": "line-2",
+      "timeout": 1,
+      "before": "The quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nThe quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nThe quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\n",
+      "updated": "The quick brown fox jumps over the lazy cat again and again with padding to exceed one hundred characters in total now.\nThe quick brown fox jumps over the lazy cat again and again with padding to exceed one hundred characters in total now.\n"
+    },
+    {
+      "name": "line-3",
+      "timeout": 1,
+      "before": "The quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nThe quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nThe quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nThe quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\n",
+      "updated": "The quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nThe quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nThe quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\nThe quick brown fox jumps over the lazy dog again and again with padding to exceed one hundred characters in total now.\n"
+    },
+    {
+      "name": "blank-1",
+      "timeout": 0.1,
+      "before": "a\n\nb\n\nc\n",
+      "updated": "a\n\nd\ne\n"
+    },
+    {
+      "name": "blank-2",
+      "timeout": 0.1,
+      "before": "x\r\n\r\ny\r\n",
+      "updated": "x\r\nz\n"
+    },
+    {
+      "name": "blank-3",
+      "timeout": 0.1,
+      "before": "start\n\n\n\nend\n",
+      "updated": "start\nend\n"
+    },
+    {
+      "name": "blank-4",
+      "timeout": 0.1,
+      "before": "a b\nc d\ne f\n",
+      "updated": "A B\nc D\nE f\n"
+    },
+    {
+      "name": "shift-1",
+      "timeout": 0.1,
+      "before": "aaaa bbb ccc",
+      "updated": "bbb ccc aaaaa"
+    },
+    {
+      "name": "shift-2",
+      "timeout": 0.1,
+      "before": "aabbcc aabbcc",
+      "updated": "bbccaa bbccaa"
+    },
+    {
+      "name": "shift-3",
+      "timeout": 0.1,
+      "before": "one two three",
+      "updated": "two three one"
+    },
+    {
+      "name": "shift-4",
+      "timeout": 0.1,
+      "before": "Xab Y",
+      "updated": "ab XY"
+    },
+    {
+      "name": "shift-5",
+      "timeout": 0.1,
+      "before": "aab aabb",
+      "updated": "abb aab"
+    },
+    {
+      "name": "shift-x1",
+      "timeout": 0.1,
+      "before": "a a a a a a ",
+      "updated": "ab ab ab ab ab ab "
+    },
+    {
+      "name": "shift-x2",
+      "timeout": 0.1,
+      "before": "a a a a a a ",
+      "updated": "bc bc bc bc bc bc "
+    }
+  ],
+  "timeout": 0.1
+}
