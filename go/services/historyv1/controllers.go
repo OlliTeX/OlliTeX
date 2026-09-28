@@ -274,7 +274,7 @@ func (s *Service) getChanges(w http.ResponseWriter, r *http.Request) {
 			jsonRes(w, 400, map[string]any{"error": "Version out of bounds: " + itoaVersion(since)})
 			return
 		}
-		s.Cfg.Log("\1 error: %s", oerror.GetFullStack(err))
+		s.Cfg.Log("getChanges error: %s", oerror.GetFullStack(err))
 		renderErr(w, 500)
 		return
 	}
