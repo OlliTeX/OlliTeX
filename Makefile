@@ -195,13 +195,9 @@ test-go: ## Run the Go service test suite (race detector + coverage)
 .PHONY: test
 test: test-go ## Run repo tests (Go services; node front-end uses 'unit'/'hub')
 
-.PHONY: go-test-history-v1
-go-test-history-v1: ## history-v1 Go module gate (hermetic; separate module)
-	cd services/history-v1.go && $(GO) build -buildvcs=false ./... && $(GO) vet -buildvcs=false ./... && test -z "$$(gofmt -l .)" && $(GO) test -count=1 -race -buildvcs=false ./...
-
-.PHONY: go-test-document-updater
-go-test-document-updater: ## document-updater Go module gate (internal packages; separate module)
-	cd services/document-updater.go && $(GO) build -buildvcs=false ./... && $(GO) vet -buildvcs=false ./... && test -z "$$(gofmt -l .)" && $(GO) test -count=1 -race -buildvcs=false ./...
+# (2026-09-28) the standalone services/{history-v1,document-updater}.go module
+# targets are retired with their trees (junk/ + D41-DU/otc-reduction); the Go
+# gate is `test-go` over the root module (./go/... ./cmd/...).
 
 .PHONY: go-build
 go-build: ## Build all Go service binaries into ./bin
