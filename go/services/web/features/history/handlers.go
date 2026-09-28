@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"ollitex/go/services/collab"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
 )
@@ -120,6 +121,21 @@ func (h *svc) updates(cxt *core.Cxt, res *core.Res) {
 	if !ok {
 		return
 	}
+	// d5dd23dd S1.2 (D41 b1): the Yjs plane is the version store of record —
+	// compose /updates from the room when it has versions (Yjs edits are
+	// INVISIBLE to the OT plane). Empty room / store failure → the legacy
+	// V2 path (byte-identical to today for OT-era projects).
+	if h.a != nil && h.a.Mongo != nil {
+		if body, okYjs, cerr := h.yjsUpdates(cxt); cerr == nil && okYjs {
+			out, jerr := injectUserDetails(h.a, cxt, body)
+			if jerr != nil {
+				h.s500(cxt, res, cxt.Req.URL.Path)
+				return
+			}
+			res.JSON(200, out)
+			return
+		}
+	}
 	resp, err := v2Do(cxt, uid, v2Base()+reqURL(cxt), "GET", nil)
 	if err != nil {
 		h.s500(cxt, res, cxt.Req.URL.Path)
@@ -137,6 +153,30 @@ func (h *svc) updates(cxt *core.Cxt, res *core.Res) {
 		return
 	}
 	res.JSON(200, out)
+}
+
+// yjsUpdates — the S1.2 adapter over app Mongo (room = project id).
+func (h *svc) yjsUpdates(cxt *core.Cxt) (body []byte, ok bool, err error) {
+	pid := strings.ToLower(cxt.Params["1"])
+	ctx := cxt.Req.Context()
+	db, err := h.a.Mongo.DB(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	st, err := collab.NewMongoStore(ctx, db)
+	if err != nil {
+		return nil, false, err
+	}
+	var vlog collab.Log
+	if vl, verr := collab.NewMongoVersionLog(ctx, db); verr == nil {
+		vlog = vl
+	}
+	var before *int
+	if b, berr := strconv.Atoi(cxt.Req.URL.Query().Get("before")); berr == nil && b > 0 {
+		before = &b
+	}
+	seek := MongoDocSeeker(db)
+	return composeYjsUpdates(ctx, st, vlog, pid, rootDocPathname(ctx, seek, pid), before)
 }
 
 // docDiff adds the doc_id objectId validation (Node docDiffSchema:
