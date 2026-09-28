@@ -1636,3 +1636,12 @@ S3 retire: DU tree → junk (or gate runit off), remove DU from compose/Dockerfi
 - **Bug found live:** the S1.2 `rootDocPathname` read the mongo `docs` collection for the filename — but in this stack `docs` is the OT content doc (lines/rev, NO name). The FILE NAME lives in the **project doc's `rootFolder` entity tree** (`rootFolder[].docs[].{name,_id}`, nested `folders`). Verified live: `rootFolder[0].docs[0] = {name:'main.tex'}`. With the wrong look-up, rows carried empty pathnames → the vendor "empty update invisible" rule silently dropped every update row → `/updates` returned `{"updates":[]}` for Yjs rooms (root cause of the first live probe failure).
 - **Fix:** `rootDocPathname` now walks `rootFolder` (docs direct + nested folders) for the entity `_id == rootDoc_id`, returns its `name` (leading `/` trimmed). Same `findOne` seam, testable; added nested-folder + not-in-tree cases to the tests.
 - **Gate:** full `go test -race -p 4` **119 pkgs / 0 FAIL**. Live re-prove next.
+
+## d5dd23dd S2 — LIVE VERIFIED (probe `specs/tmp-yjs-s2-diff.test.e2e.ts`, now a standing spec)
+- **Editor-seeded live room (v1 seed + typed v2+):**
+  - `GET /project/:p/updates` → rows present, pathname `main.tex` (the LIVE rootFolder name of the basic template — NOT `mainbasic.tex`; my earlier hermetic assumption was the only wrong piece).
+  - `GET /project/:p/filetree/diff?from=0&to=N` → `{diff:[{pathname:"main.tex",operation:"edited"}]}` (FileEdited shape).
+  - `GET /project/:p/doc/:oid/diff?from=0&to=N` → Node parts `{u}/{i,meta}`; typed marker reconstructed; `meta.users` raw-id array (the Node-correct wire for this route — no injection).
+  - zero-width range → single u part.
+- **Canonical battery (20 specs incl. the probe): 19 passed + 1 flaky-then-pass (smoke login-throttle retry) — DU still down.**
+- **Ops incident (recorded):** `collab-overleaf` was found SIGSTOPped (runit "paused", `State: T`) — the frozen process kept binding :3450, so every WS handshake TIMED OUT (editor hangs with no server log, doc GET still 200). `kill -CONT` revived it (401 auth gate answered). Rule: for "connection hangs on X service" diagnose `grep State /proc/<pid>/status` before blaming code; `sv status` "paused" + live socket = frozen process.
