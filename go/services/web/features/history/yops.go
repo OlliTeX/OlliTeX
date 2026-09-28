@@ -97,12 +97,16 @@ func projectOpsWire(m YopMeta) map[string]any {
 // exact shape the S1.2 summarizer consumes ({v, meta, pathnames,
 // project_ops}) — v is the unified index (1-based).
 type mergedFeedItem struct {
-	V      int
-	Meta   map[string]any
-	Path   []string
-	Ops    []map[string]any
-	Ts     int64 // feed order key (ms)
-	Source int   // 0 = room (text), 1 = yops (tree) — tie-break: room first
+	UnifiedV int // unified index (1-based), assigned after sort
+	V        int
+	Meta     map[string]any
+	Path     []string
+	Ops      []map[string]any
+	Ts       int64   // feed order key (ms)
+	Source   int     // 0 = room (text), 1 = yops (tree) — tie-break: room first
+	Kind     YopKind // Source==1 only
+	Pathname string
+	NewPath  string
 }
 
 type mergedFeed []mergedFeedItem

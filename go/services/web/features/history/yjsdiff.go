@@ -36,7 +36,9 @@ package history
 
 import (
 	"context"
+	"sort"
 	"strconv"
+	"strings"
 
 	"ollitex/go/libraries/dmp"
 	"ollitex/go/services/collab"
@@ -163,4 +165,125 @@ func vlogMetaFor(ctx context.Context, vlog collab.Log, room, rootPath string, v 
 		out["origin"] = o
 	}
 	return out
+}
+
+// ---------- S3b: full tree-op replay (Node FileTreeDiffGenerator shapes) ----------
+
+// yjsFiletreeDiffS3 — the {diff: [FileDiff]} wire for [from,to) over the
+// UNIFIED stream (room text versions + tree ops), Node-oracle shapes:
+//
+//	added     {pathname, operation:"added", editable}
+//	removed   {pathname, operation:"removed", editable, deletedAtV:<unified v>}
+//	renamed   {pathname:<old>, newPathname, operation:"renamed", editable}
+//	edited    {pathname, operation:"edited"}            (no editable — vendor: edit implies editable)
+//	unchanged {pathname, editable}
+//
+// Entry order: the initial pathnames (sorted), then ops in unified order —
+// matching the generator's "initial tree, then appended ops" entry order.
+func yjsFiletreeDiffS3(initial []string, feed mergedFeed, from, to int, rootEdited bool) map[string]any {
+	type acc struct {
+		entry map[string]any
+		pos   int // order rank: initial = sorted idx; ops = 1000+v
+	}
+	byPath := map[string]*acc{}
+	order := []string{}
+	for i, p := range initial {
+		if p == "" {
+			continue
+		}
+		a := &acc{entry: map[string]any{"pathname": p, "editable": yjsEditable(p)}, pos: i}
+		byPath[p] = a
+		order = append(order, p)
+	}
+	for _, it := range feed {
+		if it.Source != 1 {
+			continue
+		}
+		v := it.UnifiedV
+		if v < from || v >= to {
+			continue
+		}
+		switch it.Kind {
+		case YopAdd:
+			a := &acc{entry: map[string]any{"pathname": it.Pathname, "operation": "added", "editable": yjsEditable(it.Pathname)}, pos: 1000 + v}
+			byPath[it.Pathname] = a
+			if _, ok := orderMap(order, it.Pathname); !ok {
+				order = append(order, it.Pathname)
+			}
+		case YopRemove:
+			if a, ok := byPath[it.Pathname]; ok {
+				a.entry = map[string]any{"pathname": it.Pathname, "operation": "removed", "editable": yjsEditable(it.Pathname), "deletedAtV": v}
+				a.pos = 1000 + v
+			}
+		case YopRename:
+			if a, ok := byPath[it.Pathname]; ok {
+				a.entry = map[string]any{"pathname": it.Pathname, "newPathname": it.NewPath, "operation": "renamed", "editable": yjsEditable(it.Pathname)}
+				a.pos = 1000 + v
+				if _, ok := orderMap(order, it.Pathname); !ok {
+					order = append(order, it.Pathname)
+				}
+			}
+		}
+	}
+	// the root doc's text edit (only if not already represented by a
+	// stronger op on it)
+	if rootEdited {
+		// locate the edited doc = the room's seeded text file; the entry
+		// wins only when it has no operation yet (unchanged) — vendor
+		// precedence: removed > added > renamed > edited > unchanged
+		for _, p := range initial {
+			if p == "" {
+				continue
+			}
+			if a, ok := byPath[p]; ok && a.entry["operation"] == nil {
+				a.entry = map[string]any{"pathname": p, "operation": "edited"}
+			}
+			break // single-doc room text (S3 scope)
+		}
+	}
+	diffs := []map[string]any{}
+	seen := map[string]bool{}
+	rank := map[string]int{}
+	for _, a := range byPath {
+		rank[a.entry["pathname"].(string)] = a.pos
+	}
+	sort.SliceStable(order, func(i, j int) bool {
+		return rank[order[i]] < rank[order[j]]
+	})
+	for _, p := range order {
+		if seen[p] {
+			continue
+		}
+		seen[p] = true
+		diffs = append(diffs, byPath[p].entry)
+	}
+	return map[string]any{"diff": diffs}
+}
+
+func orderMap(s []string, want string) (string, bool) {
+	for _, x := range s {
+		if x == want {
+			return x, true
+		}
+	}
+	return "", false
+}
+
+// yjsEditable — the file-editability signal (Node File.isEditable()): text
+// file types are editable; known binary types are not. Unknown → editable
+// (overleaf defaults to string content).
+func yjsEditable(pathname string) bool {
+	name := strings.ToLower(pathname)
+	ext := ""
+	if i := strings.LastIndex(name, "."); i >= 0 {
+		ext = name[i+1:]
+	}
+	switch ext {
+	case "pdf", "png", "jpg", "jpeg", "gif", "bmp", "tiff", "eps", "ps", "ai",
+		"psd", "mp3", "mp4", "wav", "zip", "gz", "tgz", "tar", "7z", "rar",
+		"doc", "docx", "xls", "xlsx", "ppt", "pptx", "epub", "exe", "ttf",
+		"otf", "woff", "woff2", "eot", "ico":
+		return false
+	}
+	return true
 }

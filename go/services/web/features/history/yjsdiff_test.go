@@ -157,3 +157,94 @@ func TestVDropWhenInvalid(t *testing.T) {
 		t.Fatalf("inverted range must reject")
 	}
 }
+
+// ---------- S3b: tree-op replay shapes (Node FileTreeDiffGenerator oracle) ----------
+
+func ftFeed(items ...mergedFeedItem) mergedFeed { return mergedFeed(items) }
+
+func TestFiletreeDiffS3Added(t *testing.T) {
+	feed := ftFeed(
+		mergedFeedItem{UnifiedV: 1, Source: 0, Meta: map[string]any{"start_ts": 1, "end_ts": 1, "users": []any{}}},
+		mergedFeedItem{UnifiedV: 2, Source: 1, Kind: YopAdd, Pathname: "img/pic.png"},
+		mergedFeedItem{UnifiedV: 3, Source: 1, Kind: YopAdd, Pathname: "notes/todo.md"},
+	)
+	out := yjsFiletreeDiffS3([]string{"main.tex"}, feed, 1, 4, false)
+	diffs := out["diff"].([]map[string]any)
+	if len(diffs) != 3 {
+		t.Fatalf("want 3 entries: %+v", diffs)
+	}
+	// initial first (main.tex, unchanged), then ops in unified order
+	if diffs[0]["pathname"] != "main.tex" {
+		t.Fatalf("entry0: %+v", diffs[0])
+	}
+	if _, has := diffs[0]["operation"]; has || diffs[0]["editable"] != true {
+		t.Fatalf("main.tex unchanged shape: %+v", diffs[0])
+	}
+	if diffs[1]["operation"] != "added" || diffs[1]["pathname"] != "img/pic.png" || diffs[1]["editable"] != false {
+		t.Fatalf("png added shape: %+v", diffs[1])
+	}
+	if diffs[2]["operation"] != "added" || diffs[2]["pathname"] != "notes/todo.md" || diffs[2]["editable"] != true {
+		t.Fatalf("md added shape: %+v", diffs[2])
+	}
+}
+
+func TestFiletreeDiffS3Removed(t *testing.T) {
+	feed := ftFeed(
+		mergedFeedItem{UnifiedV: 1, Source: 0, Meta: map[string]any{}},
+		mergedFeedItem{UnifiedV: 2, Source: 1, Kind: YopRemove, Pathname: "old/draft.tex"},
+	)
+	out := yjsFiletreeDiffS3([]string{"main.tex", "old/draft.tex"}, feed, 1, 3, false)
+	diffs := out["diff"].([]map[string]any)
+	byName := map[string]map[string]any{}
+	for _, d := range diffs {
+		byName[d["pathname"].(string)] = d
+	}
+	rem := byName["old/draft.tex"]
+	if rem["operation"] != "removed" || rem["deletedAtV"] != 2 || rem["editable"] != true {
+		t.Fatalf("removed shape: %+v", rem)
+	}
+	if ed, has := byName["main.tex"]["operation"]; has || ed != nil {
+		t.Fatalf("main.tex should stay unchanged: %+v", byName["main.tex"])
+	}
+}
+
+func TestFiletreeDiffS3Renamed(t *testing.T) {
+	feed := ftFeed(mergedFeedItem{UnifiedV: 2, Source: 1, Kind: YopRename, Pathname: "a.md", NewPath: "b.md"})
+	out := yjsFiletreeDiffS3([]string{"a.md", "main.tex"}, feed, 1, 3, false)
+	diffs := out["diff"].([]map[string]any)
+	byName := map[string]map[string]any{}
+	for _, d := range diffs {
+		byName[d["pathname"].(string)] = d
+	}
+	rn := byName["a.md"]
+	if rn["operation"] != "renamed" || rn["newPathname"] != "b.md" || rn["editable"] != true {
+		t.Fatalf("renamed shape: %+v", rn)
+	}
+	if _, has := byName["b.md"]; has {
+		t.Fatalf("renamed entry keys off the OLD pathname: %+v", diffs)
+	}
+}
+
+func TestFiletreeDiffS3RootEdited(t *testing.T) {
+	// no ops, text changed → legacy single-doc shape stays byte-identical
+	feed := ftFeed(mergedFeedItem{UnifiedV: 1, Source: 0, Meta: map[string]any{}})
+	out := yjsFiletreeDiffS3([]string{"main.tex"}, feed, 1, 2, true)
+	diffs := out["diff"].([]map[string]any)
+	if len(diffs) != 1 || diffs[0]["operation"] != "edited" || diffs[0]["pathname"] != "main.tex" {
+		t.Fatalf("edited shape: %+v", diffs)
+	}
+	if _, has := diffs[0]["editable"]; has {
+		t.Fatalf("edited must NOT carry editable (vendor: edit implies editable): %+v", diffs[0])
+	}
+}
+
+func TestYjsEditable(t *testing.T) {
+	for _, c := range []struct {
+		p string
+		b bool
+	}{{"main.tex", true}, {"notes/IMG.PNG", false}, {"a.pdf", false}, {"code.py", true}, {"noext", true}, {"x.zip", false}} {
+		if got := yjsEditable(c.p); got != c.b {
+			t.Fatalf("yjsEditable(%q)=%v want %v", c.p, got, c.b)
+		}
+	}
+}

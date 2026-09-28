@@ -378,47 +378,10 @@ func composeMerged(ctx context.Context, st persistence.VersionedPersistence, vlo
 			}
 		}
 	}
-	feed := mergedFeed{}
-	for _, lv := range lvs {
-		v := int(lv.Version)
-		metaInfo, _ := vmetas[uint64(v)]
-		ts := lv.UpdatedAt.UTC().UnixMilli()
-		users := []any{}
-		if metaInfo.UID != "" {
-			users = []any{metaInfo.UID}
-		}
-		m := map[string]any{"users": users, "start_ts": ts, "end_ts": ts}
-		if o, has := originObject(metaInfo.Origin, rootPath, ts); has {
-			m["origin"] = o
-		}
-		pathnames := []string{}
-		if rootPath != "" {
-			pathnames = []string{rootPath}
-		}
-		feed = append(feed, mergedFeedItem{Ts: ts, Source: 0, V: v, Meta: m, Path: pathnames})
-	}
-	for _, yo := range yops {
-		ts := yo.At.UTC().UnixMilli()
-		users := []any{}
-		if yo.UID != "" {
-			users = []any{yo.UID}
-		}
-		m := map[string]any{"users": users, "start_ts": ts, "end_ts": ts}
-		feed = append(feed, mergedFeedItem{Ts: ts, Source: 1, V: int(yo.V), Meta: m, Ops: []map[string]any{projectOpsWire(yo)}})
-	}
-	// unified index in ts order (ties: room before yops)
-	sort.Slice(feed, func(i, j int) bool {
-		if feed[i].Ts != feed[j].Ts {
-			return feed[i].Ts < feed[j].Ts
-		}
-		if feed[i].Source != feed[j].Source {
-			return feed[i].Source < feed[j].Source
-		}
-		return feed[i].V < feed[j].V
-	})
+	feed := buildUnifiedFeed(lvs, vmetas, yops, rootPath)
 	updates := []map[string]any{}
-	for i, item := range feed {
-		v := i + 1 // unified index (1-based)
+	for _, item := range feed {
+		v := item.UnifiedV
 		if before != nil && v >= *before {
 			continue
 		}
@@ -599,4 +562,127 @@ func MongoDocSeeker(db *mongo.Database) func(ctx context.Context, coll string, i
 		}
 		return out, nil
 	}
+}
+
+// buildUnifiedFeed — S3a core: sort room versions + tree ops by ts (ties:
+// room before yops), assign the unified 1-based index. Shared by the
+// /updates composition and the S3b filetree range selection.
+func buildUnifiedFeed(lvs []persistence.VersionMeta, vmetas map[uint64]collab.VersionMeta, yops []YopMeta, rootPath string) mergedFeed {
+	feed := mergedFeed{}
+	for _, lv := range lvs {
+		metaInfo, _ := vmetas[uint64(lv.Version)]
+		ts := lv.UpdatedAt.UTC().UnixMilli()
+		users := []any{}
+		if metaInfo.UID != "" {
+			users = []any{metaInfo.UID}
+		}
+		m := map[string]any{"users": users, "start_ts": ts, "end_ts": ts}
+		if o, has := originObject(metaInfo.Origin, rootPath, ts); has {
+			m["origin"] = o
+		}
+		pathnames := []string{}
+		if rootPath != "" {
+			pathnames = []string{rootPath}
+		}
+		feed = append(feed, mergedFeedItem{V: int(lv.Version), Meta: m, Path: pathnames, Ts: ts, Source: 0})
+	}
+	for _, yo := range yops {
+		ts := yo.At.UTC().UnixMilli()
+		users := []any{}
+		if yo.UID != "" {
+			users = []any{yo.UID}
+		}
+		m := map[string]any{"users": users, "start_ts": ts, "end_ts": ts}
+		feed = append(feed, mergedFeedItem{V: int(yo.V), Meta: m, Ops: []map[string]any{projectOpsWire(yo)}, Ts: ts, Source: 1, Kind: yo.Kind, Pathname: yo.Pathname, NewPath: yo.NewPath})
+	}
+	sort.Slice(feed, func(i, j int) bool {
+		if feed[i].Ts != feed[j].Ts {
+			return feed[i].Ts < feed[j].Ts
+		}
+		if feed[i].Source != feed[j].Source {
+			return feed[i].Source < feed[j].Source
+		}
+		return feed[i].V < feed[j].V
+	})
+	for i := range feed {
+		feed[i].UnifiedV = i + 1
+	}
+	return feed
+}
+
+// rootFolderPaths — ALL doc pathnames in the project doc's rootFolder tree
+// (the S3b "initial snapshot" for filetree/diff). Sorted, '/'-joined for
+// nested folders, "" entries dropped.
+func rootFolderPaths(ctx context.Context, findOne func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error), pid string) []string {
+	if findOne == nil {
+		return nil
+	}
+	po, err := primitive.ObjectIDFromHex(strings.ToLower(pid))
+	if err != nil {
+		return nil
+	}
+	proj, err := findOne(ctx, "projects", po)
+	if err != nil || len(proj) == 0 {
+		return nil
+	}
+	var rootFolder any
+	for _, e := range proj {
+		if e.Key == "rootFolder" {
+			rootFolder = e.Value
+		}
+	}
+	if rootFolder == nil {
+		return nil
+	}
+	var out []string
+	var walk func(prefix string, v any)
+	walk = func(prefix string, v any) {
+		ent, ok := v.(primitive.D)
+		if !ok {
+			if dm, dok := v.(primitive.M); dok {
+				ent = dmToD(dm)
+			} else {
+				return
+			}
+		}
+		if docs := entArrAny(ent, "docs"); docs != nil {
+			for _, de := range docs {
+				m, dok := de.(primitive.D)
+				if !dok {
+					continue
+				}
+				if name, ok := entField(m, "name"); ok && name != "" {
+					out = append(out, prefix+strings.TrimPrefix(name, "/"))
+				}
+			}
+		}
+		if folders := entArrAny(ent, "folders"); folders != nil {
+			// folder names (from their _name/`name` field if present)
+			fname := ""
+			if nm, ok := entField(ent, "name"); ok {
+				fname = nm + "/"
+			}
+			for _, f := range folders {
+				walk(fname, f)
+			}
+		}
+	}
+	switch rf := rootFolder.(type) {
+	case []any:
+		for _, e := range rf {
+			walk("", e)
+		}
+	case bson.A:
+		for _, e := range rf {
+			walk("", e)
+		}
+	case []primitive.D:
+		for _, e := range rf {
+			walk("", primitive.D(e))
+		}
+	case primitive.D:
+		walk("", rf)
+	}
+	sort.Strings(out)
+	return out
 }

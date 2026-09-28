@@ -234,8 +234,21 @@ func (h *svc) yjsDiffBody(cxt *core.Cxt, from, to int, doc bool) (body []byte, s
 	}
 	room := strings.ToLower(cxt.Params["1"])
 	covered, err := roomCovers(ctx, st, room, from, to)
-	if err != nil || !covered {
+	if err != nil {
 		return nil, false
+	}
+	// S3b: a room with no versions but recorded tree ops still serves the
+	// diff (tree history is part of the Yjs plane — S3a parity).
+	if !covered {
+		hasYops := false
+		if yl, yerr := NewMongoYopLog(ctx, db); yerr == nil {
+			if ops, oerr := yl.List(ctx, room); oerr == nil && len(ops) > 0 {
+				hasYops = true
+			}
+		}
+		if !hasYops {
+			return nil, false
+		}
 	}
 	var vlog collab.Log
 	if vl, verr := collab.NewMongoVersionLog(ctx, db); verr == nil {
@@ -248,12 +261,51 @@ func (h *svc) yjsDiffBody(cxt *core.Cxt, from, to int, doc bool) (body []byte, s
 			return vlogMetaFor(ctx, vlog, room, root, v)
 		})
 	} else {
-		before, eB := textAt(ctx, st, room, from-1)
-		after, eA := textAt(ctx, st, room, to-1)
-		if eB != nil || eA != nil {
-			return nil, false
+		// S3b: unified-stream replay (room text + tree ops) when the plane is
+		// available; the S2 single-doc shape below stays as the fallback.
+		var servedOut map[string]any
+		if ylog, yerr := NewMongoYopLog(ctx, db); yerr == nil {
+			if ops, oerr := ylog.List(ctx, room); oerr == nil {
+				if lvs, lerr := st.ListVersions(ctx, room); lerr == nil {
+					vmetas := map[uint64]collab.VersionMeta{}
+					if vlog != nil {
+						var maxV uint64
+						for _, lv := range lvs {
+							if uint64(lv.Version) > maxV {
+								maxV = uint64(lv.Version)
+							}
+						}
+						if metas, merr := vlog.Range(ctx, room, 0, maxV); merr == nil {
+							for _, m := range metas {
+								vmetas[m.V] = m
+							}
+						}
+					}
+					feed := buildUnifiedFeed(lvs, vmetas, ops, root)
+					before, eB := textAt(ctx, st, room, from-1)
+					after, eA := textAt(ctx, st, room, to-1)
+					if eB == nil && eA == nil {
+						initial := rootFolderPaths(ctx, MongoDocSeeker(db), room)
+						if len(initial) == 0 {
+							initial = []string{}
+						}
+						if root != "" {
+							initial = append(initial, root)
+						}
+						servedOut = yjsFiletreeDiffS3(initial, feed, from, to, before != after)
+					}
+				}
+			}
 		}
-		out = yjsFiletreeDiff(root, before != after)
+		if servedOut == nil {
+			before, eB := textAt(ctx, st, room, from-1)
+			after, eA := textAt(ctx, st, room, to-1)
+			if eB != nil || eA != nil {
+				return nil, false
+			}
+			servedOut = yjsFiletreeDiff(root, before != after)
+		}
+		out = servedOut
 	}
 	if err != nil {
 		return nil, false
