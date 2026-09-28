@@ -33,6 +33,8 @@ func pageBase(cxt *core.Cxt, email, uid string) views.PageData {
 	if cxt.Sess != nil {
 		d.CSRFToken = cxt.Sess.CsrfToken()
 	}
+	// i18n wave B: the /user/settings + /user/sessions shell strings.
+	d.I18n = views.ShellI18n(cxt.A, cxt)
 	return d
 }
 

@@ -88,6 +88,7 @@ func pageData(cxt *core.Cxt) views.PageData {
 		d.UserID = uid
 	}
 	d.CSP = "script-src 'nonce-" + d.Nonce + "' 'unsafe-inline' 'strict-dynamic' https: 'report-sample'; object-src 'none'; base-uri 'none'"
+	d.I18n = views.ShellI18n(cxt.A, cxt)
 	return d
 }
 

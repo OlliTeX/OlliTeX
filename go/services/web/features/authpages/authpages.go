@@ -43,6 +43,7 @@ func pageData(cxt *core.Cxt) views.PageData {
 	if cxt.Sess != nil {
 		tok = cxt.Sess.CsrfToken()
 	}
+
 	// Views' origin (alternate link, footer URLs, siteUrl) is the
 	// configured site URL — Node reads settings.siteUrl, not the
 	// per-request Host (pinned: via nginx Node renders :7420 even when
@@ -71,6 +72,8 @@ func pageData(cxt *core.Cxt) views.PageData {
 		// ladder (Node ExpressLocals; live-pinned 2026-09-22: admin session
 		// true / user false on /logout, the P6.13 slot the other pages get).
 		CanManageTemplateMenu: templates.MenuGrant(ctx, cxt),
+		// i18n wave B: shell page locale pass (zero when the bundle is absent).
+		I18n: views.ShellI18n(cxt.A, cxt),
 	}
 }
 

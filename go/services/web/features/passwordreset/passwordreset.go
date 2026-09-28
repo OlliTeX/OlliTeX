@@ -83,6 +83,8 @@ func Feature(a *core.App) core.Feature {
 			d.CSRFToken = cxt.Sess.CsrfToken()
 			d.UserEmail, d.UserID = core.PageUserSlots(cxt.Sess)
 		}
+		// i18n wave B: the reset / set-password shell strings.
+		d.I18n = views.ShellI18n(cxt.A, cxt)
 		return d
 	}
 

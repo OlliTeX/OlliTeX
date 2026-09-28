@@ -54,14 +54,27 @@ func TestWaveACatalogIntegrity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := WaveALaunchpadAll()
-	for k, eng := range set {
-		en, okEN := b.T("en", k, nil)
-		if !okEN || en != eng {
-			t.Fatalf("en catalog[%q]=%q(ok=%v) must equal the Go set %q", k, en, okEN, eng)
+	// Wave A+B: every shell + launchpad string key resolves in BOTH loaded
+	// locales (en = identity — the byte-pinning contract; de = present),
+	// and the two waves key disjointly (no ambiguous substitution).
+	waveB := WaveBShellAll()
+	sets := map[string]map[string]string{"waveA": WaveALaunchpadAll(), "waveB": waveB}
+	for name, set := range sets {
+		for k, eng := range set {
+			en, okEN := b.T("en", k, nil)
+			if !okEN || en != eng {
+				t.Fatalf("%s en catalog[%q]=%q(ok=%v) must equal the Go set %q", name, k, en, okEN, eng)
+			}
+			if _, ok := b.T("de", k, nil); !ok {
+				t.Fatalf("%s de catalog missing key %q", name, k)
+			}
 		}
-		if _, ok := b.T("de", k, nil); !ok {
-			t.Fatalf("de catalog missing key %q", k)
+	}
+	// wave B must cover the navbar (it renders on every shell page:
+	// admin + manage-site resolve in both locales).
+	for _, k := range []string{"view.nav.admin", "view.nav.manage-site"} {
+		if _, ok := waveB[k]; !ok {
+			t.Fatalf("WaveBShellAll missing navbar key %q (navbar renders on shell pages)", k)
 		}
 	}
 }

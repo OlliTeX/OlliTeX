@@ -58,26 +58,14 @@ func pageData(a *core.App, cxt *core.Cxt) views.PageData {
 	}
 	d.Origin = origin
 	d.UserEmail, d.UserID = core.PageUserSlots(cxt.Sess)
-	// i18n wave A (docs/go-i18n-evaluation.md §3.1-2): the locale resolves
-	// user.language (best-effort from the session doc) → Accept-Language;
-	// bundle nil or locale en/"" → EXACT English bytes (e2e pins).
-	userLang := ""
-	if cxt.Sess != nil {
-		if raw, ok := cxt.Sess.Doc["user"]; ok {
-			var u struct {
-				Language string `json:"language"`
-			}
-			if json.Unmarshal(raw, &u) == nil {
-				userLang = u.Language
-			}
-		}
-	}
-	loc := i18nlib.LocaleOf(userLang, cxt.Req.Header.Get("Accept-Language"))
+	// i18n wave A (docs/go-i18n-evaluation.md §3.1-2): the locale resolves via
+	// App.PageLocale (user.language best-effort → Accept-Language); bundle nil
+	// or locale en/"" → EXACT English bytes (e2e pins).
 	var tf i18nlib.TFunc
 	if a != nil && a.I18n != nil {
 		tf = a.I18n.T
 	}
-	d.I18n = views.I18nPage{Locale: loc, T: tf, Strings: views.WaveALaunchpadAll()}
+	d.I18n = views.I18nPage{Locale: a.PageLocale(cxt), T: tf, Strings: views.WaveALaunchpadAll()}
 	return d
 }
 

@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	i18nlib "ollitex/go/libraries/i18n"
+	"ollitex/go/services/web/core"
 )
 
 // I18nPage — the per-request locale pass for a baked page.
@@ -41,7 +42,16 @@ func translateI18n(html string, p I18nPage) string {
 	for k := range p.Strings {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys) // deterministic replacement order
+	// LONGEST English source first: "Log in now" must be replaced before
+	// its substring "Log in" (and friends) — key order as deterministic
+	// tie-break.
+	sort.Slice(keys, func(i, j int) bool {
+		li, lj := len(p.Strings[keys[i]]), len(p.Strings[keys[j]])
+		if li != lj {
+			return li > lj
+		}
+		return keys[i] < keys[j]
+	})
 	for _, k := range keys {
 		eng := p.Strings[k]
 		if eng == "" {
@@ -110,4 +120,82 @@ func WaveALaunchpadAll() map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+// WaveBSharedStrings — the site chrome shared by every baked page:
+// cookie banner + footer attribution (the navbar set is Wave A's).
+var WaveBSharedStrings = map[string]string{
+	"view.cookie.text":        "We use cookies to improve your experience on our site, for analytics, and to support marketing, which may involve the sharing of data. You can find out more in our",
+	"view.cookie.accept":      "Accept all cookies",
+	"view.cookie.essential":   "Essential cookies only",
+	"view.cookie.policy":      "cookie policy",
+	"view.footer.agpl":        "(open source, AGPLv3)",
+	"view.footer.cec":         "Overleaf Community Edition",
+	"view.404.title":          "Not found",
+	"view.404.message":        "Sorry, we can’t find the page you are looking for.",
+	"view.404.home":           "Home",
+	"view.restricted.message": "Restricted, sorry you don’t have permission to load this page.",
+	"view.logout.cancel":      "Cancel",
+	"view.logout.title":       "Log out of OlliTeX",
+}
+
+// WaveBSetPasswordStrings — the /set-password page set (p2 family).
+var WaveBSetPasswordStrings = map[string]string{
+	"view.setpw.heading":       "Create a new password for your account.",
+	"view.setpw.label":         "New password",
+	"view.setpw.rules-intro":   "To help keep your account secure, make sure your new password:",
+	"view.setpw.rule-len":      "is at least 8 characters long",
+	"view.setpw.rule-leak":     "is not used on any other website",
+	"view.setpw.rule-email":    "does not contain or significantly match your email",
+	"view.setpw.leak-note":     "This password was detected on a",
+	"view.setpw.leak-list":     "public list of known compromised passwords",
+	"view.setpw.invalid":       "Invalid Password..",
+	"view.setpw.same-current":  "Password can’t be the same as current one.",
+	"view.setpw.changed":       "Your password has been successfully changed.",
+	"view.setpw.updated":       "Password updated.",
+	"view.setpw.login-now":     "Log in now",
+	"view.setpw.expired":       "Your password reset token has expired. Please request a new password reset email and follow the link there.",
+	"view.setpw.request-again": "Request a new password reset email",
+	"view.setpw.reset-heading": "Reset your password",
+	"view.setpw.set-new":       "Set new password",
+}
+
+// WaveBSessionsStrings — the /user/sessions page set (p3c family).
+var WaveBSessionsStrings = map[string]string{
+	"view.sessions.your":          "Your Sessions",
+	"view.sessions.current":       "Current Session",
+	"view.sessions.other":         "Other Sessions",
+	"view.sessions.none-other":    "No other sessions active",
+	"view.sessions.created":       "Session Created At",
+	"view.sessions.ip":            "IP Address",
+	"view.sessions.clear":         "Clear sessions",
+	"view.sessions.cleared":       "Sessions cleared",
+	"view.sessions.back":          "Back to account settings",
+	"view.sessions.back-projects": "Back to your projects",
+}
+
+// WaveBShellAll — the full wave-A+B set for the site shell pages
+// (login-adjacent, 404/500/restricted, logout, set-password, sessions).
+func WaveBShellAll() map[string]string {
+	out := map[string]string{}
+	for k, v := range WaveANavStrings {
+		out[k] = v
+	}
+	for _, s := range []map[string]string{WaveBSharedStrings, WaveBSetPasswordStrings, WaveBSessionsStrings} {
+		for k, v := range s {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// ShellI18n — the wave-A+B locale pass for a shell page (nav + cookie/
+// footer + 404/500/restricted + logout + set-password + sessions). One
+// line per feature builder: d.I18n = views.ShellI18n(cxt.A, cxt).
+// a or a.I18n nil → zero I18nPage → EXACT English bytes (e2e pins).
+func ShellI18n(a *core.App, cxt *core.Cxt) I18nPage {
+	if a == nil || a.I18n == nil {
+		return I18nPage{}
+	}
+	return I18nPage{Locale: a.PageLocale(cxt), T: a.I18n.T, Strings: WaveBShellAll()}
 }

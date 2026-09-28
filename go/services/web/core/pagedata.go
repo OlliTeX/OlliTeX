@@ -2,6 +2,8 @@ package core
 
 import (
 	"encoding/json"
+
+	i18nlib "ollitex/go/libraries/i18n"
 	"os"
 	"strings"
 )
@@ -73,4 +75,27 @@ func PageUserSlots(s *Session) (email, id string) {
 		}
 	}
 	return strings.TrimSpace(pe), uid
+}
+
+// PageLocale — i18n (wave B, docs/go-i18n-evaluation.md §3.1-2): the shell
+// page locale for this request. Resolution: the session doc's user.language
+// (best-effort — no extra DB read) then the Accept-Language header; "" when
+// neither (the caller then renders EXACT English bytes).
+func (a *App) PageLocale(cxt *Cxt) string {
+	userLang := ""
+	if cxt != nil && cxt.Sess != nil {
+		if raw, ok := cxt.Sess.Doc["user"]; ok {
+			var u struct {
+				Language string `json:"language"`
+			}
+			if json.Unmarshal(raw, &u) == nil {
+				userLang = u.Language
+			}
+		}
+	}
+	accept := ""
+	if cxt != nil && cxt.Req != nil {
+		accept = cxt.Req.Header.Get("Accept-Language")
+	}
+	return i18nlib.LocaleOf(userLang, accept)
 }
