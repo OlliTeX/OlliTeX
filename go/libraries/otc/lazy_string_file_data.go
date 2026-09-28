@@ -3,6 +3,7 @@ package otc
 import (
 	"context"
 	"encoding/json"
+	"ollitex/go/libraries/otpure"
 )
 
 // LazyStringFileData mirrors file_data/lazy_string_file_data.js: a cached set of
@@ -166,16 +167,16 @@ func (l *LazyStringFileData) ToEager(ctx context.Context, bs BlobStore) (FileDat
 	if err := applyOperations(l.Operations, file); err != nil {
 		info := map[string]any{
 			"blobHash":             l.Hash,
-			"blobContentLength":    utf16Units(content),
+			"blobContentLength":    otpure.UTF16Units(content),
 			"metadataStringLength": int(l.StringLength),
 			"totalOperations":      len(l.Operations),
 		}
 		first := firstOpBaseLengthOf(l.Operations)
 		if first != nil {
 			info["firstOpBaseLength"] = *first
-			info["contentMatchesFirstOp"] = (utf16Units(content) == *first)
+			info["contentMatchesFirstOp"] = (otpure.UTF16Units(content) == *first)
 		}
-		info["contentMatchesMetadata"] = (utf16Units(content) == int(l.StringLength))
+		info["contentMatchesMetadata"] = (otpure.UTF16Units(content) == int(l.StringLength))
 		return nil, tagErr(err, info)
 	}
 	return file, nil
@@ -236,7 +237,7 @@ func applyOperations(operations []EditOperation, file *StringFileData) error {
 			return tagErr(err, map[string]any{
 				"operationIndex":       i,
 				"totalOperations":      len(operations),
-				"currentContentLength": utf16Units(file.Content),
+				"currentContentLength": otpure.UTF16Units(file.Content),
 			})
 		}
 	}

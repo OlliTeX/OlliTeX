@@ -1,10 +1,10 @@
 package otc
 
 import (
+	"ollitex/go/libraries/otpure"
 	"os"
 	"path"
 	"strings"
-	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -91,13 +91,13 @@ func NeedsContent(pathname string, byteLength *int, existingType ExistingType, c
 // stored as a doc.
 func IsEditableString(content string, config *FileTypeConfig) bool {
 	validateFileTypeConfig(config)
-	if utf16Units(content) >= config.MaxDocLength {
+	if otpure.UTF16Units(content) >= config.MaxDocLength {
 		return false
 	}
 	if strings.ContainsRune(content, 0) {
 		return false
 	}
-	if ContainsNonBmpChars(content) {
+	if otpure.ContainsNonBmpChars(content) {
 		return false
 	}
 	return true
@@ -138,9 +138,4 @@ func DetectFile(pathname, localPath string, existingType ExistingType, config *F
 		return DetectedType{}, err
 	}
 	return DetectBuffer(buf, pathname, existingType, config), nil
-}
-
-// utf16Units is the Node-JS `content.length`: the number of UTF-16 code units.
-func utf16Units(s string) int {
-	return len(utf16.Encode([]rune(s)))
 }

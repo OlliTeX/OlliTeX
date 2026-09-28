@@ -1,23 +1,17 @@
 package otc
 
 import (
-	"regexp"
+	"ollitex/go/libraries/otpure"
 	"strconv"
 )
 
 // Mirrors libraries/overleaf-editor-core/lib/blob.js.
 
-// hexHashRx matches a 40-hex-char hash.
-var hexHashRx = regexp.MustCompile(`^[0-9a-f]{40,40}$`)
-
 const (
-	// HexHashRxString is the hash pattern (a git/sha1 hex digest).
-	HexHashRxString = `^[0-9a-f]{40,40}$`
 	// MaxEditableByteLengthBound bounds the byte length of a file that might be
 	// editable: 3 * MaxStringLength (a BMP char is at most 3 UTF-8 bytes).
-	MaxEditableByteLengthBound = 3 * MaxStringLength
-	// EmptyHash is the git hash of an empty blob.
-	EmptyHash = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+	// MaxStringLength lives in ollitex/go/libraries/otpure (d5dd23dd S1a).
+	MaxEditableByteLengthBound = 3 * otpure.MaxStringLength
 )
 
 // RawBlob is the wire shape consumed/produced by BlobFromRaw/ToRaw.
@@ -44,7 +38,7 @@ func NewBlob(hash string, byteLength int64, stringLength *int64) *Blob {
 // newBlob mirrors setHash + setByteLength's assertions, panicking a typed
 // *typeError (the Node check-types TypeError) on a bad value.
 func newBlob(hash string, byteLength int64) {
-	if !hexHashRx.MatchString(hash) {
+	if !otpure.HexHashRx.MatchString(hash) {
 		panic(newTypeError("blob: bad hash " + hash))
 	}
 	if byteLength < 0 {

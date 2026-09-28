@@ -3,6 +3,7 @@ package otc
 import (
 	"context"
 	"encoding/json"
+	"ollitex/go/libraries/otpure"
 	"testing"
 )
 
@@ -12,11 +13,11 @@ func realBlobStore() *BaseBlobStore {
 	return &BaseBlobStore{
 		PutStringFn: func(_ context.Context, content string) (*Blob, error) {
 			n := int64(len(content))
-			return &Blob{Hash: BlobHashFromString(content), ByteLength: n, StringLength: int64Ptr(len(content))}, nil
+			return &Blob{Hash: otpure.BlobHashFromString(content), ByteLength: n, StringLength: int64Ptr(len(content))}, nil
 		},
 		PutObjectFn: func(_ context.Context, obj map[string]any) (*Blob, error) {
 			b, _ := json.Marshal(obj)
-			return &Blob{Hash: BlobHashFromBuffer(b), ByteLength: int64(len(b))}, nil
+			return &Blob{Hash: otpure.BlobHashFromBuffer(b), ByteLength: int64(len(b))}, nil
 		},
 	}
 }

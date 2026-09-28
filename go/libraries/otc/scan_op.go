@@ -2,6 +2,7 @@ package otc
 
 import (
 	"fmt"
+	"ollitex/go/libraries/otpure"
 )
 
 // applyCtx is the `LengthApplyContext` (Node scan_op): {length, inputCursor,
@@ -154,7 +155,7 @@ func (InsertOp) isScanOp() {}
 // NewInsertOp builds an InsertOp (Node: `new InsertOp(insertion, tracking, commentIds)`).
 // Returns InvalidInsertionError for non-BMP characters.
 func NewInsertOp(insertion string, tracking TrackingDirective, commentIds []string) (InsertOp, error) {
-	if ContainsNonBmpChars(insertion) {
+	if otpure.ContainsNonBmpChars(insertion) {
 		return InsertOp{}, NewInvalidInsertionError(insertion, nil)
 	}
 	return InsertOp{Insertion: insertion, Tracking: tracking, CommentIds: commentIds}, nil

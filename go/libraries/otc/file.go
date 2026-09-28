@@ -3,11 +3,12 @@ package otc
 import (
 	"context"
 	"encoding/json"
+	"ollitex/go/libraries/otpure"
 )
 
 // FileEmptyHash is File.EMPTY_FILE_HASH (the git empty-blob hash, spelled out
 // rather than read across a module boundary to avoid a load-order undefined).
-const FileEmptyHash = EmptyHash
+const FileEmptyHash = otpure.EmptyHash
 
 // File mirrors lib/file.js: a file in a Snapshot, carrying FileData + metadata.
 type File struct {

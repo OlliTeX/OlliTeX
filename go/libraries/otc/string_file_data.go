@@ -3,6 +3,7 @@ package otc
 import (
 	"context"
 	"encoding/json"
+	"ollitex/go/libraries/otpure"
 	"strings"
 	"unicode/utf8"
 )
@@ -71,7 +72,7 @@ func (f *StringFileData) GetByteLength() *int64 {
 
 // GetStringLength returns the UTF-16 code-unit length (Node: `content.length`).
 func (f *StringFileData) GetStringLength() *int64 {
-	n := int64(utf16Units(f.Content))
+	n := int64(otpure.UTF16Units(f.Content))
 	return &n
 }
 
@@ -170,7 +171,7 @@ func (f *StringFileData) Edit(op EditOperation) error {
 // (Node: `toHollow`).
 func (f *StringFileData) ToHollow(context.Context, BlobStore) (FileData, error) {
 	byteLength := int64(len(f.Content))
-	stringLength := int64(utf16Units(f.Content))
+	stringLength := int64(otpure.UTF16Units(f.Content))
 	return CreateHollow(byteLength, &stringLength), nil
 }
 

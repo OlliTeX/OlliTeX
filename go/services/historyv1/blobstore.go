@@ -15,6 +15,7 @@ package historyv1
 
 import (
 	"bytes"
+	"ollitex/go/libraries/otpure"
 	"strings"
 
 	"context"
@@ -110,8 +111,8 @@ func (b *BlobStore) Initialize(ctx context.Context) error {
 // numeric ids route meta to the PG project_blobs table (Node index.js
 // getBackend 1:1).
 func (b *BlobStore) FindBlob(ctx context.Context, hash string) (*otc.Blob, error) {
-	if hash == otc.EmptyHash {
-		return otc.NewBlob(otc.EmptyHash, 0, i64(0)), nil
+	if hash == otpure.EmptyHash {
+		return otc.NewBlob(otpure.EmptyHash, 0, i64(0)), nil
 	}
 	if b.pg != nil && numericID(b.projectID) {
 		return (&pgBlobMeta{pg: b.pg}).Find(ctx, b.projectID, hash)
@@ -194,7 +195,7 @@ func (b *BlobStore) PutFile(ctx context.Context, data []byte) (*otc.Blob, error)
 		n := int64(runeCount(string(data)))
 		sLen = &n
 	}
-	return b.put(ctx, otc.BlobHashFromBuffer(data), int64(len(data)), data, sLen)
+	return b.put(ctx, otpure.BlobHashFromBuffer(data), int64(len(data)), data, sLen)
 }
 
 // PutWithHash — controller path: the URL-validated hash (Node stores the
@@ -214,7 +215,7 @@ func (b *BlobStore) putBuffer(ctx context.Context, data []byte, isText bool) (*o
 		n := int64(runeCount(string(data)))
 		sLen = &n
 	}
-	return b.put(ctx, otc.BlobHashFromBuffer(data), int64(len(data)), data, sLen)
+	return b.put(ctx, otpure.BlobHashFromBuffer(data), int64(len(data)), data, sLen)
 }
 
 func (b *BlobStore) put(ctx context.Context, hash string, size int64, data []byte, sLen *int64) (*otc.Blob, error) {
@@ -336,7 +337,7 @@ func (b *BlobStore) GetStream(ctx context.Context, hash string, start, end *int6
 
 // GetString — BlobStoreBase.getString (empty fast path + read all).
 func (b *BlobStore) GetString(ctx context.Context, hash string) (string, error) {
-	if hash == otc.EmptyHash {
+	if hash == otpure.EmptyHash {
 		return "", nil
 	}
 	rc, err := b.GetStream(ctx, hash, nil, nil)

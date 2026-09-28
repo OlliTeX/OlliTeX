@@ -2,6 +2,7 @@ package otc
 
 import (
 	"context"
+	"ollitex/go/libraries/otpure"
 )
 
 // --- HashFileData ----------------------------------------------------------
@@ -256,5 +257,5 @@ func (h *HollowBinaryFileData) ToHollow(context.Context, BlobStore) (FileData, e
 
 // isHexHash40 mirrors the Blob.HEX_HASH_RX match used by the hash variants.
 func isHexHash40(hash string) bool {
-	return hexHashRx.MatchString(hash)
+	return otpure.HexHashRx.MatchString(hash)
 }

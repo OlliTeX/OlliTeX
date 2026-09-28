@@ -7,6 +7,7 @@ package otc
 import (
 	"context"
 	"encoding/json"
+	"ollitex/go/libraries/otpure"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,7 +30,7 @@ type bssBlobStore struct {
 func newBSSBlobStore() *bssBlobStore { return &bssBlobStore{blobs: map[string]bssBlob{}} }
 
 func (s *bssBlobStore) put(content string, stringLength *int64) *Blob {
-	hash := BlobHashFromString(content)
+	hash := otpure.BlobHashFromString(content)
 	b := &Blob{Hash: hash, ByteLength: int64(len(content)), StringLength: stringLength}
 	s.blobs[hash] = bssBlob{content: content, stringLength: stringLength}
 	return b
@@ -123,7 +124,7 @@ func TestBSS_RequiresExactlyOneOfContentAndBlob(t *testing.T) {
 	bs := newBSSBlobStore()
 	cases := []BuildSetContentArgs{
 		{File: nil, Pathname: bssPathname, BlobStore: bs},
-		{File: nil, Pathname: bssPathname, Content: strPtr("a"), Blob: &Blob{Hash: BlobHashFromString("a"), ByteLength: 1, StringLength: int64Ptr(1)}, BlobStore: bs},
+		{File: nil, Pathname: bssPathname, Content: strPtr("a"), Blob: &Blob{Hash: otpure.BlobHashFromString("a"), ByteLength: 1, StringLength: int64Ptr(1)}, BlobStore: bs},
 	}
 	for i, args := range cases {
 		_, err := bssRun(t, args)
@@ -290,7 +291,7 @@ func TestBSS_ReplacesBinaryWithDoc(t *testing.T) {
 		t.Fatalf("expected a remove-file operation")
 	}
 	add := bssAs[*AddFileOperation](res.Operations[1], "AddFileOperation")
-	if h := add.GetFile().GetHash(); h == nil || *h != BlobHashFromString("hello world") {
+	if h := add.GetFile().GetHash(); h == nil || *h != otpure.BlobHashFromString("hello world") {
 		t.Fatalf("hash = %v", h)
 	}
 	if sl := add.GetFile().GetStringLength(); sl == nil || *sl != int64(len("hello world")) {
@@ -299,7 +300,7 @@ func TestBSS_ReplacesBinaryWithDoc(t *testing.T) {
 	if !reflect.DeepEqual(add.GetFile().GetMetadata(), map[string]any{"main": true}) {
 		t.Fatalf("metadata = %v", add.GetFile().GetMetadata())
 	}
-	got, err := bs.GetString(context.Background(), BlobHashFromString("hello world"))
+	got, err := bs.GetString(context.Background(), otpure.BlobHashFromString("hello world"))
 	if err != nil || got != "hello world" {
 		t.Fatalf("getString = %q, %v", got, err)
 	}

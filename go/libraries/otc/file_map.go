@@ -1,6 +1,10 @@
 package otc
 
-import "sort"
+import (
+	"sort"
+
+	"ollitex/go/libraries/otpure"
+)
 
 // --- pathname error family (Node: lib/file_map.js, each extends OError) ----
 
@@ -224,7 +228,7 @@ func checkPathname(pathname string) error {
 	if pathname == "" {
 		return newBadPathnameError(pathname, "pathname must be non-empty")
 	}
-	isClean, reason := IsCleanDebug(pathname)
+	isClean, reason := otpure.IsCleanDebug(pathname)
 	if !isClean {
 		return newBadPathnameError(pathname, reason)
 	}

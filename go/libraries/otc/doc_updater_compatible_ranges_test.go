@@ -4,6 +4,7 @@ package otc
 // test/unit/doc_updater_compatible_ranges.test.js (the Node oracle).
 
 import (
+	"ollitex/go/libraries/otpure"
 	"testing"
 )
 
@@ -137,7 +138,7 @@ func TestDU_CommentEntirelyInTrackedDelete(t *testing.T) {
 
 // A binary (uneditable) file yields the empty shape.
 func TestDU_BinaryFileIsEmpty(t *testing.T) {
-	bfd, err := newBinaryFileData(EmptyHash, 3)
+	bfd, err := newBinaryFileData(otpure.EmptyHash, 3)
 	if err != nil {
 		t.Fatalf("newBinaryFileData: %v", err)
 	}

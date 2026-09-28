@@ -2,6 +2,7 @@ package otc
 
 import (
 	"context"
+	"ollitex/go/libraries/otpure"
 	"strings"
 	"testing"
 )
@@ -192,7 +193,7 @@ func TestLazyEditValidates(t *testing.T) {
 
 func TestLazyEditTooLong(t *testing.T) {
 	ld, _ := NewLazyStringFileData(FileEmptyHash, nil, 0, nil)
-	long := strings.Repeat("a", MaxStringLength)
+	long := strings.Repeat("a", otpure.MaxStringLength)
 	op := NewTextOperation()
 	if err := op.Insert(long, InsertBuilderOpts{}); err != nil {
 		t.Fatal(err)

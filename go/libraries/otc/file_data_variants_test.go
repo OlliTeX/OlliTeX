@@ -1,6 +1,7 @@
 package otc
 
 import (
+	"ollitex/go/libraries/otpure"
 	"strings"
 	"testing"
 )
@@ -101,7 +102,7 @@ func TestHollowVariants(t *testing.T) {
 
 func TestHollowStringEditValidatesLength(t *testing.T) {
 	// Node hollow_string_file_data.test.js: "validates string length when edited"
-	maxLen := MaxStringLength
+	maxLen := otpure.MaxStringLength
 	fd, err := newHollowStringFileData(int64(maxLen))
 	if err != nil {
 		t.Fatal(err)

@@ -2,12 +2,11 @@ package otc
 
 import (
 	"fmt"
+	"ollitex/go/libraries/otpure"
 	"sort"
 )
 
-// MaxStringLength is the longest file we'll attempt to edit
-// (Node: TextOperation.MAX_STRING_LENGTH = 3 * 1024^2).
-const MaxStringLength = 3 * 1024 * 1024
+// (MaxStringLength moved to ollitex/go/libraries/otpure — d5dd23dd S1a; in-package users call otpure.MaxStringLength.)
 
 // RetainBuilderOpts carries the optional tracking directive for a retain.
 type RetainBuilderOpts struct{ Tracking TrackingDirective }
@@ -266,7 +265,7 @@ func (o *TextOperation) Apply(file *StringFileData) error {
 	if inputCursor != len(str) {
 		return NewApplyError("The operation didn't operate on the whole string.", o, str)
 	}
-	if len(result) > MaxStringLength {
+	if len(result) > otpure.MaxStringLength {
 		return NewTooLongError(o, len(result))
 	}
 	if file.TrackedChanges != nil {
@@ -293,7 +292,7 @@ func (o *TextOperation) ApplyToLength(length int) (int, error) {
 	if ctx.inputCursor != length {
 		return 0, NewApplyError("The operation didn't operate on the whole string.", o, length)
 	}
-	if ctx.length > MaxStringLength {
+	if ctx.length > otpure.MaxStringLength {
 		return 0, NewTooLongError(o, ctx.length)
 	}
 	return ctx.length, nil
