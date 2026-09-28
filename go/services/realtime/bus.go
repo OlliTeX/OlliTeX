@@ -82,7 +82,6 @@ type Client struct {
 type Bus struct {
 	Sessions *SessionResolver
 	Web      *WebAPI
-	Flush    *FlushAPI
 	Redis    RedisLike
 	Host     string // HOSTNAME (debug.getHostname + debug response)
 	Log      *slog.Logger
@@ -100,7 +99,6 @@ type Bus struct {
 type Options struct {
 	Sessions *SessionResolver
 	Web      *WebAPI
-	Flush    *FlushAPI
 	Redis    RedisLike
 	Log      *slog.Logger
 }
@@ -117,7 +115,6 @@ func New(opts Options) *Bus {
 	return &Bus{
 		Sessions:  opts.Sessions,
 		Web:       opts.Web,
-		Flush:     opts.Flush,
 		Redis:     opts.Redis,
 		Host:      host,
 		Log:       log,
@@ -299,18 +296,10 @@ func (b *Bus) Close(sid string) {
 		b.Log.Error("error marking client as disconnected", "err", err)
 	}
 
-	b.mu.RLock()
-	remaining := len(b.byProject[pid])
-	b.mu.RUnlock()
-	if remaining == 0 && b.Flush != nil {
-		// Node: setTimeout(500ms) → DocumentUpdaterManager.flushProjectToMongoAndDelete
-		go func() {
-			time.Sleep(500 * time.Millisecond)
-			fctx, fcancel := context.WithTimeout(context.Background(), 3*time.Second)
-			defer fcancel()
-			b.Flush.Flush(fctx, pid)
-		}()
-	}
+	// S4 (owner RETIRE document-updater; Yjs cutover done): Node's last-leaver
+	// flush (DocumentUpdaterManager.flushProjectToMongoAndDelete -> DU) is
+	// removed. In the Yjs world the collab service owns persistence (ygo
+	// store); there is no in-memory OT state to flush on last-leaver.
 }
 
 // remove — de-register a client (join rejection / rejected-connect path).

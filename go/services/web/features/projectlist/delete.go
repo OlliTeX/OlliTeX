@@ -66,9 +66,10 @@ import (
 var delPat = regexp.MustCompile(`^/Project/([^/]+)$`)
 var restPat = regexp.MustCompile(`^/Project/([^/]+)/restore$`)
 
-// cduBase — document-updater service base (same env naming as create.go's
-// WEB_DOCSTORE_URL / WEB_PROJECT_HISTORY_URL).
-func cduBase() string { return crEnvOr("WEB_DOCUMENT_UPDATER_URL", "http://127.0.0.1:3003") }
+// S4 (owner RETIRE document-updater): the DU service base + the delete-flow
+// DEL {DU}/project/{pid} flush fallback are removed — content truth is the
+// docstore; the OT in-memory state DU flushed no longer exists in the Yjs
+// world.
 
 // fireHTTP is a best-effort service call (result ignored — Node's
 // fetchNothing-and-warn semantics for the delete flow).

@@ -24,26 +24,11 @@ type WebAPI struct {
 	HTTP    *http.Client
 }
 
-// FlushURL — the document-updater flush endpoint the Node real-time called on
-// last-leaver (DocumentUpdaterManager.flushProjectToMongoAndDelete):
-// DELETE {docUpdater}/project/{pid}?background=true.
-type FlushAPI struct {
-	BaseURL string // e.g. http://127.0.0.1:3003
-	HTTP    *http.Client
-}
-
 func (w *WebAPI) client() *http.Client {
 	if w.HTTP != nil {
 		return w.HTTP
 	}
 	return &http.Client{Timeout: 10 * time.Second}
-}
-
-func (f *FlushAPI) client() *http.Client {
-	if f.HTTP != nil {
-		return f.HTTP
-	}
-	return &http.Client{Timeout: 5 * time.Second}
 }
 
 // JoinErrorKind — the Node error taxonomy for join failures (real-time
@@ -124,22 +109,6 @@ func (w *WebAPI) Join(ctx context.Context, pid, userID, anonToken string) (joinS
 
 // Flush — best-effort last-leaver flush (parity call; a no-op in practice
 // since the OT text-sync buffer is empty in the Yjs world).
-func (f *FlushAPI) Flush(ctx context.Context, pid string) {
-	if f == nil || f.BaseURL == "" {
-		return
-	}
-	u := strings2(f.BaseURL) + "/project/" + url.PathEscape(pid) + "?background=true"
-	req, err := http.NewRequestWithContext(ctx, "DELETE", u, nil)
-	if err != nil {
-		return
-	}
-	res, err := f.client().Do(req)
-	if err != nil {
-		return
-	}
-	io.Copy(io.Discard, io.LimitReader(res.Body, 64<<10))
-	res.Body.Close()
-}
 
 func strings2(s string) string {
 	if len(s) > 0 && s[len(s)-1] == '/' {

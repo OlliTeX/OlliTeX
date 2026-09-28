@@ -149,7 +149,6 @@ func newTestBus(t *testing.T, web *fakeWeb, src *fakeSessionSource) *Bus {
 	return New(Options{
 		Sessions: &SessionResolver{Source: src, Secrets: []string{testSecret}},
 		Web:      &WebAPI{BaseURL: srv.URL, User: "overleaf", Pass: "password"},
-		Flush:    &FlushAPI{},
 		Redis:    newMemRedis(),
 	})
 }
@@ -219,7 +218,6 @@ func TestJoinNotFound(t *testing.T) {
 	b := New(Options{
 		Sessions: &SessionResolver{Source: src, Secrets: []string{testSecret}},
 		Web:      &WebAPI{},
-		Flush:    &FlushAPI{},
 		Redis:    newMemRedis(),
 	})
 	neg := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

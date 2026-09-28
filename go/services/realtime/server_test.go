@@ -29,7 +29,6 @@ func TestServerEndToEnd(t *testing.T) {
 	b := New(Options{
 		Sessions: &SessionResolver{Source: src, Secrets: []string{testSecret}},
 		Web:      &WebAPI{BaseURL: srvWeb.URL, User: "overleaf", Pass: "password"},
-		Flush:    &FlushAPI{},
 		Redis:    newMemRedis(),
 	})
 	srv := httptest.NewServer(NewServer(b).Routes())

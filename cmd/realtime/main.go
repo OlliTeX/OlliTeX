@@ -118,16 +118,12 @@ func main() {
 		User:    webUser,
 		Pass:    webPass,
 	}
-	dupHost, _ := env("DOCUMENT_UPDATER_HOST", "DOCUPDATER_HOST")
-	if dupHost == "" {
-		dupHost = "127.0.0.1"
-	}
-	flush := &rt.FlushAPI{BaseURL: fmt.Sprintf("http://%s:3003", dupHost)}
+	// S4 (owner RETIRE document-updater): the last-leaver DU flush is gone;
+	// the collab service owns Yjs persistence.
 
 	bus := rt.New(rt.Options{
 		Sessions: sessions,
 		Web:      web,
-		Flush:    flush,
 		Redis:    g,
 	})
 	srv := rt.NewServer(bus)
