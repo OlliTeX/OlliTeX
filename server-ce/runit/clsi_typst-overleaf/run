@@ -11,8 +11,15 @@ fi
 if [ -e '/var/run/docker.sock' ]; then
   echo ">> Setting permissions on docker socket"
   DOCKER_GROUP=$(stat -c '%g' /var/run/docker.sock)
-  groupadd --non-unique --gid "${DOCKER_GROUP}" dockeronhost
-  usermod -aG dockeronhost www-data
+  # portable: groupadd/usermod are shadow-utils (Debian); the alpine base
+  # (busybox) needs addgroup/adduser instead (proven 2026-09-28 alpine spike).
+  if command -v groupadd 2>/dev/null; then
+    groupadd --non-unique --gid "${DOCKER_GROUP}" dockeronhost || true
+    usermod -aG dockeronhost www-data
+  else
+    addgroup -g "${DOCKER_GROUP}" dockeronhost 2>/dev/null || true
+    adduser www-data dockeronhost 2>/dev/null || true
+  fi
 fi
 
 source /etc/overleaf/env.sh

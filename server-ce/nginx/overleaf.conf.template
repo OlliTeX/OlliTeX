@@ -9,6 +9,15 @@ server {
 		internal;
 	}
 
+	# ACME HTTP-01 challenge webroot (edge: HAProxy proxies this path here;
+	# owner mounts the certbot webroot dir into /var/www/acme). Served as
+	# plain files; a missing mount simply 404s (harmless in e2e/self-host
+	# setups without ACME).
+	location ^~ /.well-known/acme-challenge/ {
+		alias /var/www/acme/;
+		try_files $uri =404;
+	}
+
 	location / {
 		proxy_pass http://127.0.0.1:4000;
 		proxy_http_version 1.1;

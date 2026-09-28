@@ -2,18 +2,21 @@
 # ---------------------------------------------
 # Ollitex Community Edition (overleaf/overleaf)
 # ---------------------------------------------
-# Build-system re-arch (2026-09): the 12 Go microservice binaries are now
-# compiled IN DOCKER on the ollitex Go builder (glibc + cgo-sqlite) instead of
-# copied from the host (`COPY bin/`). The app base is ubuntu:26.04 (node 24 +
-# runit + my_init). The Node services (clsi, document-updater, history-v1, …)
-# and the webpack/pug front-end build still run here, on the base's node 24.
+# Build-system re-arch (2026-09): the Go microservice binaries are compiled
+# IN DOCKER on the ollitex Go builder (cgo-sqlite; musl alpine:3.24 builder
+# since the 2026-09-28 cutover) instead of copied from the host
+# (`COPY bin/`). The app base is alpine:3.24 (node 24 + runit + my_init) since
+# the 2026-09-28 cutover (owner: alpine if it works; gate green + smaller
+# image: 6.43GB vs 6.7GB); the ubuntu base file is retired in junk/. The Node
+# services (clsi, document-updater, history-v1, …) and the webpack/pug
+# front-end build still run here, on the base's node 24.
 
 ARG OVERLEAF_BASE_TAG=ollitex/base:latest
 
 # ALPINE SPIKE (2026-09-28, TODO da07f9fe): overridable Go builder tag so the
 # same stage can compile the 17 Go services on the musl builder
 # (ollitex/golang-builder-amd64-alpine:1.27.1) or the glibc one (default).
-ARG GO_BUILDER_TAG=ollitex/golang-builder-amd64:1.27.1
+ARG GO_BUILDER_TAG=ollitex/golang-builder-amd64-alpine:1.27.1
 
 # ---- Stage 1: compile the 12 Go services (ollitex Go builder, host cache) ----
 FROM ${GO_BUILDER_TAG} AS gobuilder

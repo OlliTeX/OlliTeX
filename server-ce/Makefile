@@ -24,6 +24,18 @@ CACHE_FROM_BASE ?=
 CACHE_FROM_COMMUNITY ?=
 CACHE_FROM_PANDOC ?=
 
+# Which base Dockerfile build-base uses. Alpine:3.24 is the CANONICAL base
+# (cutover 2026-09-28, owner directive: alpine if it works — e2e gate GREEN,
+# image smaller: 6.43GB vs 6.7GB ubuntu). The ubuntu file is retired in
+# junk/Dockerfile-base-ubuntu26.04; override BASE_FILE to restore it.
+BASE_FILE ?= Dockerfile-base
+
+# Which Go builder the app image compiles on (cutover 2026-09-28: the musl
+# alpine:3.24 builder is the default; the glibc one is retired in
+# junk/images-golang-builder-amd64-ubuntu and can be passed back via
+# GO_BUILDER_TAG if ever needed).
+GO_BUILDER_TAG ?= ollitex/golang-builder-amd64-alpine:1.27.1
+
 
 all: build-base build-community build-pandoc
 
@@ -45,7 +57,7 @@ build-base:
 	docker build \
 	  --build-arg BUILDKIT_INLINE_CACHE=1 \
 	  --progress=plain \
-	  --file Dockerfile-base \
+	  --file $(BASE_FILE) \
 	  --pull \
 	  $(CACHE_FROM_BASE) \
 	  --tag $(OVERLEAF_BASE_TAG) \
@@ -60,6 +72,7 @@ build-community:
 	  --build-arg BUILDKIT_INLINE_CACHE=1 \
 	  --progress=plain \
 	  --build-arg OVERLEAF_BASE_TAG \
+	  --build-arg GO_BUILDER_TAG \
 	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
 	  $(CACHE_FROM_COMMUNITY) \
 	  --file Dockerfile \
@@ -74,6 +87,7 @@ build-pandoc:
 	  --build-arg BUILDKIT_INLINE_CACHE=1 \
 	  --progress=plain \
 	  --build-arg OVERLEAF_BASE_TAG \
+	  --build-arg GO_BUILDER_TAG \
 	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
 	  $(CACHE_FROM_PANDOC) \
 	  --file Dockerfile-pandoc \

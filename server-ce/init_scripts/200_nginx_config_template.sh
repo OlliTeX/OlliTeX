@@ -56,5 +56,12 @@ if [ -f "${nginx_template_file}" ]; then
   nginx -t
 
   echo "Nginx: reloading config"
-  service nginx reload
+  # Best-effort and portable (`service` is Debian-only; a stale-but-live PID in
+  # /run/nginx.pid is not necessarily nginx — proved on alpine 2026-09-28).
+  # At hook time nginx is not up yet (runit starts it after the hooks), so the
+  # generated config is simply picked up at nginx start; a failure here must
+  # never kill boot.
+  if ! nginx -s reload 2>/dev/null; then
+    echo "nginx not reloadable yet; config will be picked up at nginx start"
+  fi
 fi

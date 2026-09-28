@@ -1,0 +1,45 @@
+# OlliTeX edge — HAProxy drop-in (replaces compose_cep/nginx/compose.yaml)
+#
+# Owner-applied to /data_1/docker/compose_cep (see ../README.md "Cutover").
+# Same mounts as the retired nginx edge: certs + ACME webroot (now consumed by
+# the app container via the in-image nginx location
+# `/.well-known/acme-challenge/` when /var/www/acme is ALSO mounted into
+# overleafserver — compose_cep overleafserver service: add
+#   - "/var/www/acme:/var/www/acme:ro"
+# to its volumes).
+#
+# Image: official haproxy (Debian), TLS-enabled. No config templating needed
+# (overleafserver is the only upstream of the overleaf-network).
+services:
+  haproxy:
+    image: haproxy:2.8
+    container_name: edge
+    hostname: edge
+    restart: always
+    volumes:
+      - "/etc/letsencrypt/live/psintern.neuro.uni-bremen.de/privkey.pem:/certs/nginx_key.pem:ro"
+      - "/etc/letsencrypt/live/psintern.neuro.uni-bremen.de/fullchain.pem:/certs/nginx_certificate.pem:ro"
+      - "./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"
+    ports:
+      - "0.0.0.0:443:443"
+      - "0.0.0.0:80:80"
+      - ":::443:443"
+      - ":::80:80"
+    # haproxy's `crt` needs ONE pem (key + chain); compose the two certbot
+    # files at start, then exec haproxy in the foreground.
+    command: >-
+      sh -c "cat /certs/nginx_key.pem /certs/nginx_certificate.pem > /tmp/edge.crt
+      && exec haproxy -f /usr/local/etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -ds"
+    networks:
+      - overleaf-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "echo | timeout 10 nc 127.0.0.1 80 || haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+networks:
+  overleaf-network:
+    external: true

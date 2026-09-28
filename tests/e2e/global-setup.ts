@@ -145,7 +145,15 @@ async function loginViaBrowser(
   attempt = 0
 ): Promise<boolean> {
   await gotoRobust(page, BASE + '/login')
-  await page.waitForSelector('#password', { timeout: 15_000 }).catch(() => {})
+  let formReady = await page
+    .waitForSelector('#password', { timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false)
+  if (!formReady && attempt === 0) {
+    // Throttled login page (no form at all): wait out the window, one retry.
+    await new Promise(res => setTimeout(res, 70_000))
+    return loginViaBrowser(page, email, password, 1)
+  }
   await page.fill('#email', email)
   await page.fill('#password', password)
   let postStatus = 0
