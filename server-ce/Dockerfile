@@ -10,8 +10,13 @@
 
 ARG OVERLEAF_BASE_TAG=ollitex/base:latest
 
+# ALPINE SPIKE (2026-09-28, TODO da07f9fe): overridable Go builder tag so the
+# same stage can compile the 17 Go services on the musl builder
+# (ollitex/golang-builder-amd64-alpine:1.27.1) or the glibc one (default).
+ARG GO_BUILDER_TAG=ollitex/golang-builder-amd64:1.27.1
+
 # ---- Stage 1: compile the 12 Go services (ollitex Go builder, host cache) ----
-FROM ollitex/golang-builder-amd64:1.27.1 AS gobuilder
+FROM ${GO_BUILDER_TAG} AS gobuilder
 WORKDIR /src
 COPY go.mod go.sum ./
 COPY go/ ./go/
@@ -19,7 +24,7 @@ COPY cmd/ ./cmd/
 RUN --mount=type=cache,id=ol-go-mod,target=/gocache/mod \
     --mount=type=cache,id=ol-go-build,target=/gocache/build \
     set -e; mkdir -p /usr/local/bin/go-services; \
-    for s in linked-url-proxy webdavinterface dropboxinterface githubinterface datamanipulator filestore notifications chat docstore web seaweed-migrate configdb cronmail collab realtime historyv1 project-history; do \
+    for s in linked-url-proxy webdavinterface dropboxinterface githubinterface filestore notifications chat docstore web seaweed-migrate configdb cronmail collab realtime historyv1 project-history; do \
       CGO_ENABLED=1 GOOS=linux go build -o /usr/local/bin/go-services/$s ./cmd/$s; \
     done; \
     echo "built go-services: $(ls /usr/local/bin/go-services | tr '\n' ' ')"

@@ -30,7 +30,6 @@ go/
     ├── docstore/           # port 3016 — text-document store + archive (fs **or** s3/SeaweedFS backend)
     ├── filestore/          # port 3009 — project/template file blobs (fs **or** s3/SeaweedFS backend)
     ├── linked-url-proxy/   # port 3066 — "import file from URL" proxy
-    ├── datamanipulator/    # port env — file ops / sync engine helpers
     ├── dropboxinterface/   # port env — Dropbox sync bridge (token-protected)
     ├── githubinterface/    # port env — GitHub clone/push bridge (token-protected)
     └── webdavinterface/    # port 4002 — WebDAV sync bridge (token-protected)
@@ -120,7 +119,7 @@ cutover (see each service README's Status section).
 | docstore | 3016 | `services/docstore` | `go/services/docstore` | converted + **live-verified vs real mongod**; archive backend fs **or s3/SeaweedFS**; cutover pending owner call |
 | filestore | 3009 | `services/filestore` | `go/services/filestore` | converted, tests green; backend fs **or s3/SeaweedFS** (s3 live-verified) |
 | linked-url-proxy | 3066 | `services/linked-url-proxy` | `go/services/linked-url-proxy` | converted, tests green |
-| datamanipulator | env | `services/datamanipulator` | `go/services/datamanipulator` | converted, tests green |
+| datamanipulator | env | `services/datamanipulator` | `go/libraries/datamanipulator` | converted, tests green; **library** (owner 2026-09-28), :4001 runit service retired |
 | dropboxinterface | env | `services/dropboxinterface` | `go/services/dropboxinterface` | converted, tests green |
 | githubinterface | env | `services/githubinterface` | `go/services/githubinterface` | converted, tests green |
 | webdavinterface | 4002 | `services/webdavinterface` | `go/services/webdavinterface` | converted, tests green |

@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	datamanipulator "ollitex/go/services/datamanipulator"
+	datamanipulator "ollitex/go/libraries/datamanipulator"
 )
 
 func firstNonEmpty(vals ...string) string {

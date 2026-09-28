@@ -8,7 +8,7 @@ its own 1:1 mapping table.
 | service | port | Node original | note |
 | --- | --- | --- | --- |
 | `chat` | 3010 | `services/chat` | AI-chat rooms/messages + notification writes |
-| `datamanipulator` | internal (token-protected) | `services/datamanipulator` | data import/export workers |
+| ~~`datamanipulator`~~ | — | `services/datamanipulator` | **moved to `go/libraries/datamanipulator`** (owner-approved library shape, 2026-09-28); :4001 runit service retired |
 | `docstore` | 3016 | `services/docstore` | document history store |
 | `dropboxinterface` | internal (token-protected) | `services/dropbox-interface` | dropbox OAuth + file sync |
 | `filestore` | 3009 | `services/filestore` | blob storage (GCS/S3/SeaweedFS) |

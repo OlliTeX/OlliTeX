@@ -47,11 +47,18 @@ the three external bridges depend on, so they are reproduced 1:1.
 ## Build / test / run
 
 ```sh
-go build ./go/services/datamanipulator
-go test  ./go/services/datamanipulator
+go build ./go/libraries/datamanipulator
+go test  ./go/libraries/datamanipulator
 go run   ./cmd/datamanipulator
 ```
 
 ## Status
 
 Converted, tests green. Cutover in the CE image awaits the owner call.
+
+## Library shape (owner-approved 2026-09-28)
+Moved `go/services/datamanipulator` → `go/libraries/datamanipulator`; the
+`:4001` runit service is RETIRED (no in-tree HTTP consumers; the sync
+interfaces + Go web handle their trees in-process). `cmd/datamanipulator`
+remains as a dev/test server binding for the library. Consumers import
+`ollitex/go/libraries/datamanipulator`.

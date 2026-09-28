@@ -21,7 +21,12 @@ entry in §2 and D36/D37 above). Remaining flip work: F2 OT sweep + F3 e2e-
 suite promotion + D28a bus-to-Go. Also in flight: turning the two remaining
 Node microservices (**history-v1**, **document-updater**) into real Go
 services (API/logic already ported+green in-repo; **storage/service
-layers are the gap**) and the follow-on dependency-refresh arc (D27)..
+layers are the gap**) and the follow-on dependency-refresh arc (D27).
+**UPDATED 2026-09-28:** history-v1 (H1, `go/services/historyv1`) and
+project-history (PH, `go/services/project-history`) are now Go + flipped
+live in e2e (G2 S3-only + H1 PG18 seam + PH bundle all green — see the
+H1 and PH sections at the bottom); only **document-updater** remains
+Node (42fd4366 D41-DU retarget is next in the owner order)..
 
 ---
 
@@ -1423,3 +1428,146 @@ to the G2 S3 envs: `MONGO_CONNECTION_STRING` (or MONGO_HOST), the history S3
 creds, and (for numeric-id projects) `DATABASE_URL`/`HISTORY_CONNECTION_STRING`
 pointing at the PG18 durable store. Node history-v1 code remains in the image
 (flip-off default) until the owner flips `HISTORY_V1_GO=1` on prod.
+
+## PH — project-history Go production bundle (601239b5) — GREEN 2026-09-28
+
+**Owner scope (2026-07-18 "don't ask, just continue" + 2026-09-28 order):**
+services/project-history (V2 history service) becomes a real Go service —
+1:1 port of the vendor module graph (`services/project-history/app/js/*.js`),
+S3-native blob seams (G2: fs retired), real mongo + redis, HTTP API on
+:3054, runit flip `PROJECT_HISTORY_GO=1` (default OFF everywhere).
+
+**Tree / commits (all pushed to main):**
+- `b9abbbfb51` — the bundle (141 files): `go/services/project-history/`
+  (all manager ports: blob/history-store/sync/updates/summarized/labels/
+  diff/retry/flush/errrecorder/largefile + `internal/appfactory/factory.go`
+  wiring every `*Deps` seam to real mongo (5 collections) / two redis
+  clients / V1 + webapi HTTP seams / S3 persistor), Node `sleep-infinity`
+  gate on `project-history-overleaf`, NEW `project-history-go-overleaf`
+  runit service, Dockerfile build entry, compose `PROJECT_HISTORY_GO`.
+- `4a5316faa4` — entrypoint moved to repo-root `cmd/project-history/` +
+  public façade `go/services/project-history/projecthistory.go` (Go
+  internal-visibility: root `cmd/` cannot import `internal/...`).
+- `0cade80954` — exec bit on the go runit `run` (sv could not exec → the
+  flip silently ran the Node twin; 100755 + verified sv status).
+- `bcf7a75c8a` — the fix set proven by the gate (below).
+
+**Root causes found & fixed today (the u101 500 chain, in order found):**
+1. `redisx/client.go` RESP framing: bulk-string must be
+   `$<len>\r\n<data>\r\n`; the CRLF **after the length** was missing →
+   Redis rejected the request and dropped the connection → every redis op
+   failed (`broken pipe`/`EOF`) → the whole V2 service looked 500. Fixed.
+2. `appfactory` labelsAdapter: vendor create returns the label **with its
+   id** (mongoose generates `_id` on insert). The C1 phmongo seam discards
+   the driver InsertedID, so the adapter now pre-generates the ObjectID
+   (1:1 with mongoose) and returns it (was: `"id":null`). DeleteOne also
+   coerces a 24-hex string `_id` → ObjectID (mongoose does this in query
+   filters; the raw Go driver does not — deletes were silently 0-match +
+   204, leaving labels behind and breaking the 2-run gate). Fixed.
+3. `historyv1` (H1) `historyReadErr`: Node `Chunk.NotFoundError` is an
+   inheritance family (Version/BeforeTimestamp/NotPersisted all `extends`
+   it in overleaf-editor-core) → all four must 404; the flat-struct port
+   500'd on e.g. `zip version 9999` (VersionNotFound). Family now
+   mapped 404.
+4. `u101-history-matrix.cjs`: unrecorded pre-leg label hygiene — the Go
+   V1/PH plane is write-capable (Node-era baseline was 500/unseeded in
+   this environment), so labels persist between legs without a cleanup;
+   the matrix is a stability gate and is now leg-idempotent.
+5. `appfactory` log seams → stderr (`project-history <lvl>: msg {info}`)
+   so service failures are visible in `/var/log/overleaf/project-history-go.log`
+   (vendor logger parity; no-op seams had hidden every failure).
+
+**Service config parity (1:1 vendor settings.defaults):**
+web-api = raw `WEB_API_USER`/`WEB_API_PASSWORD` (unset = no auth), port
+`WEB_API_PORT || WEB_PORT || 3000`; V1 history calls use
+`V1_HISTORY_USER/PASSWORD` + root path (`/projects/...`, NOT `/api/...`);
+e2e V1 creds = `staging` + `SHARED_SERVICE_TOKEN` (verified 401 without,
+200 with).
+
+**Gate (canonical, image-proved on `ollitex/ollitex:main-bcf7a75c8a…` — container
+image-id == tagged build, Node twins verified `sleep infinity`, Go owns
+:3054 + :3100, V1 auth `staging`+`SHARED_SERVICE_TOKEN` → 200):**
+`npx playwright test specs/smoke.test.e2e.ts specs/parity/web-go-u101-history specs/parity/hub-storage-admin`
+→ **4 passed (50.6s)** (smoke 1; u101 battery 2-run wire-identical incl.
+labels round-trip create-200/real-id + delete-204 + get-stable-0;
+hub-storage-admin 2). TRANSITIONAL (recorded, not asserted, D41 —
+owned by d5dd23dd Yjs-hybrid composition): zip v1, diff 0-1, filetree-diff,
+changes-since1, labels v1-OT semantics.
+
+**Hot-swap dev loop (fast iteration, no image rebuild):**
+`go build -o /tmp/ph ./cmd/project-history/` → `docker cp`
+→ `mv /usr/local/bin/go-services/project-history.new` → `sv restart
+project-history-go-overleaf`. Same for H1 (`sv restart history-v1-go-overleaf`).
+`ss` is NOT in the container — probe with curl + `sv status`. Runit flips
+evaluate `PROJECT_HISTORY_GO`/`HISTORY_V1_GO` from the pid-1 env ✓ (both
+verified live: Node twins asleep, Go owns :3054 + :3100).
+
+## D41-DU — document-updater retirement (42fd4366) — INVESTIGATION 2026-09-28
+
+**Owner verdict (D41, 2026-09-26):** "document-updater: RETIRE (as OT applier) +
+salvage non-OT duties. Apply/rebase-into-docstore is exactly what ygo
+persistence replaces — nothing to convert." Slicing: slice 1 = DU-down
+verified + `/project/:pid/ranges` docstore-direct oracle (DONE, committed,
+`tmp-d41du-down.test.e2e.ts` passes with DU stopped). This section = slice 2+
+recon.
+
+**DU (Node) is STILL UP in e2e** (runit `document-updater-overleaf`,
+:3003; `sv down` works and is reversible — it auto-recovers; the runit dir has
+no flip gate yet, unlike PH/H1).
+
+**Live DU call-sites in Go web (the exact retarget surface):**
+Return-CRITICAL (handler 500s without DU) — only two functions:
+- `upDUSetDoc(pj,docID,lines,uid,track,source)`  → DU `POST /project/{pj}/doc/{docID}` (content set)
+- `upUpdateStructure(pj,uid,version,hid,updates,source)` → DU `POST /project/{pj}` (entity-tree OT ops: add-doc/add-file/rename-*)
+Callers of those two:
+- upload.go:949 (upDUSetDoc), :973,995,1027,1054,1071 (upUpdateStructure)
+- tpdssync.go:144 (upDUSetDoc), :159,166,185,197,204,404 (upUpdateStructure)
+- gitbridge.go:195 (upUpdateStructure, `_=` ignored → best-effort)
+Best-effort (fireHTTP / `_ =` — do NOT 500; safe to drop or keep):
+- collab.go:941 flush; newzip.go:808,809 del+flush; gitbridge.go:181 flush,
+  :201 del doc; entops.go:403 flush; docapi.go:820 del; historyresync.go:136
+  resync; internalops.go:114 del
+- docdl.go:122 `base:=cduBase()`; newzip.go:676 `upHTTP.Post(upDUBase()/project/{pj})`;
+  entops.go:421 `crHTTP.Post(upDUBase()...)` (these two are CHECKED posts to
+  `POST /project/{pj}` = the structure/apply path — treat as return-critical)
+
+**Existing docstore-direct primitive (the 1:1 target):**
+`upDocstorePut(pj,docID,lines)` → `POST {DOCSTORE_HOST}:3016/project/{pj}/doc/{docID}`
+body `{lines,version:0,ranges:{}}` → returns `{modified,rev}`. Already used at
+upload.go:959,982 for the NEW-doc content. So the content-plane swap
+(upDUSetDoc → upDocstorePut) has a proven in-file equivalent.
+
+**ORACLE (empirical, DU stopped in e2e):** create / ranges / clone / delete all
+PASS with DU down (slice 1). With DU down these FAILED: file upload+download
+round trip (service-docstore-filestore), doc download (p412b), upload (p413a),
+git (p619), resync (u102a), rename (u102b) — i.e. the content/entity
+write-path. Caveat: that run was partially contaminated by a transient
+"services not up (go=000)" in u102b retry; re-verify per-slice with DU
+explicitly down + all go services confirmed up (web:4000/PH:3054/H1:3100/
+docstore:3016 all /status 200; DU:3003 closed) before trusting each oracle.
+
+**OPEN DATA-PLANE QUESTION (must resolve before slicing, to guarantee 1:1):**
+Where is the PROJECT ENTITY TREE read back from in the canonical Go web?
+(i.e. is the file-tree/structure canonical store the OT doc applied by DU, or
+docstore `docs` + V1-history structure?) This decides whether the
+`upUpdateStructure` retarget is a docstore write, a V1-history structure op, or
+a no-op under the Yjs flip. Investigate the entity-tree read path
+(projectlist file-tree handler + `upAddOpDoc/upAddOpFile/upDelOp` consumers)
+before replacing any structure call.
+
+**PLAN (small green slices, each: code → gofmt/vet/test → e2e oracle w/ DU down):**
+S2a content-plane: upDUSetDoc → upDocstorePut (upload.go:949, tpdssync.go:144)
+     [lowest risk — proven in-file equivalent]
+S2b structure-plane: resolve data-plane question, retarget upUpdateStructure
+     callers (upload/newzip/entops/tpdssync/gitbridge) to the canonical write
+S2c best-effort: drop/neutralize the fireHTTP flush/del/resync calls that point at
+     a retired service; confirm no live spec regresses
+S3 retire: DU tree → junk (or gate runit off), remove DU from compose/Dockerfile
+     build, owner-gated prod flip; then full e2e parity battery green with DU
+     never running.
+
+
+## datamanipulator → go/libraries (owner-approved shape, 2026-09-28)
+- `git mv go/services/datamanipulator go/libraries/datamanipulator` (import `ollitex/go/libraries/datamanipulator`); the ONLY importer was `cmd/datamanipulator` (kept as dev/test binding — zero in-tree HTTP consumers, matching the upstream shape where only web plumbing referenced its env).
+- :4001 runit service RETIRED (`server-ce/runit/datamanipulator-overleaf` removed); removed from the image build loop (server-ce/Dockerfile stage-1). Library stays importable; `cmd/datamanipulator` + root Makefile go-build keep it compile-/test-checked.
+- Green slice: gofmt clean, go vet clean, `go build ./go/... ./cmd/...` OK, `go test -race otc→no — datamanipulator package ok (1.0s)`; go/README + go/services/README tables updated.
