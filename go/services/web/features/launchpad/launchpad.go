@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	i18nlib "ollitex/go/libraries/i18n"
 	"os"
 	"time"
 
@@ -46,7 +47,7 @@ func Feature(a *core.App) core.Feature {
 
 // ---- view plumbing ---------------------------------------------------------
 
-func pageData(cxt *core.Cxt) views.PageData {
+func pageData(a *core.App, cxt *core.Cxt) views.PageData {
 	d := views.PageData{Nonce: views.NewNonce()}
 	if cxt.Sess != nil {
 		d.CSRFToken = cxt.Sess.CsrfToken()
@@ -57,11 +58,31 @@ func pageData(cxt *core.Cxt) views.PageData {
 	}
 	d.Origin = origin
 	d.UserEmail, d.UserID = core.PageUserSlots(cxt.Sess)
+	// i18n wave A (docs/go-i18n-evaluation.md §3.1-2): the locale resolves
+	// user.language (best-effort from the session doc) → Accept-Language;
+	// bundle nil or locale en/"" → EXACT English bytes (e2e pins).
+	userLang := ""
+	if cxt.Sess != nil {
+		if raw, ok := cxt.Sess.Doc["user"]; ok {
+			var u struct {
+				Language string `json:"language"`
+			}
+			if json.Unmarshal(raw, &u) == nil {
+				userLang = u.Language
+			}
+		}
+	}
+	loc := i18nlib.LocaleOf(userLang, cxt.Req.Header.Get("Accept-Language"))
+	var tf i18nlib.TFunc
+	if a != nil && a.I18n != nil {
+		tf = a.I18n.T
+	}
+	d.I18n = views.I18nPage{Locale: loc, T: tf, Strings: views.WaveALaunchpadAll()}
 	return d
 }
 
-func render500(cxt *core.Cxt, res *core.Res) {
-	views.Error500Page(res.W, pageData(cxt))
+func render500(a *core.App, cxt *core.Cxt, res *core.Res) {
+	views.Error500Page(res.W, pageData(a, cxt))
 }
 
 // ---- GET /launchpad ---------------------------------------------------------
@@ -75,7 +96,7 @@ func hPage(a *core.App) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		if cxt.Sess != nil && cxt.Sess.IsLoggedIn() {
 			if templates.SessionIsAdmin(cxt.Sess) {
-				views.LaunchpadAdminPage(res.W, pageData(cxt))
+				views.LaunchpadAdminPage(res.W, pageData(a, cxt))
 				return
 			}
 			res.Redirect(cxt.Req, 302, "/restricted")
@@ -98,7 +119,7 @@ func hPage(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 		if !exists {
-			views.LaunchpadFreshPage(res.W, pageData(cxt))
+			views.LaunchpadFreshPage(res.W, pageData(a, cxt))
 			return
 		}
 		// Node: AuthenticationController.setRedirectInSession(req) then
@@ -184,7 +205,7 @@ func hRegisterAdmin(a *core.App) func(*core.Cxt, *core.Res) {
 		email = parseEmail(email) // Node: registerNewUser re-parses (trim+lower)
 		if cerr := createLocalAdminOrReuse(ctx, db, email, password, randomUUID()); cerr != nil {
 			if errors.Is(cerr, errEmailAlreadyRegistered) {
-				render500(cxt, res)
+				render500(a, cxt, res)
 				return
 			}
 			res.SendStatus(500)
@@ -247,13 +268,13 @@ func hRegisterExternal(a *core.App, method string) func(*core.Cxt, *core.Res) {
 		if email == "" {
 			// Node: registerNewUser fails _registrationRequestIsValid
 			// (validateEmail) → throws 'request is not valid' → 500 view.
-			render500(cxt, res)
+			render500(a, cxt, res)
 			return
 		}
 		existing, _ := userByEmail(ctx, db, email)
 		if existing != nil {
 			if holdingAccountFalse(existing) {
-				render500(cxt, res)
+				render500(a, cxt, res)
 				return
 			}
 			// Node reuse path: the existing user is reused; the controller's
@@ -342,12 +363,12 @@ func hSendTestEmail(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 		// byte-identical to the pre-move inline strings at app=appName.
 		tmpl, tmErr := emailtemplates.RenderFor(a, "test-mail", map[string]string{"app": appName, "site": site})
 		if tmErr != nil {
-			render500(cxt, res)
+			render500(a, cxt, res)
 			return
 		}
 		if mail != nil {
 			if serr := mail.Send(in.Email, tmpl.Subject, tmpl.Text, tmpl.HTML); serr != nil {
-				render500(cxt, res)
+				render500(a, cxt, res)
 				return
 			}
 		}

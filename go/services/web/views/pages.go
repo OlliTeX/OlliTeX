@@ -206,12 +206,13 @@ type PageData struct {
 	ProjectSyncSuccessMessage    string
 	ProjectSyncErrorMessage      string
 	ReferenceLinkingErrorMessage string
-	SessionsCurrentRow           string // sessions page current <tr> (IP + moment date)
-	SessionsOtherRows            string // other sessions <tr>s (may be empty)
-	LibUsersJSON                 string // P6.5: ol-userSettings JSON (editorpages.BuildUserSettings)
-	CanManageTemplateMenu        bool   // P6.13: ExposedSettings.canManageTemplatesMenu (per-user)
-	NavAdmin                     string // P6.13: admin navbar fragment (site admins only)
-	LaunchpadAdminExists         bool   // P6.20: ol-adminUserExists bare-content boolean
+	SessionsCurrentRow           string   // sessions page current <tr> (IP + moment date)
+	SessionsOtherRows            string   // other sessions <tr>s (may be empty)
+	LibUsersJSON                 string   // P6.5: ol-userSettings JSON (editorpages.BuildUserSettings)
+	CanManageTemplateMenu        bool     // P6.13: ExposedSettings.canManageTemplatesMenu (per-user)
+	NavAdmin                     string   // P6.13: admin navbar fragment (site admins only)
+	LaunchpadAdminExists         bool     // P6.20: ol-adminUserExists bare-content boolean
+	I18n                         I18nPage // i18n wave A: locale pass (zero = English bytes)
 }
 
 func (p PageData) finalize(html string) string {
@@ -402,6 +403,7 @@ func Page(w http.ResponseWriter, d PageData, skeleton string) {
 		csp = cspReact(d.Nonce)
 	}
 	html := d.finalize(skeleton)
+	html = translateI18n(html, d.I18n)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", csp)
 	// Express res.render always sends the full body length (Node sends
@@ -428,6 +430,7 @@ func StatusPage(w http.ResponseWriter, d PageData, status int, skeleton string) 
 		csp = cspReact(d.Nonce)
 	}
 	html := d.finalize(skeleton)
+	html = translateI18n(html, d.I18n)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
