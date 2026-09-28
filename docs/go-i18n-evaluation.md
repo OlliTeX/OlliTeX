@@ -1,7 +1,16 @@
 # go-i18n evaluation (P7-post item 4)
 
-**Date:** 2026-09-25 · **Status:** evaluation complete; recommendation = **defer adoption,
-one seam is in place (email templates), two candidates shortlisted** if we ever build it.
+**Date:** 2026-09-25 (evaluation) · **Status:** **ADOPTED** (owner, 2026-09-28) — waves landed.
+Phase 1 `9d586e7929` (seam + German canary e-mail). Wave A `c461b0ff7f` (navbar +
+/launchpad, 38 strings). Wave B `b6c796f836` (shell pages: login/register/logout/
+404/500/restricted/set-password/sessions — App.PageLocale + views.ShellI18n).
+Wave C scoped: admin pages, /user/settings page strings, one-time-login.
+The frontend/ pipeline and ALL API error strings stay OUT (frontend keeps its
+own i18n; errors byte-pinned).
+Integration audit against the nicksnyder README + v2.6.1 source (2026-09-28):
+correct; two deliberate documented deviations (DefaultMessage fallback replaced
+by the ok=false English-default seam; q-weighted Accept-Language replaced by
+the CE locale policy — user.language -> first Accept-Language value, q ignored).
 
 Owner scope (remember.md P7-post item 4): *"evaluate go-i18n … The recommendation
 should focus on Go-rendered strings, e-mail template text, and future error strings.
