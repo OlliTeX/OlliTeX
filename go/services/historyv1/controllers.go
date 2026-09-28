@@ -54,7 +54,7 @@ func (s *Service) initializeProject(w http.ResponseWriter, r *http.Request) {
 			conflict(w)
 			return
 		}
-		s.Cfg.Log("initializeProject error: %s", oerror.GetFullStack(err))
+		s.Cfg.Log("initializeProject error: %s | info=%v", oerror.GetFullStack(err), oerror.GetFullInfo(err))
 		renderErr(w, 500)
 		return
 	}
