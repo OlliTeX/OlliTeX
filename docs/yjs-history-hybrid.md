@@ -106,3 +106,17 @@ implementer):
    `services/document-updater`, `services/history-v1`, `services/
    project-history` — are retired (runit entries, Dockerfile COPY/config
    entries, env flips, toolkit defaults, trees → `junk/`).
+
+## S3 — tree-ops into the version stream (design, 2026-09-28)
+**Scope:** file add/remove/rename/move (+upload/file-restore) must show in `/updates` (as `project_ops`) and `/filetree/diff` (as `added/removed/renamed` FileDiff entries) on Yjs rooms.
+
+**Design (D41-b1 composition):** the file tree lives in the project doc (rootFolder) + filestore — NOT in the Y.Text room. Per the approved design, tree ops keep **their own version log** in the Go web API; the composition layer merges both streams:
+
+1. **`yops` log** (new, web-side Mongo `yopsVersionMeta`): one record per tree op — `{project (room), v (own counter), kind (add|remove|rename|move|upload|file-restore), pathname, new_pathname?, file_hash?, user, at}`. Written by the file-mutation handlers (the S2a/S2b-lite retarget sites already live in Go web: entops/files/upload/restore-file).
+2. **`/updates` composition (S1.2 extension):** merge room versions (text edits, per-version meta) + yops (tree ops, per-op meta) in ts order → single unified index (fromV/toV stay self-consistent: toV = last+1). Node op shapes (pinned from the Node UpdateTranslator oracle): rename `{pathname, newPathname}`; add `{pathname, file: {hash, metadata?}}`; edit `{pathname, ...op}`; comment `{pathname, commentId, resolved}`. Summarizer stamps `atV` (the S1.2 core already does).
+3. **`/filetree/diff` (S2 extension):** replay yops in [from,to) over the path set → FileDiff entries `{pathname, operation:'added'|'removed'|'renamed', newPathname?/oldPathname?, editable}` + existing root-doc `edited`/unchanged entry. FileTreeDiffGenerator port (`project-history/internal/filetreediff`) is the reference algebra.
+4. **`/changes?since=` (legacy surface, frontend does NOT call it — change-list renders from LoadedUpdate):** compose from the same merged stream (each unified version = one change object) to close the last wire.
+
+**Slices:** S3a = yops log + /updates merge + op-shape tests → S3b = filetree/diff replay → S3c = handler recording sites (live) → then S4/S5 (DU + Node retirements, owner directive) → otc junk.
+
+**Status:** design recorded; S3a not started. S2 done+live (2026-09-28, see WEB_GO_STATE.md ledger).
