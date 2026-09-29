@@ -1,7 +1,8 @@
-# SeaweedFS — local S3 object storage for filestore + docstore (default storage).
+# SeaweedFS — local S3 object storage for filestore + docstore (DEFAULT storage).
 #
-# Enabled with SEAWEEDFS_ENABLED=true (lib/default.rc). Four containers on the
-# toolkit's shared default network, started in dependency order:
+# Enabled by default (SEAWEEDFS_ENABLED=true in lib/default.rc); set the flag
+# to false to run the previous local-fs layout instead. Four containers on
+# the toolkit's shared default network, started FIRST in dependency order:
 #   master -> volume, master -> filer -> s3
 #
 # Host ports: master 9333/19333, volume 18080 (gRPC), filer 8888/18888,

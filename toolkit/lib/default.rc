@@ -38,13 +38,15 @@ LANGUAGE_TOOL_DATA_PATH=data/languagetool
 # Comma-separated n-gram languages downloaded by bin/languagetool-ngrams
 LANGUAGE_TOOL_NGRAM_LANGUAGES=en,de,es,fr,de
 
-# SeaweedFS (optional local S3 object storage for filestore + docstore):
-# 4 containers on the shared network, started master -> volume/filer -> s3;
-# data under ${OVERLEAF_DATA_PATH}/seaweedfs; host ports 9333/19333/18080/
-# 8888/18888/8333 (S3 gateway). When enabled, the app is seeded with the S3
-# default-storage env: OVERLEAF_FILESTORE_BACKEND=s3,
+# SeaweedFS (DEFAULT local S3 storage for filestore + docstore):
+# 4 containers on the shared network, started FIRST (master ->
+# volume/filer -> s3) before the app; data under
+# ${OVERLEAF_DATA_PATH}/seaweedfs; host ports 9333/19333/18080/
+# 8888/18888/8333 (S3 gateway). The app is seeded with the S3 storage env:
+# OVERLEAF_FILESTORE_BACKEND=s3,
 # OVERLEAF_FILESTORE_S3_ENDPOINT=http://seaweedfs-s3:8333, buckets
 # template/blobs/global; docstore BACKEND=s3, BUCKET_NAME=archives,
-# AWS_S3_ENDPOINT. Default OFF = current behaviour unchanged.
+# AWS_S3_ENDPOINT. Default ON (the S3-only durable storage backend);
+# set SEAWEEDFS_ENABLED=false to revert to the previous local-fs layout.
 # See lib/docker-compose.seaweedfs.yml (header) for the full contract.
-SEAWEEDFS_ENABLED=false
+SEAWEEDFS_ENABLED=true
