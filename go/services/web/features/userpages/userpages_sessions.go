@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // usAppName — the mail-template brand variable (Node parity helper shape:

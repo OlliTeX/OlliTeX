@@ -55,8 +55,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -80,15 +79,15 @@ func crTypstDocLines(dir, rel, name string) []string {
 
 // crCreateTypstProject — Node createBlankProject(compiler 'typst') +
 // buildTemplateFiles seed. version = 0 (blank) + #addDoc + #addFile.
-func crCreateTypstProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwnerUser, tmpl string) primitive.ObjectID {
+func crCreateTypstProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwnerUser, tmpl string) bson.ObjectID {
 	dir := crTypstTemplateDir()
 
 	switch {
 	case tmpl == "article":
-		pid := primitive.NewObjectID()
-		mainID := primitive.NewObjectID()
-		bibID := primitive.NewObjectID()
-		rootID := primitive.NewObjectID()
+		pid := bson.NewObjectID()
+		mainID := bson.NewObjectID()
+		bibID := bson.NewObjectID()
+		rootID := bson.NewObjectID()
 		docs := bson.A{
 			bson.D{{Key: "name", Value: "main.typ"}, {Key: "_id", Value: mainID}},
 			bson.D{{Key: "name", Value: "references.bib"}, {Key: "_id", Value: bibID}},
@@ -100,10 +99,10 @@ func crCreateTypstProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwne
 		return pid
 
 	case tmpl == "example":
-		pid := primitive.NewObjectID()
-		mainID := primitive.NewObjectID()
-		bibID := primitive.NewObjectID()
-		rootID := primitive.NewObjectID()
+		pid := bson.NewObjectID()
+		mainID := bson.NewObjectID()
+		bibID := bson.NewObjectID()
+		rootID := bson.NewObjectID()
 
 		frog, frogErr := os.ReadFile(dir + "/example/frog.jpg")
 		var fileRefs bson.A
@@ -116,7 +115,7 @@ func crCreateTypstProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwne
 				{Key: "rev", Value: 0},
 				{Key: "linkedFileData", Value: nil},
 				{Key: "hash", Value: hash},
-				{Key: "_id", Value: primitive.NewObjectID()},
+				{Key: "_id", Value: bson.NewObjectID()},
 			}}
 		}
 		docs := bson.A{
@@ -133,9 +132,9 @@ func crCreateTypstProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwne
 		return pid
 
 	default: // basic (incl. unknown/absent template — Node fallback)
-		pid := primitive.NewObjectID()
-		mainID := primitive.NewObjectID()
-		rootID := primitive.NewObjectID()
+		pid := bson.NewObjectID()
+		mainID := bson.NewObjectID()
+		rootID := bson.NewObjectID()
 		docs := bson.A{bson.D{
 			{Key: "name", Value: "main.typ"},
 			{Key: "_id", Value: mainID},

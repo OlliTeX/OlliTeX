@@ -13,9 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -46,14 +45,14 @@ func doRegister(a *core.App, mail *core.Mail, tok *core.OneTimeTokens, cxt *core
 	}
 
 	reuse := false
-	reuseID := primitive.NilObjectID
+	reuseID := bson.NilObjectID
 	if err == nil {
 		if holdingAccountFalse(ex) {
 			return "taken"
 		}
 		// holding account (holdingAccount true) — Node reuses the existing user
 		reuse = true
-		if o, ok := ex["_id"].(primitive.ObjectID); ok {
+		if o, ok := ex["_id"].(bson.ObjectID); ok {
 			reuseID = o
 		} else {
 			return "error"
@@ -63,7 +62,7 @@ func doRegister(a *core.App, mail *core.Mail, tok *core.OneTimeTokens, cxt *core
 	return createAndMail(ctx, a, mail, tok, cxt, coll, reuse, reuseID, email, first, last)
 }
 
-func createAndMail(ctx context.Context, a *core.App, mail *core.Mail, tok *core.OneTimeTokens, cxt *core.Cxt, coll *mongo.Collection, reuse bool, reuseID primitive.ObjectID, email, first, last string) string {
+func createAndMail(ctx context.Context, a *core.App, mail *core.Mail, tok *core.OneTimeTokens, cxt *core.Cxt, coll *mongo.Collection, reuse bool, reuseID bson.ObjectID, email, first, last string) string {
 	now := time.Now().UTC()
 	pw := randomHex32()
 	hash, herr := bcrypt.GenerateFromPassword([]byte(pw), bcryptRounds())
@@ -72,7 +71,7 @@ func createAndMail(ctx context.Context, a *core.App, mail *core.Mail, tok *core.
 	}
 	id := reuseID
 	if !reuse {
-		id = primitive.NewObjectID()
+		id = bson.NewObjectID()
 	}
 
 	doc := newUserDoc() // 42 static Node-parity defaults
@@ -88,7 +87,7 @@ func createAndMail(ctx context.Context, a *core.App, mail *core.Mail, tok *core.
 		"email":            email,
 		"reversedHostname": reversedHostname(email),
 		"createdAt":        now.Add(time.Millisecond),
-		"_id":              primitive.NewObjectID(),
+		"_id":              bson.NewObjectID(),
 	}}
 
 	if reuse {

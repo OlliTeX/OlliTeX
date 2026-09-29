@@ -11,8 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/features/sitesettings"
 )
@@ -97,8 +96,8 @@ func TestWdJSNumber(t *testing.T) {
 }
 
 func TestWdCanWrite(t *testing.T) {
-	uid, _ := primitive.ObjectIDFromHex("6aa4b8b573ef0e5094f4cbc0")
-	coll, _ := primitive.ObjectIDFromHex("6aa4b8b573ef0e5094f4cbc1")
+	uid, _ := bson.ObjectIDFromHex("6aa4b8b573ef0e5094f4cbc0")
+	coll, _ := bson.ObjectIDFromHex("6aa4b8b573ef0e5094f4cbc1")
 	doc := bson.D{
 		{Key: "owner", Value: bson.D{{Key: "userId", Value: uid}}},
 		{Key: "owner_ref", Value: uid},

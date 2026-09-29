@@ -11,8 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -221,7 +220,7 @@ func idString(v any) string {
 	if s, ok := v.(string); ok {
 		return s
 	}
-	if o, ok := v.(primitive.ObjectID); ok {
+	if o, ok := v.(bson.ObjectID); ok {
 		return o.Hex()
 	}
 	// fallback: hex-ish string form

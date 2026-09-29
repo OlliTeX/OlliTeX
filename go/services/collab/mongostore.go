@@ -6,10 +6,9 @@ import (
 
 	"github.com/reearth/ygo/crdt"
 	"github.com/reearth/ygo/persistence"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // MongoStore — a VersionedPersistence implementation over a single Mongo
@@ -41,15 +40,15 @@ type mongoStore struct {
 }
 
 type mongUpd struct {
-	V  uint64           `bson:"v"`
-	At time.Time        `bson:"at"`
-	U  primitive.Binary `bson:"u"`
+	V  uint64      `bson:"v"`
+	At time.Time   `bson:"at"`
+	U  bson.Binary `bson:"u"`
 }
 
 type mongSnap struct {
-	V     uint64           `bson:"v"`
-	At    time.Time        `bson:"at"`
-	State primitive.Binary `bson:"state"`
+	V     uint64      `bson:"v"`
+	At    time.Time   `bson:"at"`
+	State bson.Binary `bson:"state"`
 }
 
 type mongRoom struct {
@@ -64,7 +63,9 @@ var _ persistence.VersionedPersistence = (*mongoStore)(nil)
 // NewMongoStore opens the store on db (collection defaultYDocCollection).
 func NewMongoStore(ctx context.Context, db *mongo.Database) (*mongoStore, error) {
 	s := &mongoStore{coll: db.Collection(defaultYDocCollection)}
-	if _, err := s.coll.Distinct(ctx, "_id", bson.D{}); err != nil {
+	// v2 driver: Distinct no longer returns an error — ping the client
+	// directly for the connectivity check (same intent as the v1 probe).
+	if err := s.coll.Database().Client().Ping(ctx, nil); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -151,7 +152,7 @@ func (s *mongoStore) AppendUpdate(ctx context.Context, room string, update []byt
 	appendRec := bson.D{
 		{Key: "v", Value: "$head"},
 		{Key: "at", Value: now},
-		{Key: "u", Value: primitive.Binary{Subtype: 0, Data: update}},
+		{Key: "u", Value: bson.Binary{Subtype: 0, Data: update}},
 	}
 	appendLog := bson.D{{Key: "$set", Value: bson.D{{Key: "upds", Value: bson.D{{Key: "$concatArrays", Value: bson.A{
 		bson.D{{Key: "$ifNull", Value: bson.A{"$upds", bson.D{{Key: "$literal", Value: []any{}}}}}},
@@ -255,7 +256,7 @@ func (s *mongoStore) CaptureSnapshot(ctx context.Context, room, name string, sta
 	snap := mongSnap{
 		V:     uint64(head),
 		At:    time.Now().UTC(),
-		State: primitive.Binary{Subtype: 0, Data: state},
+		State: bson.Binary{Subtype: 0, Data: state},
 	}
 	nameMap := bson.D{{Key: name, Value: snap}}
 	snapField := bson.E{Key: "snaps", Value: nameMap}
@@ -351,7 +352,7 @@ func (s *mongoStore) Compact(ctx context.Context, room string, keep int) (int, e
 	folded := mongUpd{
 		V:  d.Upds[trimEnd].V,
 		At: d.Upds[trimEnd].At,
-		U:  primitive.Binary{Subtype: 0, Data: merged},
+		U:  bson.Binary{Subtype: 0, Data: merged},
 	}
 	newLog := make([]mongUpd, 0, keep)
 	newLog = append(newLog, folded)

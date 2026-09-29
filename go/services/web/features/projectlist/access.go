@@ -5,10 +5,9 @@ import (
 	"path"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -61,7 +60,7 @@ func inOIDList(v any, uid string) bool {
 }
 
 // canRead mirrors canUserReadProject for a logged-in user.
-func canRead(uid string, isAdmin bool, d primitive.D) bool {
+func canRead(uid string, isAdmin bool, d bson.D) bool {
 	if uid == "" {
 		return false
 	}
@@ -109,7 +108,7 @@ var accessProj = bson.D{
 
 // loadProject returns the project doc (access fields + rootFolder), or
 // (nil, nil) when it does not exist (Node: NotFoundError -> 404).
-func loadProject(a *core.App, cxt *core.Cxt, oid primitive.ObjectID) (*primitive.D, error) {
+func loadProject(a *core.App, cxt *core.Cxt, oid bson.ObjectID) (*bson.D, error) {
 	if a.Mongo == nil {
 		return nil, nil
 	}
@@ -120,7 +119,7 @@ func loadProject(a *core.App, cxt *core.Cxt, oid primitive.ObjectID) (*primitive
 		return nil, err
 	}
 	opts := options.FindOne().SetProjection(accessProj)
-	var d primitive.D
+	var d bson.D
 	err = db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}, opts).Decode(&d)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -134,7 +133,7 @@ func loadProject(a *core.App, cxt *core.Cxt, oid primitive.ObjectID) (*primitive
 // canAdmin mirrors canUserAdminProject: OWNER or (adminPrivilegeAvailable &&
 // site-admin). Used by ensureUserCanAdminProject-guarded routes (rename,
 // access-requests, delete/restore).
-func canAdmin(uid string, isAdmin bool, d primitive.D) bool {
+func canAdmin(uid string, isAdmin bool, d bson.D) bool {
 	if uid == "" {
 		return false
 	}
@@ -150,7 +149,7 @@ func loadUserAdmin(a *core.App, cxt *core.Cxt, uid string) bool {
 	if a.Mongo == nil || uid == "" {
 		return false
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return false
 	}
@@ -160,7 +159,7 @@ func loadUserAdmin(a *core.App, cxt *core.Cxt, uid string) bool {
 	if err != nil {
 		return false
 	}
-	var d primitive.D
+	var d bson.D
 	opts := options.FindOne().SetProjection(bson.D{{Key: "isAdmin", Value: 1}})
 	if db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}, opts).Decode(&d) != nil {
 		return false
@@ -178,16 +177,16 @@ type ent struct {
 
 func pjoin(base, name string) string { return path.Join(base, name) }
 
-func dgetArr(d primitive.D, key string) primitive.A {
-	a, _ := dget(d, key).(primitive.A)
+func dgetArr(d bson.D, key string) bson.A {
+	a, _ := dget(d, key).(bson.A)
 	return a
 }
 
 // walkFolder mirrors _getAllFoldersFromProject (folders) +
 // getAllEntitiesFromProject (docs + fileRefs), for one folder subtree.
-func walkFolder(folder primitive.D, base string, out *[]ent) {
+func walkFolder(folder bson.D, base string, out *[]ent) {
 	for _, doc := range dgetArr(folder, "docs") {
-		dm, ok := doc.(primitive.D)
+		dm, ok := doc.(bson.D)
 		if !ok {
 			continue
 		}
@@ -196,7 +195,7 @@ func walkFolder(folder primitive.D, base string, out *[]ent) {
 		}
 	}
 	for _, fr := range dgetArr(folder, "fileRefs") {
-		fm, ok := fr.(primitive.D)
+		fm, ok := fr.(bson.D)
 		if !ok {
 			continue
 		}
@@ -205,7 +204,7 @@ func walkFolder(folder primitive.D, base string, out *[]ent) {
 		}
 	}
 	for _, c := range dgetArr(folder, "folders") {
-		cm, ok := c.(primitive.D)
+		cm, ok := c.(bson.D)
 		if !ok {
 			continue
 		}
@@ -218,11 +217,11 @@ func walkFolder(folder primitive.D, base string, out *[]ent) {
 
 // collectEntities returns the project's doc+file entities (pre-sort), walking
 // rootFolder[0] from "/".
-func collectEntities(doc *primitive.D) []ent {
+func collectEntities(doc *bson.D) []ent {
 	var out []ent
 	rf := dgetArr(*doc, "rootFolder")
 	if len(rf) > 0 {
-		if root, ok := rf[0].(primitive.D); ok {
+		if root, ok := rf[0].(bson.D); ok {
 			walkFolder(root, "/", &out)
 		}
 	}

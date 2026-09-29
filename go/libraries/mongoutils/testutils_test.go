@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const liveMongoURI = "mongodb://127.0.0.1:27017"
@@ -22,7 +22,7 @@ func liveMongo(t *testing.T) *mongo.Client {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(liveMongoURI))
+	client, err := mongo.Connect(options.Client().ApplyURI(liveMongoURI))
 	if err != nil {
 		t.Skipf("live mongo not available: %v", err)
 	}
@@ -81,10 +81,11 @@ func TestCleanupTestDatabaseLive(t *testing.T) {
 	}()
 
 	// seed: unique index + data in `work`; data in `migrations` (preserved)
-	_, _ = work.Indexes().DropAll(ctx)
+	_ = work.Indexes().DropAll(ctx)
 	if _, err := work.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bson.D{{Key: "token", Value: 1}},
-		Options: &options.IndexOptions{Name: ptr("uniq_token"), Unique: ptrBool(true)},
+		Keys: bson.D{{Key: "token", Value: 1}},
+		// v2 driver: index options are set through the builder.
+		Options: options.Index().SetName("uniq_token").SetUnique(true),
 	}); err != nil {
 		t.Fatal(err)
 	}

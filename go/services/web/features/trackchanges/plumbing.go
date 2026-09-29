@@ -5,9 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -61,7 +60,7 @@ func tcAuthzProject(a *core.App, cxt *core.Cxt, res *core.Res, write bool) (stri
 		res.JSON(404, []byte(tcBadOID404))
 		return "", false
 	}
-	oid, oerr := primitive.ObjectIDFromHex(strings.ToLower(seg))
+	oid, oerr := bson.ObjectIDFromHex(strings.ToLower(seg))
 	if oerr != nil {
 		res.JSON(404, []byte(tcBadOID404))
 		return "", false
@@ -87,7 +86,7 @@ func tcAuthzProject(a *core.App, cxt *core.Cxt, res *core.Res, write bool) (stri
 	return seg, true
 }
 
-func tcLoadProject(a *core.App, ctx context.Context, oid primitive.ObjectID) (*bson.D, error) {
+func tcLoadProject(a *core.App, ctx context.Context, oid bson.ObjectID) (*bson.D, error) {
 	if a.Mongo == nil {
 		return nil, nil
 	}
@@ -122,7 +121,7 @@ func tcDocStr(doc bson.D, key string) (string, bool) {
 	if s, ok := v.(string); ok {
 		return s, true
 	}
-	if o, ok := v.(primitive.ObjectID); ok {
+	if o, ok := v.(bson.ObjectID); ok {
 		return o.Hex(), true
 	}
 	return "", false
@@ -132,7 +131,7 @@ func tcOidHex(v interface{}) (string, bool) {
 	switch t := v.(type) {
 	case string:
 		return strings.ToLower(t), true
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex(), true
 	}
 	return "", false

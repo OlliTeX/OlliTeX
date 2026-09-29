@@ -10,8 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -68,7 +67,7 @@ func wdFirstStateForUser(ctx context.Context, a *core.App, uid string, username 
 
 func stateTime(v interface{}) int64 {
 	switch t := v.(type) {
-	case primitive.DateTime:
+	case bson.DateTime:
 		return t.Time().UnixMilli()
 	case int64:
 		return t
@@ -80,7 +79,7 @@ func stateTime(v interface{}) int64 {
 // JSON or "") from a state doc.
 func wdStateSyncFields(r *wdStateRec) (*string, *string, string) {
 	var lastSyncAt, lastSyncError *string
-	if t, ok := r.LastSyncAt.(primitive.DateTime); ok {
+	if t, ok := r.LastSyncAt.(bson.DateTime); ok {
 		s := t.Time().UTC().Format("2006-01-02T15:04:05.000Z")
 		lastSyncAt = &s
 	}
@@ -127,10 +126,10 @@ func wdOrderedRaw(v interface{}) (string, error) {
 		return itoa64(t), nil
 	case float64:
 		return jsNumberFinite(t), nil
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		q, _ := json.Marshal(t.Hex())
 		return string(q), nil
-	case primitive.DateTime:
+	case bson.DateTime:
 		q, _ := json.Marshal(t.Time().UTC().Format("2006-01-02T15:04:05.000Z"))
 		return string(q), nil
 	case time.Time:

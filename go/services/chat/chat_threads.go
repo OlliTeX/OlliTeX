@@ -1,11 +1,10 @@
 package chat
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"context"
 	"net/http"
 	"ollitex/go/pbhttp"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ---- threads ------------------------------------------------------------------
@@ -16,7 +15,7 @@ func (s *Server) getThreads(w http.ResponseWriter, r *http.Request, params map[s
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
 	rooms, err := s.store.ThreadRooms(ctx, pid)
 	if err != nil {
 		s.internal(w, err)
@@ -43,10 +42,10 @@ func (s *Server) generateThreadData(w http.ResponseWriter, r *http.Request, para
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	ids := make([]primitive.ObjectID, 0, len(threads))
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	ids := make([]bson.ObjectID, 0, len(threads))
 	for _, t := range threads {
-		id, _ := primitive.ObjectIDFromHex(t)
+		id, _ := bson.ObjectIDFromHex(t)
 		ids = append(ids, id)
 	}
 	rooms, err := s.store.RoomsByThreadIDs(ctx, pid, ids)
@@ -66,7 +65,7 @@ func (s *Server) generateThreadData(w http.ResponseWriter, r *http.Request, para
 
 // threadsPayload: rooms → messages → groupMessagesByThreads (Node 1:1).
 func (s *Server) threadsPayload(ctx context.Context, rooms []*Room) (map[string]*threadData, error) {
-	roomIDs := make([]primitive.ObjectID, 0, len(rooms))
+	roomIDs := make([]bson.ObjectID, 0, len(rooms))
 	for _, r := range rooms {
 		roomIDs = append(roomIDs, r.ID)
 	}
@@ -88,8 +87,8 @@ func (s *Server) getThread(w http.ResponseWriter, r *http.Request, params map[st
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	tid, _ := primitive.ObjectIDFromHex(params["threadId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	tid, _ := bson.ObjectIDFromHex(params["threadId"])
 	room, err := s.store.FindRoom(ctx, pid, &tid) // findThread
 	if err != nil {
 		s.internal(w, err)
@@ -99,7 +98,7 @@ func (s *Server) getThread(w http.ResponseWriter, r *http.Request, params map[st
 		sendStatus(w, http.StatusNotFound) // MissingThreadError
 		return
 	}
-	msgs, err := s.store.MessagesInRooms(ctx, []primitive.ObjectID{room.ID})
+	msgs, err := s.store.MessagesInRooms(ctx, []bson.ObjectID{room.ID})
 	if err != nil {
 		s.internal(w, err)
 		return
@@ -132,8 +131,8 @@ func (s *Server) deleteThread(w http.ResponseWriter, r *http.Request, params map
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	tid, _ := primitive.ObjectIDFromHex(params["threadId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	tid, _ := bson.ObjectIDFromHex(params["threadId"])
 	room, err := s.store.FindOrCreateRoom(ctx, pid, &tid)
 	if err != nil {
 		s.internal(w, err)
@@ -158,7 +157,7 @@ func (s *Server) getResolvedThreadIds(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
 	ids, err := s.store.ResolvedThreadIDs(ctx, pid)
 	if err != nil {
 		s.internal(w, err)
@@ -183,13 +182,13 @@ func (s *Server) destroyProject(w http.ResponseWriter, r *http.Request, params m
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
 	rooms, err := s.store.AllRooms(ctx, pid)
 	if err != nil {
 		s.internal(w, err)
 		return
 	}
-	ids := make([]primitive.ObjectID, 0, len(rooms))
+	ids := make([]bson.ObjectID, 0, len(rooms))
 	for _, r := range rooms {
 		ids = append(ids, r.ID)
 	}
@@ -220,9 +219,9 @@ func (s *Server) getThreadMessage(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	tid, _ := primitive.ObjectIDFromHex(params["threadId"])
-	mid, _ := primitive.ObjectIDFromHex(params["messageId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	tid, _ := bson.ObjectIDFromHex(params["threadId"])
+	mid, _ := bson.ObjectIDFromHex(params["messageId"])
 	room, err := s.store.FindRoom(ctx, pid, &tid)
 	if err != nil {
 		s.internal(w, err)
@@ -258,9 +257,9 @@ func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request, params ma
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	tid, _ := primitive.ObjectIDFromHex(params["threadId"])
-	mid, _ := primitive.ObjectIDFromHex(params["messageId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	tid, _ := bson.ObjectIDFromHex(params["threadId"])
+	mid, _ := bson.ObjectIDFromHex(params["messageId"])
 	room, err := s.store.FindOrCreateRoom(ctx, pid, &tid)
 	if err != nil {
 		s.internal(w, err)
@@ -290,10 +289,10 @@ func (s *Server) deleteUserMessage(w http.ResponseWriter, r *http.Request, param
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	tid, _ := primitive.ObjectIDFromHex(params["threadId"])
-	uid, _ := primitive.ObjectIDFromHex(params["userId"])
-	mid, _ := primitive.ObjectIDFromHex(params["messageId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	tid, _ := bson.ObjectIDFromHex(params["threadId"])
+	uid, _ := bson.ObjectIDFromHex(params["userId"])
+	mid, _ := bson.ObjectIDFromHex(params["messageId"])
 	room, err := s.store.FindOrCreateRoom(ctx, pid, &tid)
 	if err != nil {
 		s.internal(w, err)
@@ -332,9 +331,9 @@ func (s *Server) resolveThread(w http.ResponseWriter, r *http.Request, params ma
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	tid, _ := primitive.ObjectIDFromHex(params["threadId"])
-	uid, _ := primitive.ObjectIDFromHex(userID)
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	tid, _ := bson.ObjectIDFromHex(params["threadId"])
+	uid, _ := bson.ObjectIDFromHex(userID)
 	if err := s.store.ResolveThread(ctx, pid, tid, uid); err != nil {
 		s.internal(w, err)
 		return
@@ -353,8 +352,8 @@ func (s *Server) reopenThread(w http.ResponseWriter, r *http.Request, params map
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	tid, _ := primitive.ObjectIDFromHex(params["threadId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	tid, _ := bson.ObjectIDFromHex(params["threadId"])
 	if err := s.store.ReopenThread(ctx, pid, tid); err != nil {
 		s.internal(w, err)
 		return

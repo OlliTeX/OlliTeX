@@ -8,9 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // ---------- series ----------
@@ -79,7 +78,7 @@ func series(a *core.App) func(*core.Cxt, *core.Res) {
 			// day is a BSON Date in the docs — query with a Date too (an
 			// int64 would fall in the Number type-bracket and the $gte
 			// ordering would match every doc regardless of the cutoff).
-			{Key: "day", Value: bson.D{{Key: "$gte", Value: primitive.DateTime(cutoffMS)}}},
+			{Key: "day", Value: bson.D{{Key: "$gte", Value: bson.DateTime(cutoffMS)}}},
 		}, options.Find().SetSort(bson.D{{Key: "day", Value: 1}}))
 		if err != nil {
 			res.SendStatus(500)
@@ -95,7 +94,7 @@ func series(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 			var dayMS int64
 			switch v := bm["day"].(type) {
-			case primitive.DateTime: // driver v1 decodes BSON Date in a map
+			case bson.DateTime: // driver v1 decodes BSON Date in a map
 				dayMS = int64(v)
 			case time.Time:
 				dayMS = v.UnixMilli()
@@ -134,7 +133,7 @@ func series(a *core.App) func(*core.Cxt, *core.Res) {
 func normalizeValues(v any) []any {
 	arr, ok := v.([]any)
 	if !ok {
-		if pa, ok2 := v.(primitive.A); ok2 { // driver v1 BSON array type
+		if pa, ok2 := v.(bson.A); ok2 { // driver v1 BSON array type
 			arr = pa
 			ok = true
 		}
@@ -174,7 +173,7 @@ func configEmails(doc map[string]any) []string {
 	switch v := doc["alertEmails"].(type) {
 	case []any:
 		arr = v
-	case primitive.A:
+	case bson.A:
 		arr = v
 	case []string:
 		for _, s := range v {

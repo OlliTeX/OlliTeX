@@ -110,10 +110,9 @@ import (
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // Express `webRouter.post('/project/:Project_id/...')` — one non-empty path
@@ -182,7 +181,7 @@ func Feature(a *core.App) core.Feature {
 // small helpers (mirrors projectlist's P4-pinned shapes)
 // ---------------------------------------------------------------------------
 
-func dget(d primitive.D, key string) any {
+func dget(d bson.D, key string) any {
 	for _, e := range d {
 		if e.Key == key {
 			return e.Value
@@ -193,7 +192,7 @@ func dget(d primitive.D, key string) any {
 
 func oidHex(v any) string {
 	switch t := v.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex()
 	case string:
 		return strings.ToLower(t)
@@ -203,7 +202,7 @@ func oidHex(v any) string {
 
 func asOIDList(v any) []string {
 	var out []string
-	a, ok := v.(primitive.A)
+	a, ok := v.(bson.A)
 	if !ok {
 		return out
 	}
@@ -228,7 +227,7 @@ func inOIDList(v any, uid string) bool {
 }
 
 // canRead mirrors canUserReadProject (P4.2 contract, byte-pinned).
-func canRead(p primitive.D, uid string, isAdmin bool) bool {
+func canRead(p bson.D, uid string, isAdmin bool) bool {
 	if uid == "" {
 		return false
 	}
@@ -256,7 +255,7 @@ func loadUserAdmin(a *core.App, cxt *core.Cxt, uid string) bool {
 	if a.Mongo == nil || uid == "" || !core.AdminPrivilegeAvailable() {
 		return false
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return false
 	}
@@ -266,7 +265,7 @@ func loadUserAdmin(a *core.App, cxt *core.Cxt, uid string) bool {
 	if err != nil {
 		return false
 	}
-	var d primitive.D
+	var d bson.D
 	opts := options.FindOne().SetProjection(bson.D{{Key: "isAdmin", Value: 1}})
 	err = db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}, opts).Decode(&d)
 	if err != nil {
@@ -338,8 +337,8 @@ const internal500 = `{"error":{"type":"InternalServerError","message":"Internal 
 
 // loadProject returns the project doc, or (nil, nil) when absent (Node:
 // NotFoundError → 404 HTML general/404, NOT accept-dependent).
-func loadProject(ctx context.Context, a *core.App, idHex string) (*primitive.D, error) {
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(idHex))
+func loadProject(ctx context.Context, a *core.App, idHex string) (*bson.D, error) {
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(idHex))
 	if err != nil {
 		return nil, nil
 	}
@@ -350,7 +349,7 @@ func loadProject(ctx context.Context, a *core.App, idHex string) (*primitive.D, 
 	if err != nil {
 		return nil, err
 	}
-	var d primitive.D
+	var d bson.D
 	e := db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&d)
 	if e == mongo.ErrNoDocuments {
 		return nil, nil
@@ -383,10 +382,10 @@ type treeFile struct {
 // path semantics. Depth-first, docs then fileRefs per folder (the map order
 // is Node's tree order; clsi keys resources by path so order is
 // semantically neutral).
-func walk(root primitive.A) (docs []treeDoc, files []treeFile) {
+func walk(root bson.A) (docs []treeDoc, files []treeFile) {
 	var walkFolder func(f any, base string)
 	walkFolder = func(f any, base string) {
-		fd, ok := f.(primitive.D)
+		fd, ok := f.(bson.D)
 		if !ok {
 			return
 		}
@@ -397,7 +396,7 @@ func walk(root primitive.A) (docs []treeDoc, files []treeFile) {
 			return base + "/" + name
 		}
 		for _, dv := range asD(dget(fd, "docs")) {
-			d, dok := dv.(primitive.D)
+			d, dok := dv.(bson.D)
 			if !dok {
 				continue
 			}
@@ -408,7 +407,7 @@ func walk(root primitive.A) (docs []treeDoc, files []treeFile) {
 			docs = append(docs, treeDoc{Path: p(dn), ID: oidHex(dget(d, "_id"))})
 		}
 		for _, fv := range asD(dget(fd, "fileRefs")) {
-			fr, fok := fv.(primitive.D)
+			fr, fok := fv.(bson.D)
 			if !fok {
 				continue
 			}
@@ -419,7 +418,7 @@ func walk(root primitive.A) (docs []treeDoc, files []treeFile) {
 			hash, _ := dget(fr, "hash").(string)
 			var created int64
 			switch t := dget(fr, "created").(type) {
-			case primitive.DateTime:
+			case bson.DateTime:
 				created = int64(t)
 			case int64:
 				created = t
@@ -430,7 +429,7 @@ func walk(root primitive.A) (docs []treeDoc, files []treeFile) {
 			if sub == nil {
 				continue
 			}
-			sd, ok := sub.(primitive.D)
+			sd, ok := sub.(bson.D)
 			if !ok {
 				continue
 			}
@@ -447,10 +446,10 @@ func walk(root primitive.A) (docs []treeDoc, files []treeFile) {
 	return docs, files
 }
 
-// asD coerces a (possibly nil) primitive.A or []any to a slice of any.
+// asD coerces a (possibly nil) bson.A or []any to a slice of any.
 func asD(v any) []any {
 	switch t := v.(type) {
-	case primitive.A:
+	case bson.A:
 		return t
 	case []any:
 		return t
@@ -510,7 +509,7 @@ const (
 	defCompileTimeout = 180        // Settings.defaultFeatures.compileTimeout
 )
 
-func computeLimits(owner *primitive.D, projectCompiler string) limits {
+func computeLimits(owner *bson.D, projectCompiler string) limits {
 	lim := limits{
 		Timeout:      defCompileTimeout,
 		CompileGroup: defCompileGroup,
@@ -523,9 +522,9 @@ func computeLimits(owner *primitive.D, projectCompiler string) limits {
 	if alpha, _ := dget(*owner, "alphaProgram").(bool); alpha {
 		lim.CompileGroup = "alpha"
 	}
-	features, _ := dget(*owner, "features").(primitive.D)
+	features, _ := dget(*owner, "features").(bson.D)
 	if features == nil {
-		features = primitive.D{}
+		features = bson.D{}
 	}
 	fget := func(k string) any {
 		return dget(features, k)
@@ -596,7 +595,7 @@ func writeJSON(res *core.Res, status int, body *resp) {
 // preflight runs the Node middleware order: zod objectId (404 JSON),
 // project load (404 HTML), ensureUserCanReadProject (403). Returns the
 // project doc on success.
-func preflight(cxt *core.Cxt, res *core.Res, a *core.App, idParam string) (*primitive.D, bool) {
+func preflight(cxt *core.Cxt, res *core.Res, a *core.App, idParam string) (*bson.D, bool) {
 	if !validOID.MatchString(idParam) {
 		res.JSON(404, []byte(malformed404))
 		return nil, false
@@ -701,15 +700,15 @@ func compileHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		//      for the SUCCESS/limits path; the validation-problems branch has
 		//      no limits keys — computed here but used only after root resolve)
 		ownerHex := oidHex(dget(*p, "owner_ref"))
-		var ownerDoc *primitive.D
+		var ownerDoc *bson.D
 		if ownerHex != "" && a.Mongo != nil {
-			if ooid, oerr := primitive.ObjectIDFromHex(ownerHex); oerr == nil {
+			if ooid, oerr := bson.ObjectIDFromHex(ownerHex); oerr == nil {
 				opts := options.FindOne().SetProjection(bson.D{
 					{Key: "alphaProgram", Value: 1},
 					{Key: "features", Value: 1},
 				})
 				if db, derr := a.Mongo.DB(ctx); derr == nil {
-					var od primitive.D
+					var od bson.D
 					if db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: ooid}}, opts).Decode(&od) == nil {
 						ownerDoc = &od
 					}
@@ -720,7 +719,7 @@ func compileHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		lim := computeLimits(ownerDoc, projectCompiler)
 
 		// ---- 2) tree + docstore content
-		rootFolder, _ := dget(*p, "rootFolder").(primitive.A)
+		rootFolder, _ := dget(*p, "rootFolder").(bson.A)
 		docs, files := walk(rootFolder)
 		lines, derr := getDocLines(ctx, pid)
 		if derr != nil {
@@ -803,8 +802,8 @@ func compileHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		resources := []resEntry{}
 		historyID := ""
-		if ov, ok := dget(*p, "overleaf").(primitive.D); ok {
-			if h, ok := dget(ov, "history").(primitive.D); ok {
+		if ov, ok := dget(*p, "overleaf").(bson.D); ok {
+			if h, ok := dget(ov, "history").(bson.D); ok {
 				historyID, _ = dget(h, "id").(string)
 			}
 		}

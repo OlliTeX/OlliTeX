@@ -8,8 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -61,7 +60,7 @@ func zodReceived(v any, present bool) string {
 		return "number"
 	case int64:
 		return "number"
-	case primitive.A:
+	case bson.A:
 		return "array"
 	case nil:
 		return "null"
@@ -88,7 +87,7 @@ func renameHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(404, []byte(malformed404))
 			return
 		}
-		oid, err := primitive.ObjectIDFromHex(strings.ToLower(param))
+		oid, err := bson.ObjectIDFromHex(strings.ToLower(param))
 		if err != nil {
 			res.JSON(404, []byte(malformed404))
 			return
@@ -148,7 +147,7 @@ func renameHandler(a *core.App) func(*core.Cxt, *core.Res) {
 }
 
 // writeRename sets the project's name.
-func writeRename(a *core.App, cxt *core.Cxt, oid primitive.ObjectID, name string) {
+func writeRename(a *core.App, cxt *core.Cxt, oid bson.ObjectID, name string) {
 	if a.Mongo == nil {
 		return
 	}

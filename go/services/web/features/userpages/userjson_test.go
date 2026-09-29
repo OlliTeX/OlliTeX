@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // ---------- sortContacts (Node sortContacts: n DESC, ts DESC, stable) ----------
@@ -50,8 +49,8 @@ func TestSortContactsStableOnFullTie(t *testing.T) {
 // ---------- parseContacts (BSON doc shape) ----------
 
 func TestParseContactsBSON(t *testing.T) {
-	tsA := primitive.NewDateTimeFromTime(time.Date(2026, 9, 22, 13, 27, 50, 329e6, time.UTC))
-	tsB := primitive.NewDateTimeFromTime(time.Date(2026, 9, 22, 13, 27, 51, 105e6, time.UTC))
+	tsA := bson.NewDateTimeFromTime(time.Date(2026, 9, 22, 13, 27, 50, 329e6, time.UTC))
+	tsB := bson.NewDateTimeFromTime(time.Date(2026, 9, 22, 13, 27, 51, 105e6, time.UTC))
 	cdoc := bson.D{{Key: "contacts", Value: bson.D{
 		{Key: "6aa4b8b5...", Value: bson.D{
 			{Key: "n", Value: int32(1)},
@@ -111,8 +110,8 @@ func TestContactsRowJSON(t *testing.T) {
 	}
 }
 
-func mustObjectIDFromHex(h string) primitive.ObjectID {
-	oid, err := primitive.ObjectIDFromHex(h)
+func mustObjectIDFromHex(h string) bson.ObjectID {
+	oid, err := bson.ObjectIDFromHex(h)
 	if err != nil {
 		panic(err)
 	}
@@ -122,7 +121,7 @@ func mustObjectIDFromHex(h string) primitive.ObjectID {
 // ---------- emailJSONStruct (wire order + CE flags) ----------
 
 func TestEmailJSONWire(t *testing.T) {
-	created := primitive.NewDateTimeFromTime(time.Date(2026, 9, 12, 2, 27, 52, 936e6, time.UTC))
+	created := bson.NewDateTimeFromTime(time.Date(2026, 9, 12, 2, 27, 52, 936e6, time.UTC))
 	ed := emailDocV{
 		Email:            "e2e-admin@e2e.test",
 		ReversedHostname: "tset.e2e",
@@ -135,7 +134,7 @@ func TestEmailJSONWire(t *testing.T) {
 		t.Fatalf("email row:\n got  %s\n want %s", got, want)
 	}
 	// secondary: default false + confirmedAt -> lastConfirmedAt
-	confirmed := primitive.NewDateTimeFromTime(time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC))
+	confirmed := bson.NewDateTimeFromTime(time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC))
 	ed2 := emailDocV{
 		Email:            "second@x.test",
 		ReversedHostname: "tse.x",

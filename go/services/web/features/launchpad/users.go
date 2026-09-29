@@ -9,9 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"golang.org/x/crypto/bcrypt"
 
 	"ollitex/go/services/web/features/registrationpage"
@@ -119,7 +118,7 @@ func createLocalAdminUser(ctx context.Context, db *mongo.Database, email, passwo
 		"email":            email,
 		"reversedHostname": reversedHostname(email),
 		"createdAt":        nowUTC(),
-		"_id":              primitive.NewObjectID(),
+		"_id":              bson.NewObjectID(),
 	}}
 	if _, ierr := db.Collection("users").InsertOne(ctx, doc); ierr != nil {
 		return ierr
@@ -149,7 +148,7 @@ func createExternalAdminUser(ctx context.Context, db *mongo.Database, email, ana
 		"reversedHostname": reversedHostname(email),
 		"confirmedAt":      timeNowMillis(),
 		"createdAt":        nowUTC(),
-		"_id":              primitive.NewObjectID(),
+		"_id":              bson.NewObjectID(),
 	}}
 	if _, ierr := db.Collection("users").InsertOne(ctx, doc); ierr != nil {
 		return ierr

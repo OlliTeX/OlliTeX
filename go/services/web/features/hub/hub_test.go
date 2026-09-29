@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // Parity pins against services/web/modules/ollitex-hub/app/src/HubTheme.mjs

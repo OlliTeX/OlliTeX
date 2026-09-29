@@ -1,5 +1,7 @@
 package mongoutils
 
+import "go.mongodb.org/mongo-driver/v2/bson"
+
 // objectid_test.go — pure pins for the ObjectId helpers (batchedUpdate.js),
 // plus the batch-options refresh semantics (env precedence, defaults).
 
@@ -7,8 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestObjectIdFromInputHex(t *testing.T) {
@@ -127,11 +127,11 @@ type globalsSnapshot struct {
 	descending  bool
 	size        int
 	verbose     bool
-	rangeStart  primitive.ObjectID
-	rangeEnd    primitive.ObjectID
+	rangeStart  bson.ObjectID
+	rangeEnd    bson.ObjectID
 	maxSpan     int64
 	running     bool
-	ideEdgePast primitive.ObjectID
+	ideEdgePast bson.ObjectID
 	hasEdgePast bool
 }
 

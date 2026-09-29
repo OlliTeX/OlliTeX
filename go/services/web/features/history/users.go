@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -31,8 +30,8 @@ func keysOf(m map[string]bool) []string {
 	return out
 }
 
-func hexUID(s string) (primitive.ObjectID, error) {
-	return primitive.ObjectIDFromHex(s)
+func hexUID(s string) (bson.ObjectID, error) {
+	return bson.ObjectIDFromHex(s)
 }
 
 // userView fields (Node _userView / projection {first_name,last_name,email}
@@ -54,7 +53,7 @@ func loadUsersByIDs(a *core.App, cxt *core.Cxt, ids []string) map[string]userVie
 	}
 	oids := make([]any, 0, len(ids))
 	for _, s := range ids {
-		if o, err := primitive.ObjectIDFromHex(s); err == nil {
+		if o, err := bson.ObjectIDFromHex(s); err == nil {
 			oids = append(oids, o)
 		}
 	}
@@ -77,12 +76,12 @@ func loadUsersByIDs(a *core.App, cxt *core.Cxt, ids []string) map[string]userVie
 		return out
 	}
 	for cur.Next(ctx) {
-		var d primitive.D
+		var d bson.D
 		if cur.Decode(&d) != nil {
 			continue
 		}
 		o := &d
-		out[oidHex(o.Map()["_id"])] = userViewFromDoc(o)
+		out[oidHex(dmap(*o)["_id"])] = userViewFromDoc(o)
 	}
 	return out
 }
@@ -111,17 +110,18 @@ func loadUsersByV1IDs(a *core.App, cxt *core.Cxt, ids []int64) map[int64]userVie
 		return out
 	}
 	for cur.Next(ctx) {
-		var d primitive.D
+		var d bson.D
 		if cur.Decode(&d) != nil {
 			continue
 		}
 		o := &d
 		u := userViewFromDoc(o)
 		key := int64(0)
-		if ov, ok := o.Map()["overleaf"].(primitive.D); ok {
-			if id, ok := ov.Map()["id"].(int64); ok {
+		if ov, ok := dmap(*o)["overleaf"].(bson.D); ok {
+			om := dmap(ov)
+			if id, ok := om["id"].(int64); ok {
 				key = id
-			} else if id, ok := ov.Map()["id"].(primitive.ObjectID); ok {
+			} else if id, ok := om["id"].(bson.ObjectID); ok {
 				u.ID = id.Hex()
 			}
 		}
@@ -130,8 +130,8 @@ func loadUsersByV1IDs(a *core.App, cxt *core.Cxt, ids []int64) map[int64]userVie
 	return out
 }
 
-func userViewFromDoc(d *primitive.D) userView {
-	m := d.Map()
+func userViewFromDoc(d *bson.D) userView {
+	m := dmap(*d)
 	u := userView{
 		FirstName: strOf(m["first_name"]),
 		LastName:  strOf(m["last_name"]),

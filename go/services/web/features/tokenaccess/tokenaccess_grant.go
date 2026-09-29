@@ -6,8 +6,7 @@ import (
 	"ollitex/go/services/web/views"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func grant(a *core.App, rw bool) func(*core.Cxt, *core.Res) {
@@ -120,7 +119,7 @@ func consent(a *core.App, which string) func(*core.Cxt, *core.Res) {
 			res.W.WriteHeader(500)
 			return
 		}
-		oaid, oerr := primitive.ObjectIDFromHex(pidHex)
+		oaid, oerr := bson.ObjectIDFromHex(pidHex)
 		if oerr != nil {
 			res.W.WriteHeader(400)
 			return

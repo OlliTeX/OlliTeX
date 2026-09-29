@@ -13,9 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -43,7 +42,7 @@ func generateAndEmailResetToken(cxt *core.Cxt, a *core.App, mail *core.Mail, tok
 	}
 	userID := ""
 	switch v := userDoc["_id"].(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		userID = v.Hex()
 	}
 	token, err := tok.New(ctx, "password", bson.M{"user_id": userID, "email": email})
@@ -142,8 +141,8 @@ func setNewPassword(a *core.App, mail *core.Mail, tok *core.OneTimeTokens) func(
 		}
 		dataEmail, _ := data["email"].(string)
 		var userDoc struct {
-			ObjectID primitive.ObjectID `bson:"_id"`
-			Email    string             `bson:"email"`
+			ObjectID bson.ObjectID `bson:"_id"`
+			Email    string        `bson:"email"`
 		}
 		umatch := false
 		if e := db.Collection("users").FindOne(ctx, bson.M{"$or": bson.A{

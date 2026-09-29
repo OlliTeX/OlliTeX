@@ -72,8 +72,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/history"
@@ -391,7 +390,7 @@ func upTrackChanges(d any, uid string) bool {
 	switch v := d.(type) {
 	case bool:
 		return v
-	case primitive.D:
+	case bson.D:
 		for _, e := range v {
 			if e.Key == uid {
 				return e.Value == true
@@ -401,9 +400,9 @@ func upTrackChanges(d any, uid string) bool {
 	return false
 }
 
-func upHistoryID(d primitive.D) string {
-	if ov, ok := entFld(d, "overleaf").(primitive.D); ok {
-		if h, ok := entFld(ov, "history").(primitive.D); ok {
+func upHistoryID(d bson.D) string {
+	if ov, ok := entFld(d, "overleaf").(bson.D); ok {
+		if h, ok := entFld(ov, "history").(bson.D); ok {
 			if hx := oidHex(entFld(h, "id")); hx != "" {
 				return hx
 			}
@@ -413,7 +412,7 @@ func upHistoryID(d primitive.D) string {
 	return ""
 }
 
-func upVersion(d primitive.D) int64 {
+func upVersion(d bson.D) int64 {
 	switch v := entFld(d, "version").(type) {
 	case int32:
 		return int64(v)
@@ -464,7 +463,7 @@ func upResolveFolder(root []entFolder, folderID, name string) *upTarget {
 
 // upMkdirp — Node ProjectEntityMongoUpdateHandler.mkdirp (default
 // case-INSENSITIVE per-segment child matching; creates missing folders).
-func upMkdirp(a *core.App, uid string, doc *primitive.D, tgt *upTarget, rel string) (*primitive.D, *upTarget, bool) {
+func upMkdirp(a *core.App, uid string, doc *bson.D, tgt *upTarget, rel string) (*bson.D, *upTarget, bool) {
 	cur := tgt
 	curDoc := doc
 	for _, name := range upSegments(rel) {
@@ -486,7 +485,7 @@ func upMkdirp(a *core.App, uid string, doc *primitive.D, tgt *upTarget, rel stri
 			cur = &upTarget{mongoPath: mp, fsPath: fs, folderID: child}
 			continue
 		}
-		newID := primitive.NewObjectID()
+		newID := bson.NewObjectID()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		db, derr := a.Mongo.DB(ctx)
 		cancel()
@@ -515,7 +514,7 @@ func upMkdirp(a *core.App, uid string, doc *primitive.D, tgt *upTarget, rel stri
 		if err != nil || ure.MatchedCount == 0 {
 			return nil, nil, false
 		}
-		var ndoc primitive.D
+		var ndoc bson.D
 		rctx, rcancel := context.WithTimeout(context.Background(), 10*time.Second)
 		ferr := db.Collection("projects").FindOne(rctx, bson.D{{Key: "_id", Value: mustObjectID(cur.folderID)}}).Decode(&ndoc)
 		rcancel()
@@ -859,7 +858,7 @@ func uploadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 // ---------- branches (inline order pinned in Node upsertDoc/upsertFile) ---------
 
-func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj string, tgt *upTarget, name string, lines []string, uid string, doc primitive.D, track bool, source string) {
+func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj string, tgt *upTarget, name string, lines []string, uid string, doc bson.D, track bool, source string) {
 	now := time.Now()
 	uidl := strings.ToLower(uid)
 	if tgt.existingDoc != nil {
@@ -875,7 +874,7 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 	}
 	if tgt.existingFile != nil {
 		// file → doc: docstore new id → mongo swap → DU [rename-file, add-doc].
-		newDocID := primitive.NewObjectID()
+		newDocID := bson.NewObjectID()
 		rev, ok := upDocstorePut(pj, newDocID.Hex(), lines)
 		if !ok {
 			fail500()
@@ -890,7 +889,7 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 		return
 	}
 	// new doc: docstore → $push docs → DU add-doc.
-	newDocID := primitive.NewObjectID()
+	newDocID := bson.NewObjectID()
 	rev, ok := upDocstorePut(pj, newDocID.Hex(), lines)
 	if !ok {
 		fail500()
@@ -906,7 +905,7 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 	res.JSON(200, upJSONDoc(newDocID.Hex()))
 }
 
-func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj string, tgt *upTarget, name string, data []byte, uid string, doc primitive.D, source string) {
+func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj string, tgt *upTarget, name string, data []byte, uid string, doc bson.D, source string) {
 	now := time.Now()
 	uidl := strings.ToLower(uid)
 	hash := upGitBlobHash(data)
@@ -921,7 +920,7 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 
 	if tgt.existingFile != nullElement() {
 		// file re-upload: $set same path with NEW _id, $inc [path].rev+version.
-		newFileID := primitive.NewObjectID()
+		newFileID := bson.NewObjectID()
 		if !upReplaceFile(a, pj, tgt.mongoPath, newFileID.Hex(), hash, uidl, now, tgt.fileIdx) {
 			fail500()
 			return
@@ -932,7 +931,7 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 	}
 	if tgt.existingDoc != nullElement() {
 		// doc → file: $pull docs + $push fileRefs + DU [rename-doc, add-file].
-		newFileID := primitive.NewObjectID()
+		newFileID := bson.NewObjectID()
 		newFile := bson.D{
 			{Key: "name", Value: name},
 			{Key: "created", Value: now},
@@ -950,7 +949,7 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 		return
 	}
 	// new file: $push fileRefs → DU add-file.
-	newFileID := primitive.NewObjectID()
+	newFileID := bson.NewObjectID()
 	if !upPushFile(a, pj, tgt.mongoPath, name, newFileID.Hex(), hash, uidl, now) {
 		fail500()
 		return

@@ -49,9 +49,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -168,7 +167,7 @@ func asDateMs(v any) (int64, bool) {
 	switch t := v.(type) {
 	case time.Time:
 		return t.UnixMilli(), true
-	case primitive.DateTime:
+	case bson.DateTime:
 		return int64(t), true
 	case int64:
 		return t, true
@@ -255,7 +254,7 @@ func truthy(v any) bool {
 // buildRow — Node `_formatUserInfo` for one user doc (active doc, or a
 // deletedUsers snapshot doc), plus auth-method / allow-update / inactive
 // derivations. yearAgo = now - 1 calendar year (Node setFullYear(y-1)).
-func buildRow(d primitive.D, deleted bool, recDeletedAt any) *urow {
+func buildRow(d bson.D, deleted bool, recDeletedAt any) *urow {
 	now := time.Now().UTC()
 	yearAgo := now.AddDate(-1, 0, 0).UnixMilli()
 
@@ -270,7 +269,7 @@ func buildRow(d primitive.D, deleted bool, recDeletedAt any) *urow {
 
 	idHex := ""
 	if v, ok := get("_id"); ok {
-		if oc, ok := v.(primitive.ObjectID); ok {
+		if oc, ok := v.(bson.ObjectID); ok {
 			idHex = oc.Hex()
 		} else if s, ok := v.(string); ok && hex24.MatchString(s) {
 			idHex = strings.ToLower(s)
@@ -333,7 +332,7 @@ func buildRow(d primitive.D, deleted bool, recDeletedAt any) *urow {
 		lastLoggedIn: dateF("lastLoggedIn"),
 	}
 	if v, ok := get("flags"); ok {
-		if fd, ok := v.(primitive.D); ok {
+		if fd, ok := v.(bson.D); ok {
 			for _, e := range fd {
 				if e.Key == "canManageTemplates" {
 					if b, ok := e.Value.(bool); ok {
@@ -823,7 +822,7 @@ func listAndRespond(a *core.App, cxt *core.Cxt, res *core.Res, f filters, s sort
 		boom()
 		return
 	}
-	var active []primitive.D
+	var active []bson.D
 	if err := cur.All(ctx, &active); err != nil {
 		boom()
 		return
@@ -837,24 +836,24 @@ func listAndRespond(a *core.App, cxt *core.Cxt, res *core.Res, f filters, s sort
 		boom()
 		return
 	}
-	var dels []primitive.D
+	var dels []bson.D
 	if err := dcur.All(ctx, &dels); err != nil {
 		boom()
 		return
 	}
 	for _, rec := range dels {
-		var u *primitive.D
+		var u *bson.D
 		var delAt any
 		for _, e := range rec {
 			switch e.Key {
 			case "user":
-				if pd, ok := e.Value.(primitive.D); ok {
+				if pd, ok := e.Value.(bson.D); ok {
 					u = &pd
-				} else if pds, ok := e.Value.(*primitive.D); ok {
+				} else if pds, ok := e.Value.(*bson.D); ok {
 					u = pds
 				}
 			case "deleterData":
-				if dd, ok := e.Value.(primitive.D); ok {
+				if dd, ok := e.Value.(bson.D); ok {
 					for _, de := range dd {
 						if de.Key == "deletedAt" {
 							delAt = de.Value
@@ -948,7 +947,7 @@ func infoHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		// missing user -> caught -> false; both pinned 200).
 		canMgmt := false
 		if hex24.MatchString(userId) {
-			oid, _ := primitive.ObjectIDFromHex(userId)
+			oid, _ := bson.ObjectIDFromHex(userId)
 			var u struct {
 				Flags struct {
 					CanMgmt *bool `bson:"canManageTemplates"`

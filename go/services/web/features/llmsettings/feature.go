@@ -34,9 +34,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 )
@@ -207,7 +206,7 @@ func (f *fs) loadUser(ctx context.Context, uidHex string) (*userDoc, error) {
 	if err != nil {
 		return nil, err
 	}
-	oid, err := primitive.ObjectIDFromHex(uidHex)
+	oid, err := bson.ObjectIDFromHex(uidHex)
 	if err != nil {
 		return nil, err
 	}
@@ -257,13 +256,13 @@ func rID(m map[string]any) string {
 	return s
 }
 
-// asMap — tolerant map extraction (bson.M / primitive.M both decode to
+// asMap — tolerant map extraction (bson.M / bson.M both decode to
 // map[string]any in this driver's use here).
 func asMap(v any) (map[string]any, bool) {
 	switch t := v.(type) {
 	case map[string]any:
 		return t, true
-	case primitive.M:
+	case bson.M:
 		out := make(map[string]any, len(t))
 		for k, x := range t {
 			out[k] = x
@@ -280,13 +279,13 @@ func asMap(v any) (map[string]any, bool) {
 }
 
 // asAnySlice — tolerant BSON array extraction: the driver decodes arrays
-// into interface{} targets as the NAMED type primitive.A, so a plain
+// into interface{} targets as the NAMED type bson.A, so a plain
 // v.([]any) assertion does not match.
 func asAnySlice(v any) []any {
 	switch t := v.(type) {
 	case []any:
 		return t
-	case primitive.A:
+	case bson.A:
 		out := make([]any, len(t))
 		copy(out, t)
 		return out

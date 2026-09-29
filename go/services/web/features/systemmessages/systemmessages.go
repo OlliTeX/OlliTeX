@@ -19,8 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -123,7 +122,7 @@ func marshalMessages(docs []map[string]any) ([]byte, error) {
 			}
 			if e.k == "_id" {
 				// ObjectID → hex string (mongoose toJSON), not a JSON object.
-				if oid, ok := e.v.(primitive.ObjectID); ok {
+				if oid, ok := e.v.(bson.ObjectID); ok {
 					ob.WriteString(`"` + oid.Hex() + `"`)
 					continue
 				}

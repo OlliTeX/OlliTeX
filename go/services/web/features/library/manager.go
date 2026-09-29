@@ -10,10 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -30,15 +29,15 @@ import (
 const collectionName = "libraryreferences"
 
 // driver type shorthands (keep signatures short).
-type primitiveObjectID = primitive.ObjectID
+type primitiveObjectID = bson.ObjectID
 
-var NilObjectID = primitive.NilObjectID
+var NilObjectID = bson.NilObjectID
 
-func primitiveObjectIDFromHex(s string) (primitive.ObjectID, error) {
-	return primitive.ObjectIDFromHex(s)
+func primitiveObjectIDFromHex(s string) (bson.ObjectID, error) {
+	return bson.ObjectIDFromHex(s)
 }
 
-func findOptsLimitSort(n int64) *options.FindOptions {
+func findOptsLimitSort(n int64) *options.FindOptionsBuilder {
 	return options.Find().SetLimit(n).SetSort(bson.D{{Key: "_id", Value: 1}})
 }
 
@@ -103,20 +102,20 @@ func tsOf(v any) (time.Time, bool) {
 	switch t := v.(type) {
 	case time.Time:
 		return t, true
-	case primitive.DateTime: // driver decodes BSON dates into interface{} as primitive.DateTime
+	case bson.DateTime: // driver decodes BSON dates into interface{} as bson.DateTime
 		return t.Time(), true
 	}
 	return time.Time{}, false
 }
 
 // asAnySlice — driver-v1 decodes BSON arrays into interface{} as
-// primitive.A (a NAMED slice type, so a plain .([]any) assertion FAILS — the
+// bson.A (a NAMED slice type, so a plain .([]any) assertion FAILS — the
 // same P6.4b lesson; always go through this helper).
 func asAnySlice(v any) []any {
 	switch t := v.(type) {
 	case []any:
 		return t
-	case primitive.A: // type A []interface{}
+	case bson.A: // type A []interface{}
 		return []any(t)
 	}
 	return nil

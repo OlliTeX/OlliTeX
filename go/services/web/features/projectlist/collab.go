@@ -46,9 +46,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/emailtemplates"
@@ -93,9 +92,9 @@ func colNotCollaborator(target, project string) []byte {
 // aGate — the project-route authorization gate signature (login check +
 // project load + permission) parameterizing the P4 handlers so the P6.2
 // admin surface can reuse the exact cores under RequireSiteAdmin.
-type aGate func(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, bool)
+type aGate func(a *core.App, cxt *core.Cxt, res *core.Res) (string, *bson.D, bool)
 
-func gateAdmin(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, bool) {
+func gateAdmin(a *core.App, cxt *core.Cxt, res *core.Res) (string, *bson.D, bool) {
 	uid := gatedLogin(cxt, res)
 	if uid == "" {
 		return "", nil, false
@@ -126,7 +125,7 @@ func gateAdmin(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D,
 
 // gateRead: same as gateAdmin but the access test is canRead (any reader) —
 // the request-access route's ensureUserCanReadProject.
-func gateRead(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, bool) {
+func gateRead(a *core.App, cxt *core.Cxt, res *core.Res) (string, *bson.D, bool) {
 	uid := gatedLogin(cxt, res)
 	if uid == "" {
 		return "", nil, false
@@ -167,23 +166,23 @@ func gatedLogin(cxt *core.Cxt, res *core.Res) string {
 	return cxt.Sess.UserIDHex()
 }
 
-func paramProject(v string, res *core.Res) (primitive.ObjectID, bool) {
+func paramProject(v string, res *core.Res) (bson.ObjectID, bool) {
 	return paramHex(v, "Project_id", res)
 }
 
-func paramUser(v string, res *core.Res) (primitive.ObjectID, bool) {
+func paramUser(v string, res *core.Res) (bson.ObjectID, bool) {
 	return paramHex(v, "user_id", res)
 }
 
-func paramHex(v, name string, res *core.Res) (primitive.ObjectID, bool) {
+func paramHex(v, name string, res *core.Res) (bson.ObjectID, bool) {
 	if !validOID.MatchString(v) {
 		res.JSON(404, []byte(malformedMsg(name)))
-		return primitive.ObjectID{}, false
+		return bson.ObjectID{}, false
 	}
-	o, err := primitive.ObjectIDFromHex(strings.ToLower(v))
+	o, err := bson.ObjectIDFromHex(strings.ToLower(v))
 	if err != nil {
 		res.JSON(404, []byte(malformedMsg(name)))
-		return primitive.ObjectID{}, false
+		return bson.ObjectID{}, false
 	}
 	return o, true
 }
@@ -296,7 +295,7 @@ func colLoadUserMail(a *core.App, cxt *core.Cxt, hex string) (colUserMail, bool)
 	if a.Mongo == nil || hex == "" {
 		return colUserMail{}, false
 	}
-	oid, err := primitive.ObjectIDFromHex(hex)
+	oid, err := bson.ObjectIDFromHex(hex)
 	if err != nil {
 		return colUserMail{}, false
 	}
@@ -306,7 +305,7 @@ func colLoadUserMail(a *core.App, cxt *core.Cxt, hex string) (colUserMail, bool)
 	if err != nil {
 		return colUserMail{}, false
 	}
-	var d primitive.D
+	var d bson.D
 	opts := options.FindOne().SetProjection(bson.D{
 		{Key: "first_name", Value: 1},
 		{Key: "last_name", Value: 1},
@@ -338,11 +337,11 @@ func colTouchContact(a *core.App, cxt *core.Cxt, userHex, contactHex string) {
 	if a.Mongo == nil || userHex == "" || contactHex == "" {
 		return
 	}
-	uo, err1 := primitive.ObjectIDFromHex(userHex)
+	uo, err1 := bson.ObjectIDFromHex(userHex)
 	if err1 != nil {
 		return
 	}
-	if _, err2 := primitive.ObjectIDFromHex(contactHex); err2 != nil {
+	if _, err2 := bson.ObjectIDFromHex(contactHex); err2 != nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
@@ -359,7 +358,7 @@ func colTouchContact(a *core.App, cxt *core.Cxt, userHex, contactHex string) {
 			{Key: "$inc", Value: bson.D{{Key: "contacts." + contactHex + ".n", Value: 1}}},
 			{Key: "$set", Value: bson.D{{Key: "contacts." + contactHex + ".ts", Value: now}}},
 		},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 }
 
@@ -371,7 +370,7 @@ func colAddContact(a *core.App, cxt *core.Cxt, aHex, bHex string) {
 // ---------- core updates ----------
 
 // colPullUser mirrors CollaboratorsHandler.removeUserFromProject (10 keys).
-func colPullUser(a *core.App, cxt *core.Cxt, proj primitive.ObjectID, target string) {
+func colPullUser(a *core.App, cxt *core.Cxt, proj bson.ObjectID, target string) {
 	if a.Mongo == nil {
 		return
 	}
@@ -381,7 +380,7 @@ func colPullUser(a *core.App, cxt *core.Cxt, proj primitive.ObjectID, target str
 	if err != nil {
 		return
 	}
-	toid, err := primitive.ObjectIDFromHex(target)
+	toid, err := bson.ObjectIDFromHex(target)
 	if err != nil {
 		return
 	}
@@ -403,11 +402,11 @@ func colPullUser(a *core.App, cxt *core.Cxt, proj primitive.ObjectID, target str
 }
 
 // colSetLevel mirrors setCollaboratorPrivilegeLevel. Returns matched>0.
-func colSetLevel(a *core.App, cxt *core.Cxt, proj primitive.ObjectID, doc *primitive.D, target, level string) (bool, error) {
+func colSetLevel(a *core.App, cxt *core.Cxt, proj bson.ObjectID, doc *bson.D, target, level string) (bool, error) {
 	if a.Mongo == nil {
 		return false, nil
 	}
-	uid, err := primitive.ObjectIDFromHex(target)
+	uid, err := bson.ObjectIDFromHex(target)
 	if err != nil {
 		return false, nil
 	}
@@ -459,7 +458,7 @@ func colSetLevel(a *core.App, cxt *core.Cxt, proj primitive.ObjectID, doc *primi
 		whole := false
 		if v, present := colTCValue(doc); present {
 			switch m := v.(type) {
-			case primitive.D:
+			case bson.D:
 				for i := range m {
 					if m[i].Key == target {
 						if b, ok := m[i].Value.(bool); ok && b {
@@ -509,7 +508,7 @@ func colSetLevel(a *core.App, cxt *core.Cxt, proj primitive.ObjectID, doc *primi
 	return res.MatchedCount > 0, nil
 }
 
-func colTCValue(doc *primitive.D) (any, bool) {
+func colTCValue(doc *bson.D) (any, bool) {
 	for i := range *doc {
 		if (*doc)[i].Key == "track_changes" {
 			return (*doc)[i].Value, true
@@ -520,7 +519,7 @@ func colTCValue(doc *primitive.D) (any, bool) {
 
 // colTCMembersState: Node convertTrackChangesToExplicitFormat(track_changes===true)
 // — every member at owner/readAndWrite/review gets true (gate-uncovered).
-func colTCMembersState(doc *primitive.D, target string) bson.D {
+func colTCMembersState(doc *bson.D, target string) bson.D {
 	out := bson.D{}
 	seen := map[string]bool{}
 	addOne := func(hex string) {
@@ -532,7 +531,7 @@ func colTCMembersState(doc *primitive.D, target string) bson.D {
 	}
 	addOne(oidHex(dget(*doc, "owner_ref")))
 	for _, k := range []string{"collaberator_refs", "reviewer_refs"} {
-		if arr, ok := dget(*doc, k).(primitive.A); ok {
+		if arr, ok := dget(*doc, k).(bson.A); ok {
 			for _, m := range arr {
 				addOne(oidHex(m))
 			}
@@ -585,7 +584,7 @@ func setUserLevelHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 			return
 		}
 		// doc was loaded by the gate; re-derive the project oid via the doc id.
-		proj, _ := (*doc)[0].Value.(primitive.ObjectID)
+		proj, _ := (*doc)[0].Value.(bson.ObjectID)
 		matched, err := colSetLevel(a, cxt, proj, doc, target, level)
 		if err != nil {
 			res.JSON(500, []byte("internal error"))
@@ -615,7 +614,7 @@ func removeUserHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 			return
 		}
 		target := strings.ToLower(cxt.Params["2"])
-		proj, _ := (*doc)[0].Value.(primitive.ObjectID)
+		proj, _ := (*doc)[0].Value.(bson.ObjectID)
 		colPullUser(a, cxt, proj, target)
 		res.NoContent()
 	}
@@ -657,19 +656,19 @@ func requestAccessHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 			return
 		}
-		proj, _ := (*doc)[0].Value.(primitive.ObjectID)
+		proj, _ := (*doc)[0].Value.(bson.ObjectID)
 		// rebuild editAccessRequests = (existing minus self) + new entry.
 		old := reqEntries(*doc)
 		kept := []bson.D{}
 		isNew := true
 		for _, e := range old {
-			if eid, _ := e[0].Value.(primitive.ObjectID); eid.Hex() == uid {
+			if eid, _ := e[0].Value.(bson.ObjectID); eid.Hex() == uid {
 				isNew = false
 				continue
 			}
 			kept = append(kept, e)
 		}
-		uto, _ := primitive.ObjectIDFromHex(uid)
+		uto, _ := bson.ObjectIDFromHex(uid)
 		kept = append(kept, bson.D{
 			{Key: "userId", Value: uto},
 			{Key: "privilegeLevel", Value: level},
@@ -704,21 +703,21 @@ func requestAccessHandler(a *core.App) func(*core.Cxt, *core.Res) {
 	}
 }
 
-func reqEntries(d primitive.D) []bson.D {
+func reqEntries(d bson.D) []bson.D {
 	v := dget(d, "editAccessRequests")
-	arr, ok := v.(primitive.A)
+	arr, ok := v.(bson.A)
 	if !ok {
 		return nil
 	}
 	out := []bson.D{}
 	for _, m := range arr {
-		if ed, ok2 := m.(primitive.D); ok2 {
+		if ed, ok2 := m.(bson.D); ok2 {
 			out = append(out, bson.D(ed))
 			continue
 		}
 		// re-encode non-D shapes (gate: never happens in practice)
 		if bdata, err := bson.Marshal(m); err == nil {
-			var ed primitive.D
+			var ed bson.D
 			if bson.Unmarshal(bdata, &ed) == nil {
 				out = append(out, bson.D(ed))
 			}
@@ -751,12 +750,12 @@ func declineReqHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		if !okN {
 			return
 		}
-		proj, _ := (*doc)[0].Value.(primitive.ObjectID)
+		proj, _ := (*doc)[0].Value.(bson.ObjectID)
 		old := reqEntries(*doc)
 		kept := []bson.D{}
 		removed := false
 		for _, e := range old {
-			if eid, _ := e[0].Value.(primitive.ObjectID); eid.Hex() == target {
+			if eid, _ := e[0].Value.(bson.ObjectID); eid.Hex() == target {
 				removed = true
 				continue
 			}
@@ -816,11 +815,11 @@ func grantReqHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		if !okN {
 			return
 		}
-		proj, _ := (*doc)[0].Value.(primitive.ObjectID)
+		proj, _ := (*doc)[0].Value.(bson.ObjectID)
 		// hadRequest up front (Node: captured before setLevel clears it).
 		hadRequest := false
 		for _, e := range reqEntries(*doc) {
-			if eid, _ := e[0].Value.(primitive.ObjectID); eid.Hex() == target {
+			if eid, _ := e[0].Value.(bson.ObjectID); eid.Hex() == target {
 				hadRequest = true
 				break
 			}
@@ -876,7 +875,7 @@ func transferOwnerHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 
-		proj, _ := (*doc)[0].Value.(primitive.ObjectID)
+		proj, _ := (*doc)[0].Value.(bson.ObjectID)
 		ownerHex := oidHex(dget(*doc, "owner_ref"))
 		if to == ownerHex {
 			res.NoContent()
@@ -955,7 +954,7 @@ func transferOwnerHandler(a *core.App) func(*core.Cxt, *core.Res) {
 	}
 }
 
-func toObjectID(hex string) primitive.ObjectID {
-	o, _ := primitive.ObjectIDFromHex(hex)
+func toObjectID(hex string) bson.ObjectID {
+	o, _ := bson.ObjectIDFromHex(hex)
 	return o
 }

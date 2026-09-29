@@ -10,9 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func getAlertConfig(a *core.App) func(*core.Cxt, *core.Res) {
@@ -61,7 +60,7 @@ func normalizeEmails(body map[string]any) ([]string, string) {
 				raw = append(raw, s)
 			}
 		}
-	case primitive.A:
+	case bson.A:
 		hasSa = true
 		for _, x := range v {
 			if s, ok := x.(string); ok {
@@ -154,7 +153,7 @@ func saveAlertConfig(a *core.App) func(*core.Cxt, *core.Res) {
 		if _, err := db.Collection("instanceStatAlertConfigs").UpdateOne(ctx,
 			bson.D{{Key: "_id", Value: alertConfigID}},
 			bson.D{{Key: "$set", Value: parsed}},
-			options.Update().SetUpsert(true),
+			options.UpdateOne().SetUpsert(true),
 		); err != nil {
 			res.SendStatus(500)
 			return

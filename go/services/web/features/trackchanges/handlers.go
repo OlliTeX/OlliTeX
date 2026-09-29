@@ -31,9 +31,8 @@ import (
 	"sort"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -111,7 +110,7 @@ func hTrackChanges(a *core.App, lim *tcLimitRunner) func(*core.Cxt, *core.Res) {
 			tcErr500(cxt, res)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+		oid, _ := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 		db, err := a.Mongo.DB(cxt.Req.Context())
 		if err != nil {
 			tcErr500(cxt, res)
@@ -247,7 +246,7 @@ func tcRangesWire(docstoreBody []byte) (int, []byte, bool) {
 // root document; the file tree lives inside it). (hex, false, nil) = no
 // rootDoc set; ("", false, err) = Mongo failure.
 func tcProjectRootDoc(a *core.App, ctx context.Context, pidHex string) (string, bool, error) {
-	opt, err := primitive.ObjectIDFromHex(strings.ToLower(pidHex))
+	opt, err := bson.ObjectIDFromHex(strings.ToLower(pidHex))
 	if err != nil {
 		return "", false, nil
 	}
@@ -262,7 +261,7 @@ func tcProjectRootDoc(a *core.App, ctx context.Context, pidHex string) (string, 
 		}
 		return "", false, err
 	}
-	if v, ok := doc["rootDoc_id"].(primitive.ObjectID); ok {
+	if v, ok := doc["rootDoc_id"].(bson.ObjectID); ok {
 		return v.Hex(), true, nil
 	}
 	return "", false, nil

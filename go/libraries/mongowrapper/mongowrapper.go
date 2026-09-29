@@ -19,9 +19,9 @@ package mongowrapper
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // Connection is the Node `connection` export (the live client + the default
@@ -112,13 +112,29 @@ func (s *Schema) Apply(ctx context.Context, coll *mongo.Collection) error {
 	models := make([]mongo.IndexModel, 0, len(s.Indexes))
 	for _, spec := range s.Indexes {
 		opts := spec.Opts
-		if opts.Name == nil {
-			name := spec.Name
-			opts.Name = &name
+		name := spec.Name
+		if name == "" && opts.Name != nil {
+			name = *opts.Name
+		}
+		b := options.Index()
+		if name != "" {
+			b = b.SetName(name)
+		}
+		if opts.ExpireAfterSeconds != nil {
+			b = b.SetExpireAfterSeconds(*opts.ExpireAfterSeconds)
+		}
+		if opts.Sparse != nil {
+			b = b.SetSparse(*opts.Sparse)
+		}
+		if opts.Unique != nil {
+			b = b.SetUnique(*opts.Unique)
+		}
+		if opts.StorageEngine != nil {
+			b = b.SetStorageEngine(opts.StorageEngine)
 		}
 		models = append(models, mongo.IndexModel{
 			Keys:    spec.Keys,
-			Options: &opts,
+			Options: b,
 		})
 	}
 	_, err := coll.Indexes().CreateMany(ctx, models)

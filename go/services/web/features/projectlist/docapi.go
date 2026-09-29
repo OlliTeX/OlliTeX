@@ -58,9 +58,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -91,7 +90,7 @@ var (
 func crChatBase() string { return crEnvOr("WEB_CHAT_URL", "http://127.0.0.1:3010") }
 
 // dpath walks a document by nested keys (mongo-driver decodes nested docs
-// to primitive.M / maps).
+// to bson.M / maps).
 // apiText mirrors express res.sendStatus text (404/500) on the api process:
 // Content-Type text/plain + exact Content-Length, no nosniff (web baseline
 // never applies to the api profile) and no ETag (sendStatus omits it).
@@ -102,11 +101,11 @@ func apiText(res *core.Res, code int, body string) {
 	res.W.WriteHeader(code)
 	_, _ = res.W.Write([]byte(body))
 }
-func dpath(d primitive.D, path ...string) (any, bool) {
+func dpath(d bson.D, path ...string) (any, bool) {
 	v := any(d)
 	for _, p := range path {
 		switch x := v.(type) {
-		case primitive.D:
+		case bson.D:
 			v = nil
 			for _, e := range x {
 				if e.Key == p {
@@ -114,7 +113,7 @@ func dpath(d primitive.D, path ...string) (any, bool) {
 					break
 				}
 			}
-		case primitive.M:
+		case bson.M:
 			v = x[p]
 		case map[string]any:
 			v = x[p]
@@ -257,7 +256,7 @@ func docapiGetHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			apiDoc404(cxt, res)
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
 		doc, _ := loadProjectFull(a, cxt, oid)
 		if doc == nil {
 			apiDoc404(cxt, res)
@@ -510,7 +509,7 @@ func docapiPostHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
 		doc, _ := loadProjectFull(a, cxt, oid)
 		if doc == nil {
 			apiText(res, http.StatusNotFound, "Not Found")
@@ -690,32 +689,32 @@ func detailsHandlerWithPattern(a *core.App, pat *regexp.Regexp) func(c *core.Cxt
 			r.JSON(404, delParamVA("project_id"))
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
 		ctx := req.Context()
 		db, err := a.Mongo.DB(ctx)
 		if err != nil {
 			details404Plain(r)
 			return
 		}
-		var pd primitive.D
+		var pd bson.D
 		if err := db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&pd); err != nil {
 			details404Plain(r) // valid ObjectId but no such project → NotFoundError → 404
 			return
 		}
 
 		// owner user -> features (document order preserved)
-		var uid primitive.ObjectID
+		var uid bson.ObjectID
 		if uRaw, ok := dpath(pd, "owner_ref"); ok && uRaw != nil {
-			if o, ok2 := uRaw.(primitive.ObjectID); ok2 {
+			if o, ok2 := uRaw.(bson.ObjectID); ok2 {
 				uid = o
 			}
 		}
 		featuresJSON := []byte(`{}`) // fallback = settings.defaultFeatures (not exercised in the gate)
-		if uid != (primitive.ObjectID{}) {
-			var ud primitive.D
+		if uid != (bson.ObjectID{}) {
+			var ud bson.D
 			if err := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: uid}}).Decode(&ud); err == nil {
 				if fv, ok := dpath(ud, "features"); ok && fv != nil {
-					if fd, ok2 := fv.(primitive.D); ok2 {
+					if fd, ok2 := fv.(bson.D); ok2 {
 						featuresJSON = core.OrderedD(fd)
 					}
 				}
@@ -814,7 +813,7 @@ func internalDeactivateHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			r.JSON(404, delParamVA("project_id"))
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
 		pid := oid.Hex()
 
 		// 1. (D41 slice-2: Node's DU flush+delete removed — DU retired.)
@@ -893,7 +892,7 @@ func personalInfoGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			f, _ := strconv.ParseFloat(uidRaw, 64)
 			query = bson.D{{Key: "overleaf.id", Value: f}}
 		} else if delHex24(uidRaw) {
-			oid, _ := primitive.ObjectIDFromHex(uidRaw)
+			oid, _ := bson.ObjectIDFromHex(uidRaw)
 			query = bson.D{{Key: "_id", Value: oid}}
 		} else {
 			r.W.Header().Set("X-Powered-By", "Express")
@@ -906,7 +905,7 @@ func personalInfoGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			details404Plain(r)
 			return
 		}
-		var ud primitive.D
+		var ud bson.D
 		if err := db.Collection("users").FindOne(ctx, query,
 			options.FindOne().SetProjection(bson.D{
 				{Key: "_id", Value: 1}, {Key: "first_name", Value: 1},
@@ -928,7 +927,7 @@ func personalInfoGetHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		var sb strings.Builder
 		sb.WriteString(`{"id":`)
 		if idRaw, ok := dpath(ud, "_id"); ok && idRaw != nil {
-			if oid, ok2 := idRaw.(primitive.ObjectID); ok2 {
+			if oid, ok2 := idRaw.(bson.ObjectID); ok2 {
 				sb.WriteString(`"` + oid.Hex() + `"`)
 			} else {
 				core.WriteOrderedValue(&sb, idRaw)

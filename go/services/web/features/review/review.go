@@ -54,9 +54,8 @@ import (
 	"ollitex/go/services/web/core"
 
 	"github.com/reearth/ygo/persistence"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 const hex24 = `[a-fA-F0-9]{24}`
@@ -218,11 +217,11 @@ type threadRecord struct {
 
 // ---------- helpers ----------
 
-func oid(id string) primitive.ObjectID {
-	if o, err := primitive.ObjectIDFromHex(id); err == nil {
+func oid(id string) bson.ObjectID {
+	if o, err := bson.ObjectIDFromHex(id); err == nil {
 		return o
 	}
-	return primitive.NilObjectID
+	return bson.NilObjectID
 }
 
 func bsonDToAny(d bson.D) map[string]any {
@@ -984,13 +983,13 @@ func prodTrack(a *core.App) (TrackStateFor, TrackStateSet) {
 		}
 		m := map[string]bool{}
 		switch v := doc.TrackChanges.(type) {
-		case primitive.D:
+		case bson.D:
 			for _, e := range v {
 				if b, ok := e.Value.(bool); ok {
 					m[e.Key] = b
 				}
 			}
-		case primitive.M:
+		case bson.M:
 			for k, av := range v {
 				if b, ok := av.(bool); ok {
 					m[k] = b

@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -54,7 +53,7 @@ func adminPrivilegeAvailable() bool { return os.Getenv("ADMIN_PRIVILEGE_AVAILABL
 // currentPrivLevel mirrors ProjectAccess.privilegeLevelForUser: the
 // member-record level for uid (owner | readAndWrite | review | readOnly; token
 // refs only count when publicAccesLevel == tokenBased), else NONE (false).
-func currentPrivLevel(uid string, d primitive.D) any {
+func currentPrivLevel(uid string, d bson.D) any {
 	if oidHex(dget(d, "owner_ref")) == uid {
 		return "owner"
 	}
@@ -79,19 +78,19 @@ func currentPrivLevel(uid string, d primitive.D) any {
 }
 
 // loadUsersHex batch-loads user docs by hex id (Node: UserGetter.getUsers).
-func loadUsersHex(a *core.App, cxt *core.Cxt, uids []string, proj bson.D) map[string]primitive.D {
-	out := map[string]primitive.D{}
+func loadUsersHex(a *core.App, cxt *core.Cxt, uids []string, proj bson.D) map[string]bson.D {
+	out := map[string]bson.D{}
 	if a.Mongo == nil || len(uids) == 0 {
 		return out
 	}
-	oids := make([]primitive.ObjectID, 0, len(uids))
+	oids := make([]bson.ObjectID, 0, len(uids))
 	seen := map[string]bool{}
 	for _, h := range uids {
 		if seen[h] {
 			continue
 		}
 		seen[h] = true
-		if o, err := primitive.ObjectIDFromHex(h); err == nil {
+		if o, err := bson.ObjectIDFromHex(h); err == nil {
 			oids = append(oids, o)
 		}
 	}
@@ -110,7 +109,7 @@ func loadUsersHex(a *core.App, cxt *core.Cxt, uids []string, proj bson.D) map[st
 	if err != nil {
 		return out
 	}
-	var docs []primitive.D
+	var docs []bson.D
 	if err := cur.All(ctx, &docs); err != nil {
 		cur.Close(ctx)
 		return out
@@ -165,7 +164,7 @@ func accessRequestsHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(404, []byte(malformed404))
 			return
 		}
-		oid, err := primitive.ObjectIDFromHex(strings.ToLower(param))
+		oid, err := bson.ObjectIDFromHex(strings.ToLower(param))
 		if err != nil {
 			res.JSON(404, []byte(malformed404))
 			return
@@ -190,7 +189,7 @@ func accessRequestsHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 
-		reqs, _ := dget(*doc, "editAccessRequests").(primitive.A)
+		reqs, _ := dget(*doc, "editAccessRequests").(bson.A)
 		uids := make([]string, 0, len(reqs))
 		type reqRow struct {
 			uid            string
@@ -199,7 +198,7 @@ func accessRequestsHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		var rows []reqRow
 		for _, rq := range reqs {
-			r, ok := rq.(primitive.D)
+			r, ok := rq.(bson.D)
 			if !ok {
 				continue
 			}

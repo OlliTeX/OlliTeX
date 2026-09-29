@@ -53,9 +53,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -130,7 +129,7 @@ func joinHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		}
 
 		// --- load project (ghost → 404 plain "Not Found") ---
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
 		ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
 		defer cancel()
 		db, err := a.Mongo.DB(ctx)
@@ -138,7 +137,7 @@ func joinHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			details404Plain(r)
 			return
 		}
-		var pd primitive.D
+		var pd bson.D
 		if err := db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&pd); err != nil {
 			details404Plain(r)
 			return
@@ -164,23 +163,23 @@ func joinHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		isOwner := !anon && ownerRefHex(pd) == uidHex
 
 		// --- owner / members / invites ---
-		var ownerMember *primitive.D
-		var members, invites primitive.A
+		var ownerMember *bson.D
+		var members, invites bson.A
 		if !isRestricted {
 			ownerMember = joinLoadUser(a, ctx, db, dget(pd, "owner_ref"))
 			members = joinInvitedMembers(a, ctx, db, pd, ownerRefHex(pd))
-			invites = primitive.A{} // P4.13: no invites
+			invites = bson.A{} // P4.13: no invites
 		}
 
 		projectView := joinProjectModelView(pd, ownerMember, members, invites, isRestricted, isAnon(isOwner, anon), uidHex, isOwner, a, ctx, db)
 
-		var outer primitive.D
+		var outer bson.D
 		outer = append(outer,
-			primitive.E{Key: "project", Value: projectView},
-			primitive.E{Key: "privilegeLevel", Value: level},
-			primitive.E{Key: "isRestrictedUser", Value: isRestricted},
-			primitive.E{Key: "isTokenMember", Value: tokenMemb},
-			primitive.E{Key: "isInvitedMember", Value: !anon && invited},
+			bson.E{Key: "project", Value: projectView},
+			bson.E{Key: "privilegeLevel", Value: level},
+			bson.E{Key: "isRestrictedUser", Value: isRestricted},
+			bson.E{Key: "isTokenMember", Value: tokenMemb},
+			bson.E{Key: "isInvitedMember", Value: !anon && invited},
 		)
 		r.W.Header().Set("X-Powered-By", "Express") // res.json sets X-Powered-By
 		r.JSON(200, core.OrderedD(outer))
@@ -199,7 +198,7 @@ func joinVA(status int, segs ...string) []byte {
 
 // --- privilege / member flags (non-site-admin path) ---
 
-func joinPrivilegeForUser(uidHex string, d primitive.D, pal string) string {
+func joinPrivilegeForUser(uidHex string, d bson.D, pal string) string {
 	if ownerRefHex(d) == uidHex {
 		return "owner"
 	}
@@ -239,7 +238,7 @@ func joinPrivilegeAnon(pal string) string {
 	return ""
 }
 
-func joinInvitedMember(uidHex string, d primitive.D, pal string) bool {
+func joinInvitedMember(uidHex string, d bson.D, pal string) bool {
 	if uidHex == "" {
 		return false
 	}
@@ -251,7 +250,7 @@ func joinInvitedMember(uidHex string, d primitive.D, pal string) bool {
 		inOIDList(dget(d, "readOnly_refs"), uidHex)
 }
 
-func joinTokenMember(uidHex string, d primitive.D, pal string) bool {
+func joinTokenMember(uidHex string, d bson.D, pal string) bool {
 	if uidHex == "" || pal != "tokenBased" {
 		return false
 	}
@@ -266,11 +265,11 @@ func joinRestricted(hasUser bool, level string, tokenMemb, invited bool) bool {
 	return level == "readOnly" && (tokenMemb || !hasUser) && !invited
 }
 
-func ownerRefHex(d primitive.D) string { return strings.ToLower(oidHex(dget(d, "owner_ref"))) }
+func ownerRefHex(d bson.D) string { return strings.ToLower(oidHex(dget(d, "owner_ref"))) }
 
 // --- user / members loading ---
 
-func joinLoadUser(a *core.App, ctx context.Context, db *mongo.Database, o any) *primitive.D {
+func joinLoadUser(a *core.App, ctx context.Context, db *mongo.Database, o any) *bson.D {
 	if a == nil || db == nil {
 		return nil
 	}
@@ -278,19 +277,19 @@ func joinLoadUser(a *core.App, ctx context.Context, db *mongo.Database, o any) *
 	if hex == "" {
 		return nil
 	}
-	oid, err := primitive.ObjectIDFromHex(hex)
+	oid, err := bson.ObjectIDFromHex(hex)
 	if err != nil {
 		return nil
 	}
-	var d primitive.D
+	var d bson.D
 	if err := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&d); err != nil {
 		return nil
 	}
 	return &d
 }
 
-func joinInvitedMembers(a *core.App, ctx context.Context, db *mongo.Database, pd primitive.D, owner string) primitive.A {
-	out := primitive.A{}
+func joinInvitedMembers(a *core.App, ctx context.Context, db *mongo.Database, pd bson.D, owner string) bson.A {
+	out := bson.A{}
 	seen := map[string]bool{}
 	privFor := map[string]string{
 		"collablator_refs": "readAndWrite",
@@ -298,7 +297,7 @@ func joinInvitedMembers(a *core.App, ctx context.Context, db *mongo.Database, pd
 		"readOnly_refs":    "readOnly",
 	}
 	for _, key := range []string{"collablator_refs", "reviewer_refs", "readOnly_refs"} {
-		arr, ok := dget(pd, key).(primitive.A)
+		arr, ok := dget(pd, key).(bson.A)
 		if !ok {
 			continue
 		}
@@ -323,10 +322,10 @@ func joinInvitedMembers(a *core.App, ctx context.Context, db *mongo.Database, pd
 // joinAccessRequestsView — Node loadAccessRequestsView: for each stored
 // request, the flattened user detail + privilegeLevel + currentPrivilegeLevel.
 // P4.13 has none → [].
-func joinAccessRequestsView(ar primitive.A, pd primitive.D, a *core.App, ctx context.Context, db *mongo.Database) primitive.A {
-	out := primitive.A{}
+func joinAccessRequestsView(ar bson.A, pd bson.D, a *core.App, ctx context.Context, db *mongo.Database) bson.A {
+	out := bson.A{}
 	for _, r := range ar {
-		rr, ok := r.(primitive.D)
+		rr, ok := r.(bson.D)
 		if !ok {
 			continue
 		}
@@ -343,7 +342,7 @@ func joinAccessRequestsView(ar primitive.A, pd primitive.D, a *core.App, ctx con
 		} else if inOIDList(dget(pd, "reviewer_refs"), oidHex(uid)) {
 			cur = "review"
 		}
-		e := primitive.D{
+		e := bson.D{
 			{Key: "_id", Value: dget(*u, "_id")},
 			{Key: "email", Value: dget(*u, "email")},
 			{Key: "first_name", Value: dget(*u, "first_name")},
@@ -353,7 +352,7 @@ func joinAccessRequestsView(ar primitive.A, pd primitive.D, a *core.App, ctx con
 		}
 		if ra := dget(rr, "requestedAt"); ra != nil {
 			if iso, ok := signUpDateISO(ra); ok {
-				e = append(e, primitive.E{Key: "requestedAt", Value: iso})
+				e = append(e, bson.E{Key: "requestedAt", Value: iso})
 			}
 		}
 		out = append(out, e)
@@ -363,19 +362,19 @@ func joinAccessRequestsView(ar primitive.A, pd primitive.D, a *core.App, ctx con
 
 // joinMyAccessRequest — Node getAccessRequestForUser: the caller's own request
 // ({privilegeLevel, requestedAt}) or null.
-func joinMyAccessRequest(ar primitive.A, uidHex string) any {
+func joinMyAccessRequest(ar bson.A, uidHex string) any {
 	for _, r := range ar {
-		rr, ok := r.(primitive.D)
+		rr, ok := r.(bson.D)
 		if !ok {
 			continue
 		}
 		if strings.ToLower(oidHex(dget(rr, "userId"))) != uidHex {
 			continue
 		}
-		e := primitive.D{{Key: "privilegeLevel", Value: dget(rr, "privilegeLevel")}}
+		e := bson.D{{Key: "privilegeLevel", Value: dget(rr, "privilegeLevel")}}
 		if ra := dget(rr, "requestedAt"); ra != nil {
 			if iso, ok := signUpDateISO(ra); ok {
-				e = append(e, primitive.E{Key: "requestedAt", Value: iso})
+				e = append(e, bson.E{Key: "requestedAt", Value: iso})
 			}
 		}
 		return e
@@ -385,39 +384,39 @@ func joinMyAccessRequest(ar primitive.A, uidHex string) any {
 
 // --- view builders (order-preserving, undefined dropped) ---
 
-func joinUserModel(u *primitive.D, priv string) primitive.D {
-	var m primitive.D
-	m = append(m, primitive.E{Key: "_id", Value: dget(*u, "_id")})
+func joinUserModel(u *bson.D, priv string) bson.D {
+	var m bson.D
+	m = append(m, bson.E{Key: "_id", Value: dget(*u, "_id")})
 	if s := dget(*u, "first_name"); s != nil {
-		m = append(m, primitive.E{Key: "first_name", Value: s})
+		m = append(m, bson.E{Key: "first_name", Value: s})
 	}
 	if s := dget(*u, "last_name"); s != nil {
-		m = append(m, primitive.E{Key: "last_name", Value: s})
+		m = append(m, bson.E{Key: "last_name", Value: s})
 	}
 	if s := dget(*u, "email"); s != nil {
-		m = append(m, primitive.E{Key: "email", Value: s})
+		m = append(m, bson.E{Key: "email", Value: s})
 	}
-	m = append(m, primitive.E{Key: "privileges", Value: priv})
+	m = append(m, bson.E{Key: "privileges", Value: priv})
 	if su := dget(*u, "signUpDate"); su != nil {
 		if iso, ok := signUpDateISO(su); ok {
-			m = append(m, primitive.E{Key: "signUpDate", Value: iso})
+			m = append(m, bson.E{Key: "signUpDate", Value: iso})
 		}
 	}
 	return m
 }
 
-func joinFeatures(ownerMember *primitive.D) primitive.D {
-	var feats primitive.D
+func joinFeatures(ownerMember *bson.D) bson.D {
+	var feats bson.D
 	if ownerMember != nil {
 		if f := dget(*ownerMember, "features"); f != nil {
-			if fd, ok := f.(primitive.D); ok {
+			if fd, ok := f.(bson.D); ok {
 				feats = fd
 			}
 		}
 	}
 	// _.defaults(object, source): object's keys (stored order) first, then
 	// source keys appended (in source order) for the missing ones.
-	defs := []primitive.E{
+	defs := []bson.E{
 		{Key: "collaborators", Value: int32(-1)},
 		{Key: "versioning", Value: false},
 		{Key: "dropbox", Value: false},
@@ -447,7 +446,7 @@ func joinFeatures(ownerMember *primitive.D) primitive.D {
 	return feats
 }
 
-func featBool(d primitive.D, key string) bool {
+func featBool(d bson.D, key string) bool {
 	for _, e := range d {
 		if e.Key == key {
 			if b, ok := e.Value.(bool); ok {
@@ -459,7 +458,7 @@ func featBool(d primitive.D, key string) bool {
 	return false
 }
 
-func featSet(d primitive.D, key string, val any) {
+func featSet(d bson.D, key string, val any) {
 	for i := range d {
 		if d[i].Key == key {
 			d[i].Value = val
@@ -468,21 +467,21 @@ func featSet(d primitive.D, key string, val any) {
 	}
 }
 
-func joinProjectModelView(pd primitive.D, ownerMember *primitive.D, members, invites primitive.A, isRestricted, anonReq bool, uidHex string, isOwner bool, a *core.App, ctx context.Context, db *mongo.Database) primitive.D {
-	var v primitive.D
-	v = append(v, primitive.E{Key: "_id", Value: dget(pd, "_id")})
+func joinProjectModelView(pd bson.D, ownerMember *bson.D, members, invites bson.A, isRestricted, anonReq bool, uidHex string, isOwner bool, a *core.App, ctx context.Context, db *mongo.Database) bson.D {
+	var v bson.D
+	v = append(v, bson.E{Key: "_id", Value: dget(pd, "_id")})
 	if nm := dget(pd, "name"); nm != nil {
-		v = append(v, primitive.E{Key: "name", Value: nm})
+		v = append(v, bson.E{Key: "name", Value: nm})
 	}
 	if x := dget(pd, "rootDoc_id"); x != nil {
-		v = append(v, primitive.E{Key: "rootDoc_id", Value: x})
+		v = append(v, bson.E{Key: "rootDoc_id", Value: x})
 	}
 	if x := dget(pd, "mainBibliographyDoc_id"); x != nil {
-		v = append(v, primitive.E{Key: "mainBibliographyDoc_id", Value: x})
+		v = append(v, bson.E{Key: "mainBibliographyDoc_id", Value: x})
 	}
-	v = append(v, primitive.E{Key: "rootFolder", Value: joinRootFolder(pd)})
+	v = append(v, bson.E{Key: "rootFolder", Value: joinRootFolder(pd)})
 	if x := dget(pd, "publicAccesLevel"); x != nil {
-		v = append(v, primitive.E{Key: "publicAccesLevel", Value: x})
+		v = append(v, bson.E{Key: "publicAccesLevel", Value: x})
 	}
 	// Node (ProjectEditorHandler.mjs): `dropboxEnabled: !!project.existsInDropbox`
 	// — strict truthiness. NOT existence: `dget(...) != nil` would report true
@@ -490,65 +489,65 @@ func joinProjectModelView(pd primitive.D, ownerMember *primitive.D, members, inv
 	// e.g. deletedByExternalDataSource:false), flipping the frontend flag and
 	// raising the blocking "renamed or deleted by external data source" modal
 	// on every editor load.
-	v = append(v, primitive.E{Key: "dropboxEnabled", Value: btruth(dget(pd, "existsInDropbox"))})
+	v = append(v, bson.E{Key: "dropboxEnabled", Value: btruth(dget(pd, "existsInDropbox"))})
 	if x := dget(pd, "compiler"); x != nil {
-		v = append(v, primitive.E{Key: "compiler", Value: x})
+		v = append(v, bson.E{Key: "compiler", Value: x})
 	}
 	if x := dget(pd, "description"); x != nil {
-		v = append(v, primitive.E{Key: "description", Value: x})
+		v = append(v, bson.E{Key: "description", Value: x})
 	}
 	if x := dget(pd, "spellCheckLanguage"); x != nil {
-		v = append(v, primitive.E{Key: "spellCheckLanguage", Value: x})
+		v = append(v, bson.E{Key: "spellCheckLanguage", Value: x})
 	}
 	if x := dget(pd, "referenceFormat"); x != nil {
-		v = append(v, primitive.E{Key: "referenceFormat", Value: x})
+		v = append(v, bson.E{Key: "referenceFormat", Value: x})
 	}
-	v = append(v, primitive.E{Key: "grammarPicky", Value: notFalse(dget(pd, "grammarPicky"))})
+	v = append(v, bson.E{Key: "grammarPicky", Value: notFalse(dget(pd, "grammarPicky"))})
 	if x := dget(pd, "png2pdf"); x != nil {
-		v = append(v, primitive.E{Key: "png2pdf", Value: x})
+		v = append(v, bson.E{Key: "png2pdf", Value: x})
 	}
-	v = append(v, primitive.E{Key: "deletedByExternalDataSource", Value: btruth(dget(pd, "deletedByExternalDataSource"))})
+	v = append(v, bson.E{Key: "deletedByExternalDataSource", Value: btruth(dget(pd, "deletedByExternalDataSource"))})
 	if x := dget(pd, "imageName"); x != nil {
-		v = append(v, primitive.E{Key: "imageName", Value: x})
+		v = append(v, bson.E{Key: "imageName", Value: x})
 	}
 
 	if isRestricted {
-		v = append(v, primitive.E{Key: "owner", Value: primitive.D{{Key: "_id", Value: dget(pd, "owner_ref")}}})
-		v = append(v, primitive.E{Key: "members", Value: primitive.A{}})
-		v = append(v, primitive.E{Key: "invites", Value: primitive.A{}})
+		v = append(v, bson.E{Key: "owner", Value: bson.D{{Key: "_id", Value: dget(pd, "owner_ref")}}})
+		v = append(v, bson.E{Key: "members", Value: bson.A{}})
+		v = append(v, bson.E{Key: "invites", Value: bson.A{}})
 	} else {
-		om := primitive.D{}
+		om := bson.D{}
 		if ownerMember == nil {
-			om = primitive.D{{Key: "_id", Value: dget(pd, "owner_ref")}}
+			om = bson.D{{Key: "_id", Value: dget(pd, "owner_ref")}}
 		} else {
 			om = joinUserModel(ownerMember, "owner")
 		}
-		v = append(v, primitive.E{Key: "owner", Value: om})
+		v = append(v, bson.E{Key: "owner", Value: om})
 		if members == nil {
-			members = primitive.A{}
+			members = bson.A{}
 		}
-		v = append(v, primitive.E{Key: "members", Value: members})
+		v = append(v, bson.E{Key: "members", Value: members})
 		if invites == nil {
-			invites = primitive.A{}
+			invites = bson.A{}
 		}
-		v = append(v, primitive.E{Key: "invites", Value: invites})
+		v = append(v, bson.E{Key: "invites", Value: invites})
 	}
 
 	// accessRequestData
-	ar, _ := dget(pd, "editAccessRequests").(primitive.A)
+	ar, _ := dget(pd, "editAccessRequests").(bson.A)
 	if isOwner {
-		v = append(v, primitive.E{Key: "editAccessRequests", Value: joinAccessRequestsView(ar, pd, a, ctx, db)})
+		v = append(v, bson.E{Key: "editAccessRequests", Value: joinAccessRequestsView(ar, pd, a, ctx, db)})
 	} else if !anonReq && uidHex != "" {
-		v = append(v, primitive.E{Key: "myAccessRequest", Value: joinMyAccessRequest(ar, uidHex)})
+		v = append(v, bson.E{Key: "myAccessRequest", Value: joinMyAccessRequest(ar, uidHex)})
 	}
 
 	feats := joinFeatures(ownerMember)
-	v = append(v, primitive.E{Key: "features", Value: feats})
+	v = append(v, bson.E{Key: "features", Value: feats})
 	if featBool(feats, "trackChanges") {
 		if tc := dget(pd, "track_changes"); tc != nil && tc != false {
-			v = append(v, primitive.E{Key: "trackChangesState", Value: true})
+			v = append(v, bson.E{Key: "trackChangesState", Value: true})
 		} else {
-			v = append(v, primitive.E{Key: "trackChangesState", Value: false})
+			v = append(v, bson.E{Key: "trackChangesState", Value: false})
 		}
 	}
 	return v
@@ -572,46 +571,46 @@ func notFalse(v any) bool {
 	return true
 }
 
-func joinRootFolder(pd primitive.D) primitive.A {
-	rf, ok := dget(pd, "rootFolder").(primitive.A)
+func joinRootFolder(pd bson.D) bson.A {
+	rf, ok := dget(pd, "rootFolder").(bson.A)
 	if !ok || len(rf) == 0 {
-		return primitive.A{}
+		return bson.A{}
 	}
-	if root, ok := rf[0].(primitive.D); ok {
-		return primitive.A{joinFolderModel(root)}
+	if root, ok := rf[0].(bson.D); ok {
+		return bson.A{joinFolderModel(root)}
 	}
-	return primitive.A{}
+	return bson.A{}
 }
 
-func joinFolderModel(folder primitive.D) primitive.D {
-	var f primitive.D
-	f = append(f, primitive.E{Key: "_id", Value: dget(folder, "_id")})
+func joinFolderModel(folder bson.D) bson.D {
+	var f bson.D
+	f = append(f, bson.E{Key: "_id", Value: dget(folder, "_id")})
 	if nm := dget(folder, "name"); nm != nil {
-		f = append(f, primitive.E{Key: "name", Value: nm})
+		f = append(f, bson.E{Key: "name", Value: nm})
 	}
-	f = append(f, primitive.E{Key: "folders", Value: joinFolderChildren(folder)})
-	f = append(f, primitive.E{Key: "fileRefs", Value: joinFileRefs(folder)})
-	f = append(f, primitive.E{Key: "docs", Value: joinDocs(folder)})
+	f = append(f, bson.E{Key: "folders", Value: joinFolderChildren(folder)})
+	f = append(f, bson.E{Key: "fileRefs", Value: joinFileRefs(folder)})
+	f = append(f, bson.E{Key: "docs", Value: joinDocs(folder)})
 	return f
 }
 
-func joinFolderChildren(folder primitive.D) primitive.A {
-	var out primitive.A
-	fr, ok := dget(folder, "folders").(primitive.A)
+func joinFolderChildren(folder bson.D) bson.A {
+	var out bson.A
+	fr, ok := dget(folder, "folders").(bson.A)
 	if !ok {
 		return out
 	}
 	for _, s := range fr {
-		if sd, ok := s.(primitive.D); ok {
+		if sd, ok := s.(bson.D); ok {
 			out = append(out, joinFolderModel(sd))
 		}
 	}
 	return out
 }
 
-func joinFileRefs(folder primitive.D) primitive.A {
-	var out primitive.A
-	fr, ok := dget(folder, "fileRefs").(primitive.A)
+func joinFileRefs(folder bson.D) bson.A {
+	var out bson.A
+	fr, ok := dget(folder, "fileRefs").(bson.A)
 	if !ok {
 		return out
 	}
@@ -619,50 +618,50 @@ func joinFileRefs(folder primitive.D) primitive.A {
 		if s == nil {
 			continue // _.filter(file => file != null)
 		}
-		if sd, ok := s.(primitive.D); ok {
+		if sd, ok := s.(bson.D); ok {
 			out = append(out, joinFileModel(sd))
 		}
 	}
 	return out
 }
 
-func joinDocs(folder primitive.D) primitive.A {
-	var out primitive.A
-	dr, ok := dget(folder, "docs").(primitive.A)
+func joinDocs(folder bson.D) bson.A {
+	var out bson.A
+	dr, ok := dget(folder, "docs").(bson.A)
 	if !ok {
 		return out
 	}
 	for _, s := range dr {
-		if sd, ok := s.(primitive.D); ok {
+		if sd, ok := s.(bson.D); ok {
 			out = append(out, joinDocModel(sd))
 		}
 	}
 	return out
 }
 
-func joinFileModel(file primitive.D) primitive.D {
-	var f primitive.D
-	f = append(f, primitive.E{Key: "_id", Value: dget(file, "_id")})
+func joinFileModel(file bson.D) bson.D {
+	var f bson.D
+	f = append(f, bson.E{Key: "_id", Value: dget(file, "_id")})
 	if nm := dget(file, "name"); nm != nil {
-		f = append(f, primitive.E{Key: "name", Value: nm})
+		f = append(f, bson.E{Key: "name", Value: nm})
 	}
 	if x := dget(file, "linkedFileData"); x != nil {
-		f = append(f, primitive.E{Key: "linkedFileData", Value: x})
+		f = append(f, bson.E{Key: "linkedFileData", Value: x})
 	}
 	if x := dget(file, "created"); x != nil {
-		f = append(f, primitive.E{Key: "created", Value: x})
+		f = append(f, bson.E{Key: "created", Value: x})
 	}
 	if x := dget(file, "hash"); x != nil {
-		f = append(f, primitive.E{Key: "hash", Value: x})
+		f = append(f, bson.E{Key: "hash", Value: x})
 	}
 	return f
 }
 
-func joinDocModel(doc primitive.D) primitive.D {
-	var d primitive.D
-	d = append(d, primitive.E{Key: "_id", Value: dget(doc, "_id")})
+func joinDocModel(doc bson.D) bson.D {
+	var d bson.D
+	d = append(d, bson.E{Key: "_id", Value: dget(doc, "_id")})
 	if nm := dget(doc, "name"); nm != nil {
-		d = append(d, primitive.E{Key: "name", Value: nm})
+		d = append(d, bson.E{Key: "name", Value: nm})
 	}
 	return d
 }

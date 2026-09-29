@@ -1,11 +1,10 @@
 package mongoutils
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"os"
 	"strconv"
 	"sync"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // module-scope batched-update state (Node batchedUpdate.js let-variables).
@@ -16,12 +15,12 @@ var (
 	BatchDescending      bool
 	BatchSize            int
 	VerboseLogging       bool
-	BatchLastID          primitive.ObjectID // (Node: set via options only)
-	BatchRangeStart      primitive.ObjectID
-	BatchRangeEnd        primitive.ObjectID
+	BatchLastID          bson.ObjectID // (Node: set via options only)
+	BatchRangeStart      bson.ObjectID
+	BatchRangeEnd        bson.ObjectID
 	BatchMaxTimeSpanMs   int64
 	BatchedUpdateRunning bool
-	ideEdgePast          primitive.ObjectID
+	ideEdgePast          bson.ObjectID
 	hasIdeEdgePast       bool
 )
 
@@ -108,9 +107,9 @@ func parseIntOr(s string, def int) int {
 
 // edgePastIDLocked — caller holds batchStateMu (the only caller is
 // refreshGlobalOptionsForBatchedUpdate, which runs under it).
-func edgePastIDLocked() primitive.ObjectID {
+func edgePastIDLocked() bson.ObjectID {
 	if hasIdeEdgePast {
 		return ideEdgePast
 	}
-	return primitive.ObjectID{}
+	return bson.ObjectID{}
 }

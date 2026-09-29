@@ -4,14 +4,13 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -161,7 +160,7 @@ func metadataHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(404, []byte(malformed404))
 			return
 		}
-		oid, err := primitive.ObjectIDFromHex(strings.ToLower(param))
+		oid, err := bson.ObjectIDFromHex(strings.ToLower(param))
 		if err != nil {
 			res.JSON(404, []byte(malformed404))
 			return

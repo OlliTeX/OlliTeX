@@ -69,8 +69,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -222,7 +221,7 @@ func cloneProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(404, []byte(malformedMsg("Project_id")))
 			return
 		}
-		oid, err := primitive.ObjectIDFromHex(strings.ToLower(param))
+		oid, err := bson.ObjectIDFromHex(strings.ToLower(param))
 		if err != nil {
 			res.JSON(404, []byte(malformedMsg("Project_id")))
 			return
@@ -281,21 +280,21 @@ func cloneProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		srcHex := oid.Hex()
 
 		// source entries (array order preserved)
-		var srcDocs []primitive.D
-		var srcFiles []primitive.D
-		if rfArr, ok := dget(*doc, "rootFolder").(primitive.A); ok {
+		var srcDocs []bson.D
+		var srcFiles []bson.D
+		if rfArr, ok := dget(*doc, "rootFolder").(bson.A); ok {
 			if len(rfArr) > 0 {
-				if rf, ok := rfArr[0].(primitive.D); ok {
-					if docs, ok := dget(rf, "docs").(primitive.A); ok {
+				if rf, ok := rfArr[0].(bson.D); ok {
+					if docs, ok := dget(rf, "docs").(bson.A); ok {
 						for _, dm := range docs {
-							if m, ok := dm.(primitive.D); ok {
+							if m, ok := dm.(bson.D); ok {
 								srcDocs = append(srcDocs, m)
 							}
 						}
 					}
-					if files, ok := dget(rf, "fileRefs").(primitive.A); ok {
+					if files, ok := dget(rf, "fileRefs").(bson.A); ok {
 						for _, fm := range files {
-							if m, ok := fm.(primitive.D); ok {
+							if m, ok := fm.(bson.D); ok {
 								srcFiles = append(srcFiles, m)
 							}
 						}
@@ -307,19 +306,19 @@ func cloneProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		owner, _ := loadOwnerUser(a, cxt, uid)
 
 		// new project ids
-		pid := primitive.NewObjectID()
-		rootID := primitive.NewObjectID()
+		pid := bson.NewObjectID()
+		rootID := bson.NewObjectID()
 		now := time.Now().UTC()
 
 		docsOut := bson.A{}
 		rootDocSet := false
-		rootDocID := primitive.ObjectID{}
+		rootDocID := bson.ObjectID{}
 		for _, sd := range srcDocs {
-			newDocID := primitive.NewObjectID()
+			newDocID := bson.NewObjectID()
 			dname := asStr(dget(sd, "name"))
 			dcid := asStr(dget(sd, "_id"))
 			if dcid == "" {
-				if v, ok := dget(sd, "_id").(primitive.ObjectID); ok {
+				if v, ok := dget(sd, "_id").(bson.ObjectID); ok {
 					dcid = v.Hex()
 				}
 			}
@@ -345,7 +344,7 @@ func cloneProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 					fhash = v
 				}
 			}
-			fr := primitive.D{
+			fr := bson.D{
 				{Key: "name", Value: fname},
 				{Key: "created", Value: now},
 				{Key: "rev", Value: 0},
@@ -358,26 +357,26 @@ func cloneProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 			fr = append(fr,
 				bson.E{Key: "hash", Value: fhash},
-				bson.E{Key: "_id", Value: primitive.NewObjectID()})
+				bson.E{Key: "_id", Value: bson.NewObjectID()})
 			filesOut = append(filesOut, fr)
 			clCopyBlob(cxt, srcHex, pid.Hex(), fhash)
 		}
 
 		// rootDoc: the source's rootDoc if found among the copied docs, else
 		// the first copied doc (Node: findRootDoc -> main.tex for these fixtures).
-		var rootDoc primitive.ObjectID
-		if srcRoot, ok := dget(*doc, "rootDoc_id").(primitive.ObjectID); ok {
+		var rootDoc bson.ObjectID
+		if srcRoot, ok := dget(*doc, "rootDoc_id").(bson.ObjectID); ok {
 			for i, sd := range srcDocs {
-				if v, _ := dget(sd, "_id").(primitive.ObjectID); v == srcRoot && i < len(docsOut) {
+				if v, _ := dget(sd, "_id").(bson.ObjectID); v == srcRoot && i < len(docsOut) {
 					if dm, ok := docsOut[i].(bson.D); ok {
-						if nv, ok := dget(dm, "_id").(primitive.ObjectID); ok {
+						if nv, ok := dget(dm, "_id").(bson.ObjectID); ok {
 							rootDoc = nv
 						}
 					}
 				}
 			}
 		}
-		if rootDoc == (primitive.ObjectID{}) {
+		if rootDoc == (bson.ObjectID{}) {
 			rootDoc = rootDocID
 		}
 

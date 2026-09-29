@@ -70,8 +70,7 @@ import (
 	"ollitex/go/services/web/features/history"
 	"ollitex/go/services/web/views"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var (
@@ -129,7 +128,7 @@ type entFolder struct {
 
 func entFld(d any, key string) any {
 	switch t := d.(type) {
-	case primitive.D:
+	case bson.D:
 		for _, e := range t {
 			if e.Key == key {
 				return e.Value
@@ -145,7 +144,7 @@ func entArr(v any) []any {
 	switch t := v.(type) {
 	case []any:
 		return t
-	case primitive.A:
+	case bson.A:
 		return t
 	}
 	return nil
@@ -153,7 +152,7 @@ func entArr(v any) []any {
 
 func entIsDocObj(v any) bool {
 	switch v.(type) {
-	case primitive.D, primitive.M, map[string]any:
+	case bson.D, bson.M, map[string]any:
 		return true
 	}
 	return false
@@ -378,8 +377,8 @@ func addEntityHandler(a *core.App, kind string) func(*core.Cxt, *core.Res) {
 			}
 			return
 		}
-		newDocID := primitive.NewObjectID()
-		newFoldID := primitive.NewObjectID()
+		newDocID := bson.NewObjectID()
+		newFoldID := bson.NewObjectID()
 		if isDoc {
 			// docstore updateDoc — before the remaining checks, so
 			// blocked/duplicate 400s leave the same side calls as Node.
@@ -481,7 +480,7 @@ func addEntityHandler(a *core.App, kind string) func(*core.Cxt, *core.Res) {
 // entCanWrite: Node canUserWriteProjectContent for token-less sessions —
 // owner_ref or collab_refs membership (readAndWrite|owner). Reviewer and
 // readOnly refs are NOT write access.
-func entCanWrite(uidHex string, doc primitive.D) bool {
+func entCanWrite(uidHex string, doc bson.D) bool {
 	own := oidHex(dget(doc, "owner_ref"))
 	if own == "" {
 		own = oidHex(dget(doc, "owner"))

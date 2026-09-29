@@ -26,10 +26,9 @@ package editorpages
 
 import (
 	"fmt"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"strings"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // jesc — JSON string escape (Node JSON.stringify: \" \\ \n \t and
@@ -108,11 +107,11 @@ func boolJSON(v bool) string {
 
 // isoDate — Node `user.signUpDate` is serialized as an ISO-8601 UTC string
 // with 3-digit milliseconds (moment .toISOString()). The Go driver decodes
-// BSON dates into map[string]any as primitive.DateTime (int64 ms epoch);
+// BSON dates into map[string]any as bson.DateTime (int64 ms epoch);
 // tolerate time.Time as well.
 func isoDate(v any) string {
 	switch t := v.(type) {
-	case primitive.DateTime:
+	case bson.DateTime:
 		return time.UnixMilli(int64(t)).UTC().Format("2006-01-02T15:04:05.000Z")
 	case time.Time:
 		return t.UTC().Format("2006-01-02T15:04:05.000Z")
@@ -357,7 +356,7 @@ func buildUserSettings(doc map[string]any) string {
 		var sdMs int64
 		sdOk := false
 		switch t := doc["signUpDate"].(type) {
-		case primitive.DateTime:
+		case bson.DateTime:
 			sdMs, sdOk = int64(t), true
 		case int64:
 			sdMs, sdOk = t, true

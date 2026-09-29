@@ -7,9 +7,9 @@ package mongodrv
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	phmongo "ollitex/go/services/project-history/internal/mongo"
 )
@@ -85,7 +85,7 @@ func (r realColl) InsertMany(ctx context.Context, docs []map[string]any) error {
 }
 
 func (r realColl) UpdateOne(ctx context.Context, filter map[string]any, update map[string]any, opts map[string]any) (*phmongo.UpdateResult, error) {
-	res, err := r.c.UpdateOne(ctx, bson.M(filter), bson.M(update), upsertOpts(opts))
+	res, err := r.c.UpdateOne(ctx, bson.M(filter), bson.M(update), upsertOneOpts(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (r realColl) UpdateOne(ctx context.Context, filter map[string]any, update m
 }
 
 func (r realColl) UpdateMany(ctx context.Context, filter map[string]any, update map[string]any, opts map[string]any) (*phmongo.UpdateResult, error) {
-	res, err := r.c.UpdateMany(ctx, bson.M(filter), bson.M(update), upsertOpts(opts))
+	res, err := r.c.UpdateMany(ctx, bson.M(filter), bson.M(update), upsertManyOpts(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +131,9 @@ func (r realColl) FindOneAndUpdate(ctx context.Context, filter map[string]any, u
 }
 
 func (r realColl) Distinct(ctx context.Context, field string, filter map[string]any) ([]any, error) {
-	vals, err := r.c.Distinct(ctx, field, bson.M(filter))
-	if err != nil {
+	// v2 driver: Distinct returns a DistinctResult (decode into a slice).
+	var vals []any
+	if err := r.c.Distinct(ctx, field, bson.M(filter)).Decode(&vals); err != nil {
 		return nil, err
 	}
 	out := make([]any, 0, len(vals))
@@ -156,8 +157,20 @@ func (r realDB) Collection(name string) DriverCollection {
 // DriverDB binds the official driver database. Call for `-what=serve`.
 func DriverDB(db *mongo.Database) DBDriver { return realDB{db: db} }
 
-func upsertOpts(opts map[string]any) *options.UpdateOptions {
-	o := options.Update()
+func upsertOneOpts(opts map[string]any) *options.UpdateOneOptionsBuilder {
+	o := options.UpdateOne()
+	if b, ok := optBool(opts["upsert"]); ok {
+		o = o.SetUpsert(b)
+	}
+	if c, ok := opts["collation"]; ok && c != nil {
+		if cm, ok := c.(map[string]any); ok {
+			o = o.SetCollation(&options.Collation{Locale: stringVal(cm["locale"])})
+		}
+	}
+	return o
+}
+func upsertManyOpts(opts map[string]any) *options.UpdateManyOptionsBuilder {
+	o := options.UpdateMany()
 	if b, ok := optBool(opts["upsert"]); ok {
 		o = o.SetUpsert(b)
 	}
@@ -169,7 +182,7 @@ func upsertOpts(opts map[string]any) *options.UpdateOptions {
 	return o
 }
 
-func fauOpts(opts map[string]any) *options.FindOneAndUpdateOptions {
+func fauOpts(opts map[string]any) *options.FindOneAndUpdateOptionsBuilder {
 	o := options.FindOneAndUpdate()
 	if b, ok := optBool(opts["upsert"]); ok {
 		o = o.SetUpsert(b)
@@ -182,11 +195,11 @@ func fauOpts(opts map[string]any) *options.FindOneAndUpdateOptions {
 	}
 	if a, ok := opts["arrayFilters"]; ok && a != nil {
 		if arr, ok := a.([]map[string]any); ok {
-			f := options.ArrayFilters{}
-			for _, af := range arr {
-				f.Filters = append(f.Filters, bson.M(af))
+			aff := make([]any, len(arr))
+			for i, af := range arr {
+				aff[i] = bson.M(af)
 			}
-			o = o.SetArrayFilters(f)
+			o = o.SetArrayFilters(aff)
 		}
 	}
 	if c, ok := opts["collation"]; ok && c != nil {

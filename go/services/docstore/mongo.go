@@ -11,11 +11,10 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
 type mongoStore struct {
@@ -25,7 +24,7 @@ type mongoStore struct {
 }
 
 func NewMongoStore(ctx context.Context, uri, database string, hasSecondaries bool, logf func(string, ...any)) (*mongoStore, error) {
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, err
 	}
@@ -58,17 +57,17 @@ func (s *mongoStore) col(useSecondary bool) *mongo.Collection {
 // rawDoc is the flexible `docs` cursor; pointer fields preserve absent vs
 // zero (views include a key only when != null, Node _buildDocView).
 type rawDoc struct {
-	ID             primitive.ObjectID `bson:"_id,omitempty"`
-	ProjectID      primitive.ObjectID `bson:"project_id,omitempty"`
-	Lines          *[]string          `bson:"lines,omitempty"`
-	Rev            *int64             `bson:"rev,omitempty"`
-	Version        *int64             `bson:"version,omitempty"`
-	Ranges         any                `bson:"ranges,omitempty"`
-	Deleted        *bool              `bson:"deleted,omitempty"`
-	InS3           *bool              `bson:"inS3,omitempty"`
-	Name           *string            `bson:"name,omitempty"`
-	DeletedAt      *time.Time         `bson:"deletedAt,omitempty"`
-	ArchivingUntil *time.Time         `bson:"archivingUntil,omitempty"`
+	ID             bson.ObjectID `bson:"_id,omitempty"`
+	ProjectID      bson.ObjectID `bson:"project_id,omitempty"`
+	Lines          *[]string     `bson:"lines,omitempty"`
+	Rev            *int64        `bson:"rev,omitempty"`
+	Version        *int64        `bson:"version,omitempty"`
+	Ranges         any           `bson:"ranges,omitempty"`
+	Deleted        *bool         `bson:"deleted,omitempty"`
+	InS3           *bool         `bson:"inS3,omitempty"`
+	Name           *string       `bson:"name,omitempty"`
+	DeletedAt      *time.Time    `bson:"deletedAt,omitempty"`
+	ArchivingUntil *time.Time    `bson:"archivingUntil,omitempty"`
 }
 
 func (d *rawDoc) toDoc() *Doc {
@@ -77,7 +76,7 @@ func (d *rawDoc) toDoc() *Doc {
 	}
 	out := &Doc{
 		ID:             d.ID.Hex(),
-		Ranges:         normalizeTree(d.Ranges), // driver gives primitive.D/A; normalize to the neutral tree
+		Ranges:         normalizeTree(d.Ranges), // driver gives bson.D/A; normalize to the neutral tree
 		ArchivingUntil: d.ArchivingUntil,
 	}
 	if !d.ProjectID.IsZero() {
@@ -263,10 +262,10 @@ func (s *mongoStore) GetDocRev(ctx context.Context, docID string) (int64, bool, 
 func treeToBSON(v any) any {
 	switch t := v.(type) {
 	case objectIDHex:
-		if id, err := primitive.ObjectIDFromHex(string(t)); err == nil {
+		if id, err := bson.ObjectIDFromHex(string(t)); err == nil {
 			return id
 		}
-		return primitive.ObjectID{}
+		return bson.ObjectID{}
 	case jsDate:
 		return time.Time(t)
 	case map[string]any:
@@ -438,9 +437,9 @@ func (s *mongoStore) DeleteDoc(ctx context.Context, projectID, docID string) err
 	return err
 }
 
-func oidOf(hexstring string) primitive.ObjectID {
-	if id, err := primitive.ObjectIDFromHex(hexstring); err == nil {
+func oidOf(hexstring string) bson.ObjectID {
+	if id, err := bson.ObjectIDFromHex(hexstring); err == nil {
 		return id
 	}
-	return primitive.ObjectID{}
+	return bson.ObjectID{}
 }

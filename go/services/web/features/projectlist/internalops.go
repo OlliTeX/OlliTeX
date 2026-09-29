@@ -35,8 +35,7 @@ import (
 	"strconv"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -82,7 +81,7 @@ func internalExpireProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			r.JSON(404, delParamVA("projectId"))
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
 		ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
 		defer cancel()
 		db, err := a.Mongo.DB(ctx)
@@ -92,7 +91,7 @@ func internalExpireProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			return
 		}
 		projects, deleted := db.Collection("projects"), db.Collection("deletedProjects")
-		var projDoc primitive.D
+		var projDoc bson.D
 		if projects.FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&projDoc) == nil {
 			// ACTIVE project → Node deletes a leftover deletedProject record (a
 			// NO-OP when none) and returns 200 "OK". Faithful + non-mutating.
@@ -101,7 +100,7 @@ func internalExpireProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			apiText(r, 200, "OK")
 			return
 		}
-		var dpDoc primitive.D
+		var dpDoc bson.D
 		if deleted.FindOne(ctx, bson.D{{Key: "deleterData.deletedProjectId", Value: oid}}).Decode(&dpDoc) != nil {
 			// No project AND no deletedProject record → Node NotFoundError → 404.
 			r.W.Header().Set("X-Powered-By", "Express")
@@ -135,7 +134,7 @@ func internalExpireUserHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			r.JSON(404, delParamVA("userId"))
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(uidHex)
+		oid, _ := bson.ObjectIDFromHex(uidHex)
 		ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
 		defer cancel()
 		db, err := a.Mongo.DB(ctx)
@@ -178,7 +177,7 @@ func internalZipHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			r.JSON(404, delParamVA("Project_id"))
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
 		ctx, cancel := context.WithTimeout(req.Context(), 15*time.Second)
 		defer cancel()
 		db, err := a.Mongo.DB(ctx)
@@ -187,7 +186,7 @@ func internalZipHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			apiText(r, 500, "Internal Server Error")
 			return
 		}
-		var projDoc primitive.D
+		var projDoc bson.D
 		if db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&projDoc) != nil {
 			// ghost → Node 404 (project missing). Safe + deterministic.
 			r.W.Header().Set("X-Powered-By", "Express")

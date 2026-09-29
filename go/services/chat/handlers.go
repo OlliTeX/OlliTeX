@@ -1,5 +1,6 @@
 package chat
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"fmt"
 	"io"
@@ -7,8 +8,6 @@ import (
 	"ollitex/go/pbhttp"
 	"sort"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ---- client-side shapes (Node: MessageFormatter) -----------------------------
@@ -65,11 +64,11 @@ func jsonable(v any) any {
 	switch x := v.(type) {
 	case nil:
 		return nil
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return x.Hex()
 	case time.Time:
 		return formatISO(x)
-	case []primitive.ObjectID:
+	case []bson.ObjectID:
 		out := make([]any, 0, len(x))
 		for _, id := range x {
 			out = append(out, id.Hex())
@@ -275,7 +274,7 @@ func (s *Server) getGlobalMessages(w http.ResponseWriter, r *http.Request, param
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
 	room, err := s.store.FindOrCreateRoom(ctx, pid, nil) // GLOBAL_THREAD room
 	if err != nil {
 		s.internal(w, err)
@@ -304,8 +303,8 @@ func (s *Server) getGlobalMessage(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	mid, _ := primitive.ObjectIDFromHex(params["messageId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	mid, _ := bson.ObjectIDFromHex(params["messageId"])
 
 	room, err := s.store.FindRoom(ctx, pid, nil) // findThread(GLOBAL)
 	if err != nil {

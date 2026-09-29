@@ -6,9 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 )
@@ -73,13 +72,13 @@ func getMendeleySettings(ctx context.Context, a *core.App) (mendeleySettings, er
 	}
 	var sec map[string]any
 	switch v := doc.Mendeley.(type) {
-	case primitive.D:
+	case bson.D:
 		tmp := map[string]any{}
 		for _, kv := range v {
 			tmp[kv.Key] = kv.Value
 		}
 		sec = tmp
-	case primitive.M:
+	case bson.M:
 		sec = v
 	case map[string]any:
 		sec = v

@@ -13,9 +13,8 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -344,7 +343,7 @@ func newProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 		// Branch: 'example' (main.tex + sample.bib + frog.jpg blob) vs the
 		// default BASIC (mainbasic.tex). Both return the new project id.
-		var pid primitive.ObjectID
+		var pid bson.ObjectID
 		if body.tmplPresent && body.template == "example" {
 			pid = crCreateExampleProject(a, cxt, name, uid, u)
 		} else {
@@ -366,10 +365,10 @@ func newProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 }
 
 // crCreateBasicProject: basic 'New Project' (mainbasic.tex -> main.tex).
-func crCreateBasicProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwnerUser) primitive.ObjectID {
-	pid := primitive.NewObjectID()
-	docID := primitive.NewObjectID()
-	rootID := primitive.NewObjectID()
+func crCreateBasicProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwnerUser) bson.ObjectID {
+	pid := bson.NewObjectID()
+	docID := bson.NewObjectID()
+	rootID := bson.NewObjectID()
 	docs := bson.A{bson.D{
 		{Key: "name", Value: "main.tex"},
 		{Key: "_id", Value: docID},
@@ -389,7 +388,7 @@ func loadOwnerUser(a *core.App, cxt *core.Cxt, uid string) (crOwnerUser, bool) {
 	if a.Mongo == nil || uid == "" {
 		return crOwnerUser{}, false
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return crOwnerUser{}, false
 	}
@@ -399,7 +398,7 @@ func loadOwnerUser(a *core.App, cxt *core.Cxt, uid string) (crOwnerUser, bool) {
 	if err != nil {
 		return crOwnerUser{}, false
 	}
-	var d primitive.D
+	var d bson.D
 	opts := options.FindOne().SetProjection(bson.D{
 		{Key: "first_name", Value: 1},
 		{Key: "last_name", Value: 1},
@@ -410,7 +409,7 @@ func loadOwnerUser(a *core.App, cxt *core.Cxt, uid string) (crOwnerUser, bool) {
 		return crOwnerUser{}, false
 	}
 	spell := ""
-	if ace, ok := dget(d, "ace").(primitive.D); ok {
+	if ace, ok := dget(d, "ace").(bson.D); ok {
 		spell = asStr(dget(ace, "spellCheckLanguage"))
 	}
 	// Node's User model default for ace.spellCheckLanguage is "en"; a project
@@ -432,18 +431,18 @@ func loadOwnerUser(a *core.App, cxt *core.Cxt, uid string) (crOwnerUser, bool) {
 // default field set. The rootFolder contents (docs / fileRefs / rootDoc_id)
 // are parameterised so the BASIC ('main.tex') and EXAMPLE (main.tex, sample.bib,
 // frog.jpg) variants share one document shape.
-func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID primitive.ObjectID, rootDocID *primitive.ObjectID, name, ownerRef, spellLang, compiler string, docs bson.A, fileRefs bson.A, version int) {
+func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID bson.ObjectID, rootDocID *bson.ObjectID, name, ownerRef, spellLang, compiler string, docs bson.A, fileRefs bson.A, version int) {
 	if a.Mongo == nil {
 		return
 	}
-	uid, _ := primitive.ObjectIDFromHex(ownerRef)
+	uid, _ := bson.ObjectIDFromHex(ownerRef)
 	ctx, cancel := context.WithTimeout(cxt.Req.Context(), 8*time.Second)
 	defer cancel()
 	db, err := a.Mongo.DB(ctx)
 	if err != nil {
 		return
 	}
-	e := []primitive.ObjectID{}
+	e := []bson.ObjectID{}
 	doc := bson.D{
 		{Key: "_id", Value: pid},
 		{Key: "name", Value: name},
@@ -480,7 +479,7 @@ func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID primitive.ObjectID,
 			{Key: "folders", Value: []bson.D{}},
 		}}},
 		{Key: "deletedDocs", Value: []bson.D{}},
-		{Key: "collabratecUsers", Value: []primitive.M{}},
+		{Key: "collabratecUsers", Value: []bson.M{}},
 		{Key: "__v", Value: 0},
 		{Key: "version", Value: version},
 		{Key: "rootDoc_id", Value: func() any {
@@ -494,7 +493,7 @@ func crInsertProject(a *core.App, cxt *core.Cxt, pid, rootID primitive.ObjectID,
 }
 
 // crCreateDocRevision asks the docstore (Go service) for revision 0 of the doc.
-func crCreateDocRevision(cxt *core.Cxt, pid, docID primitive.ObjectID, lines []string) {
+func crCreateDocRevision(cxt *core.Cxt, pid, docID bson.ObjectID, lines []string) {
 	payload, _ := json.Marshal(map[string]any{
 		"lines":   lines,
 		"version": 0,

@@ -54,10 +54,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -96,7 +95,7 @@ func fireHTTP(cxt *core.Cxt, method, url string, body []byte) bool {
 
 // loadProjectFull returns the UNPROJECTED project doc (the delete record must
 // embed the whole document), or (nil, nil) when it does not exist.
-func loadProjectFull(a *core.App, cxt *core.Cxt, oid primitive.ObjectID) (*primitive.D, error) {
+func loadProjectFull(a *core.App, cxt *core.Cxt, oid bson.ObjectID) (*bson.D, error) {
 	if a.Mongo == nil {
 		return nil, nil
 	}
@@ -106,7 +105,7 @@ func loadProjectFull(a *core.App, cxt *core.Cxt, oid primitive.ObjectID) (*primi
 	if err != nil {
 		return nil, err
 	}
-	var d primitive.D
+	var d bson.D
 	if err := db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&d); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
@@ -118,7 +117,7 @@ func loadProjectFull(a *core.App, cxt *core.Cxt, oid primitive.ObjectID) (*primi
 
 // deleteProjectExec mirrors ProjectDeleter.deleteProject side effects (steps
 // 2–6 above). The caller verified canAdmin + project existence.
-func deleteProjectExec(a *core.App, cxt *core.Cxt, oid primitive.ObjectID, project primitive.D, uid, ip, reason string) {
+func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bson.D, uid, ip, reason string) {
 	pid := oid.Hex()
 	hist := strings.TrimSuffix(crHistoryBase(), "/")
 	ds := strings.TrimSuffix(crDocstoreBase(), "/")
@@ -141,14 +140,14 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid primitive.ObjectID, proje
 
 	// 4. per-member tag pulls (owner + collaborators + read-only + reviewers).
 	{
-		members := []primitive.ObjectID{}
-		if v, ok := dget(project, "owner_ref").(primitive.ObjectID); ok {
+		members := []bson.ObjectID{}
+		if v, ok := dget(project, "owner_ref").(bson.ObjectID); ok {
 			members = append(members, v)
 		}
 		for _, key := range []string{"collablator_refs", "readOnly_refs", "reviewer_refs"} {
-			if arr, ok := dget(project, key).(primitive.A); ok {
+			if arr, ok := dget(project, key).(bson.A); ok {
 				for _, m := range arr {
-					if mo, ok := m.(primitive.ObjectID); ok {
+					if mo, ok := m.(bson.ObjectID); ok {
 						members = append(members, mo)
 					}
 				}
@@ -182,7 +181,7 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid primitive.ObjectID, proje
 					{Key: "deleterData", Value: deleterData},
 					{Key: "__v", Value: 0},
 				}}},
-				options.Update().SetUpsert(true))
+				options.UpdateOne().SetUpsert(true))
 		}
 	}
 
@@ -213,9 +212,9 @@ var ddRefs = []ddRef{
 // way — pinned live: [_id, deletedAt, deletedProjectCollaboratorIds, ...]).
 // The optional keys Node drops when undefined (deletedProjectOverleafId and
 // the two token keys) are omitted here as well.
-func ddBuildDeleterData(pid primitive.ObjectID, project primitive.D, reason, uid, ip string) primitive.D {
+func ddBuildDeleterData(pid bson.ObjectID, project bson.D, reason, uid, ip string) bson.D {
 	fields := bson.D{bson.E{Key: "deletedAt", Value: time.Now().UTC()}}
-	if uuid, err := primitive.ObjectIDFromHex(uid); err == nil {
+	if uuid, err := bson.ObjectIDFromHex(uid); err == nil {
 		fields = append(fields, bson.E{Key: "deleterId", Value: uuid})
 	}
 	if ip != "" {
@@ -226,31 +225,31 @@ func ddBuildDeleterData(pid primitive.ObjectID, project primitive.D, reason, uid
 	}
 	fields = append(fields,
 		bson.E{Key: "deletedProjectId", Value: pid})
-	if v, ok := dget(project, "owner_ref").(primitive.ObjectID); ok {
+	if v, ok := dget(project, "owner_ref").(bson.ObjectID); ok {
 		fields = append(fields, bson.E{Key: "deletedProjectOwnerId", Value: v})
 	}
 	for _, rr := range ddRefs {
-		val := []primitive.ObjectID{}
-		if arr, ok := dget(project, rr.src).(primitive.A); ok {
+		val := []bson.ObjectID{}
+		if arr, ok := dget(project, rr.src).(bson.A); ok {
 			for _, m := range arr {
-				if mo, ok := m.(primitive.ObjectID); ok {
+				if mo, ok := m.(bson.ObjectID); ok {
 					val = append(val, mo)
 				}
 			}
 		}
 		fields = append(fields, bson.E{Key: rr.key, Value: val})
 	}
-	if overleaf, ok := dget(project, "overleaf").(primitive.D); ok {
+	if overleaf, ok := dget(project, "overleaf").(bson.D); ok {
 		if ov, ok := dget(overleaf, "id").(string); ok && ov != "" {
 			fields = append(fields, bson.E{Key: "deletedProjectOverleafId", Value: ov})
 		}
-		if hist, ok := dget(overleaf, "history").(primitive.D); ok {
+		if hist, ok := dget(overleaf, "history").(bson.D); ok {
 			if hid, ok := dget(hist, "id").(string); ok && hid != "" {
 				fields = append(fields, bson.E{Key: "deletedProjectOverleafHistoryId", Value: hid})
 			}
 		}
 	}
-	if tokens, ok := dget(project, "tokens").(primitive.D); ok {
+	if tokens, ok := dget(project, "tokens").(bson.D); ok {
 		if rw, ok := dget(tokens, "readAndWrite").(string); ok && rw != "" {
 			fields = append(fields, bson.E{Key: "deletedProjectReadWriteToken", Value: rw})
 		}
@@ -259,15 +258,15 @@ func ddBuildDeleterData(pid primitive.ObjectID, project primitive.D, reason, uid
 		}
 	}
 	// Node: deletedProjectLastUpdatedAt: project.lastUpdated (BSON date).
-	// driver v1 decodes dates to primitive.DateTime into primitive.D.
+	// driver v1 decodes dates to bson.DateTime into bson.D.
 	switch v := dget(project, "lastUpdated").(type) {
-	case primitive.DateTime:
+	case bson.DateTime:
 		fields = append(fields, bson.E{Key: "deletedProjectLastUpdatedAt", Value: v.Time()})
 	case time.Time:
 		fields = append(fields, bson.E{Key: "deletedProjectLastUpdatedAt", Value: v})
 	}
 	sort.Slice(fields, func(i, j int) bool { return fields[i].Key < fields[j].Key })
-	return append(primitive.D{bson.E{Key: "_id", Value: primitive.NewObjectID()}}, fields...)
+	return append(bson.D{bson.E{Key: "_id", Value: bson.NewObjectID()}}, fields...)
 }
 
 // delAuthGate runs the route guards in Node's middleware order: login ->
@@ -275,7 +274,7 @@ func ddBuildDeleterData(pid primitive.ObjectID, project primitive.D, reason, uid
 // selects the unprojected load (delete) vs the access-projection load
 // (restore). On any early response the handler must return without writing
 // anything further.
-func delAuthGate(a *core.App, cxt *core.Cxt, res *core.Res, full bool) (uid string, oid *primitive.ObjectID, doc *primitive.D, okFlag bool) {
+func delAuthGate(a *core.App, cxt *core.Cxt, res *core.Res, full bool) (uid string, oid *bson.ObjectID, doc *bson.D, okFlag bool) {
 	if cxt.Sess == nil || cxt.Sess.UserIDHex() == "" {
 		if core.AcceptsJSON(cxt.Req) {
 			res.SendStatus(401)
@@ -290,12 +289,12 @@ func delAuthGate(a *core.App, cxt *core.Cxt, res *core.Res, full bool) (uid stri
 		res.JSON(404, []byte(malformedMsg("Project_id")))
 		return
 	}
-	o, err := primitive.ObjectIDFromHex(strings.ToLower(param))
+	o, err := bson.ObjectIDFromHex(strings.ToLower(param))
 	if err != nil {
 		res.JSON(404, []byte(malformedMsg("Project_id")))
 		return
 	}
-	var d *primitive.D
+	var d *bson.D
 	var lerr error
 	if full {
 		d, lerr = loadProjectFull(a, cxt, o)

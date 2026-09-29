@@ -77,9 +77,8 @@ import (
 	"regexp"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -116,7 +115,7 @@ func wdPageBase(cxt *core.Cxt, reqPath string) views.PageData {
 }
 
 // wdLoadProject — minimal project fetch (nil when absent).
-func wdLoadProject(a *core.App, ctx context.Context, oid primitive.ObjectID) (*bson.D, error) {
+func wdLoadProject(a *core.App, ctx context.Context, oid bson.ObjectID) (*bson.D, error) {
 	if a.Mongo == nil {
 		return nil, nil
 	}
@@ -178,7 +177,7 @@ func wdDocStr(doc bson.D, key string) (string, bool) {
 	if s, ok := v.(string); ok {
 		return s, true
 	}
-	if o, ok := v.(primitive.ObjectID); ok {
+	if o, ok := v.(bson.ObjectID); ok {
 		return o.Hex(), true
 	}
 	return "", false
@@ -195,7 +194,7 @@ func wdDocVal(doc bson.D, key string) (interface{}, bool) {
 
 func oidHex(v interface{}) (string, bool) {
 	switch t := v.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex(), true
 	case string:
 		if wdHex24.MatchString(t) {
@@ -218,7 +217,7 @@ func wdAuthzProject(a *core.App, cxt *core.Cxt, res *core.Res) (string, bool) {
 		res.JSON(404, []byte(wdBadOID404))
 		return "", false
 	}
-	oid, oerr := primitive.ObjectIDFromHex(strings.ToLower(seg))
+	oid, oerr := bson.ObjectIDFromHex(strings.ToLower(seg))
 	if oerr != nil {
 		res.JSON(404, []byte(wdBadOID404))
 		return "", false
@@ -790,7 +789,7 @@ func itoa64(n int64) string {
 
 // wdProjectName — project name by id ("" on lookup failure/absent).
 func wdProjectName(ctx context.Context, a *core.App, projectID string) string {
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(projectID))
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(projectID))
 	if err != nil {
 		return ""
 	}

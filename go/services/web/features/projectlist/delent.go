@@ -36,8 +36,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/history"
@@ -182,9 +181,9 @@ func delEntityHandler(a *core.App, kind string) func(cxt *core.Cxt, res *core.Re
 			res.JSON(404, delParamVA("entity_id"))
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
-		oidE, _ := primitive.ObjectIDFromHex(eidHex)
-		uidObj, uerr := primitive.ObjectIDFromHex(uid)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
+		oidE, _ := bson.ObjectIDFromHex(eidHex)
+		uidObj, uerr := bson.ObjectIDFromHex(uid)
 		if uerr != nil {
 			res.SendStatus(401)
 			return
@@ -244,7 +243,7 @@ func delEntityHandler(a *core.App, kind string) func(cxt *core.Cxt, res *core.Re
 			{Key: "$set", Value: bson.D{{Key: "lastUpdated", Value: time.Now()}, {Key: "lastUpdatedBy", Value: uidObj}}},
 		}
 		if loc.rootDoc {
-			updDoc = append(updDoc, primitive.E{Key: "$unset", Value: bson.D{{Key: "rootDoc_id", Value: 1}}})
+			updDoc = append(updDoc, bson.E{Key: "$unset", Value: bson.D{{Key: "rootDoc_id", Value: 1}}})
 		}
 		resT, err := db.Collection("projects").UpdateOne(ctx, bson.D{{Key: "_id", Value: oid}}, updDoc)
 		if err != nil || resT.MatchedCount == 0 {

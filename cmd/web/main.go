@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	i18nlib "ollitex/go/libraries/i18n"
 	"ollitex/go/mongoh"

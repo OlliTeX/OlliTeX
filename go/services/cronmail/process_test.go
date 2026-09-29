@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // fakeStore — in-memory Store implementing the node claim protocol to

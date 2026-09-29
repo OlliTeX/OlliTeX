@@ -16,7 +16,7 @@ import (
 	"github.com/reearth/ygo/encoding"
 	"github.com/reearth/ygo/persistence"
 	ysync "github.com/reearth/ygo/sync"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // ---------------------------------------------------------------------------

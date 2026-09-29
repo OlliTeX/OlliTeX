@@ -12,10 +12,9 @@ import (
 	"strings"
 
 	gredis "github.com/redis/go-redis/v9"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // ---- session cookie contract (mirrors go/services/web/core) ----
@@ -100,7 +99,7 @@ type mongoClient struct {
 // mongodb://host/sharelatex, mirroring core config precedence) and returns
 // the client + database for the given db name.
 func NewMongoClient(ctx context.Context, uri, dbName string) (*mongo.Client, *mongo.Database, error) {
-	c, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	c, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -123,11 +122,12 @@ func NewMongo(ctx context.Context, uri, dbName string) (Mongo, error) {
 // deployments: auth + seed + store share ONE client, see cmd/collab).
 func NewMongoFrom(db *mongo.Database) Mongo { return &mongoClient{db: db} }
 
-func objID(id string) (primitive.ObjectID, bool) {
-	if !primitive.IsValidObjectID(id) {
-		return primitive.ObjectID{}, false
+func objID(id string) (bson.ObjectID, bool) {
+	// v2 driver: no IsValidObjectID — ObjectIDFromHex is the validator.
+	oid, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return bson.ObjectID{}, false
 	}
-	oid, _ := primitive.ObjectIDFromHex(id)
 	return oid, true
 }
 

@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // AdminPrivilegeAvailable mirrors settings.defaults.js:
@@ -52,7 +51,7 @@ func (a *App) RequireSiteAdmin(cxt *Cxt, res *Res) bool {
 	var doc struct {
 		IsAdmin bool `bson:"isAdmin"`
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return deny()
 	}

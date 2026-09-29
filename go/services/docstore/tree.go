@@ -1,11 +1,10 @@
 package docstore
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"fmt"
 	"strings"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Marker values inside the neutral tree (see normalizeTree):
@@ -32,7 +31,7 @@ func toJSDate(t time.Time) string {
 	return t.UTC().Format("2006-01-02T15:04:05.") + fmt.Sprintf("%03dZ", ms)
 }
 
-// normalizeTree converts driver values (primitive.ObjectID, time.Time,
+// normalizeTree converts driver values (bson.ObjectID, time.Time,
 // int32/64, bsoncore-ish maps) into the neutral tree used for both storage
 // conversion and JSON output: map[string]any, []any, string, int64, float64,
 // bool, nil, objectIDHex, jsDate.
@@ -40,7 +39,7 @@ func normalizeTree(v any) any {
 	switch t := v.(type) {
 	case nil:
 		return nil
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return newObjectIDHex(t.Hex())
 	case time.Time:
 		return newJSDate(t)
@@ -86,13 +85,13 @@ func normalizeTree(v any) any {
 			out[fmt.Sprint(k)] = normalizeTree(e)
 		}
 		return out
-	case primitive.D:
+	case bson.D:
 		out := make(map[string]any, len(t))
 		for i := range len(t) {
 			out[t[i].Key] = normalizeTree(t[i].Value)
 		}
 		return out
-	case primitive.A:
+	case bson.A:
 		out := make([]any, len(t))
 		for i, e := range t {
 			out[i] = normalizeTree(e)
@@ -122,7 +121,7 @@ func writeJSONNode(sb *strings.Builder, v any) {
 		writeJSONString(sb, string(t))
 	case jsDate:
 		writeJSONString(sb, toJSDate(time.Time(t)))
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		writeJSONString(sb, t.Hex())
 	case time.Time:
 		writeJSONString(sb, toJSDate(t))
@@ -252,19 +251,19 @@ func jsonEqual(a, b any) bool {
 		if y, ok := tb.(objectIDHex); ok {
 			return y == x
 		}
-		if y, ok := tb.(primitive.ObjectID); ok {
-			if id, err := primitive.ObjectIDFromHex(string(x)); err == nil {
+		if y, ok := tb.(bson.ObjectID); ok {
+			if id, err := bson.ObjectIDFromHex(string(x)); err == nil {
 				return id == y
 			}
 			return false
 		}
 		return false
-	case primitive.ObjectID:
-		if y, ok := tb.(primitive.ObjectID); ok {
+	case bson.ObjectID:
+		if y, ok := tb.(bson.ObjectID); ok {
 			return x == y
 		}
 		if y, ok := tb.(objectIDHex); ok {
-			if id, err := primitive.ObjectIDFromHex(string(y)); err == nil {
+			if id, err := bson.ObjectIDFromHex(string(y)); err == nil {
 				return x == id
 			}
 			return false

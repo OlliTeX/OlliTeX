@@ -25,8 +25,8 @@ import (
 	"syscall"
 	"time"
 
-	mongodrv "go.mongodb.org/mongo-driver/mongo"
-	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
+	mongodrv "go.mongodb.org/mongo-driver/v2/mongo"
+	mongooptions "go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -40,7 +40,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	client, err := mongodrv.Connect(ctx, mongooptions.Client().ApplyURI(cfg.MongoURI))
+	client, err := mongodrv.Connect(mongooptions.Client().ApplyURI(cfg.MongoURI))
 	if err != nil {
 		log.Fatalf("historyv1: mongo connect: %v", err)
 	}

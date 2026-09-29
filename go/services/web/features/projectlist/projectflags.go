@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -87,7 +86,7 @@ func flagHandler(a *core.App, op flagOp) func(*core.Cxt, *core.Res) {
 			res.JSON(404, []byte(malformedMsg(op.paramName)))
 			return
 		}
-		oid, err := primitive.ObjectIDFromHex(strings.ToLower(param))
+		oid, err := bson.ObjectIDFromHex(strings.ToLower(param))
 		if err != nil {
 			res.JSON(404, []byte(malformedMsg(op.paramName)))
 			return
@@ -118,11 +117,11 @@ func flagHandler(a *core.App, op flagOp) func(*core.Cxt, *core.Res) {
 
 // applyFlagOp executes the exact Node $addToSet/$pull update for the per-user
 // archived/trashed sets.
-func applyFlagOp(a *core.App, cxt *core.Cxt, oid primitive.ObjectID, op flagOp, uid string) {
+func applyFlagOp(a *core.App, cxt *core.Cxt, oid bson.ObjectID, op flagOp, uid string) {
 	if a.Mongo == nil || uid == "" {
 		return
 	}
-	uidOID, err := primitive.ObjectIDFromHex(uid)
+	uidOID, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return
 	}

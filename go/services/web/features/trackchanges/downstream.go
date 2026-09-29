@@ -12,10 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -100,7 +99,7 @@ func tcPersonalJSON(ctx context.Context, a *core.App, uidHex string) (string, bo
 	if !tcHex24.MatchString(uidHex) {
 		return "{}", true // Node: getUser(null-ish/invalid) → null → {}
 	}
-	oid, err := primitive.ObjectIDFromHex(uidHex)
+	oid, err := bson.ObjectIDFromHex(uidHex)
 	if err != nil {
 		return "{}", true
 	}

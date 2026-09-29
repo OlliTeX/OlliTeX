@@ -5,9 +5,8 @@ import (
 	"regexp"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -41,7 +40,7 @@ var validOID = regexp.MustCompile(`^[0-9a-fA-F]{24}$`)
 // Anonymous never reaches the gate (core global gate: 401/302 pinned).
 
 type projDoc struct {
-	*primitive.D
+	*bson.D
 	OwnerRef string
 	Collabs  []string
 	Readers  []string
@@ -55,7 +54,7 @@ type projDoc struct {
 
 func oidHex(v any) string {
 	switch x := v.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return x.Hex()
 	case string:
 		return x
@@ -65,7 +64,7 @@ func oidHex(v any) string {
 
 func strArr(v any) []string {
 	out := []string{}
-	if a, ok := v.(primitive.A); ok {
+	if a, ok := v.(bson.A); ok {
 		for _, e := range a {
 			s := oidHex(e)
 			if s != "" {
@@ -78,7 +77,20 @@ func strArr(v any) []string {
 
 // loadProject reads the project doc (full doc is fine; the e2e projects are
 // small) for access decisions + name/history id.
-func (h *svc) loadProject(cxt *core.Cxt, oid primitive.ObjectID) (*projDoc, error) {
+
+// dmap — v2 driver has no bson.D.Map(); first-key-wins conversion (matches the
+// reads above; docs are mongo-shaped with unique keys).
+func dmap(d bson.D) map[string]any {
+	m := make(map[string]any, len(d))
+	for _, e := range d {
+		if _, exists := m[e.Key]; !exists {
+			m[e.Key] = e.Value
+		}
+	}
+	return m
+}
+
+func (h *svc) loadProject(cxt *core.Cxt, oid bson.ObjectID) (*projDoc, error) {
 	ctx, cancel := context.WithTimeout(cxt.Req.Context(), 10*time.Second)
 	defer cancel()
 	if h.a.Mongo == nil {
@@ -88,7 +100,7 @@ func (h *svc) loadProject(cxt *core.Cxt, oid primitive.ObjectID) (*projDoc, erro
 	if err != nil {
 		return nil, err
 	}
-	var d primitive.D
+	var d bson.D
 	if err := db.Collection("projects").FindOne(ctx,
 		bson.D{{Key: "_id", Value: oid}}).Decode(&d); err != nil {
 		if err.Error() == "mongo: no documents in result" || err.Error() == "mongo: no documents in result" {
@@ -96,20 +108,22 @@ func (h *svc) loadProject(cxt *core.Cxt, oid primitive.ObjectID) (*projDoc, erro
 		}
 		return nil, err
 	}
+	m := dmap(d)
 	p := &projDoc{D: &d}
-	p.Name, _ = d.Map()["name"].(string)
-	p.Pal, _ = d.Map()["publicAccesLevel"].(string)
-	p.OwnerRef = oidHex(d.Map()["owner_ref"])
-	p.Collabs = strArr(d.Map()["collaberator_refs"])
-	p.Readers = strArr(d.Map()["readOnly_refs"])
-	p.Reviews = strArr(d.Map()["reviewer_refs"])
-	p.TokRW = strArr(d.Map()["tokenAccessReadAndWrite_refs"])
-	p.TokRD = strArr(d.Map()["tokenAccessReadOnly_refs"])
-	if ov, ok := d.Map()["overleaf"].(primitive.D); ok {
-		if his, ok := ov.Map()["history"].(primitive.D); ok {
-			if id, ok := his.Map()["id"].(primitive.ObjectID); ok {
+	p.Name, _ = m["name"].(string)
+	p.Pal, _ = m["publicAccesLevel"].(string)
+	p.OwnerRef = oidHex(m["owner_ref"])
+	p.Collabs = strArr(m["collaberator_refs"])
+	p.Readers = strArr(m["readOnly_refs"])
+	p.Reviews = strArr(m["reviewer_refs"])
+	p.TokRW = strArr(m["tokenAccessReadAndWrite_refs"])
+	p.TokRD = strArr(m["tokenAccessReadOnly_refs"])
+	if ov, ok := m["overleaf"].(bson.D); ok {
+		if his, ok := dmap(ov)["history"].(bson.D); ok {
+			hm := dmap(his)
+			if id, ok := hm["id"].(bson.ObjectID); ok {
 				p.HistID = id.Hex()
-			} else if s, ok := his.Map()["id"].(string); ok {
+			} else if s, ok := hm["id"].(string); ok {
 				p.HistID = s
 			}
 		}
@@ -122,7 +136,7 @@ func (h *svc) userAdmin(cxt *core.Cxt, uid string) (isAdmin, blocked bool) {
 	if h.a.Mongo == nil || uid == "" {
 		return false, false
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return false, false
 	}
@@ -132,15 +146,16 @@ func (h *svc) userAdmin(cxt *core.Cxt, uid string) (isAdmin, blocked bool) {
 	if db == nil {
 		return false, false
 	}
-	var d primitive.D
+	var d bson.D
 	opts := options.FindOne().SetProjection(bson.D{{Key: "isAdmin", Value: 1}, {Key: "blocked", Value: 1}})
 	if db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}, opts).Decode(&d) != nil {
 		return false, false
 	}
-	if b, ok := d.Map()["blocked"].(bool); ok && b {
+	um := dmap(d)
+	if b, ok := um["blocked"].(bool); ok && b {
 		blocked = true
 	}
-	if isAdminOk, ok := d.Map()["isAdmin"].(bool); ok && isAdminOk {
+	if isAdminOk, ok := um["isAdmin"].(bool); ok && isAdminOk {
 		isAdmin = true
 	}
 	return
@@ -223,7 +238,7 @@ func (h *svc) gate(cxt *core.Cxt, res *core.Res, level string) (string, *projDoc
 		res.JSON(404, []byte(`{"error":"Validation error: Invalid Mongo ObjectId at \"params.Project_id\"","statusCode":404}`))
 		return "", nil, false
 	}
-	oid, _ := primitive.ObjectIDFromHex(pidRaw) // safe: matched validOID
+	oid, _ := bson.ObjectIDFromHex(pidRaw) // safe: matched validOID
 	uid := ""
 	if cxt.Sess != nil {
 		_, uid = core.PassportUser(cxt.Sess)

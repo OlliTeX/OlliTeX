@@ -1,5 +1,6 @@
 package chat
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"bytes"
 	"encoding/json"
@@ -9,8 +10,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
@@ -458,7 +457,7 @@ func TestCloneCommentThreads(t *testing.T) {
 	}
 
 	// clone into the (empty) target project — any valid objectId works as target
-	targetID, _ := primitive.ObjectIDFromHex(userC)
+	targetID, _ := bson.ObjectIDFromHex(userC)
 	code, body, _ = ct.do(t, "POST", "/project/"+pid+"/clone-comment-threads",
 		map[string]any{"targetProjectId": userC}, "json")
 	if code != 204 || body != "" {
@@ -496,7 +495,7 @@ func TestCloneCommentThreads(t *testing.T) {
 		t.Fatalf("cloned first message must drop edited_at: %+v", first)
 	}
 	// source untouched (Node clone does not delete)
-	pidObj, _ := primitive.ObjectIDFromHex(pid)
+	pidObj, _ := bson.ObjectIDFromHex(pid)
 	var sRooms int
 	for _, r := range ct.m.rooms {
 		if r.ProjectID == pidObj {
@@ -618,16 +617,16 @@ func TestPaginationSemantics(t *testing.T) {
 
 func TestNotificationFanoutCommentAndReply(t *testing.T) {
 	ct := newChatTest(t)
-	owner, _ := primitive.ObjectIDFromHex(userA)
-	userBID, _ := primitive.ObjectIDFromHex(userB)
-	userCID, _ := primitive.ObjectIDFromHex(userC)
+	owner, _ := bson.ObjectIDFromHex(userA)
+	userBID, _ := bson.ObjectIDFromHex(userB)
+	userCID, _ := bson.ObjectIDFromHex(userC)
 	nameA := "Alice"
 	emailA := "alice@example.org"
-	pidObj, _ := primitive.ObjectIDFromHex(pid)
+	pidObj, _ := bson.ObjectIDFromHex(pid)
 	ct.m.projects[pid] = &ProjectRefs{
 		Owner:    &owner,
-		Collab:   []primitive.ObjectID{userBID, userCID},
-		AccessRO: []primitive.ObjectID{owner}, // duplicate on purpose: dedupe expected
+		Collab:   []bson.ObjectID{userBID, userCID},
+		AccessRO: []bson.ObjectID{owner}, // duplicate on purpose: dedupe expected
 		Name:     &nameA,
 	}
 	ct.m.users[userA] = &UserNames{FirstName: &nameA, Email: &emailA}
@@ -653,7 +652,7 @@ func TestNotificationFanoutCommentAndReply(t *testing.T) {
 		t.Fatalf("comment notifications = %d; want 1 (invited userC only); got %+v", len(ct.m.notifications), ct.m.notifications)
 	}
 	n := ct.m.notifications[0]
-	uid, _ := n["user_id"].(primitive.ObjectID)
+	uid, _ := n["user_id"].(bson.ObjectID)
 	if uid != userCID {
 		t.Fatalf("comment recipient = %s; want userC", uid.Hex())
 	}
@@ -689,7 +688,7 @@ func TestNotificationFanoutCommentAndReply(t *testing.T) {
 	if len(added) != 1 {
 		t.Fatalf("reply notifications = %d; want 1; got %+v", len(added), added)
 	}
-	rid, _ := added[0]["user_id"].(primitive.ObjectID)
+	rid, _ := added[0]["user_id"].(bson.ObjectID)
 	if rid != owner {
 		t.Fatalf("reply recipient = %s; want owner userA", rid.Hex())
 	}

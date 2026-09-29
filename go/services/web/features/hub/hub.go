@@ -54,9 +54,8 @@ import (
 	"ollitex/go/services/web/features/sitesettings"
 	"ollitex/go/services/web/views"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // mode — a theme light/dark mode (validated map, canonical key order at
@@ -583,7 +582,7 @@ func saveTheme(a *core.App) func(*core.Cxt, *core.Res) {
 						{Key: "dark", Value: orderedMode(d)},
 						{Key: "updatedAt", Value: time.Now().UTC()},
 					}}},
-					options.Update().SetUpsert(true))
+					options.UpdateOne().SetUpsert(true))
 			}
 		}
 		res.JSON(200, []byte(themeJSON(l, d)))
@@ -965,10 +964,10 @@ func bsonValueToAny(v bson.RawValue) any {
 	case bson.TypeEmbeddedDocument:
 		return bsonToMap(v.Document())
 	case bson.TypeArray:
-		vals, _ := v.Array().Elements()
+		vals, _ := v.Array().Values()
 		out := []any{}
 		for _, el := range vals {
-			out = append(out, bsonValueToAny(el.Value()))
+			out = append(out, bsonValueToAny(el))
 		}
 		return out
 	case bson.TypeString:
@@ -1071,7 +1070,15 @@ func bsonToJSONValue(v bson.RawValue) string {
 		return bsonToJSON(v.Document())
 	}
 	if v.Type == bson.TypeArray {
-		return bsonJSONArray(v.Array())
+		vals, err := v.Array().Values()
+		if err != nil {
+			return "null"
+		}
+		parts := make([]string, 0, len(vals))
+		for _, el := range vals {
+			parts = append(parts, bsonToJSONValue(el))
+		}
+		return "[" + strings.Join(parts, ",") + "]"
 	}
 	switch v.Type {
 	case bson.TypeString:
@@ -1139,7 +1146,7 @@ func loadUserDoc(a *core.App, ctx context.Context, uid string) (map[string]any, 
 	if err != nil {
 		return nil, nil, false
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return nil, nil, false
 	}

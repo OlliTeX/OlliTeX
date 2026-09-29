@@ -7,9 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 )
@@ -54,17 +53,17 @@ func zoteroEnabled(ctx context.Context, a *core.App) (bool, error) {
 		return enabled, err
 	}
 	if doc.Zotero != nil {
-		// driver decodes a nested doc into primitive.D (a defined type —
+		// driver decodes a nested doc into bson.D (a defined type —
 		// asserting map[string]any would miss it). Handle D + M + map.
 		var sec map[string]any
 		switch v := doc.Zotero.(type) {
-		case primitive.D:
+		case bson.D:
 			tmp := map[string]any{}
 			for _, kv := range v {
 				tmp[kv.Key] = kv.Value
 			}
 			sec = tmp
-		case primitive.M:
+		case bson.M:
 			sec = v
 		case map[string]any:
 			sec = v

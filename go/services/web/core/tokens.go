@@ -7,9 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // OneTimeTokens — CE OneTimeTokens parity (mongo collection `tokens`).
@@ -101,7 +100,7 @@ func (o *OneTimeTokens) Expire(ctx context.Context, use, token string) {
 // token data.user_id is stored as a string (pinned from the fixture doc).
 func ObjectIdHex(v any) string {
 	switch t := v.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex()
 	case string:
 		return t

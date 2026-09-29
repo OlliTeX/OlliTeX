@@ -30,9 +30,8 @@ import (
 	"sync"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	mgoOptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	mgoOptions "go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -200,7 +199,7 @@ func chPersistJob(f *fs, ctx context.Context, j *chJob, create bool) {
 	if create {
 		_, _ = c.UpdateOne(ctx, filter,
 			bson.D{{Key: "$setOnInsert", Value: bson.D{{Key: "jobId", Value: j.id}}}, {Key: "$set", Value: set}},
-			mgoOptions.Update().SetUpsert(true))
+			mgoOptions.UpdateOne().SetUpsert(true))
 	} else {
 		_, _ = c.UpdateOne(ctx, filter, bson.D{{Key: "$set", Value: set}})
 	}
@@ -599,10 +598,10 @@ func (f *fs) chPerform(ctx context.Context, j *chJob) {
 
 func (d projDoc) text() string { return strings.Join(d.lines, "\n") }
 
-func chOID(s string) primitive.ObjectID {
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(s))
+func chOID(s string) bson.ObjectID {
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(s))
 	if err != nil {
-		return primitive.NilObjectID
+		return bson.NilObjectID
 	}
 	return oid
 }

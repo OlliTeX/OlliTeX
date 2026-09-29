@@ -63,9 +63,8 @@ import (
 	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/views"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 var (
@@ -98,8 +97,8 @@ func invRandToken() string {
 	return hex.EncodeToString(b)
 }
 
-func mustObjectID(hex string) primitive.ObjectID {
-	oid, _ := primitive.ObjectIDFromHex(strings.ToLower(hex))
+func mustObjectID(hex string) bson.ObjectID {
+	oid, _ := bson.ObjectIDFromHex(strings.ToLower(hex))
 	return oid
 }
 
@@ -169,7 +168,7 @@ func invInsert(a *core.App, cxt *core.Cxt, rec bson.D) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return res.InsertedID.(primitive.ObjectID).Hex(), nil
+	return res.InsertedID.(bson.ObjectID).Hex(), nil
 }
 
 func invDelete(a *core.App, cxt *core.Cxt, flt bson.D) bool {
@@ -190,7 +189,7 @@ func invDelete(a *core.App, cxt *core.Cxt, flt bson.D) bool {
 }
 
 // invMember — owner_ref ∪ collaberator_refs ∪ readOnly_refs ∪ reviewer_refs.
-func invMember(uid string, doc primitive.D) bool {
+func invMember(uid string, doc bson.D) bool {
 	uidl := strings.ToLower(uid)
 	owner := strings.ToLower(asStr(dget(doc, "owner_ref")))
 	if owner != "" && owner == uidl {
@@ -198,7 +197,7 @@ func invMember(uid string, doc primitive.D) bool {
 	}
 	for _, k := range []string{"collaberator_refs", "readOnly_refs", "reviewer_refs"} {
 		switch v := dget(doc, k).(type) {
-		case primitive.A:
+		case bson.A:
 			for i := range v {
 				if oidHex(v[i]) == uidl {
 					return true
@@ -209,24 +208,24 @@ func invMember(uid string, doc primitive.D) bool {
 	return false
 }
 
-func invMemberLevel(uid string, doc primitive.D) string {
+func invMemberLevel(uid string, doc bson.D) string {
 	if strings.ToLower(asStr(dget(doc, "owner_ref"))) == strings.ToLower(uid) {
 		return "owner"
 	}
 	if invA(dget(doc, "collaberator_refs"), uid) {
 		return "readAndWrite"
 	}
-	if invA(dget(doc, "reviewer_refs").(primitive.A), uid) {
+	if invA(dget(doc, "reviewer_refs").(bson.A), uid) {
 		return "review"
 	}
-	if invA(dget(doc, "readOnly_refs").(primitive.A), uid) {
+	if invA(dget(doc, "readOnly_refs").(bson.A), uid) {
 		return "readOnly"
 	}
 	return "none"
 }
 
 func invA(v any, uid string) bool {
-	a, ok := v.(primitive.A)
+	a, ok := v.(bson.A)
 	if !ok {
 		return false
 	}
@@ -262,7 +261,7 @@ func invUserEmails(a *core.App, cxt *core.Cxt, uid string) []string {
 	if a.Mongo == nil || uid == "" {
 		return nil
 	}
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(uid))
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(uid))
 	if err != nil {
 		return nil
 	}
@@ -441,12 +440,12 @@ func inviteCreateHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 		// both sides), so the limiter never trips inside the battery (the
 		// Node limiter is redis-backed; Go mirrors its "fresh deploy" state).
 		projHex := strings.ToLower(cxt.Params["1"])
-		projID, err := primitive.ObjectIDFromHex(projHex)
+		projID, err := bson.ObjectIDFromHex(projHex)
 		if err != nil {
 			res.JSON(500, []byte("internal error"))
 			return
 		}
-		id := primitive.NewObjectID()
+		id := bson.NewObjectID()
 		token := invRandToken()
 		rec := bson.D{
 			{Key: "_id", Value: id},
@@ -494,7 +493,7 @@ func inviteListHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 		}
 		_ = doc
 		projHex := strings.ToLower(cxt.Params["1"])
-		projID, err := primitive.ObjectIDFromHex(projHex)
+		projID, err := bson.ObjectIDFromHex(projHex)
 		if err != nil {
 			res.JSON(500, []byte("internal error"))
 			return
@@ -514,7 +513,7 @@ func inviteListHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 						var d bson.M
 						if cur.Decode(&d) == nil {
 							list = append(list, invOut{
-								ID:         d["_id"].(primitive.ObjectID).Hex(),
+								ID:         d["_id"].(bson.ObjectID).Hex(),
 								Email:      asStr(d["email"]),
 								Privileges: asStr(d["privileges"]),
 							})
@@ -543,7 +542,7 @@ func inviteRevokeHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 		if !ok {
 			return
 		}
-		projID, _ := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+		projID, _ := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 		invDelete(a, cxt, bson.D{{Key: "_id", Value: oid}, {Key: "projectId", Value: projID}})
 		res.NoContent() // Node: res.sendStatus(204) — even when nothing matched.
 	}
@@ -562,7 +561,7 @@ func inviteResendHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 			return
 		}
 		projHex := strings.ToLower(cxt.Params["1"])
-		projID, _ := primitive.ObjectIDFromHex(projHex)
+		projID, _ := bson.ObjectIDFromHex(projHex)
 		old, _ := invFindOne(a, cxt, bson.D{{Key: "_id", Value: oid}, {Key: "projectId", Value: projID}})
 		if old == nil {
 			res.SendStatus(404) // Node: res.sendStatus(404) → "Not Found"
@@ -571,7 +570,7 @@ func inviteResendHandler(a *core.App, gate aGate) func(*core.Cxt, *core.Res) {
 		email := asStr(dget(*old, "email"))
 		priv := asStr(dget(*old, "privileges"))
 		invDelete(a, cxt, bson.D{{Key: "_id", Value: oid}})
-		id := primitive.NewObjectID()
+		id := bson.NewObjectID()
 		token := invRandToken()
 		rec := bson.D{
 			{Key: "_id", Value: id},
@@ -649,7 +648,7 @@ func inviteViewHandler(a *core.App) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		projHex := strings.ToLower(cxt.Params["1"])
 		token := cxt.Params["2"]
-		projID, err := primitive.ObjectIDFromHex(projHex)
+		projID, err := bson.ObjectIDFromHex(projHex)
 		if err != nil {
 			res.JSON(500, []byte("internal error"))
 			return
@@ -715,7 +714,7 @@ func inviteAcceptHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		uid = strings.ToLower(uid)
 		projHex := strings.ToLower(cxt.Params["1"])
 		token := cxt.Params["2"]
-		projID, err := primitive.ObjectIDFromHex(projHex)
+		projID, err := bson.ObjectIDFromHex(projHex)
 		if err != nil {
 			res.JSON(500, []byte("internal error"))
 			return
@@ -772,7 +771,7 @@ func inviteAcceptHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			colAddContact(a, cxt, sendingHex, uid)
 		}
 		// single-use invite consumption + same-user sibling revocation.
-		if rev, ok := dget(*inv, "_id").(primitive.ObjectID); ok {
+		if rev, ok := dget(*inv, "_id").(bson.ObjectID); ok {
 			invDelete(a, cxt, bson.D{{Key: "_id", Value: rev}})
 		}
 		for _, em := range invUserEmails(a, cxt, uid) {
@@ -782,7 +781,7 @@ func inviteAcceptHandler(a *core.App) func(*core.Cxt, *core.Res) {
 				{Key: "reusable", Value: bson.D{{Key: "$ne", Value: true}}},
 			})
 			if match != nil {
-				if mid, ok := dget(*match, "_id").(primitive.ObjectID); ok {
+				if mid, ok := dget(*match, "_id").(bson.ObjectID); ok {
 					invDelete(a, cxt, bson.D{{Key: "_id", Value: mid}})
 				}
 			}
@@ -833,7 +832,7 @@ func tokensHandler(a *core.App) func(*core.Cxt, *core.Res) {
 				res.SendStatus(403) // Node: !tokens (undefined) -> sendStatus(403)
 				return
 			}
-			if m, okm := t.(primitive.D); okm {
+			if m, okm := t.(bson.D); okm {
 				for _, kv := range m {
 					tokens[kv.Key] = kv.Value
 				}
@@ -844,7 +843,7 @@ func tokensHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			if p, _ := dget(*doc, "publicAccesLevel").(string); p == "tokenBased" {
 				if invA(dget(*doc, "tokenAccessReadOnly_refs"), uid) {
 					if t := dget(*doc, "tokens"); t != nil {
-						if m, okm := t.(primitive.D); okm {
+						if m, okm := t.(bson.D); okm {
 							for _, kv := range m {
 								if kv.Key == "readOnly" {
 									tokens["readOnly"] = kv.Value
@@ -869,7 +868,7 @@ func tokensHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		order := []string{}
 		val := func(k string) any { return tokens[k] }
 		switch d := dget(*doc, "tokens").(type) {
-		case primitive.D:
+		case bson.D:
 			for _, kv := range d {
 				order = append(order, kv.Key)
 			}
@@ -919,7 +918,7 @@ func tokensHandler(a *core.App) func(*core.Cxt, *core.Res) {
 }
 
 // strOrHex — owner_ref is stored either as a hex string (fixture
-// projects) or a primitive.ObjectID (Node-created ones); normalise both
+// projects) or a bson.ObjectID (Node-created ones); normalise both
 // (U10.2 tk2 battery: owner-403 case needs ObjectID owners to resolve).
 func strOrHex(v any) string {
 	if s := asStr(v); s != "" {

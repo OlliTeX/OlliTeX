@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const liveDB = "test-overleaf"
@@ -293,9 +293,8 @@ func TestBatchedUpdateSingleFlight(t *testing.T) {
 	BatchedUpdateRunning = true
 	batchStateMu.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(liveMongoURI))
+	// v2 driver: Connect takes no context (lazy connect is the default).
+	client, err := mongo.Connect(options.Client().ApplyURI(liveMongoURI))
 	if err != nil {
 		t.Fatalf("lazy connect: %v", err)
 	}

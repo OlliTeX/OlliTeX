@@ -35,9 +35,8 @@ import (
 	"ollitex/go/services/collab"
 
 	"github.com/reearth/ygo/persistence"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // yjsTimeBetweenDistinctUpdates — vendor TIME_BETWEEN_DISTINCT_UPDATES
@@ -414,11 +413,11 @@ func composeMerged(ctx context.Context, st persistence.VersionedPersistence, vlo
 // honest state). NOTE: in this stack the mongo `docs` collection is the OT
 // content doc (lines/rev) and has no name — the FILE NAME lives in the
 // project doc's rootFolder tree (verified live: rootFolder[0].docs[0]).
-func rootDocPathname(ctx context.Context, findOne func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error), pid string) string {
+func rootDocPathname(ctx context.Context, findOne func(ctx context.Context, coll string, id bson.ObjectID) (bson.D, error), pid string) string {
 	if findOne == nil {
 		return ""
 	}
-	po, err := primitive.ObjectIDFromHex(strings.ToLower(pid))
+	po, err := bson.ObjectIDFromHex(strings.ToLower(pid))
 	if err != nil {
 		return ""
 	}
@@ -432,7 +431,7 @@ func rootDocPathname(ctx context.Context, findOne func(ctx context.Context, coll
 		switch e.Key {
 		case "rootDoc_id":
 			switch v := e.Value.(type) {
-			case primitive.ObjectID:
+			case bson.ObjectID:
 				rootDoc = v.Hex()
 			case string:
 				rootDoc = v
@@ -447,9 +446,9 @@ func rootDocPathname(ctx context.Context, findOne func(ctx context.Context, coll
 	want := strings.ToLower(rootDoc)
 	var walk func(v any) string
 	walk = func(v any) string {
-		ent, ok := v.(primitive.D)
+		ent, ok := v.(bson.D)
 		if !ok {
-			if dm, dok := v.(primitive.M); dok {
+			if dm, dok := v.(bson.M); dok {
 				ent = dmToD(dm)
 			} else {
 				return ""
@@ -458,7 +457,7 @@ func rootDocPathname(ctx context.Context, findOne func(ctx context.Context, coll
 		// docs: direct children
 		if docs := entArrAny(ent, "docs"); docs != nil {
 			for _, de := range docs {
-				m, ok := de.(primitive.D)
+				m, ok := de.(bson.D)
 				if !ok {
 					continue
 				}
@@ -492,13 +491,13 @@ func rootDocPathname(ctx context.Context, findOne func(ctx context.Context, coll
 				return r
 			}
 		}
-	case []primitive.D:
+	case []bson.D:
 		for _, e := range rf {
-			if r := walk(primitive.D(e)); r != "" {
+			if r := walk(bson.D(e)); r != "" {
 				return r
 			}
 		}
-	case primitive.D:
+	case bson.D:
 		if r := walk(rf); r != "" {
 			return r
 		}
@@ -506,21 +505,21 @@ func rootDocPathname(ctx context.Context, findOne func(ctx context.Context, coll
 	return ""
 }
 
-func dmToD(m primitive.M) primitive.D {
-	out := make(primitive.D, 0, len(m))
+func dmToD(m bson.M) bson.D {
+	out := make(bson.D, 0, len(m))
 	for k, v := range m {
 		out = append(out, bson.E{Key: k, Value: v})
 	}
 	return out
 }
 
-func entField(d primitive.D, key string) (string, bool) {
+func entField(d bson.D, key string) (string, bool) {
 	for _, e := range d {
 		if e.Key == key {
 			if s, ok := e.Value.(string); ok {
 				return s, true
 			}
-			if o, ok := e.Value.(primitive.ObjectID); ok {
+			if o, ok := e.Value.(bson.ObjectID); ok {
 				return o.Hex(), true
 			}
 		}
@@ -528,7 +527,7 @@ func entField(d primitive.D, key string) (string, bool) {
 	return "", false
 }
 
-func entArrAny(d primitive.D, key string) []any {
+func entArrAny(d bson.D, key string) []any {
 	for _, e := range d {
 		if e.Key == key {
 			switch v := e.Value.(type) {
@@ -536,7 +535,7 @@ func entArrAny(d primitive.D, key string) []any {
 				return v
 			case bson.A:
 				return []any(v)
-			case []primitive.D:
+			case []bson.D:
 				out := make([]any, len(v))
 				for i, x := range v {
 					out[i] = x
@@ -550,8 +549,8 @@ func entArrAny(d primitive.D, key string) []any {
 
 // MongoDocSeeker — adapts a lazy *mongo.Database to the findOne seam so
 // the composition layer stays testable without a live MongoDB driver.
-func MongoDocSeeker(db *mongo.Database) func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error) {
-	return func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error) {
+func MongoDocSeeker(db *mongo.Database) func(ctx context.Context, coll string, id bson.ObjectID) (bson.D, error) {
+	return func(ctx context.Context, coll string, id bson.ObjectID) (bson.D, error) {
 		var out bson.D
 		err := db.Collection(coll).FindOne(ctx, bson.D{{Key: "_id", Value: id}}).Decode(&out)
 		if err != nil {
@@ -613,11 +612,11 @@ func buildUnifiedFeed(lvs []persistence.VersionMeta, vmetas map[uint64]collab.Ve
 // rootFolderPaths — ALL doc pathnames in the project doc's rootFolder tree
 // (the S3b "initial snapshot" for filetree/diff). Sorted, '/'-joined for
 // nested folders, "" entries dropped.
-func rootFolderPaths(ctx context.Context, findOne func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error), pid string) []string {
+func rootFolderPaths(ctx context.Context, findOne func(ctx context.Context, coll string, id bson.ObjectID) (bson.D, error), pid string) []string {
 	if findOne == nil {
 		return nil
 	}
-	po, err := primitive.ObjectIDFromHex(strings.ToLower(pid))
+	po, err := bson.ObjectIDFromHex(strings.ToLower(pid))
 	if err != nil {
 		return nil
 	}
@@ -637,9 +636,9 @@ func rootFolderPaths(ctx context.Context, findOne func(ctx context.Context, coll
 	var out []string
 	var walk func(prefix string, v any)
 	walk = func(prefix string, v any) {
-		ent, ok := v.(primitive.D)
+		ent, ok := v.(bson.D)
 		if !ok {
-			if dm, dok := v.(primitive.M); dok {
+			if dm, dok := v.(bson.M); dok {
 				ent = dmToD(dm)
 			} else {
 				return
@@ -647,7 +646,7 @@ func rootFolderPaths(ctx context.Context, findOne func(ctx context.Context, coll
 		}
 		if docs := entArrAny(ent, "docs"); docs != nil {
 			for _, de := range docs {
-				m, dok := de.(primitive.D)
+				m, dok := de.(bson.D)
 				if !dok {
 					continue
 				}
@@ -676,11 +675,11 @@ func rootFolderPaths(ctx context.Context, findOne func(ctx context.Context, coll
 		for _, e := range rf {
 			walk("", e)
 		}
-	case []primitive.D:
+	case []bson.D:
 		for _, e := range rf {
-			walk("", primitive.D(e))
+			walk("", bson.D(e))
 		}
-	case primitive.D:
+	case bson.D:
 		walk("", rf)
 	}
 	sort.Strings(out)

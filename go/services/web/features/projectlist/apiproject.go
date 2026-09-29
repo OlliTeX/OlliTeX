@@ -60,9 +60,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -746,7 +745,7 @@ func apLoadTags(a *core.App, cxt *core.Cxt, uid string) ([]apTagRow, error) {
 	defer cur.Close(ctx)
 	out := []apTagRow{}
 	for cur.Next(ctx) {
-		var d primitive.D
+		var d bson.D
 		if cur.Decode(&d) != nil {
 			continue
 		}
@@ -758,7 +757,7 @@ func apLoadTags(a *core.App, cxt *core.Cxt, uid string) ([]apTagRow, error) {
 					row.name = s
 				}
 			case "project_ids":
-				if arr, ok := e.Value.(primitive.A); ok {
+				if arr, ok := e.Value.(bson.A); ok {
 					row.projectIDs = make([]string, 0, len(arr))
 					for _, pv := range arr {
 						if s, ok := pv.(string); ok {
@@ -778,9 +777,9 @@ func apLoadUsers(a *core.App, cxt *core.Cxt, need map[string]bool) (map[string]a
 	if a.Mongo == nil {
 		return nil, fmt.Errorf("mongo not available")
 	}
-	ids := make([]primitive.ObjectID, 0, len(need))
+	ids := make([]bson.ObjectID, 0, len(need))
 	for h := range need {
-		o, err := primitive.ObjectIDFromHex(h)
+		o, err := bson.ObjectIDFromHex(h)
 		if err != nil {
 			continue // malformed stored ids never match (Node: same)
 		}
@@ -807,7 +806,7 @@ func apLoadUsers(a *core.App, cxt *core.Cxt, need map[string]bool) (map[string]a
 	defer cur.Close(ctx)
 	out := map[string]apUserRef{}
 	for cur.Next(ctx) {
-		var d primitive.D
+		var d bson.D
 		if cur.Decode(&d) != nil {
 			continue
 		}
@@ -815,7 +814,7 @@ func apLoadUsers(a *core.App, cxt *core.Cxt, need map[string]bool) (map[string]a
 		for _, e := range d {
 			switch e.Key {
 			case "_id":
-				if o, ok := e.Value.(primitive.ObjectID); ok {
+				if o, ok := e.Value.(bson.ObjectID); ok {
 					ref.ID = o.Hex()
 				}
 			case "email":

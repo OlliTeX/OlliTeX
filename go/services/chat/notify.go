@@ -1,9 +1,8 @@
 package chat
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"context"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // DEFAULT_NOTIFICATION_PREFERENCES (Node: NotificationsManager) — all true.
@@ -73,12 +72,12 @@ func senderName(u *UserNames) string {
 // branch for real room documents — thread_id is an ObjectId or absent, never
 // the string 'GLOBAL' — so the fan-out actually runs for global threads too.
 // We mirror the behaviour: no early return.)
-func (s *Server) notifyThreadMessage(ctx context.Context, rawProjectID string, thread *Room, messageID primitive.ObjectID, senderID primitive.ObjectID) {
+func (s *Server) notifyThreadMessage(ctx context.Context, rawProjectID string, thread *Room, messageID bson.ObjectID, senderID bson.ObjectID) {
 	s.notify(ctx, rawProjectID, thread, messageID, senderID)
 }
 
-func (s *Server) notify(ctx context.Context, rawProjectID string, thread *Room, messageID primitive.ObjectID, senderID primitive.ObjectID) {
-	projectID, _ := primitive.ObjectIDFromHex(rawProjectID)
+func (s *Server) notify(ctx context.Context, rawProjectID string, thread *Room, messageID bson.ObjectID, senderID bson.ObjectID) {
+	projectID, _ := bson.ObjectIDFromHex(rawProjectID)
 	senderHex := senderID.Hex()
 
 	project, err := s.store.ProjectRefs(ctx, projectID)
@@ -94,9 +93,9 @@ func (s *Server) notify(ctx context.Context, rawProjectID string, thread *Room, 
 	// projectUserIds: [owner, ...collaborators, ...readOnly, ...tokenAccessRW,
 	// ...tokenAccessRO] filtered Boolean, deduped, sender excluded, JS Set
 	// (insertion) order.
-	var projectUserIDs []primitive.ObjectID
+	var projectUserIDs []bson.ObjectID
 	seen := map[string]bool{}
-	addUser := func(id *primitive.ObjectID) {
+	addUser := func(id *bson.ObjectID) {
 		if id == nil {
 			return
 		}
@@ -178,7 +177,7 @@ func (s *Server) notify(ctx context.Context, rawProjectID string, thread *Room, 
 		ownerHex = project.Owner.Hex()
 	}
 
-	var recipients []primitive.ObjectID
+	var recipients []bson.ObjectID
 	for _, rid := range projectUserIDs {
 		rhex := rid.Hex()
 		if muted[rhex] {

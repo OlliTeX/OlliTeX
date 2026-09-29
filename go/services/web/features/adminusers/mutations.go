@@ -30,9 +30,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 
 	"ollitex/go/services/web/core"
@@ -191,7 +190,7 @@ func jsonValEqual63b(a, b any) bool {
 	}
 }
 
-func findDE63b(d primitive.D, key string) (any, bool) {
+func findDE63b(d bson.D, key string) (any, bool) {
 	for _, e := range d {
 		if e.Key == key {
 			return e.Value, true
@@ -200,7 +199,7 @@ func findDE63b(d primitive.D, key string) (any, bool) {
 	return nil, false
 }
 
-func docString63b(d primitive.D, key string) (string, bool) {
+func docString63b(d bson.D, key string) (string, bool) {
 	v, ok := findDE63b(d, key)
 	if !ok {
 		return "", false
@@ -209,11 +208,11 @@ func docString63b(d primitive.D, key string) (string, bool) {
 	return s, isS
 }
 
-func objectID63bOrZero(h string) primitive.ObjectID {
-	if o, err := primitive.ObjectIDFromHex(h); err == nil {
+func objectID63bOrZero(h string) bson.ObjectID {
+	if o, err := bson.ObjectIDFromHex(h); err == nil {
 		return o
 	}
-	return primitive.NilObjectID
+	return bson.NilObjectID
 }
 
 func actorHex63b(cxt *core.Cxt) string {
@@ -427,7 +426,7 @@ func createHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, res *core
 		users := db.Collection("users")
 
 		// registerNewUser: validate + getUserByAnyEmail + create-if-missing.
-		var existing primitive.D
+		var existing bson.D
 		found := users.FindOne(ctx,
 			bson.D{{Key: "emails", Value: bson.D{{Key: "$exists", Value: true}}}, {Key: "emails.email", Value: email}}).
 			Decode(&existing) == nil
@@ -440,12 +439,12 @@ func createHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, res *core
 		}
 
 		now := time.Now().UTC()
-		var id primitive.ObjectID
+		var id bson.ObjectID
 		createFresh := !found
 		if found {
-			id, _ = existing[0].Value.(primitive.ObjectID)
+			id, _ = existing[0].Value.(bson.ObjectID)
 		} else {
-			id = primitive.NewObjectID()
+			id = bson.NewObjectID()
 		}
 
 		first, firstIsStr := bm["first_name"].(string)
@@ -469,7 +468,7 @@ func createHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, res *core
 			"email":            emailStr,
 			"reversedHostname": reversedHostname63b(email),
 			"confirmedAt":      now.Add(time.Millisecond),
-			"_id":              primitive.NewObjectID(),
+			"_id":              bson.NewObjectID(),
 			"createdAt":        now.Add(time.Millisecond),
 		}}
 
@@ -579,7 +578,7 @@ func createHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, res *core
 	}
 }
 
-func holdingAccountFalse63b(doc primitive.D) bool {
+func holdingAccountFalse63b(doc bson.D) bool {
 	v, ok := findDE63b(doc, "holdingAccount")
 	if !ok {
 		return false
@@ -600,7 +599,7 @@ func sendActivationHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, r
 				"Error sending activation email. Please check your SMTP configuration.",
 				"unprocessable entity")
 		}
-		tid, err := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+		tid, err := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 		if err != nil {
 			fail422()
 			return
@@ -612,7 +611,7 @@ func sendActivationHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, r
 			fail422()
 			return
 		}
-		var udoc primitive.D
+		var udoc bson.D
 		if db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: tid}}).Decode(&udoc) != nil {
 			fail422()
 			return
@@ -641,7 +640,7 @@ func updateHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, res *core
 		if _, ok := gate(a, cxt, res); !ok {
 			return
 		}
-		tid, err := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+		tid, err := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 		if err != nil {
 			views.Error500Page(res.W, pageBase(cxt, cxt.Req.URL.Path))
 			return
@@ -670,7 +669,7 @@ func updateHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, res *core
 			return
 		}
 		users := db.Collection("users")
-		var udoc primitive.D
+		var udoc bson.D
 		if users.FindOne(ctx, bson.D{{Key: "_id", Value: tid}}).Decode(&udoc) != nil {
 			views.Error500Page(res.W, pageBase(cxt, cxt.Req.URL.Path))
 			return
@@ -696,7 +695,7 @@ func updateHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, res *core
 					"There was a problem changing your email address. Please try again in a few moments. If the problem continues please contact us.")
 				return
 			}
-			var hit primitive.D
+			var hit bson.D
 			exists := users.FindOne(ctx,
 				bson.D{{Key: "emails", Value: bson.D{{Key: "$exists", Value: true}}}, {Key: "emails.email", Value: newEmail}}).
 				Decode(&hit) == nil
@@ -804,7 +803,7 @@ func updateHandler63b(fm *mailBox63b, a *core.App) func(cxt *core.Cxt, res *core
 		// ---- canManageTemplates (Node: after the loop, before save) ----
 		if ct, ctIsPresent := bm["canManageTemplates"]; ctIsPresent {
 			if bv, isB := ct.(bool); isB && !bv {
-				var full primitive.D
+				var full bson.D
 				okFull := users.FindOne(ctx, bson.D{{Key: "_id", Value: tid}},
 					options.FindOne().SetProjection(bson.D{{Key: "isAdmin", Value: 1}})).Decode(&full) == nil
 				if okFull {
@@ -879,7 +878,7 @@ func deleteHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 		fail422 := func() {
 			errResponse63b(cxt, res, 422, "Something went wrong. Does the account still exist?", "unprocessable entity")
 		}
-		tid, err := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+		tid, err := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 		if err != nil {
 			fail422()
 			return
@@ -893,7 +892,7 @@ func deleteHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			return
 		}
 		users := db.Collection("users")
-		var udoc primitive.D
+		var udoc bson.D
 		if users.FindOne(ctx, bson.D{{Key: "_id", Value: tid}}).Decode(&udoc) != nil {
 			fail422()
 			return
@@ -925,7 +924,7 @@ func deleteHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 		dd := bson.D{
 			{Key: "deletedAt", Value: nowT},
 		}
-		if o, oerr := primitive.ObjectIDFromHex(actor); oerr == nil {
+		if o, oerr := bson.ObjectIDFromHex(actor); oerr == nil {
 			dd = append(dd, bson.E{Key: "deleterId", Value: o})
 		}
 		if ip != "" {
@@ -945,7 +944,7 @@ func deleteHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			}
 		}
 		if ov, hasOv := findDE63b(udoc, "overleaf"); hasOv {
-			if m, isM := ov.(primitive.D); isM {
+			if m, isM := ov.(bson.D); isM {
 				if idv, isID := findDE63b(m, "id"); isID && idv != nil {
 					dd = append(dd, bson.E{Key: "deletedUserOverleafId", Value: idv})
 				}
@@ -956,7 +955,7 @@ func deleteHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			bson.D{{Key: "$set", Value: bson.D{
 				{Key: "user", Value: udoc},
 				{Key: "deleterData", Value: dd},
-			}}}, options.Update().SetUpsert(true))
+			}}}, options.UpdateOne().SetUpsert(true))
 
 		// 3) owned-projects chain ("account-deletion") + membership pulls.
 		projectlist.DeleteOwnedProjects(a, cxt, tid.Hex(), actor, ip)
@@ -991,7 +990,7 @@ func deleteHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 				dat = jsonString63b(isoMs63b(tm))
 			case int64:
 				dat = jsonString63b(time.UnixMilli(tm).UTC().Format("2006-01-02T15:04:05.000Z"))
-			case primitive.DateTime:
+			case bson.DateTime:
 				dat = jsonString63b(time.UnixMilli(int64(tm)).UTC().Format("2006-01-02T15:04:05.000Z"))
 			}
 		}
@@ -1006,7 +1005,7 @@ func restoreHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 		if _, ok := gate(a, cxt, res); !ok {
 			return
 		}
-		tid, err := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+		tid, err := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 		if err != nil {
 			legacyInternal63b(cxt, res, "Sorry, something went wrong")
 			return
@@ -1030,7 +1029,7 @@ func restoreHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 		}
 		snapshot := delRec.User
 		snapshotEmail, _ := docString63b(snapshot, "email")
-		var hit primitive.D
+		var hit bson.D
 		if db.Collection("users").FindOne(ctx, bson.D{{Key: "email", Value: snapshotEmail}}).Decode(&hit) == nil {
 			errResponse63b(cxt, res, 409,
 				"This email address is already associated with a different Overleaf account.",
@@ -1063,11 +1062,11 @@ func restoreHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 }
 
 // delRec63b — explicit D targets keep nested documents ordered (decoding a
-// sub-doc into interface{} yields an unordered primitive.M).
+// sub-doc into interface{} yields an unordered bson.M).
 type delRec63b struct {
-	ID          primitive.ObjectID `bson:"_id"`
-	User        primitive.D        `bson:"user"`
-	DeleterData primitive.D        `bson:"deleterData"`
+	ID          bson.ObjectID `bson:"_id"`
+	User        bson.D        `bson:"user"`
+	DeleterData bson.D        `bson:"deleterData"`
 }
 
 // ---------- DELETE /admin/user/:userId (purge) ----------
@@ -1080,7 +1079,7 @@ func purgeHandler63b(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 		fail422 := func() {
 			errResponse63b(cxt, res, 422, "Something went wrong. The user is already deleted?", "unprocessable entity")
 		}
-		tid, err := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+		tid, err := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 		if err != nil {
 			fail422()
 			return

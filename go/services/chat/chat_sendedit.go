@@ -1,10 +1,9 @@
 package chat
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"net/http"
 	"ollitex/go/pbhttp"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // sendBody validates { user_id: objectId, content: messageContent } (strict).
@@ -74,7 +73,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request, params map[
 	if !finishValidation(w, pIssues, bIssues) {
 		return
 	}
-	tid, _ := primitive.ObjectIDFromHex(params["threadId"])
+	tid, _ := bson.ObjectIDFromHex(params["threadId"])
 	s.sendCore(w, r, params["projectId"], &tid, userID, content)
 }
 
@@ -83,10 +82,10 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request, params map[
 
 // sendCore is the Node _sendMessage body: findOrCreateThread → createMessage →
 // fire-and-forget notifications → 201 {id, content, timestamp, user_id, room_id}.
-func (s *Server) sendCore(w http.ResponseWriter, r *http.Request, rawProjectID string, threadID *primitive.ObjectID, userID, content string) {
+func (s *Server) sendCore(w http.ResponseWriter, r *http.Request, rawProjectID string, threadID *bson.ObjectID, userID, content string) {
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(rawProjectID)
-	sender, _ := primitive.ObjectIDFromHex(userID)
+	pid, _ := bson.ObjectIDFromHex(rawProjectID)
+	sender, _ := bson.ObjectIDFromHex(userID)
 
 	room, err := s.store.FindOrCreateRoom(ctx, pid, threadID)
 	if err != nil {
@@ -125,8 +124,8 @@ func (s *Server) deleteGlobalMessage(w http.ResponseWriter, r *http.Request, par
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
-	mid, _ := primitive.ObjectIDFromHex(params["messageId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
+	mid, _ := bson.ObjectIDFromHex(params["messageId"])
 	room, err := s.store.FindOrCreateRoom(ctx, pid, nil)
 	if err != nil {
 		s.internal(w, err)
@@ -173,7 +172,7 @@ func (s *Server) editMessage(w http.ResponseWriter, r *http.Request, params map[
 	if !finishValidation(w, pIssues, bIssues) {
 		return
 	}
-	tid, _ := primitive.ObjectIDFromHex(params["threadId"])
+	tid, _ := bson.ObjectIDFromHex(params["threadId"])
 	s.editCore(w, r, params["projectId"], &tid, params["messageId"], content, userID)
 }
 
@@ -182,18 +181,18 @@ func (s *Server) editMessage(w http.ResponseWriter, r *http.Request, params map[
 
 // editCore mirrors edit*Message: findOrCreateThread + updateMessage;
 // modifiedCount !== 1 → res.sendStatus(404), else 204.
-func (s *Server) editCore(w http.ResponseWriter, r *http.Request, rawProjectID string, threadID *primitive.ObjectID, rawMessageID, content, rawUserID string) {
+func (s *Server) editCore(w http.ResponseWriter, r *http.Request, rawProjectID string, threadID *bson.ObjectID, rawMessageID, content, rawUserID string) {
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(rawProjectID)
-	mid, _ := primitive.ObjectIDFromHex(rawMessageID)
+	pid, _ := bson.ObjectIDFromHex(rawProjectID)
+	mid, _ := bson.ObjectIDFromHex(rawMessageID)
 	room, err := s.store.FindOrCreateRoom(ctx, pid, threadID)
 	if err != nil {
 		s.internal(w, err)
 		return
 	}
-	var userID *primitive.ObjectID
+	var userID *bson.ObjectID
 	if rawUserID != "" {
-		u, _ := primitive.ObjectIDFromHex(rawUserID)
+		u, _ := bson.ObjectIDFromHex(rawUserID)
 		userID = &u // Node: if (userId) query.user_id = new ObjectId(userId)
 	}
 	found, err := s.store.UpdateMessage(ctx, room.ID, mid, userID, content, s.nowMs())

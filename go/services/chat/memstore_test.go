@@ -1,11 +1,10 @@
 package chat
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"context"
 	"sort"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // memStore is a deterministic in-memory Store mirroring the Mongo-backed
@@ -30,7 +29,7 @@ func newMemStore() *memStore {
 	}
 }
 
-func (m *memStore) roomByID(id primitive.ObjectID) *Room {
+func (m *memStore) roomByID(id bson.ObjectID) *Room {
 	for _, r := range m.rooms {
 		if r.ID == id {
 			return r
@@ -39,7 +38,7 @@ func (m *memStore) roomByID(id primitive.ObjectID) *Room {
 	return nil
 }
 
-func (m *memStore) FindOrCreateRoom(ctx context.Context, projectID primitive.ObjectID, threadID *primitive.ObjectID) (*Room, error) {
+func (m *memStore) FindOrCreateRoom(ctx context.Context, projectID bson.ObjectID, threadID *bson.ObjectID) (*Room, error) {
 	m.mu <- struct{}{}
 	defer func() { <-m.mu }()
 	match := func(r *Room) bool {
@@ -57,7 +56,7 @@ func (m *memStore) FindOrCreateRoom(ctx context.Context, projectID primitive.Obj
 		}
 	}
 	room := &Room{
-		ID:        primitive.NewObjectID(),
+		ID:        bson.NewObjectID(),
 		ProjectID: projectID,
 		ThreadID:  threadID,
 	}
@@ -65,14 +64,14 @@ func (m *memStore) FindOrCreateRoom(ctx context.Context, projectID primitive.Obj
 	return room, nil
 }
 
-func (m *memStore) FindRoom(ctx context.Context, projectID primitive.ObjectID, threadID *primitive.ObjectID) (*Room, error) {
+func (m *memStore) FindRoom(ctx context.Context, projectID bson.ObjectID, threadID *bson.ObjectID) (*Room, error) {
 	room, _ := m.FindOrCreateRoomLocked(projectID, threadID)
 	return room, nil
 }
 
 // FindOrCreateRoomLocked is FindOrCreateRoom without creating (pure lookup),
 // used by FindRoom.
-func (m *memStore) FindOrCreateRoomLocked(projectID primitive.ObjectID, threadID *primitive.ObjectID) (*Room, bool) {
+func (m *memStore) FindOrCreateRoomLocked(projectID bson.ObjectID, threadID *bson.ObjectID) (*Room, bool) {
 	m.mu <- struct{}{}
 	defer func() { <-m.mu }()
 	match := func(r *Room) bool {
@@ -92,7 +91,7 @@ func (m *memStore) FindOrCreateRoomLocked(projectID primitive.ObjectID, threadID
 	return nil, false
 }
 
-func (m *memStore) ThreadRooms(ctx context.Context, projectID primitive.ObjectID) ([]*Room, error) {
+func (m *memStore) ThreadRooms(ctx context.Context, projectID bson.ObjectID) ([]*Room, error) {
 	var out []*Room
 	for _, r := range m.rooms {
 		if r.ProjectID == projectID && r.ThreadID != nil {
@@ -102,7 +101,7 @@ func (m *memStore) ThreadRooms(ctx context.Context, projectID primitive.ObjectID
 	return out, nil
 }
 
-func (m *memStore) AllRooms(ctx context.Context, projectID primitive.ObjectID) ([]*Room, error) {
+func (m *memStore) AllRooms(ctx context.Context, projectID bson.ObjectID) ([]*Room, error) {
 	var out []*Room
 	for _, r := range m.rooms {
 		if r.ProjectID == projectID {
@@ -112,7 +111,7 @@ func (m *memStore) AllRooms(ctx context.Context, projectID primitive.ObjectID) (
 	return out, nil
 }
 
-func (m *memStore) RoomsByThreadIDs(ctx context.Context, projectID primitive.ObjectID, threadIDs []primitive.ObjectID) ([]*Room, error) {
+func (m *memStore) RoomsByThreadIDs(ctx context.Context, projectID bson.ObjectID, threadIDs []bson.ObjectID) ([]*Room, error) {
 	set := map[string]bool{}
 	for _, id := range threadIDs {
 		set[id.Hex()] = true
@@ -126,7 +125,7 @@ func (m *memStore) RoomsByThreadIDs(ctx context.Context, projectID primitive.Obj
 	return out, nil
 }
 
-func (m *memStore) ResolveThread(ctx context.Context, projectID, threadID, userID primitive.ObjectID) error {
+func (m *memStore) ResolveThread(ctx context.Context, projectID, threadID, userID bson.ObjectID) error {
 	room, _ := m.FindOrCreateRoomLocked(projectID, &threadID)
 	if room == nil {
 		return nil // no-match updateOne: not an error in Node either
@@ -135,7 +134,7 @@ func (m *memStore) ResolveThread(ctx context.Context, projectID, threadID, userI
 	return nil
 }
 
-func (m *memStore) ReopenThread(ctx context.Context, projectID, threadID primitive.ObjectID) error {
+func (m *memStore) ReopenThread(ctx context.Context, projectID, threadID bson.ObjectID) error {
 	room, _ := m.FindOrCreateRoomLocked(projectID, &threadID)
 	if room == nil {
 		return nil
@@ -144,7 +143,7 @@ func (m *memStore) ReopenThread(ctx context.Context, projectID, threadID primiti
 	return nil
 }
 
-func (m *memStore) DeleteRoom(ctx context.Context, id primitive.ObjectID) error {
+func (m *memStore) DeleteRoom(ctx context.Context, id bson.ObjectID) error {
 	for i, r := range m.rooms {
 		if r.ID == id {
 			m.rooms = append(m.rooms[:i], m.rooms[i+1:]...)
@@ -154,7 +153,7 @@ func (m *memStore) DeleteRoom(ctx context.Context, id primitive.ObjectID) error 
 	return nil
 }
 
-func (m *memStore) DeleteRoomsByProject(ctx context.Context, projectID primitive.ObjectID) error {
+func (m *memStore) DeleteRoomsByProject(ctx context.Context, projectID bson.ObjectID) error {
 	var kept []*Room
 	for _, r := range m.rooms {
 		if r.ProjectID != projectID {
@@ -172,8 +171,8 @@ func (m *memStore) InsertRoom(ctx context.Context, room *Room) error {
 	return nil
 }
 
-func (m *memStore) ResolvedThreadIDs(ctx context.Context, projectID primitive.ObjectID) ([]primitive.ObjectID, error) {
-	var out []primitive.ObjectID
+func (m *memStore) ResolvedThreadIDs(ctx context.Context, projectID bson.ObjectID) ([]bson.ObjectID, error) {
+	var out []bson.ObjectID
 	for _, r := range m.rooms {
 		if r.ProjectID == projectID && r.ThreadID != nil && r.Resolved != nil {
 			out = append(out, *r.ThreadID)
@@ -182,7 +181,7 @@ func (m *memStore) ResolvedThreadIDs(ctx context.Context, projectID primitive.Ob
 	return out, nil
 }
 
-func (m *memStore) FetchMessage(ctx context.Context, roomID, msgID primitive.ObjectID) (*Message, error) {
+func (m *memStore) FetchMessage(ctx context.Context, roomID, msgID bson.ObjectID) (*Message, error) {
 	for _, msg := range m.messages {
 		if msg.ID == msgID && msg.RoomID == roomID {
 			return msg, nil
@@ -191,10 +190,10 @@ func (m *memStore) FetchMessage(ctx context.Context, roomID, msgID primitive.Obj
 	return nil, nil
 }
 
-func (m *memStore) InsertMessage(ctx context.Context, roomID, userID primitive.ObjectID, content any, ts int64) (primitive.ObjectID, error) {
+func (m *memStore) InsertMessage(ctx context.Context, roomID, userID bson.ObjectID, content any, ts int64) (bson.ObjectID, error) {
 	m.mu <- struct{}{}
 	defer func() { <-m.mu }()
-	id := primitive.NewObjectID()
+	id := bson.NewObjectID()
 	m.messages = append(m.messages, &Message{
 		ID:        id,
 		Content:   content,
@@ -205,7 +204,7 @@ func (m *memStore) InsertMessage(ctx context.Context, roomID, userID primitive.O
 	return id, nil
 }
 
-func (m *memStore) RoomMessages(ctx context.Context, roomID primitive.ObjectID, limit int, before int64) ([]*Message, error) {
+func (m *memStore) RoomMessages(ctx context.Context, roomID bson.ObjectID, limit int, before int64) ([]*Message, error) {
 	var out []*Message
 	for _, msg := range m.messages {
 		if msg.RoomID == roomID {
@@ -222,7 +221,7 @@ func (m *memStore) RoomMessages(ctx context.Context, roomID primitive.ObjectID, 
 	return out, nil
 }
 
-func (m *memStore) MessagesInRooms(ctx context.Context, roomIDs []primitive.ObjectID) ([]*Message, error) {
+func (m *memStore) MessagesInRooms(ctx context.Context, roomIDs []bson.ObjectID) ([]*Message, error) {
 	set := map[string]bool{}
 	for _, id := range roomIDs {
 		set[id.Hex()] = true
@@ -236,7 +235,7 @@ func (m *memStore) MessagesInRooms(ctx context.Context, roomIDs []primitive.Obje
 	return out, nil
 }
 
-func (m *memStore) UpdateMessage(ctx context.Context, roomID, msgID primitive.ObjectID, userID *primitive.ObjectID, content any, ts int64) (bool, error) {
+func (m *memStore) UpdateMessage(ctx context.Context, roomID, msgID bson.ObjectID, userID *bson.ObjectID, content any, ts int64) (bool, error) {
 	for _, msg := range m.messages {
 		if msg.ID == msgID && msg.RoomID == roomID {
 			if userID != nil && msg.UserID != *userID {
@@ -250,7 +249,7 @@ func (m *memStore) UpdateMessage(ctx context.Context, roomID, msgID primitive.Ob
 	return false, nil
 }
 
-func (m *memStore) DeleteMessage(ctx context.Context, roomID, msgID primitive.ObjectID) error {
+func (m *memStore) DeleteMessage(ctx context.Context, roomID, msgID bson.ObjectID) error {
 	for i, msg := range m.messages {
 		if msg.ID == msgID && msg.RoomID == roomID {
 			m.messages = append(m.messages[:i], m.messages[i+1:]...)
@@ -260,7 +259,7 @@ func (m *memStore) DeleteMessage(ctx context.Context, roomID, msgID primitive.Ob
 	return nil
 }
 
-func (m *memStore) DeleteUserMessage(ctx context.Context, userID, roomID, msgID primitive.ObjectID) error {
+func (m *memStore) DeleteUserMessage(ctx context.Context, userID, roomID, msgID bson.ObjectID) error {
 	for i, msg := range m.messages {
 		if msg.ID == msgID && msg.UserID == userID && msg.RoomID == roomID {
 			m.messages = append(m.messages[:i], m.messages[i+1:]...)
@@ -270,7 +269,7 @@ func (m *memStore) DeleteUserMessage(ctx context.Context, userID, roomID, msgID 
 	return nil
 }
 
-func (m *memStore) DeleteMessagesInRoom(ctx context.Context, roomID primitive.ObjectID) error {
+func (m *memStore) DeleteMessagesInRoom(ctx context.Context, roomID bson.ObjectID) error {
 	var kept []*Message
 	for _, msg := range m.messages {
 		if msg.RoomID != roomID {
@@ -281,7 +280,7 @@ func (m *memStore) DeleteMessagesInRoom(ctx context.Context, roomID primitive.Ob
 	return nil
 }
 
-func (m *memStore) DeleteMessagesInRooms(ctx context.Context, roomIDs []primitive.ObjectID) error {
+func (m *memStore) DeleteMessagesInRooms(ctx context.Context, roomIDs []bson.ObjectID) error {
 	set := map[string]bool{}
 	for _, id := range roomIDs {
 		set[id.Hex()] = true
@@ -296,7 +295,7 @@ func (m *memStore) DeleteMessagesInRooms(ctx context.Context, roomIDs []primitiv
 	return nil
 }
 
-func (m *memStore) CountMessages(ctx context.Context, roomID primitive.ObjectID) (int64, error) {
+func (m *memStore) CountMessages(ctx context.Context, roomID bson.ObjectID) (int64, error) {
 	var n int64
 	for _, msg := range m.messages {
 		if msg.RoomID == roomID {
@@ -306,7 +305,7 @@ func (m *memStore) CountMessages(ctx context.Context, roomID primitive.ObjectID)
 	return n, nil
 }
 
-func (m *memStore) FirstMessage(ctx context.Context, roomID primitive.ObjectID) (*Message, error) {
+func (m *memStore) FirstMessage(ctx context.Context, roomID bson.ObjectID) (*Message, error) {
 	var best *Message
 	for _, msg := range m.messages {
 		if msg.RoomID != roomID {
@@ -319,9 +318,9 @@ func (m *memStore) FirstMessage(ctx context.Context, roomID primitive.ObjectID) 
 	return best, nil
 }
 
-func (m *memStore) DistinctMessageUsers(ctx context.Context, roomID primitive.ObjectID) ([]primitive.ObjectID, error) {
+func (m *memStore) DistinctMessageUsers(ctx context.Context, roomID bson.ObjectID) ([]bson.ObjectID, error) {
 	seen := map[string]bool{}
-	var out []primitive.ObjectID
+	var out []bson.ObjectID
 	for _, msg := range m.messages {
 		if msg.RoomID == roomID && !seen[msg.UserID.Hex()] {
 			seen[msg.UserID.Hex()] = true
@@ -333,23 +332,23 @@ func (m *memStore) DistinctMessageUsers(ctx context.Context, roomID primitive.Ob
 
 // ---- cross-service -------------------------------------------------------------
 
-func (m *memStore) ProjectRefs(ctx context.Context, id primitive.ObjectID) (*ProjectRefs, error) {
+func (m *memStore) ProjectRefs(ctx context.Context, id bson.ObjectID) (*ProjectRefs, error) {
 	return m.projects[id.Hex()], nil
 }
 
-func (m *memStore) UserNames(ctx context.Context, id primitive.ObjectID) (*UserNames, error) {
+func (m *memStore) UserNames(ctx context.Context, id bson.ObjectID) (*UserNames, error) {
 	return m.users[id.Hex()], nil
 }
 
-func (m *memStore) ProjectPrefs(ctx context.Context, projectID primitive.ObjectID, userIDs []primitive.ObjectID) (map[string]map[string]any, error) {
+func (m *memStore) ProjectPrefs(ctx context.Context, projectID bson.ObjectID, userIDs []bson.ObjectID) (map[string]map[string]any, error) {
 	want := map[string]bool{}
 	for _, id := range userIDs {
 		want[id.Hex()] = true
 	}
 	out := map[string]map[string]any{}
 	for _, doc := range m.prefs {
-		uid, _ := doc["user_id"].(primitive.ObjectID)
-		pid, _ := doc["project_id"].(primitive.ObjectID)
+		uid, _ := doc["user_id"].(bson.ObjectID)
+		pid, _ := doc["project_id"].(bson.ObjectID)
 		if want[uid.Hex()] && pid == projectID {
 			out[uid.Hex()] = doc
 		}
@@ -357,15 +356,15 @@ func (m *memStore) ProjectPrefs(ctx context.Context, projectID primitive.ObjectI
 	return out, nil
 }
 
-func (m *memStore) MutedUserIDs(ctx context.Context, userIDs []primitive.ObjectID) (map[string]bool, error) {
+func (m *memStore) MutedUserIDs(ctx context.Context, userIDs []bson.ObjectID) (map[string]bool, error) {
 	want := map[string]bool{}
 	for _, id := range userIDs {
 		want[id.Hex()] = true
 	}
 	out := map[string]bool{}
 	for _, doc := range m.prefs {
-		uid, _ := doc["user_id"].(primitive.ObjectID)
-		_, hasPID := doc["project_id"].(primitive.ObjectID)
+		uid, _ := doc["user_id"].(bson.ObjectID)
+		_, hasPID := doc["project_id"].(bson.ObjectID)
 		mute, _ := doc["muteAllNotifications"].(bool)
 		if want[uid.Hex()] && (!hasPID) && mute {
 			out[uid.Hex()] = true
@@ -374,9 +373,9 @@ func (m *memStore) MutedUserIDs(ctx context.Context, userIDs []primitive.ObjectI
 	return out, nil
 }
 
-func (m *memStore) UpsertNotification(ctx context.Context, userID primitive.ObjectID, key string, messageOpts map[string]any, templateKey string) error {
+func (m *memStore) UpsertNotification(ctx context.Context, userID bson.ObjectID, key string, messageOpts map[string]any, templateKey string) error {
 	for _, n := range m.notifications {
-		if id, _ := n["user_id"].(primitive.ObjectID); id == userID && n["key"] == key {
+		if id, _ := n["user_id"].(bson.ObjectID); id == userID && n["key"] == key {
 			n["messageOpts"] = messageOpts
 			n["templateKey"] = templateKey
 			return nil
@@ -388,11 +387,11 @@ func (m *memStore) UpsertNotification(ctx context.Context, userID primitive.Obje
 	return nil
 }
 
-func (m *memStore) UpsertEmailNotification(ctx context.Context, recipient, projectID primitive.ObjectID, opts map[string]any) error {
+func (m *memStore) UpsertEmailNotification(ctx context.Context, recipient, projectID bson.ObjectID, opts map[string]any) error {
 	now := time.Now()
 	for _, e := range m.emailNotifs {
-		if id, _ := e["recipient_id"].(primitive.ObjectID); id == recipient {
-			if pid, _ := e["project_id"].(primitive.ObjectID); pid == projectID {
+		if id, _ := e["recipient_id"].(bson.ObjectID); id == recipient {
+			if pid, _ := e["project_id"].(bson.ObjectID); pid == projectID {
 				e["opts"] = opts
 				e["scheduledAt"] = now
 				e["updatedAt"] = now

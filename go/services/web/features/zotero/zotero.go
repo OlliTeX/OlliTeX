@@ -44,16 +44,15 @@ package zotero
 
 import (
 	"context"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"strconv"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"ollitex/go/services/web/core"
 )
 
-func mustObjectID(hex string) primitive.ObjectID {
-	oid, _ := primitive.ObjectIDFromHex(hex)
+func mustObjectID(hex string) bson.ObjectID {
+	oid, _ := bson.ObjectIDFromHex(hex)
 	return oid
 }
 

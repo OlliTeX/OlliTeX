@@ -2,10 +2,9 @@ package compile
 
 import (
 	"encoding/json"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"regexp"
 	"testing"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func mustJSON(t *testing.T, v any) string {
@@ -167,13 +166,13 @@ func TestComputeLimitsDefaults(t *testing.T) {
 		t.Fatalf("defaults: %+v", lim)
 	}
 	// alpha user → alpha group → premium backend
-	ownerAlpha := primitive.D{{Key: "alphaProgram", Value: true}}
+	ownerAlpha := bson.D{{Key: "alphaProgram", Value: true}}
 	lim = computeLimits(&ownerAlpha, "")
 	if lim.CompileGroup != "alpha" || lim.BackendClass != "premium" {
 		t.Fatalf("alpha: %+v", lim)
 	}
 	// owner features override
-	ownerFeatures := primitive.D{{Key: "features", Value: primitive.D{
+	ownerFeatures := bson.D{{Key: "features", Value: bson.D{
 		{Key: "compileGroup", Value: "standard"},
 		{Key: "compileTimeout", Value: int32(100)},
 	}}}
@@ -187,38 +186,38 @@ func TestComputeLimitsDefaults(t *testing.T) {
 	}
 }
 
-func fakeProject() primitive.D {
-	d1 := primitive.NewObjectID()
-	d2 := primitive.NewObjectID()
-	d3 := primitive.NewObjectID()
-	return primitive.D{
-		{Key: "_id", Value: primitive.NewObjectID()},
+func fakeProject() bson.D {
+	d1 := bson.NewObjectID()
+	d2 := bson.NewObjectID()
+	d3 := bson.NewObjectID()
+	return bson.D{
+		{Key: "_id", Value: bson.NewObjectID()},
 		{Key: "compiler", Value: "pdflatex"},
-		{Key: "overleaf", Value: primitive.D{{Key: "history", Value: primitive.D{{Key: "id", Value: "hid123"}}}}},
+		{Key: "overleaf", Value: bson.D{{Key: "history", Value: bson.D{{Key: "id", Value: "hid123"}}}}},
 		{Key: "rootDoc_id", Value: d1},
-		{Key: "owner_ref", Value: primitive.NewObjectID()},
-		{Key: "rootFolder", Value: primitive.A{
-			primitive.D{
-				{Key: "_id", Value: primitive.NewObjectID()},
+		{Key: "owner_ref", Value: bson.NewObjectID()},
+		{Key: "rootFolder", Value: bson.A{
+			bson.D{
+				{Key: "_id", Value: bson.NewObjectID()},
 				{Key: "name", Value: "rootFolder"},
-				{Key: "docs", Value: primitive.A{
-					primitive.D{{Key: "_id", Value: d1}, {Key: "name", Value: "main.tex"}},
-					primitive.D{{Key: "_id", Value: d2}, {Key: "name", Value: "notes.md"}},
+				{Key: "docs", Value: bson.A{
+					bson.D{{Key: "_id", Value: d1}, {Key: "name", Value: "main.tex"}},
+					bson.D{{Key: "_id", Value: d2}, {Key: "name", Value: "notes.md"}},
 				}},
-				{Key: "fileRefs", Value: primitive.A{
-					primitive.D{
-						{Key: "_id", Value: primitive.NewObjectID()},
+				{Key: "fileRefs", Value: bson.A{
+					bson.D{
+						{Key: "_id", Value: bson.NewObjectID()},
 						{Key: "name", Value: "frog.jpg"},
 						{Key: "hash", Value: "h1"},
-						{Key: "created", Value: primitive.DateTime(1726422000000)},
+						{Key: "created", Value: bson.DateTime(1726422000000)},
 					},
 				}},
-				{Key: "folders", Value: primitive.A{
-					primitive.D{
-						{Key: "_id", Value: primitive.NewObjectID()},
+				{Key: "folders", Value: bson.A{
+					bson.D{
+						{Key: "_id", Value: bson.NewObjectID()},
 						{Key: "name", Value: "src"},
-						{Key: "docs", Value: primitive.A{
-							primitive.D{{Key: "_id", Value: d3}, {Key: "name", Value: "chap.tex"}},
+						{Key: "docs", Value: bson.A{
+							bson.D{{Key: "_id", Value: d3}, {Key: "name", Value: "chap.tex"}},
 						}},
 					},
 				}},
@@ -229,10 +228,10 @@ func fakeProject() primitive.D {
 
 func TestWalk(t *testing.T) {
 	p := fakeProject()
-	var root primitive.A
+	var root bson.A
 	for _, e := range p {
 		if e.Key == "rootFolder" {
-			root = e.Value.(primitive.A)
+			root = e.Value.(bson.A)
 		}
 	}
 	docs, files := walk(root)
@@ -254,46 +253,46 @@ func TestWalk(t *testing.T) {
 }
 
 func TestCanRead(t *testing.T) {
-	owner := primitive.NewObjectID()
+	owner := bson.NewObjectID()
 	uid := "6aa4b8b573ef0e5094f4cbc0"
 
-	uidOID, _ := primitive.ObjectIDFromHex(uid)
+	uidOID, _ := bson.ObjectIDFromHex(uid)
 
 	cases := []struct {
 		name string
-		doc  primitive.D
+		doc  bson.D
 		ok   bool
 	}{
-		{"owner", primitive.D{
+		{"owner", bson.D{
 			{Key: "owner_ref", Value: uidOID},
 		}, true},
-		{"collab", primitive.D{
+		{"collab", bson.D{
 			{Key: "owner_ref", Value: owner},
-			{Key: "collaberator_refs", Value: primitive.A{uidOID}},
+			{Key: "collaberator_refs", Value: bson.A{uidOID}},
 		}, true},
-		{"readOnly ref", primitive.D{
+		{"readOnly ref", bson.D{
 			{Key: "owner_ref", Value: owner},
-			{Key: "readOnly_refs", Value: primitive.A{uidOID}},
+			{Key: "readOnly_refs", Value: bson.A{uidOID}},
 		}, true},
-		{"public readOnly", primitive.D{
+		{"public readOnly", bson.D{
 			{Key: "owner_ref", Value: owner},
 			{Key: "publicAccesLevel", Value: "readOnly"},
 		}, true},
-		{"public readAndWrite", primitive.D{
+		{"public readAndWrite", bson.D{
 			{Key: "owner_ref", Value: owner},
 			{Key: "publicAccesLevel", Value: "readAndWrite"},
 		}, true},
-		{"token but not tokenBased", primitive.D{
+		{"token but not tokenBased", bson.D{
 			{Key: "owner_ref", Value: owner},
 			{Key: "publicAccesLevel", Value: "off"},
-			{Key: "tokenAccessReadOnly_refs", Value: primitive.A{uidOID}},
+			{Key: "tokenAccessReadOnly_refs", Value: bson.A{uidOID}},
 		}, false},
-		{"token tokenBased", primitive.D{
+		{"token tokenBased", bson.D{
 			{Key: "owner_ref", Value: owner},
 			{Key: "publicAccesLevel", Value: "tokenBased"},
-			{Key: "tokenAccessReadOnly_refs", Value: primitive.A{uidOID}},
+			{Key: "tokenAccessReadOnly_refs", Value: bson.A{uidOID}},
 		}, true},
-		{"stranger private", primitive.D{
+		{"stranger private", bson.D{
 			{Key: "owner_ref", Value: owner},
 		}, false},
 	}
@@ -303,7 +302,7 @@ func TestCanRead(t *testing.T) {
 		}
 	}
 	// site admin always reads
-	if !canRead(primitive.D{{Key: "owner_ref", Value: owner}}, uid, true) {
+	if !canRead(bson.D{{Key: "owner_ref", Value: owner}}, uid, true) {
 		t.Fatal("admin read should pass")
 	}
 }

@@ -1,11 +1,10 @@
 package chat
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"context"
 	"net/http"
 	"ollitex/go/pbhttp"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ---- cross-project --------------------------------------------------------------
@@ -42,10 +41,10 @@ func (s *Server) duplicateCommentThreads(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	ctx := r.Context()
-	pid, _ := primitive.ObjectIDFromHex(params["projectId"])
+	pid, _ := bson.ObjectIDFromHex(params["projectId"])
 	result := map[string]dupResult{}
 	for _, raw := range threads {
-		tid, _ := primitive.ObjectIDFromHex(raw)
+		tid, _ := bson.ObjectIDFromHex(raw)
 		old, err := s.store.FindRoom(ctx, pid, &tid)
 		if err != nil {
 			result[raw] = dupUnknown()
@@ -98,8 +97,8 @@ func (s *Server) cloneCommentThreads(w http.ResponseWriter, r *http.Request, par
 
 func (s *Server) cloneCore(w http.ResponseWriter, r *http.Request, rawSource, rawTarget string) {
 	ctx := r.Context()
-	src, _ := primitive.ObjectIDFromHex(rawSource)
-	dst, _ := primitive.ObjectIDFromHex(rawTarget)
+	src, _ := bson.ObjectIDFromHex(rawSource)
+	dst, _ := bson.ObjectIDFromHex(rawTarget)
 
 	// ThreadManager.cloneThreads: source rooms with thread_id present (natural
 	// order) → insert copies {...room, _id: new, project_id: target},
@@ -111,7 +110,7 @@ func (s *Server) cloneCore(w http.ResponseWriter, r *http.Request, rawSource, ra
 	}
 	var pairs []Pair
 	for _, room := range rooms {
-		to := primitive.NewObjectID()
+		to := bson.NewObjectID()
 		clone := &Room{
 			ID:        to,
 			ProjectID: dst,
@@ -144,13 +143,13 @@ func (s *Server) cloneCore(w http.ResponseWriter, r *http.Request, rawSource, ra
 // new thread_id, resolved copied) and copy the source room's messages without
 // edited_at. Returns the new room's thread_id hex (the Node duplicateId).
 func (s *Server) duplicateRoomCopy(ctx context.Context, old *Room) (string, error) {
-	newThread := primitive.NewObjectID()
+	newThread := bson.NewObjectID()
 	var resolvedCopy *Resolved
 	if old.Resolved != nil {
 		resolvedCopy = &Resolved{UserID: old.Resolved.UserID, TS: old.Resolved.TS}
 	}
 	room := &Room{
-		ID:        primitive.NewObjectID(),
+		ID:        bson.NewObjectID(),
 		ProjectID: old.ProjectID, // Node: project_id: room.project_id (same project)
 		ThreadID:  &newThread,
 		Resolved:  resolvedCopy,
@@ -171,8 +170,8 @@ func (s *Server) duplicateRoomCopy(ctx context.Context, old *Room) (string, erro
 // copyRoomMessagesTo mirrors duplicateRoomToOtherRoom: copy the source room's
 // messages (natural order) to the target, dropping _id and edited_at. A source
 // with no messages is a no-op (Node early return).
-func (s *Server) copyRoomMessagesTo(ctx context.Context, from, to primitive.ObjectID) error {
-	msgs, err := s.store.MessagesInRooms(ctx, []primitive.ObjectID{from})
+func (s *Server) copyRoomMessagesTo(ctx context.Context, from, to bson.ObjectID) error {
+	msgs, err := s.store.MessagesInRooms(ctx, []bson.ObjectID{from})
 	if err != nil {
 		return err
 	}

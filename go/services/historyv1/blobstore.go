@@ -28,10 +28,9 @@ import (
 	"regexp"
 	"unicode/utf8"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/libraries/otc"
 	persistors "ollitex/go/libraries/persistors"
@@ -93,7 +92,7 @@ func (b *BlobStore) Initialize(ctx context.Context) error {
 	if b.pg != nil && numericID(b.projectID) {
 		return nil // Node: "Nothing to do for Postgres"
 	}
-	oid, err := primitive.ObjectIDFromHex(b.projectID)
+	oid, err := bson.ObjectIDFromHex(b.projectID)
 	if err != nil {
 		return fmt.Errorf("bad projectId: %v", err)
 	}
@@ -120,7 +119,7 @@ func (b *BlobStore) FindBlob(ctx context.Context, hash string) (*otc.Blob, error
 	if !blobHashRe.MatchString(hash) {
 		return nil, errors.New("bad blob hash")
 	}
-	oid, err := primitive.ObjectIDFromHex(b.projectID)
+	oid, err := bson.ObjectIDFromHex(b.projectID)
 	if err != nil {
 		return nil, errors.New("bad projectId")
 	}
@@ -138,7 +137,7 @@ func (b *BlobStore) FindBlob(ctx context.Context, hash string) (*otc.Blob, error
 }
 
 // lookup — unsharded `blobs` collection: doc.blobs.<h[0:3]>[] record {h==hash}.
-func (b *BlobStore) lookup(coll *mongo.Collection, oid primitive.ObjectID, bucket, hash string, ctx context.Context) (*BlobMeta, error) {
+func (b *BlobStore) lookup(coll *mongo.Collection, oid bson.ObjectID, bucket, hash string, ctx context.Context) (*BlobMeta, error) {
 	var doc projectBlobDoc
 	err := coll.FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&doc)
 	if err != nil {
@@ -164,7 +163,7 @@ func (b *BlobStore) lookupSharded(hash string, ctx context.Context) (*BlobMeta, 
 	}
 	var doc projectBlobDoc
 	err = b.db.Collection("shardedBlobs").FindOne(ctx, bson.D{
-		{Key: "_id", Value: primitive.Binary{Subtype: 0x00, Data: idBytes}},
+		{Key: "_id", Value: bson.Binary{Subtype: 0x00, Data: idBytes}},
 	}).Decode(&doc)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -244,7 +243,7 @@ func (b *BlobStore) InsertBlob(ctx context.Context, blob *otc.Blob) error {
 		return (&pgBlobMeta{pg: b.pg}).Insert(ctx, b.projectID, blob)
 	}
 	rec := BlobMeta{Hash: blob.Hash, ByteLength: blob.ByteLength, StringLength: blob.StringLength}
-	oid, err := primitive.ObjectIDFromHex(b.projectID)
+	oid, err := bson.ObjectIDFromHex(b.projectID)
 	if err != nil {
 		return errors.New("bad projectId")
 	}
@@ -294,7 +293,7 @@ func (b *BlobStore) insertSharded(ctx context.Context, rec BlobMeta) error {
 		return err
 	}
 	coll := b.db.Collection("shardedBlobs")
-	id := primitive.Binary{Subtype: 0x00, Data: idBytes}
+	id := bson.Binary{Subtype: 0x00, Data: idBytes}
 	var doc projectBlobDoc
 	err = coll.FindOne(ctx, bson.D{{Key: "_id", Value: id}}).Decode(&doc)
 	if errors.Is(err, mongo.ErrNoDocuments) {
@@ -386,7 +385,7 @@ func (b *BlobStore) DeleteBlobs(ctx context.Context) error {
 	if b.pg != nil && numericID(b.projectID) {
 		return (&pgBlobMeta{pg: b.pg}).Delete(ctx, b.projectID)
 	}
-	oid, err := primitive.ObjectIDFromHex(b.projectID)
+	oid, err := bson.ObjectIDFromHex(b.projectID)
 	if err != nil {
 		return errors.New("bad projectId")
 	}
@@ -397,8 +396,8 @@ func (b *BlobStore) DeleteBlobs(ctx context.Context) error {
 	maxBytes, _ := hex.DecodeString(b.projectID + "0f")
 	_, err = b.db.Collection("shardedBlobs").DeleteMany(ctx, bson.D{
 		{Key: "_id", Value: bson.D{
-			{Key: "$gte", Value: primitive.Binary{Subtype: 0x00, Data: minBytes}},
-			{Key: "$lte", Value: primitive.Binary{Subtype: 0x00, Data: maxBytes}},
+			{Key: "$gte", Value: bson.Binary{Subtype: 0x00, Data: minBytes}},
+			{Key: "$lte", Value: bson.Binary{Subtype: 0x00, Data: maxBytes}},
 		}},
 	})
 	return err
@@ -409,7 +408,7 @@ func (b *BlobStore) GetProjectBlobs(ctx context.Context) ([]BlobMeta, error) {
 	if b.pg != nil && numericID(b.projectID) {
 		return (&pgBlobMeta{pg: b.pg}).GetProjectBlobs(ctx, b.projectID)
 	}
-	oid, err := primitive.ObjectIDFromHex(b.projectID)
+	oid, err := bson.ObjectIDFromHex(b.projectID)
 	if err != nil {
 		return nil, errors.New("bad projectId")
 	}
@@ -429,7 +428,7 @@ func (b *BlobStore) GetProjectBlobs(ctx context.Context) ([]BlobMeta, error) {
 		}
 		var sdoc projectBlobDoc
 		err = b.db.Collection("shardedBlobs").FindOne(ctx, bson.D{
-			{Key: "_id", Value: primitive.Binary{Subtype: 0x00, Data: idBytes}},
+			{Key: "_id", Value: bson.Binary{Subtype: 0x00, Data: idBytes}},
 		}).Decode(&sdoc)
 		if err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
@@ -449,11 +448,11 @@ func (b *BlobStore) Clone(ctx context.Context, sourceProjectID string) ([]string
 	if b.pg != nil && numericID(b.projectID) && numericID(sourceProjectID) {
 		return (&pgBlobMeta{pg: b.pg}).Clone(ctx, sourceProjectID, b.projectID)
 	}
-	oidSrc, err := primitive.ObjectIDFromHex(sourceProjectID)
+	oidSrc, err := bson.ObjectIDFromHex(sourceProjectID)
 	if err != nil {
 		return nil, errors.New("bad source projectId")
 	}
-	oidDst, err := primitive.ObjectIDFromHex(b.projectID)
+	oidDst, err := bson.ObjectIDFromHex(b.projectID)
 	if err != nil {
 		return nil, errors.New("bad target projectId")
 	}
@@ -477,7 +476,7 @@ func (b *BlobStore) Clone(ctx context.Context, sourceProjectID string) ([]string
 		dstBytes, _ := hex.DecodeString(b.projectID + "0" + shard)
 		var sdoc projectBlobDoc
 		err := b.db.Collection("shardedBlobs").FindOne(ctx, bson.D{
-			{Key: "_id", Value: primitive.Binary{Subtype: 0x00, Data: srcBytes}},
+			{Key: "_id", Value: bson.Binary{Subtype: 0x00, Data: srcBytes}},
 		}).Decode(&sdoc)
 		if err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
@@ -492,9 +491,9 @@ func (b *BlobStore) Clone(ctx context.Context, sourceProjectID string) ([]string
 		}
 		if len(sdoc.Blobs) > 0 {
 			if _, err := b.db.Collection("shardedBlobs").UpdateOne(ctx,
-				bson.D{{Key: "_id", Value: primitive.Binary{Subtype: 0x00, Data: dstBytes}}},
+				bson.D{{Key: "_id", Value: bson.Binary{Subtype: 0x00, Data: dstBytes}}},
 				bson.D{{Key: "$set", Value: bson.D{{Key: "blobs", Value: sdoc.Blobs}}}},
-				options.Update().SetUpsert(true)); err != nil {
+				options.UpdateOne().SetUpsert(true)); err != nil {
 				return nil, err
 			}
 		}

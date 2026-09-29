@@ -8,22 +8,21 @@ import (
 	"ollitex/go/services/web/core"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // ---------- project helpers (shared with P3/P4 authorization) ----------
 
 type projectDoc struct {
-	ID                primitive.ObjectID `bson:"_id"`
-	Name              string             `bson:"name"`
-	OwnerRef          string             `bson:"owner_ref"`
-	Tokens            map[string]any     `bson:"tokens"`
-	PublicAccessLevel string             `bson:"publicAccesLevel"`
-	RWRefs            []string           `bson:"tokenAccessReadAndWrite_refs"`
-	RORefs            []string           `bson:"tokenAccessReadOnly_refs"`
-	CollabRefs        []string           `bson:"collaberator_refs"`
-	ReadonlyNamedRefs []string           `bson:"readOnly_refs"`
+	ID                bson.ObjectID  `bson:"_id"`
+	Name              string         `bson:"name"`
+	OwnerRef          string         `bson:"owner_ref"`
+	Tokens            map[string]any `bson:"tokens"`
+	PublicAccessLevel string         `bson:"publicAccesLevel"`
+	RWRefs            []string       `bson:"tokenAccessReadAndWrite_refs"`
+	RORefs            []string       `bson:"tokenAccessReadOnly_refs"`
+	CollabRefs        []string       `bson:"collaberator_refs"`
+	ReadonlyNamedRefs []string       `bson:"readOnly_refs"`
 }
 
 func (p *projectDoc) tokenRW() string { s, _ := p.Tokens["readAndWrite"].(string); return s }
@@ -69,7 +68,7 @@ func findProjectByToken(a *core.App, ctx context.Context, rw bool, token string)
 }
 
 func findProject(a *core.App, ctx context.Context, idHex string) (*projectDoc, bool) {
-	oaid, err := primitive.ObjectIDFromHex(idHex)
+	oaid, err := bson.ObjectIDFromHex(idHex)
 	if err != nil {
 		return nil, false
 	}

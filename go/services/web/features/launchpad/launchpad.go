@@ -9,9 +9,8 @@ import (
 	"os"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -142,8 +141,8 @@ func jsonBody(res *core.Res, code int, obj string) {
 	res.JSON(code, []byte(obj))
 }
 
-func objID(doc bson.M) (primitive.ObjectID, bool) {
-	oid, ok := doc["_id"].(primitive.ObjectID)
+func objID(doc bson.M) (bson.ObjectID, bool) {
+	oid, ok := doc["_id"].(bson.ObjectID)
 	return oid, ok
 }
 
@@ -283,7 +282,7 @@ func hRegisterExternal(a *core.App, method string) func(*core.Cxt, *core.Res) {
 					"email":            email,
 					"reversedHostname": reversedHostname(email),
 					"confirmedAt":      timeNowMillis(),
-					"_id":              primitive.NewObjectID(),
+					"_id":              bson.NewObjectID(),
 				}},
 			}
 			filt := bson.M{"_id": oid}
@@ -401,7 +400,7 @@ func createLocalAdminOrReuse(ctx context.Context, db *mongo.Database, email, pas
 				"email":            email,
 				"reversedHostname": reversedHostname(email),
 				"createdAt":        nowUTC(),
-				"_id":              primitive.NewObjectID(),
+				"_id":              bson.NewObjectID(),
 			}},
 		}
 		if _, uerr := db.Collection("users").UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": set}); uerr != nil {

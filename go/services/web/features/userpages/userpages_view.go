@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func pageBase(cxt *core.Cxt, email, uid string) views.PageData {

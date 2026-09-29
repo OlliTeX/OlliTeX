@@ -12,8 +12,7 @@ package notifications
 
 import (
 	"context"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // Store abstracts the `notifications` collection. It isolates the HTTP layer
@@ -25,24 +24,24 @@ import (
 type Store interface {
 	// GetUserNotifications — UserNotifications(userId):
 	//   db.notifications.find({user_id, templateKey:{$exists:true}}).toArray()
-	GetUserNotifications(ctx context.Context, userID primitive.ObjectID) ([]primitive.M, error)
+	GetUserNotifications(ctx context.Context, userID bson.ObjectID) ([]bson.M, error)
 
 	// CountByUserKey — _countExistingNotifications(userId, notification):
 	//   db.notifications.count({user_id, key})
-	CountByUserKey(ctx context.Context, userID primitive.ObjectID, key string) (int64, error)
+	CountByUserKey(ctx context.Context, userID bson.ObjectID, key string) (int64, error)
 
 	// Upsert — the upsert half of addNotification:
 	//   db.notifications.updateOne({user_id, key}, {$set: doc}, {upsert:true})
 	// setDoc is the full {$set} document (caller builds it, matching Node).
-	Upsert(ctx context.Context, filter primitive.M, setDoc primitive.M) error
+	Upsert(ctx context.Context, filter bson.M, setDoc bson.M) error
 
 	// UnsetByID — removeNotificationId(userId, notificationId):
 	//   db.notifications.updateOne({user_id, _id}, {$unset:{templateKey, messageOpts}})
-	UnsetByID(ctx context.Context, userID, id primitive.ObjectID) error
+	UnsetByID(ctx context.Context, userID, id bson.ObjectID) error
 
 	// UnsetByUserKey — removeNotificationKey(userId, key):
 	//   db.notifications.updateOne({user_id, key}, {$unset:{templateKey}})
-	UnsetByUserKey(ctx context.Context, userID primitive.ObjectID, key string) error
+	UnsetByUserKey(ctx context.Context, userID bson.ObjectID, key string) error
 
 	// UnsetByKeyOnly — removeNotificationByKeyOnly(key):
 	//   db.notifications.updateOne({key}, {$unset:{templateKey}})
@@ -58,7 +57,7 @@ type Store interface {
 
 	// DeleteOneByUser — HealthCheckController.cleanupNotifications:
 	//   db.notifications.deleteOne({user_id})
-	DeleteOneByUser(ctx context.Context, userID primitive.ObjectID) error
+	DeleteOneByUser(ctx context.Context, userID bson.ObjectID) error
 }
 
 // ---- in-memory fake (unit tests) -------------------------------------------
@@ -71,23 +70,23 @@ type Store interface {
 //
 //	{ _id, user_id, key, templateKey?, messageOpts?, expires? }
 type memStore struct {
-	docs  map[string]primitive.M // keyed by user_idHex + "|" + key
+	docs  map[string]bson.M // keyed by user_idHex + "|" + key
 	order []string
 }
 
 func newMemStore() *memStore {
-	return &memStore{docs: map[string]primitive.M{}}
+	return &memStore{docs: map[string]bson.M{}}
 }
 
-func memKey(userID primitive.ObjectID, key string) string {
+func memKey(userID bson.ObjectID, key string) string {
 	return userID.Hex() + "|" + key
 }
 
-func (m *memStore) GetUserNotifications(_ context.Context, userID primitive.ObjectID) ([]primitive.M, error) {
-	out := make([]primitive.M, 0)
+func (m *memStore) GetUserNotifications(_ context.Context, userID bson.ObjectID) ([]bson.M, error) {
+	out := make([]bson.M, 0)
 	for _, k := range m.order {
 		d := m.docs[k]
-		if oid, ok := d["user_id"].(primitive.ObjectID); ok && oid == userID {
+		if oid, ok := d["user_id"].(bson.ObjectID); ok && oid == userID {
 			if _, hasTK := d["templateKey"]; hasTK { // templateKey: {$exists: true}
 				out = append(out, copyDoc(d))
 			}
@@ -96,7 +95,7 @@ func (m *memStore) GetUserNotifications(_ context.Context, userID primitive.Obje
 	return out, nil
 }
 
-func (m *memStore) CountByUserKey(_ context.Context, userID primitive.ObjectID, key string) (int64, error) {
+func (m *memStore) CountByUserKey(_ context.Context, userID bson.ObjectID, key string) (int64, error) {
 	_, ok := m.docs[memKey(userID, key)]
 	if ok {
 		return 1, nil
@@ -104,15 +103,15 @@ func (m *memStore) CountByUserKey(_ context.Context, userID primitive.ObjectID, 
 	return 0, nil
 }
 
-func (m *memStore) Upsert(_ context.Context, filter, setDoc primitive.M) error {
-	userID, _ := filter["user_id"].(primitive.ObjectID)
+func (m *memStore) Upsert(_ context.Context, filter, setDoc bson.M) error {
+	userID, _ := filter["user_id"].(bson.ObjectID)
 	key, _ := filter["key"].(string)
 	k := memKey(userID, key)
-	var base primitive.M
+	var base bson.M
 	if existing, ok := m.docs[k]; ok {
 		base = copyDoc(existing)
 	} else {
-		base = primitive.M{"_id": primitive.NewObjectID()}
+		base = bson.M{"_id": bson.NewObjectID()}
 		m.order = append(m.order, k)
 	}
 	for field, val := range setDoc {
@@ -122,11 +121,11 @@ func (m *memStore) Upsert(_ context.Context, filter, setDoc primitive.M) error {
 	return nil
 }
 
-func (m *memStore) UnsetByID(_ context.Context, userID, id primitive.ObjectID) error {
+func (m *memStore) UnsetByID(_ context.Context, userID, id bson.ObjectID) error {
 	for _, k := range m.order {
 		d := m.docs[k]
-		did, _ := d["_id"].(primitive.ObjectID)
-		_uid, _ := d["user_id"].(primitive.ObjectID)
+		did, _ := d["_id"].(bson.ObjectID)
+		_uid, _ := d["user_id"].(bson.ObjectID)
 		if did == id && _uid == userID {
 			delete(d, "templateKey")
 			delete(d, "messageOpts")
@@ -135,7 +134,7 @@ func (m *memStore) UnsetByID(_ context.Context, userID, id primitive.ObjectID) e
 	return nil
 }
 
-func (m *memStore) UnsetByUserKey(_ context.Context, userID primitive.ObjectID, key string) error {
+func (m *memStore) UnsetByUserKey(_ context.Context, userID bson.ObjectID, key string) error {
 	k := memKey(userID, key)
 	if d, ok := m.docs[k]; ok {
 		delete(d, "templateKey")
@@ -196,12 +195,12 @@ func (m *memStore) DeleteManyByKeyOnly(_ context.Context, key string) (int64, er
 	return n, nil
 }
 
-func (m *memStore) DeleteOneByUser(_ context.Context, userID primitive.ObjectID) error {
+func (m *memStore) DeleteOneByUser(_ context.Context, userID bson.ObjectID) error {
 	write := make([]string, 0, len(m.order))
 	deleted := false
 	for _, k := range m.order {
 		d := m.docs[k]
-		uid, _ := d["user_id"].(primitive.ObjectID)
+		uid, _ := d["user_id"].(bson.ObjectID)
 		if uid == userID && !deleted {
 			delete(m.docs, k)
 			deleted = true
@@ -213,8 +212,8 @@ func (m *memStore) DeleteOneByUser(_ context.Context, userID primitive.ObjectID)
 	return nil
 }
 
-func copyDoc(d primitive.M) primitive.M {
-	out := make(primitive.M, len(d))
+func copyDoc(d bson.M) bson.M {
+	out := make(bson.M, len(d))
 	for k, v := range d {
 		out[k] = v
 	}

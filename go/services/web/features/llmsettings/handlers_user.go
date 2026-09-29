@@ -3,8 +3,7 @@ package llmsettings
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"strings"
 
@@ -165,7 +164,7 @@ func (f *fs) loadProviders(cxt *core.Cxt, u *userDoc) ([]map[string]any, error) 
 			merged = append(merged, orderedRowOf(p))
 		}
 		if u.found {
-			oid, err := primitive.ObjectIDFromHex(cxt.Sess.UserIDHex())
+			oid, err := bson.ObjectIDFromHex(cxt.Sess.UserIDHex())
 			if err == nil {
 				coll, cerr := f.usersColl(cxt.Req.Context())
 				if cerr == nil {
@@ -393,7 +392,7 @@ func (f *fs) addProvider(cxt *core.Cxt, res *core.Res) {
 		f.internal500(res, err)
 		return
 	}
-	oid, err := primitive.ObjectIDFromHex(cxt.Sess.UserIDHex())
+	oid, err := bson.ObjectIDFromHex(cxt.Sess.UserIDHex())
 	if err != nil {
 		f.internal500(res, err)
 		return
@@ -557,7 +556,7 @@ func (f *fs) updateProvider(cxt *core.Cxt, res *core.Res) {
 		f.internal500(res, err)
 		return
 	}
-	oid, err := primitive.ObjectIDFromHex(cxt.Sess.UserIDHex())
+	oid, err := bson.ObjectIDFromHex(cxt.Sess.UserIDHex())
 	if err != nil {
 		f.internal500(res, err)
 		return
@@ -684,7 +683,7 @@ func (f *fs) deleteProvider(cxt *core.Cxt, res *core.Res) {
 		f.internal500(res, err)
 		return
 	}
-	oid, err := primitive.ObjectIDFromHex(cxt.Sess.UserIDHex())
+	oid, err := bson.ObjectIDFromHex(cxt.Sess.UserIDHex())
 	if err != nil {
 		f.internal500(res, err)
 		return
@@ -932,7 +931,7 @@ func (f *fs) saveSelectedModel(cxt *core.Cxt, res *core.Res) {
 		f.internal500(res, err)
 		return
 	}
-	oid, err := primitive.ObjectIDFromHex(cxt.Sess.UserIDHex())
+	oid, err := bson.ObjectIDFromHex(cxt.Sess.UserIDHex())
 	if err != nil {
 		f.internal500(res, err)
 		return
@@ -1017,7 +1016,7 @@ func (f *fs) saveUserCompliance(cxt *core.Cxt, res *core.Res) {
 		f.internal500(res, err)
 		return
 	}
-	oid, err := primitive.ObjectIDFromHex(cxt.Sess.UserIDHex())
+	oid, err := bson.ObjectIDFromHex(cxt.Sess.UserIDHex())
 	if err != nil {
 		f.internal500(res, err)
 		return
@@ -1411,7 +1410,7 @@ func (f *fs) saveGrammarSettings(cxt *core.Cxt, res *core.Res) {
 		f.internal500(res, err)
 		return
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		f.internal500(res, err)
 		return

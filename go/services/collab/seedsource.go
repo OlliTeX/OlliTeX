@@ -41,8 +41,7 @@ import (
 	"regexp"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // maxSeedBytes bounds the seeded text (safety valve; .tex sizes are small).
@@ -152,7 +151,7 @@ func rootDocID(doc bson.D) string {
 	switch t := docGet(doc, "rootDoc_id").(type) {
 	case string:
 		return t
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex()
 	}
 	return ""

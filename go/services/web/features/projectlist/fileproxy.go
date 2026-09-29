@@ -23,12 +23,11 @@
 package projectlist
 
 import (
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -115,8 +114,8 @@ func fileProxyHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			res.JSON(404, delParamVA("File_id"))
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
-		oidF, _ := primitive.ObjectIDFromHex(fidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
+		oidF, _ := bson.ObjectIDFromHex(fidHex)
 		_ = oidF
 
 		uid := ""

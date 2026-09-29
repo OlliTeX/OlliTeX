@@ -11,9 +11,8 @@ import (
 	"ollitex/go/services/web/views"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // ---------- GET /user/settings ----------
@@ -392,7 +391,7 @@ func emailTakenByOther(db *mongo.Database, ctx context.Context, email, selfUID s
 	}
 	self := mustObjectID(selfUID)
 	var hits []struct {
-		ID primitive.ObjectID `bson:"_id"`
+		ID bson.ObjectID `bson:"_id"`
 	}
 	if err := cursor.All(ctx, &hits); err != nil {
 		return false

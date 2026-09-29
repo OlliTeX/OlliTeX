@@ -25,9 +25,8 @@ import (
 	"regexp"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/editorpages"
@@ -72,7 +71,7 @@ func adminUserFields(a *core.App, ctx context.Context, uidHex string) (email, th
 	if a == nil || a.Mongo == nil || uidHex == "" {
 		return "", ""
 	}
-	oid, err := primitive.ObjectIDFromHex(uidHex)
+	oid, err := bson.ObjectIDFromHex(uidHex)
 	if err != nil {
 		return "", ""
 	}

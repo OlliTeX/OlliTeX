@@ -17,10 +17,9 @@ import (
 	"errors"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/libraries/otc"
 )
@@ -130,7 +129,7 @@ func (cs *ChunkStores) getBackend(projectID string) (ChunkBackend, error) {
 // Initialize 1:1 (index.js initializeProject).
 func (cs *ChunkStores) Initialize(ctx context.Context, projectID string) (string, error) {
 	if projectID == "" {
-		oid := primitive.NewObjectID().Hex()
+		oid := bson.NewObjectID().Hex()
 		projectID = oid
 	}
 	// Node: assert.projectId — both shapes accepted (mongo id asserted inside
@@ -485,17 +484,17 @@ func (rec mongoChunkRecord) toMeta() ChunkMeta {
 }
 
 type mongoChunkRecord struct {
-	ID           primitive.ObjectID `bson:"_id"`
-	ProjectID    primitive.ObjectID `bson:"projectId"`
-	StartVersion int                `bson:"startVersion"`
-	EndVersion   int                `bson:"endVersion"`
-	EndTimestamp *time.Time         `bson:"endTimestamp"`
-	State        string             `bson:"state"`
-	Updated      *time.Time         `bson:"updatedAt"`
+	ID           bson.ObjectID `bson:"_id"`
+	ProjectID    bson.ObjectID `bson:"projectId"`
+	StartVersion int           `bson:"startVersion"`
+	EndVersion   int           `bson:"endVersion"`
+	EndTimestamp *time.Time    `bson:"endTimestamp"`
+	State        string        `bson:"state"`
+	Updated      *time.Time    `bson:"updatedAt"`
 }
 
 func (m *mongoChunkBackend) GetLatestChunk(ctx context.Context, projectID string, readOnly bool) (*ChunkMeta, error) {
-	oid, err := primitive.ObjectIDFromHex(projectID)
+	oid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return nil, errors.New("bad projectId")
 	}
@@ -516,7 +515,7 @@ func (m *mongoChunkBackend) GetLatestChunk(ctx context.Context, projectID string
 }
 
 func (m *mongoChunkBackend) GetChunkForVersion(ctx context.Context, projectID string, version int, preferNewer bool) (*ChunkMeta, error) {
-	oid, err := primitive.ObjectIDFromHex(projectID)
+	oid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return nil, errors.New("bad projectId")
 	}
@@ -542,7 +541,7 @@ func (m *mongoChunkBackend) GetChunkForVersion(ctx context.Context, projectID st
 }
 
 func (m *mongoChunkBackend) GetChunkForTimestamp(ctx context.Context, projectID string, ts time.Time) (*ChunkMeta, error) {
-	oid, err := primitive.ObjectIDFromHex(projectID)
+	oid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return nil, errors.New("bad projectId")
 	}
@@ -571,7 +570,7 @@ func (m *mongoChunkBackend) GetChunkForTimestamp(ctx context.Context, projectID 
 }
 
 func (m *mongoChunkBackend) GetProjectChunkIDs(ctx context.Context, projectID string) ([]string, error) {
-	oid, err := primitive.ObjectIDFromHex(projectID)
+	oid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return nil, errors.New("bad projectId")
 	}
@@ -595,7 +594,7 @@ func (m *mongoChunkBackend) GetProjectChunkIDs(ctx context.Context, projectID st
 }
 
 func (m *mongoChunkBackend) GetProjectChunks(ctx context.Context, projectID string) ([]ChunkMeta, error) {
-	oid, err := primitive.ObjectIDFromHex(projectID)
+	oid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return nil, errors.New("bad projectId")
 	}
@@ -619,11 +618,11 @@ func (m *mongoChunkBackend) GetProjectChunks(ctx context.Context, projectID stri
 }
 
 func (m *mongoChunkBackend) Clone(ctx context.Context, srcID, dstID string) (map[string]string, error) {
-	oidSrc, err := primitive.ObjectIDFromHex(srcID)
+	oidSrc, err := bson.ObjectIDFromHex(srcID)
 	if err != nil {
 		return nil, errors.New("bad source projectId")
 	}
-	oidDst, err := primitive.ObjectIDFromHex(dstID)
+	oidDst, err := bson.ObjectIDFromHex(dstID)
 	if err != nil {
 		return nil, errors.New("bad target projectId")
 	}
@@ -653,8 +652,8 @@ func (m *mongoChunkBackend) Clone(ctx context.Context, srcID, dstID string) (map
 			return nil, err
 		}
 		delete(rec, "projectId")
-		newID := primitive.NewObjectID()
-		old, _ := rec["_id"].(primitive.ObjectID)
+		newID := bson.NewObjectID()
+		old, _ := rec["_id"].(bson.ObjectID)
 		chunkIDs[old.Hex()] = newID.Hex()
 		rec["_id"] = newID
 		rec["projectId"] = oidDst
@@ -675,11 +674,11 @@ func (m *mongoChunkBackend) Clone(ctx context.Context, srcID, dstID string) (map
 }
 
 func (m *mongoChunkBackend) InsertPendingChunk(ctx context.Context, projectID string, c *otc.Chunk) (string, error) {
-	oid, err := primitive.ObjectIDFromHex(projectID)
+	oid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return "", errors.New("bad projectId")
 	}
-	chunkID := primitive.NewObjectID()
+	chunkID := bson.NewObjectID()
 	_, err = m.coll().InsertOne(ctx, bson.D{
 		{Key: "_id", Value: chunkID},
 		{Key: "projectId", Value: oid},
@@ -696,11 +695,11 @@ func (m *mongoChunkBackend) InsertPendingChunk(ctx context.Context, projectID st
 }
 
 func (m *mongoChunkBackend) activate(ctx context.Context, projectID, chunkID string) error {
-	poid, err := primitive.ObjectIDFromHex(projectID)
+	poid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return errors.New("bad projectId")
 	}
-	coid, err := primitive.ObjectIDFromHex(chunkID)
+	coid, err := bson.ObjectIDFromHex(chunkID)
 	if err != nil {
 		return errors.New("bad chunkId")
 	}
@@ -725,11 +724,11 @@ func (m *mongoChunkBackend) activate(ctx context.Context, projectID, chunkID str
 }
 
 func (m *mongoChunkBackend) closeChunk(ctx context.Context, projectID, chunkID string) error {
-	poid, err := primitive.ObjectIDFromHex(projectID)
+	poid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return errors.New("bad projectId")
 	}
-	coid, err := primitive.ObjectIDFromHex(chunkID)
+	coid, err := bson.ObjectIDFromHex(chunkID)
 	if err != nil {
 		return errors.New("bad chunkId")
 	}
@@ -748,11 +747,11 @@ func (m *mongoChunkBackend) closeChunk(ctx context.Context, projectID, chunkID s
 }
 
 func (m *mongoChunkBackend) deleteActiveChunk(ctx context.Context, projectID, chunkID string) error {
-	poid, err := primitive.ObjectIDFromHex(projectID)
+	poid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return errors.New("bad projectId")
 	}
-	coid, err := primitive.ObjectIDFromHex(chunkID)
+	coid, err := bson.ObjectIDFromHex(chunkID)
 	if err != nil {
 		return errors.New("bad chunkId")
 	}
@@ -779,7 +778,7 @@ func (m *mongoChunkBackend) ConfirmCreate(ctx context.Context, projectID string,
 		return err
 	}
 	defer sess.EndSession(ctx)
-	_, err = sess.WithTransaction(ctx, func(tctx mongo.SessionContext) (any, error) {
+	_, err = sess.WithTransaction(ctx, func(tctx context.Context) (any, error) {
 		if oldChunkID != nil {
 			if err := m.closeChunk(tctx, projectID, *oldChunkID); err != nil {
 				return nil, err
@@ -802,7 +801,7 @@ func (m *mongoChunkBackend) ConfirmUpdate(ctx context.Context, projectID, oldChu
 		return err
 	}
 	defer sess.EndSession(ctx)
-	_, err = sess.WithTransaction(ctx, func(tctx mongo.SessionContext) (any, error) {
+	_, err = sess.WithTransaction(ctx, func(tctx context.Context) (any, error) {
 		if err := m.deleteActiveChunk(tctx, projectID, oldChunkID); err != nil {
 			return nil, err
 		}
@@ -818,11 +817,11 @@ func (m *mongoChunkBackend) ConfirmUpdate(ctx context.Context, projectID, oldChu
 }
 
 func (m *mongoChunkBackend) DeleteChunk(ctx context.Context, projectID, chunkID string) error {
-	poid, err := primitive.ObjectIDFromHex(projectID)
+	poid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return errors.New("bad projectId")
 	}
-	coid, err := primitive.ObjectIDFromHex(chunkID)
+	coid, err := bson.ObjectIDFromHex(chunkID)
 	if err != nil {
 		return errors.New("bad chunkId")
 	}
@@ -837,7 +836,7 @@ func (m *mongoChunkBackend) DeleteChunk(ctx context.Context, projectID, chunkID 
 }
 
 func (m *mongoChunkBackend) DeleteProjectChunks(ctx context.Context, projectID string) error {
-	poid, err := primitive.ObjectIDFromHex(projectID)
+	poid, err := bson.ObjectIDFromHex(projectID)
 	if err != nil {
 		return errors.New("bad projectId")
 	}
@@ -859,7 +858,7 @@ func (m *mongoChunkBackend) updateProjectRecord(ctx context.Context, projectID s
 
 func (m *mongoChunkBackend) lookupMongoProjectIDFromHistoryID(ctx context.Context, historyID any) (string, error) {
 	var doc struct {
-		ID primitive.ObjectID `bson:"_id"`
+		ID bson.ObjectID `bson:"_id"`
 	}
 	if err := m.db.Collection("projects").FindOne(ctx, bson.D{
 		{Key: "overleaf.history.id", Value: historyID},

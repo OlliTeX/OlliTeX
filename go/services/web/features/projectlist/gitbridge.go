@@ -18,8 +18,7 @@ import (
 	"net/http"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"ollitex/go/services/web/core"
 )
 
@@ -40,7 +39,7 @@ func (s *sinkW) Write(p []byte) (int, error) { return len(p), nil }
 // name). Node _determineFileType table (pinned): existing file stays a file;
 // existing doc: text?doc:file; neither: binary?file:doc.
 // source = DU source string (Node: 'git-bridge').
-func GBWriteBytes(ctx context.Context, a *core.App, pj primitive.ObjectID, uid, relDir, name string, data []byte, source string) bool {
+func GBWriteBytes(ctx context.Context, a *core.App, pj bson.ObjectID, uid, relDir, name string, data []byte, source string) bool {
 	cxt := gctx(ctx)
 	docPtr, lerr := loadProjectFull(a, cxt, pj)
 	if lerr != nil || docPtr == nil {
@@ -85,7 +84,7 @@ func GBWriteBytes(ctx context.Context, a *core.App, pj primitive.ObjectID, uid, 
 
 // GBCollectEntityPaths — Node `entityPaths` (docs + files, root-relative,
 // leading "/", folders NOT included).
-func GBCollectEntityPaths(ctx context.Context, a *core.App, pj primitive.ObjectID) []string {
+func GBCollectEntityPaths(ctx context.Context, a *core.App, pj bson.ObjectID) []string {
 	cxt := gctx(ctx)
 	docPtr, lerr := loadProjectFull(a, cxt, pj)
 	if lerr != nil || docPtr == nil {
@@ -100,7 +99,7 @@ func GBCollectEntityPaths(ctx context.Context, a *core.App, pj primitive.ObjectI
 
 // GBDeleteEntityAtPath deletes the doc or file at (root-relative) fullPath
 // (Node deleteEntityWithPath for a doc/file — P4d pinned sequence).
-func GBDeleteEntityAtPath(ctx context.Context, a *core.App, pj primitive.ObjectID, uid, fullPath string) bool {
+func GBDeleteEntityAtPath(ctx context.Context, a *core.App, pj bson.ObjectID, uid, fullPath string) bool {
 	cxt := gctx(ctx)
 	docPtr, lerr := loadProjectFull(a, cxt, pj)
 	if lerr != nil || docPtr == nil {
@@ -111,7 +110,7 @@ func GBDeleteEntityAtPath(ctx context.Context, a *core.App, pj primitive.ObjectI
 	if len(root) == 0 {
 		return false
 	}
-	uidObj, uerr := primitive.ObjectIDFromHex(uid)
+	uidObj, uerr := bson.ObjectIDFromHex(uid)
 	if uerr != nil {
 		return false
 	}
@@ -161,7 +160,7 @@ func GBDeleteEntityAtPath(ctx context.Context, a *core.App, pj primitive.ObjectI
 	if elemHex == "" {
 		return false
 	}
-	eid, _ := primitive.ObjectIDFromHex(elemHex)
+	eid, _ := bson.ObjectIDFromHex(elemHex)
 	rootDoc := parentEl == mp+".docs" && oidHex(entFld(doc, "rootDoc_id")) == elemHex
 
 	// Node _cleanUpEntity: the deleted doc (self) gets docstore PATCH +
@@ -223,7 +222,7 @@ func splitPath(s string) []string {
 }
 
 // mongoPullEntity — the P4d pinned $pull + $inc + $set (+ $unset rootDoc).
-func mongoPullEntity(ctx context.Context, a *core.App, pj primitive.ObjectID, parentEl string, eid primitive.ObjectID, uid string, uidObj primitive.ObjectID, rootDoc bool) bool {
+func mongoPullEntity(ctx context.Context, a *core.App, pj bson.ObjectID, parentEl string, eid bson.ObjectID, uid string, uidObj bson.ObjectID, rootDoc bool) bool {
 	db, err := a.Mongo.DB(ctx)
 	if err != nil {
 		return false
@@ -234,7 +233,7 @@ func mongoPullEntity(ctx context.Context, a *core.App, pj primitive.ObjectID, pa
 		{Key: "$set", Value: bson.D{{Key: "lastUpdated", Value: time.Now()}, {Key: "lastUpdatedBy", Value: uidObj}}},
 	}
 	if rootDoc {
-		upd = append(upd, primitive.E{Key: "$unset", Value: bson.D{{Key: "rootDoc_id", Value: 1}}})
+		upd = append(upd, bson.E{Key: "$unset", Value: bson.D{{Key: "rootDoc_id", Value: 1}}})
 	}
 	ur, err := db.Collection("projects").UpdateOne(ctx, bson.D{{Key: "_id", Value: pj}}, upd)
 	return err == nil && ur.MatchedCount == 1

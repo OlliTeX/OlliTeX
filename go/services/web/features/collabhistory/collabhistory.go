@@ -39,9 +39,8 @@ import (
 	"ollitex/go/services/web/core"
 
 	"github.com/reearth/ygo/persistence"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // RoleFor resolves (user, project) → collab role. Production wiring reuses
@@ -146,11 +145,11 @@ func (w webMongo) ProjectByID(ctx context.Context, id string) (bson.D, error) {
 	return d, nil
 }
 
-func oid(id string) primitive.ObjectID {
-	if o, err := primitive.ObjectIDFromHex(id); err == nil {
+func oid(id string) bson.ObjectID {
+	if o, err := bson.ObjectIDFromHex(id); err == nil {
 		return o
 	}
-	return primitive.NilObjectID
+	return bson.NilObjectID
 }
 
 // ---------- response bodies (stable shapes; the client parses these) ----------

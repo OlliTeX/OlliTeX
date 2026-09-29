@@ -26,12 +26,11 @@ package projectlist
 import (
 	"encoding/json"
 	"fmt"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -87,7 +86,7 @@ func docDownloadHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			res.JSON(404, delParamVA("Doc_id"))
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
 
 		uid := ""
 		if cxt.Sess != nil {

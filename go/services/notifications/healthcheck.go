@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"io"
 	"net/http"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // healthCheck 1:1 with HealthCheckController.check.
@@ -23,8 +22,8 @@ import (
 // matching Node.
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request, _ map[string]string) {
 	ctx := r.Context()
-	uid := primitive.NewObjectID().Hex()
-	nKey := "smoke-test-notification-" + primitive.NewObjectID().Hex()
+	uid := bson.NewObjectID().Hex()
+	nKey := "smoke-test-notification-" + bson.NewObjectID().Hex()
 
 	// (1) makeNotification — failure here skips the try/catch/finally, → 500.
 	if st, _, e := s.doJSON(ctx, http.MethodPost, "/user/"+uid, map[string]any{

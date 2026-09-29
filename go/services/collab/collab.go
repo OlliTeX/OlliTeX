@@ -31,8 +31,7 @@ import (
 	"github.com/reearth/ygo/crdt"
 	"github.com/reearth/ygo/persistence"
 	ws "github.com/reearth/ygo/provider/websocket"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // Role — the authorization outcome for (user, project).
@@ -333,7 +332,7 @@ func dstr(d bson.D, key string) (string, bool) {
 			if s, ok := e.Value.(string); ok {
 				return s, true
 			}
-			if o, ok := e.Value.(primitive.ObjectID); ok {
+			if o, ok := e.Value.(bson.ObjectID); ok {
 				return o.Hex(), true
 			}
 		}
@@ -364,7 +363,7 @@ func arrContains(arr []any, uid string) bool {
 		if s, ok := v.(string); ok && s == uid {
 			return true
 		}
-		if o, ok := v.(primitive.ObjectID); ok && o.Hex() == uid {
+		if o, ok := v.(bson.ObjectID); ok && o.Hex() == uid {
 			return true
 		}
 	}

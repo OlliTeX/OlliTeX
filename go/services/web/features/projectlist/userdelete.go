@@ -17,8 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -32,7 +31,7 @@ func DeleteOwnedProjects(a *core.App, cxt *core.Cxt, ownerHex, actorHex, ip stri
 	if a.Mongo == nil {
 		return
 	}
-	owner, err := primitive.ObjectIDFromHex(ownerHex)
+	owner, err := bson.ObjectIDFromHex(ownerHex)
 	if err != nil {
 		return
 	}
@@ -49,12 +48,12 @@ func DeleteOwnedProjects(a *core.App, cxt *core.Cxt, ownerHex, actorHex, ip stri
 	if errf != nil {
 		return
 	}
-	var owned []primitive.D
+	var owned []bson.D
 	if err := cur.All(ctx, &owned); err != nil {
 		return
 	}
 	for _, p := range owned {
-		pid, _ := p[0].Value.(primitive.ObjectID)
+		pid, _ := p[0].Value.(bson.ObjectID)
 		deleteProjectExec(a, cxt, pid, p, actorHex, ip, "account-deletion")
 	}
 
@@ -71,12 +70,12 @@ func DeleteOwnedProjects(a *core.App, cxt *core.Cxt, ownerHex, actorHex, ip stri
 	if errm != nil {
 		return
 	}
-	var memberProjs []primitive.D
+	var memberProjs []bson.D
 	if err := mcur.All(ctx, &memberProjs); err != nil {
 		return
 	}
 	for _, mp := range memberProjs {
-		pid, _ := mp[0].Value.(primitive.ObjectID)
+		pid, _ := mp[0].Value.(bson.ObjectID)
 		colPullUser(a, cxt, pid, ownerHex)
 	}
 }
@@ -89,7 +88,7 @@ func RestoreOwnedDeletedProjects(a *core.App, cxt *core.Cxt, userHex string) {
 	if a.Mongo == nil {
 		return
 	}
-	owner, err := primitive.ObjectIDFromHex(userHex)
+	owner, err := bson.ObjectIDFromHex(userHex)
 	if err != nil {
 		return
 	}
@@ -104,7 +103,7 @@ func RestoreOwnedDeletedProjects(a *core.App, cxt *core.Cxt, userHex string) {
 	if errf != nil {
 		return
 	}
-	var recs []primitive.D
+	var recs []bson.D
 	if err := cur.All(ctx, &recs); err != nil {
 		return
 	}
@@ -117,11 +116,11 @@ func RestoreOwnedDeletedProjects(a *core.App, cxt *core.Cxt, userHex string) {
 		if saved[0].Key != "_id" {
 			continue
 		}
-		pid, _ := saved[0].Value.(primitive.ObjectID)
+		pid, _ := saved[0].Value.(bson.ObjectID)
 		origOwnerHex := ""
 		if dv, okv := dg(dpDoc, "deleterData"); okv && dv != nil {
 			if dd := dcast(dv); dd != nil {
-				if o, isO := dget(*dd, "deletedProjectOwnerId").(primitive.ObjectID); isO {
+				if o, isO := dget(*dd, "deletedProjectOwnerId").(bson.ObjectID); isO {
 					origOwnerHex = o.Hex()
 				}
 			}
@@ -151,10 +150,10 @@ func RestoreOwnedDeletedProjects(a *core.App, cxt *core.Cxt, userHex string) {
 			case "name":
 				restored = append(restored, bson.E{Key: "name", Value: finalName})
 			case "deletedDocs":
-				if arr, isA := el.Value.(primitive.A); isA {
+				if arr, isA := el.Value.(bson.A); isA {
 					deletedDocs = arr
 				}
-				restored = append(restored, bson.E{Key: "deletedDocs", Value: primitive.A{}})
+				restored = append(restored, bson.E{Key: "deletedDocs", Value: bson.A{}})
 			default:
 				restored = append(restored, el)
 			}
@@ -170,7 +169,7 @@ func RestoreOwnedDeletedProjects(a *core.App, cxt *core.Cxt, userHex string) {
 				fireHTTP(cxt, "DELETE", f+"/project/"+pid.Hex()+"/doc/"+asStr(did)+"/name/"+asStr(dnm), nil)
 			}
 		}
-		dpID, _ := dpDoc[0].Value.(primitive.ObjectID)
+		dpID, _ := dpDoc[0].Value.(bson.ObjectID)
 		_, _ = db.Collection("deletedProjects").DeleteOne(ctx, bson.D{{Key: "_id", Value: dpID}})
 	}
 }

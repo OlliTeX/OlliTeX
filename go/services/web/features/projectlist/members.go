@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -62,7 +61,7 @@ type memberRow struct {
 // TOKEN-sourced rows): collaborators → readAndWrite, reviewers → review,
 // readOnly → readOnly (with pendingEditor/pendingReviewer flags). Each refs
 // array is emitted in its stored order (no dedup, no sort).
-func invitedMemberRows(doc *primitive.D) []memberRow {
+func invitedMemberRows(doc *bson.D) []memberRow {
 	pe := map[string]bool{}
 	for _, id := range asOIDList(dget(*doc, "pendingEditor_refs")) {
 		pe[id] = true
@@ -92,7 +91,7 @@ func invitedMemberRows(doc *primitive.D) []memberRow {
 
 // loadUsers batch-loads the member user docs (Node: UserGetter.getUsers with
 // projection {_id, email, first_name, last_name, signUpDate}).
-func loadUsers(a *core.App, cxt *core.Cxt, rows []memberRow) map[string]primitive.D {
+func loadUsers(a *core.App, cxt *core.Cxt, rows []memberRow) map[string]bson.D {
 	uids := make([]string, 0, len(rows))
 	for _, r := range rows {
 		uids = append(uids, r.uid)
@@ -124,7 +123,7 @@ func membersHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(404, []byte(malformed404))
 			return
 		}
-		oid, err := primitive.ObjectIDFromHex(strings.ToLower(param))
+		oid, err := bson.ObjectIDFromHex(strings.ToLower(param))
 		if err != nil {
 			res.JSON(404, []byte(malformed404))
 			return
@@ -198,7 +197,7 @@ func jstr(s string) string {
 }
 
 // signUpDateISO formats a BSON Date (which the driver may decode to
-// time.Time, primitive.DateTime, or an int64 ms epoch depending on the target
+// time.Time, bson.DateTime, or an int64 ms epoch depending on the target
 // type) as Node's JSON.stringify(Date): ISO-8601 UTC with milliseconds,
 // e.g. 2026-09-12T02:28:05.099Z.
 func signUpDateISO(v any) (string, bool) {
@@ -206,7 +205,7 @@ func signUpDateISO(v any) (string, bool) {
 	switch x := v.(type) {
 	case time.Time:
 		return f(x), true
-	case primitive.DateTime:
+	case bson.DateTime:
 		return f(time.UnixMilli(int64(x))), true
 	case int64:
 		return f(time.UnixMilli(x)), true

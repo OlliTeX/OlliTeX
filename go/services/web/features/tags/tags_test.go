@@ -1,10 +1,9 @@
 package tags
 
 import (
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"regexp"
 	"testing"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ---------- VA message matrix (pinned against the live Node 400s) ----------
@@ -148,13 +147,13 @@ func TestJstype(t *testing.T) {
 // ---------- doc JSON ----------
 
 func TestDJSONTagStoredOrder(t *testing.T) {
-	oid, _ := primitive.ObjectIDFromHex("6ab225a7db71f85bd15ffaae")
-	d := primitive.D{
+	oid, _ := bson.ObjectIDFromHex("6ab225a7db71f85bd15ffaae")
+	d := bson.D{
 		{Key: "_id", Value: oid},
 		{Key: "user_id", Value: "6aa4b8a873ef0e5094f4cba3"},
 		{Key: "name", Value: "p7u1-alpha"},
 		{Key: "color", Value: "#a1b2c3"},
-		{Key: "project_ids", Value: primitive.A{"6ab225bedb71f85bd15ffaeb"}},
+		{Key: "project_ids", Value: bson.A{"6ab225bedb71f85bd15ffaeb"}},
 		{Key: "__v", Value: int32(0)},
 	}
 	got := string(dJSONTag(d))
@@ -165,12 +164,12 @@ func TestDJSONTagStoredOrder(t *testing.T) {
 }
 
 func TestDJSONTagNoColor(t *testing.T) {
-	oid, _ := primitive.ObjectIDFromHex("6ab225a7db71f85bd15ffab1")
-	d := primitive.D{
+	oid, _ := bson.ObjectIDFromHex("6ab225a7db71f85bd15ffab1")
+	d := bson.D{
 		{Key: "_id", Value: oid},
 		{Key: "user_id", Value: "u"},
 		{Key: "name", Value: "n"},
-		{Key: "project_ids", Value: primitive.A{}},
+		{Key: "project_ids", Value: bson.A{}},
 		{Key: "__v", Value: int32(0)},
 	}
 	got := string(dJSONTag(d))

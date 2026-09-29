@@ -8,8 +8,8 @@ import (
 
 	"github.com/reearth/ygo/crdt"
 	"github.com/reearth/ygo/persistence"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // mongoTestStore — live-Mongo backing for the conformance suite. Skipped
@@ -29,7 +29,7 @@ func TestMongoStoreConformance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	c, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	c, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestMongoStoreAdapterBridge(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	c, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	c, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}

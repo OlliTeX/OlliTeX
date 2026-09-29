@@ -1,14 +1,13 @@
 package editorpages
 
 import (
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"testing"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestBuildUserSettingsP61Fixtures(t *testing.T) {
 	user := map[string]any{
-		"signUpDate": primitive.DateTime(1789391285099), // 2026-09-12 (>= cutoff)
+		"signUpDate": bson.DateTime(1789391285099), // 2026-09-12 (>= cutoff)
 		"ace": map[string]any{
 			"zotero":   map[string]any{"enabled": true, "disablePersonalLibrary": false, "groups": []any{}},
 			"mendeley": map[string]any{"enabled": true, "disablePersonalLibrary": false, "groups": []any{}},

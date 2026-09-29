@@ -49,8 +49,7 @@ import (
 	"ollitex/go/services/web/features/templates"
 	"ollitex/go/services/web/views"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // editorPagePattern — both main-shell prefixes (Node/Express routing is
@@ -331,7 +330,7 @@ type projDoc struct {
 	refs      map[string]any // collab/review/readonly/token refs + publicAccesLevel
 }
 
-func loadProject(a *core.App, ctx context.Context, oid primitive.ObjectID) (map[string]any, bool) {
+func loadProject(a *core.App, ctx context.Context, oid bson.ObjectID) (map[string]any, bool) {
 	if a.Mongo == nil {
 		return nil, false
 	}
@@ -461,7 +460,7 @@ func millisOf(v any) (int64, bool) {
 	switch t := v.(type) {
 	case time.Time:
 		return t.UnixMilli(), true
-	case primitive.DateTime:
+	case bson.DateTime:
 		return int64(t), true
 	case int64:
 		return t, true
@@ -503,8 +502,8 @@ func editorBadId(cxt *core.Cxt, res *core.Res) {
 
 // ---------- tiny decoders ----------
 
-func primitiveObjectID(hex string) primitive.ObjectID {
-	oid, _ := primitive.ObjectIDFromHex(strings.ToLower(hex))
+func primitiveObjectID(hex string) bson.ObjectID {
+	oid, _ := bson.ObjectIDFromHex(strings.ToLower(hex))
 	return oid
 }
 
@@ -517,7 +516,7 @@ func strOf(v any) string {
 
 func oidHexOf(v any) string {
 	switch t := v.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex()
 	case string:
 		return t

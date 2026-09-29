@@ -8,8 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func getRealEnv(k string) string { return os.Getenv(k) }
@@ -30,32 +29,32 @@ func validObjectID(s string) bool {
 	return true
 }
 
-func mustObjectID(s string) primitive.ObjectID {
-	id, _ := primitive.ObjectIDFromHex(s)
+func mustObjectID(s string) bson.ObjectID {
+	id, _ := bson.ObjectIDFromHex(s)
 	return id
 }
 
 // ---- JSON serialisation (Node ⇄ Go document compatibility) -----------------
 //
-// The Go store returns driver-shaped values: primitive.ObjectID, time.Time
-// (BSON dates), primitive.M (objects), primitive.D / bson.A / []any (arrays).
+// The Go store returns driver-shaped values: bson.ObjectID, time.Time
+// (BSON dates), bson.M (objects), bson.D / bson.A / []any (arrays).
 // Node's express res.json() renders ObjectId→hex string, Date→ISO-8601 string.
 // sanitiseForJSON reproduces that so a document read by the Go service is
 // byte-equivalent (as JSON) to one read by the Node service.
 func sanitiseForJSON(v any) any {
 	switch t := v.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex()
 	case time.Time:
 		// JS toISOString() is always millisecond precision, UTC, 'Z' suffix.
 		return t.UTC().Truncate(time.Millisecond).Format("2006-01-02T15:04:05.000Z")
-	case primitive.M:
+	case bson.M:
 		out := make(map[string]any, len(t))
 		for k, val := range t {
 			out[k] = sanitiseForJSON(val)
 		}
 		return out
-	case primitive.D:
+	case bson.D:
 		seen := map[string]bool{}
 		out := make(map[string]any, len(t))
 		for _, el := range t {
@@ -95,7 +94,7 @@ func sanitiseForJSON(v any) any {
 	}
 }
 
-func sanitiseDoc(d primitive.M) map[string]any {
+func sanitiseDoc(d bson.M) map[string]any {
 	return sanitiseForJSON(d).(map[string]any)
 }
 
@@ -148,7 +147,7 @@ func (s *Server) addNotification(w http.ResponseWriter, r *http.Request, params 
 		return
 	}
 
-	setDoc := primitive.M{
+	setDoc := bson.M{
 		"user_id":     mustObjectID(userID),
 		"key":         *body.Key,
 		"templateKey": *body.TemplateKey,
@@ -166,7 +165,7 @@ func (s *Server) addNotification(w http.ResponseWriter, r *http.Request, params 
 		}
 		setDoc["expires"] = t
 	}
-	if uperr := s.store.Upsert(ctx, primitive.M{"user_id": mustObjectID(userID), "key": *body.Key}, setDoc); uperr != nil {
+	if uperr := s.store.Upsert(ctx, bson.M{"user_id": mustObjectID(userID), "key": *body.Key}, setDoc); uperr != nil {
 		slogf("addNotification upsert error", uperr)
 		sendStatus(w, http.StatusInternalServerError)
 		return

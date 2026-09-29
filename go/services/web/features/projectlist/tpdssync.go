@@ -47,8 +47,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -93,11 +92,11 @@ func syncSplitPath(hasId bool, pathStr string) (filePath, projectName string) {
 
 // resolveSyncProject — Node findProjectByIdWithRWAccess (by id): load; require
 // owner OR RW collaborator AND not archived/trashed; null on miss.
-func resolveSyncProject(a *core.App, c *core.Cxt, uid primitive.ObjectID, pidS string) (primitive.D, bool) {
-	oid, _ := primitive.ObjectIDFromHex(strings.ToLower(pidS))
+func resolveSyncProject(a *core.App, c *core.Cxt, uid bson.ObjectID, pidS string) (bson.D, bool) {
+	oid, _ := bson.ObjectIDFromHex(strings.ToLower(pidS))
 	ctx, cancel := tpdssyncCtx()
 	defer cancel()
-	var doc primitive.D
+	var doc bson.D
 	if db, err := a.Mongo.DB(ctx); err == nil &&
 		db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&doc) == nil && doc != nil {
 		ow, _ := dgetOID(doc, "owner_ref")
@@ -109,7 +108,7 @@ func resolveSyncProject(a *core.App, c *core.Cxt, uid primitive.ObjectID, pidS s
 }
 
 // syncUpsert — UpdateMerger.mergeUpdate 200-applied core (new/replace/swap).
-func syncUpsert(a *core.App, uidHex string, pd *primitive.D, pid primitive.ObjectID, fullPath string, data []byte) (entityID, folderID, kind string, rev int64, hasRev, ok bool) {
+func syncUpsert(a *core.App, uidHex string, pd *bson.D, pid bson.ObjectID, fullPath string, data []byte) (entityID, folderID, kind string, rev int64, hasRev, ok bool) {
 	seg := upSegments(fullPath)
 	if len(seg) == 0 {
 		return "", "", "", 0, false, false
@@ -146,7 +145,7 @@ func syncUpsert(a *core.App, uidHex string, pd *primitive.D, pid primitive.Objec
 			}
 			return tgt.existingDoc.idHex, folderID, "doc", 0, false, true
 		}
-		newDocID := primitive.NewObjectID()
+		newDocID := bson.NewObjectID()
 		r2, dok := upDocstorePut(pid.Hex(), newDocID.Hex(), lines)
 		if !dok {
 			return "", "", "", 0, false, false
@@ -170,7 +169,7 @@ func syncUpsert(a *core.App, uidHex string, pd *primitive.D, pid primitive.Objec
 	if hist != "" && !upPutBlob(hist, hash, data) {
 		return "", "", "", 0, false, false
 	}
-	newFileID := primitive.NewObjectID()
+	newFileID := bson.NewObjectID()
 	switch {
 	case tgt.existingFile != nil:
 		if !upReplaceFile(a, pid.Hex(), tgt.mongoPath, newFileID.Hex(), hash, uidl, now, tgt.fileIdx) {
@@ -235,12 +234,12 @@ func syncMergeRoute() func(a *core.App) func(c *core.Cxt, r *core.Res) {
 				r.JSON(404, []byte(`{"error":"Validation error: `+strings.Join(verrs, "; ")+`","statusCode":404}`))
 				return
 			}
-			uid, _ := primitive.ObjectIDFromHex(uidl)
+			uid, _ := bson.ObjectIDFromHex(uidl)
 			hasId := hasPid && pidS != ""
 			filePath, projectName := syncSplitPath(hasId, pathS)
 			data, _ := io.ReadAll(io.LimitReader(req.Body, 64<<20))
 
-			var pd primitive.D
+			var pd bson.D
 			found := false
 			if hasId {
 				pd, found = resolveSyncProject(a, c, uid, pidS)
@@ -301,9 +300,9 @@ func syncGHUpdateRoute() func(a *core.App) func(c *core.Cxt, r *core.Res) {
 				r.JSON(404, delParamVA("project_id"))
 				return
 			}
-			pid, _ := primitive.ObjectIDFromHex(pidl)
+			pid, _ := bson.ObjectIDFromHex(pidl)
 			ctx, cancel := tpdssyncCtx()
-			var pd primitive.D
+			var pd bson.D
 			ok := false
 			if db, err := a.Mongo.DB(ctx); err == nil {
 				ok = db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: pid}}).Decode(&pd) == nil && pd != nil
@@ -365,7 +364,7 @@ func syncLocate(root []entFolder, fullPath string) (kind, eid, arrPath, name str
 
 // syncDeleteEntity — find the entity at fullPath and remove it (mongo $pull +
 // docstore delete for docs + DU structure del-op). Returns the entity id.
-func syncDeleteEntity(a *core.App, uidHex string, pd *primitive.D, pid primitive.ObjectID, fullPath string) (kind, eid string, found bool) {
+func syncDeleteEntity(a *core.App, uidHex string, pd *bson.D, pid bson.ObjectID, fullPath string) (kind, eid string, found bool) {
 	root := entParseTree(entFld(*pd, "rootFolder"))
 	kind, eid, arrPath, name, ok := syncLocate(root, fullPath)
 	if !ok {
@@ -433,7 +432,7 @@ func syncDeleteRoute() func(a *core.App) func(c *core.Cxt, r *core.Res) {
 				r.JSON(404, []byte(`{"error":"Validation error: `+strings.Join(verrs, "; ")+`","statusCode":404}`))
 				return
 			}
-			uid, _ := primitive.ObjectIDFromHex(uidl)
+			uid, _ := bson.ObjectIDFromHex(uidl)
 			hasId := hasPid && pidS != ""
 			filePath, projectName := syncSplitPath(hasId, pathS)
 			if hasId {
@@ -482,9 +481,9 @@ func syncGHDeleteRoute() func(a *core.App) func(c *core.Cxt, r *core.Res) {
 				r.JSON(404, delParamVA("project_id"))
 				return
 			}
-			pid, _ := primitive.ObjectIDFromHex(strings.ToLower(pidS))
+			pid, _ := bson.ObjectIDFromHex(strings.ToLower(pidS))
 			ctx, cancel := tpdssyncCtx()
-			var pd primitive.D
+			var pd bson.D
 			ok := false
 			if db, err := a.Mongo.DB(ctx); err == nil {
 				ok = db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: pid}}).Decode(&pd) == nil && pd != nil
@@ -509,9 +508,9 @@ func syncGHDeleteRoute() func(a *core.App) func(c *core.Cxt, r *core.Res) {
 // resolveByNameActive — Node ProjectGetter.findUsersProjectsByName (owned OR
 // RW collaborator), filtered to non-archived/trashed; returns the active one
 // (does NOT create). Multiple -> Node fires duplicate handling and stops.
-func resolveByNameActive(a *core.App, c *core.Cxt, uid primitive.ObjectID, name string) (primitive.D, bool) {
+func resolveByNameActive(a *core.App, c *core.Cxt, uid bson.ObjectID, name string) (bson.D, bool) {
 	lower := strings.ToLower(name)
-	var active []primitive.D
+	var active []bson.D
 	for _, pd := range tpdsOwnedOrRWProjects(a, c, uid) {
 		if strings.ToLower(dspellLang(pd)) == lower && tpdsProjectActive(pd, uid) {
 			active = append(active, pd)

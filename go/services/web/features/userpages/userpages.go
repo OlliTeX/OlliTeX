@@ -21,11 +21,10 @@ package userpages
 
 import (
 	"encoding/json"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"ollitex/go/services/web/core"
 	"os"
 	"strings"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ---------- routes ----------
@@ -62,8 +61,8 @@ func render500(a *core.App, cxt *core.Cxt, res *core.Res) {
 	res.SendStatus(500)
 }
 
-func mustObjectID(hex string) primitive.ObjectID {
-	oid, _ := primitive.ObjectIDFromHex(hex)
+func mustObjectID(hex string) bson.ObjectID {
+	oid, _ := bson.ObjectIDFromHex(hex)
 	return oid
 }
 

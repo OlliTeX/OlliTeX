@@ -35,8 +35,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -99,7 +98,7 @@ func resyncHistoryHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		}
 
 		// --- load project: ghost→500 (Node quirk), history-disabled→404, else 204 ---
-		oid, _ := primitive.ObjectIDFromHex(pidHex)
+		oid, _ := bson.ObjectIDFromHex(pidHex)
 		ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
 		defer cancel()
 		db, err := a.Mongo.DB(ctx)
@@ -109,7 +108,7 @@ func resyncHistoryHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			apiText(r, 500, "Internal Server Error")
 			return
 		}
-		var pd primitive.D
+		var pd bson.D
 		if err := db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&pd); err != nil {
 			// ghost → Node 500 "Internal Server Error" (getProject null → TypeError → throw)
 			r.W.Header().Set("X-Powered-By", "Express")
@@ -121,7 +120,7 @@ func resyncHistoryHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		switch x := hidVal.(type) {
 		case string:
 			hid = x
-		case primitive.ObjectID:
+		case bson.ObjectID:
 			hid = x.Hex()
 		}
 		if hid == "" {

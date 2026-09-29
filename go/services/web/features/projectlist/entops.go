@@ -94,8 +94,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/history"
@@ -110,13 +109,13 @@ var (
 
 // ---------- small primitives ----------
 
-func primitiveObjectID(hex string) (primitive.ObjectID, bool) {
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(hex))
+func primitiveObjectID(hex string) (bson.ObjectID, bool) {
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(hex))
 	return oid, err == nil
 }
 
-func primitiveObjectIDOr(hex string) primitive.ObjectID {
-	oid, _ := primitive.ObjectIDFromHex(strings.ToLower(hex))
+func primitiveObjectIDOr(hex string) bson.ObjectID {
+	oid, _ := bson.ObjectIDFromHex(strings.ToLower(hex))
 	return oid
 }
 
@@ -151,18 +150,18 @@ func entCleanNameU16(name string) bool {
 
 // entLoc — one entity found in the tree (raw bson for $push fidelity).
 type entLoc struct {
-	mongo  string       // e.g. "rootFolder.0.docs.0" / "...folders.1"
-	fs     string       // LEADING slash per Node findElement: "/sub/a.txt"
-	elem   bson.D       // the raw stored element (or root folder doc)
-	folder *primitive.D // parent folder (nil: the root-folder element)
+	mongo  string  // e.g. "rootFolder.0.docs.0" / "...folders.1"
+	fs     string  // LEADING slash per Node findElement: "/sub/a.txt"
+	elem   bson.D  // the raw stored element (or root folder doc)
+	folder *bson.D // parent folder (nil: the root-folder element)
 }
 
-func entFindEnt(pj *primitive.D, idHex, seg string) (*entLoc, bool) {
+func entFindEnt(pj *bson.D, idHex, seg string) (*entLoc, bool) {
 	root := dgetArr(*pj, "rootFolder")
 	if len(root) == 0 {
 		return nil, false
 	}
-	rf, ok := root[0].(primitive.D)
+	rf, ok := root[0].(bson.D)
 	if !ok {
 		return nil, false
 	}
@@ -170,10 +169,10 @@ func entFindEnt(pj *primitive.D, idHex, seg string) (*entLoc, bool) {
 	if idHex == oidHex(entFld(rf, "_id")) && seg == "folders" {
 		return &entLoc{mongo: "rootFolder.0", fs: "", elem: rf, folder: nil}, true
 	}
-	var walk func(f primitive.D, mongo, fs string) (*entLoc, bool)
-	walk = func(f primitive.D, mongo, fs string) (*entLoc, bool) {
+	var walk func(f bson.D, mongo, fs string) (*entLoc, bool)
+	walk = func(f bson.D, mongo, fs string) (*entLoc, bool) {
 		for i, x := range dgetArr(f, seg) {
-			xm, ok := x.(primitive.D)
+			xm, ok := x.(bson.D)
 			if !ok {
 				continue
 			}
@@ -187,7 +186,7 @@ func entFindEnt(pj *primitive.D, idHex, seg string) (*entLoc, bool) {
 			}
 		}
 		for j, s := range dgetArr(f, "folders") {
-			sm, ok := s.(primitive.D)
+			sm, ok := s.(bson.D)
 			if !ok {
 				continue
 			}
@@ -209,7 +208,7 @@ func entFindEnt(pj *primitive.D, idHex, seg string) (*entLoc, bool) {
 
 // entFindEntKinded — duplicate route: docs first, then fileRefs (the
 // controller's _findEntityInProject + kind check).
-func entFindEntKinded(pj *primitive.D, idHex, wantKind string) (*entLoc, string, bool) {
+func entFindEntKinded(pj *bson.D, idHex, wantKind string) (*entLoc, string, bool) {
 	if l, ok := entFindEnt(pj, idHex, "docs"); ok {
 		return l, "doc", true
 	}
@@ -239,10 +238,10 @@ func entDupName(name string, existing []string) string {
 	return c
 }
 
-func entFolderNames(f *primitive.D, seg string) []string {
+func entFolderNames(f *bson.D, seg string) []string {
 	var out []string
 	for _, x := range dgetArr(*f, seg) {
-		if xm, ok := x.(primitive.D); ok {
+		if xm, ok := x.(bson.D); ok {
 			out = append(out, asStr(entFld(xm, "name")))
 		}
 	}
@@ -361,7 +360,7 @@ func entVA(cxt *core.Cxt, res *core.Res, keys []string, required map[string]bool
 
 // ---------- auth gate (Node ensureUserCanWriteProjectContent order) -----
 
-func entGateAuth(a *core.App, cxt *core.Cxt, res *core.Res, projectId string) (string, *primitive.D, bool) {
+func entGateAuth(a *core.App, cxt *core.Cxt, res *core.Res, projectId string) (string, *bson.D, bool) {
 	uid := ""
 	if cxt.Sess != nil {
 		uid = cxt.Sess.UserIDHex()
@@ -408,18 +407,18 @@ func entJSONEsc(s string) string {
 // rangesSupportEnabled', false)`.
 
 // pjEntSub navigates two levels of possibly-array-wrapped subdocs
-// (the go driver materializes BSON subdocs as primitive.D and
-// subdoc-arrays as primitive.A; be tolerant of both shapes).
-func pjEntSub(d primitive.D, key string) (primitive.D, bool) {
+// (the go driver materializes BSON subdocs as bson.D and
+// subdoc-arrays as bson.A; be tolerant of both shapes).
+func pjEntSub(d bson.D, key string) (bson.D, bool) {
 	v := dget(d, key)
-	if a, ok := v.(primitive.A); ok && len(a) > 0 {
+	if a, ok := v.(bson.A); ok && len(a) > 0 {
 		v = a[0]
 	}
-	dn, ok := v.(primitive.D)
+	dn, ok := v.(bson.D)
 	return dn, ok
 }
 
-func entHistoryID(pj *primitive.D) string {
+func entHistoryID(pj *bson.D) string {
 	dn, ok := pjEntSub(*pj, "overleaf")
 	if !ok {
 		return ""
@@ -542,7 +541,7 @@ func entDocstoreUpdate(pidHex, didHex string, lines []string) bool {
 
 // ---------- mongo writes ----------
 
-func entMongoRename(cxt *core.Cxt, a *core.App, pid primitive.ObjectID, mongoPath, name, uid string) bool {
+func entMongoRename(cxt *core.Cxt, a *core.App, pid bson.ObjectID, mongoPath, name, uid string) bool {
 	if a.Mongo == nil {
 		return false
 	}
@@ -569,7 +568,7 @@ func entMongoRename(cxt *core.Cxt, a *core.App, pid primitive.ObjectID, mongoPat
 	return err == nil && ure.MatchedCount == 1
 }
 
-func entMongoPushParent(cxt *core.Cxt, a *core.App, pid primitive.ObjectID, parentMongo, seg string, elem bson.D, uid string) bool {
+func entMongoPushParent(cxt *core.Cxt, a *core.App, pid bson.ObjectID, parentMongo, seg string, elem bson.D, uid string) bool {
 	if a.Mongo == nil {
 		return false
 	}
@@ -595,7 +594,7 @@ func entMongoPushParent(cxt *core.Cxt, a *core.App, pid primitive.ObjectID, pare
 	return err == nil && ure.MatchedCount == 1
 }
 
-func entMongoPull(cxt *core.Cxt, a *core.App, pid primitive.ObjectID, mongoPath, seg, elemHex, uid string) bool {
+func entMongoPull(cxt *core.Cxt, a *core.App, pid bson.ObjectID, mongoPath, seg, elemHex, uid string) bool {
 	if a.Mongo == nil {
 		return false
 	}
@@ -705,20 +704,20 @@ func segOf(kind string) string {
 
 // entCountAll — total docs+fileRefs+folders under the root (Node
 // _countElements for the maxEntitiesPerProject gate).
-func entCountAll(pj *primitive.D) int {
+func entCountAll(pj *bson.D) int {
 	root := dgetArr(*pj, "rootFolder")
 	if len(root) == 0 {
 		return 0
 	}
-	rf, ok := root[0].(primitive.D)
+	rf, ok := root[0].(bson.D)
 	if !ok {
 		return 0
 	}
-	var walk func(f primitive.D) int
-	walk = func(f primitive.D) int {
+	var walk func(f bson.D) int
+	walk = func(f bson.D) int {
 		n := 1 + len(dgetArr(f, "docs")) + len(dgetArr(f, "fileRefs"))
 		for _, s := range dgetArr(f, "folders") {
-			if sm, ok := s.(primitive.D); ok {
+			if sm, ok := s.(bson.D); ok {
 				n += walk(sm)
 			}
 		}
@@ -902,7 +901,7 @@ func entDuplicateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			if lines == nil {
 				lines = []string{}
 			}
-			newDocID := primitive.NewObjectID()
+			newDocID := bson.NewObjectID()
 			// docstore updateDoc BEFORE the lock (Node beforeLock).
 			if !entDocstoreUpdate(pidHex, newDocID.Hex(), lines) {
 				page500()
@@ -940,7 +939,7 @@ func entDuplicateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 		// file duplicate.
-		newFileID := primitive.NewObjectID()
+		newFileID := bson.NewObjectID()
 		now := time.Now()
 		hash := asStr(entFld(loc.elem, "hash"))
 		linkedJSON, hasLinked := entLinkedFileJSON(entFld(loc.elem, "linkedFileData"))
@@ -1008,7 +1007,7 @@ func entLinkedFileJSON(v any) (string, bool) {
 		return "null", false
 	case string:
 		return t, true
-	case primitive.D:
+	case bson.D:
 		b, _ := bson.MarshalExtJSON(t, false, false)
 		return string(b), true
 	case map[string]any:
@@ -1057,7 +1056,7 @@ func entLinkedBSON(has bool, s string) any {
 	}
 	var v any
 	if err := json.Unmarshal([]byte(s), &v); err != nil {
-		var d primitive.D
+		var d bson.D
 		if err2 := bson.UnmarshalExtJSON([]byte(s), false, &d); err2 == nil {
 			return d
 		}

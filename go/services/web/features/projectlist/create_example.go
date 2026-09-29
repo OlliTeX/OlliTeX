@@ -42,8 +42,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -52,11 +51,11 @@ import (
 // documents (docstore rev 0 each), the frog.jpg file (history-v1 blob +
 // rootFolder.fileRefs entry) and the shared project-history initialisation.
 // The caller owns the response.
-func crCreateExampleProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwnerUser) primitive.ObjectID {
-	pid := primitive.NewObjectID()
-	mainDocID := primitive.NewObjectID()
-	bibDocID := primitive.NewObjectID()
-	rootID := primitive.NewObjectID()
+func crCreateExampleProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwnerUser) bson.ObjectID {
+	pid := bson.NewObjectID()
+	mainDocID := bson.NewObjectID()
+	bibDocID := bson.NewObjectID()
+	rootID := bson.NewObjectID()
 
 	dir := crExampleProjectDir()
 	mainLines := crTemplateLines(dir + "/main.tex")
@@ -73,7 +72,7 @@ func crCreateExampleProject(a *core.App, cxt *core.Cxt, name, uid string, u crOw
 			{Key: "rev", Value: 0},
 			{Key: "linkedFileData", Value: nil},
 			{Key: "hash", Value: hash},
-			{Key: "_id", Value: primitive.NewObjectID()},
+			{Key: "_id", Value: bson.NewObjectID()},
 		}}
 	}
 	docs := bson.A{

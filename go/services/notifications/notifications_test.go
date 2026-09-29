@@ -1,5 +1,6 @@
 package notifications
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"context"
 	"encoding/json"
@@ -7,8 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // --- test helpers -----------------------------------------------------------
@@ -420,8 +419,8 @@ func TestMemStore_CountAndDeleteSemantics(t *testing.T) {
 
 // --- tiny test helpers ------------------------------------------------------
 
-func mkM(kvs ...any) primitive.M {
-	out := primitive.M{}
+func mkM(kvs ...any) bson.M {
+	out := bson.M{}
 	for i := 0; i+1 < len(kvs); i += 2 {
 		out[kvs[i].(string)] = kvs[i+1]
 	}

@@ -72,10 +72,9 @@ import (
 	"regexp"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/emailtemplates"
@@ -107,7 +106,7 @@ const (
 
 var projectP = regexp.MustCompile(`^/notifications/preferences/project/([^/]+)/?$`)
 
-var upsertOpts = options.Update().SetUpsert(true)
+var upsertOpts = options.UpdateOne().SetUpsert(true)
 
 // ---------- Feature ----------------------------------------------------------
 
@@ -136,10 +135,10 @@ func ntfUID(cxt *core.Cxt) string {
 	return cxt.Sess.UserIDHex()
 }
 
-func ntfOid(uid string) primitive.ObjectID {
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(uid))
+func ntfOid(uid string) bson.ObjectID {
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(uid))
 	if err != nil {
-		return primitive.ObjectID{}
+		return bson.ObjectID{}
 	}
 	return oid
 }
@@ -182,7 +181,7 @@ func ntfOidHex(v interface{}) (string, bool) {
 	switch t := v.(type) {
 	case string:
 		return strings.ToLower(t), true
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex(), true
 	}
 	return "", false
@@ -463,7 +462,7 @@ func hSaveGlobal(a *core.App) func(*core.Cxt, *core.Res) {
 // json accept included, unlike the track-changes json-403 family).
 func ntfAuthzProject(a *core.App, cxt *core.Cxt, res *core.Res) (string, bool) {
 	seg := cxt.Params["1"]
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(seg))
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(seg))
 	if err != nil {
 		ntfErr500(cxt, res)
 		return "", false

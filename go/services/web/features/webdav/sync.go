@@ -24,8 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -55,7 +54,7 @@ type wdProjectTreeEntry struct {
 // wdProjectTree — walk the project overleaf tree (Mongo project doc) into
 // a flat entry list. Returns (entries, projectDoc, error).
 func wdProjectTree(a *core.App, ctx context.Context, projectID string) ([]wdProjectTreeEntry, *bson.D, error) {
-	oid, oerr := primitive.ObjectIDFromHex(strings.ToLower(projectID))
+	oid, oerr := bson.ObjectIDFromHex(strings.ToLower(projectID))
 	if oerr != nil {
 		return nil, nil, &wdHTTPError{code: 500, msg: "project not found"}
 	}
@@ -208,15 +207,15 @@ func wdWriteEntity(ctx context.Context, a *core.App, uid, projectID, relPath str
 	if err != nil {
 		return false
 	}
-	oid, oerr := primitive.ObjectIDFromHex(strings.ToLower(projectID))
+	oid, oerr := bson.ObjectIDFromHex(strings.ToLower(projectID))
 	if oerr != nil {
 		return false
 	}
 	parts := strings.Split(strings.TrimPrefix(relPath, "/"), "/")
 	name := parts[len(parts)-1]
 	isDoc := strings.Contains(name, ".tex")
-	newID := primitive.NewObjectID()
-	uidOid, _ := primitive.ObjectIDFromHex(uid)
+	newID := bson.NewObjectID()
+	uidOid, _ := bson.ObjectIDFromHex(uid)
 
 	var elem bson.D
 	if isDoc {
@@ -306,7 +305,7 @@ func wdSyncProject(ctx context.Context, a *core.App, uid, projectID string) erro
 	defer cancel()
 	if wdGetCredsStateWritable(ctx2, a, projectID) {
 		_ = wdSetStateFields(ctx2, a, projectID, bson.D{
-			{Key: "lastSyncAt", Value: primitive.NewDateTimeFromTime(time.Now())},
+			{Key: "lastSyncAt", Value: bson.NewDateTimeFromTime(time.Now())},
 			{Key: "mergeStatus", Value: "clean"},
 		})
 	}
@@ -319,8 +318,8 @@ func wdLoadDoc(a *core.App, ctx context.Context, projectID string) *bson.D {
 	return dot
 }
 
-func mustOID(s string) primitive.ObjectID {
-	o, _ := primitive.ObjectIDFromHex(strings.ToLower(s))
+func mustOID(s string) bson.ObjectID {
+	o, _ := bson.ObjectIDFromHex(strings.ToLower(s))
 	return o
 }
 
@@ -396,7 +395,7 @@ func wdPollProject(ctx context.Context, a *core.App, uid, projectID string) erro
 		_ = n
 	}
 	return wdSetStateFields(ctx, a, projectID, bson.D{
-		{Key: "lastSyncAt", Value: primitive.NewDateTimeFromTime(time.Now())},
+		{Key: "lastSyncAt", Value: bson.NewDateTimeFromTime(time.Now())},
 		{Key: "mergeStatus", Value: "clean"},
 	})
 }
@@ -445,7 +444,7 @@ func wdResolveConflictWork(ctx context.Context, a *core.App, uid, projectID, pat
 	}
 	return wdSetStateFields(ctx, a, projectID, bson.D{
 		{Key: "mergeStatus", Value: "clean"},
-		{Key: "lastSyncAt", Value: primitive.NewDateTimeFromTime(time.Now())},
+		{Key: "lastSyncAt", Value: bson.NewDateTimeFromTime(time.Now())},
 		{Key: "resolvedChoice", Value: choice},
 	})
 }

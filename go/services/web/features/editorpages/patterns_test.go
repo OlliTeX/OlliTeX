@@ -1,11 +1,10 @@
 package editorpages
 
 import (
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"testing"
 
 	"ollitex/go/services/web/core"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // TestEditorRoutePatternsCase — U2 pin: Node/Express matches the editor
@@ -104,8 +103,8 @@ func TestInitialLoadingScreenTheme(t *testing.T) {
 		"no ace":      {map[string]any{}, "system"},
 		"old signup":  {map[string]any{"signUpDate": int64(1600000000000)}, "dark"},
 		"new signup":  {map[string]any{"signUpDate": int64(1789391285099)}, "system"},
-		"dt signup":   {map[string]any{"signUpDate": primitive.DateTime(1789391285099)}, "system"},
-		"dt old":      {map[string]any{"signUpDate": primitive.DateTime(1600000000000)}, "dark"},
+		"dt signup":   {map[string]any{"signUpDate": bson.DateTime(1789391285099)}, "system"},
+		"dt old":      {map[string]any{"signUpDate": bson.DateTime(1600000000000)}, "dark"},
 		"ace nullish": {map[string]any{"ace": map[string]any{}, "signUpDate": int64(1789391285099)}, "system"},
 	}
 	for name, c := range cases {

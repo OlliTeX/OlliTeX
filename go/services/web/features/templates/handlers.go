@@ -14,10 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -162,7 +161,7 @@ func tplDocVal(d *bson.D, key string) (any, bool) {
 // the hex string (pinned: "6aa4b8a8…").
 func tplOwnerHex(v any) string {
 	switch t := v.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex()
 	case string:
 		return t
@@ -174,7 +173,7 @@ func tplOwnerHex(v any) string {
 // tplISODate — Date → the exact Node JSON form (milliseconds → toISOString).
 func tplISODate(v any) (string, bool) {
 	switch t := v.(type) {
-	case primitive.DateTime:
+	case bson.DateTime:
 		return t.Time().UTC().Format("2006-01-02T15:04:05.000Z"), true
 	case time.Time:
 		return t.UTC().Format("2006-01-02T15:04:05.000Z"), true
@@ -406,7 +405,7 @@ func hGetTemplate(a *core.App) func(*core.Cxt, *core.Res) {
 		switch key {
 		case "_id":
 			if hasVal && tplOidValid(val) {
-				oid, _ := primitive.ObjectIDFromHex(strings.ToLower(val))
+				oid, _ := bson.ObjectIDFromHex(strings.ToLower(val))
 				tmp, ok := tplFindTemplate(ctx, a, bson.D{{Key: "_id", Value: oid}})
 				if !ok {
 					tplErr500(cxt, res)
@@ -447,7 +446,7 @@ func tplFormatForPage(d *bson.D) string {
 	var parts []string
 	add := func(k string, v string) { parts = append(parts, nodeJSONString(k)+":"+v) }
 	if v, ok := tplDocVal(d, "_id"); ok {
-		if oid, ok := v.(primitive.ObjectID); ok {
+		if oid, ok := v.(bson.ObjectID); ok {
 			add("id", nodeJSONString(oid.Hex()))
 		}
 	}
@@ -588,7 +587,7 @@ func tplSortKey(d *bson.D, by string) (time.Time, string) {
 	}
 	if v, ok := tplDocVal(d, "lastUpdated"); ok {
 		switch t := v.(type) {
-		case primitive.DateTime:
+		case bson.DateTime:
 			return t.Time(), ""
 		case time.Time:
 			return t, ""
@@ -676,7 +675,7 @@ func tplFormatForList(d *bson.D) string {
 	var parts []string
 	add := func(k string, v string) { parts = append(parts, nodeJSONString(k)+":"+v) }
 	if v, ok := tplDocVal(d, "_id"); ok {
-		if oid, ok := v.(primitive.ObjectID); ok {
+		if oid, ok := v.(bson.ObjectID); ok {
 			add("id", nodeJSONString(oid.Hex()))
 		}
 	}
@@ -857,7 +856,7 @@ func hBundle(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(500, []byte(`{"message":`+nodeJSONString(msg)+`}`))
 			return
 		}
-		oid, _ := primitive.ObjectIDFromHex(tid)
+		oid, _ := bson.ObjectIDFromHex(tid)
 		d, ok := tplFindTemplate(ctx, a, bson.D{{Key: "_id", Value: oid}})
 		if !ok {
 			tplErr500(cxt, res)
@@ -943,11 +942,11 @@ func tplMetaVal(v any) string {
 		return "false"
 	case nil:
 		return "null"
-	case primitive.DateTime:
+	case bson.DateTime:
 		return nodeJSONString(t.Time().UTC().Format("2006-01-02T15:04:05.000Z"))
 	case time.Time:
 		return nodeJSONString(t.UTC().Format("2006-01-02T15:04:05.000Z"))
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return nodeJSONString(t.Hex())
 	default:
 		b, err := json.Marshal(t)

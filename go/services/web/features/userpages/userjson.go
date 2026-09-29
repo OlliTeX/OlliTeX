@@ -44,9 +44,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 )
@@ -88,7 +87,7 @@ func dTimeV(v any) (time.Time, bool) {
 	switch t := v.(type) {
 	case time.Time:
 		return t, !t.IsZero()
-	case primitive.DateTime:
+	case bson.DateTime:
 		tt := t.Time()
 		return tt, !tt.IsZero()
 	case string:
@@ -113,7 +112,7 @@ func dIDStr(d bson.D, k string) string {
 		return ""
 	}
 	switch t := v.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex()
 	case string:
 		return t
@@ -246,9 +245,9 @@ func getContacts(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(200, []byte(`{"contacts":[]}`))
 			return
 		}
-		ids := make([]primitive.ObjectID, 0, limit)
+		ids := make([]bson.ObjectID, 0, limit)
 		for _, e := range entries[:limit] {
-			if oid, oerr := primitive.ObjectIDFromHex(e.id); oerr == nil {
+			if oid, oerr := bson.ObjectIDFromHex(e.id); oerr == nil {
 				ids = append(ids, oid)
 			}
 		}
@@ -316,12 +315,12 @@ type userEmailsDoc struct {
 }
 
 type emailDocV struct {
-	Email            string              `bson:"email"`
-	ReversedHostname string              `bson:"reversedHostname"`
-	CreatedAt        *primitive.DateTime `bson:"createdAt"`
-	ID               primitive.ObjectID  `bson:"_id"`
-	ConfirmedAt      *primitive.DateTime `bson:"confirmedAt"`
-	ReconfirmedAt    *primitive.DateTime `bson:"reconfirmedAt"`
+	Email            string         `bson:"email"`
+	ReversedHostname string         `bson:"reversedHostname"`
+	CreatedAt        *bson.DateTime `bson:"createdAt"`
+	ID               bson.ObjectID  `bson:"_id"`
+	ConfirmedAt      *bson.DateTime `bson:"confirmedAt"`
+	ReconfirmedAt    *bson.DateTime `bson:"reconfirmedAt"`
 }
 
 func getEmails(a *core.App) func(*core.Cxt, *core.Res) {
@@ -359,7 +358,7 @@ func emailJSONStruct(ed emailDocV, defaultEmail string) string {
 		createdAt = `,"createdAt":"` + jsonTime(ed.CreatedAt.Time()) + `"`
 	}
 	idKey := ""
-	if ed.ID != primitive.NilObjectID {
+	if ed.ID != bson.NilObjectID {
 		idKey = `,"_id":"` + ed.ID.Hex() + `"`
 	}
 	lastConfirmed := "null"

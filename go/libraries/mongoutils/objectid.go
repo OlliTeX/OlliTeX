@@ -1,10 +1,9 @@
 package mongoutils
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"fmt"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ONE_MONTH_IN_MS mirrors the Node constant (31 days — the Node source uses
@@ -17,12 +16,12 @@ const ONE_MONTH_IN_MS = 1000 * 60 * 60 * 24 * 31
 var IEdgeFuture = objectIdFromMs(time.Now().UnixMilli() + 1000)
 
 // objectIdFromMs mirrors `ObjectId.createFromTime(ms/1000)`.
-func objectIdFromMs(ms int64) primitive.ObjectID {
-	return primitive.NewObjectIDFromTimestamp(time.UnixMilli(ms))
+func objectIdFromMs(ms int64) bson.ObjectID {
+	return bson.NewObjectIDFromTimestamp(time.UnixMilli(ms))
 }
 
 // getMsFromObjectId mirrors `id.getTimestamp().getTime()`.
-func getMsFromObjectId(id primitive.ObjectID) int64 {
+func getMsFromObjectId(id bson.ObjectID) int64 {
 	return id.Timestamp().UnixMilli()
 }
 
@@ -31,11 +30,11 @@ func getMsFromObjectId(id primitive.ObjectID) int64 {
 // anything else is a raw 24-hex ObjectID.
 //
 // Node error on an unparseable date: `${input} is not a valid date`.
-func ObjectIdFromInput(input string) (primitive.ObjectID, error) {
+func ObjectIdFromInput(input string) (bson.ObjectID, error) {
 	if indexT(input) >= 0 {
 		t, err := parseNodeDate(input)
 		if err != nil {
-			return primitive.ObjectID{}, fmt.Errorf("%s is not a valid date", input)
+			return bson.ObjectID{}, fmt.Errorf("%s is not a valid date", input)
 		}
 		return objectIdFromMs(t.UnixMilli()), nil
 	}
@@ -76,10 +75,10 @@ func parseNodeDate(input string) (time.Time, error) {
 }
 
 // newObjectIDHex mirrors `new ObjectId(input)` (24-hex string).
-func newObjectIDHex(input string) (primitive.ObjectID, error) {
-	id, err := primitive.ObjectIDFromHex(input)
+func newObjectIDHex(input string) (bson.ObjectID, error) {
+	id, err := bson.ObjectIDFromHex(input)
 	if err != nil {
-		return primitive.ObjectID{}, err
+		return bson.ObjectID{}, err
 	}
 	return id, nil
 }
@@ -88,6 +87,6 @@ func newObjectIDHex(input string) (primitive.ObjectID, error) {
 // Node's `${objectId}` is the 24-hex form (JS ObjectId.toString()), so Hex()
 // is used — the Go driver's default String() renders ObjectID("hex"), which
 // would diverge from the Node-pinned string.
-func RenderObjectId(objectID primitive.ObjectID) string {
+func RenderObjectId(objectID bson.ObjectID) string {
 	return fmt.Sprintf("%s (%s)", objectID.Hex(), objectID.Timestamp().UTC().Format("2006-01-02T15:04:05.000Z"))
 }

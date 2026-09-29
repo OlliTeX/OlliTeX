@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -264,7 +264,7 @@ func setSection(a *core.App, ctx context.Context, name string, value Obj, c *cip
 	res, err := db.Collection("site_settings").UpdateOne(ctx,
 		bson.D{{Key: "_id", Value: "global"}},
 		bson.D{{Key: "$set", Value: update}},
-		options.Update().SetUpsert(true))
+		options.UpdateOne().SetUpsert(true))
 	if err != nil {
 		return false, false, err
 	}

@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"os"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
 // Doc is one document the batch walker sees (Node's `Document`; Go consumers
@@ -32,7 +31,7 @@ func batchedUpdate(
 	query bson.M,
 	update any,
 	projection bson.M,
-	findOpts *options.FindOptions,
+	findOpts *options.FindOptionsBuilder,
 	batchOpts BatchedUpdateOptions,
 ) (int, error) {
 	batchStateMu.Lock()
@@ -149,7 +148,7 @@ func BatchedUpdate(
 	query bson.M,
 	update any,
 	projection bson.M,
-	findOpts *options.FindOptions,
+	findOpts *options.FindOptionsBuilder,
 	batchOpts BatchedUpdateOptions,
 ) (int, error) {
 	return batchedUpdate(ctx, collection, query, update, projection, findOpts, batchOpts)
@@ -165,7 +164,7 @@ func BatchedUpdateWithResultHandling(
 	query bson.M,
 	update any,
 	projection bson.M,
-	findOpts *options.FindOptions,
+	findOpts *options.FindOptionsBuilder,
 	batchOpts BatchedUpdateOptions,
 ) {
 	processed, err := batchedUpdate(ctx, collection, query, update, projection, findOpts, batchOpts)
@@ -183,9 +182,9 @@ func getNextBatch(
 	ctx context.Context,
 	collection *mongo.Collection,
 	query bson.M,
-	start, end primitive.ObjectID,
+	start, end bson.ObjectID,
 	projection bson.M,
-	findOpts *options.FindOptions,
+	findOpts *options.FindOptionsBuilder,
 	limit int,
 ) ([]Doc, error) {
 	findOpts = findOpts.SetProjection(projection).SetSort(bson.D{{Key: "_id", Value: batchSortDir()}}).
@@ -224,14 +223,14 @@ func performUpdate(ctx context.Context, collection *mongo.Collection, batch []Do
 
 // objectIDOf reads a document's `_id` (map-shaped documents; the projection
 // default guarantees its presence).
-func objectIDOf(doc Doc) (primitive.ObjectID, bool) {
-	id, ok := doc["_id"].(primitive.ObjectID)
+func objectIDOf(doc Doc) (bson.ObjectID, bool) {
+	id, ok := doc["_id"].(bson.ObjectID)
 	return id, ok
 }
 
 // getNextEnd mirrors getNextEnd(start).
-func getNextEnd(start primitive.ObjectID, maxTimeSpanMs int64, descending bool, rangeEnd primitive.ObjectID) primitive.ObjectID {
-	var end primitive.ObjectID
+func getNextEnd(start bson.ObjectID, maxTimeSpanMs int64, descending bool, rangeEnd bson.ObjectID) bson.ObjectID {
+	var end bson.ObjectID
 	if descending {
 		end = objectIdFromMs(getMsFromObjectId(start) - maxTimeSpanMs)
 		if getMsFromObjectId(end) <= getMsFromObjectId(rangeEnd) {
@@ -249,13 +248,13 @@ func getNextEnd(start primitive.ObjectID, maxTimeSpanMs int64, descending bool, 
 // getIdEdgePast mirrors getIdEdgePast — the first _id (ascending), pulled one
 // second into the past so the first entry passes `first._id > ID_EDGE_PAST`;
 // nil for an empty collection.
-func awaitIDEdgePast(ctx context.Context, collection *mongo.Collection) (primitive.ObjectID, bool) {
+func awaitIDEdgePast(ctx context.Context, collection *mongo.Collection) (bson.ObjectID, bool) {
 	var first Doc
 	err := collection.FindOne(ctx, bson.M{},
 		options.FindOne().SetSort(bson.D{{Key: "_id", Value: 1}}).SetProjection(bson.M{"_id": 1}),
 	).Decode(&first)
 	if err != nil {
-		return primitive.ObjectID{}, false
+		return bson.ObjectID{}, false
 	}
 	id, _ := objectIDOf(first)
 	ms := getMsFromObjectId(id) - 1000
@@ -265,7 +264,7 @@ func awaitIDEdgePast(ctx context.Context, collection *mongo.Collection) (primiti
 	return objectIdFromMs(ms), true
 }
 
-func setIDedgePast(id primitive.ObjectID) {
+func setIDedgePast(id bson.ObjectID) {
 	batchStateMu.Lock()
 	ideEdgePast = id
 	hasIdeEdgePast = true

@@ -11,8 +11,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -127,8 +126,8 @@ func tpdsCreateProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		if u, okU := loadOwnerUser(a, c, uid); okU && u.spellCheckLanguage != "" {
 			sp = u.spellCheckLanguage
 		}
-		pj := primitive.NewObjectID()
-		rootID := primitive.NewObjectID()
+		pj := bson.NewObjectID()
+		rootID := bson.NewObjectID()
 		crInsertProject(a, c, pj, rootID, nil, unique, uid, sp, "pdflatex", bson.A{}, bson.A{}, 0)
 		crInitHistory(c, pj.Hex())
 
@@ -167,24 +166,24 @@ func tpdsCreateProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 // historyId == the project _id (Node initializeProject(_id) returns _id); otMigrationStage 0.
 var tpdsProjectResolvePat = regexp.MustCompile(`^/user/([^/]+)/project/resolve$`)
 
-func dgetOID(pd primitive.D, key string) (primitive.ObjectID, bool) {
+func dgetOID(pd bson.D, key string) (bson.ObjectID, bool) {
 	for _, kv := range pd {
 		if kv.Key == key {
-			if o, ok := kv.Value.(primitive.ObjectID); ok {
+			if o, ok := kv.Value.(bson.ObjectID); ok {
 				return o, true
 			}
-			return primitive.ObjectID{}, false
+			return bson.ObjectID{}, false
 		}
 	}
-	return primitive.ObjectID{}, false
+	return bson.ObjectID{}, false
 }
 
-func darrContainsOID(pd primitive.D, key string, uid primitive.ObjectID) bool {
+func darrContainsOID(pd bson.D, key string, uid bson.ObjectID) bool {
 	for _, kv := range pd {
 		if kv.Key == key {
-			if arr, ok := kv.Value.(primitive.A); ok {
+			if arr, ok := kv.Value.(bson.A); ok {
 				for _, v := range arr {
-					if o, ok2 := v.(primitive.ObjectID); ok2 && o == uid {
+					if o, ok2 := v.(bson.ObjectID); ok2 && o == uid {
 						return true
 					}
 				}
@@ -195,7 +194,7 @@ func darrContainsOID(pd primitive.D, key string, uid primitive.ObjectID) bool {
 	return false
 }
 
-func dspellLang(pd primitive.D) string {
+func dspellLang(pd bson.D) string {
 	var sb strings.Builder
 	for _, kv := range pd {
 		if kv.Key == "name" {
@@ -210,13 +209,13 @@ func dspellLang(pd primitive.D) string {
 
 // tpdsProjectActive — !isArchivedOrTrashed(project, uid): neither the
 // project's `archived` nor `trashed` user-id array contains uid.
-func tpdsProjectActive(pd primitive.D, uid primitive.ObjectID) bool {
+func tpdsProjectActive(pd bson.D, uid bson.ObjectID) bool {
 	return !darrContainsOID(pd, "archived", uid) && !darrContainsOID(pd, "trashed", uid)
 }
 
 // tpdsOwnedOrRWProjects — Node findUsersProjectsByName's candidate set:
 // owner_ref==uid concat collaborator_refs contains uid, deduped by _id.
-func tpdsOwnedOrRWProjects(a *core.App, c *core.Cxt, uid primitive.ObjectID) []primitive.D {
+func tpdsOwnedOrRWProjects(a *core.App, c *core.Cxt, uid bson.ObjectID) []bson.D {
 	if a.Mongo == nil {
 		return nil
 	}
@@ -226,8 +225,8 @@ func tpdsOwnedOrRWProjects(a *core.App, c *core.Cxt, uid primitive.ObjectID) []p
 		return nil
 	}
 	seen := map[string]bool{}
-	var out []primitive.D
-	push := func(coll primitive.D) {
+	var out []bson.D
+	push := func(coll bson.D) {
 		if o, ok := dgetOID(coll, "_id"); ok && !seen[o.Hex()] {
 			seen[o.Hex()] = true
 			out = append(out, coll)
@@ -235,7 +234,7 @@ func tpdsOwnedOrRWProjects(a *core.App, c *core.Cxt, uid primitive.ObjectID) []p
 	}
 	for _, key := range []string{"owner_ref", "collaborator_refs"} {
 		cur, _ := db.Collection("projects").Find(ctx, bson.D{{Key: key, Value: uid}})
-		var list []primitive.D
+		var list []bson.D
 		_ = cur.All(ctx, &list)
 		for _, d := range list {
 			push(d)
@@ -268,7 +267,7 @@ func tpdsResolveProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			r.JSON(404, delParamVA("user_id"))
 			return
 		}
-		uid, _ := primitive.ObjectIDFromHex(strings.ToLower(uidHex))
+		uid, _ := bson.ObjectIDFromHex(strings.ToLower(uidHex))
 
 		// Body branch (strict {projectId} .or {projectName}).
 		raw, _ := io.ReadAll(io.LimitReader(req.Body, 1<<20))
@@ -305,8 +304,8 @@ func tpdsResolveProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 				r.JSON(400, tpdsVal400(`Invalid Mongo ObjectId at \"body.projectId\"`))
 				return
 			}
-			o, _ := primitive.ObjectIDFromHex(strings.ToLower(strings.Trim(string(pidRaw), `"`)))
-			var pd primitive.D
+			o, _ := bson.ObjectIDFromHex(strings.ToLower(strings.Trim(string(pidRaw), `"`)))
+			var pd bson.D
 			ctx := req.Context()
 			db, err := a.Mongo.DB(ctx)
 			if err == nil {
@@ -366,7 +365,7 @@ func tpdsResolveProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 	}
 }
 
-func tpdsResolved200(r *core.Res, pd primitive.D) {
+func tpdsResolved200(r *core.Res, pd bson.D) {
 	pid, _ := dgetOID(pd, "_id")
 	// Node: historyId = project.overleaf?.history?.id (the key is OMITTED when
 	// undefined — fixtures inserted without `overleaf` have no historyId);
@@ -375,14 +374,14 @@ func tpdsResolved200(r *core.Res, pd primitive.D) {
 	histPresent := false
 	var otm int
 	if v, ok := dpath(pd, "overleaf"); ok {
-		if hd, ok2 := v.(primitive.D); ok2 {
+		if hd, ok2 := v.(bson.D); ok2 {
 			if hv, ok3 := dpath(hd, "history"); ok3 {
-				if hd2, ok4 := hv.(primitive.D); ok4 {
+				if hd2, ok4 := hv.(bson.D); ok4 {
 					if iv, ok5 := dpath(hd2, "id"); ok5 {
 						if s, ok6 := iv.(string); ok6 && len(s) == 24 {
 							histStr = s
 							histPresent = true
-						} else if o, ok6 := iv.(primitive.ObjectID); ok6 {
+						} else if o, ok6 := iv.(bson.ObjectID); ok6 {
 							histStr = o.Hex()
 							histPresent = true
 						}
@@ -416,10 +415,10 @@ func tpdsResolved200(r *core.Res, pd primitive.D) {
 // tpdsGetOrCreateByName — Node getOrCreateProjectByName: find owned/RW projects
 // by case-insensitive name; none -> createBlankProject (exact name); all
 // archived/trashed -> null; >1 -> duplicate -> null; exactly one active -> it.
-func tpdsGetOrCreateByName(a *core.App, c *core.Cxt, uid primitive.ObjectID, name string) (primitive.D, bool) {
+func tpdsGetOrCreateByName(a *core.App, c *core.Cxt, uid bson.ObjectID, name string) (bson.D, bool) {
 	cands := tpdsOwnedOrRWProjects(a, c, uid)
 	lower := strings.ToLower(name)
-	var matches []primitive.D
+	var matches []bson.D
 	for _, pd := range cands {
 		if strings.ToLower(dspellLang(pd)) == lower {
 			matches = append(matches, pd)
@@ -427,8 +426,8 @@ func tpdsGetOrCreateByName(a *core.App, c *core.Cxt, uid primitive.ObjectID, nam
 	}
 	if len(matches) == 0 {
 		// createBlankProject(uid, name) — exact name (NOT uniquified in this path).
-		pj := primitive.NewObjectID()
-		rootID := primitive.NewObjectID()
+		pj := bson.NewObjectID()
+		rootID := bson.NewObjectID()
 		sp := "en"
 		if u, okU := loadOwnerUser(a, c, uid.Hex()); okU && u.spellCheckLanguage != "" {
 			sp = u.spellCheckLanguage
@@ -449,17 +448,17 @@ func tpdsGetOrCreateByName(a *core.App, c *core.Cxt, uid primitive.ObjectID, nam
 			}}}},
 		}, true
 	}
-	var active []primitive.D
+	var active []bson.D
 	for _, pd := range matches {
 		if tpdsProjectActive(pd, uid) {
 			active = append(active, pd)
 		}
 	}
 	if len(active) == 0 {
-		return primitive.D{}, false // all archived/trashed -> rejected
+		return bson.D{}, false // all archived/trashed -> rejected
 	}
 	if len(matches) > 1 {
-		return primitive.D{}, false // duplicate -> rejected
+		return bson.D{}, false // duplicate -> rejected
 	}
 	return active[0], true
 }

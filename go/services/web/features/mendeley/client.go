@@ -13,8 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -48,11 +47,11 @@ var mendeleyHTTP = &http.Client{
 }
 
 // objID — Node ObjectId(userId) (the session user id is a 24-hex string).
-func objID(h string) primitive.ObjectID {
-	if hid, err := primitive.ObjectIDFromHex(h); err == nil {
+func objID(h string) bson.ObjectID {
+	if hid, err := bson.ObjectIDFromHex(h); err == nil {
 		return hid
 	}
-	return primitive.NilObjectID
+	return bson.NilObjectID
 }
 
 // ---------- credential storage (user.refProviders.mendeley) ----------

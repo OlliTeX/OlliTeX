@@ -8,8 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func createMessage(a *core.App) func(*core.Cxt, *core.Res) {
@@ -371,7 +370,7 @@ func insertMessage(a *core.App, cxt *core.Cxt, content string, placements []stri
 		return false
 	}
 	_, err = db.Collection("systemmessages").InsertOne(ctx, bson.D{
-		{Key: "_id", Value: primitive.NewObjectID()},
+		{Key: "_id", Value: bson.NewObjectID()},
 		{Key: "content", Value: content},
 		{Key: "placements", Value: placements},
 		{Key: "__v", Value: 0},
@@ -389,7 +388,7 @@ func patchMessage(a *core.App, cxt *core.Cxt, id string, placements []string) bo
 	if err != nil {
 		return false
 	}
-	oid, err := primitive.ObjectIDFromHex(id)
+	oid, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return false // Node: CastError → 500 page (pinned 'abc')
 	}
@@ -415,7 +414,7 @@ func removeMessage(a *core.App, cxt *core.Cxt, id string) bool {
 	if err != nil {
 		return false
 	}
-	oid, err := primitive.ObjectIDFromHex(id)
+	oid, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return false
 	}

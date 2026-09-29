@@ -1,7 +1,7 @@
 package registrationpage
 
 import (
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // newUserDoc returns the Node-parity user document for a freshly registered

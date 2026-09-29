@@ -34,8 +34,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/services/web/core"
 )
@@ -357,9 +356,9 @@ func tplAnyJSON(v any) string {
 			return strconv.FormatInt(int64(t), 10)
 		}
 		return strconv.FormatFloat(t, 'g', -1, 64)
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return nodeJSONString(t.Hex())
-	case primitive.DateTime:
+	case bson.DateTime:
 		return nodeJSONString(t.Time().UTC().Format("2006-01-02T15:04:05.000Z"))
 	case time.Time:
 		return nodeJSONString(t.UTC().Format("2006-01-02T15:04:05.000Z"))
@@ -441,7 +440,7 @@ func tplPrivileged(ctx context.Context, a *core.App, cxt *core.Cxt) bool {
 	if uidHex == "" || !tplHex24.MatchString(uidHex) || a == nil || a.Mongo == nil {
 		return false
 	}
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(uidHex))
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(uidHex))
 	if err != nil {
 		return false
 	}
@@ -486,7 +485,7 @@ func tplUserName(ctx context.Context, a *core.App, ownerHex string) string {
 	if ownerHex == "" || !tplHex24.MatchString(ownerHex) || a == nil || a.Mongo == nil {
 		return "unknown"
 	}
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(ownerHex))
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(ownerHex))
 	if err != nil {
 		return "unknown"
 	}
@@ -520,7 +519,7 @@ func tplRouteGate(ctx context.Context, a *core.App, cxt *core.Cxt, res *core.Res
 	if templateID != "" && tplHex24.MatchString(templateID) {
 		uid := cxt.Sess.UserIDHex()
 		if uid != "" {
-			oid, err := primitive.ObjectIDFromHex(strings.ToLower(templateID))
+			oid, err := bson.ObjectIDFromHex(strings.ToLower(templateID))
 			if err == nil {
 				if db, derr := a.Mongo.DB(ctx); derr == nil {
 					var d bson.D
@@ -687,7 +686,7 @@ func tplEditFlow(ctx context.Context, a *core.App, cxt *core.Cxt, res *core.Res,
 		res.JSON(500, tplJSONMsg(msgWrongServer))
 		return
 	}
-	oid, _ := primitive.ObjectIDFromHex(tid)
+	oid, _ := bson.ObjectIDFromHex(tid)
 	var d bson.D
 	if err := db.Collection("templates").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&d); err != nil {
 		res.JSON(500, tplJSONMsg(msgWrongServer))
@@ -741,7 +740,7 @@ func tplEditFlow(ctx context.Context, a *core.App, cxt *core.Cxt, res *core.Res,
 	if _, ok := body.get("authorMD"); ok {
 		set = append(set, bson.E{Key: "author", Value: echoStr(echo, "author")})
 	}
-	set = append(set, bson.E{Key: "lastUpdated", Value: primitive.DateTime(time.Now().UnixMilli())})
+	set = append(set, bson.E{Key: "lastUpdated", Value: bson.DateTime(time.Now().UnixMilli())})
 	if len(set) > 0 {
 		_, _ = db.Collection("templates").UpdateByID(ctx, oid, bson.D{{Key: "$set", Value: set}})
 	}
@@ -787,7 +786,7 @@ func tplDeleteFlow(ctx context.Context, a *core.App, res *core.Res, tid string, 
 		res.JSON(500, tplJSONMsg(msgWrongServer))
 		return
 	}
-	oid, _ := primitive.ObjectIDFromHex(tid)
+	oid, _ := bson.ObjectIDFromHex(tid)
 	version := "undefined"
 	if body != nil {
 		if v, ok := body.get("version"); ok {
@@ -949,7 +948,7 @@ func tplCreateFlow(ctx context.Context, a *core.App, cxt *core.Cxt, res *core.Re
 		var proj bson.D
 		found := false
 		if tplHex24.MatchString(pid) {
-			oid, oerr := primitive.ObjectIDFromHex(strings.ToLower(pid))
+			oid, oerr := bson.ObjectIDFromHex(strings.ToLower(pid))
 			if oerr == nil {
 				if db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&proj) == nil {
 					found = true
@@ -1010,12 +1009,12 @@ func tplImportFlow(ctx context.Context, a *core.App, cxt *core.Cxt, res *core.Re
 		}
 	}
 	version := int64(1)
-	var oid primitive.ObjectID
+	var oid bson.ObjectID
 	if exists {
 		version = tplIntVal(mustVal2(&existing, "version")) + 1
-		oid, _ = mustVal2(&existing, "_id").(primitive.ObjectID)
+		oid, _ = mustVal2(&existing, "_id").(bson.ObjectID)
 	} else {
-		oid = primitive.NewObjectID()
+		oid = bson.NewObjectID()
 	}
 	vstr := strconv.FormatInt(version, 10)
 	base := tplFilestoreBase() + "/template/" + oid.Hex() + "/v/" + vstr
@@ -1031,7 +1030,7 @@ func tplImportFlow(ctx context.Context, a *core.App, cxt *core.Cxt, res *core.Re
 		res.JSON(500, tplJSONMsg("Failed to store template assets"))
 		return
 	}
-	now := primitive.DateTime(time.Now().UnixMilli())
+	now := bson.DateTime(time.Now().UnixMilli())
 	set := bson.D{
 		{Key: "name", Value: doc.name},
 		{Key: "category", Value: doc.category},
@@ -1076,13 +1075,13 @@ func tplImportFlow(ctx context.Context, a *core.App, cxt *core.Cxt, res *core.Re
 	res.JSON(200, []byte(`{"template_id":`+nodeJSONString(oid.Hex())+`,"version":`+vstr+`,"created":`+tplBool(!exists)+`}`))
 }
 
-func tplUserOID(hex string) primitive.ObjectID {
+func tplUserOID(hex string) bson.ObjectID {
 	if hex != "" && tplHex24.MatchString(hex) {
-		if o, err := primitive.ObjectIDFromHex(strings.ToLower(hex)); err == nil {
+		if o, err := bson.ObjectIDFromHex(strings.ToLower(hex)); err == nil {
 			return o
 		}
 	}
-	return primitive.NilObjectID
+	return bson.NilObjectID
 }
 
 func tplIntVal(v any) int64 {
@@ -1606,7 +1605,7 @@ func sortSlice(docs []bson.D, less func(i, j *bson.D) bool) {
 
 func tplTimeVal(v any) (time.Time, bool) {
 	switch t := v.(type) {
-	case primitive.DateTime:
+	case bson.DateTime:
 		return t.Time(), true
 	case time.Time:
 		return t, true

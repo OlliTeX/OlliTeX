@@ -46,10 +46,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/features/projectlist"
@@ -66,7 +65,7 @@ var (
 	patListRe   = regexp.MustCompile(`^/git-bridge/personal-access-tokens$`)
 	patDelRe    = regexp.MustCompile(`^/git-bridge/personal-access-tokens/([^/]+)$`)
 	// Node: `scope: /\bgit_bridge\b/` (regex field match).
-	patQuery = primitive.Regex{Pattern: `\bgit_bridge\b`}
+	patQuery = bson.Regex{Pattern: `\bgit_bridge\b`}
 )
 
 // Feature registers the git-bridge web routes.
@@ -234,7 +233,7 @@ func projectExists(g *gb, cxt *core.Cxt, projID string) bool {
 	if projID == "" {
 		return false
 	}
-	o, oerr := primitive.ObjectIDFromHex(projID)
+	o, oerr := bson.ObjectIDFromHex(projID)
 	if oerr != nil {
 		return false
 	}
@@ -275,8 +274,8 @@ func (p *pats) userIDForToken(ctx context.Context, token string) (string, error)
 		return "", err
 	}
 	var row struct {
-		ID     primitive.ObjectID `bson:"_id"`
-		UserID primitive.ObjectID `bson:"user_id"`
+		ID     bson.ObjectID `bson:"_id"`
+		UserID bson.ObjectID `bson:"user_id"`
 	}
 	if err := coll.FindOne(ctx, bson.M{
 		"accessToken": hex.EncodeToString(sum[:]),
@@ -294,7 +293,7 @@ func (p *pats) userIDForToken(ctx context.Context, token string) (string, error)
 		return "", err
 	}
 	var u struct {
-		ID primitive.ObjectID `bson:"_id"`
+		ID bson.ObjectID `bson:"_id"`
 	}
 	if err := db.Collection("users").FindOne(ctx, bson.M{"_id": row.UserID}).Decode(&u); err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -365,11 +364,11 @@ func (p *pats) auth(perm string, h gbRoute) func(*core.Cxt, *core.Res) {
 // gbCanAccess — canUserReadProject/canUserWriteProjectContent
 // (ignoreSiteAdmin:true, token=null — token refs never apply).
 func gbCanAccess(cxt *core.Cxt, p *pats, uid, projID string, perm string) (bool, error) {
-	o, err := primitive.ObjectIDFromHex(projID)
+	o, err := bson.ObjectIDFromHex(projID)
 	if err != nil {
 		return false, nil // Node parse throw -> 500 (mapped by the caller)
 	}
-	uoid, uerr := primitive.ObjectIDFromHex(uid)
+	uoid, uerr := bson.ObjectIDFromHex(uid)
 	if uerr != nil {
 		return false, uerr
 	}
@@ -388,19 +387,19 @@ func gbCanAccess(cxt *core.Cxt, p *pats, uid, projID string, perm string) (bool,
 	m := dval(proj)
 	member := func(v any) bool {
 		switch x := v.(type) {
-		case primitive.ObjectID:
+		case bson.ObjectID:
 			return x == uoid
 		case string:
 			if x == "" {
 				return false
 			}
-			xo, e := primitive.ObjectIDFromHex(x)
+			xo, e := bson.ObjectIDFromHex(x)
 			return e == nil && xo == uoid
 		}
 		return false
 	}
 	inArr := func(arr any) bool {
-		a, ok := arr.(primitive.A)
+		a, ok := arr.(bson.A)
 		if !ok {
 			return false
 		}
@@ -444,7 +443,7 @@ func gbAdminCap(cxt *core.Cxt, p *pats, uid, capName string) (bool, error) {
 	if !core.AdminPrivilegeAvailable() {
 		return false, nil
 	}
-	o, err := primitive.ObjectIDFromHex(uid)
+	o, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return false, err
 	}
@@ -663,7 +662,7 @@ func (p *pats) patCreate(cxt *core.Cxt, res *core.Res) {
 	}
 	// Node returns result.insertedId — the REAL row _id; responding with a
 	// separately generated ID would break delete-by-id / list _id parity.
-	id := ins.InsertedID.(primitive.ObjectID)
+	id := ins.InsertedID.(bson.ObjectID)
 	if email != "" && p.mail != nil {
 		// the /hub-managed template ("git-token"; the owner-rebranded default
 		// keeps the pinned "Overleaf security note" position, now OlliTeX)
@@ -696,7 +695,7 @@ func (p *pats) patDelete(cxt *core.Cxt, res *core.Res) {
 		res.SendStatus(400)
 		return
 	}
-	toid, terr := primitive.ObjectIDFromHex(tokenID)
+	toid, terr := bson.ObjectIDFromHex(tokenID)
 	if terr != nil {
 		res.SendStatus(500) // Node: new ObjectId(bad) throws -> 500
 		return
@@ -939,7 +938,7 @@ type gbUser struct {
 
 func loadGBUser(g *gb, cxt *core.Cxt, uid string) (gbUser, bool) {
 	var u gbUser
-	o, oerr := primitive.ObjectIDFromHex(uid)
+	o, oerr := bson.ObjectIDFromHex(uid)
 	if oerr != nil {
 		return u, false
 	}
@@ -1031,7 +1030,7 @@ func gbPushUpdate(app *core.App, projID, uid string, files []struct {
 }, postbackURL string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	pj, perr := primitive.ObjectIDFromHex(projID)
+	pj, perr := bson.ObjectIDFromHex(projID)
 	if perr != nil {
 		gbPostback(ctx, postbackURL, map[string]any{"code": "error"})
 		return

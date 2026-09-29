@@ -10,8 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // seedRoomPID / seedRoomPID2 — 24-hex project ids (the room names).
@@ -25,8 +24,8 @@ const (
 const seedDocText = "% OlliTeX — seeded\n\\begin{document}\n42\n\\end{document}\n"
 
 // ooid — 24-hex → ObjectID (test helper; mongo-driver v1 has no Must*).
-func ooid(h string) primitive.ObjectID {
-	o, err := primitive.ObjectIDFromHex(h)
+func ooid(h string) bson.ObjectID {
+	o, err := bson.ObjectIDFromHex(h)
 	if err != nil {
 		panic(err)
 	}

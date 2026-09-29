@@ -10,6 +10,8 @@
 package appfactory
 
 import (
+	"go.mongodb.org/mongo-driver/v2/bson"
+
 	"bytes"
 	"context"
 	"encoding/json"
@@ -21,9 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	mongooptions "go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/libraries/otc"
 	"ollitex/go/services/project-history/internal/blobmanager"
@@ -210,7 +211,7 @@ func (a labelsAdapter) InsertOne(ctx context.Context, doc map[string]any) (any, 
 	// driver's InsertedID, so generate it up front (1:1 with mongoose) and
 	// return the stored id.
 	if doc["_id"] == nil {
-		doc["_id"] = primitive.NewObjectID()
+		doc["_id"] = bson.NewObjectID()
 	}
 	id := doc["_id"]
 	if err := a.c.InsertOne(ctx, doc, phmongo.InsertOneOpts{}); err != nil {
@@ -223,7 +224,7 @@ func (a labelsAdapter) DeleteOne(ctx context.Context, filter map[string]any) err
 	// the raw Go driver does not — labels store ObjectID ids, so coerce to keep
 	// the vendor delete-matching 1:1 (0-match would otherwise 204 silently).
 	if id, ok := filter["_id"].(string); ok {
-		if oid, err := primitive.ObjectIDFromHex(id); err == nil {
+		if oid, err := bson.ObjectIDFromHex(id); err == nil {
 			filter["_id"] = oid
 		}
 	}
@@ -558,7 +559,7 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	httpc := &http.Client{Timeout: timeout}
 
 	// ---- Mongo (vendor mongodb.js: five named collections) -----------------
-	mclient, err := mongo.Connect(ctx, mongooptions.Client().ApplyURI(cfg.MongoURL))
+	mclient, err := mongo.Connect(mongooptions.Client().ApplyURI(cfg.MongoURL))
 	if err != nil {
 		return nil, fmt.Errorf("appfactory: mongo connect: %w", err)
 	}

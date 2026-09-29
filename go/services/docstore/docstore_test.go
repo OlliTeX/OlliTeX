@@ -1,5 +1,7 @@
 package docstore
 
+import "go.mongodb.org/mongo-driver/v2/bson"
+
 // docstore_test.go — HTTP contract tests locking the exact Node behaviour
 // (bodies, content types, issue strings) for every route, plus the archive
 // round-trip through the real FS persistor.
@@ -14,8 +16,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func testConfig(t *testing.T) Config {
@@ -597,13 +597,13 @@ func TestRevSemantics(t *testing.T) {
 
 func int64Slice(s []string) *[]string { return &s }
 
-// normalizeTree must convert driver primitive.D/A (and nested ObjectIDs,
+// normalizeTree must convert driver bson.D/A (and nested ObjectIDs,
 // dates) into the neutral tree the handlers and JSON writer expect — this
 // is what makes a mongo-backed doc indistinguishable from the memstore one.
 func TestNormalizeTreeDriverShapes(t *testing.T) {
-	v := primitive.D{
-		{Key: "comments", Value: primitive.A{
-			primitive.D{{Key: "op", Value: primitive.D{{Key: "t", Value: newTestObjectID()}}}},
+	v := bson.D{
+		{Key: "comments", Value: bson.A{
+			bson.D{{Key: "op", Value: bson.D{{Key: "t", Value: newTestObjectID()}}}},
 		}},
 	}
 	n := normalizeTree(v)
@@ -624,7 +624,7 @@ func TestNormalizeTreeDriverShapes(t *testing.T) {
 	}
 }
 
-func newTestObjectID() primitive.ObjectID {
+func newTestObjectID() bson.ObjectID {
 	b, _ := hex.DecodeString("65bc1e66bf88ccab32196bb6")
-	return primitive.ObjectID(b)
+	return bson.ObjectID(b)
 }

@@ -11,8 +11,7 @@ import (
 	"ollitex/go/services/collab"
 
 	"github.com/reearth/ygo/persistence"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const fixPID = "6abaab4caa405ee17acffd08"
@@ -20,18 +19,18 @@ const fixPID = "6abaab4caa405ee17acffd08"
 // findFixture — projects doc: rootDoc_id + a rootFolder tree holding the
 // doc entity (the LIVE shape — the mongo `docs` collection is OT content,
 // nameless).
-func findFixture(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error) {
+func findFixture(ctx context.Context, coll string, id bson.ObjectID) (bson.D, error) {
 	if coll != "projects" {
 		return bson.D{}, nil
 	}
-	rootDoc := primitive.ObjectID{0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc}
+	rootDoc := bson.ObjectID{0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc}
 	return bson.D{
 		{Key: "_id", Value: id},
 		{Key: "rootDoc_id", Value: rootDoc},
 		{Key: "rootFolder", Value: bson.A{
 			bson.D{
 				{Key: "name", Value: "rootFolder"},
-				{Key: "_id", Value: primitive.ObjectID{0xA, 0xB}},
+				{Key: "_id", Value: bson.ObjectID{0xA, 0xB}},
 				{Key: "docs", Value: bson.A{bson.D{
 					{Key: "name", Value: "mainbasic.tex"},
 					{Key: "_id", Value: rootDoc},
@@ -47,11 +46,11 @@ func TestRootDocPathname(t *testing.T) {
 		t.Fatalf("pathname = %q, want mainbasic.tex", got)
 	}
 	// nested folder: the entity sits one folder level down
-	nested := func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error) {
+	nested := func(ctx context.Context, coll string, id bson.ObjectID) (bson.D, error) {
 		if coll != "projects" {
 			return bson.D{}, nil
 		}
-		rootDoc := primitive.ObjectID{0x7}
+		rootDoc := bson.ObjectID{0x7}
 		return bson.D{
 			{Key: "_id", Value: id},
 			{Key: "rootDoc_id", Value: rootDoc},
@@ -73,8 +72,8 @@ func TestRootDocPathname(t *testing.T) {
 		t.Fatalf("nested pathname = %q, want chapters/main.tex", got)
 	}
 	// rootDoc not in the tree -> "" (the row goes vendor-invisible)
-	notree := func(ctx context.Context, coll string, id primitive.ObjectID) (bson.D, error) {
-		return bson.D{{Key: "_id", Value: id}, {Key: "rootDoc_id", Value: primitive.ObjectID{0x9}}, {Key: "rootFolder", Value: bson.A{}}}, nil
+	notree := func(ctx context.Context, coll string, id bson.ObjectID) (bson.D, error) {
+		return bson.D{{Key: "_id", Value: id}, {Key: "rootDoc_id", Value: bson.ObjectID{0x9}}, {Key: "rootFolder", Value: bson.A{}}}, nil
 	}
 	if got := rootDocPathname(context.Background(), notree, fixPID); got != "" {
 		t.Fatalf("want empty, got %q", got)

@@ -58,9 +58,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/templates"
@@ -170,7 +169,7 @@ func apiTagGetHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		// Node: Tag.find({ user_id: userId }) → res.json(allTags). An absent
 		// user yields an empty cursor → [] → 200 (not a 404).
-		var docs []primitive.D
+		var docs []bson.D
 		err := mongoRun(a, c, func(db *mongo.Database, ctx context.Context) error {
 			cur, e := db.Collection("tags").Find(ctx, bson.D{{Key: "user_id", Value: uid}})
 			if e != nil {
@@ -178,7 +177,7 @@ func apiTagGetHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 			defer cur.Close(ctx)
 			for cur.Next(ctx) {
-				var d primitive.D
+				var d bson.D
 				if decErr := cur.Decode(&d); decErr != nil {
 					continue
 				}
@@ -215,16 +214,16 @@ func userGate(cxt *core.Cxt, res *core.Res) (string, bool) {
 
 // ---------- oid route params (404 pin) ----------
 
-func oidParam(cxt *core.Cxt, res *core.Res, group, param string) (primitive.ObjectID, bool) {
+func oidParam(cxt *core.Cxt, res *core.Res, group, param string) (bson.ObjectID, bool) {
 	p := cxt.Params[group]
 	if !validOID.MatchString(p) {
 		res.JSON(404, malformedParam(param))
-		return primitive.ObjectID{}, false
+		return bson.ObjectID{}, false
 	}
-	o, err := primitive.ObjectIDFromHex(strings.ToLower(p))
+	o, err := bson.ObjectIDFromHex(strings.ToLower(p))
 	if err != nil {
 		res.JSON(404, malformedParam(param))
-		return primitive.ObjectID{}, false
+		return bson.ObjectID{}, false
 	}
 	return o, true
 }
@@ -237,7 +236,7 @@ func hexParam(cxt *core.Cxt, res *core.Res, group, param string) (string, bool) 
 		res.JSON(404, malformedParam(param))
 		return "", false
 	}
-	o, err := primitive.ObjectIDFromHex(strings.ToLower(p))
+	o, err := bson.ObjectIDFromHex(strings.ToLower(p))
 	if err != nil {
 		res.JSON(404, malformedParam(param))
 		return "", false
@@ -459,7 +458,7 @@ func writeJSONVal(sb *strings.Builder, v any) {
 	switch x := v.(type) {
 	case string:
 		sb.WriteString(jstr(x))
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		sb.WriteString(`"` + x.Hex() + `"`)
 	case int32:
 		sb.WriteString(strconv.Itoa(int(x)))
@@ -471,7 +470,7 @@ func writeJSONVal(sb *strings.Builder, v any) {
 		} else {
 			sb.WriteString("false")
 		}
-	case primitive.A:
+	case bson.A:
 		sb.WriteByte('[')
 		for i, e := range x {
 			if i > 0 {
@@ -480,7 +479,7 @@ func writeJSONVal(sb *strings.Builder, v any) {
 			writeJSONVal(sb, e)
 		}
 		sb.WriteByte(']')
-	case primitive.D:
+	case bson.D:
 		sb.WriteByte('{')
 		for i, e := range x {
 			if i > 0 {
@@ -498,9 +497,9 @@ func writeJSONVal(sb *strings.Builder, v any) {
 	}
 }
 
-// dJSONTag — one tag doc (primitive.D, stored BSON order) → JSON keeping the
+// dJSONTag — one tag doc (bson.D, stored BSON order) → JSON keeping the
 // key order: {_id, user_id, name, color?, project_ids, __v, ...}.
-func dJSONTag(d primitive.D) []byte {
+func dJSONTag(d bson.D) []byte {
 	var sb strings.Builder
 	sb.WriteByte('{')
 	for i, e := range d {
@@ -543,7 +542,7 @@ func getAllTags(a *core.App) func(*core.Cxt, *core.Res) {
 		if !ok {
 			return
 		}
-		var docs []primitive.D
+		var docs []bson.D
 		err := mongoRun(a, cxt, func(db *mongo.Database, ctx context.Context) error {
 			cur, e := db.Collection("tags").Find(ctx, bson.D{{Key: "user_id", Value: uid}})
 			if e != nil {
@@ -551,7 +550,7 @@ func getAllTags(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 			defer cur.Close(ctx)
 			for cur.Next(ctx) {
-				var d primitive.D
+				var d bson.D
 				if decErr := cur.Decode(&d); decErr != nil {
 					continue
 				}
@@ -599,11 +598,11 @@ func createTagHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 		var (
-			newID primitive.ObjectID
-			dup   *primitive.D
+			newID bson.ObjectID
+			dup   *bson.D
 		)
 		err := mongoRun(a, cxt, func(db *mongo.Database, ctx context.Context) error {
-			newID = primitive.NewObjectID()
+			newID = bson.NewObjectID()
 			ins := bson.D{
 				{Key: "_id", Value: newID},
 				{Key: "user_id", Value: uid},
@@ -613,14 +612,14 @@ func createTagHandler(a *core.App) func(*core.Cxt, *core.Res) {
 				ins = append(ins, bson.E{Key: "color", Value: color})
 			}
 			ins = append(ins,
-				bson.E{Key: "project_ids", Value: primitive.A{}},
+				bson.E{Key: "project_ids", Value: bson.A{}},
 				bson.E{Key: "__v", Value: int32(0)})
 			if _, e := db.Collection("tags").InsertOne(ctx, ins); e != nil {
 				if mongo.IsDuplicateKeyError(e) {
 					// Node: duplicate key → return the EXISTING tag
 					f := db.Collection("tags").FindOne(ctx,
 						bson.D{{Key: "user_id", Value: uid}, {Key: "name", Value: name}})
-					var d primitive.D
+					var d bson.D
 					if decErr := f.Decode(&d); decErr != nil {
 						return decErr
 					}

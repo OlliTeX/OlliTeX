@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // connectWithDBName dials the URI and recovers the default database name the
@@ -14,7 +14,7 @@ import (
 // read off the URI path directly.
 func connectWithDBName(ctx context.Context, uri string) (string, *mongo.Client, error) {
 	dbName := dbFromURI(uri)
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		return "", nil, err
 	}

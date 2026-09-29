@@ -32,10 +32,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	mgoOptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	mgoOptions "go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -114,7 +113,7 @@ func mstr(m map[string]any, k string) string {
 	return s
 }
 func mhex(m map[string]any, k string) string {
-	if v, ok := m[k].(primitive.ObjectID); ok {
+	if v, ok := m[k].(bson.ObjectID); ok {
 		return v.Hex()
 	}
 	return ""
@@ -122,7 +121,7 @@ func mhex(m map[string]any, k string) string {
 func moidList(d map[string]any, k string) []string {
 	var out []string
 	for _, v := range asAnySlice(d[k]) {
-		if o, ok := v.(primitive.ObjectID); ok {
+		if o, ok := v.(bson.ObjectID); ok {
 			out = append(out, o.Hex())
 		}
 	}
@@ -145,7 +144,7 @@ func parseNode(m map[string]any) llmNode {
 }
 
 // loadProjectDoc — projects FindOne (existence, refs, embedded rootFolder).
-func (f *fs) loadProjectDoc(ctx context.Context, oid primitive.ObjectID) (*projectDoc, error) {
+func (f *fs) loadProjectDoc(ctx context.Context, oid bson.ObjectID) (*projectDoc, error) {
 	db, err := f.app.Mongo.DB(ctx)
 	if err != nil {
 		return nil, err
@@ -159,7 +158,7 @@ func (f *fs) loadProjectDoc(ctx context.Context, oid primitive.ObjectID) (*proje
 		return nil, e
 	}
 	p := &projectDoc{public: mstr(d, "publicAccesLevel")}
-	if v, ok := d["owner_ref"].(primitive.ObjectID); ok {
+	if v, ok := d["owner_ref"].(bson.ObjectID); ok {
 		p.owner = v.Hex()
 	}
 	p.collab = moidList(d, "collaberator_refs")
@@ -200,13 +199,13 @@ func canReadLLM(p *projectDoc, uid string) bool {
 
 // llmPref — id validation → project load → authz (Node middleware order).
 // Returns the project + its ObjectID on success.
-func (f *fs) llmPref(cxt *core.Cxt, res *core.Res, idParam string) (*projectDoc, primitive.ObjectID, bool) {
-	var zero primitive.ObjectID
+func (f *fs) llmPref(cxt *core.Cxt, res *core.Res, idParam string) (*projectDoc, bson.ObjectID, bool) {
+	var zero bson.ObjectID
 	if !reOID.MatchString(idParam) {
 		res.JSON(404, []byte(malformed404))
 		return nil, zero, false
 	}
-	oid, err := primitive.ObjectIDFromHex(strings.ToLower(idParam))
+	oid, err := bson.ObjectIDFromHex(strings.ToLower(idParam))
 	if err != nil {
 		res.JSON(404, []byte(malformed404))
 		return nil, zero, false
@@ -555,7 +554,7 @@ func profileSelectedModel(a *core.App, uid string) string {
 	if a == nil || a.Mongo == nil || uid == "" {
 		return ""
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return ""
 	}
@@ -752,7 +751,7 @@ func (f *fs) budgetGate(uid string) *laneErr {
 	if uid == "" || f.app == nil || f.app.Mongo == nil {
 		return nil // Node: !userId → no guard
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return nil
 	}
@@ -769,7 +768,7 @@ func (f *fs) budgetGate(uid string) *laneErr {
 		bson.D{{Key: "userId", Value: oid}, {Key: "minute", Value: minute}},
 		bson.D{{Key: "$inc", Value: bson.D{{Key: "calls", Value: 1}}},
 			{Key: "$set", Value: bson.D{{Key: "minute", Value: minute}, {Key: "day", Value: day}}}},
-		mgoOptions.Update().SetUpsert(true),
+		mgoOptions.UpdateOne().SetUpsert(true),
 	)
 	if err != nil || res == nil {
 		return nil // Node: fail OPEN
@@ -802,7 +801,7 @@ type projDoc struct {
 
 // allDocs — Node getAllDocs order: folders preorder (root first), docs in
 // array order per folder; only docs whose content exists (docstore `docs`).
-func (f *fs) allDocs(ctx context.Context, oid primitive.ObjectID) []projDoc {
+func (f *fs) allDocs(ctx context.Context, oid bson.ObjectID) []projDoc {
 	db, err := f.app.Mongo.DB(ctx)
 	if err != nil {
 		return nil
@@ -813,8 +812,8 @@ func (f *fs) allDocs(ctx context.Context, oid primitive.ObjectID) []projDoc {
 	if err == nil {
 		for cur.Next(ctx) {
 			var dd struct {
-				ID    primitive.ObjectID `bson:"_id"`
-				Lines []string           `bson:"lines"`
+				ID    bson.ObjectID `bson:"_id"`
+				Lines []string      `bson:"lines"`
 			}
 			if cur.Decode(&dd) == nil {
 				linesByID[dd.ID.Hex()] = dd.Lines

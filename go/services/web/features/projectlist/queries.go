@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -43,7 +42,7 @@ func loadProjectBuckets(a *core.App, cxt *core.Cxt, uid string) (*buckets, error
 	if err != nil {
 		return nil, err
 	}
-	uidOID, e := primitive.ObjectIDFromHex(uid)
+	uidOID, e := bson.ObjectIDFromHex(uid)
 	if e != nil {
 		return nil, e
 	}
@@ -57,7 +56,7 @@ func loadProjectBuckets(a *core.App, cxt *core.Cxt, uid string) (*buckets, error
 		defer cur.Close(ctx)
 		var out []docRef
 		for cur.Next(ctx) {
-			var d primitive.D
+			var d bson.D
 			if cur.Decode(&d) != nil {
 				continue
 			}
@@ -124,9 +123,9 @@ type docRef struct {
 	ownerRefHex      string // owner_ref as hex ("" = absent)
 }
 
-// ---------- primitive.D field readers ----------
+// ---------- bson.D field readers ----------
 
-func dget(d primitive.D, key string) any {
+func dget(d bson.D, key string) any {
 	for _, e := range d {
 		if e.Key == key {
 			return e.Value
@@ -144,7 +143,7 @@ func asStr(v any) string {
 }
 
 func oidHex(v any) string {
-	oid, ok := v.(primitive.ObjectID)
+	oid, ok := v.(bson.ObjectID)
 	if ok {
 		return oid.Hex()
 	}
@@ -164,7 +163,7 @@ func oidHex(v any) string {
 
 func asOIDList(v any) []string {
 	var out []string
-	a, ok := v.(primitive.A)
+	a, ok := v.(bson.A)
 	if !ok {
 		return out
 	}
@@ -176,18 +175,18 @@ func asOIDList(v any) []string {
 	return out
 }
 
-func docRefFrom(d primitive.D) docRef {
+func docRefFrom(d bson.D) docRef {
 	r := docRef{
 		id:       oidHex(dget(d, "_id")),
 		name:     asStr(dget(d, "name")),
 		archived: asOIDList(dget(d, "archived")),
 		trashed:  asOIDList(dget(d, "trashed")),
 	}
-	// The driver surfaces BSON dates as primitive.DateTime (int64 ms) when
+	// The driver surfaces BSON dates as bson.DateTime (int64 ms) when
 	// decoding into a generic document — accept both forms (Node renders
 	// either as an ISO millisecond string).
 	switch v := dget(d, "lastUpdated").(type) {
-	case primitive.DateTime:
+	case bson.DateTime:
 		r.lastUpdated, r.hasLastUpdated = time.UnixMilli(int64(v)), true
 	case time.Time:
 		r.lastUpdated, r.hasLastUpdated = v, true

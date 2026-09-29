@@ -4,10 +4,9 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // Doc — one `emailNotifications` record (the producer shapes in this stack:
@@ -19,8 +18,8 @@ type Doc struct {
 	EmailType   string
 	Type        string         // legacy docs carry the type under `type` (node `notification.emailType || notification.type`)
 	Raw         map[string]any // the selected opts bag (opts||options||data) — render inputs keep native types (isComment is a bool)
-	RecipientID *primitive.ObjectID
-	ProjectID   *primitive.ObjectID
+	RecipientID *bson.ObjectID
+	ProjectID   *bson.ObjectID
 	Attempts    int // prior failure count (node `notification.attempts || 0`)
 
 	// claim/lifecycle (node claim-protocol doc fields)
@@ -133,10 +132,10 @@ func decodeDoc(raw bson.M) *Doc {
 		rawBag = map[string]any{}
 	}
 	d.Raw = rawBag
-	if oid, ok := raw["recipient_id"].(primitive.ObjectID); ok && oid != primitive.NilObjectID {
+	if oid, ok := raw["recipient_id"].(bson.ObjectID); ok && oid != bson.NilObjectID {
 		d.RecipientID = &oid
 	}
-	if oid, ok := raw["project_id"].(primitive.ObjectID); ok && oid != primitive.NilObjectID {
+	if oid, ok := raw["project_id"].(bson.ObjectID); ok && oid != bson.NilObjectID {
 		d.ProjectID = &oid
 	}
 	if n, ok := intValue(raw["attempts"]); ok {

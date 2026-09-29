@@ -3,10 +3,9 @@ package notifications
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // mongoStore is the production Store: a 1:1 re-implementation of the Node
@@ -26,76 +25,76 @@ func NewMongoStore(client *mongo.Client, db, collection string) Store {
 	return &mongoStore{col: client.Database(db).Collection(collection)}
 }
 
-func (s *mongoStore) GetUserNotifications(ctx context.Context, userID primitive.ObjectID) ([]primitive.M, error) {
+func (s *mongoStore) GetUserNotifications(ctx context.Context, userID bson.ObjectID) ([]bson.M, error) {
 	// Node: db.notifications.find({ user_id: userId, templateKey: { $exists: true } }).toArray()
-	cur, err := s.col.Find(ctx, primitive.M{
+	cur, err := s.col.Find(ctx, bson.M{
 		"user_id":     userID,
-		"templateKey": primitive.M{"$exists": true},
+		"templateKey": bson.M{"$exists": true},
 	})
 	if err != nil {
 		return nil, err
 	}
 	defer cur.Close(ctx)
-	var out []primitive.M
+	var out []bson.M
 	if err := cur.All(ctx, &out); err != nil {
 		return nil, err
 	}
 	if out == nil {
-		out = make([]primitive.M, 0)
+		out = make([]bson.M, 0)
 	}
 	return out, nil
 }
 
-func (s *mongoStore) CountByUserKey(ctx context.Context, userID primitive.ObjectID, key string) (int64, error) {
+func (s *mongoStore) CountByUserKey(ctx context.Context, userID bson.ObjectID, key string) (int64, error) {
 	// Node: db.notifications.count({ user_id: userId, key: notification.key })
-	return s.col.CountDocuments(ctx, primitive.M{"user_id": userID, "key": key})
+	return s.col.CountDocuments(ctx, bson.M{"user_id": userID, "key": key})
 }
 
-func (s *mongoStore) Upsert(ctx context.Context, filter, setDoc primitive.M) error {
+func (s *mongoStore) Upsert(ctx context.Context, filter, setDoc bson.M) error {
 	// Node: Notifications.updateOne({ user_id, key }, { $set: { ...doc } },
 	//       { upsert: true }) — the upsert option is REQUIRED: without it a
 	//       never-seen (user,key) pair matches nothing, the driver returns
 	//       ErrNoDocuments, and the add silently no-ops (B3 test 7 catches this).
 	_, err := s.col.UpdateOne(ctx, filter, bson.D{{Key: "$set", Value: setDoc}},
-		options.Update().SetUpsert(true))
+		options.UpdateOne().SetUpsert(true))
 	return err
 }
 
-func (s *mongoStore) UnsetByID(ctx context.Context, userID, id primitive.ObjectID) error {
+func (s *mongoStore) UnsetByID(ctx context.Context, userID, id bson.ObjectID) error {
 	// Node: db.notifications.updateOne({ user_id: userId, _id: notificationId },
 	//        { $unset: { templateKey: 1, messageOpts: 1 } })
-	_, err := s.col.UpdateOne(ctx, primitive.M{"user_id": userID, "_id": id},
-		bson.D{{Key: "$unset", Value: primitive.M{"templateKey": 1, "messageOpts": 1}}})
+	_, err := s.col.UpdateOne(ctx, bson.M{"user_id": userID, "_id": id},
+		bson.D{{Key: "$unset", Value: bson.M{"templateKey": 1, "messageOpts": 1}}})
 	return err // Node lets this resolve silently (updateOne on no-match ≠ throw); keep it soft.
 }
 
-func (s *mongoStore) UnsetByUserKey(ctx context.Context, userID primitive.ObjectID, key string) error {
+func (s *mongoStore) UnsetByUserKey(ctx context.Context, userID bson.ObjectID, key string) error {
 	// Node: db.notifications.updateOne({ user_id, key }, { $unset: { templateKey: 1 } })
-	_, err := s.col.UpdateOne(ctx, primitive.M{"user_id": userID, "key": key},
-		bson.D{{Key: "$unset", Value: primitive.M{"templateKey": 1}}})
+	_, err := s.col.UpdateOne(ctx, bson.M{"user_id": userID, "key": key},
+		bson.D{{Key: "$unset", Value: bson.M{"templateKey": 1}}})
 	return err
 }
 
 func (s *mongoStore) UnsetByKeyOnly(ctx context.Context, key string) error {
 	// Node: db.notifications.updateOne({ key }, { $unset: { templateKey: 1 } })
-	_, err := s.col.UpdateOne(ctx, primitive.M{"key": key},
-		bson.D{{Key: "$unset", Value: primitive.M{"templateKey": 1}}})
+	_, err := s.col.UpdateOne(ctx, bson.M{"key": key},
+		bson.D{{Key: "$unset", Value: bson.M{"templateKey": 1}}})
 	return err
 }
 
 func (s *mongoStore) CountByKeyOnly(ctx context.Context, key string) (int64, error) {
 	// Node: db.notifications.countDocuments({ key, templateKey: { $exists: true } })
-	return s.col.CountDocuments(ctx, primitive.M{
+	return s.col.CountDocuments(ctx, bson.M{
 		"key":         key,
-		"templateKey": primitive.M{"$exists": true},
+		"templateKey": bson.M{"$exists": true},
 	})
 }
 
 func (s *mongoStore) DeleteManyByKeyOnly(ctx context.Context, key string) (int64, error) {
 	// Node: res = db.notifications.deleteMany({ key, templateKey: { $exists: true } }); res.deletedCount
-	res, err := s.col.DeleteMany(ctx, primitive.M{
+	res, err := s.col.DeleteMany(ctx, bson.M{
 		"key":         key,
-		"templateKey": primitive.M{"$exists": true},
+		"templateKey": bson.M{"$exists": true},
 	})
 	if err != nil {
 		return 0, err
@@ -103,9 +102,9 @@ func (s *mongoStore) DeleteManyByKeyOnly(ctx context.Context, key string) (int64
 	return res.DeletedCount, nil
 }
 
-func (s *mongoStore) DeleteOneByUser(ctx context.Context, userID primitive.ObjectID) error {
+func (s *mongoStore) DeleteOneByUser(ctx context.Context, userID bson.ObjectID) error {
 	// Node: db.notifications.deleteOne({ user_id: userId })
-	_, err := s.col.DeleteOne(ctx, primitive.M{"user_id": userID})
+	_, err := s.col.DeleteOne(ctx, bson.M{"user_id": userID})
 	return err
 }
 

@@ -55,8 +55,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"ollitex/go/minimatch"
 	"ollitex/go/services/web/core"
@@ -106,7 +105,7 @@ func tpdsFolder409(r *core.Res) {
 
 // tpdsFolder200 — {entityId, projectId, path, folderId} in Node key order;
 // folderId null for the root-folder (path=="/") case.
-func tpdsFolder200(r *core.Res, entity string, pid primitive.ObjectID, filePath, parent string) {
+func tpdsFolder200(r *core.Res, entity string, pid bson.ObjectID, filePath, parent string) {
 	pj, _ := json.Marshal(filePath)
 	fc := "null"
 	if parent != "" {
@@ -206,7 +205,7 @@ func apiFolderUpdateHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			tpdsPlain500(r)
 			return
 		}
-		uid, _ := primitive.ObjectIDFromHex(uidHex)
+		uid, _ := bson.ObjectIDFromHex(uidHex)
 
 		// splitPath(projectId, path) — Node Path.join('/', path) first.
 		np := path.Join("/", pathStr)
@@ -226,13 +225,13 @@ func apiFolderUpdateHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 		}
 
 		// getOrCreateProject(uid, projectId, projectName).
-		var pd primitive.D
+		var pd bson.D
 		found := false
 		if hasId {
-			o, _ := primitive.ObjectIDFromHex(strings.ToLower(pidStr))
+			o, _ := bson.ObjectIDFromHex(strings.ToLower(pidStr))
 			ctx := req.Context()
 			if db, err := a.Mongo.DB(ctx); err == nil {
-				var doc primitive.D
+				var doc bson.D
 				if db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: o}}).Decode(&doc) == nil && doc != nil {
 					pd = doc
 					ow, _ := dgetOID(pd, "owner_ref")
@@ -288,7 +287,7 @@ func apiFolderUpdateHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 // fileRefs/folders) == Node's addFolder / upMkdirp push. Returns the deepest
 // folder id + the folder that CONTAINS it (parent; "" only if the path is the
 // root, which the caller special-cases).
-func tpdsMkdirp(a *core.App, uidHex string, pd *primitive.D, pid primitive.ObjectID, np string) (string, string, bool) {
+func tpdsMkdirp(a *core.App, uidHex string, pd *bson.D, pid bson.ObjectID, np string) (string, string, bool) {
 	root := entParseTree(entFld(*pd, "rootFolder"))
 	if len(root) == 0 || root[0].idHex == "" {
 		return "", "", false
@@ -317,7 +316,7 @@ func tpdsMkdirp(a *core.App, uidHex string, pd *primitive.D, pid primitive.Objec
 			containerID = child
 			continue
 		}
-		newID := primitive.NewObjectID()
+		newID := bson.NewObjectID()
 		opCtx, opCancel := context.WithTimeout(context.Background(), 20*time.Second)
 		db, derr := a.Mongo.DB(opCtx)
 		if derr != nil {
@@ -343,7 +342,7 @@ func tpdsMkdirp(a *core.App, uidHex string, pd *primitive.D, pid primitive.Objec
 					{Key: "lastUpdatedBy", Value: mustObjectID(uidHex)},
 				}},
 			})
-		var ndoc primitive.D
+		var ndoc bson.D
 		ferr := db.Collection("projects").FindOne(opCtx, bson.D{{Key: "_id", Value: pid}}).Decode(&ndoc)
 		opCancel()
 		if err != nil || ure.MatchedCount == 0 {

@@ -84,9 +84,8 @@ import (
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 var nzipPat = regexp.MustCompile(`^/project/new/upload$`)
@@ -437,7 +436,7 @@ func nzipUserNames(a *core.App, cxt *core.Cxt, uid string) []string {
 	if a.Mongo == nil {
 		return nil
 	}
-	oid, err := primitive.ObjectIDFromHex(uid)
+	oid, err := bson.ObjectIDFromHex(uid)
 	if err != nil {
 		return nil
 	}
@@ -523,14 +522,14 @@ func nzipEnsureUnique(existing []string, name string) string {
 // ---------- tree build (FolderStructureBuilder) --------------------------------
 
 type nzipDocE struct {
-	id   primitive.ObjectID
+	id   bson.ObjectID
 	path string // project path "/a/b.tex"
 	rel  string // "a/b.tex" | "b.tex"
 	name string
 	ln   []string
 }
 type nzipFileE struct {
-	id   primitive.ObjectID
+	id   bson.ObjectID
 	path string
 	rel  string
 	name string
@@ -538,17 +537,17 @@ type nzipFileE struct {
 }
 
 type nzipFolder struct {
-	id      primitive.ObjectID
+	id      bson.ObjectID
 	name    string
 	folders []nzipFolder
-	docs    []primitive.D
-	files   []primitive.D
+	docs    []bson.D
+	files   []bson.D
 }
 
 // nzipBuildTree — FolderStructureBuilder: doc entries first (insertion
 // order), then file entries; folders created in first-reference order.
-func nzipBuildTree(docs []nzipDocE, files []nzipFileE) primitive.D {
-	root := nzipFolder{id: primitive.NewObjectID(), name: "rootFolder"}
+func nzipBuildTree(docs []nzipDocE, files []nzipFileE) bson.D {
+	root := nzipFolder{id: bson.NewObjectID(), name: "rootFolder"}
 	fmap := map[string]*nzipFolder{"/": &root}
 
 	mkdirp := func(dir string) *nzipFolder {
@@ -566,7 +565,7 @@ func nzipBuildTree(docs []nzipDocE, files []nzipFileE) primitive.D {
 				acc = acc2
 				continue
 			}
-			f := &nzipFolder{id: primitive.NewObjectID(), name: part}
+			f := &nzipFolder{id: bson.NewObjectID(), name: part}
 			cur.folders = append(cur.folders, *f)
 			fmap[acc2] = f
 			cur = f
@@ -581,7 +580,7 @@ func nzipBuildTree(docs []nzipDocE, files []nzipFileE) primitive.D {
 			dir = de.rel[:i]
 		}
 		f := mkdirp(dir)
-		f.docs = append(f.docs, primitive.D{
+		f.docs = append(f.docs, bson.D{
 			{Key: "_id", Value: de.id},
 			{Key: "name", Value: de.name},
 		})
@@ -592,7 +591,7 @@ func nzipBuildTree(docs []nzipDocE, files []nzipFileE) primitive.D {
 			dir = fe.rel[:i]
 		}
 		f := mkdirp(dir)
-		f.files = append(f.files, primitive.D{
+		f.files = append(f.files, bson.D{
 			{Key: "_id", Value: fe.id},
 			{Key: "name", Value: fe.name},
 			{Key: "created", Value: time.Now().UTC()},
@@ -600,21 +599,21 @@ func nzipBuildTree(docs []nzipDocE, files []nzipFileE) primitive.D {
 			{Key: "hash", Value: fe.hash},
 		})
 	}
-	var render func(f *nzipFolder) primitive.D
-	render = func(f *nzipFolder) primitive.D {
-		folders := make([]primitive.D, 0, len(f.folders))
+	var render func(f *nzipFolder) bson.D
+	render = func(f *nzipFolder) bson.D {
+		folders := make([]bson.D, 0, len(f.folders))
 		for i := range f.folders {
 			folders = append(folders, render(&f.folders[i]))
 		}
 		docs := f.docs
 		if docs == nil {
-			docs = []primitive.D{}
+			docs = []bson.D{}
 		}
 		files := f.files
 		if files == nil {
-			files = []primitive.D{}
+			files = []bson.D{}
 		}
-		return primitive.D{
+		return bson.D{
 			{Key: "_id", Value: f.id},
 			{Key: "name", Value: f.name},
 			{Key: "folders", Value: folders},
@@ -632,7 +631,7 @@ var nzipValidRootExt = map[string]bool{
 }
 
 // nzipWriteStructure — createNewFolderStructure (guarded $set + $inc).
-func nzipWriteStructure(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, root primitive.D) bool {
+func nzipWriteStructure(a *core.App, cxt *core.Cxt, pj bson.ObjectID, root bson.D) bool {
 	if a.Mongo == nil {
 		return false
 	}
@@ -660,7 +659,7 @@ func nzipWriteStructure(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, root 
 }
 
 // nzipSetRootDoc — setRootDocFromName + setRootDoc over the final tree.
-func nzipSetRootDoc(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, rootDocName string) bool {
+func nzipSetRootDoc(a *core.App, cxt *core.Cxt, pj bson.ObjectID, rootDocName string) bool {
 	if a.Mongo == nil {
 		return false
 	}
@@ -670,41 +669,41 @@ func nzipSetRootDoc(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, rootDocNa
 	if err != nil {
 		return false
 	}
-	var doc primitive.D
+	var doc bson.D
 	if db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: pj}}).Decode(&doc) != nil {
 		return false
 	}
-	rootFolder, _ := dget(doc, "rootFolder").(primitive.A)
+	rootFolder, _ := dget(doc, "rootFolder").(bson.A)
 	if len(rootFolder) == 0 {
 		return false
 	}
-	root0, _ := rootFolder[0].(primitive.D)
+	root0, _ := rootFolder[0].(bson.D)
 
 	type drec struct {
-		id   primitive.ObjectID
+		id   bson.ObjectID
 		path string
 	}
 	var recs []drec
-	var walk func(f primitive.D, prefix string)
-	walk = func(f primitive.D, prefix string) {
+	var walk func(f bson.D, prefix string)
+	walk = func(f bson.D, prefix string) {
 		nm, _ := dget(f, "name").(string)
 		p := prefix + "/" + nm
-		if docs, ok := dget(f, "docs").(primitive.A); ok {
+		if docs, ok := dget(f, "docs").(bson.A); ok {
 			for _, dv := range docs {
-				dd, ok := dv.(primitive.D)
+				dd, ok := dv.(bson.D)
 				if !ok {
 					continue
 				}
-				id, ok2 := dget(dd, "_id").(primitive.ObjectID)
+				id, ok2 := dget(dd, "_id").(bson.ObjectID)
 				nm2, _ := dget(dd, "name").(string)
 				if ok2 {
 					recs = append(recs, drec{id: id, path: p + "/" + nm2})
 				}
 			}
 		}
-		if folders, ok := dget(f, "folders").(primitive.A); ok {
+		if folders, ok := dget(f, "folders").(bson.A); ok {
 			for _, fv := range folders {
-				fo, ok := fv.(primitive.D)
+				fo, ok := fv.(bson.D)
 				if !ok {
 					continue
 				}
@@ -718,7 +717,7 @@ func nzipSetRootDoc(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, rootDocNa
 	if !strings.HasPrefix(want, "/") {
 		want = "/" + want
 	}
-	var pick primitive.ObjectID
+	var pick bson.ObjectID
 	found := false
 	for _, r := range recs {
 		if r.path == want {
@@ -778,7 +777,7 @@ func vaEsc(s string) string {
 // side-effect chain as P4.8's deleteProjectExec, but deleterData carries
 // NO deleterId/deleterIpAddress (options.deleterUser/ipAddress undefined)
 // and deletedReason 'zip-import-failure'.
-func nzipFailCleanup(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, uid, ip string) {
+func nzipFailCleanup(a *core.App, cxt *core.Cxt, pj bson.ObjectID, uid, ip string) {
 	pid := pj.Hex()
 	hist := strings.TrimSuffix(crHistoryBase(), "/")
 	ds := strings.TrimSuffix(crDocstoreBase(), "/")
@@ -795,7 +794,7 @@ func nzipFailCleanup(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, uid, ip 
 	if err != nil {
 		return
 	}
-	var procdoc primitive.D
+	var procdoc bson.D
 	if db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: pj}}).Decode(&procdoc) != nil {
 		return
 	}
@@ -808,7 +807,7 @@ func nzipFailCleanup(a *core.App, cxt *core.Cxt, pj primitive.ObjectID, uid, ip 
 			{Key: "deleterData", Value: deleterData},
 			{Key: "__v", Value: 0},
 		}}},
-		options.Update().SetUpsert(true))
+		options.UpdateOne().SetUpsert(true))
 	_, _ = db.Collection("projects").DeleteOne(ctx, bson.D{{Key: "_id", Value: pj}})
 }
 
@@ -943,8 +942,8 @@ func newzipHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 		// createBlankProject (P4.7 shape; blank: no docs/files, rootDoc null,
 		// version 0 — the P4.8-style structure write below then $inc → 1).
-		pj := primitive.NewObjectID()
-		rootID := primitive.NewObjectID()
+		pj := bson.NewObjectID()
+		rootID := bson.NewObjectID()
 		u, okU := loadOwnerUser(a, cxt, uid)
 		if !okU {
 			u = crOwnerUser{spellCheckLanguage: "en"}
@@ -971,14 +970,14 @@ func newzipHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 			kind2, lines2 := upClassify(e.data, e.path, false)
 			if kind2 == "doc" {
-				docID := primitive.NewObjectID()
+				docID := bson.NewObjectID()
 				if _, okps := upDocstorePut(pj.Hex(), docID.Hex(), lines2); !okps {
 					cleanup()
 					return
 				}
 				docs = append(docs, nzipDocE{id: docID, path: projPath, rel: e.path, name: nzipBase(e.path), ln: lines2})
 			} else {
-				fileID := primitive.NewObjectID()
+				fileID := bson.NewObjectID()
 				hash := upGitBlobHash(e.data)
 				if !upPutBlob(pj.Hex(), hash, e.data) {
 					cleanup()

@@ -16,8 +16,8 @@ import (
 	"context"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -96,7 +96,7 @@ func wdSaveCreds(ctx context.Context, a *core.App, uid, plainJSON string) error 
 	_, err = db.Collection(wdCredsColl).UpdateOne(ctx,
 		bson.D{{Key: "userId", Value: uid}},
 		bson.D{{Key: "$set", Value: bson.D{{Key: "credentials", Value: enc}}}},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 	return err
 }
@@ -191,7 +191,7 @@ func wdCreateState(ctx context.Context, a *core.App, projectID string, fields []
 			{Key: "$set", Value: bson.D(fields)},
 			{Key: "$setOnInsert", Value: bson.D{{Key: "projectId", Value: pid}}},
 		},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 	return err
 }

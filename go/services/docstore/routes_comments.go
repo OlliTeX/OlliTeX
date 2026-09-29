@@ -1,10 +1,9 @@
 package docstore
 
+import "go.mongodb.org/mongo-driver/v2/bson"
 import (
 	"context"
 	"net/http"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (s *Server) hCommentThreadIDs(ctx context.Context, w http.ResponseWriter, p routeParams, r *http.Request) {
@@ -171,7 +170,7 @@ func threadKey(v any) string {
 		return "s:" + t
 	case objectIDHex:
 		return "o:" + string(t)
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return "o:" + t.Hex()
 	}
 	return "x:" + fmtSprint(v)

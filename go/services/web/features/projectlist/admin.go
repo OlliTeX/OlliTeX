@@ -54,8 +54,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
 )
@@ -83,7 +82,7 @@ func aLoginAdmin(a *core.App, cxt *core.Cxt, res *core.Res) (string, bool) {
 
 // aGate500 — admin gate whose controllers throw BSONError on a malformed id:
 // 500 HTML page (badpid_members/badpid_delete pins).
-func aGate500(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, bool) {
+func aGate500(a *core.App, cxt *core.Cxt, res *core.Res) (string, *bson.D, bool) {
 	uid, ok := aLoginAdmin(a, cxt, res)
 	if !ok {
 		return "", nil, false
@@ -92,7 +91,7 @@ func aGate500(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, 
 		aPage500(cxt, res)
 		return "", nil, false
 	}
-	oid, _ := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+	oid, _ := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 	doc, lerr := loadProjectFull(a, cxt, oid)
 	if lerr != nil {
 		res.JSON(500, []byte("internal error"))
@@ -107,7 +106,7 @@ func aGate500(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, 
 
 // aGateParam — admin gate for the parseReq controllers: malformed id ->
 // 404 Validation JSON (same shape as the P4 member-surface gate, P4 pin).
-func aGateParam(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, bool) {
+func aGateParam(a *core.App, cxt *core.Cxt, res *core.Res) (string, *bson.D, bool) {
 	uid, ok := aLoginAdmin(a, cxt, res)
 	if !ok {
 		return "", nil, false
@@ -116,7 +115,7 @@ func aGateParam(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D
 		res.JSON(404, []byte(malformed404))
 		return "", nil, false
 	}
-	oid, _ := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+	oid, _ := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 	doc, lerr := loadProjectFull(a, cxt, oid)
 	if lerr != nil {
 		res.JSON(500, []byte("internal error"))
@@ -211,7 +210,7 @@ func adminRedir(a *core.App, loc string) func(*core.Cxt, *core.Res) {
 // project load (404 matrix). NO per-project ownership check (Node admin
 // routes carry only ensureUserIsSiteAdmin; the core membership checks live
 // in the /project router middleware, not these handlers).
-func aGateAdmin(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D, bool) {
+func aGateAdmin(a *core.App, cxt *core.Cxt, res *core.Res) (string, *bson.D, bool) {
 	uid, ok := aLoginAdmin(a, cxt, res)
 	if !ok {
 		return "", nil, false
@@ -220,7 +219,7 @@ func aGateAdmin(a *core.App, cxt *core.Cxt, res *core.Res) (string, *primitive.D
 		res.JSON(404, []byte(malformed404))
 		return "", nil, false
 	}
-	oid, _ := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+	oid, _ := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 	doc, lerr := loadProjectFull(a, cxt, oid)
 	if lerr != nil {
 		res.JSON(500, []byte("internal error"))
@@ -377,7 +376,7 @@ func adminActiveProjects(a *core.App) func(*core.Cxt, *core.Res) {
 				aPage500(cxt, res)
 				return
 			}
-			oid, _ := primitive.ObjectIDFromHex(pid)
+			oid, _ := bson.ObjectIDFromHex(pid)
 			var name *string
 			if dbErr == nil {
 				var proj struct {
@@ -454,7 +453,7 @@ func adNameSet(a *core.App, cxt *core.Cxt, ownerHex string) map[string]bool {
 	if err != nil {
 		return set
 	}
-	oid, _ := primitive.ObjectIDFromHex(ownerHex)
+	oid, _ := bson.ObjectIDFromHex(ownerHex)
 	add := func(filter bson.D) {
 		cr, err := db.Collection("projects").Find(ctx, filter)
 		if err != nil {
@@ -571,7 +570,7 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		pFilter := bson.D{}
 		if !allUsers {
-			oid, _ := primitive.ObjectIDFromHex(ownerHex)
+			oid, _ := bson.ObjectIDFromHex(ownerHex)
 			pFilter = bson.D{{Key: "owner_ref", Value: oid}}
 		}
 		pcr, err := db.Collection("projects").Find(ctx, pFilter)
@@ -579,9 +578,9 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 			aPage500(cxt, res)
 			return
 		}
-		var activeD []primitive.D
+		var activeD []bson.D
 		for pcr.Next(ctx) {
-			var d primitive.D
+			var d bson.D
 			if pcr.Decode(&d) != nil {
 				aPage500(cxt, res)
 				return
@@ -592,7 +591,7 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 		if allUsers {
 			dFilter = bson.D{{Key: "project", Value: bson.D{{Key: "$type", Value: "object"}}}}
 		} else {
-			oid, _ := primitive.ObjectIDFromHex(ownerHex)
+			oid, _ := bson.ObjectIDFromHex(ownerHex)
 			dFilter = bson.D{{Key: "project.owner_ref", Value: oid}}
 		}
 		dcr, err := db.Collection("deletedProjects").Find(ctx, dFilter)
@@ -600,9 +599,9 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 			aPage500(cxt, res)
 			return
 		}
-		var delD []primitive.D
+		var delD []bson.D
 		for dcr.Next(ctx) {
-			var d primitive.D
+			var d bson.D
 			if dcr.Decode(&d) != nil {
 				aPage500(cxt, res)
 				return
@@ -620,7 +619,7 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 			// returns false -> caller 500s.
 			var r row
 			doc := *dcast(p)
-			idv, ok := doc[0].Value.(primitive.ObjectID)
+			idv, ok := doc[0].Value.(bson.ObjectID)
 			if !ok {
 				return false
 			}
@@ -634,7 +633,7 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 			if v, okm := dg(doc, "owner_ref"); okm {
 				switch o := v.(type) {
-				case primitive.ObjectID:
+				case bson.ObjectID:
 					r.owner, r.ownerHas = o.Hex(), true
 				case string:
 					r.owner, r.ownerHas = o, true
@@ -650,7 +649,7 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 				r.lu, r.luHas = t.UTC().Format("2006-01-02T15:04:05.000Z"), true
 			}
 			if v, okm := dg(doc, "lastUpdatedBy"); okm {
-				if o, isO := v.(primitive.ObjectID); isO {
+				if o, isO := v.(bson.ObjectID); isO {
 					r.lub, r.lubHas = o.Hex(), true
 				}
 			} else if v == nil {
@@ -665,14 +664,14 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 				if !validOID.MatchString(r.owner) {
 					return false // isTrashed: new ObjectId throws -> 500
 				}
-				oo, _ := primitive.ObjectIDFromHex(strings.ToLower(r.owner))
+				oo, _ := bson.ObjectIDFromHex(strings.ToLower(r.owner))
 				if tvRaw, okTr := dg(doc, "trashed"); okTr {
-					arr, isA := tvRaw.(primitive.A)
+					arr, isA := tvRaw.(bson.A)
 					if !isA {
 						return false // Node: (trashed||[]).some TypeError -> 500
 					}
 					for _, tv := range arr {
-						to, isO := tv.(primitive.ObjectID)
+						to, isO := tv.(bson.ObjectID)
 						if !isO {
 							return false // Node: id.equals TypeError -> 500
 						}
@@ -720,7 +719,7 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 					recDat, recDatHas = v2, true
 				}
 				if v, okv := dg(ddd, "deleterId"); okv {
-					if o, isO := v.(primitive.ObjectID); isO {
+					if o, isO := v.(bson.ObjectID); isO {
 						recDid, recDidHas = o.Hex(), true
 					}
 				}
@@ -860,23 +859,23 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 	}
 }
 
-func dcast(v any) *primitive.D {
+func dcast(v any) *bson.D {
 	switch t := v.(type) {
-	case *primitive.D:
+	case *bson.D:
 		return t
 	case bson.D:
-		d := primitive.D(t)
+		d := bson.D(t)
 		return &d
 	case bson.M:
-		var d primitive.D
+		var d bson.D
 		for k, val := range t {
-			d = append(d, primitive.E{Key: k, Value: val})
+			d = append(d, bson.E{Key: k, Value: val})
 		}
 		return &d
 	case map[string]any:
-		var d primitive.D
+		var d bson.D
 		for k, val := range t {
-			d = append(d, primitive.E{Key: k, Value: val})
+			d = append(d, bson.E{Key: k, Value: val})
 		}
 		return &d
 	}
@@ -884,7 +883,7 @@ func dcast(v any) *primitive.D {
 }
 
 // dg — dget with presence bool.
-func dg(d primitive.D, key string) (any, bool) {
+func dg(d bson.D, key string) (any, bool) {
 	for _, e := range d {
 		if e.Key == key {
 			return e.Value, true
@@ -897,7 +896,7 @@ func asTime(v any) (time.Time, bool) {
 	switch t := v.(type) {
 	case time.Time:
 		return t, true
-	case primitive.DateTime:
+	case bson.DateTime:
 		return time.UnixMilli(int64(t)), true
 	case int64:
 		return time.UnixMilli(t), true
@@ -962,7 +961,7 @@ func adminTrashOrUntrash(a *core.App, trash bool) func(*core.Cxt, *core.Res) {
 			aPage500(cxt, res)
 			return
 		}
-		pid, _ := primitive.ObjectIDFromHex(strings.ToLower(pidP))
+		pid, _ := bson.ObjectIDFromHex(strings.ToLower(pidP))
 
 		body, _ := io.ReadAll(io.LimitReader(cxt.Req.Body, 1<<20))
 		uidHex := ""
@@ -977,10 +976,10 @@ func adminTrashOrUntrash(a *core.App, trash bool) func(*core.Cxt, *core.Res) {
 		if uidHex == "" {
 			// resolveProjectUserId fallback: the project's own owner.
 			db, dbErr := a.Mongo.DB(cxt.Req.Context())
-			var doc primitive.D
+			var doc bson.D
 			okDoc := false
 			if dbErr == nil {
-				var d primitive.D
+				var d bson.D
 				if db.Collection("projects").FindOne(cxt.Req.Context(), bson.D{{Key: "_id", Value: pid}}).Decode(&d) == nil {
 					doc = d
 					okDoc = true
@@ -988,7 +987,7 @@ func adminTrashOrUntrash(a *core.App, trash bool) func(*core.Cxt, *core.Res) {
 			}
 			if okDoc {
 				if v, okv := dg(doc, "owner_ref"); okv && v != nil {
-					if o, isO := v.(primitive.ObjectID); isO {
+					if o, isO := v.(bson.ObjectID); isO {
 						uidHex = o.Hex()
 					} else if s, isS := v.(string); isS {
 						uidHex = s
@@ -998,7 +997,7 @@ func adminTrashOrUntrash(a *core.App, trash bool) func(*core.Cxt, *core.Res) {
 					if ov, okv := dg(doc, "owner"); okv && ov != nil {
 						if dd2 := dcast(ov); dd2 != nil {
 							if id, oki := dg(*dd2, "_id"); oki {
-								if o, isO := id.(primitive.ObjectID); isO {
+								if o, isO := id.(bson.ObjectID); isO {
 									uidHex = o.Hex()
 								}
 							}
@@ -1011,7 +1010,7 @@ func adminTrashOrUntrash(a *core.App, trash bool) func(*core.Cxt, *core.Res) {
 			aPage500(cxt, res) // OError / BSONError
 			return
 		}
-		uid, _ := primitive.ObjectIDFromHex(strings.ToLower(uidHex))
+		uid, _ := bson.ObjectIDFromHex(strings.ToLower(uidHex))
 		db, dbErr := a.Mongo.DB(cxt.Req.Context())
 		if dbErr != nil {
 			aPage500(cxt, res)
@@ -1050,7 +1049,7 @@ func adminDelete(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(500, []byte("internal error"))
 			return
 		}
-		var dpDoc primitive.D
+		var dpDoc bson.D
 		if db.Collection("deletedProjects").FindOne(ctx,
 			bson.D{{Key: "deleterData.deletedProjectId", Value: oid}}).Decode(&dpDoc) != nil {
 			res.JSON(500, []byte("internal error"))
@@ -1062,7 +1061,7 @@ func adminDelete(a *core.App) func(*core.Cxt, *core.Res) {
 				if t, okT := asTime(dget2raw(*dd, "deletedAt")); okT {
 					dat = jstr(t.UTC().Format("2006-01-02T15:04:05.000Z"))
 				}
-				if o, isO := dget2raw(*dd, "deleterId").(primitive.ObjectID); isO {
+				if o, isO := dget2raw(*dd, "deleterId").(bson.ObjectID); isO {
 					did = jstr(o.Hex())
 				}
 			}
@@ -1071,18 +1070,18 @@ func adminDelete(a *core.App) func(*core.Cxt, *core.Res) {
 	}
 }
 
-func dget2(v any) *primitive.ObjectID {
-	if o, ok := v.(primitive.ObjectID); ok {
+func dget2(v any) *bson.ObjectID {
+	if o, ok := v.(bson.ObjectID); ok {
 		return &o
 	}
 	return nil
 }
 
-func dget2get(d primitive.D, key string) (any, bool) {
+func dget2get(d bson.D, key string) (any, bool) {
 	return dg(d, key)
 }
 
-func dget2raw(d primitive.D, key string) any {
+func dget2raw(d bson.D, key string) any {
 	return dget(d, key)
 }
 
@@ -1098,7 +1097,7 @@ func adminUndelete(a *core.App) func(*core.Cxt, *core.Res) {
 			aPage500(cxt, res)
 			return
 		}
-		pid, _ := primitive.ObjectIDFromHex(strings.ToLower(pidP))
+		pid, _ := bson.ObjectIDFromHex(strings.ToLower(pidP))
 
 		body, _ := io.ReadAll(io.LimitReader(cxt.Req.Body, 1<<20))
 		uidHex := ""
@@ -1116,7 +1115,7 @@ func adminUndelete(a *core.App) func(*core.Cxt, *core.Res) {
 			aPage500(cxt, res)
 			return
 		}
-		var dpDoc primitive.D
+		var dpDoc bson.D
 		if db.Collection("deletedProjects").FindOne(ctx,
 			bson.D{{Key: "deleterData.deletedProjectId", Value: pid}}).Decode(&dpDoc) != nil {
 			aNotFound(cxt, res)
@@ -1131,12 +1130,12 @@ func adminUndelete(a *core.App) func(*core.Cxt, *core.Res) {
 			aPage500(cxt, res) // resolveProjectUserId -> OError (project gone)
 			return
 		}
-		uid, _ := primitive.ObjectIDFromHex(uidHex)
+		uid, _ := bson.ObjectIDFromHex(uidHex)
 
 		origOwnerHex := ""
 		if dv, okv := dg(dpDoc, "deleterData"); okv && dv != nil {
 			if dd := dcast(dv); dd != nil {
-				if o, isO := dget(*dd, "deletedProjectOwnerId").(primitive.ObjectID); isO {
+				if o, isO := dget(*dd, "deletedProjectOwnerId").(bson.ObjectID); isO {
 					origOwnerHex = o.Hex()
 				}
 			}
@@ -1170,10 +1169,10 @@ func adminUndelete(a *core.App) func(*core.Cxt, *core.Res) {
 			case "name":
 				restored = append(restored, bson.E{Key: "name", Value: finalName})
 			case "deletedDocs":
-				if arr, isA := el.Value.(primitive.A); isA {
+				if arr, isA := el.Value.(bson.A); isA {
 					deletedDocs = arr
 				}
-				restored = append(restored, bson.E{Key: "deletedDocs", Value: primitive.A{}})
+				restored = append(restored, bson.E{Key: "deletedDocs", Value: bson.A{}})
 			default:
 				restored = append(restored, el)
 			}
@@ -1192,7 +1191,7 @@ func adminUndelete(a *core.App) func(*core.Cxt, *core.Res) {
 				fireHTTP(cxt, "DELETE", f+"/project/"+pid.Hex()+"/doc/"+asStr(did)+"/name/"+asStr(dnm), nil)
 			}
 		}
-		dpID, _ := dpDoc[0].Value.(primitive.ObjectID)
+		dpID, _ := dpDoc[0].Value.(bson.ObjectID)
 		_, _ = db.Collection("deletedProjects").DeleteOne(ctx, bson.D{{Key: "_id", Value: dpID}})
 		_, _ = db.Collection("projects").UpdateOne(ctx,
 			bson.D{{Key: "_id", Value: pid}},
@@ -1213,21 +1212,21 @@ func adminPurge(a *core.App) func(*core.Cxt, *core.Res) {
 			aPage500(cxt, res)
 			return
 		}
-		pid, _ := primitive.ObjectIDFromHex(strings.ToLower(pidP))
+		pid, _ := bson.ObjectIDFromHex(strings.ToLower(pidP))
 		ctx := cxt.Req.Context()
 		db, dbErr := a.Mongo.DB(ctx)
 		if dbErr != nil {
 			aPage500(cxt, res)
 			return
 		}
-		var act primitive.D
+		var act bson.D
 		if db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: pid}}).Decode(&act) == nil {
 			_, _ = db.Collection("deletedProjects").DeleteOne(ctx,
 				bson.D{{Key: "deleterData.deletedProjectId", Value: pid}})
 			res.PlainText(200, "OK")
 			return
 		}
-		var dpDoc primitive.D
+		var dpDoc bson.D
 		if db.Collection("deletedProjects").FindOne(ctx,
 			bson.D{{Key: "deleterData.deletedProjectId", Value: pid}}).Decode(&dpDoc) != nil {
 			aNotFound(cxt, res)
@@ -1275,7 +1274,7 @@ func adminPurge(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		_, _ = db.Collection("projectAuditLogEntries").DeleteMany(ctx, bson.D{{Key: "projectId", Value: pid}})
 
-		dpID, _ := dpDoc[0].Value.(primitive.ObjectID)
+		dpID, _ := dpDoc[0].Value.(bson.ObjectID)
 		if _, uerr := db.Collection("deletedProjects").UpdateOne(ctx,
 			bson.D{{Key: "_id", Value: dpID}},
 			bson.D{{Key: "$set", Value: bson.D{
@@ -1315,8 +1314,8 @@ func adminMembers(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		ownerJSON := "null"
 		if or, okm := dg(*doc, "owner_ref"); okm {
-			if o, isO := or.(primitive.ObjectID); isO {
-				var u primitive.D
+			if o, isO := or.(bson.ObjectID); isO {
+				var u bson.D
 				db, dbErr := a.Mongo.DB(cxt.Req.Context())
 				if dbErr == nil && db.Collection("users").FindOne(cxt.Req.Context(),
 					bson.D{{Key: "_id", Value: o}}).Decode(&u) == nil {
@@ -1451,7 +1450,7 @@ func adminShareGet(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(500, []byte("internal error"))
 			return
 		}
-		var inv primitive.D
+		var inv bson.D
 		if db.Collection("projectInvites").FindOne(cxt.Req.Context(),
 			bson.D{{Key: "projectId", Value: projID}, {Key: "reusable", Value: true}}).Decode(&inv) != nil {
 			res.SendStatus(404)
@@ -1477,9 +1476,9 @@ func adminShareGet(a *core.App) func(*core.Cxt, *core.Res) {
 	}
 }
 
-func shareInvJSON(inv primitive.D) []byte {
+func shareInvJSON(inv bson.D) []byte {
 	var sb strings.Builder
-	id, _ := inv[0].Value.(primitive.ObjectID)
+	id, _ := inv[0].Value.(bson.ObjectID)
 	enc, _ := dget(inv, "encryptedToken").(string)
 	plain, okD := atDecrypt(enc)
 	token := ""
@@ -1501,7 +1500,7 @@ func shareInvJSON(inv primitive.D) []byte {
 		}
 	}
 	if sub, okS := dg(inv, "subscriptionId"); okS {
-		if o, isO := sub.(primitive.ObjectID); isO {
+		if o, isO := sub.(bson.ObjectID); isO {
 			sb.WriteString(`,"subscriptionId":` + jstr(o.Hex()))
 		} else if s, isS := sub.(string); isS {
 			sb.WriteString(`,"subscriptionId":` + jstr(s))
@@ -1516,7 +1515,7 @@ func adminShareSet(a *core.App) func(*core.Cxt, *core.Res) {
 		if _, _, ok := aGateParam(a, cxt, res); !ok {
 			return
 		}
-		projID, _ := primitive.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
+		projID, _ := bson.ObjectIDFromHex(strings.ToLower(cxt.Params["1"]))
 		body, _ := io.ReadAll(io.LimitReader(cxt.Req.Body, 1<<20))
 		var bm map[string]any
 		var keyOrder []string
@@ -1590,7 +1589,7 @@ func adminShareSet(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(500, []byte("internal error"))
 			return
 		}
-		var inv primitive.D
+		var inv bson.D
 		err := db.Collection("projectInvites").FindOne(ctx,
 			bson.D{{Key: "projectId", Value: projID}, {Key: "reusable", Value: true}}).Decode(&inv)
 		if err != nil {
@@ -1607,7 +1606,7 @@ func adminShareSet(a *core.App) func(*core.Cxt, *core.Res) {
 				{Key: "privileges", Value: privVal},
 			}
 			if s, isS := subVal.(string); isS {
-				sub, _ := primitive.ObjectIDFromHex(s)
+				sub, _ := bson.ObjectIDFromHex(s)
 				doc = append(doc, bson.E{Key: "subscriptionId", Value: sub})
 			}
 			doc = append(doc, bson.E{Key: "reusable", Value: true}, bson.E{Key: "expires", Value: nil})
@@ -1624,10 +1623,10 @@ func adminShareSet(a *core.App) func(*core.Cxt, *core.Res) {
 			setD := bson.D{{Key: "privileges", Value: privVal}}
 			switch sv := subVal.(type) {
 			case string:
-				sub, _ := primitive.ObjectIDFromHex(sv)
+				sub, _ := bson.ObjectIDFromHex(sv)
 				setD = append(setD, bson.E{Key: "subscriptionId", Value: sub})
 			}
-			id, _ := inv[0].Value.(primitive.ObjectID)
+			id, _ := inv[0].Value.(bson.ObjectID)
 			if _, e5 := db.Collection("projectInvites").UpdateOne(ctx,
 				bson.D{{Key: "_id", Value: id}},
 				bson.D{{Key: "$set", Value: setD}}); e5 != nil {

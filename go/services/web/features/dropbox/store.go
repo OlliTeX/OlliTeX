@@ -6,10 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -73,7 +72,7 @@ func dbxEncryptAndSave(ctx context.Context, a *core.App, uid, plaintextToken str
 	}
 	return dbxRun(ctx, a, func(db *mongo.Database) error {
 		_, err := db.Collection(dbxCredsColl).UpdateOne(ctx, bson.D{{Key: "userId", Value: uid}}, update,
-			options.Update().SetUpsert(true))
+			options.UpdateOne().SetUpsert(true))
 		return err
 	})
 }
@@ -222,7 +221,7 @@ func jsonQuoteString(s string) (string, error) {
 
 // isoTime — a stored date → Node's toISOString form for JSON serialization.
 func isoTime(v interface{}) (string, bool) {
-	if dt, ok := v.(primitive.DateTime); ok {
+	if dt, ok := v.(bson.DateTime); ok {
 		return dt.Time().UTC().Format("2006-01-02T15:04:05.000Z"), true
 	}
 	if t, ok := v.(time.Time); ok {

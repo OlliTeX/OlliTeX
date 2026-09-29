@@ -37,9 +37,8 @@ import (
 	"regexp"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
@@ -102,7 +101,7 @@ func dbxAuthzProject(a *core.App, cxt *core.Cxt, res *core.Res) (string, bool) {
 		res.JSON(404, []byte(dbxBadOID404))
 		return "", false
 	}
-	oid, oerr := primitive.ObjectIDFromHex(strings.ToLower(seg))
+	oid, oerr := bson.ObjectIDFromHex(strings.ToLower(seg))
 	if oerr != nil {
 		res.JSON(404, []byte(dbxBadOID404))
 		return "", false
@@ -128,7 +127,7 @@ func dbxAuthzProject(a *core.App, cxt *core.Cxt, res *core.Res) (string, bool) {
 	return seg, true
 }
 
-func dbxLoadProject(a *core.App, ctx context.Context, oid primitive.ObjectID) (*bson.D, error) {
+func dbxLoadProject(a *core.App, ctx context.Context, oid bson.ObjectID) (*bson.D, error) {
 	if a.Mongo == nil {
 		return nil, nil
 	}
@@ -197,7 +196,7 @@ func dbxDocStr(doc bson.D, key string) (string, bool) {
 	if s, ok := v.(string); ok {
 		return s, true
 	}
-	if o, ok := v.(primitive.ObjectID); ok {
+	if o, ok := v.(bson.ObjectID); ok {
 		return o.Hex(), true
 	}
 	return "", false
@@ -205,7 +204,7 @@ func dbxDocStr(doc bson.D, key string) (string, bool) {
 
 func oidHex(v interface{}) (string, bool) {
 	switch t := v.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex(), true
 	case string:
 		if dbxHex24.MatchString(t) {
