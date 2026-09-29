@@ -141,6 +141,10 @@
     "ALLOWED_COMPILE_GROUPS": null, // Space-separated allowed compile groups (clsitex)
     // ── limits ──
     "MAX_UPLOAD_SIZE": 50, // Max upload size (MiB)
+    "WEBDAVINTERFACE_MAX_BODY_MB": 50, // webdavinterface JSON body limit (MB)
+    "DROPBOXINTERFACE_MAX_BODY_MB": 50, // dropboxinterface JSON body limit (MB)
+    "GITHUBINTERFACE_MAX_BODY_MB": 10, // githubinterface JSON body limit (MB)
+    "DATAMANIPULATOR_MAX_BODY_MB": 10, // datamanipulator JSON body limit (MB)
     "MAX_ENTITIES_PER_PROJECT": 2000, // Max files per project
     "ARCHIVE_ON_SOFT_DELETE": false, // Archive project content on soft-delete (docstore)
     "KEEP_SOFT_DELETED_DOCS_ARCHIVED": false, // Keep soft-deleted docs archived (docstore)

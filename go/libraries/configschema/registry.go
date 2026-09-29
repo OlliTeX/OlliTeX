@@ -184,6 +184,10 @@ var Registry = []Param{
 
 	// ---------- limits & retention ----------
 	{Key: "MAX_UPLOAD_SIZE", Kind: KInt, Group: "limits", Default: "50", Description: "Max upload size (MiB)."},
+	{Key: "WEBDAVINTERFACE_MAX_BODY_MB", Kind: KInt, Group: "limits", Default: "50", Description: "webdavinterface JSON body limit (MB)."},
+	{Key: "DROPBOXINTERFACE_MAX_BODY_MB", Kind: KInt, Group: "limits", Default: "50", Description: "dropboxinterface JSON body limit (MB)."},
+	{Key: "GITHUBINTERFACE_MAX_BODY_MB", Kind: KInt, Group: "limits", Default: "10", Description: "githubinterface JSON body limit (MB)."},
+	{Key: "DATAMANIPULATOR_MAX_BODY_MB", Kind: KInt, Group: "limits", Default: "10", Description: "datamanipulator JSON body limit (MB)."},
 	{Key: "MAX_ENTITIES_PER_PROJECT", Kind: KInt, Group: "limits", Default: "2000", Description: "Max files per project."},
 	{Key: "INSTANCE_STATS_RETENTION_DAYS", Kind: KInt, Group: "limits", Description: "Instance-stats retention (days)."},
 	{Key: "ARCHIVE_ON_SOFT_DELETE", Kind: KBool, Group: "limits", Default: "false", Description: "Archive project content on soft-delete (docstore)."},

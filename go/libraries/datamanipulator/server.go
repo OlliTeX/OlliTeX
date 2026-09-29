@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	pbhttp "ollitex/go/pbhttp"
+
+	"ollitex/go/libraries/configres"
 )
 
 // --- HTTP server (1:1 routes + ARC-02 auth) ---------------------------------
@@ -90,10 +92,12 @@ func (h *DMHandlers) Mux() http.Handler {
 	// Node: app-level token gate with a /health exemption; unknown paths with
 	// a valid token get Express's 404 page (contract verified vs Node).
 	mux.HandleFunc("/", pbhttp.ExpressNotFound)
-	// 1:1 with Node express.json({ limit: '10mb' }).
+	// 1:1 with Node express.json({ limit: '10mb' }); the limit itself is
+	// admin-configurable (config-DB: DATAMANIPULATOR_MAX_BODY_MB, default 10).
+	bodyBytes := int64(configres.Int(configres.Open(), "DATAMANIPULATOR_MAX_BODY_MB", "DATAMANIPULATOR_MAX_BODY_MB", 10)) << 20
 	return pbhttp.LimitBody(pbhttp.AuthGate(mux, cfg.ServiceToken, func() {
 		fmt.Println("SHARED_SERVICE_TOKEN is unset; accepting unauthenticated requests (should be restricted to in-container callers)")
-	}, "/health"), 10<<20)
+	}, "/health"), bodyBytes)
 }
 
 func (h *DMHandlers) route(w http.ResponseWriter, r *http.Request) {

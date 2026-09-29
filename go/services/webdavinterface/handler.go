@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	pbhttp "ollitex/go/pbhttp"
+
+	"ollitex/go/libraries/configres"
 )
 
 // --- HTTP server (1:1 with server.mjs routes) --------------------------------
@@ -37,8 +39,10 @@ func (h *WebDAVHandlers) Mux() http.Handler {
 	// unknown path WITH a valid token gets Express's 404 page. Verified
 	// against the Node service (both probes).
 	mux.HandleFunc("/", pbhttp.ExpressNotFound)
-	// 1:1 with Node express.json({ limit: '50mb' }).
-	return pbhttp.LimitBody(pbhttp.AuthGate(mux, cfg.ServiceToken, warnFn), 50<<20)
+	// 1:1 with Node express.json({ limit: '50mb' }); the limit itself is
+	// admin-configurable (config-DB: WEBDAVINTERFACE_MAX_BODY_MB, default 50).
+	bodyBytes := int64(configres.Int(configres.Open(), "WEBDAVINTERFACE_MAX_BODY_MB", "WEBDAVINTERFACE_MAX_BODY_MB", 50)) << 20
+	return pbhttp.LimitBody(pbhttp.AuthGate(mux, cfg.ServiceToken, warnFn), bodyBytes)
 }
 
 func bodyJSON(r *http.Request, v interface{}) {

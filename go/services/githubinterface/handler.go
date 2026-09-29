@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	pbhttp "ollitex/go/pbhttp"
+
+	"ollitex/go/libraries/configres"
 )
 
 // --- HTTP server (1:1 routes + concurrency + service token) -----------------
@@ -127,8 +129,10 @@ func NewGHIHandlerMux(cfg GHIConfig) http.Handler {
 		}
 		pbhttp.ExpressNotFound(w, r)
 	})
-	// 1:1 with Node express.json({ limit: '10mb' }).
-	return pbhttp.LimitBody(mux, 10<<20)
+	// 1:1 with Node express.json({ limit: '10mb' }); the limit itself is
+	// admin-configurable (config-DB: GITHUBINTERFACE_MAX_BODY_MB, default 10).
+	bodyBytes := int64(configres.Int(configres.Open(), "GITHUBINTERFACE_MAX_BODY_MB", "GITHUBINTERFACE_MAX_BODY_MB", 10)) << 20
+	return pbhttp.LimitBody(mux, bodyBytes)
 }
 
 func (h *GHIHandlers) dispatch(name string, w http.ResponseWriter, r *http.Request) {

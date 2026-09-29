@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	pbhttp "ollitex/go/pbhttp"
+
+	"ollitex/go/libraries/configres"
 )
 
 // --- HTTP server (1:1 with dropbox server.mjs) -------------------------------
@@ -40,8 +42,10 @@ func (h *DropboxHandlers) Mux() http.Handler {
 	// Node: app-level token gate with a /health exemption; unknown paths with
 	// a valid token get Express's 404 page (contract verified vs Node).
 	mux.HandleFunc("/", pbhttp.ExpressNotFound)
-	// 1:1 with Node express.json({ limit: '50mb' }).
-	return pbhttp.LimitBody(pbhttp.AuthGate(mux, cfg.ServiceToken, warnFn, "/health"), 50<<20)
+	// 1:1 with Node express.json({ limit: '50mb' }); the limit itself is
+	// admin-configurable (config-DB: DROPBOXINTERFACE_MAX_BODY_MB, default 50).
+	bodyBytes := int64(configres.Int(configres.Open(), "DROPBOXINTERFACE_MAX_BODY_MB", "DROPBOXINTERFACE_MAX_BODY_MB", 50)) << 20
+	return pbhttp.LimitBody(pbhttp.AuthGate(mux, cfg.ServiceToken, warnFn, "/health"), bodyBytes)
 }
 
 func (h *DropboxHandlers) client(accessToken string) (*DropboxClient, error) {
