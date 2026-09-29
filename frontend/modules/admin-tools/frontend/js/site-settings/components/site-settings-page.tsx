@@ -369,7 +369,7 @@ export default function SiteSettingsPage() {
                       {active === 'pandoc' && (
                         <PandocTab
                           key={`pd-${settings.pandoc?.enabled}`}
-                          initial={settings.pandoc ?? { enabled: false, image: 'pandoc-ol:3.10.0.0' }}
+                          initial={settings.pandoc ?? { enabled: false, image: 'ollitex/pandoc' }}
                         />
                       )}
                       {active === 'webdav' && (

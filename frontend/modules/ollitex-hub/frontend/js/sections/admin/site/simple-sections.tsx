@@ -124,7 +124,7 @@ export function PandocSection() {
   const { data, error, flash, save, load } = useSiteSettings('pandoc')
   const { v, up } = useSyncValues(data, d => ({
     enabled: bool0((d as any).enabled),
-    image: str0((d as any).image, 'pandoc-ol:3.10.0.0'),
+    image: str0((d as any).image, 'ollitex/pandoc'),
   }))
   if (!data && !error) return <PageLoading label="Loading Pandoc settings…" />
   if (error && !data) return <Group><Text size="sm" c="red">Pandoc: {error}</Text><Anchor href="#" onClick={e => { e.preventDefault(); void load() }}>Retry</Anchor></Group>
@@ -143,7 +143,7 @@ export function PandocSection() {
       })}
     >
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start', width: '100%' }}>
-        <Field label="Docker image" required value={String(v.image || '')} onChange={x => up({ image: x })} placeholder="pandoc-ol:3.10.0.0" hint="e.g. pandoc-ol:3.10.0.0 — build your own image for custom filters." width="100%" />
+        <Field label="Docker image" required value={String(v.image || '')} onChange={x => up({ image: x })} placeholder="ollitex/pandoc" hint="e.g. ollitex/pandoc — build it via server-ce/Dockerfile-pandoc (pandoc/core:3.10.0.0-ubuntu + zip)." width="100%" />
       </Group>
     </SectionShell>
   )

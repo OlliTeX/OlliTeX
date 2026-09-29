@@ -623,7 +623,7 @@ function envSeeds(env, coreSettings, stored) {
     },
     pandoc: {
       enabled: boolFromEnv(env.ENABLE_PANDOC_CONVERSIONS) === true,
-      image: env.PANDOC_IMAGE || 'pandoc-ol:3.10.0.0',
+      image: env.PANDOC_IMAGE || 'ollitex/pandoc',
     },
     // 2026-09-04 (owner #10): seed WebDAV/DropBox from compose env so an
     // admin can take over via /admin/site (stored values win at boot).

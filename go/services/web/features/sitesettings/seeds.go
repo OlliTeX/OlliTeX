@@ -217,7 +217,7 @@ func seedObj(name string) Obj {
 	case "pandoc":
 		return Obj{
 			KV{"enabled", envIsTrue("ENABLE_PANDOC_CONVERSIONS")},
-			KV{"image", envVarOr("PANDOC_IMAGE", "pandoc-ol:3.10.0.0")},
+			KV{"image", envVarOr("PANDOC_IMAGE", "ollitex/pandoc")},
 		}
 	case "webdav":
 		tmo := 60000

@@ -602,7 +602,7 @@ export function PandocTab ({ initial }: { initial: SectionValue }) {
   const { flash, save } = useSave('pandoc')
   const [enabled, setEnabled] = useState(Boolean(initial.enabled))
   const [image, setImage] = useState(
-    String(initial.image ?? 'pandoc-ol:3.10.0.0')
+    String(initial.image ?? 'ollitex/pandoc')
   )
 
   return (
@@ -614,7 +614,7 @@ export function PandocTab ({ initial }: { initial: SectionValue }) {
     >
       <p className="text-muted">{t('adminSite.pandocDesc')}</p>
       <Two
-        a={<Field id="pd-image" label={t('adminSite.pandocImage')} required value={image} onChange={setImage} placeholder="pandoc-ol:3.10.0.0" hint={t('adminSite.restartHint')} />}
+        a={<Field id="pd-image" label={t('adminSite.pandocImage')} required value={image} onChange={setImage} placeholder="ollitex/pandoc" hint={t('adminSite.restartHint')} />}
       />
       <p className="text-muted">{t('adminSite.pandocBuildNote')}</p>
       <SaveFooter

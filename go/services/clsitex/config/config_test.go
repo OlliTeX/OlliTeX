@@ -103,7 +103,7 @@ func TestNew_Defaults(t *testing.T) {
 	if c.APIs.Compile.URL != "http://127.0.0.1:3013" {
 		t.Errorf("clsi url = %q", c.APIs.Compile.URL)
 	}
-	if c.PandocImage != "quay.io/sharelatex/pandoc:3.9" {
+	if c.PandocImage != "ollitex/pandoc" {
 		t.Errorf("pandocImage = %q", c.PandocImage)
 	}
 	if c.PdftocairoImage != "quay.io/sharelatex/pdftocairo:24.02" {
