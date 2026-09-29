@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"ollitex/go/libraries/configres"
 	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
@@ -77,7 +78,12 @@ func main() {
 	// Node: settings.mongo.url = OVERLEAF_MONGO_URL || mongodb://dockerhost/sharelatex;
 	// deployments may also set MONGO_CONNECTION_STRING (e2e sets both), so the
 	// chain is: MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://host/sharelatex.
-	uri := envOrChain([]string{"MONGO_CONNECTION_STRING", "OVERLEAF_MONGO_URL"}, "")
+	// D23 (owner order 2026-09-28): config-DB -> env -> default.
+	cfgStore := configres.Open()
+	uri := configres.String(cfgStore, "OVERLEAF_MONGO_URL", "", "")
+	if uri == "" {
+		uri = envOrChain([]string{"MONGO_CONNECTION_STRING", "OVERLEAF_MONGO_URL"}, "")
+	}
 	if uri == "" {
 		uri = "mongodb://" + envOr("MONGO_HOST", "127.0.0.1") + "/sharelatex"
 	}
@@ -94,16 +100,16 @@ func main() {
 		Port:                        envIntOr("PORT", 3016), // internal.docstore.port (3016; PORT = shadow-run escape hatch)
 		Backend:                     os.Getenv("BACKEND"),
 		Bucket:                      envOrChain([]string{"BUCKET_NAME", "AWS_BUCKET"}, "bucket"),
-		ArchiveOnSoftDelete:         os.Getenv("ARCHIVE_ON_SOFT_DELETE") == "true",
-		KeepSoftDeletedDocsArchived: os.Getenv("KEEP_SOFT_DELETED_DOCS_ARCHIVED") == "true",
+		ArchiveOnSoftDelete:         configres.Bool(cfgStore, "ARCHIVE_ON_SOFT_DELETE", "ARCHIVE_ON_SOFT_DELETE", false),
+		KeepSoftDeletedDocsArchived: configres.Bool(cfgStore, "KEEP_SOFT_DELETED_DOCS_ARCHIVED", "KEEP_SOFT_DELETED_DOCS_ARCHIVED", false),
 		HealthCheckProjectID:        os.Getenv("HEALTH_CHECK_PROJECT_ID"),
 		HasSecondaries:              os.Getenv("MONGO_HAS_SECONDARIES") == "true",
-		MaxDeletedDocs:              envIntOr("MAX_DELETED_DOCS", 0),
+		MaxDeletedDocs:              configres.Int(cfgStore, "MAX_DELETED_DOCS", "MAX_DELETED_DOCS", 0),
 		MaxDocLength:                envInt64Or("MAX_DOC_LENGTH", 0),
 		MaxJSONRequestSize:          envInt64Or("MAX_JSON_REQUEST_SIZE", 0),
-		ArchiveBatchSize:            envIntOr("UN_ARCHIVE_BATCH_SIZE", 0),
-		ParallelArchiveJobs:         envIntOr("PARALLEL_ARCHIVE_JOBS", 0),
-		ArchivingLockMS:             time.Duration(envIntOr("ARCHIVING_LOCK_DURATION_MS", 0)) * time.Millisecond,
+		ArchiveBatchSize:            configres.Int(cfgStore, "UN_ARCHIVE_BATCH_SIZE", "UN_ARCHIVE_BATCH_SIZE", 0),
+		ParallelArchiveJobs:         configres.Int(cfgStore, "PARALLEL_ARCHIVE_JOBS", "PARALLEL_ARCHIVE_JOBS", 0),
+		ArchivingLockMS:             time.Duration(configres.Int(cfgStore, "ARCHIVING_LOCK_DURATION_MS", "ARCHIVING_LOCK_DURATION_MS", 0)) * time.Millisecond,
 	}
 	cfg.Defaults()
 

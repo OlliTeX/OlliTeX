@@ -31,6 +31,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"ollitex/go/libraries/configres"
 )
 
 // Settings — the node `settings` values these templates consume
@@ -47,10 +49,13 @@ var Env = func(k string) string { return os.Getenv(k) }
 // NewSettingsFromEnv mirrors the node env defaults (1:1).
 func NewSettingsFromEnv() Settings {
 	s := Settings{
-		AppName: envOr("APP_NAME", "OlliTeX"),
-		SiteURL: envOr("PUBLIC_URL", "http://127.0.0.1:3000"),
-		Env:     "server-ce", // node settings.defaults.js `env: 'server-ce'`
+		Env: "server-ce", // node settings.defaults.js `env: 'server-ce'`
 	}
+	// D23 (owner order 2026-09-28): config-DB -> env (the SITE_URL admin key
+	// fronts the PUBLIC_URL env) -> default.
+	st := configres.Open()
+	s.AppName = configres.String(st, "APP_NAME", "APP_NAME", "OlliTeX")
+	s.SiteURL = configres.String(st, "SITE_URL", "PUBLIC_URL", "http://127.0.0.1:3000")
 	if e := strings.TrimSpace(Env("ENVIRONMENT")); e != "" {
 		s.Env = e
 	}

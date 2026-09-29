@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"ollitex/go/libraries/configres"
+
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -19,11 +21,13 @@ type Config struct {
 
 // NewConfigFromEnv mirrors the node env block (node `Number(x) || fallback`).
 func NewConfigFromEnv() Config {
+	// D23 (owner order 2026-09-28): config-DB -> env -> default.
+	st := configres.Open()
 	return Config{
-		BatchSize:   intEnv("PROCESS_NOTIFICATIONS_BATCH_SIZE", 100),
-		MaxAttempts: intEnv("OVERLEAF_NOTIFICATIONS_MAX_ATTEMPTS", 3),
-		BackoffBase: durEnvMS("OVERLEAF_NOTIFICATION_SILENCE_PERIOD_MS", 2*time.Hour),
-		DryRun:      Env("OVERLEAF_NOTIFICATIONS_DRY_RUN") == "true",
+		BatchSize:   configres.Int(st, "PROCESS_NOTIFICATIONS_BATCH_SIZE", "PROCESS_NOTIFICATIONS_BATCH_SIZE", 100),
+		MaxAttempts: configres.Int(st, "OVERLEAF_NOTIFICATIONS_MAX_ATTEMPTS", "OVERLEAF_NOTIFICATIONS_MAX_ATTEMPTS", 3),
+		BackoffBase: time.Duration(configres.Int(st, "OVERLEAF_NOTIFICATION_SILENCE_PERIOD_MS", "OVERLEAF_NOTIFICATION_SILENCE_PERIOD_MS", 2*3600*1000)) * time.Millisecond,
+		DryRun:      configres.Bool(st, "OVERLEAF_NOTIFICATIONS_DRY_RUN", "OVERLEAF_NOTIFICATIONS_DRY_RUN", false),
 	}
 }
 

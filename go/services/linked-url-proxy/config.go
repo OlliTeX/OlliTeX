@@ -5,6 +5,7 @@ package linkedurlproxy
 
 import (
 	"net/netip"
+	"ollitex/go/libraries/configres"
 	"regexp"
 	"strconv"
 	"strings"
@@ -58,15 +59,30 @@ func DefaultLinkedURLProxyConfig() *LinkedURLProxyConfig {
 func NewLinkedURLProxyConfigFromEnv(getEnv func(string) string) *LinkedURLProxyConfig {
 	cfg := DefaultLinkedURLProxyConfig()
 
-	if raw := getEnv("OVERLEAF_LINKED_URL_BLOCKED_NETWORKS"); raw != "" {
+	// D23 (owner order 2026-09-28): config-DB value fronts each legacy env key.
+	st := configres.Open()
+	db := func(k string) string { return configres.String(st, k, "", "") }
+	raw := db("OVERLEAF_LINKED_URL_BLOCKED_NETWORKS")
+	if raw == "" {
+		raw = getEnv("OVERLEAF_LINKED_URL_BLOCKED_NETWORKS")
+	}
+	if raw != "" {
 		cfg.BlockedNetworks = splitCIDRList(raw)
 	}
-	if raw := getEnv("OVERLEAF_LINKED_URL_ALLOWED_RESOURCES"); raw != "" {
+	raw = db("OVERLEAF_LINKED_URL_ALLOWED_RESOURCES")
+	if raw == "" {
+		raw = getEnv("OVERLEAF_LINKED_URL_ALLOWED_RESOURCES")
+	}
+	if raw != "" {
 		if re, err := regexp.Compile(raw); err == nil {
 			cfg.AllowedResources = re
 		}
 	}
-	if raw := getEnv("MAX_UPLOAD_SIZE"); raw != "" {
+	raw = db("MAX_UPLOAD_SIZE")
+	if raw == "" {
+		raw = getEnv("MAX_UPLOAD_SIZE")
+	}
+	if raw != "" {
 		if mb, err := strconv.Atoi(raw); err == nil {
 			cfg.MaxUploadSize = int64(mb) * 1024 * 1024
 		}

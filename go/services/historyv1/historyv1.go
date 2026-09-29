@@ -45,6 +45,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
+	"ollitex/go/libraries/configres"
 	persistors "ollitex/go/libraries/persistors"
 )
 
@@ -96,7 +97,14 @@ func (c *Config) Defaults() {
 // FromEnv builds the config from the environment (1:1 env names).
 func FromEnv() Config {
 	c := Config{}
-	c.MongoURI = os.Getenv("MONGO_CONNECTION_STRING")
+	// D23 (owner order 2026-09-28): config-DB -> env -> default.
+	st := configres.Open()
+	if u := configres.String(st, "OVERLEAF_MONGO_URL", "", ""); u != "" {
+		c.MongoURI = u
+	}
+	if c.MongoURI == "" {
+		c.MongoURI = os.Getenv("MONGO_CONNECTION_STRING")
+	}
 	if c.MongoURI == "" {
 		if host := os.Getenv("MONGO_HOST"); host != "" {
 			c.MongoURI = "mongodb://" + host + "/sharelatex"
@@ -104,7 +112,12 @@ func FromEnv() Config {
 			c.MongoURI = "mongodb://127.0.0.1/sharelatex"
 		}
 	}
-	c.PGDSN = os.Getenv("HISTORY_CONNECTION_STRING")
+	if d := configres.String(st, "HISTORY_CONNECTION_STRING", "", ""); d != "" {
+		c.PGDSN = d
+	}
+	if c.PGDSN == "" {
+		c.PGDSN = os.Getenv("HISTORY_CONNECTION_STRING")
+	}
 	if c.PGDSN == "" {
 		c.PGDSN = os.Getenv("DATABASE_URL")
 	}

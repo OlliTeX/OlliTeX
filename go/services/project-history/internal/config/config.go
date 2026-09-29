@@ -3,6 +3,7 @@ package config
 
 import (
 	"net"
+	"ollitex/go/libraries/configres"
 	"os"
 	"strconv"
 	"strings"
@@ -113,7 +114,7 @@ func Load() *Config {
 	}
 
 	return &Config{
-		MongoURL:                  envOr("MONGO_CONNECTION_STRING", "mongodb://"+envOr("MONGO_HOST", "127.0.0.1")+"/sharelatex"),
+		MongoURL:                  configresMongo(),
 		ListenHost:                envOr("LISTEN_ADDRESS", "127.0.0.1"),
 		Port:                      3054,
 		DocUpdaterURL:             hostURL("DOCUPDATER_HOST", 3003),
@@ -121,8 +122,8 @@ func Load() *Config {
 		FileStoreEnabled:          fileStoreEnabled,
 		FileStoreURL:              hostURL("FILESTORE_HOST", 3009),
 		WebURL:                    "http://" + webHost + ":" + strconv.Itoa(webPort),
-		WebUser:                   os.Getenv("WEB_API_USER"),
-		WebPass:                   os.Getenv("WEB_API_PASSWORD"),
+		WebUser:                   configres.String(configres.Open(), "WEB_API_USER", "WEB_API_USER", ""),
+		WebPass:                   configres.String(configres.Open(), "WEB_API_PASSWORD", "WEB_API_PASSWORD", ""),
 		HistoryIDCacheSize:        envOrInt("HISTORY_ID_CACHE_SIZE", 10000),
 		RedisLockHost:             redisHost,
 		RedisLockPort:             redisPort,
@@ -166,3 +167,16 @@ func (KeySchema) ProjectHistoryLock(projectID string) string {
 
 // Keys returns the redis key schema.
 func (c *Config) Keys() KeySchema { return KeySchema{} }
+
+// configresMongo mirrors the vendor chain (MONGO_CONNECTION_STRING || mongodb://MONGO_HOST||127.0.0.1)/sharelatex),
+// with the config-DB OVERLEAF_MONGO_URL key first (D23, owner order 2026-09-28).
+func configresMongo() string {
+	st := configres.Open()
+	if u := configres.String(st, "OVERLEAF_MONGO_URL", "", ""); u != "" {
+		return u
+	}
+	if v := os.Getenv("MONGO_CONNECTION_STRING"); v != "" {
+		return v
+	}
+	return "mongodb://" + envOr("MONGO_HOST", "127.0.0.1") + "/sharelatex"
+}

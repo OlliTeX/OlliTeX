@@ -7,8 +7,10 @@
     // ── core ──
     "APP_NAME": "OlliTeX", // Product name shown in the UI, e-mails and titles
     "SITE_URL": null, // Public base URL (links, e-mails, redirects)
+    "OVERLEAF_NOTIFICATIONS_DRY_RUN": false, // Process notifications in dry-run (cronmail)
     "ENABLED_SERVICES": "web,api", // Which server profiles run: web and/or api
     "ALLOWED_ORIGINS": null, // Comma-separated allowed CORS origins
+    "COLLAB_ALLOWED_ORIGINS": null, // Allowed CORS origins for the collab Yjs endpoint (CSV)
     "ADMIN_PRIVILEGE_AVAILABLE": false, // Enable the site-admin privilege
     "SITE_OPEN": true, // Site-wide 'open' toggle (false = closed-notice page)
     "EDITOR_OPEN": true, // Editor-open toggle (false = closed-notice for editor loads)
@@ -46,6 +48,7 @@
     "PROJECT_HISTORY_URL": null, // project-history URL
     "WEB_PROJECT_HISTORY_URL": null, // project-history URL as seen by the web
     "REALTIME_URL": null, // real-time (socket) URL
+    "HISTORY_CONNECTION_STRING": null, // history-v1 Postgres DSN (numeric-id plane)  [secret: masked in listings; field-encrypted in the store]
     "V1_HISTORY_URL": null, // history-v1 URL (e.g. http://127.0.0.1:3100/api)
     "WEB_V1_HISTORY_URL": null, // history-v1 URL as seen by the web
     "APIS_V1_URL": null, // v1 API base URL surface
@@ -116,7 +119,7 @@
     "TEX_LIVE_DOCKER_IMAGE": "texlive/texlive:latest-full", // Default TeXLive image
     "COMPILE_TYPEST_ENABLED": true, // Enable Typst compilation
     "ENABLE_PANDOC_CONVERSIONS": false, // Enable pandoc (Markdown→LaTeX) conversions
-    "PANDOC_IMAGE": "pandoc-ol:3.10.0.0", // Pandoc compile image
+    "PANDOC_IMAGE": "ollitex/pandoc", // Pandoc compile image (locally built via server-ce/Dockerfile-pandoc)
     "FILE_IGNORE_PATTERN": null, // File ignore pattern for sync/compile
     "ENABLE_PYTHON_RUNNER": false, // Enable the Python runner
     "ENABLE_PDF_CACHING": true, // Enable PDF caching
@@ -138,7 +141,17 @@
     // ── limits ──
     "MAX_UPLOAD_SIZE": 50, // Max upload size (MiB)
     "MAX_ENTITIES_PER_PROJECT": 2000, // Max files per project
+    "ARCHIVE_ON_SOFT_DELETE": false, // Archive project content on soft-delete (docstore)
+    "KEEP_SOFT_DELETED_DOCS_ARCHIVED": false, // Keep soft-deleted docs archived (docstore)
+    "MAX_DELETED_DOCS": 2000, // Soft-deleted docs kept before purge (docstore)
+    "UN_ARCHIVE_BATCH_SIZE": 50, // Un-archive batch size (docstore)
+    "PARALLEL_ARCHIVE_JOBS": 5, // Parallel archive jobs (docstore)
+    "ARCHIVING_LOCK_DURATION_MS": 60000, // Archiving lock duration, ms (docstore)
     "INSTANCE_STATS_RETENTION_DAYS": null, // Instance-stats retention (days)
+    "OVERLEAF_LINKED_URL_BLOCKED_NETWORKS": null, // CIDR networks blocked by the linked-URL proxy
+    "PROCESS_NOTIFICATIONS_BATCH_SIZE": 100, // Notification-dispatch batch size (cronmail)
+    "OVERLEAF_NOTIFICATIONS_MAX_ATTEMPTS": 3, // Max dispatch attempts per notification (cronmail)
+    "OVERLEAF_NOTIFICATION_SILENCE_PERIOD_MS": 7200000, // Dispatch backoff silence period, ms (cronmail)
     "OVERLEAF_BIB_LIBRARY_TRASH_RETENTION_DAYS": null, // Reference-library trash retention (days)
     "OVERLEAF_PROJECT_HARD_DELETION_DELAY": 7776000000, // Project hard-deletion delay (ms)
     "OVERLEAF_USER_HARD_DELETION_DELAY": 7776000000, // User hard-deletion delay (ms)

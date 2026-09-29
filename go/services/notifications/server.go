@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"ollitex/go/libraries/configres"
 	"ollitex/go/mongoh"
 	"ollitex/go/pbhttp"
 )
@@ -32,6 +33,12 @@ func (c *Config) WithDefaults() {
 	}
 	if c.Port == 0 {
 		c.Port = 3042 // Node has no env override for the notifications port.
+	}
+	if c.MongoURI == "" {
+		// D23 (owner order 2026-09-28): config-DB -> env (Node 1:1 chain) -> default.
+		if uri := configres.String(configres.Open(), "OVERLEAF_MONGO_URL", "", ""); uri != "" {
+			c.MongoURI = uri
+		}
 	}
 	if c.MongoURI == "" {
 		c.MongoURI = envOrChain([]string{"MONGO_CONNECTION_STRING", "OVERLEAF_MONGO_URL"}, "")

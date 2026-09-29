@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"ollitex/go/libraries/configres"
 	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
@@ -85,9 +86,13 @@ func envInt(k string, def int) int {
 	return def
 }
 
-// mongoURI mirrors the Node settings.mongo.url resolution:
-// MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://host/sharelatex.
+// mongoURI mirrors the Node settings.mongo.url resolution, config-DB first
+// (D23, owner order 2026-09-28):
+// DB OVERLEAF_MONGO_URL || MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://host/sharelatex.
 func mongoURI() string {
+	if u := configres.String(configres.Open(), "OVERLEAF_MONGO_URL", "", ""); u != "" {
+		return u
+	}
 	for _, k := range []string{"MONGO_CONNECTION_STRING", "OVERLEAF_MONGO_URL"} {
 		if u := os.Getenv(k); u != "" {
 			return u

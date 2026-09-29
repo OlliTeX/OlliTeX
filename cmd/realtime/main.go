@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"os"
 
+	"ollitex/go/libraries/configres"
 	"ollitex/go/libraries/ometrics"
 	"os/signal"
 	"strconv"
@@ -47,6 +48,11 @@ func env(names ...string) (string, bool) {
 }
 
 func main() {
+	// D23 (owner order 2026-09-28): config-DB -> env -> default.
+	cfgStore := configres.Open()
+	if cfgStore != nil {
+		defer cfgStore.Close()
+	}
 	level := slog.LevelInfo
 	if lv := os.Getenv("LOGLEVEL"); lv != "" {
 		switch strings.ToLower(lv) {
@@ -80,7 +86,11 @@ func main() {
 	log.Info("realtime: redis connected", "host", redisHost, "port", redisPort)
 
 	secrets := []string{}
-	if sc := os.Getenv("OVERLEAF_SESSION_SECRET"); sc != "" {
+	sc := configres.String(cfgStore, "OVERLEAF_SESSION_SECRET", "", "")
+	if sc == "" {
+		sc = os.Getenv("OVERLEAF_SESSION_SECRET")
+	}
+	if sc != "" {
 		for _, part := range strings.Split(sc, ",") {
 			if strings.TrimSpace(part) != "" {
 				secrets = append(secrets, strings.TrimSpace(part))
@@ -107,14 +117,8 @@ func main() {
 			webPort = n
 		}
 	}
-	webUser := "overleaf"
-	if v, ok := env("WEB_API_USER"); ok {
-		webUser = v
-	}
-	webPass := "password"
-	if v, ok := env("WEB_API_PASSWORD"); ok {
-		webPass = v
-	}
+	webUser := configres.String(cfgStore, "WEB_API_USER", "WEB_API_USER", "overleaf")
+	webPass := configres.String(cfgStore, "WEB_API_PASSWORD", "WEB_API_PASSWORD", "password")
 	web := &rt.WebAPI{
 		BaseURL: fmt.Sprintf("http://%s:%d", webHost, webPort),
 		User:    webUser,

@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"ollitex/go/libraries/configres"
 	"ollitex/go/mongoh"
 	"ollitex/go/services/cronmail"
 	"ollitex/go/services/web/core"
@@ -31,7 +32,15 @@ import (
 func main() {
 	log.SetFlags(0)
 
-	mongoURI := envOr("OVERLEAF_MONGO_URL", "mongodb://127.0.0.1:27017/sharelatex")
+	// D23 (owner order 2026-09-28): config-DB -> env -> default.
+	cfgStore := configres.Open()
+	if cfgStore != nil {
+		defer cfgStore.Close()
+	}
+	mongoURI := configres.String(cfgStore, "OVERLEAF_MONGO_URL", "", "")
+	if mongoURI == "" {
+		mongoURI = envOr("OVERLEAF_MONGO_URL", "mongodb://127.0.0.1:27017/sharelatex")
+	}
 	db := mongoh.DBFromURI(mongoURI, "sharelatex") // node: client.db() on the same URI
 	log.Printf("cronmail: connecting to mongo db=%q", db)
 

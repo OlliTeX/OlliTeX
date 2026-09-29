@@ -68,6 +68,13 @@ func env(k, def string) string {
 
 func main() {
 	log.SetPrefix("collab: ")
+	// Config-DB (D6) precedence for the retention knobs: /hub-admin value →
+	// env → default, via the shared configres contract (Open never creates
+	// the file — a pre-config-DB deployment is bit-identical).
+	cfgStore := configres.Open()
+	if cfgStore != nil {
+		defer cfgStore.Close()
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -79,7 +86,11 @@ func main() {
 		Password: env("OVERLEAF_REDIS_PASS", env("REDIS_PASSWORD", "")),
 	})
 
-	mongoURI := env("MONGO_CONNECTION_STRING", env("OVERLEAF_MONGO_URL", "mongodb://127.0.0.1:27017/sharelatex"))
+	mongoURI := configres.String(cfgStore, "OVERLEAF_MONGO_URL", "", "")
+	if mongoURI == "" {
+		// legacy env chain (Node 1:1), unchanged when the config DB has no key:
+		mongoURI = env("MONGO_CONNECTION_STRING", env("OVERLEAF_MONGO_URL", "mongodb://127.0.0.1:27017/sharelatex"))
+	}
 	// ONE Mongo client for the whole service: auth gate, seed source, and
 	// the versioned room store all share it (no per-component connections).
 	mcl, mdb, err := collab.NewMongoClient(ctx, mongoURI, env("OLLITEX_DB_NAME", "sharelatex"))
@@ -105,9 +116,13 @@ func main() {
 	_ = vlog                   // wired via Options.VersionLog below
 	defer func() { _ = mcl }() // lifetime = process; released on exit
 
-	// Session cookie signatures: the SAME secret chain as the web (core/config.go):
+	// Session cookie signatures: the SAME secret chain as the web (core/config.go),
+	// config-DB first (D23):
 	// OVERLEAF_SESSION_SECRET || CRYPTO_RANDOM (+ upcoming/fallback).
-	secretChain := []string{os.Getenv("OVERLEAF_SESSION_SECRET")}
+	secretChain := []string{configres.String(cfgStore, "OVERLEAF_SESSION_SECRET", "", "")}
+	if secretChain[0] == "" {
+		secretChain[0] = os.Getenv("OVERLEAF_SESSION_SECRET")
+	}
 	if secretChain[0] == "" {
 		secretChain[0] = os.Getenv("CRYPTO_RANDOM")
 	}
@@ -121,7 +136,7 @@ func main() {
 	}
 
 	var origins []string
-	if o := os.Getenv("COLLAB_ALLOWED_ORIGINS"); o != "" {
+	if o := configres.String(cfgStore, "COLLAB_ALLOWED_ORIGINS", "COLLAB_ALLOWED_ORIGINS", ""); o != "" {
 		for _, p := range strings.Split(o, ",") {
 			if p = strings.TrimSpace(p); p != "" {
 				origins = append(origins, p)
@@ -130,13 +145,6 @@ func main() {
 	}
 	maxConn, _ := strconv.Atoi(env("COLLAB_MAX_CONNECTIONS", "0"))
 	maxPeers, _ := strconv.Atoi(env("COLLAB_MAX_PEERS_PER_ROOM", "0"))
-	// Config-DB (D6) precedence for the retention knobs: /hub-admin value →
-	// env → default, via the shared configres contract (Open never creates
-	// the file — a pre-config-DB deployment is bit-identical).
-	cfgStore := configres.Open()
-	if cfgStore != nil {
-		defer cfgStore.Close()
-	}
 	keepVersions := configres.Int(cfgStore, "COLLAB_KEEP_VERSIONS", "COLLAB_KEEP_VERSIONS", 0)
 	compactEvery := configres.Int(cfgStore, "COLLAB_COMPACT_EVERY", "COLLAB_COMPACT_EVERY", 0)
 

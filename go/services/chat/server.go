@@ -15,16 +15,19 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"ollitex/go/libraries/configres"
 	"ollitex/go/mongoh"
 	"ollitex/go/pbhttp"
 )
 
-// Config bundles the knobs read from the environment, mirroring the Node
-// service (services/chat/config/settings.defaults.cjs):
+// WithDefaults applies the D23 chain (config-DB → legacy env → default),
+// mirroring the Node service (services/chat/config/settings.defaults.cjs):
 //
 //	host  = LISTEN_ADDRESS || '127.0.0.1'
 //	port  = 3010 (fixed — no env override)
-//	mongo = MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL || mongodb://MONGO_HOST||127.0.0.1/sharelatex
+//	mongo = config-DB OVERLEAF_MONGO_URL
+//	      || MONGO_CONNECTION_STRING || OVERLEAF_MONGO_URL
+//	      || mongodb://MONGO_HOST||127.0.0.1/sharelatex
 type Config struct {
 	Host     string
 	Port     int
@@ -32,13 +35,20 @@ type Config struct {
 	DB       string
 }
 
-// WithDefaults applies the Node 1:1 env defaults.
+// WithDefaults applies the D23 chain (config-DB → legacy env → default).
 func (c *Config) WithDefaults() {
+	st := configres.Open()
 	if c.Host == "" {
 		c.Host = envOr("LISTEN_ADDRESS", "127.0.0.1")
 	}
 	if c.Port == 0 {
 		c.Port = 3010
+	}
+	if c.MongoURI == "" {
+		// DB tier first (pure lookup; the env chain below stays Node 1:1):
+		if uri := configres.String(st, "OVERLEAF_MONGO_URL", "", ""); uri != "" {
+			c.MongoURI = uri
+		}
 	}
 	if c.MongoURI == "" {
 		c.MongoURI = envOrChain([]string{"MONGO_CONNECTION_STRING", "OVERLEAF_MONGO_URL"}, "")

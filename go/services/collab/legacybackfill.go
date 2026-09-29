@@ -51,6 +51,8 @@ import (
 	"time"
 
 	"github.com/reearth/ygo/persistence"
+
+	"ollitex/go/libraries/configres"
 )
 
 // ---------------------------------------------------------------------------
@@ -122,7 +124,11 @@ type LegacySource struct {
 // NewLegacySource wires the production legacy source (env defaults mirror
 // features/trackchanges/downstream.go so both consumers agree).
 func NewLegacySource(docs *SeedSource) *LegacySource {
-	chat := os.Getenv("WEB_CHAT_URL")
+	st := configres.Open()
+	chat := configres.String(st, "WEB_CHAT_URL", "", "")
+	if chat == "" {
+		chat = os.Getenv("WEB_CHAT_URL")
+	}
 	if chat == "" {
 		host := os.Getenv("CHAT_HOST")
 		if host == "" {
