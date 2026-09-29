@@ -201,7 +201,7 @@ func New() (*Config, error) {
 	c.ConversionTimeoutSeconds = configres.Int(st, "CLSI_CONVERSION_TIMEOUT_SECONDS", "CLSI_CONVERSION_TIMEOUT_SECONDS", 60)
 	c.PandocImage = configres.String(st, "PANDOC_IMAGE", "PANDOC_IMAGE", "ollitex/pandoc")
 	c.EnablePandocConversions = configres.Bool(st, "ENABLE_PANDOC_CONVERSIONS", "ENABLE_PANDOC_CONVERSIONS", false)
-	c.PdftocairoImage = envOr("PDFTOCAIRO_IMAGE", "quay.io/sharelatex/pdftocairo:24.02")
+	c.PdftocairoImage = configres.String(st, "PDFTOCAIRO_IMAGE", "PDFTOCAIRO_IMAGE", "ollitex/pdftocairo")
 	c.EnablePdfConversions = configres.Bool(st, "ENABLE_PDF_CONVERSIONS", "ENABLE_PDF_CONVERSIONS", false)
 	c.Png2pdfImage = configres.String(st, "PNG2PDF_IMAGE", "PNG2PDF_IMAGE", "quay.io/sharelatex/png2pdf:2026-06-24")
 	c.EnablePng2pdfConversions = configres.Bool(st, "ENABLE_PNG2PDF_CONVERSIONS", "ENABLE_PNG2PDF_CONVERSIONS", false)

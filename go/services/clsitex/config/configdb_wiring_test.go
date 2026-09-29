@@ -151,3 +151,33 @@ func TestNew_MalformedDBValueFallsThrough(t *testing.T) {
 		t.Errorf("malformed DB value must fall through to env: got %d", c.Png2pdfMinFileSizeBytes)
 	}
 }
+
+// TestNew_PdftocairoImageFromConfigDB — the conversion image is admin
+// tunable (SaaS constraint: local builds like ollitex/pdftocairo).
+func TestNew_PdftocairoImageFromConfigDB(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "configdb.sqlite3")
+	st, err := configstore.New(dbPath)
+	if err != nil {
+		t.Fatalf("configstore.New: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+	if err := st.Set("PDFTOCAIRO_IMAGE", "local/pdftocairo:custom", "test"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := os.Setenv("CONFIG_DB_PATH", dbPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("SANDBOXED_COMPILES_HOST_DIR_COMPILES", "/c"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Unsetenv("SANDBOXED_COMPILES_HOST_DIR_COMPILES") })
+
+	c, err := New()
+	if err != nil {
+		t.Fatalf("New(): %v", err)
+	}
+	if c.PdftocairoImage != "local/pdftocairo:custom" {
+		t.Errorf("DB PDFTOCAIRO_IMAGE not applied: %q", c.PdftocairoImage)
+	}
+}

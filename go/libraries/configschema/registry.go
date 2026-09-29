@@ -174,6 +174,7 @@ var Registry = []Param{
 	{Key: "PNG2PDF_IMAGE", Kind: KString, Group: "compilation", Default: "quay.io/sharelatex/png2pdf:2026-06-24", Description: "PNG→PDF compile image (clsitex)."},
 	{Key: "PNG2PDF_MIN_FILE_SIZE_BYTES", Kind: KInt, Group: "compilation", Default: "1048576", Description: "Skip PNGs smaller than this (bytes, clsitex)."},
 	{Key: "ENABLE_PDF_CONVERSIONS", Kind: KBool, Group: "compilation", Default: "false", Description: "Enable PDF (pdftocairo) conversions (clsitex)."},
+	{Key: "PDFTOCAIRO_IMAGE", Kind: KString, Group: "compilation", Default: "ollitex/pdftocairo", Description: "pdftocairo (PDF-to-JPEG) conversion image (locally built via server-ce/Dockerfile-pdftocairo)."},
 	{Key: "CLSI_CONVERSION_TIMEOUT_SECONDS", Kind: KInt, Group: "compilation", Default: "60", Description: "Conversion job timeout, seconds (clsitex)."},
 	{Key: "PRECIOUS_FILE_PATTERN", Kind: KString, Group: "compilation", Description: "Precious-file glob kept on cache clears (clsitex)."},
 	{Key: "TEXLIVE_OPENOUT_ANY", Kind: KString, Group: "compilation", Description: "Openout-any file whitelist (clsitex)."},

@@ -14,6 +14,9 @@ export OVERLEAF_TAG ?= ollitex/ollitex:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISI
 export OVERLEAF_PANDOC_BRANCH ?= ollitex/pandoc:$(BRANCH_NAME_TAG_SAFE)
 export OVERLEAF_PANDOC_LATEST ?= ollitex/pandoc
 export OVERLEAF_PANDOC_TAG ?= ollitex/pandoc:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export OVERLEAF_PDFTOCAIRO_BRANCH ?= ollitex/pdftocairo:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_PDFTOCAIRO_LATEST ?= ollitex/pdftocairo
+export OVERLEAF_PDFTOCAIRO_TAG ?= ollitex/pdftocairo:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
 
 # Optional extra --cache-from references (overridable). The branch tags only
 # exist LOCALLY (they are never pushed to Docker Hub), so pulling them as cache
@@ -23,6 +26,7 @@ export OVERLEAF_PANDOC_TAG ?= ollitex/pandoc:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_
 CACHE_FROM_BASE ?=
 CACHE_FROM_COMMUNITY ?=
 CACHE_FROM_PANDOC ?=
+CACHE_FROM_PDFTOCAIRO ?=
 
 # Which base Dockerfile build-base uses. Alpine:3.24 is the CANONICAL base
 # (cutover 2026-09-28, owner directive: alpine if it works — e2e gate GREEN,
@@ -37,20 +41,23 @@ BASE_FILE ?= Dockerfile-base
 GO_BUILDER_TAG ?= ollitex/golang-builder-amd64-alpine:1.27.1
 
 
-all: build-base build-community build-pandoc
+all: build-base build-community build-pandoc build-pdftocairo
 
 clean:
-	-docker rmi --force $(OVERLEAF_BASE_TAG) $(OVERLEAF_TAG) $(OVERLEAF_PANDOC_TAG)
+	-docker rmi --force $(OVERLEAF_BASE_TAG) $(OVERLEAF_TAG) $(OVERLEAF_PANDOC_TAG) $(OVERLEAF_PDFTOCAIRO_TAG)
 
 refresh-cache: refresh-cache-branch
 refresh-cache-branch:
 	docker inspect $(OVERLEAF_BASE_BRANCH) > /dev/null && docker pull $(OVERLEAF_BASE_BRANCH) || true
 	docker inspect $(OVERLEAF_BRANCH) > /dev/null && docker pull $(OVERLEAF_BRANCH) || true
 	docker inspect $(OVERLEAF_PANDOC_BRANCH) > /dev/null && docker pull $(OVERLEAF_PANDOC_BRANCH) || true
+	docker inspect $(OVERLEAF_PDFTOCAIRO_BRANCH) > /dev/null && docker pull $(OVERLEAF_PDFTOCAIRO_BRANCH) || true
 refresh-cache: refresh-cache-latest
 refresh-cache-latest:
 	docker inspect $(OVERLEAF_BASE_LATEST) > /dev/null && docker pull $(OVERLEAF_BASE_LATEST) || true
 	docker inspect $(OVERLEAF_LATEST) > /dev/null && docker pull $(OVERLEAF_LATEST) || true
+	docker inspect $(OVERLEAF_PANDOC_LATEST) > /dev/null && docker pull $(OVERLEAF_PANDOC_LATEST) || true
+	docker inspect $(OVERLEAF_PDFTOCAIRO_LATEST) > /dev/null && docker pull $(OVERLEAF_PDFTOCAIRO_LATEST) || true
 
 build-base:
 	cp .dockerignore $(MONOREPO_ROOT)
@@ -96,6 +103,21 @@ build-pandoc:
 	  --network=host \
 	  $(MONOREPO_ROOT)
 
+# pdftocairo replacement for quay.io/sharelatex/pdftocairo:24.02 (clsitex
+# PDF→JPEG). Dockerfile-pdftocairo is standalone alpine with no COPY, so
+# no .dockerignore needed.
+build-pdftocairo:
+	docker build \
+	  --build-arg BUILDKIT_INLINE_CACHE=1 \
+	  --progress=plain \
+	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
+	  $(CACHE_FROM_PDFTOCAIRO) \
+	  --file Dockerfile-pdftocairo \
+	  --tag $(OVERLEAF_PDFTOCAIRO_TAG) \
+	  --tag $(OVERLEAF_PDFTOCAIRO_BRANCH) \
+	  --network=host \
+	  $(MONOREPO_ROOT)
+
 # [V] git-bridge (D14): the Java service was deleted 2026-09-26 — the 1:1
 # Go replacement builds via go/services/gitbridge/build.sh (ollitex/git-bridge).
 
@@ -105,6 +127,7 @@ push:
 	docker push $(OVERLEAF_TAG)
 	docker push $(OVERLEAF_BRANCH)
 	docker push $(OVERLEAF_PANDOC_TAG)
+	docker push $(OVERLEAF_PDFTOCAIRO_TAG)
 
 SHELLCHECK_OPTS = \
 	--shell=bash \
@@ -119,13 +142,12 @@ shellcheck:
 
 shellcheck_fix:
 	@$(SHELLCHECK_FILES) | while IFS= read -r -d '' file; do \
-		diff=$$(docker run --rm -v $(HERE):/mnt -w /mnt koalaman/shellcheck:stable $(SHELLCHECK_OPTS) --format=diff "$$file" 2>/dev/null); \
+		diff=$$(docker run --rm -v $(HERE):/mnt -w /mnt koalaman/shellcheck:stable --format=diff "$$file" 2>/dev/null); \
 		if [ -n "$$diff" ] && ! echo "$$diff" | patch -p1 >/dev/null 2>&1; then echo "\033[31m$$file\033[0m"; \
 		elif [ -n "$$diff" ]; then echo "$$file"; \
 		else echo "\033[2m$$file\033[0m"; fi \
 	done
-
 .PHONY: all \
 	build-base build-community \
-	build-pandoc \
+	build-pandoc build-pdftocairo \
 	shellcheck shellcheck_fix

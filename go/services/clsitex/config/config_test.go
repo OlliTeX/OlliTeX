@@ -106,7 +106,7 @@ func TestNew_Defaults(t *testing.T) {
 	if c.PandocImage != "ollitex/pandoc" {
 		t.Errorf("pandocImage = %q", c.PandocImage)
 	}
-	if c.PdftocairoImage != "quay.io/sharelatex/pdftocairo:24.02" {
+	if c.PdftocairoImage != "ollitex/pdftocairo" {
 		t.Errorf("pdftocairoImage = %q", c.PdftocairoImage)
 	}
 	if c.Png2pdfImage != "quay.io/sharelatex/png2pdf:2026-06-24" {
