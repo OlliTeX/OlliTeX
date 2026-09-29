@@ -623,9 +623,16 @@ func (m *Manager) saveOutputFilesInBuildDir(
 
 	// Archive logs in background: Node fires this promise and does NOT
 	// await it, so mirror with a goroutine.
+	// Snapshot the slice: Node's single-threaded model makes the later
+	// per-element mutation (files[i].Build = buildId below) and the
+	// background archive read unobservable; in Go the background goroutine
+	// reading the caller's live slice would data-race with that loop's
+	// writes (go test -race: archiveLogs@L886 read vs files[i].Build write).
 	if m.ArchiveLogs || m.Strace {
+		archiveFiles := make([]off.OutputFile, len(files))
+		copy(archiveFiles, files)
 		go func() {
-			if err := m.archiveLogs(files, compileDir, outputDir, buildId); err != nil {
+			if err := m.archiveLogs(archiveFiles, compileDir, outputDir, buildId); err != nil {
 				m.Log("warn", "erroring archiving log files", map[string]any{
 					"err": err.Error(),
 				})

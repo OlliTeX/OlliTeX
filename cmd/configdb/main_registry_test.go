@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -137,11 +138,38 @@ func TestInitAndDoctor(t *testing.T) {
 	if !strings.Contains(out, "env-seeded 2") { // APP_NAME + CONFIG_DB_PATH
 		t.Fatalf("init should seed from env: %q", out)
 	}
-	if !strings.Contains(out, "defaults(embedded): seeded 5") {
-		t.Fatalf("init should seed the defaults JSONC: %q", out)
+	// Registry+defaults set grows over time (owner-approved key additions),
+	// so assert the seed report STRUCTURE + arithmetic, not a fixed count:
+	//   seeded N, kept 1 already-set (APP_NAME), 0 unknown -> total = N + 2
+	// (env 2 = APP_NAME[kept] + CONFIG_DB_PATH)
+	var seededN, totalN int
+	seedIdx := strings.Index(out, "defaults(embedded): seeded ")
+	if seedIdx < 0 {
+		t.Fatalf("init should produce the defaults seed report: %q", out)
+	}
+	seedRest := out[seedIdx+len("defaults(embedded): seeded "):]
+	if _, err := fmt.Sscanf(seedRest[:strings.Index(seedRest, ", kept")], "%d", &seededN); err != nil {
+		t.Fatalf("init defaults seed report unparseable: %q", out)
+	}
+	totalIdx := strings.Index(out, "store now has ")
+	if totalIdx < 0 {
+		t.Fatalf("init should report the final key count: %q", out)
+	}
+	totalRest := out[totalIdx+len("store now has "):]
+	if _, err := fmt.Sscanf(totalRest[:strings.Index(totalRest, " keys")], "%d", &totalN); err != nil {
+		t.Fatalf("init final count unparseable: %q", out)
+	}
+	if seededN < 5 { // the original five embedded defaults are still the floor
+		t.Fatalf("defaults seeded below the original floor: %d", seededN)
+	}
+	if totalN != seededN+2 { // seeded + kept-1 + env-only-1 (APP_NAME kept, CONFIG_DB_PATH new)
+		t.Fatalf("key-count arithmetic broken: seeded %d but store has %d keys", seededN, totalN)
 	}
 	if !strings.Contains(out, "kept 1 already-set") { // APP_NAME must not be clobbered
 		t.Fatalf("env-seeded value must survive the defaults pass: %q", out)
+	}
+	if !strings.Contains(out, "0 unknown") { // every defaults key must be registry-known
+		t.Fatalf("defaults must contain no unknown keys: %q", out)
 	}
 	out, err = runArgs(t, "get", "APP_NAME")
 	if err != nil || !strings.Contains(out, "InitFromEnv") {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -606,14 +607,31 @@ func TestRunTickStops(t *testing.T) {
 
 func TestRunTickFires(t *testing.T) {
 	stop := make(chan struct{})
+	var mu sync.Mutex
 	var ran int
-	go runTick(5*time.Millisecond, stop, func() { ran++ })
-	time.Sleep(30 * time.Millisecond)
-	close(stop)
-	time.Sleep(10 * time.Millisecond)
-	if ran == 0 {
-		t.Fatal("tick should fire before stop")
+	go runTick(5*time.Millisecond, stop, func() {
+		mu.Lock()
+		ran++
+		mu.Unlock()
+	})
+	// deadline-wait instead of a blind sleep: under -race / loaded hosts the
+	// timer goroutine can be delayed well past 30ms (observed flake
+	// 2026-09-29); the contract is "ticks fire while stop is open".
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		mu.Lock()
+		n := ran
+		mu.Unlock()
+		if n > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("tick should fire before stop")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
+	close(stop)
+	time.Sleep(20 * time.Millisecond)
 }
 
 func TestDiskStateAccessors(t *testing.T) {
