@@ -102,7 +102,8 @@ administrator tools) **plus** the OlliTeX-specific stack:
 >   compile containers can start — the same mechanism that runs the Typst
 >   compile containers. Mounting the Docker socket is the standard way to
 >   run sandboxed compiles; keep the Docker host itself trusted, and note
->   the bundled seccomp profile (`services/clsi/seccomp/clsi-profile.json`)
+>   the bundled seccomp profile (embedded in the Go `clsitex` binary;
+>   the profile source is `go/services/clsitex/seccomp/clsi-profile.json`)
 >   restricts the compile containers.
 
 ## Getting started

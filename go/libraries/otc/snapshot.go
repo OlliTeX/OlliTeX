@@ -44,9 +44,31 @@ func NewSnapshot(fileMap *FileMap, projectVersion *string, v2 *V2DocVersions, ts
 
 // SnapshotFromRaw mirrors Snapshot.fromRaw.
 func SnapshotFromRaw(raw map[string]any) (*Snapshot, error) {
-	files, _ := raw["files"].(map[string]map[string]any)
+	// The JSON boundary shape is map[string]any of map[string]any (each file
+	// entry is a heterogeneous object). FileMap.ToRaw's native
+	// map[string]map[string]any also works (Go-native round trip).
+	var fileEntries map[string]any
+	switch fv := raw["files"].(type) {
+	case map[string]map[string]any:
+		fileEntries = make(map[string]any, len(fv))
+		for k, v := range fv {
+			fileEntries[k] = v
+		}
+	case map[string]any:
+		fileEntries = fv
+	default:
+		return nil, gop("bad raw.files")
+	}
 	if !rawHas(raw, "files") {
 		return nil, gop("bad raw.files")
+	}
+	files := make(map[string]map[string]any, len(fileEntries))
+	for k, v := range fileEntries {
+		fm, ok := v.(map[string]any)
+		if !ok {
+			return nil, gop("bad raw.files." + k)
+		}
+		files[k] = fm
 	}
 	fm, err := FileMapFromRaw(files)
 	if err != nil {

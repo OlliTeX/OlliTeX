@@ -1,0 +1,30 @@
+[
+  {
+    "stdout": "'pdflatex  -interaction=nonstopmode': time = 1.234\n'bibtex   -w': time = 0.500\n'pdflatex final': time = 2.345\n\nNumber of rules run = 4\nProcessing time = 6.012, of which invoked processes = 5.500, other = 0.512\nElapsed clock time = 7.012",
+    "stderr": "PNG copy: a.png\nPNG copy skipped (alpha): /compile/img1.png\nPNG copy skipped (gamma): img2.png\nImage written (PNG, 12 ms): a.png\nImage written (JPG, 3 ms): photo.jpg\nImage written (JBIG2, 9 ms): scan.jpg\nImage written (PDF, 4 ms): pngconv.png\nImage written (PNG, 1 ms): img1.png\nImage written (PNG, 2 ms): img2.png"
+  },
+  {
+    "stdout": "'pdflatex a': time = 0.500\n'bibtex': time = 0.250\nAccumulated processing time = 3.001",
+    "stderr": "Image written (PNG, 5 ms): x.png\nPNG copy: x.png\n"
+  },
+  {
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "stdout": "Number of rules run = 1\nProcessing time = 1.000, of which invoked processes = 1.000, other = 0.000\nElapsed clock time = 1.111\n",
+    "stderr": "Image written (PDF, 4 ms): p.png\nPNG copy skipped (interlaced): p.png\n"
+  },
+  {
+    "stdout": "",
+    "stderr": "Image written (PNG, 8 ms): plain.png\n"
+  },
+  {
+    "stdout": "Elapsed clock time = 0.000\nNumber of rules run = 0\n",
+    "stderr": ""
+  },
+  {
+    "stdout": "Elapsed clock time = 5.000\n",
+    "stderr": "Image written (JPG, 1 ms): t.jpg\n"
+  }
+]

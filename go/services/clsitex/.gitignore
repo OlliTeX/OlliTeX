@@ -1,0 +1,4 @@
+# clsi.go build/test artifacts
+coverage.out
+*.test
+coverage/

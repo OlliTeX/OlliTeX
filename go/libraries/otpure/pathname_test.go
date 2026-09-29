@@ -137,38 +137,57 @@ func TestSafePathnameEmpty(t *testing.T) {
 	}
 }
 
-// Pin the BAD_CHAR_RX branches: '/', '*', C0 controls, DEL (0x7F), C1 controls
-// (0x80-0x9F), and non-BMP (surrogate-pair) characters all become '_'.
+// Pin the per-UTF-16-code-unit branches of cleanPart (cleanPartUnits).
+// BAD_CHAR_RX = /[/*\u0000-\u001F\u007F\u0080-\u009F\uD800-\uDFFF]/g
+// matches per unit, so a supplementary char (a surrogate pair) becomes two
+// underscores, and a lone surrogate unit is its own match. BAD_FILE_RX's \s
+// (JS \s, which includes U+FEFF that Go's unicode.IsSpace does NOT) is
+// replaced per run at each part's edge. Inputs are []uint16 because Go
+// strings cannot hold lone surrogate units (encoding/json replaces unpaired
+// ones with U+FFFD) while per-unit matching is the crux of the port.
 func TestCleanPartInvalidChars(t *testing.T) {
 	cases := []struct {
-		in   string
+		in   []uint16
 		want string
 	}{
-		{"a/b", "a_b"},          // slash
-		{"a*b", "a_b"},          // star
-		{"a\x01b", "a_b"},       // C0 control
-		{"a\x7Fb", "a_b"},       // DEL
-		{"a\u0080b", "a_b"},     // C1 control (U+0080)
-		{"a\u009Fb", "a_b"},     // C1 control (U+009F)
-		{"a\U0001F600b", "a_b"}, // non-BMP char
-		{"abc", "abc"},          // untouched
-		{"a b", "a b"},          // space is allowed (BAD_CHAR leaves it)
+		{[]uint16{'a', '/', 'b'}, "a_b"},             // slash
+		{[]uint16{'a', '*', 'b'}, "a_b"},             // star
+		{[]uint16{'a', 0x01, 'b'}, "a_b"},            // C0 control
+		{[]uint16{'a', 0x7F, 'b'}, "a_b"},            // DEL
+		{[]uint16{'a', 0x80, 'b'}, "a_b"},            // C1 control
+		{[]uint16{'a', 0x9F, 'b'}, "a_b"},            // C1 control
+		{[]uint16{'a', 0xD83D, 0xDE00, 'b'}, "a__b"}, // U+1F600 = surrogate pair = two units
+		{[]uint16{'a', 0xD800, 'b'}, "a_b"},          // lone high surrogate unit
+		{[]uint16{'a', 0xDC00, 'b'}, "a_b"},          // lone low surrogate unit
+		{[]uint16{'a', 'b', 'c'}, "abc"},             // untouched
+		{[]uint16{'a', ' ', 'b'}, "a b"},             // space survives BAD_CHAR
 	}
 	for _, c := range cases {
-		if got := cleanPart(c.in); got != c.want {
-			t.Errorf("cleanPart(%q) = %q, want %q", c.in, got, c.want)
+		if got := utf16DecodeString(cleanPartUnits(c.in)); got != c.want {
+			t.Errorf("cleanPartUnits(%v) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }
 
 func TestCleanPartWhitespace(t *testing.T) {
-	if got := cleanPart(" a "); got != "_a_" {
-		t.Fatalf("cleanPart(' a ') = %q, want '_a_'", got)
+	cases := []struct {
+		in   []uint16
+		want string
+	}{
+		{[]uint16{' ', 'a', ' '}, "_a_"},
+		{[]uint16{' ', ' ', 'f', 'o', 'o'}, "__foo"},
+		{[]uint16{'f', 'o', 'o', ' ', ' '}, "foo__"},
+		{[]uint16{0xFEFF}, "_"}, // FEFF is JS \s
+		{[]uint16{0xFEFF, 'a', 0xFEFF}, "_a_"},
+		{[]uint16{0x2000, 'a', 0x202F}, "_a_"},
+		{[]uint16{0x3000, 'a', 0xA0}, "_a_"},
+		{[]uint16{'.', '.'}, "__"},             // full ".." -> "__"
+		{[]uint16{'.'}, "_"},                   // full "." -> "_"
+		{[]uint16{'.', '.', '.', '.'}, "...."}, // "...." untouched
 	}
-	if got := cleanPart("  foo"); got != "__foo" {
-		t.Fatalf("cleanPart('  foo') = %q, want '__foo'", got)
-	}
-	if got := cleanPart("foo  "); got != "foo__" {
-		t.Fatalf("cleanPart('foo  ') = %q, want 'foo__'", got)
+	for _, c := range cases {
+		if got := utf16DecodeString(cleanPartUnits(c.in)); got != c.want {
+			t.Errorf("cleanPartUnits(%v) = %q, want %q", c.in, got, c.want)
+		}
 	}
 }

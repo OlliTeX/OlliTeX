@@ -41,6 +41,7 @@
     "WEB_DOCUMENT_UPDATER_URL": null, // document-updater URL as seen by the web
     "WEB_DOCUPDATER_URL": null, // document-updater URL (legacy alias)
     "WEB_FILESTORE_URL": null, // filestore (S3/TPDS) URL
+    "FILESTORE_PARALLEL_FILE_DOWNLOADS": 1, // Parallel file downloads for compile resources (clsitex)
     "PROJECT_HISTORY_HOST": null, // project-history host
     "PROJECT_HISTORY_URL": null, // project-history URL
     "WEB_PROJECT_HISTORY_URL": null, // project-history URL as seen by the web
@@ -119,6 +120,21 @@
     "FILE_IGNORE_PATTERN": null, // File ignore pattern for sync/compile
     "ENABLE_PYTHON_RUNNER": false, // Enable the Python runner
     "ENABLE_PDF_CACHING": true, // Enable PDF caching
+    "ENABLE_PDF_CACHING_DARK": false, // Dark-mode PDF-caching variant (clsitex)
+    "PDF_CACHING_MIN_CHUNK_SIZE": 1024, // PDF-caching minimum chunk size (clsitex)
+    "PDF_CACHING_MAX_PROCESSING_TIME": 10000, // PDF-caching max processing time, ms (clsitex)
+    "PDF_CACHING_ENABLE_WORKER_POOL": false, // Use the PDF-caching worker pool (clsitex)
+    "PDF_CACHING_WORKER_POOL_SIZE": 4, // PDF-caching worker pool size (clsitex)
+    "PDF_CACHING_WORKER_POOL_BACK_LOG_LIMIT": 40, // PDF-caching worker pool backlog limit (clsitex)
+    "ENABLE_PNG2PDF_CONVERSIONS": false, // Enable PNG→PDF slow-PNG conversion (clsitex)
+    "PNG2PDF_IMAGE": "quay.io/sharelatex/png2pdf:2026-06-24", // PNG→PDF compile image (clsitex)
+    "PNG2PDF_MIN_FILE_SIZE_BYTES": 1048576, // Skip PNGs smaller than this (bytes, clsitex)
+    "ENABLE_PDF_CONVERSIONS": false, // Enable PDF (pdftocairo) conversions (clsitex)
+    "CLSI_CONVERSION_TIMEOUT_SECONDS": 60, // Conversion job timeout, seconds (clsitex)
+    "PRECIOUS_FILE_PATTERN": null, // Precious-file glob kept on cache clears (clsitex)
+    "TEXLIVE_OPENOUT_ANY": null, // Openout-any file whitelist (clsitex)
+    "TEXLIVE_MAX_PRINT_LINE": null, // max_print_line value for TeX compiles (clsitex)
+    "ALLOWED_COMPILE_GROUPS": null, // Space-separated allowed compile groups (clsitex)
     // ── limits ──
     "MAX_UPLOAD_SIZE": 50, // Max upload size (MiB)
     "MAX_ENTITIES_PER_PROJECT": 2000, // Max files per project

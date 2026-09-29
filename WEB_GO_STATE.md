@@ -26,7 +26,28 @@ layers are the gap**) and the follow-on dependency-refresh arc (D27).
 project-history (PH, `go/services/project-history`) are now Go + flipped
 live in e2e (G2 S3-only + H1 PG18 seam + PH bundle all green — see the
 H1 and PH sections at the bottom); only **document-updater** remains
-Node (42fd4366 D41-DU retarget is next in the owner order)..
+Node (42fd4366 D41-DU retarget is next in the owner order).. 
+
+**UPDATED 2026-09-28 (CLSI arc, this commit):** `services/clsi` (Node)
+**replaced by Go `go/services/clsitex`** (support-LLM conversion, integrated
+into the root module; `cmd/clsitex` production entrypoint; HTTP contract 1:1
+on the pinned :3013 + load-agent :3048/3049; seccomp profile embedded in the
+binary via `//go:embed`). Oracle gate GREEN on the 80,782-row safe_pathname
+fixture (the corrected implementation lives in `go/libraries/otpure` and the
+`otc` public surface, oracle-pinned). `otc.SnapshotFromRaw` JSON-boundary
+bug fixed (native Go `map[string]map[string]any` vs JSON `map[string]any`
+files) — 14 historyresourcewriter tests un-broken. Node `services/clsi`
+deleted (`git rm -r`); **`services/clsi_typst` made self-contained** (vendored
+the 15 shared `app/js` files locally; 46/46 unit tests green). Runtime wiring:
+server-ce Dockerfile builds `clsitex`; runit `clsi-overleaf` execs the Go
+binary; `services.js`/`package.json` no longer list Node clsi; dev compose
+uses the Go binary from the main image; dev nginx config preserved as
+`develop/clsi-nginx.conf`. Full-tree gate: 159 packages ok; 2 solo-green
+load-flakes (`fetchutils` timeout; `outputcachemanager` tick race) — recorded
+as the known-flake class. CLSI is also the second config-DB consumer (D23/
+D6 contract) after collab: `config.New()` resolves every registry-backed key
+through `configres` (DB → env → default), and the 16 previously missing CLSI
+registry/seed entries were added (compilation/services groups).
 
 ---
 
@@ -49,11 +70,11 @@ Node (42fd4366 D41-DU retarget is next in the owner order)..
 | D13 | **Storybook**: expose as much web UI as possible | APPROVED |
 | D14 | **git-bridge**: confirmed already Go (`gitbridge-go:latest`). **DELETE `services/git-bridge`** (Java) + clean the Java `build-git-bridge` Makefile target | **DONE 2026-09-26**: 564 tracked files deleted; Makefile Java target + GIT_BRIDGE vars removed; develop/ + server-ce/test/ compose re-pointed to the Go image (ollitex/git-bridge:latest, `git_bridge serve /conf/runtime.json` + runtime.json mounts; Java rollback commented). All compose configs validate. |
 | D15 | **Procedural**: stop appending to `WEB_GO_PLAN.md`; maintain this file as the state doc | APPROVED |
-| D16 | **`services/clsi`, `clsi_typst`, `project-history`, `real-time`** are being converted to Go **by support LLMs** (parallel; "ready soon") — do NOT re-port; integrate + audit when they land | AWARE (no action) |
+| D16 | **`services/clsi`, `clsi_typst`, `project-history`, `real-time`** are being converted to Go **by support LLMs** (parallel; "ready soon") — do NOT re-port; integrate + audit when they land | **clsi: DONE 2026-09-28** (integrated as `go/services/clsitex` + `cmd/clsitex`; Node tree retired; `clsi_typst` self-contained; config-DB wired per D23; see UPDATED block) — remainder as stated |
 | D17 | **Notifications email-dispatch cron → Go** (kills last `modules/notifications/app` runtime dependency) | APPROVED — **DONE** (ARC-8 + ARC-8a severance; zero Node runtime hooks left in services/web) |
 | D18 | **Toolkit placement**: `tools/toolkit` → repo-root **`toolkit/`** (visible root position), all references updated | APPROVED — **DONE this commit** |
 | D19 | **Collaboration pivot — Option B (Yjs/Ygo, HARD CUT)**: the document model becomes Yjs; server = **ygo** (`github.com/reearth/ygo`, Re:Earth's pure-Go CRDT stack — Hocuspocus-compatible WS server, Redis-Streams cluster relay, versioned persistence + snapshots, awareness; MIT; v1.50.0 pinned). The 2014 substrate (real-time Node + socket.io fork + ShareJS + OT client/editor-core) is **retired junk after the flip — no OT legacy reader** (owner hard-cut call 2026-09-25). Support-LLM real-time port: irrelevant (their own copy). Existing OT history is **not portable** — new projects seed Y.Text from current file content; OT history drops. | APPROVED — **IN PROGRESS (ARC-9)** |
-| D16* | `clsi`/`clsi_typst`/`project-history` still support-LLM territory; **`real-time` is SUPERSEDED** by D19 (pivot, not port) | SUPERSEDED (real-time) |
+| D16* | `clsi`/`clsi_typst`/`project-history` still support-LLM territory; **`real-time` is SUPERSEDED** by D19 (pivot, not port) | SUPERSEDED (real-time) — **clsi: DONE 2026-09-28** (integrated as `go/services/clsitex`, Node tree retired, `clsi_typst` self-contained) |
 | D20 | **Collab client stack**: browser `yjs` (stable v13 line) + `y-websocket` + `y-indexeddb` + `y-undo`; CodeMirror-6 bridge is OUR code (full-replace sync loop; y-cursor is CM5-only → awareness-rendered cursors via a CM6 decoration plugin). **yhub = REST DESIGN SPEC ONLY (history/changeset/restore shape), never a runtime** (AGPL/beta + Postgres + Redis Streams = D5/D19 conflict). `k_yrs_go`/`electric` investigated and **rejected** (wrong substrate). Client code MIT-compatible with the AGPL product. | CONFIRMED (owner 2026-09-25) |
 | D21 | **Notifications**: email stack stays **`wneessen/go-mail`** (owner-approved P3; stronger client than `go-pkgz/notify`'s SMTP — adopting notify as a mailer REJECTED; its multi-channel shape is only a design reference). Non-email delivery (webhook/Slack/in-app presence) = separate arc under owner-delegated discretion (2026-09-25 "make the priority decisions yourself"); the Yjs awareness stack already provides the real-time presence half. | RECORDED |
 | D22 | **Observability modernization (owner note 2026-09-25)**: rework `features/instancestats` (Mongo time-series + email-threshold alerts) onto the **Prometheus + Grafana** ecosystem: Go services expose Prometheus-format `/metrics` (client_golang; the existing `go/libraries/ometrics` registry becomes a bridge/collector), node_exporter (host) + cAdvisor (containers) scrapes, Prometheus sidecar (runit/compose, OFF-BY-DEFAULT to keep clean-by-default images), Grafana embedded in /hub (kiosk iframe, Mantine `GrafanaPanel`), admin email alerts re-implemented as Prometheus rule alerts → webhook → the existing email pipeline. Loki/Alloy (logs) = optional phase. Single-host stack (NO k8s) → static scrape configs, no ServiceMonitor/K8s auth bits. Phased: A instrument → B Prometheus → C Grafana/hub → D alerts (product behavior kept) → E optional Loki → legacy series retirement. **Sized after the D19 flip (S4) so it measures the live Go stack.** | RECORDED — PLANNED (owner note for later) |
