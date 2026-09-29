@@ -57,7 +57,7 @@ module.exports = defineConfig({
         ),
       },
       { find: '@modules', replacement: path.join(__dirname, 'modules') },
-      { find: '@', replacement: path.join(__dirname, 'frontend/js') },
+      { find: '@', replacement: path.join(__dirname, '..', '..', 'frontend/js') },
     ],
   },
   esbuild: {

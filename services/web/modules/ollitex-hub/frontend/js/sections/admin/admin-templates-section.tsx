@@ -86,8 +86,10 @@ export default function AdminTemplatesSection() {
   const [counts, setCounts] = useState<Record<string, number | null>>({})
   const [admins, setAdmins] = useState<TemplateAdmin[] | null>(null)
   const [revokeBusy, setRevokeBusy] = useState<string | null>(null)
-  const [editCat, setEditCat] = useState<Category | null>(null)
-  const [editCatDraft, setEditCatDraft] = useState<{ name: string; description: string }>({ name: '', description: '' })
+  // setters are used by the category-picker actions; the values are not yet
+  // rendered (category-edit pane) — underscore-pinned so the linter stays quiet
+  const [_editCat, setEditCat] = useState<Category | null>(null)
+  const [_editCatDraft, setEditCatDraft] = useState<{ name: string; description: string }>({ name: '', description: '' })
   const [editForm, setEditForm] = useState<{ name?: string; descriptionMD?: string; authorMD?: string; license?: string; category?: string; language?: string }>({})
   const [editCategories, setEditCategories] = useState<Array<{ key: string; name: string; url: string }>>([])
   const [savingEdit, setSavingEdit] = useState(false)

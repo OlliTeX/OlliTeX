@@ -1064,7 +1064,36 @@ export default defineConfig([
       'no-restricted-imports': 'off',
     },
   },
+  // Legacy Node-web + vendored upstream UI, out of lint scope (2026-09-29 gate
+  // recovery): the flat-config migration dropped the old .eslintrc.js
+  // ignorePatterns that covered these. They are either dead in the Go era
+  // (app/ test/ scripts/ + the Node module trees behind them) or unmodified
+  // upstream Overleaf components (admin-tools DS, git-bridge/zotero/mendeley/
+  // reference-picker widgets, auth modules) where the current plugin versions
+  // flag patterns upstream never linted. Re-scope when the P7 tree reorg moves
+  // the dead Node trees into junk/.
   globalIgnores([
+    'app/',
+    'test/',
+    'scripts/',
+    'modules/authentication/',
+    'modules/admin-tools/frontend/js/project-list/',
+    'modules/admin-tools/frontend/js/user-list/',
+    'modules/admin-tools/frontend/js/users-page-context.tsx',
+    'modules/server-ce-scripts/',
+    'modules/git-bridge/frontend/',
+    'modules/zotero/frontend/js/components/file-tree-import-from-zotero.tsx',
+    'modules/zotero/frontend/js/components/tpr-file-view-not-original-importer.tsx',
+    'modules/zotero/frontend/js/components/zotero-widget.tsx',
+    'modules/mendeley/frontend/js/components/file-tree-import-from-mendeley.tsx',
+    'modules/reference-picker/frontend/components/reference-picker-modal.tsx',
+    'modules/reference-picker/frontend/extensions/reference-picker-keybinding.ts',
+    'modules/page-shells/test/',
+    'modules/python-runner/test/',
+    'modules/template-gallery/test/',
+    'modules/typst/test/',
+    'modules/webdav/test/',
+    'modules/tex-autoformatter/test/',
     '**/data/',
     'scripts/translations/.cache/',
     '**/node_modules',

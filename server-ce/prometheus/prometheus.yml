@@ -85,5 +85,12 @@ scrape_configs:
     static_configs:
       - targets: ["node-exporter:9100"]
 
-# D22 phase D (alert rules → the OlliTeX email pipeline) will drop in here.
-rule_files: []
+# D22 phase D — alert rules + delivery via the d22 Alertmanager to the
+# OlliTeX mail pipeline (POST /internal/alerts on the Go web).
+rule_files:
+  - /etc/prometheus/rules/ollitex.rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]

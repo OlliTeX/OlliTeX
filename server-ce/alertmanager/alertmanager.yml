@@ -1,0 +1,22 @@
+# D22 (8cbc1526) phase D — Alertmanager (the sole alert bridge).
+#
+# Prometheus → Alertmanager → HTTP webhook → the OlliTeX mail pipeline
+# (Go web POST /internal/alerts, instancestats feature, one mail per
+# firing alert to the instance-stats alert configuration). No external
+# notification channels are configured: this single-host box delivers
+# through the existing OlliTeX SMTP setup only.
+#
+# The __OVERLEAF_HOST__ placeholder is sed-resolved at container start
+# (same convention as the Prometheus sidecar).
+
+route:
+  receiver: ollitex-mail
+  group_by: ["alertname", "job"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: ollitex-mail
+    webhook_configs:
+      - url: "http://__OVERLEAF_HOST__:4000/internal/alerts"

@@ -43,8 +43,8 @@ func TestRegistryIntegrity(t *testing.T) {
 			}
 		}
 	}
-	if got := len(Registry); got != 13 {
-		t.Errorf("registry size = %d, want 13", got)
+	if got := len(Registry); got != 14 {
+		t.Errorf("registry size = %d, want 14", got)
 	}
 	want := map[string]bool{
 		"password-reset": true, "instance-stats-test": true, "sessions-cleared": true,
@@ -52,7 +52,7 @@ func TestRegistryIntegrity(t *testing.T) {
 		"collab-access-requested": true, "collab-access-declined": true,
 		"collab-access-granted": true, "ownership-transfer": true,
 		"project-invite": true, "security-note": true, "git-token": true,
-		"test-mail": true,
+		"test-mail": true, "instance-stats-alert": true,
 	}
 	for name := range want {
 		if !seen[name] {

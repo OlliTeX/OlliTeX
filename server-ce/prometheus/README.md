@@ -61,9 +61,16 @@ service, set by the runit units) and `host` (container hostname).
   ten services wired (`417351bca7`)
 - **B — sidecar** ✅ this file + the compose profile (11 static jobs +
   node-exporter, retention 15d)
-- **C — Grafana** (planned): `grafana/grafana` compose service + a shared
-  datasource provisioning + the kiosk iframe on `/hub`
-- **D — alerts** (planned): `rule_files/` in this directory, rules → the
-  OlliTeX email pipeline (phase F of the plan)
-- **F — legacy**: after C/D are stable, the Node-era metrics series that
-  have no Go source can be retired from any operator dashboards
+- **C — Grafana** ✅ `server-ce/grafana/` (datasource + dashboard
+  provisioning, same `d22` profile; see that README). **Owned decision
+  pending:** the optional kiosk iframe on `/hub` (a product-surface change
+  — not taken by default).
+- **D — alerts** ✅ `rules/ollitex.rules.yml` (5 rules, promtool-validated) +
+  `server-ce/alertmanager/` (sidecar, the webhook bridge) → Go web
+  `POST /internal/alerts` (instancestats feature) → one mail per firing
+  alert to the instance-stats alert configuration, same SMTP pipeline as
+  the `/admin` test button. Recipients: the
+  `instanceStatAlertConfigs` singleton (set in the /admin site-settings
+  API).
+- **F — legacy**: after C/D are stable in the image, the Node-era metrics
+  series that have no Go source can be retired from any operator dashboards

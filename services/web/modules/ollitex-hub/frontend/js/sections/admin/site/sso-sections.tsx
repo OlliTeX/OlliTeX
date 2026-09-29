@@ -178,13 +178,13 @@ export function SsoOidcSection() {
           fields that back the (now non-standard-claim-aware) admin check. */}
       <SectionTitle top>Claim mapping</SectionTitle>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
-        <Field label="User ID claim" value={String(v.attUserId || '')} onChange={x => up({ attUserId: x })} placeholder="id" hint={'Claim used as the stable OIDC user id ("email" = the email). Non-standard claims are read from the userinfo payload.'} />
+        <Field label="User ID claim" value={String(v.attUserId || '')} onChange={x => up({ attUserId: x })} placeholder="id" hint='Claim used as the stable OIDC user id ("email" = the email). Non-standard claims are read from the userinfo payload.' />
       </Group>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
         <SwitchRow label="Update profile on login" checked={Boolean(v.updateUserDetailsOnLogin)} onChange={x => up({ updateUserDetailsOnLogin: x })} />
       </Group>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
-        <Field label="Admin claim" value={String(v.attAdmin || '')} onChange={x => up({ attAdmin: x })} placeholder="groups" hint={'Claim (standard or non-standard) whose value marks an admin ("email" = use the email).'} />
+        <Field label="Admin claim" value={String(v.attAdmin || '')} onChange={x => up({ attAdmin: x })} placeholder="groups" hint='Claim (standard or non-standard) whose value marks an admin ("email" = use the email).' />
         <Field label="Admin claim value" value={String(v.valAdmin || '')} onChange={x => up({ valAdmin: x })} placeholder="admins" hint="Expected value of the admin claim." />
       </Group>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>

@@ -154,10 +154,30 @@ services:
       OVERLEAF_HOST: sharelatex
       GITBRIDGE_HOST: git-bridge
     volumes:
-      - ./server-ce/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./server-ce/prometheus:/etc/prometheus:ro  # yml + rules/ (phase D)
       - ~/prometheus_data:/prometheus
     ports:
       - "9090:9090"
+
+  # ---------------------------------------------------------------------------
+  # OlliTeX D22 (8cbc1526) — phase D: Alertmanager (alert bridge).
+  # Prometheus alerts land here; it webhooks the d22 Go-web alert route
+  # (POST /internal/alerts) which fans out mails via the instance-stats
+  # alert configuration. No host port (sidecar only; docker-internal).
+  # ---------------------------------------------------------------------------
+  alertmanager:
+    profiles: ["d22"]
+    restart: always
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "sed -e 's/__OVERLEAF_HOST__/${OVERLEAF_HOST:-sharelatex}/g' /etc/alertmanager/alertmanager.yml > /tmp/am-live.yml && exec /bin/alertmanager --config.file=/tmp/am-live.yml --storage.path=/alertmanager"
+    environment:
+      OVERLEAF_HOST: sharelatex
+    volumes:
+      - ./server-ce/alertmanager:/etc/alertmanager:ro
+      - ~/alertmanager_data:/alertmanager
     depends_on:
       - sharelatex
 
@@ -169,6 +189,32 @@ services:
     command: ["--path.procfs=/host/proc", "--path.rootfs=/host", "--path.sysfs=/host/sys"]
     volumes:
       - /:/host:ro
+    depends_on:
+      - prometheus
+
+  # D22 (8cbc1526) phase C — Grafana (shared datasource + repo-shipped
+  # dashboards via provisioning; host :3180 -> container :3000 so it never
+  # collides with the web-api internal :3000). Internal/observability UI only;
+  # the HAProxy edge does NOT forward it.
+  grafana:
+    profiles: ["d22"]
+    restart: always
+    image: grafana/grafana-oss:11.6.0
+    container_name: grafana
+    environment:
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_DISABLE_MESSAGE: "true"
+      GF_ANALYTICS_DO_NOT_TRACK: "true"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-ollitex-observability}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ~/grafana_data:/var/lib/grafana
+      - ./server-ce/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./server-ce/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3180:3000"
     depends_on:
       - prometheus
 

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 // The caveat string (owner requirement 2026-09-06) is covered explicitly.
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const webRoot = path.resolve(here, '../../../../..') // services/web (5 up from test/unit/src)
+const webRoot = path.resolve(here, '../../../../../../../') // repo root (7 up from test/unit/src; locales moved to root in the reorg)
 const enPath = path.join(webRoot, 'locales/en.json')
 const extractedPath = path.join(webRoot, 'frontend/extracted-translations.json')
 

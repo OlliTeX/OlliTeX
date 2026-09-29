@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 // to the KEY (the 'your_username' placeholder bug).
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const webRoot = path.resolve(here, '../../../..') // services/web
+const webRoot = path.resolve(here, '../../../../../../') // repo root (6 up; locales moved to root in the reorg)
 const enPath = path.join(webRoot, 'locales/en.json')
 const extractedPath = path.join(webRoot, 'frontend/extracted-translations.json')
 

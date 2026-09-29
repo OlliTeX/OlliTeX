@@ -19,7 +19,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const moduleDir = path.resolve(here, '../../..')
 const frontendJs = path.join(moduleDir, 'frontend/js')
 // services/web is two levels up from the module dir
-const webDir = path.resolve(moduleDir, '../..')
+const webDir = path.resolve(moduleDir, '../../../../') // repo root (4 up; locales moved to root in the reorg)
 
 // Match single- and double-quoted literals (an unescaped opposite-kind quote
 // is legal inside the other kind — the string we ship contains exactly that).

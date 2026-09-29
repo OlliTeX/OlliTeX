@@ -105,6 +105,7 @@ afterEach(() => {
   invalidateSiteSettingsCache()
   if (typeof window !== 'undefined') {
     window.metaAttributesCache?.clear()
+    // eslint-disable-next-line no-restricted-syntax -- test teardown only: a full storage wipe between specs is intentional, not app-code access
     window.localStorage?.clear()
     window.location.hash = ''
   }

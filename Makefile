@@ -56,7 +56,7 @@ i18n: ## Translation linter: code -> locales/en.json -> extracted-translations (
 
 .PHONY: lint
 lint: ## ESLint (zero-warning policy)
-	$(YARN) lint
+	cd $(SERVICES_WEB) && $(YARN) lint
 
 .PHONY: format
 format: ## Prettier check

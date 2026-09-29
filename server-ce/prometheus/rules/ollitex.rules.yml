@@ -1,0 +1,68 @@
+# D22 (8cbc1526) phase D — OlliTeX alert rules.
+#
+# Delivery chain: Prometheus → Alertmanager (d22 sidecar,
+# server-ce/alertmanager/alertmanager.yml) → HTTP webhook into the Go web
+# route
+#   POST http://<OVERLEAF_HOST>:4000/internal/alerts
+# which fans one mail per firing alert out to the instance-stats alert
+# configuration (instanceStatAlertConfigs singleton — the same recipients
+# the /admin site-settings API manages). The OlliTeX mail pipeline IS the
+# notification channel (phase F of the D22 plan); no other channels.
+#
+# Series contract (pinned by D22 A1 — Node-faithful):
+#   requests{method,path,code}            counter
+#   request_time{quantile,app,host,path}  summary, MILLISECONDS
+#   up{job,instance}                      scrape health
+# Rules below are validated with `docker run --rm -v :ro prom/prometheus
+# promtool check rules /etc/prometheus/rules/ollitex.rules.yml`.
+
+groups:
+  - name: ollitex.services
+    rules:
+      - alert: OllitexServiceDown
+        expr: up{job=~"ollitex-.+"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OlliTeX service {{ $labels.job }} is down (no /metrics reach for 2m)"
+
+      - alert: OllitexHigh5xxRate
+        expr: >
+          sum by (job) (rate(requests{job=~"ollitex-.+", code=~"5.."}[5m]))
+          /
+          sum by (job) (rate(requests{job=~"ollitex-.+"}[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OlliTeX {{ $labels.job }} is returning >5% 5xx responses (5m window)"
+
+      - alert: OllitexWebP99High
+        expr: request_time{quantile="0.99", job="ollitex-web"} > 3000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OlliTeX web p99 request time above 3000 ms for 10m"
+
+  - name: ollitex.host
+    rules:
+      # Instance-stats UI default is a 90% warning threshold — the rule
+      # fires at 90% used (10% free), keeping the two surfaces consistent.
+      - alert: HostRootDiskLow
+        expr: node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host root filesystem below 10% free for 10m"
+
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory below 10% available for 10m"

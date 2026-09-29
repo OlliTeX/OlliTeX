@@ -139,6 +139,10 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Path: "/admin/instance-stats/api/alert-config", Handler: getAlertConfig(a)},
 			{Method: "PUT", Path: "/admin/instance-stats/api/alert-config", Handler: saveAlertConfig(a)},
 			{Method: "POST", Path: "/admin/instance-stats/api/send-test-alert-email", Handler: sendTestAlert(a, mail)},
+			// D22 (8cbc1526) phase D: Prometheus (d22 sidecar) alert webhook —
+			// internal-only (docker network; the HAProxy edge never forwards
+			// /internal/*), machine caller, no CSRF/auth by design.
+			{Method: "POST", Path: "/internal/alerts", Handler: alertWebhook(a, mail)},
 		},
 	}
 }

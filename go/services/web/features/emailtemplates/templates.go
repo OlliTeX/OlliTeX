@@ -76,6 +76,17 @@ var Registry = []Template{
 		HTMLLabel: "text/html part (HTML tags allowed)",
 	},
 	{
+		Name:    "instance-stats-alert",
+		Label:   "Instance statistics alert (D22)",
+		Help:    "Sent by the D22 (8cbc1526) Prometheus webhook when an OlliTeX alert fires.",
+		Vars:    []string{"app", "alertname", "summary"},
+		Subject: "[{{app}}] ALERT: {{alertname}}",
+		Text:    "{{app}} observability alert fired.\n\nAlert: {{alertname}}\nSummary: {{summary}}",
+		HTML: "<p><strong>{{app}} observability alert fired.</strong></p>" +
+			"<p>Alert: {{alertname}}<br>Summary: {{summary}}</p>",
+		HTMLLabel: "text/html part (HTML tags allowed)",
+	},
+	{
 		Name:    "sessions-cleared",
 		Label:   "Security note: active sessions cleared",
 		Help:    "Security alert when all other active sessions are cleared.",

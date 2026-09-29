@@ -28,7 +28,7 @@ export default defineMain({
     disableTelemetry: true,
   },
 
-  staticDirs: [path.join(rootDir, 'public')],
+  staticDirs: [path.join(rootDir, '../../public')], // reorg step 6: public/ moved to repo root
 
   stories: [
     path.join(rootDir, '../../frontend/stories/**/*.stories.{js,jsx,ts,tsx}'),

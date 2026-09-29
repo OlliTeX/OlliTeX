@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { screen, waitFor, fireEvent, within } from '@testing-library/react'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
 import AdminUsersSection from '../../frontend/js/sections/admin/admin-users-section'
 import AdminProjectsSection from '../../frontend/js/sections/admin/admin-projects-section'
 import { ZoteroSection } from '../../frontend/js/sections/admin/site/simple-sections'
