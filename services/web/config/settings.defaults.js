@@ -1077,6 +1077,12 @@ function buildSettings() {
       __dirname,
       '../../../frontend/modules/diagram/frontend/js/components/create-diagram-file'
     ),
+      // Candidate B (2026-09-29): "New file > TikZ diagram" (.tikz)
+      Path.resolve(
+        __dirname,
+        '../../../frontend/modules/tikz/frontend/js/components/create-tikz-file'
+      ),
+
     ],
     // [IVd] Buttons rendered next to the download button in the file view header
     // (e.g. the "Edit Image" action from the toast-image module).
@@ -1348,6 +1354,11 @@ function buildSettings() {
       Path.resolve(
         __dirname,
         '../../../frontend/modules/diagram/frontend/js/visual-editor-provider'
+      ),
+      // Candidate B (2026-09-29): WYSIWYG TikZ editor claims *.tikz/*.pgf
+      Path.resolve(
+        __dirname,
+        '../../../frontend/modules/tikz/frontend/js/visual-editor-provider'
       ),
     ],
     usGovBanner: [],

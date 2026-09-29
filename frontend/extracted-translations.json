@@ -2547,5 +2547,10 @@
   "zotero_reference_loading_error_expired": null,
   "zotero_reference_loading_error_forbidden": null,
   "zotero_reference_loading_error_not_linked": null,
-  "zotero_sync_description": ""
+  "zotero_sync_description": "",
+  "tikz_new_file": "TikZ diagram",
+  "tikz_status_loading": "Loading TikZ editor…",
+  "tikz_status_ready": "TikZ canvas ready",
+  "tikz_title": "TikZ editor",
+  "tikz_error_boot": "The TikZ editor failed to start"
 }
