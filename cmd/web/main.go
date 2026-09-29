@@ -49,6 +49,7 @@ import (
 	"ollitex/go/services/web/features/orcidpicker"
 	"ollitex/go/services/web/features/pageshells"
 	"ollitex/go/services/web/features/passwordreset"
+	"ollitex/go/services/web/features/projectinspection"
 	"ollitex/go/services/web/features/projectlist"
 	"ollitex/go/services/web/features/registrationpage"
 	"ollitex/go/services/web/features/review"
@@ -195,6 +196,7 @@ func main() {
 	// cookie the first-party trackers gate on; consent.ConsentAllowsAnalytics
 	// is the server-side tracking-injection predicate.
 	app.RegisterFeature(consent.Feature(app))
+	app.RegisterFeature(projectinspection.Feature(app))
 
 	// P6.4a surface: OlliTeX llm module settings surface (BYO provider rows,
 	// selected model, compliance rubrics, usage, grammar prefs, admin LLM

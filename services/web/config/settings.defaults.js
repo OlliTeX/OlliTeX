@@ -1224,7 +1224,16 @@ function buildSettings() {
       '../../../frontend/modules/reference-picker/frontend/components/reference-picker-controller.tsx'
     ),
     ],
-    mainEditorLayoutPanels: [],
+    mainEditorLayoutPanels: [
+      // Candidate G (2026-09-29, owner-adopted): project inspection rail
+      // panel (engine: services/web/modules/project-inspection —
+      // yu-i-i/overleaf-cep#245, AGPL-3.0; API: go/services/web/features/
+      // projectinspection). Rail panel after editor+PDF (order 3).
+      Path.resolve(
+        __dirname,
+        '../../../frontend/modules/project-inspection/frontend/js/panel'
+      ),
+    ],
     pythonRunner: [
       // python-runner module (ported from ayakaleaf-pro, owner-provided 2026-09-06):
       // browser-side Python (Pyodide) execution for .py files; split editor +
