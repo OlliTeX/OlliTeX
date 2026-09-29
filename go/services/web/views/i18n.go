@@ -174,14 +174,48 @@ var WaveBSessionsStrings = map[string]string{
 	"view.sessions.back-projects": "Back to your projects",
 }
 
-// WaveBShellAll — the full wave-A+B set for the site shell pages
-// (login-adjacent, 404/500/restricted, logout, set-password, sessions).
+// WaveCAdminStrings — the /admin shell page set (U9; the custom-writer
+// AdminShellPage applies the shell set directly — see the I18n field of
+// AdminShellParams).
+var WaveCAdminStrings = map[string]string{
+	"view.admin.h1":             "Admin Panel",
+	"view.admin.tab-messages":   "System Messages",
+	"view.admin.tab-projects":   "Active Projects",
+	"view.admin.tab-sockets":    "Open Sockets",
+	"view.admin.tab-editor":     "Open/Close Editor",
+	"view.admin.projects-help":  "Real-time information from the editor service showing who is actively working on which projects.",
+	"view.admin.message-label":  "Message",
+	"view.admin.clear-messages": "Clear all messages",
+	"view.admin.disconnect":     "Disconnect all users",
+	"view.admin.editor-note":    "Will reopen the editor after closing.",
+	"view.admin.llm-tab":        "LLM Configuration",
+	"view.admin.llm-on":         "Site-wide LLM backend, model allowlist, and compliance review settings.",
+	"view.admin.llm-off":        "LLM is disabled on this deployment (set LLM_ENABLED=true to enable).",
+}
+
+// WaveCOneTimeStrings — the /read-only/one-time-login set (p3 family). The
+// sentence around the <a>log in</a> link is split into fragments so the
+// longest-first substitution keeps the anchor untouched.
+var WaveCOneTimeStrings = map[string]string{
+	"view.onetime.h1":    "We're back!",
+	"view.onetime.p1":    "Overleaf is now running normally.",
+	"view.onetime.p2a":   "Please",
+	"view.onetime.login": "log in",
+	"view.onetime.p2b":   "to continue working on your projects.",
+}
+
+// WaveBShellAll — the FULL shell-page set (waves A+B+C): every baked page
+// that renders the site shell (login-adjacent, 404/500/restricted, logout,
+// set-password, sessions, /admin, one-time-login). The per-page sets are
+// unioned: a string is only replaced when its exact English bytes exist in
+// the page, so the superset is safe for every shell page, and en/absent-
+// bundle remain byte-identical (the e2e pins).
 func WaveBShellAll() map[string]string {
 	out := map[string]string{}
 	for k, v := range WaveANavStrings {
 		out[k] = v
 	}
-	for _, s := range []map[string]string{WaveBSharedStrings, WaveBSetPasswordStrings, WaveBSessionsStrings} {
+	for _, s := range []map[string]string{WaveBSharedStrings, WaveBSetPasswordStrings, WaveBSessionsStrings, WaveCAdminStrings, WaveCOneTimeStrings} {
 		for k, v := range s {
 			out[k] = v
 		}

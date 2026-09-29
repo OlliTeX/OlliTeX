@@ -136,6 +136,9 @@ func adminPage(a *core.App) func(*core.Cxt, *core.Res) {
 		email, theme := adminUserFields(a, ctx, uid)
 		msgs := adminMsgs(a, ctx)
 		p := views.AdminShellParams{
+			// i18n wave C: the shell-page locale pass (zero = exact English
+			// bytes when the bundle is unwired — the oracle tests stay green).
+			I18n:           views.ShellI18n(cxt.A, cxt),
 			Nonce:          views.NewNonce(),
 			CSRF:           sess.CsrfToken(),
 			Email:          email,

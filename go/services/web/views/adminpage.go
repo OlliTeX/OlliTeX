@@ -12,6 +12,10 @@ import (
 // AdminShellParams — the dynamic inputs of the /admin page. Everything else
 // is pinned byte-exact in adminShellTemplate (Node oracle, U9 2026-09-22).
 type AdminShellParams struct {
+	// I18n — wave-C locale pass (zero value = exact English bytes; the
+	// feature caller sets views.ShellI18n(a, cxt) when the bundle is wired).
+	I18n I18nPage `json:"-"`
+
 	Nonce          string
 	CSRF           string
 	Email          string
@@ -92,6 +96,9 @@ func AdminShell(p AdminShellParams) string {
 // text/html 200 (same head set as views.Page — the existing gated pages).
 func AdminShellPage(w http.ResponseWriter, p AdminShellParams) {
 	html := AdminShell(p)
+	// i18n wave C: post-bake locale pass (no-op for en / unwired bundles —
+	// the byte-pinned admin oracle tests stay exact).
+	html = translateI18n(html, p.I18n)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", cspReact(p.Nonce))
 	w.Header().Set("Permissions-Policy", core.PinnedPermissionsPolicy)
