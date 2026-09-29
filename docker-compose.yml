@@ -131,6 +131,47 @@ services:
     volumes:
       - ~/redis_data:/data
 
+  # ---------------------------------------------------------------------------
+  # D22 (8cbc1526) observability — opt-in profile (default `up` is unchanged):
+  #
+  #   docker compose --profile d22 up -d
+  #
+  # Prometheus scrapes ALL Go services' /metrics on their internal docker
+  # ports (D22 A2 wiring — the HAProxy edge never forwards /metrics);
+  # node-exporter reports host-level signals (CPU/RAM/disk via mounted /).
+  # :9090 is host-published for Grafana (phase C) / operator tooling.
+  # Docs: server-ce/prometheus/README.md
+  # ---------------------------------------------------------------------------
+  prometheus:
+    profiles: ["d22"]
+    restart: always
+    image: prom/prometheus:v2.53.5
+    container_name: prometheus
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "sed -e 's/__OVERLEAF_HOST__/${OVERLEAF_HOST:-sharelatex}/g' -e 's/__GITBRIDGE_HOST__/${GITBRIDGE_HOST:-git-bridge}/g' /etc/prometheus/prometheus.yml > /tmp/prometheus-live.yml && exec /prometheus/prometheus --config.file=/tmp/prometheus-live.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d --web.enable-lifecycle"
+    environment:
+      OVERLEAF_HOST: sharelatex
+      GITBRIDGE_HOST: git-bridge
+    volumes:
+      - ./server-ce/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ~/prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - sharelatex
+
+  node-exporter:
+    profiles: ["d22"]
+    restart: always
+    image: prom/node-exporter:v1.9.1
+    container_name: node-exporter
+    command: ["--path.procfs=/host/proc", "--path.rootfs=/host", "--path.sysfs=/host/sys"]
+    volumes:
+      - /:/host:ro
+    depends_on:
+      - prometheus
+
   # ldap:
   #    restart: always
   #    image: rroemhild/test-openldap

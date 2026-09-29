@@ -1,0 +1,89 @@
+# ---------------------------------------------------------------------------
+# OlliTeX D22 (8cbc1526) — Phase B: static Prometheus scrape config.
+#
+# Single-host, static-scrape design (no k8s, no SD): every OlliTeX Go service
+# exposes /metrics on its INTERNAL docker port (wired in D22 A2 — see
+# go/libraries/ometrics/prometheus.go). The HAProxy edge does NOT forward
+# /metrics; Prometheus scrapes from inside the docker network.
+#
+# Placeholders (replaced at container start by the compose entrypoint):
+#   __OVERLEAF_HOST__  the overleaf server container's compose network name
+#                      (default: sharelatex in docker-compose.yml)
+#   __GITBRIDGE_HOST__ the git-bridge compose service name (default: git-bridge)
+# ---------------------------------------------------------------------------
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    stack: ollitex
+
+scrape_configs:
+  # --- the Go services (all ten wired in D22 A2) -------------------------
+  - job_name: ollitex-web
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:4000"]
+        labels: { service: web }
+
+  - job_name: ollitex-collab
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3450"]
+        labels: { service: collab }
+
+  - job_name: ollitex-realtime
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3026"]
+        labels: { service: realtime }
+
+  - job_name: ollitex-chat
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3010"]
+        labels: { service: chat }
+
+  - job_name: ollitex-docstore
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3016"]
+        labels: { service: docstore }
+
+  - job_name: ollitex-filestore
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3009"]
+        labels: { service: filestore }
+
+  - job_name: ollitex-notifications
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3042"]
+        labels: { service: notifications }
+
+  - job_name: ollitex-history-v1
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3100"]
+        labels: { service: history-v1 }
+
+  - job_name: ollitex-project-history
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3054"]
+        labels: { service: project-history }
+
+  - job_name: ollitex-git-bridge
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__GITBRIDGE_HOST__:8000"]
+        labels: { service: git-bridge }
+
+  # --- host-level signals --------------------------------------------------
+  - job_name: node
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+# D22 phase D (alert rules → the OlliTeX email pipeline) will drop in here.
+rule_files: []
