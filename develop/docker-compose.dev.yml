@@ -5,15 +5,12 @@
 # Node source to hot-reload and are dropped here.
 services:
   clsi:
-    command: ["node", "--watch", "app.js"]
+    # Go clsi (node app retired 2026-09-29): baked binary from the main
+    # image (rebuild first: (cd server-ce && make all)).
+    image: ollitex/ollitex:main
+    command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/clsitex"]
     environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9230:9229"
-    volumes:
-      - ../services/clsi/app:/overleaf/services/clsi/app
-      - ../services/clsi/app.js:/overleaf/services/clsi/app.js
-      - ../services/clsi/config:/overleaf/services/clsi/config
+      - SANDBOXED_COMPILES=false
 
 
 

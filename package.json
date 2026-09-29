@@ -207,7 +207,6 @@
     "libraries/*",
     "server-ce/test",
     "services/analytics",
-    "services/clsi",
     "services/clsi_typst",
     "services/clsi-cache",
     "services/clsi-lb",

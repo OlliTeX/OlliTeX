@@ -7,10 +7,10 @@ import RequestParser from './RequestParser.js'
 import CompileManager from './CompileManager.js'
 import Settings from '@overleaf/settings'
 import logger from '@overleaf/logger'
-import Errors from '../../../clsi/app/js/Errors.js'
+import Errors from './Errors.js'
 import ProjectPersistenceManager from './ProjectPersistenceManager.js'
 import { parseReq, z, zz } from '@overleaf/validation-tools'
-import { compileRequestBodySchema } from '../../../clsi/app/js/schemas.js'
+import { compileRequestBodySchema } from './schemas.js'
 import Metrics from '@overleaf/metrics'
 
 let lastSuccessfulCompileTimestamp = 0

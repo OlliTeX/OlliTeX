@@ -1,4 +1,4 @@
-import OutputFileArchiveManager from '../../../clsi/app/js/OutputFileArchiveManager.js'
+import OutputFileArchiveManager from './OutputFileArchiveManager.js'
 import { expressify } from '@overleaf/promise-utils'
 import { pipeline } from 'node:stream/promises'
 import { parseReq, z, zz } from '@overleaf/validation-tools'

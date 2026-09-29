@@ -11,20 +11,23 @@ volumes:
 
 services:
   clsi:
-    build:
-      context: ..
-      dockerfile: services/clsi/Dockerfile
-      target: with-texlive
+    # Go clsi service (node services/clsi retired 2026-09-29) — same dev
+    # pattern as the other Go services (baked binary in the main image;
+    # rebuild first: (cd server-ce && make all)).
+    image: ollitex/ollitex:main
+    command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/clsitex"]
     env_file:
       - dev.env
     environment:
       - SANDBOXED_COMPILES=false
+      - COMPILES_HOST_DIR=/output
+      - CLSI_CACHE_PATH=/tmp/clsi-cache
     user: root
     volumes:
-      - ${PWD}/compiles:/overleaf/services/clsi/compiles
-      - ${PWD}/output:/overleaf/services/clsi/output
+      - ${PWD}/compiles:/overleaf/compiles
+      - ${PWD}/output:/output
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
-      - clsi-cache:/overleaf/services/clsi/cache
+      - clsi-cache:/tmp/clsi-cache
 
   clsi-nginx:
     image: nginx:1.28
@@ -35,7 +38,7 @@ services:
       - /run
     volumes:
       - ${PWD}/output:/output:ro
-      - ../services/clsi/nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
+      - ../develop/clsi-nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
 
   real-time:
     # D28a: the event bus is a Go service (socket.io 0.9 wire, 1:1 with the

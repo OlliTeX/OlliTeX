@@ -37,7 +37,7 @@ describe('RequestParser', () => {
       default: sharedSettings,
     }))
 
-    vi.doMock('../../../../clsi/app/js/OutputCacheManager', () => ({
+    vi.doMock('../../../app/js/OutputCacheManager', () => ({
       default: { BUILD_REGEX: /^[0-9a-f]+-[0-9a-f]+$/ },
     }))
 

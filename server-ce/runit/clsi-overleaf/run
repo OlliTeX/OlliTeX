@@ -25,4 +25,7 @@ fi
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 
-exec /sbin/setuser www-data /usr/bin/node $NODE_PARAMS /overleaf/services/clsi/app.js >> /var/log/overleaf/clsi.log 2>&1
+# CLSI is the Go service (go/services/clsitex, baked as go-services/clsitex in
+# server-ce/Dockerfile). Node services/clsi retired 2026-09-29 (1:1 Go port,
+# oracle-verified: full unit suite + 80,782-row safe_pathname oracle green).
+exec /sbin/setuser www-data /usr/local/bin/go-services/clsitex >> /var/log/overleaf/clsi.log 2>&1

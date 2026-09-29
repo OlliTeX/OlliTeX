@@ -1,6 +1,6 @@
 import { promisify } from 'node:util'
 import settings from '@overleaf/settings'
-import OutputCacheManager from '../../../clsi/app/js/OutputCacheManager.js'
+import OutputCacheManager from './OutputCacheManager.js'
 
 // clsi_typst: single compiler
 const VALID_COMPILERS = ['typst']
