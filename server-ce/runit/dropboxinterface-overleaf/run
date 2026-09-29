@@ -1,8 +1,0 @@
-#!/bin/bash
-
-# dropboxinterface is served by its Go implementation (cutover plan, Phase C complete
-# 2026-09-16: Node==Go contract gates green on e2e + live). The Node version
-# was removed from this tree; Go is the canonical implementation.
-source /etc/overleaf/env.sh
-
-exec /sbin/setuser www-data /usr/local/bin/go-services/dropboxinterface >> /var/log/overleaf/dropboxinterface.log 2>&1
