@@ -28,4 +28,8 @@ if [ -f /etc/overleaf/settings.js ]; then
   fi
 fi
 
+export METRICS_APP_NAME="ollitex-web"  # D22 A2: the app label for the ometrics default labels
+#
+## D22: Prometheus instrumentation on the internal port (/metrics;
+## the HAProxy edge never forwards it).
 exec /sbin/setuser www-data /usr/local/bin/go-services/web >> /var/log/overleaf/web.log 2>&1

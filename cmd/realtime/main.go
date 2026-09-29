@@ -26,6 +26,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+
+	"ollitex/go/libraries/ometrics"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -133,9 +135,13 @@ func main() {
 		addr = net.JoinHostPort(v, "3026")
 	}
 	log.Info("realtime starting up, listening", "addr", addr)
+	// D22 A2: the metrics surface + per-request recording (internal port).
+	ometrics.Initialize()
+	srv.SetMetricsHandler(ometrics.PrometheusHandler(nil))
+
 	httpSrv := &http.Server{
 		Addr:              addr,
-		Handler:           srv.Routes(),
+		Handler:           ometrics.HTTPMiddleware(srv.Routes()),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {

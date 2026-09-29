@@ -39,6 +39,10 @@ type Server struct {
 
 	wsUpgrader websocket.Upgrader
 
+	// D22 A2: the Prometheus scrape surface (assigned by main after
+	// ometrics.Initialize(); nil-safe — MetricsHandler 404s until then).
+	metricsHttp http.Handler
+
 	mu         sync.Mutex
 	handshakes map[string]*handshake // sid → session
 	active     map[string]*wsTransport
@@ -152,6 +156,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/socket.io", s.socketioRoot)
 
 	mux.HandleFunc("/", s.rootHealth)
+	mux.Handle("/metrics", s.MetricsHandler())
 	mux.HandleFunc("/status", s.status)
 	mux.HandleFunc("/health_check/redis", s.healthRedis)
 	mux.HandleFunc("/clients/", s.clientByID)
@@ -653,3 +658,16 @@ func truncate(s string, n int) string {
 	}
 	return s[:n] + "…"
 }
+
+// MetricsHandler is the D22 A2 Prometheus surface (nil-safe: 404 until the
+// service main assigns ometrics.PrometheusHandler).
+func (s *Server) MetricsHandler() http.Handler {
+	if s.metricsHttp == nil {
+		return http.NotFoundHandler()
+	}
+	return s.metricsHttp
+}
+
+// SetMetricsHandler wires the D22 A2 Prometheus surface (called once by the
+// service main after ometrics.Initialize()).
+func (s *Server) SetMetricsHandler(h http.Handler) { s.metricsHttp = h }

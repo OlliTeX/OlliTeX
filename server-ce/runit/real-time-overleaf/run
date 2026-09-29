@@ -12,4 +12,5 @@ if [ -x "$GO_RT" ]; then
     exec /sbin/setuser www-data "$GO_RT" >> /var/log/overleaf/real-time.log 2>&1
 fi
 echo "real-time: Go binary missing — Node fallback" >&2
+export METRICS_APP_NAME="ollitex-realtime"  # D22 A2: the app label
 exec /sbin/setuser www-data /usr/bin/node /overleaf/services/real-time/app.js >> /var/log/overleaf/real-time.log 2>&1

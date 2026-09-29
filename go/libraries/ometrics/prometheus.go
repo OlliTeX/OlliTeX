@@ -187,3 +187,25 @@ func HTTPMiddleware(next http.Handler) http.Handler {
 		Summary("request_time", float64(ms), labels)
 	})
 }
+
+// WithMetricsRoute serves the registry snapshot (Prometheus text format)
+// at GET /metrics and delegates every other request to base.
+//
+// It exists for services whose dispatcher is not an injectable
+// http.ServeMux (chat/docstore/filestore/notifications/gitbridge/history-v1/
+// project-history): the main wraps its handler once and the /metrics route
+// is additive without touching the service-internal dispatch (which the
+// byte-pinned parity suites exercise).
+func WithMetricsRoute(base http.Handler) http.Handler {
+	if base == nil {
+		base = http.NotFoundHandler()
+	}
+	scrape := PrometheusHandler(nil)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/metrics" {
+			scrape.ServeHTTP(w, r)
+			return
+		}
+		base.ServeHTTP(w, r)
+	})
+}

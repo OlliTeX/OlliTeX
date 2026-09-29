@@ -14,6 +14,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
 	"syscall"
@@ -35,9 +36,12 @@ func main() {
 	}
 	defer app.Close()
 
+	// D22 A2: the metrics surface (internal port only).
+	ometrics.Initialize()
+
 	srv := &http.Server{
 		Addr:              cfg.Bind(),
-		Handler:           app.Handler,
+		Handler:           ometrics.HTTPMiddleware(ometrics.WithMetricsRoute(app.Handler)),
 		ReadTimeout:       6 * time.Minute, // vendor Router.longerTimeout (all endpoints)
 		WriteTimeout:      6 * time.Minute,
 		ReadHeaderTimeout: 30 * time.Second,

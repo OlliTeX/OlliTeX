@@ -22,6 +22,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	i18nlib "ollitex/go/libraries/i18n"
+	"ollitex/go/libraries/ometrics"
 	"ollitex/go/mongoh"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/adminusers"
@@ -133,6 +134,11 @@ func main() {
 	}
 
 	app := core.New(cfg, rdb)
+
+	// D22 A2: Prometheus instrumentation (the ometrics bridge — see
+	// go/libraries/ometrics/prometheus.go). INTERNAL port only by design.
+	ometrics.Initialize()
+	app.MetricsHTTP = ometrics.PrometheusHandler(nil)
 	app.SetMongo(core.NewMongoLazy(cfg.MongoURI))
 	// i18n (docs/go-i18n-evaluation.md §4): optional catalog dir. Nil by
 	// default = English-only = today's bytes (byte-pinned e2e contract).
@@ -343,7 +349,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           app.Handler(),
+		Handler:           ometrics.HTTPMiddleware(app.Handler()),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

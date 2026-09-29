@@ -256,6 +256,11 @@ type App struct {
 	// mode = today's bytes (default; e2e stacks stay byte-identical).
 	// Wired in cmd/web when WEB_I18N_LOCALES_DIR is set.
 	I18n *i18nlib.Bundle
+
+	// D22 A2: Prometheus scrape surface. Nil until New() wires it — requests
+	// hitting /metrics with a nil surface fall through to the normal 404
+	// (tests that never initialise metrics keep passing unchanged).
+	MetricsHTTP http.Handler
 }
 
 func (a *App) SetRender404(f fnPage) { a.Render404Web = f }
@@ -320,6 +325,15 @@ func (w *recWriter) Write(b []byte) (int, error) {
 // session + csrf + routes + fallbacks), pinned in the P0 gate.
 func (a *App) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// D22 A2: the Prometheus scrape surface — the ONLY route that bypasses
+		// the core pipeline (no session/CSRF/static/CSP): Prometheus scrapers
+		// are stateless and this port is docker-internal (the HAProxy edge
+		// does not forward /metrics). Additive route: zero existing-path
+		// impact on the byte-pinned battery.
+		if a.MetricsHTTP != nil && r.Method == http.MethodGet && r.URL.Path == "/metrics" {
+			a.MetricsHTTP.ServeHTTP(w, r)
+			return
+		}
 		// x-powered-by: Node sends it ONLY on the express res.send() paths
 		// that stay enabled — pinned live 2026-09-14 (P3.2): present on
 		// /status 200,csrf 403 (res.sendStatus) and the body-parser 400;

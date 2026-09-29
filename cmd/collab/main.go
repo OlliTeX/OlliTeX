@@ -44,6 +44,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
 	"strconv"
@@ -206,7 +207,12 @@ func main() {
 
 	// --- HTTP: /healthz + room endpoint (/collab/{projectId} — room = base
 	// path segment, exactly what the ygo server derives) ---
+	// D22 A2: the metrics surface (internal port; the edge never forwards
+	// /metrics — Prometheus scrapes from inside the docker network).
+	ometrics.Initialize()
+
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", ometrics.PrometheusHandler(nil))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"status":"ok","service":"collab","engine":"ygo"}`)
@@ -217,7 +223,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("listen: %v", err)
 	}
-	httpSrv := &http.Server{Handler: mux}
+	httpSrv := &http.Server{Handler: ometrics.HTTPMiddleware(mux)}
 
 	go func() {
 		<-ctx.Done()

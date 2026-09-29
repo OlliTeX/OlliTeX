@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
 	"strconv"
@@ -44,9 +45,12 @@ func main() {
 	store := notifications.NewMongoStore(client, cfg.DB, cfg.Collection)
 	server := notifications.NewServer(store, cfg)
 
+	// D22 A2: the metrics surface (internal port only).
+	ometrics.Initialize()
+
 	srv := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		Handler:           server.Router(),
+		Handler:           ometrics.HTTPMiddleware(ometrics.WithMetricsRoute(server.Router())),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

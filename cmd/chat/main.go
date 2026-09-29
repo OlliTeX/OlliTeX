@@ -16,6 +16,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
 	"strconv"
@@ -63,8 +64,11 @@ func main() {
 	}
 	log.Printf("chat: listening on http://%s", listener.Addr())
 
+	// D22 A2: the metrics surface (internal port only).
+	ometrics.Initialize()
+
 	httpSrv := &http.Server{
-		Handler:           srv.Router(),
+		Handler:           ometrics.HTTPMiddleware(ometrics.WithMetricsRoute(srv.Router())),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {

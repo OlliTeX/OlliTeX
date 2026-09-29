@@ -9,4 +9,8 @@ if [ "${HISTORY_V1_GO:-0}" != "1" ]; then
 fi
 export LISTEN_ADDRESS=127.0.0.1
 
+export METRICS_APP_NAME="ollitex-history-v1"  # D22 A2: the app label for the ometrics default labels
+#
+## D22: Prometheus instrumentation on the internal port (/metrics;
+## the HAProxy edge never forwards it).
 exec /sbin/setuser www-data /usr/local/bin/go-services/historyv1 >> /var/log/overleaf/history-v1-go.log 2>&1

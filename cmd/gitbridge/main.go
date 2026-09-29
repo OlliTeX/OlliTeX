@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -235,7 +236,10 @@ func runServe(cfgPath string) {
 	wglog.Info("Postback base URL: %s", cfg.GetPostbackURL())
 	wglog.Info("Root git directory path: %s", cfg.GetRootGitDirectory())
 
-	if err := http.Serve(ln, h); err != nil {
+	// D22 A2: the metrics surface (internal port only).
+	ometrics.Initialize()
+
+	if err := http.Serve(ln, ometrics.HTTPMiddleware(ometrics.WithMetricsRoute(h))); err != nil {
 		wglog.Error("http.Serve: %v", err)
 		os.Exit(1)
 	}

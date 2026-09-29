@@ -143,6 +143,7 @@ services:
       - "8000:8000"
     environment:
       LOG_LEVEL: "DEBUG"
+      METRICS_APP_NAME: "ollitex-gitbridge"   # D22 A2: the app label
     volumes:
       - ./gitbridge-runtime.json:/conf/runtime.json:ro
       - ./data/git-bridge:/data/git-bridge

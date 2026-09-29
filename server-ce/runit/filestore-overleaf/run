@@ -6,4 +6,8 @@
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 
+export METRICS_APP_NAME="ollitex-filestore"  # D22 A2: the app label for the ometrics default labels
+#
+## D22: Prometheus instrumentation on the internal port (/metrics;
+## the HAProxy edge never forwards it).
 exec /sbin/setuser www-data /usr/local/bin/go-services/filestore >> /var/log/overleaf/filestore.log 2>&1

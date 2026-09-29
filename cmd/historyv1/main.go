@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
 	"strconv"
@@ -89,7 +90,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("historyv1: listen: %v", err)
 	}
-	httpSrv := &http.Server{Handler: svc.Handler()}
+	// D22 A2: the metrics surface (internal port only).
+	ometrics.Initialize()
+
+	httpSrv := &http.Server{Handler: ometrics.HTTPMiddleware(ometrics.WithMetricsRoute(svc.Handler()))}
 	go func() {
 		if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("historyv1: serve: %v", err)

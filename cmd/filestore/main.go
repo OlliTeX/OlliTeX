@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
 	"syscall"
@@ -50,9 +51,12 @@ func main() {
 		log.Fatalf("filestore: %v", herr)
 	}
 	mux := h.Mux()
+	// D22 A2: the metrics surface (internal port only).
+	ometrics.Initialize()
+
 	srv := &http.Server{
 		Addr:         listen,
-		Handler:      mux,
+		Handler:      ometrics.HTTPMiddleware(ometrics.WithMetricsRoute(mux)),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 	}

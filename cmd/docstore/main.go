@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"ollitex/go/libraries/ometrics"
 	"os"
 	"os/signal"
 	"strconv"
@@ -131,9 +132,12 @@ func main() {
 		}
 	}
 	srv := docstore.NewServer(cfg, store, docstore.Archiver(sa))
+	// D22 A2: the metrics surface (internal port only).
+	ometrics.Initialize()
+
 	httpSrv := &http.Server{
 		Addr:    net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
-		Handler: srv.Router(),
+		Handler: ometrics.HTTPMiddleware(ometrics.WithMetricsRoute(srv.Router())),
 	}
 	log.Printf("docstore (go) listening on %s (mongo %s/%s)", httpSrv.Addr, database, uri)
 	errCh := make(chan error, 1)
