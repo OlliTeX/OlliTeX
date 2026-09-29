@@ -17,8 +17,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const SVCS = [
-  'chat', 'datamanipulator', 'docstore', 'filestore', 'linked-url-proxy',
-  'notifications',
+  'chat', 'datamanipulator', 'docstore', 'filestore', 'notifications',
 ]
 
 function walk(dir, out = []) {

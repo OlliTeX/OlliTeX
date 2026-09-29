@@ -2,7 +2,8 @@ export CHAT_HOST=127.0.0.1
 export CLSI_HOST=127.0.0.1
 export DOCSTORE_HOST=127.0.0.1
 export FILESTORE_HOST=127.0.0.1
-export LINKED_URL_PROXY_HOST=127.0.0.1
+# LINKED_URL_PROXY_HOST retired 2026-09-29 (linked-url-proxy service junked;
+# was consumed only by the legacy Node UrlHelper, which retires with services/web)
 export NOTIFICATIONS_HOST=127.0.0.1
 export REALTIME_HOST=127.0.0.1
 export WEB_HOST=127.0.0.1

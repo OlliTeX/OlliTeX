@@ -78,8 +78,5 @@ filestore GO_EXTRA OVERLEAF_HISTORY_BLOBS_BUCKET Node reads via shared settings 
 filestore GO_EXTRA OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET Node reads via shared settings layer (outside scan)
 filestore GO_EXTRA PORT shadow-run port escape hatch (Phase A4); Node binds 3009 internally
 
-# --- linked-url-proxy --------------------------------------------------------
-linked-url-proxy GO_EXTRA PORT shadow-run port escape hatch (Phase A4); Node uses services.web.api.port
-
 # --- notifications -----------------------------------------------------------
 notifications TEST_NAME_PATTERN Node test-config (mocha spec filter); not a runtime input
