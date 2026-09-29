@@ -109,7 +109,7 @@ func TestNew_Defaults(t *testing.T) {
 	if c.PdftocairoImage != "ollitex/pdftocairo" {
 		t.Errorf("pdftocairoImage = %q", c.PdftocairoImage)
 	}
-	if c.Png2pdfImage != "quay.io/sharelatex/png2pdf:2026-06-24" {
+	if c.Png2pdfImage != "ollitex/png2pdf" {
 		t.Errorf("png2pdfImage = %q", c.Png2pdfImage)
 	}
 	if c.Png2pdfMinFileSizeBytes != 1024*1024 {

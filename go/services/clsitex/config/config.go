@@ -203,7 +203,7 @@ func New() (*Config, error) {
 	c.EnablePandocConversions = configres.Bool(st, "ENABLE_PANDOC_CONVERSIONS", "ENABLE_PANDOC_CONVERSIONS", false)
 	c.PdftocairoImage = configres.String(st, "PDFTOCAIRO_IMAGE", "PDFTOCAIRO_IMAGE", "ollitex/pdftocairo")
 	c.EnablePdfConversions = configres.Bool(st, "ENABLE_PDF_CONVERSIONS", "ENABLE_PDF_CONVERSIONS", false)
-	c.Png2pdfImage = configres.String(st, "PNG2PDF_IMAGE", "PNG2PDF_IMAGE", "quay.io/sharelatex/png2pdf:2026-06-24")
+	c.Png2pdfImage = configres.String(st, "PNG2PDF_IMAGE", "PNG2PDF_IMAGE", "ollitex/png2pdf")
 	c.EnablePng2pdfConversions = configres.Bool(st, "ENABLE_PNG2PDF_CONVERSIONS", "ENABLE_PNG2PDF_CONVERSIONS", false)
 	c.Png2pdfMinFileSizeBytes = configres.Int(st, "PNG2PDF_MIN_FILE_SIZE_BYTES", "PNG2PDF_MIN_FILE_SIZE_BYTES", 1024*1024)
 	c.MaxUploadSize = configres.Int(st, "MAX_UPLOAD_SIZE", "MAX_UPLOAD_SIZE", 50) * 1024 * 1024
