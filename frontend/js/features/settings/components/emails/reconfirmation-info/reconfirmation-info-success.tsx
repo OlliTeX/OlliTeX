@@ -1,5 +1,5 @@
 import { Trans, useTranslation } from 'react-i18next'
-import { Institution } from '../../../../../../../services/web/types/institution'
+import { Institution } from '../../../../../../types/institution'
 
 type ReconfirmationInfoSuccessProps = {
   institution: Institution

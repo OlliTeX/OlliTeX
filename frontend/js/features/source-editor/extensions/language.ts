@@ -8,7 +8,7 @@ import { languages } from '../languages'
 import { ViewPlugin } from '@codemirror/view'
 import { indentUnit, LanguageDescription } from '@codemirror/language'
 import { updateHasEffect } from '../utils/effects'
-import { Folder } from '../../../../../services/web/types/folder'
+import { Folder } from '../../../../types/folder'
 import { Command } from '@/features/ide-react/context/metadata-context'
 import { AdvancedReferenceSearchResult } from '@/features/ide-react/references/types'
 

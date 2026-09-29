@@ -15,7 +15,7 @@ import {
   Tooltip,
 } from '@codemirror/view'
 import { findValidPosition } from '../utils/position'
-import { Highlight } from '../../../../../services/web/types/highlight'
+import { Highlight } from '../../../../types/highlight'
 import { fullHeightCoordsAtPos, getBase } from '../utils/layer'
 import { debugConsole } from '@/utils/debugging'
 

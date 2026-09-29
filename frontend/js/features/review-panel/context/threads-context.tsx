@@ -12,14 +12,14 @@ import {
   CommentId,
   ReviewPanelCommentThreadMessage,
   ThreadId,
-} from '../../../../../services/web/types/review-panel/review-panel'
-import { ReviewPanelCommentThread } from '../../../../../services/web/types/review-panel/comment-thread'
+} from '../../../../types/review-panel/review-panel'
+import { ReviewPanelCommentThread } from '../../../../types/review-panel/comment-thread'
 import { useConnectionContext } from '@/features/ide-react/context/connection-context'
 import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'
-import { UserId } from '../../../../../services/web/types/user'
+import { UserId } from '../../../../types/user'
 import { deleteJSON, getJSON, postJSON } from '@/infrastructure/fetch-json'
 import RangesTracker from '@overleaf/ranges-tracker'
-import { CommentOperation } from '../../../../../services/web/types/change'
+import { CommentOperation } from '../../../../types/change'
 import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
 import { useEditorContext } from '@/shared/context/editor-context'
 import { debugConsole } from '@/utils/debugging'

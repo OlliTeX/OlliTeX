@@ -1,7 +1,7 @@
 import { Form, FormTextProps as FormTextProps } from 'react-bootstrap'
 import MaterialIcon from '@/shared/components/material-icon'
 import classnames from 'classnames'
-import { MergeAndOverride } from '../../../../../services/web/types/utils'
+import { MergeAndOverride } from '../../../../types/utils'
 
 type TextType = 'default' | 'info' | 'success' | 'warning' | 'error'
 

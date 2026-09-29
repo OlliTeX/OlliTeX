@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { memo, useCallback } from 'react'
-import { Project } from '../../../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../../../types/project/dashboard/api'
 import { useProjectListContext } from '../../../../context/project-list-context'
 import { unarchiveProject } from '../../../../util/api'
 import OLTooltip from '@/shared/components/ol/ol-tooltip'

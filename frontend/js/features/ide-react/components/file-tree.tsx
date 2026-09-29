@@ -2,7 +2,7 @@ import React, { memo, useCallback, useState } from 'react'
 import { useUserContext } from '@/shared/context/user-context'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
 import { useConnectionContext } from '@/features/ide-react/context/connection-context'
-import { RefProviders } from '../../../../../services/web/types/user'
+import { RefProviders } from '../../../../types/user'
 import FileTreeRoot from '@/features/file-tree/components/file-tree-root'
 import { useFileTreeOpenContext } from '@/features/ide-react/context/file-tree-open-context'
 

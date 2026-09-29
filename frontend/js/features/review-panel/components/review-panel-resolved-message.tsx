@@ -1,6 +1,6 @@
 import { FC } from 'react'
 import { FormatTimeBasedOnYear } from '@/shared/components/format-time-based-on-year'
-import { ReviewPanelResolvedCommentThread } from '../../../../../services/web/types/review-panel/comment-thread'
+import { ReviewPanelResolvedCommentThread } from '../../../../types/review-panel/comment-thread'
 import { useTranslation } from 'react-i18next'
 import ReviewPanelEntryUser from './review-panel-entry-user'
 

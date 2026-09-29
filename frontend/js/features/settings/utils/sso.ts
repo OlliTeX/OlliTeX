@@ -1,6 +1,6 @@
 import getMeta from '../../../utils/meta'
 import { DomainInfo } from '../components/emails/add-email/input'
-import { Institution } from '../../../../../services/web/types/institution'
+import { Institution } from '../../../../types/institution'
 
 export const ssoAvailableForDomain = (
   domain: DomainInfo | null,

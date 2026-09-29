@@ -7,7 +7,7 @@ import { FetchError, postJSON } from '../../../../../infrastructure/fetch-json'
 import {
   NotificationProjectInvite,
   Notification as NotificationType,
-} from '../../../../../../../services/web/types/project/dashboard/notification'
+} from '../../../../../../types/project/dashboard/notification'
 import { debugConsole } from '@/utils/debugging'
 import OLButton from '@/shared/components/ol/ol-button'
 

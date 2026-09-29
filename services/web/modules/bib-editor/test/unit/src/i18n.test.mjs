@@ -17,7 +17,10 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 // here = <module>/test/unit/src  →  module dir is three levels up
 const moduleDir = path.resolve(here, '../../..')
-const frontendJs = path.join(moduleDir, 'frontend/js')
+const frontendJs = path.join(
+  moduleDir,
+  '../../../../frontend/modules/bib-editor/frontend/js' // consolidated under frontend/ in the reorg
+)
 // services/web is two levels up from the module dir
 const webDir = path.resolve(moduleDir, '../../../../') // repo root (4 up; locales moved to root in the reorg)
 

@@ -3,7 +3,7 @@ import useProjectWideSettings from '../hooks/use-project-wide-settings'
 import useUserWideSettings from '../hooks/use-user-wide-settings'
 import useProjectWideSettingsSocketListener from '../hooks/use-project-wide-settings-socket-listener'
 import type { ProjectSettings } from '../utils/api'
-import { UserSettings } from '../../../../../services/web/types/user-settings'
+import { UserSettings } from '../../../../types/user-settings'
 
 type ProjectSettingsSetterContextValue = {
   setCompiler: (compiler: ProjectSettings['compiler']) => Promise<void>

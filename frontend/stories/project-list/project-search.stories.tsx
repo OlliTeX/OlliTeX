@@ -1,7 +1,7 @@
 import SearchForm from '../../js/features/project-list/components/search-form'
 import { ProjectListProvider } from '../../js/features/project-list/context/project-list-context'
 import useFetchMock from '../hooks/use-fetch-mock'
-import { projectsData } from '../../../services/web/test/frontend/features/project-list/fixtures/projects-data'
+import { projectsData } from '../../test/frontend/features/project-list/fixtures/projects-data'
 
 export const Search = (args: any) => {
   useFetchMock(fetchMock => {

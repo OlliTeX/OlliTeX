@@ -1,7 +1,7 @@
 import { MessageAndDropdown } from './message-and-dropdown'
 import { useTranslation } from 'react-i18next'
 import type { Message as MessageType } from '@/features/chat/context/chat-context'
-import { User } from '../../../../../services/web/types/user'
+import { User } from '../../../../types/user'
 
 export interface MessageGroupProps {
   messages: MessageType[]

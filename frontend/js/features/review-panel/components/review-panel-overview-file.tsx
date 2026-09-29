@@ -1,5 +1,5 @@
 import { FC, useMemo } from 'react'
-import { MainDocument } from '../../../../../services/web/types/project-settings'
+import { MainDocument } from '../../../../types/project-settings'
 import { Ranges } from '../context/ranges-context'
 import { ReviewPanelComment } from './review-panel-comment'
 import { ReviewPanelChange } from './review-panel-change'
@@ -13,7 +13,7 @@ import {
   CommentOperation,
   DeleteOperation,
   EditOperation,
-} from '../../../../../services/web/types/change'
+} from '../../../../types/change'
 import { canAggregate } from '../utils/can-aggregate'
 
 import useOverviewFileCollapsed from '../hooks/use-overview-file-collapsed'

@@ -4,7 +4,7 @@ import {
   Change,
   DeleteOperation,
   EditOperation,
-} from '../../../../../services/web/types/change'
+} from '../../../../types/change'
 import { useTranslation } from 'react-i18next'
 import classnames from 'classnames'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'

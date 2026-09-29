@@ -1,4 +1,4 @@
-import { Project } from '../../../services/web/types/project'
+import { Project } from '../../types/project'
 
 export const project: Project = {
   _id: '63e21c07946dd8c76505f85a',

@@ -1,4 +1,4 @@
-import { FileTreeEntity } from '../../../../../../services/web/types/file-tree-entity'
+import { FileTreeEntity } from '../../../../../types/file-tree-entity'
 import { useTranslation } from 'react-i18next'
 import { useProjectContext } from '@/shared/context/project-context'
 import { useCallback } from 'react'

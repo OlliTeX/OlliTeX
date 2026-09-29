@@ -1,6 +1,6 @@
 import { useUserSettingsContext } from '@/shared/context/user-settings-context'
 import { saveUserSettings } from '../utils/api'
-import { UserSettings } from '../../../../../services/web/types/user-settings'
+import { UserSettings } from '../../../../types/user-settings'
 
 export default function useSaveUserSettings() {
   const { userSettings, setUserSettings } = useUserSettingsContext()

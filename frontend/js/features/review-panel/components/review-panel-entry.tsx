@@ -1,5 +1,5 @@
 import { FC, useCallback, useEffect, useRef, useState } from 'react'
-import { AnyOperation } from '../../../../../services/web/types/change'
+import { AnyOperation } from '../../../../types/change'
 import {
   useCodeMirrorStateContext,
   useCodeMirrorViewContext,

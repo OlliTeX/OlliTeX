@@ -1,5 +1,5 @@
 import classnames from 'classnames'
-import { Project } from '../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../types/project/dashboard/api'
 
 type ProjectsToDisplayProps = {
   projects: Project[]

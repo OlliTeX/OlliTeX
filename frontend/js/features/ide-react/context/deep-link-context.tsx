@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { ThreadId } from '../../../../../services/web/types/review-panel/review-panel'
+import { ThreadId } from '../../../../types/review-panel/review-panel'
 import { showCommentNotFoundToast } from '@/features/ide-react/components/deep-link-toasts'
 
 const DEEP_LINK_PARAMS = ['doc', 'comment', 'change', 'open'] as const

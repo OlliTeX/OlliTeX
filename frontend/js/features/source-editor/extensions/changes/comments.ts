@@ -5,8 +5,8 @@ import {
   StateEffect,
   Transaction,
 } from '@codemirror/state'
-import { AnyOperation, CommentOperation } from '../../../../../../services/web/types/change'
-import { ThreadId } from '../../../../../../services/web/types/review-panel/review-panel'
+import { AnyOperation, CommentOperation } from '../../../../../types/change'
+import { ThreadId } from '../../../../../types/review-panel/review-panel'
 import { DocumentContainer } from '@/features/ide-react/editor/document-container'
 
 export type StoredComment = {

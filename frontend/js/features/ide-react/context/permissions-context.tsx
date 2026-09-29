@@ -6,7 +6,7 @@ import {
   Permissions,
   PermissionsLevel,
 } from '@/features/ide-react/types/permissions'
-import { DeepReadonly } from '../../../../../services/web/types/utils'
+import { DeepReadonly } from '../../../../types/utils'
 import useViewerPermissions from '@/shared/hooks/use-viewer-permissions'
 import { useProjectContext } from '@/shared/context/project-context'
 

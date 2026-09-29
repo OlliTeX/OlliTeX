@@ -1,5 +1,5 @@
 import getMeta from '@/utils/meta'
-import { Folder } from '../../../../../services/web/types/folder'
+import { Folder } from '../../../../types/folder'
 
 type FileCountStatus = 'success' | 'warning' | 'error'
 

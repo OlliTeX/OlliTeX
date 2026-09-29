@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as eventTracking from '../../../../infrastructure/event-tracking'
-import { Project } from '../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../types/project/dashboard/api'
 import { renameProject } from '../../util/api'
 import useAsync from '../../../../shared/hooks/use-async'
 import { useProjectListContext } from '../../context/project-list-context'

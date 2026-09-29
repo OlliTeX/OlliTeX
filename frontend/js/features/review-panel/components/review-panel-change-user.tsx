@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import { useChangesUsersContext } from '@/shared/context/changes-users-context'
-import { Change } from '../../../../../services/web/types/change'
+import { Change } from '../../../../types/change'
 import ReviewPanelEntryUser from './review-panel-entry-user'
 
 export const ReviewPanelChangeUser = memo<{ change: Change }>(({ change }) => {

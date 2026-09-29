@@ -10,7 +10,7 @@ import { postJSON } from '../../../infrastructure/fetch-json'
 import useIsMounted from '../../../shared/hooks/use-is-mounted'
 import { set, cloneDeep } from 'lodash'
 import getMeta from '../../../utils/meta'
-import type { OAuthProvider } from '../../../../../services/web/types/oauth-providers'
+import type { OAuthProvider } from '../../../../types/oauth-providers'
 
 export type SSOSubscription = {
   providerId: string

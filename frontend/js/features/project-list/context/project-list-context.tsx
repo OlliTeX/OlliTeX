@@ -24,7 +24,7 @@ import {
   GetProjectsResponseBody,
   Project,
   Sort,
-} from '../../../../../services/web/types/project/dashboard/api'
+} from '../../../../types/project/dashboard/api'
 import getMeta from '../../../utils/meta'
 import useAsync from '../../../shared/hooks/use-async'
 import { getProjects } from '../util/api'

@@ -2,7 +2,7 @@ import { SelectionRange } from '@codemirror/state'
 import { Ranges } from '@/features/review-panel/context/ranges-context'
 import { isDeleteChange, isInsertChange } from '@/utils/operations'
 import { canAggregate } from './can-aggregate'
-import { Change, EditOperation } from '../../../../../services/web/types/change'
+import { Change, EditOperation } from '../../../../types/change'
 
 export function numberOfChangesInSelection(
   ranges: Ranges | undefined,

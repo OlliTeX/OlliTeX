@@ -1,12 +1,12 @@
 import { merge, cloneDeep } from 'lodash'
 import { type FetchMock } from 'fetch-mock'
-import { UserEmailData } from '../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../types/user-email'
 import {
   Institution,
   Notification,
-} from '../../../../services/web/types/project/dashboard/notification'
-import { DeepPartial, DeepReadonly } from '../../../../services/web/types/utils'
-import { Project } from '../../../../services/web/types/project/dashboard/api'
+} from '../../../types/project/dashboard/notification'
+import { DeepPartial, DeepReadonly } from '../../../types/utils'
+import { Project } from '../../../types/project/dashboard/api'
 import getMeta from '@/utils/meta'
 
 const MOCK_DELAY = 1000

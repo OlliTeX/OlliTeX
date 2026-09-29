@@ -1065,17 +1065,17 @@ function buildSettings() {
     createFileModes: [
     Path.resolve(
       __dirname,
-      '../modules/zotero/frontend/js/components/zotero-create-file'
+      '../../../frontend/modules/zotero/frontend/js/components/zotero-create-file'
     ),
     // Mendeley reference connector (2026-09-07): "New file > Mendeley" import
     Path.resolve(
       __dirname,
-      '../modules/mendeley/frontend/js/components/mendeley-create-file'
+      '../../../frontend/modules/mendeley/frontend/js/components/mendeley-create-file'
     ),
       // [IVd] diagram module: "New file > Diagram (SVG)" entry
     Path.resolve(
       __dirname,
-      '../modules/diagram/frontend/js/components/create-diagram-file'
+      '../../../frontend/modules/diagram/frontend/js/components/create-diagram-file'
     ),
     ],
     // [IVd] Buttons rendered next to the download button in the file view header
@@ -1083,7 +1083,7 @@ function buildSettings() {
     fileViewButtons: [
       Path.resolve(
         __dirname,
-        '../modules/toast-image/frontend/js/components/toast-image-editor'
+        '../../../frontend/modules/toast-image/frontend/js/components/toast-image-editor'
       ),
     ],
     devToolbar: [],
@@ -1096,25 +1096,25 @@ function buildSettings() {
     tprFileViewInfo: [
     Path.resolve(
       __dirname,
-      '../modules/zotero/frontend/js/components/tpr-file-view-info'
+      '../../../frontend/modules/zotero/frontend/js/components/tpr-file-view-info'
     ),
     ],
     tprFileViewRefreshError: [
     Path.resolve(
       __dirname,
-      '../modules/zotero/frontend/js/components/tpr-file-view-refresh-error'
+      '../../../frontend/modules/zotero/frontend/js/components/tpr-file-view-refresh-error'
     ),
     ],
     tprFileViewRefreshButton: [
     Path.resolve(
       __dirname,
-      '../modules/zotero/frontend/js/components/tpr-file-view-refresh-button'
+      '../../../frontend/modules/zotero/frontend/js/components/tpr-file-view-refresh-button'
     ),
     ],
     tprFileViewNotOriginalImporter: [
     Path.resolve(
       __dirname,
-      '../modules/zotero/frontend/js/components/tpr-file-view-not-original-importer'
+      '../../../frontend/modules/zotero/frontend/js/components/tpr-file-view-not-original-importer'
     ),
     ],
     contactUsModal: [],
@@ -1125,37 +1125,37 @@ function buildSettings() {
       // (nothing ever emitted the entries event).
       Path.resolve(
         __dirname,
-        '../modules/bib-editor/frontend/js/extensions/bib-editor-extension'
+        '../../../frontend/modules/bib-editor/frontend/js/extensions/bib-editor-extension'
       ),
       // overleaf-lab (LLM port): inline LaTeX completion.
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/extensions/llm-inline-completion'
+        '../../../frontend/modules/llm/frontend/js/extensions/llm-inline-completion'
       ),
       // overleaf-lab (grammar port): CM6 grammar-checking extension (LanguageTool
       // + optional LLM suggestions, per-user mode from /user/llm-settings/grammar).
       Path.resolve(
         __dirname,
-        '../modules/languagetool/frontend/js/grammar-extension'
+        '../../../frontend/modules/languagetool/frontend/js/grammar-extension'
       ),
     ],
     sourceEditorVisualExtensions: [],
     sourceEditorComponents: [
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/components/llm-source-editor-component'
+        '../../../frontend/modules/llm/frontend/js/components/llm-source-editor-component'
       ),
     ],
     pdfLogEntryHeaderActionComponents: [
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/components/pdf-log-entry-ask-ai-button'
+        '../../../frontend/modules/llm/frontend/js/components/pdf-log-entry-ask-ai-button'
       ),
     ],
     pdfLogEntryComponents: [
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/components/pdf-llm-compile-fix-card'
+        '../../../frontend/modules/llm/frontend/js/components/pdf-llm-compile-fix-card'
       ),
     ],
     pdfLogEntriesComponents: [],
@@ -1167,7 +1167,7 @@ function buildSettings() {
       // 6.3.0 mounts module components from this key via symbol-palette-pane.tsx.
       Path.resolve(
         __dirname,
-        '../modules/symbol-palette/frontend/components/symbol-palette-panel'
+        '../../../frontend/modules/symbol-palette/frontend/components/symbol-palette-panel'
       ),
     ],
     sourceEditorToolbarStartButtons: [
@@ -1175,7 +1175,7 @@ function buildSettings() {
       // (smart_toy) button — opens the LLM context menu.
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/extensions/llm-editor-toolbar-ask-ai'
+        '../../../frontend/modules/llm/frontend/js/extensions/llm-editor-toolbar-ask-ai'
       ),
     ],
     sourceEditorToolbarButtonGroups: [
@@ -1185,7 +1185,7 @@ function buildSettings() {
       // flag states.
       Path.resolve(
         __dirname,
-        '../modules/typst/frontend/js/components/typst-toolbar-buttons'
+        '../../../frontend/modules/typst/frontend/js/components/typst-toolbar-buttons'
       ),
     ],
     sourceEditorToolbarComponents: [],
@@ -1196,26 +1196,26 @@ function buildSettings() {
       // for .bib).
       Path.resolve(
         __dirname,
-        '../modules/tex-autoformatter/frontend/components/autoformat-button'
+        '../../../frontend/modules/tex-autoformatter/frontend/components/autoformat-button'
       ),
     
       // [IVc] latex-editor module: open the floating equation-editor (MathLive).
       Path.resolve(
         __dirname,
-        '../modules/latex-editor/frontend/js/components/latex-editor-toolbar-button'
+        '../../../frontend/modules/latex-editor/frontend/js/components/latex-editor-toolbar-button'
       ),
 
 ],
     rootContextProviders: [
       Path.resolve(
         __dirname,
-        '../modules/bib-editor/frontend/js/context/bib-editor-provider.tsx'
+        '../../../frontend/modules/bib-editor/frontend/js/context/bib-editor-provider.tsx'
       ),
     ],
     mainEditorLayoutModals: [
     Path.resolve(
       __dirname,
-      '../modules/reference-picker/frontend/components/reference-picker-controller.tsx'
+      '../../../frontend/modules/reference-picker/frontend/components/reference-picker-controller.tsx'
     ),
     ],
     mainEditorLayoutPanels: [],
@@ -1226,7 +1226,7 @@ function buildSettings() {
       // split test (gated in core editor.tsx).
       Path.resolve(
         __dirname,
-        '../modules/python-runner/frontend/js/components/layout/python-editor-split'
+        '../../../frontend/modules/python-runner/frontend/js/components/layout/python-editor-split'
       ),
     ],
     langFeedbackLinkingWidgets: [],
@@ -1234,38 +1234,38 @@ function buildSettings() {
     integrationLinkingWidgets: [
     Path.resolve(
       __dirname,
-      '../modules/github-sync/frontend/js/components/github-sync-widget.tsx'
+      '../../../frontend/modules/github-sync/frontend/js/components/github-sync-widget.tsx'
     ),
       // [III]: WebDAV (Nextcloud) + Dropbox project mirroring widgets
     Path.resolve(
       __dirname,
-      '../modules/webdav/frontend/js/components/webdav-widget.tsx'
+      '../../../frontend/modules/webdav/frontend/js/components/webdav-widget.tsx'
     ),
     Path.resolve(
       __dirname,
-      '../modules/dropbox/frontend/js/components/dropbox-widget.tsx'
+      '../../../frontend/modules/dropbox/frontend/js/components/dropbox-widget.tsx'
     ),
     ],
     referenceLinkingWidgets: [
     Path.resolve(
       __dirname,
-      '../modules/zotero/frontend/js/components/zotero-widget'
+      '../../../frontend/modules/zotero/frontend/js/components/zotero-widget'
     ),
     Path.resolve(
       __dirname,
-      '../modules/mendeley/frontend/js/components/mendeley-widget'
+      '../../../frontend/modules/mendeley/frontend/js/components/mendeley-widget'
     ),
     ],
     importProjectFromGithubModalWrapper: [
     Path.resolve(
       __dirname,
-      '../modules/github-sync/frontend/js/components/import-from-github-modal-wrapper.tsx'
+      '../../../frontend/modules/github-sync/frontend/js/components/import-from-github-modal-wrapper.tsx'
     ),
     ],
     importProjectFromGithubMenu: [
     Path.resolve(
       __dirname,
-      '../modules/github-sync/frontend/js/components/import-from-github-menu.tsx'
+      '../../../frontend/modules/github-sync/frontend/js/components/import-from-github-menu.tsx'
     ),
     ],
     // Typst: "Typst project" new-project entry + modal. Runtime visibility
@@ -1273,26 +1273,26 @@ function buildSettings() {
     typstNewProjectMenu: [
       Path.resolve(
         __dirname,
-        '../modules/typst/frontend/js/components/typst-new-project-menu.tsx'
+        '../../../frontend/modules/typst/frontend/js/components/typst-new-project-menu.tsx'
       ),
     ],
     typstNewProjectModalWrapper: [
       Path.resolve(
         __dirname,
-        '../modules/typst/frontend/js/components/typst-new-project-modal-wrapper.tsx'
+        '../../../frontend/modules/typst/frontend/js/components/typst-new-project-modal-wrapper.tsx'
       ),
     ],
     // [III]: import-project-from-Nextcloud/WebDAV modal + navbar menu entry
     importProjectFromWebdavModalWrapper: [
     Path.resolve(
       __dirname,
-      '../modules/webdav/frontend/js/components/import-from-webdav-modal-wrapper.tsx'
+      '../../../frontend/modules/webdav/frontend/js/components/import-from-webdav-modal-wrapper.tsx'
     ),
     ],
     importProjectFromWebdavMenu: [
     Path.resolve(
       __dirname,
-      '../modules/webdav/frontend/js/components/import-from-webdav-menu.tsx'
+      '../../../frontend/modules/webdav/frontend/js/components/import-from-webdav-menu.tsx'
     ),
     ],
     editorLeftMenuSync: [],
@@ -1300,13 +1300,13 @@ function buildSettings() {
     menubarExtraComponents: [
     Path.resolve(
       __dirname,
-      '../modules/template-gallery/frontend/js/features/template/components/menubar-manage-template'
+      '../../../frontend/modules/template-gallery/frontend/js/features/template/components/menubar-manage-template'
     ),
       // overleaf-lab: LLM whole-document generators (title/abstract/keywords) registered
       // for the Generate group (see insertMenuSections below).
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/extensions/llm-file-menu-commands'
+        '../../../frontend/modules/llm/frontend/js/extensions/llm-file-menu-commands'
       ),
     ],
     insertMenuSections: [
@@ -1315,7 +1315,7 @@ function buildSettings() {
       // to the INSERT menu — upstream-style placement for AI tools.
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/extensions/llm-insert-menu-section'
+        '../../../frontend/modules/llm/frontend/js/extensions/llm-insert-menu-section'
       ),
     ],
     // overleaf-lab: BYO LLM provider management embedded in Account Settings (reviewer #2);
@@ -1323,13 +1323,13 @@ function buildSettings() {
     llmUserSettingsSection: [
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/components/llm-settings-section'
+        '../../../frontend/modules/llm/frontend/js/components/llm-settings-section'
       ),
     ],
     oauth2Server: [
     Path.resolve(
       __dirname,
-      '../modules/git-bridge/frontend/js/widget/components/git-integration-widget.tsx'
+      '../../../frontend/modules/git-bridge/frontend/js/widget/components/git-integration-widget.tsx'
     ),
     ],
     managedGroupSubscriptionEnrollmentNotification: [],
@@ -1342,12 +1342,12 @@ function buildSettings() {
     visualEditorProviders: [
       Path.resolve(
         __dirname,
-        '../modules/bib-editor/frontend/js/bib-editor-visual-provider.ts'
+        '../../../frontend/modules/bib-editor/frontend/js/bib-editor-visual-provider.ts'
       ),
       // [IVd] SVG diagram editor (maxGraph canvas) claims *.svg files
       Path.resolve(
         __dirname,
-        '../modules/diagram/frontend/js/visual-editor-provider'
+        '../../../frontend/modules/diagram/frontend/js/visual-editor-provider'
       ),
     ],
     usGovBanner: [],
@@ -1357,7 +1357,7 @@ function buildSettings() {
     autoCompleteExtensions: [
     Path.resolve(
       __dirname,
-      '../modules/reference-picker/frontend/extensions/reference-picker-keybinding.ts'
+      '../../../frontend/modules/reference-picker/frontend/extensions/reference-picker-keybinding.ts'
     ),
     ],
     sectionTitleGenerators: [],
@@ -1376,52 +1376,52 @@ function buildSettings() {
       // destroys the whole editor tree (regression fixed 2026-09-06).
       Path.resolve(
         __dirname,
-        '../modules/python-runner/frontend/js/components/editor/python/python-output-toasts'
+        '../../../frontend/modules/python-runner/frontend/js/components/editor/python/python-output-toasts'
       ),
     ],
     editorSidebarComponents: [
       Path.resolve(
         __dirname,
-        '../modules/full-project-search/frontend/js/components/full-project-search.tsx'
+        '../../../frontend/modules/full-project-search/frontend/js/components/full-project-search.tsx'
       ),
     ],
     fileTreeToolbarComponents: [
       Path.resolve(
         __dirname,
-        '../modules/full-project-search/frontend/js/components/full-project-search-button.tsx'
+        '../../../frontend/modules/full-project-search/frontend/js/components/full-project-search-button.tsx'
       ),
     ],
     fullProjectSearchPanel: [
       Path.resolve(
         __dirname,
-        '../modules/full-project-search/frontend/js/components/full-project-search.tsx'
+        '../../../frontend/modules/full-project-search/frontend/js/components/full-project-search.tsx'
       ),
     ],
     integrationPanelComponents: [
     Path.resolve(
       __dirname,
-      '../modules/github-sync/frontend/js/components/github-integration-card.tsx'
+      '../../../frontend/modules/github-sync/frontend/js/components/github-integration-card.tsx'
     ),
     Path.resolve(
       __dirname,
-      '../modules/git-bridge/frontend/js/card/components/git-integration-card.tsx'
+      '../../../frontend/modules/git-bridge/frontend/js/card/components/git-integration-card.tsx'
     ),
     Path.resolve(
       __dirname,
-      '../modules/zotero/frontend/js/components/zotero-integration-card.tsx'
+      '../../../frontend/modules/zotero/frontend/js/components/zotero-integration-card.tsx'
     ),
     Path.resolve(
       __dirname,
-      '../modules/mendeley/frontend/js/components/mendeley-integration-card'
+      '../../../frontend/modules/mendeley/frontend/js/components/mendeley-integration-card'
     ),
     // [III]: WebDAV (Nextcloud) + Dropbox integration cards in the Integrations panel
     Path.resolve(
       __dirname,
-      '../modules/webdav/frontend/js/components/webdav-integration-card.tsx'
+      '../../../frontend/modules/webdav/frontend/js/components/webdav-integration-card.tsx'
     ),
     Path.resolve(
       __dirname,
-      '../modules/dropbox/frontend/js/components/dropbox-integration-card.tsx'
+      '../../../frontend/modules/dropbox/frontend/js/components/dropbox-integration-card.tsx'
     ),
     ],
     referenceSearchSetting: [],
@@ -1431,27 +1431,27 @@ function buildSettings() {
       // overleaf-lab: floating-menu "Ask AI" action (LLM context menu).
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/extensions/llm-fm-ask-ai.tsx'
+        '../../../frontend/modules/llm/frontend/js/extensions/llm-fm-ask-ai.tsx'
       ),
     ],
     errorLogsComponents: [],
     referenceIndices: [
     Path.resolve(
       __dirname,
-      '../modules/reference-picker/frontend/reference-index/advanced-reference-index.ts'
+      '../../../frontend/modules/reference-picker/frontend/reference-index/advanced-reference-index.ts'
     ),
     ],
     railEntries: [
       // overleaf-lab: LLM chat/compliance side rails.
       Path.resolve(
         __dirname,
-        '../modules/llm/frontend/js/components/llm-rail-pane'
+        '../../../frontend/modules/llm/frontend/js/components/llm-rail-pane'
       ),
       // Symbol palette: the classic palette module only (2026-09-03 owner X:
       // the redesigned "new" palette tab was a duplicate — removed).
       Path.resolve(
         __dirname,
-        '../modules/symbol-palette/frontend/components/symbol-palette-rail-entry'
+        '../../../frontend/modules/symbol-palette/frontend/components/symbol-palette-rail-entry'
       ),
     ],
     railPopovers: [],

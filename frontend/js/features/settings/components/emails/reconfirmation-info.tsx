@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { UserEmailData } from '../../../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../../../types/user-email'
 import getMeta from '../../../../utils/meta'
 import ReconfirmationInfoSuccess from './reconfirmation-info/reconfirmation-info-success'
 import ReconfirmationInfoPromptText from './reconfirmation-info/reconfirmation-info-prompt-text'

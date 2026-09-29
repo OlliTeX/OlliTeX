@@ -1,8 +1,8 @@
-import type { ProjectCompiler } from '../../../../../services/web/types/project-settings'
+import type { ProjectCompiler } from '../../../../types/project-settings'
 import { sendMB } from '../../../infrastructure/event-tracking'
 import { postJSON } from '../../../infrastructure/fetch-json'
 import { debugConsole } from '@/utils/debugging'
-import { UserSettings } from '../../../../../services/web/types/user-settings'
+import { UserSettings } from '../../../../types/user-settings'
 
 export interface ProjectSettings {
   compiler: ProjectCompiler

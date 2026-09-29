@@ -7,7 +7,7 @@ import {
 import { saveUserSettings } from '@/features/ide-settings/utils/api'
 import CustomKeybindingsModal from './custom-keybindings-modal'
 import OLButton from '@/shared/components/ol/ol-button'
-import { UserSettings } from '../../../../../services/web/types/user-settings'
+import { UserSettings } from '../../../../types/user-settings'
 
 const OPTIONS: {
   value: UserSettings['mode']

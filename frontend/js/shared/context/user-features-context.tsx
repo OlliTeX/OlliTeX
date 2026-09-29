@@ -6,7 +6,7 @@ import {
   useEffect,
   useState,
 } from 'react'
-import { User } from '../../../../services/web/types/user'
+import { User } from '../../../types/user'
 import { useUserContext } from './user-context'
 import { useReceiveUser } from '../hooks/user-channel/use-receive-user'
 import { getJSON } from '@/infrastructure/fetch-json'

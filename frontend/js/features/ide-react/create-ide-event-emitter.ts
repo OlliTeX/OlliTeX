@@ -1,4 +1,4 @@
-import { Project } from '../../../../services/web/types/project'
+import { Project } from '../../../types/project'
 import { PermissionsLevel } from '@/features/ide-react/types/permissions'
 import type { DocumentContainer } from '@/features/ide-react/editor/document-container'
 import { GotoLineOptions } from '@/features/ide-react/types/goto-line-options'

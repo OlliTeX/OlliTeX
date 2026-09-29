@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Sort } from '../../../../../../services/web/types/project/dashboard/api'
+import { Sort } from '../../../../../types/project/dashboard/api'
 
 type SortBtnOwnProps = {
   column: string

@@ -1,6 +1,6 @@
 import { Meta, User } from './shared'
 import { Label } from './label'
-import { Nullable } from '../../../../../../services/web/types/utils'
+import { Nullable } from '../../../../../types/utils'
 
 export type Version = number
 

@@ -16,7 +16,7 @@ import {
   isValidKeyString,
   keyStringFromKeyboardEvent,
 } from '@/shared/keybinding-actions'
-import type { Keybindings } from '../../../../../services/web/types/user-settings'
+import type { Keybindings } from '../../../../types/user-settings'
 
 /**
  * 2026-09-09 (owner R9 #4): custom key bindings manager (mysettings).

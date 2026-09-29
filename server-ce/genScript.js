@@ -9,7 +9,8 @@ switch (process.argv.pop()) {
     break
   case 'compile':
     for (const service of services) {
-      console.log('pushd', `services/${service.name}`)
+      const dir = service.dir || `services/${service.name}`
+      console.log('pushd', dir)
       switch (service.name) {
         case 'web':
           // precompile pug in background

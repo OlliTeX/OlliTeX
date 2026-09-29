@@ -1,4 +1,4 @@
-import { UserRef } from '../../../../../services/web/types/project/dashboard/api'
+import { UserRef } from '../../../../types/project/dashboard/api'
 import getMeta from '@/utils/meta'
 
 export function getUserName(user: UserRef) {

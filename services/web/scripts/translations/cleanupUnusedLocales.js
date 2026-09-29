@@ -36,7 +36,7 @@ async function main() {
     find . -type f \
       -not -path './cypress/results/*' \
       -not -path './data/*' \
-      -not -path '../frontend/extracted-translations.json' \
+      -not -path './extracted-translations.json' \\
       -not -path '../locales/*' \
       -not -path './public/*' \
       -not -path '*/node_modules/*' \

@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react'
 import PolymorphicComponent, {
   PolymorphicComponentProps,
 } from '@/shared/components/polymorphic-component'
-import { MergeAndOverride } from '../../../../services/web/types/utils'
+import { MergeAndOverride } from '../../../types/utils'
 
 // Performs a click event on elements that has been clicked,
 // but when releasing the mouse button are no longer hovered

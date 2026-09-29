@@ -1,0 +1,697 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.2" width="16.01mm" height="14.57mm" viewBox="0 0 1601 1457" preserveAspectRatio="xMidYMid" fill-rule="evenodd" stroke-width="28.222" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" xmlns:ooo="http://xml.openoffice.org/svg/export" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:presentation="http://sun.com/xmlns/staroffice/presentation" xmlns:smil="http://www.w3.org/2001/SMIL20/" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xml:space="preserve">
+ <defs class="ClipPathGroup">
+  <clipPath id="presentation_clip_path" clipPathUnits="userSpaceOnUse">
+   <rect x="0" y="0" width="1601" height="1457"/>
+  </clipPath>
+  <clipPath id="presentation_clip_path_shrink" clipPathUnits="userSpaceOnUse">
+   <rect x="1" y="1" width="1598" height="1455"/>
+  </clipPath>
+ </defs>
+ <defs class="TextShapeIndex">
+  <g ooo:slide="id1" ooo:id-list="id3"/>
+ </defs>
+ <defs class="EmbeddedBulletChars">
+  <g id="bullet-char-template-57356" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M 580,1141 L 1163,571 580,0 -4,571 580,1141 Z"/>
+  </g>
+  <g id="bullet-char-template-57354" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M 8,1128 L 1137,1128 1137,0 8,0 8,1128 Z"/>
+  </g>
+  <g id="bullet-char-template-10146" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M 174,0 L 602,739 174,1481 1456,739 174,0 Z M 1358,739 L 309,1346 659,739 1358,739 Z"/>
+  </g>
+  <g id="bullet-char-template-10132" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M 2015,739 L 1276,0 717,0 1260,543 174,543 174,936 1260,936 717,1481 1274,1481 2015,739 Z"/>
+  </g>
+  <g id="bullet-char-template-10007" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M 0,-2 C -7,14 -16,27 -25,37 L 356,567 C 262,823 215,952 215,954 215,979 228,992 255,992 264,992 276,990 289,987 310,991 331,999 354,1012 L 381,999 492,748 772,1049 836,1024 860,1049 C 881,1039 901,1025 922,1006 886,937 835,863 770,784 769,783 710,716 594,584 L 774,223 C 774,196 753,168 711,139 L 727,119 C 717,90 699,76 672,76 641,76 570,178 457,381 L 164,-76 C 142,-110 111,-127 72,-127 30,-127 9,-110 8,-76 1,-67 -2,-52 -2,-32 -2,-23 -1,-13 0,-2 Z"/>
+  </g>
+  <g id="bullet-char-template-10004" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M 285,-33 C 182,-33 111,30 74,156 52,228 41,333 41,471 41,549 55,616 82,672 116,743 169,778 240,778 293,778 328,747 346,684 L 369,508 C 377,444 397,411 428,410 L 1163,1116 C 1174,1127 1196,1133 1229,1133 1271,1133 1292,1118 1292,1087 L 1292,965 C 1292,929 1282,901 1262,881 L 442,47 C 390,-6 338,-33 285,-33 Z"/>
+  </g>
+  <g id="bullet-char-template-9679" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M 813,0 C 632,0 489,54 383,161 276,268 223,411 223,592 223,773 276,916 383,1023 489,1130 632,1184 813,1184 992,1184 1136,1130 1245,1023 1353,916 1407,772 1407,592 1407,412 1353,268 1245,161 1136,54 992,0 813,0 Z"/>
+  </g>
+  <g id="bullet-char-template-8226" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M 346,457 C 273,457 209,483 155,535 101,586 74,649 74,723 74,796 101,859 155,911 209,963 273,989 346,989 419,989 480,963 531,910 582,859 608,796 608,723 608,648 583,586 532,535 482,483 420,457 346,457 Z"/>
+  </g>
+  <g id="bullet-char-template-8211" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M -4,459 L 1135,459 1135,606 -4,606 -4,459 Z"/>
+  </g>
+  <g id="bullet-char-template-61548" transform="scale(0.00048828125,-0.00048828125)">
+   <path d="M 173,740 C 173,903 231,1043 346,1159 462,1274 601,1332 765,1332 928,1332 1067,1274 1183,1159 1299,1043 1357,903 1357,740 1357,577 1299,437 1183,322 1067,206 928,148 765,148 601,148 462,206 346,322 231,437 173,577 173,740 Z"/>
+  </g>
+ </defs>
+ <g>
+  <g id="id2" class="Master_Slide">
+   <g id="bg-id2" class="Background"/>
+   <g id="bo-id2" class="BackgroundObjects"/>
+  </g>
+ </g>
+ <g class="SlideGroup">
+  <g>
+   <g id="container-id1">
+    <g id="id1" class="Slide" clip-path="url(#presentation_clip_path)">
+     <g class="Page">
+      <g class="Graphic">
+       <g id="id3">
+        <rect class="BoundingBox" stroke="none" fill="none" x="118" y="-279" width="1364" height="1773"/>
+        <g style="opacity: 0.219607843137255">
+         <image x="384" y="78" width="831" height="1337" preserveAspectRatio="none" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAzCAYAAAD2OArBAAAACXBIWXMAAAsTAAALEwEAmpwYAAAEYUlEQVRYhcWYbXcaRRTHf7BAQqA0aVLTNrb1NLWN+kL9/p/Bqi/0WE80ja1pTJqHUkgIAdYX93/PDivIDkp6z5mzMDtz53+f72yJeCoBNaCpUQK6QAfoAWkMs2QOABVgFfgMeA48EKArjVEssxgqAys69GvgK0yIX3VwD3gPDBcFoAKsAU+Bb4FvNNcE2sCZQFxS0BQxAEqY9PeAZ8AOsI1pZQC8Bd4A55gpCmmhHAGgAtwGHgKf67mmufsC81hz1aJMYwDUxPwR8Kl+1zRWgS2BWgeWMY3NpNAEZf2vavMQuCZT5bKYbwF3gUZwSF3vHgAbetfR3kR8K5hfDDSGeQAVoCVGdaCPeXRbvxuS+hNM7Us57bT0bgNzynMBbGm9h+qZePaANASwBGwCX+g5AA6A18ApcEfgVgUwzCFlaei2QK4JdBMzy5YAvMNC9lpgxgDUdMgO8KUYHgAvgX3MNPclUSg9jGfHTSxJbWIm2dFzIF7nwF8CPcr7QB2z77YYbAv9Phbb7vmTvDwBbmFOCmbSR8ATaeYEU/+K3pV8kVOKOUYq6Tc0VjGv70rC9SkAPEU/xXJFHfOJdb2/EO8RQboOAVxjjhEWlQaZc/YDLU1KYL6uogOWJG1NPK8kxKXOSicB6EhVbW1oilE1QF1mcow7OPePRHOpwHcwE3wgKFp5AG3gCPPWDma7ihjNSlolHZqvsENM/Sfi+16AUkftNBC6Q+BPLPSuZhxahDz2DzDvb+usfwBIhfQIeKUNbSJK6wQaYkK9Bf4QgG7IM6/WPqaqV8CewER3OaIUc7hjLIz3MRP0CKIgb69UI8E8+A5Z5osp3e54nvm+A37CTHvxbwDQSwdRJ+v9apqbVeVSzO6nwC7wPfAD8BuWBa/DxZMAeEIaCIxXSAeQkFW1PkFMa18XU/su8CPwAvgFs/+Y+qcBQIs8MV3poBFZKfXe70TPS41zrCt6KalfAD9jTjjmfE7T7DrCbHWgTW1J8ARLyw0BudRaz+++Zw9T+Z72dQhCL6RZ9vQy67X+HuNNR5msflxg8X6oQ4/JmtSJhxcB4GsSAWlg1fIhpo27YnwM/I5J/w5Td4/MP6aGcZHQcofzQpJi4dnCyrWH3AUm+QlZJM3MH7Gx7equYmZ4rHfHmvPoKUyxFxMwk1Qxx2tpbkVzMV323AC8qRiShdWQTO03BiDsbPz3jQFwfwg1UMjp/i8AbgKX+kZNkAcBH8EEkzQwT8/wn53wo2ogPPRGfaBE1pp7LSkzvV1fCAA/aDRlfqEA/DuC3xecT5WsZStsiujczbj6/SD/CFGkZxyjeTVQw3qDpv7fwhpY/7qycABVso45EZhlblADDmCFrH33rjma2bwUFp+5ChHMp4Eh1oL1NBKsVesT2Q3NC6CP9YenGomeHwiu3YsE4NftN9glNsHufN6CL/xzPRjwGllLviswZ0SaYR4A+XvgIfYt8YjczbcIReduURXLAS1MiC7B188YRn8DaxJ6bnM1kxAAAAAASUVORK5CYII="/>
+        </g>
+        <defs>
+         <clipPath id="clip_path_1" clipPathUnits="userSpaceOnUse">
+          <path d="M 752,743 C 752,723 847,723 847,743 L 837,1097 C 837,1114 762,1114 762,1097 L 752,743 Z "/>
+         </clipPath>
+        </defs>
+        <g clip-path="url(#clip_path_1)">
+         <path fill="rgb(15,13,11)" stroke="none" d="M 745,728 L 769,728 769,1110 745,1110 745,728 Z "/>
+         <path fill="rgb(24,21,17)" stroke="none" d="M 756,728 L 780,728 780,1110 756,1110 756,728 Z "/>
+         <path fill="rgb(33,28,24)" stroke="none" d="M 767,728 L 791,728 791,1110 767,1110 767,728 Z "/>
+         <path fill="rgb(42,36,30)" stroke="none" d="M 777,728 L 801,728 801,1110 777,1110 777,728 Z "/>
+         <path fill="rgb(51,44,36)" stroke="none" d="M 788,728 L 811,728 811,1110 788,1110 788,728 Z "/>
+         <path fill="rgb(42,36,29)" stroke="none" d="M 798,728 L 822,728 822,1110 798,1110 798,728 Z "/>
+         <path fill="rgb(35,30,24)" stroke="none" d="M 808,728 L 832,728 832,1110 808,1110 808,728 Z "/>
+         <path fill="rgb(28,24,20)" stroke="none" d="M 819,728 L 843,728 843,1110 819,1110 819,728 Z "/>
+         <path fill="rgb(22,19,16)" stroke="none" d="M 830,728 L 854,728 854,1110 830,1110 830,728 Z "/>
+        </g>
+        <defs>
+         <clipPath id="clip_path_2" clipPathUnits="userSpaceOnUse">
+          <path d="M 800,1117 L 844,1117 C 849,1117 854,1113 854,1107 L 854,1097 C 854,1091 849,1087 844,1087 L 755,1087 C 750,1087 745,1091 745,1097 L 745,1107 C 745,1113 750,1117 755,1117 L 800,1117 Z "/>
+         </clipPath>
+        </defs>
+        <g clip-path="url(#clip_path_2)">
+         <path fill="rgb(138,106,46)" stroke="none" d="M 719,1087 L 810,1087 810,1117 719,1117 719,1087 Z "/>
+         <path fill="rgb(239,213,153)" stroke="none" d="M 757,1087 L 831,1087 831,1117 757,1117 757,1087 Z "/>
+         <path fill="rgb(216,180,97)" stroke="none" d="M 778,1087 L 880,1087 880,1117 778,1117 778,1087 Z "/>
+        </g>
+        <defs>
+         <clipPath id="clip_path_3" clipPathUnits="userSpaceOnUse">
+          <path d="M 759,1121 C 738,1206 745,1270 772,1321 783,1345 800,1365 800,1365 800,1365 816,1345 827,1321 854,1270 861,1206 840,1121 L 759,1121 Z "/>
+         </clipPath>
+        </defs>
+        <g clip-path="url(#clip_path_3)">
+         <path fill="rgb(138,106,46)" stroke="none" d="M 735,1121 L 777,1121 777,1365 735,1365 735,1121 Z "/>
+         <path fill="rgb(189,160,99)" stroke="none" d="M 754,1121 L 795,1121 795,1365 754,1365 754,1121 Z "/>
+         <path fill="rgb(239,213,153)" stroke="none" d="M 772,1121 L 816,1121 816,1365 772,1365 772,1121 Z "/>
+         <path fill="rgb(216,180,97)" stroke="none" d="M 793,1121 L 832,1121 832,1365 793,1365 793,1121 Z "/>
+         <path fill="rgb(190,155,80)" stroke="none" d="M 809,1121 L 848,1121 848,1365 809,1365 809,1121 Z "/>
+         <path fill="rgb(164,131,63)" stroke="none" d="M 825,1121 L 864,1121 864,1365 825,1365 825,1121 Z "/>
+        </g>
+        <path fill="none" stroke="rgb(95,73,30)" stroke-width="3" stroke-linejoin="miter" d="M 759,1121 C 738,1206 745,1270 772,1321 783,1345 800,1365 800,1365 800,1365 816,1345 827,1321 854,1270 861,1206 840,1121 L 759,1121 Z "/>
+        <path fill="none" stroke="rgb(58,46,19)" stroke-width="5" stroke-linejoin="miter" d="M 800,1144 L 800,1328 "/>
+        <path fill="none" stroke="rgb(95,73,30)" stroke-width="4" stroke-linejoin="miter" d="M 811,1195 C 811,1197 811,1199 810,1201 808,1203 807,1204 805,1205 804,1206 802,1207 800,1207 797,1207 795,1206 794,1205 792,1204 791,1203 789,1201 788,1199 788,1197 788,1195 788,1193 788,1191 789,1190 791,1188 792,1186 794,1185 795,1184 797,1184 800,1184 802,1184 804,1184 805,1185 807,1186 808,1188 810,1190 811,1191 811,1193 811,1195 Z "/>
+        <defs>
+         <clipPath id="clip_path_4" clipPathUnits="userSpaceOnUse">
+          <path d="M 768,696 C 800,599 777,502 705,429 641,352 562,307 499,297 484,359 496,450 544,538 585,631 666,690 768,696 L 768,696 Z "/>
+         </clipPath>
+        </defs>
+        <g clip-path="url(#clip_path_4)">
+         <path fill="rgb(107,155,110)" stroke="none" d="M 574,226 L 608,276 438,390 405,340 574,226 Z "/>
+         <path fill="rgb(102,151,106)" stroke="none" d="M 589,248 L 622,298 453,412 420,362 589,248 Z "/>
+         <path fill="rgb(98,147,103)" stroke="none" d="M 603,270 L 637,320 468,434 434,384 603,270 Z "/>
+         <path fill="rgb(93,143,99)" stroke="none" d="M 618,292 L 652,342 483,456 449,406 618,292 Z "/>
+         <path fill="rgb(88,139,95)" stroke="none" d="M 633,314 L 667,364 498,478 464,428 633,314 Z "/>
+         <path fill="rgb(84,136,92)" stroke="none" d="M 648,336 L 682,386 513,500 479,450 648,336 Z "/>
+         <path fill="rgb(79,132,88)" stroke="none" d="M 663,358 L 696,408 527,522 494,472 663,358 Z "/>
+         <path fill="rgb(74,128,84)" stroke="none" d="M 677,380 L 711,430 542,544 508,494 677,380 Z "/>
+         <path fill="rgb(69,124,80)" stroke="none" d="M 692,402 L 726,452 557,566 523,516 692,402 Z "/>
+         <path fill="rgb(65,120,77)" stroke="none" d="M 707,424 L 741,474 572,588 538,538 707,424 Z "/>
+         <path fill="rgb(60,116,73)" stroke="none" d="M 722,446 L 754,494 585,608 553,560 722,446 Z "/>
+         <path fill="rgb(57,111,69)" stroke="none" d="M 735,465 L 768,513 599,628 566,580 735,465 Z "/>
+         <path fill="rgb(53,105,66)" stroke="none" d="M 749,485 L 781,533 612,648 580,600 749,485 Z "/>
+         <path fill="rgb(50,100,62)" stroke="none" d="M 762,505 L 795,553 626,668 593,620 762,505 Z "/>
+         <path fill="rgb(47,95,59)" stroke="none" d="M 776,525 L 808,573 639,688 607,640 776,525 Z "/>
+         <path fill="rgb(43,89,55)" stroke="none" d="M 789,545 L 822,593 653,707 620,659 789,545 Z "/>
+         <path fill="rgb(40,84,52)" stroke="none" d="M 803,565 L 835,613 666,727 634,679 803,565 Z "/>
+         <path fill="rgb(37,79,48)" stroke="none" d="M 816,585 L 849,633 679,747 647,699 816,585 Z "/>
+         <path fill="rgb(33,73,45)" stroke="none" d="M 830,605 L 862,653 693,767 661,719 830,605 Z "/>
+        </g>
+        <path fill="none" stroke="rgb(22,50,31)" stroke-width="5" stroke-linejoin="miter" d="M 768,696 C 800,599 777,502 705,429 641,352 562,307 499,297 484,359 496,450 544,538 585,631 666,690 768,696 Z "/>
+        <path fill="rgb(255,255,255)" fill-opacity="0.161" stroke="none" d="M 522,364 C 559,453 606,534 683,614 669,567 624,465 522,364 L 522,364 Z "/>
+        <g style="opacity: 0.850980392156863">
+         <defs>
+          <clipPath id="clip_path_5" clipPathUnits="userSpaceOnUse">
+           <path d="M 768,691 C 768,692 768,692 768,693 767,693 767,694 766,694 766,694 765,695 765,695 764,695 763,695 763,694 762,694 762,694 762,693 719,627 676,562 632,497 589,432 544,368 499,304 499,304 499,303 499,302 499,302 499,301 499,301 499,300 500,300 500,299 501,299 501,299 502,299 503,299 503,299 504,299 504,299 505,300 505,300 550,364 594,428 638,493 682,558 725,624 767,689 768,690 768,690 768,691 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_5)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 485,265 L 555,370 548,375 477,271 485,265 Z "/>
+          <path fill="rgb(217,235,209)" stroke="none" d="M 514,309 L 585,414 577,419 506,315 514,309 Z "/>
+          <path fill="rgb(211,231,202)" stroke="none" d="M 544,353 L 614,458 607,463 536,358 544,353 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 573,397 L 644,502 636,507 566,402 573,397 Z "/>
+          <path fill="rgb(199,222,188)" stroke="none" d="M 603,441 L 673,546 666,551 595,446 603,441 Z "/>
+          <path fill="rgb(193,217,182)" stroke="none" d="M 632,485 L 703,590 695,595 625,490 632,485 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 662,529 L 733,633 725,639 654,534 662,529 Z "/>
+          <path fill="rgb(181,208,168)" stroke="none" d="M 692,573 L 762,677 755,683 684,578 692,573 Z "/>
+          <path fill="rgb(175,204,161)" stroke="none" d="M 721,616 L 792,721 784,726 713,622 721,616 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_6" clipPathUnits="userSpaceOnUse">
+           <path d="M 723,627 C 723,627 723,627 724,627 724,627 724,628 724,628 725,628 725,629 725,629 725,629 724,630 724,630 724,630 724,631 724,631 723,631 723,631 722,631 L 649,628 C 648,628 648,628 648,628 647,627 647,627 647,627 647,626 647,626 647,626 647,625 647,625 647,625 647,624 648,624 648,624 648,624 649,624 649,624 L 723,627 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_6)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 696,585 L 706,601 653,636 643,621 696,585 Z "/>
+          <path fill="rgb(214,233,206)" stroke="none" d="M 700,592 L 711,607 658,643 647,627 700,592 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 705,599 L 715,614 662,650 652,634 705,599 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 709,605 L 719,621 667,656 656,641 709,605 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 713,612 L 724,627 671,663 661,647 713,612 Z "/>
+          <path fill="rgb(178,206,164)" stroke="none" d="M 718,618 L 728,634 676,669 665,654 718,618 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_7" clipPathUnits="userSpaceOnUse">
+           <path d="M 724,630 C 724,630 724,630 724,630 724,631 723,631 723,631 723,631 722,631 722,631 722,631 721,630 721,630 721,630 721,630 721,629 720,629 721,629 721,628 L 745,559 C 746,558 746,558 746,558 746,558 747,557 747,557 747,557 748,557 748,557 748,558 749,558 749,558 749,558 749,559 749,559 749,559 749,560 749,560 L 724,630 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_7)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 745,552 L 755,568 703,603 692,588 745,552 Z "/>
+          <path fill="rgb(214,233,206)" stroke="none" d="M 749,559 L 760,574 707,610 697,594 749,559 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 754,565 L 764,581 712,616 701,601 754,565 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 758,572 L 769,587 716,623 706,607 758,572 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 763,579 L 773,594 721,630 710,614 763,579 Z "/>
+          <path fill="rgb(178,206,164)" stroke="none" d="M 767,585 L 778,601 725,636 715,621 767,585 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_8" clipPathUnits="userSpaceOnUse">
+           <path d="M 677,559 C 677,559 678,559 678,560 678,560 679,560 679,560 679,561 679,561 679,561 679,562 679,562 679,562 679,563 679,563 678,563 678,563 678,563 677,563 L 588,571 C 588,571 587,571 587,571 587,571 586,570 586,570 586,570 586,569 586,569 586,569 586,568 586,568 586,568 586,567 587,567 587,567 587,567 588,567 L 677,559 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_8)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 651,519 L 659,531 591,577 583,565 651,519 Z "/>
+          <path fill="rgb(216,235,208)" stroke="none" d="M 654,524 L 662,536 594,582 586,570 654,524 Z "/>
+          <path fill="rgb(210,230,201)" stroke="none" d="M 658,529 L 666,541 597,587 589,575 658,529 Z "/>
+          <path fill="rgb(203,225,193)" stroke="none" d="M 661,534 L 669,546 601,592 593,580 661,534 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 664,539 L 672,551 604,597 596,585 664,539 Z "/>
+          <path fill="rgb(189,214,177)" stroke="none" d="M 668,544 L 676,556 607,602 599,590 668,544 Z "/>
+          <path fill="rgb(183,209,170)" stroke="none" d="M 671,549 L 679,560 611,607 603,595 671,549 Z "/>
+          <path fill="rgb(176,204,162)" stroke="none" d="M 674,554 L 682,565 614,611 606,600 674,554 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_9" clipPathUnits="userSpaceOnUse">
+           <path d="M 679,562 C 679,563 679,563 678,563 678,563 678,563 677,563 677,564 676,563 676,563 676,563 676,563 675,563 675,562 675,562 675,562 675,561 675,561 675,561 L 716,480 C 716,480 716,480 716,480 717,480 717,479 717,479 718,479 718,479 718,480 719,480 719,480 719,480 719,481 719,481 719,481 719,482 719,482 719,482 L 679,562 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_9)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 716,475 L 724,487 655,533 647,521 716,475 Z "/>
+          <path fill="rgb(216,235,208)" stroke="none" d="M 719,480 L 727,492 659,538 651,526 719,480 Z "/>
+          <path fill="rgb(210,230,201)" stroke="none" d="M 722,485 L 730,497 662,543 654,531 722,485 Z "/>
+          <path fill="rgb(203,225,193)" stroke="none" d="M 726,490 L 734,502 665,548 657,536 726,490 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 729,495 L 737,507 669,553 661,541 729,495 Z "/>
+          <path fill="rgb(189,214,177)" stroke="none" d="M 732,500 L 740,512 672,558 664,546 732,500 Z "/>
+          <path fill="rgb(183,209,170)" stroke="none" d="M 736,505 L 744,517 676,563 668,551 736,505 Z "/>
+          <path fill="rgb(176,204,162)" stroke="none" d="M 739,510 L 747,522 679,568 671,556 739,510 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.650980392156863">
+         <defs>
+          <clipPath id="clip_path_10" clipPathUnits="userSpaceOnUse">
+           <path d="M 631,492 C 632,492 632,492 632,492 633,492 633,493 633,493 633,493 633,493 633,494 634,494 633,494 633,495 633,495 633,495 633,496 633,496 632,496 632,496 L 549,507 C 548,507 548,507 548,507 547,506 547,506 547,506 547,506 547,505 547,505 547,505 547,504 547,504 547,504 547,504 547,503 548,503 548,503 548,503 L 631,492 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_10)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 609,457 L 617,468 551,512 544,501 609,457 Z "/>
+          <path fill="rgb(215,234,207)" stroke="none" d="M 612,462 L 620,473 555,517 547,506 612,462 Z "/>
+          <path fill="rgb(208,228,198)" stroke="none" d="M 616,467 L 623,478 558,522 550,511 616,467 Z "/>
+          <path fill="rgb(200,222,189)" stroke="none" d="M 619,472 L 626,483 561,527 554,516 619,472 Z "/>
+          <path fill="rgb(192,217,181)" stroke="none" d="M 622,477 L 630,488 564,532 557,521 622,477 Z "/>
+          <path fill="rgb(184,211,172)" stroke="none" d="M 626,482 L 633,493 568,537 560,526 626,482 Z "/>
+          <path fill="rgb(177,205,163)" stroke="none" d="M 629,487 L 636,498 571,542 564,531 629,487 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.650980392156863">
+         <defs>
+          <clipPath id="clip_path_11" clipPathUnits="userSpaceOnUse">
+           <path d="M 633,495 C 633,495 633,495 633,496 632,496 632,496 632,496 631,496 631,496 631,496 630,495 630,495 630,495 630,495 630,494 630,494 630,494 630,493 630,493 L 671,420 C 671,420 672,419 672,419 672,419 673,419 673,419 673,419 674,419 674,419 674,419 674,420 674,420 675,420 675,421 675,421 675,421 675,422 674,422 L 633,495 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_11)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 671,415 L 679,426 613,470 606,459 671,415 Z "/>
+          <path fill="rgb(215,234,207)" stroke="none" d="M 675,420 L 682,431 617,475 609,464 675,420 Z "/>
+          <path fill="rgb(208,228,198)" stroke="none" d="M 678,425 L 685,436 620,480 613,469 678,425 Z "/>
+          <path fill="rgb(200,222,189)" stroke="none" d="M 681,430 L 689,441 623,485 616,474 681,430 Z "/>
+          <path fill="rgb(192,217,181)" stroke="none" d="M 684,435 L 692,446 627,490 619,479 684,435 Z "/>
+          <path fill="rgb(184,211,172)" stroke="none" d="M 688,440 L 695,451 630,495 622,484 688,440 Z "/>
+          <path fill="rgb(177,205,163)" stroke="none" d="M 691,445 L 699,456 633,500 626,489 691,445 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.6">
+         <defs>
+          <clipPath id="clip_path_12" clipPathUnits="userSpaceOnUse">
+           <path d="M 588,427 C 588,427 588,427 589,428 589,428 589,428 589,428 590,428 590,429 590,429 590,429 590,430 589,430 589,430 589,430 589,431 589,431 588,431 588,431 L 526,435 C 526,435 526,435 526,435 525,434 525,434 525,434 525,434 525,433 525,433 525,433 525,432 525,432 525,432 525,432 525,432 526,431 526,431 526,431 L 588,427 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_12)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 568,397 L 577,410 530,442 522,429 568,397 Z "/>
+          <path fill="rgb(212,232,204)" stroke="none" d="M 572,403 L 581,416 534,448 525,435 572,403 Z "/>
+          <path fill="rgb(201,224,191)" stroke="none" d="M 576,409 L 585,422 538,453 529,440 576,409 Z "/>
+          <path fill="rgb(191,215,179)" stroke="none" d="M 580,414 L 589,427 542,459 533,446 580,414 Z "/>
+          <path fill="rgb(180,207,166)" stroke="none" d="M 584,420 L 593,433 546,465 537,452 584,420 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.6">
+         <defs>
+          <clipPath id="clip_path_13" clipPathUnits="userSpaceOnUse">
+           <path d="M 589,430 C 589,430 589,430 589,431 589,431 588,431 588,431 588,431 587,431 587,431 587,431 587,430 586,430 586,430 586,430 586,429 586,429 586,429 586,428 L 613,373 C 613,372 613,372 614,372 614,372 614,372 614,372 615,372 615,372 615,372 616,372 616,372 616,372 616,373 616,373 616,373 616,374 616,374 616,374 L 589,430 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_13)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 613,367 L 621,380 574,412 566,399 613,367 Z "/>
+          <path fill="rgb(212,232,204)" stroke="none" d="M 616,373 L 625,386 578,418 569,405 616,373 Z "/>
+          <path fill="rgb(201,224,191)" stroke="none" d="M 620,379 L 629,392 582,424 573,411 620,379 Z "/>
+          <path fill="rgb(191,215,179)" stroke="none" d="M 624,385 L 633,398 586,429 577,416 624,385 Z "/>
+          <path fill="rgb(180,207,166)" stroke="none" d="M 628,390 L 637,404 590,435 581,422 628,390 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.549019607843137">
+         <defs>
+          <clipPath id="clip_path_14" clipPathUnits="userSpaceOnUse">
+           <path d="M 548,368 C 548,368 548,368 549,368 549,368 549,369 549,369 549,369 549,369 549,370 549,370 549,370 549,370 549,371 549,371 548,371 548,371 548,371 548,371 L 512,369 C 512,369 511,369 511,368 511,368 511,368 511,368 511,368 511,367 511,367 511,367 511,366 511,366 511,366 511,366 511,366 512,366 512,366 512,366 L 548,368 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_14)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 533,344 L 544,361 518,378 507,362 533,344 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 537,351 L 548,368 522,385 511,369 537,351 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 542,358 L 553,375 527,392 516,376 542,358 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.549019607843137">
+         <defs>
+          <clipPath id="clip_path_15" clipPathUnits="userSpaceOnUse">
+           <path d="M 549,370 C 549,370 549,370 549,371 549,371 548,371 548,371 548,371 547,371 547,371 547,371 547,371 547,371 546,370 546,370 546,370 546,370 546,369 546,369 L 557,335 C 557,335 558,335 558,334 558,334 558,334 558,334 559,334 559,334 559,334 560,334 560,334 560,335 560,335 560,335 560,335 560,336 560,336 560,336 L 549,370 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_15)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 556,329 L 567,345 541,363 530,346 556,329 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 561,336 L 572,352 546,369 535,353 561,336 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 565,343 L 576,359 550,376 539,360 565,343 Z "/>
+         </g>
+        </g>
+        <defs>
+         <clipPath id="clip_path_16" clipPathUnits="userSpaceOnUse">
+          <path d="M 831,696 C 933,690 1014,631 1055,538 1103,450 1115,359 1100,297 1037,307 958,352 894,429 822,502 799,599 831,696 L 831,696 Z "/>
+         </clipPath>
+        </defs>
+        <g clip-path="url(#clip_path_16)">
+         <path fill="rgb(107,155,110)" stroke="none" d="M 1189,348 L 1175,369 1006,255 1020,234 1189,348 Z "/>
+         <path fill="rgb(105,153,109)" stroke="none" d="M 1183,357 L 1169,377 1000,263 1014,243 1183,357 Z "/>
+         <path fill="rgb(103,152,107)" stroke="none" d="M 1177,366 L 1163,386 994,272 1008,251 1177,366 Z "/>
+         <path fill="rgb(101,150,106)" stroke="none" d="M 1171,374 L 1157,395 988,281 1002,260 1171,374 Z "/>
+         <path fill="rgb(99,149,104)" stroke="none" d="M 1165,383 L 1151,404 982,290 996,269 1165,383 Z "/>
+         <path fill="rgb(98,147,103)" stroke="none" d="M 1159,392 L 1145,413 976,298 990,278 1159,392 Z "/>
+         <path fill="rgb(96,146,101)" stroke="none" d="M 1153,401 L 1139,421 970,307 984,287 1153,401 Z "/>
+         <path fill="rgb(94,144,100)" stroke="none" d="M 1147,410 L 1133,430 964,316 978,295 1147,410 Z "/>
+         <path fill="rgb(92,143,98)" stroke="none" d="M 1141,418 L 1127,439 958,325 972,304 1141,418 Z "/>
+         <path fill="rgb(90,141,97)" stroke="none" d="M 1135,427 L 1122,448 953,334 966,313 1135,427 Z "/>
+         <path fill="rgb(88,139,95)" stroke="none" d="M 1130,436 L 1116,457 947,342 960,322 1130,436 Z "/>
+         <path fill="rgb(86,138,94)" stroke="none" d="M 1124,445 L 1110,465 941,351 955,331 1124,445 Z "/>
+         <path fill="rgb(84,136,92)" stroke="none" d="M 1118,453 L 1104,474 935,360 949,339 1118,453 Z "/>
+         <path fill="rgb(83,135,91)" stroke="none" d="M 1112,462 L 1098,483 929,369 943,348 1112,462 Z "/>
+         <path fill="rgb(81,133,89)" stroke="none" d="M 1106,471 L 1092,492 923,378 937,357 1106,471 Z "/>
+         <path fill="rgb(79,132,88)" stroke="none" d="M 1100,480 L 1086,500 917,386 931,366 1100,480 Z "/>
+         <path fill="rgb(77,130,86)" stroke="none" d="M 1094,489 L 1080,509 911,395 925,375 1094,489 Z "/>
+         <path fill="rgb(75,128,85)" stroke="none" d="M 1088,497 L 1074,518 905,404 919,383 1088,497 Z "/>
+         <path fill="rgb(73,127,83)" stroke="none" d="M 1082,506 L 1068,527 899,413 913,392 1082,506 Z "/>
+         <path fill="rgb(71,125,82)" stroke="none" d="M 1076,515 L 1062,536 893,421 907,401 1076,515 Z "/>
+         <path fill="rgb(69,124,80)" stroke="none" d="M 1070,524 L 1056,544 887,430 901,410 1070,524 Z "/>
+         <path fill="rgb(68,122,79)" stroke="none" d="M 1064,533 L 1050,553 881,439 895,418 1064,533 Z "/>
+         <path fill="rgb(66,121,77)" stroke="none" d="M 1058,541 L 1045,562 875,448 889,427 1058,541 Z "/>
+         <path fill="rgb(64,119,76)" stroke="none" d="M 1053,550 L 1039,571 870,457 883,436 1053,550 Z "/>
+         <path fill="rgb(62,118,74)" stroke="none" d="M 1047,559 L 1033,580 864,465 878,445 1047,559 Z "/>
+         <path fill="rgb(60,116,73)" stroke="none" d="M 1041,568 L 1027,589 858,474 872,454 1041,568 Z "/>
+         <path fill="rgb(59,114,71)" stroke="none" d="M 1035,577 L 1021,598 852,483 866,463 1035,577 Z "/>
+         <path fill="rgb(57,111,70)" stroke="none" d="M 1029,586 L 1015,607 845,492 859,472 1029,586 Z "/>
+         <path fill="rgb(56,109,68)" stroke="none" d="M 1022,595 L 1008,615 839,501 853,481 1022,595 Z "/>
+         <path fill="rgb(54,106,67)" stroke="none" d="M 1016,604 L 1002,624 833,510 847,490 1016,604 Z "/>
+         <path fill="rgb(53,104,65)" stroke="none" d="M 1010,613 L 996,633 827,519 841,499 1010,613 Z "/>
+         <path fill="rgb(51,102,63)" stroke="none" d="M 1004,622 L 990,642 821,528 835,508 1004,622 Z "/>
+         <path fill="rgb(50,99,62)" stroke="none" d="M 998,631 L 984,651 815,537 829,517 998,631 Z "/>
+         <path fill="rgb(48,97,60)" stroke="none" d="M 992,640 L 978,660 809,546 823,526 992,640 Z "/>
+         <path fill="rgb(47,94,59)" stroke="none" d="M 986,649 L 972,669 803,555 817,535 986,649 Z "/>
+         <path fill="rgb(45,92,57)" stroke="none" d="M 980,658 L 966,678 797,564 811,544 980,658 Z "/>
+         <path fill="rgb(44,90,55)" stroke="none" d="M 974,667 L 960,687 791,573 805,552 974,667 Z "/>
+         <path fill="rgb(42,87,54)" stroke="none" d="M 968,676 L 954,696 785,582 799,561 968,676 Z "/>
+         <path fill="rgb(41,85,52)" stroke="none" d="M 962,685 L 948,705 779,591 793,570 962,685 Z "/>
+         <path fill="rgb(39,82,51)" stroke="none" d="M 956,694 L 942,714 773,600 787,579 956,694 Z "/>
+         <path fill="rgb(37,80,49)" stroke="none" d="M 950,703 L 936,723 767,609 781,588 950,703 Z "/>
+         <path fill="rgb(36,78,47)" stroke="none" d="M 944,712 L 930,732 761,618 775,597 944,712 Z "/>
+         <path fill="rgb(34,75,46)" stroke="none" d="M 938,721 L 924,741 755,627 769,606 938,721 Z "/>
+         <path fill="rgb(33,73,44)" stroke="none" d="M 932,730 L 918,750 749,636 763,615 932,730 Z "/>
+         <path fill="rgb(31,70,43)" stroke="none" d="M 926,739 L 912,759 742,645 756,624 926,739 Z "/>
+        </g>
+        <path fill="none" stroke="rgb(22,50,31)" stroke-width="5" stroke-linejoin="miter" d="M 831,696 C 933,690 1014,631 1055,538 1103,450 1115,359 1100,297 1037,307 958,352 894,429 822,502 799,599 831,696 Z "/>
+        <path fill="rgb(255,255,255)" fill-opacity="0.161" stroke="none" d="M 1046,343 C 978,411 921,485 875,586 914,556 991,476 1046,343 L 1046,343 Z "/>
+        <g style="opacity: 0.850980392156863">
+         <defs>
+          <clipPath id="clip_path_17" clipPathUnits="userSpaceOnUse">
+           <path d="M 836,694 C 835,695 835,695 834,695 834,695 833,694 832,694 832,694 832,693 831,693 831,692 831,691 831,691 831,690 831,690 832,689 877,625 921,561 965,496 1008,431 1051,366 1094,300 1094,300 1095,299 1095,299 1096,299 1096,299 1097,299 1098,299 1098,299 1099,299 1099,299 1100,300 1100,300 1100,301 1100,302 1100,302 1100,303 1100,303 1100,304 1057,370 1014,435 970,500 927,565 882,629 837,693 837,694 836,694 836,694 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_17)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 1107,297 L 1094,317 1086,312 1100,291 1107,297 Z "/>
+          <path fill="rgb(222,239,215)" stroke="none" d="M 1102,305 L 1088,326 1080,321 1094,300 1102,305 Z "/>
+          <path fill="rgb(221,238,213)" stroke="none" d="M 1096,314 L 1082,335 1074,330 1088,309 1096,314 Z "/>
+          <path fill="rgb(219,237,212)" stroke="none" d="M 1090,323 L 1076,343 1068,338 1082,318 1090,323 Z "/>
+          <path fill="rgb(218,236,210)" stroke="none" d="M 1084,332 L 1070,352 1062,347 1076,326 1084,332 Z "/>
+          <path fill="rgb(217,235,209)" stroke="none" d="M 1078,340 L 1064,361 1056,356 1070,335 1078,340 Z "/>
+          <path fill="rgb(216,235,208)" stroke="none" d="M 1072,349 L 1058,370 1050,365 1064,344 1072,349 Z "/>
+          <path fill="rgb(215,234,206)" stroke="none" d="M 1066,358 L 1052,379 1045,373 1058,353 1066,358 Z "/>
+          <path fill="rgb(213,233,205)" stroke="none" d="M 1060,367 L 1046,387 1039,382 1053,362 1060,367 Z "/>
+          <path fill="rgb(212,232,204)" stroke="none" d="M 1054,375 L 1040,396 1033,391 1047,370 1054,375 Z "/>
+          <path fill="rgb(211,231,202)" stroke="none" d="M 1048,384 L 1034,405 1027,400 1041,379 1048,384 Z "/>
+          <path fill="rgb(210,230,201)" stroke="none" d="M 1042,393 L 1029,414 1021,408 1035,388 1042,393 Z "/>
+          <path fill="rgb(209,229,199)" stroke="none" d="M 1037,402 L 1023,422 1015,417 1029,397 1037,402 Z "/>
+          <path fill="rgb(207,228,198)" stroke="none" d="M 1031,411 L 1017,431 1009,426 1023,405 1031,411 Z "/>
+          <path fill="rgb(206,227,197)" stroke="none" d="M 1025,419 L 1011,440 1003,435 1017,414 1025,419 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 1019,428 L 1005,449 997,444 1011,423 1019,428 Z "/>
+          <path fill="rgb(204,225,194)" stroke="none" d="M 1013,437 L 999,457 991,452 1005,432 1013,437 Z "/>
+          <path fill="rgb(203,225,193)" stroke="none" d="M 1007,446 L 993,466 985,461 999,441 1007,446 Z "/>
+          <path fill="rgb(201,224,191)" stroke="none" d="M 1001,454 L 987,475 979,470 993,449 1001,454 Z "/>
+          <path fill="rgb(200,223,190)" stroke="none" d="M 995,463 L 981,484 974,479 987,458 995,463 Z "/>
+          <path fill="rgb(199,222,188)" stroke="none" d="M 989,472 L 975,493 968,487 982,467 989,472 Z "/>
+          <path fill="rgb(198,221,187)" stroke="none" d="M 983,481 L 969,501 962,496 976,476 983,481 Z "/>
+          <path fill="rgb(197,220,186)" stroke="none" d="M 977,490 L 963,510 956,505 970,484 977,490 Z "/>
+          <path fill="rgb(195,219,184)" stroke="none" d="M 971,498 L 958,519 950,514 964,493 971,498 Z "/>
+          <path fill="rgb(194,218,183)" stroke="none" d="M 966,507 L 952,528 944,523 958,502 966,507 Z "/>
+          <path fill="rgb(193,217,182)" stroke="none" d="M 960,516 L 946,536 938,531 952,511 960,516 Z "/>
+          <path fill="rgb(192,216,180)" stroke="none" d="M 954,525 L 940,545 932,540 946,519 954,525 Z "/>
+          <path fill="rgb(191,215,179)" stroke="none" d="M 948,533 L 934,554 926,549 940,528 948,533 Z "/>
+          <path fill="rgb(189,214,177)" stroke="none" d="M 942,542 L 928,563 920,558 934,537 942,542 Z "/>
+          <path fill="rgb(188,214,176)" stroke="none" d="M 936,551 L 922,572 914,566 928,546 936,551 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 930,560 L 916,580 909,575 922,555 930,560 Z "/>
+          <path fill="rgb(186,212,173)" stroke="none" d="M 924,569 L 910,589 903,584 916,563 924,569 Z "/>
+          <path fill="rgb(185,211,172)" stroke="none" d="M 918,577 L 904,598 897,593 911,572 918,577 Z "/>
+          <path fill="rgb(183,210,171)" stroke="none" d="M 912,586 L 898,607 891,601 905,581 912,586 Z "/>
+          <path fill="rgb(182,209,169)" stroke="none" d="M 906,595 L 893,615 885,610 899,590 906,595 Z "/>
+          <path fill="rgb(181,208,168)" stroke="none" d="M 900,604 L 887,624 879,619 893,598 900,604 Z "/>
+          <path fill="rgb(180,207,166)" stroke="none" d="M 895,612 L 881,633 873,628 887,607 895,612 Z "/>
+          <path fill="rgb(179,206,165)" stroke="none" d="M 889,621 L 875,642 867,637 881,616 889,621 Z "/>
+          <path fill="rgb(177,205,164)" stroke="none" d="M 883,630 L 869,651 861,645 875,625 883,630 Z "/>
+          <path fill="rgb(176,204,162)" stroke="none" d="M 877,639 L 863,659 855,654 869,634 877,639 Z "/>
+          <path fill="rgb(175,204,161)" stroke="none" d="M 871,647 L 857,668 849,663 863,642 871,647 Z "/>
+          <path fill="rgb(174,203,160)" stroke="none" d="M 865,656 L 851,677 843,672 857,651 865,656 Z "/>
+          <path fill="rgb(173,202,158)" stroke="none" d="M 859,665 L 845,686 838,680 851,660 859,665 Z "/>
+          <path fill="rgb(171,201,157)" stroke="none" d="M 853,674 L 839,694 832,689 846,669 853,674 Z "/>
+          <path fill="rgb(170,200,155)" stroke="none" d="M 847,683 L 833,703 826,698 840,677 847,683 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_18" clipPathUnits="userSpaceOnUse">
+           <path d="M 878,628 C 878,629 879,629 878,629 878,630 878,630 878,630 878,630 877,631 877,631 877,631 876,631 876,631 876,631 875,631 875,630 875,630 875,630 875,630 L 850,560 C 850,560 850,559 850,559 850,559 850,558 850,558 850,558 851,558 851,557 851,557 852,557 852,557 852,557 853,558 853,558 853,558 853,558 854,559 L 878,628 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_18)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 908,586 L 893,608 840,572 855,551 908,586 Z "/>
+          <path fill="rgb(210,230,201)" stroke="none" d="M 901,596 L 886,618 834,582 848,561 901,596 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 894,606 L 880,628 827,592 842,570 894,606 Z "/>
+          <path fill="rgb(183,209,170)" stroke="none" d="M 888,616 L 873,638 820,602 835,580 888,616 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_19" clipPathUnits="userSpaceOnUse">
+           <path d="M 877,631 C 876,631 876,631 875,631 875,631 875,630 875,630 875,630 874,629 874,629 874,629 874,628 875,628 875,628 875,627 875,627 876,627 876,627 876,627 L 950,624 C 950,624 951,624 951,624 951,624 952,624 952,625 952,625 952,625 952,626 952,626 952,626 952,627 952,627 952,627 951,628 951,628 951,628 950,628 L 877,631 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_19)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 957,619 L 942,641 890,606 904,584 957,619 Z "/>
+          <path fill="rgb(210,230,201)" stroke="none" d="M 950,629 L 936,651 883,616 898,594 950,629 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 944,639 L 929,661 876,625 891,604 944,639 Z "/>
+          <path fill="rgb(183,209,170)" stroke="none" d="M 937,649 L 922,671 870,635 884,614 937,649 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_20" clipPathUnits="userSpaceOnUse">
+           <path d="M 924,561 C 924,561 924,561 924,562 924,562 924,562 924,563 923,563 923,563 923,563 923,563 922,564 922,563 921,563 921,563 921,563 920,563 920,563 920,562 L 880,482 C 880,482 880,482 880,481 880,481 880,481 880,480 880,480 880,480 881,480 881,479 881,479 882,479 882,479 882,480 883,480 883,480 883,480 883,480 L 924,561 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_20)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 953,519 L 939,540 870,494 885,473 953,519 Z "/>
+          <path fill="rgb(210,230,201)" stroke="none" d="M 947,529 L 932,550 864,504 878,483 947,529 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 940,539 L 925,560 857,514 872,493 940,539 Z "/>
+          <path fill="rgb(183,209,170)" stroke="none" d="M 933,548 L 918,570 850,524 865,502 933,548 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_21" clipPathUnits="userSpaceOnUse">
+           <path d="M 922,563 C 921,563 921,563 921,563 920,563 920,563 920,562 920,562 920,562 920,561 920,561 920,561 920,560 920,560 921,560 921,560 921,559 922,559 922,559 L 1011,567 C 1012,567 1012,567 1012,567 1013,567 1013,568 1013,568 1013,568 1013,569 1013,569 1013,569 1013,570 1013,570 1013,570 1012,571 1012,571 1012,571 1011,571 1011,571 L 922,563 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_21)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 1018,562 L 1003,584 935,538 950,516 1018,562 Z "/>
+          <path fill="rgb(210,230,201)" stroke="none" d="M 1011,572 L 997,594 928,548 943,526 1011,572 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 1005,582 L 990,604 922,558 936,536 1005,582 Z "/>
+          <path fill="rgb(183,209,170)" stroke="none" d="M 998,592 L 983,614 915,568 930,546 998,592 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.650980392156863">
+         <defs>
+          <clipPath id="clip_path_22" clipPathUnits="userSpaceOnUse">
+           <path d="M 969,493 C 969,493 969,494 969,494 969,494 969,495 969,495 969,495 969,495 968,496 968,496 968,496 967,496 967,496 967,496 966,496 966,495 966,495 966,495 L 925,422 C 924,422 924,421 924,421 924,421 924,420 925,420 925,420 925,419 925,419 925,419 926,419 926,419 926,419 927,419 927,419 927,419 928,420 928,420 L 969,493 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_22)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 995,456 L 981,477 916,433 930,412 995,456 Z "/>
+          <path fill="rgb(210,230,201)" stroke="none" d="M 989,465 L 975,485 910,441 924,421 989,465 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 983,474 L 970,494 904,450 918,429 983,474 Z "/>
+          <path fill="rgb(183,209,170)" stroke="none" d="M 978,482 L 964,503 899,458 912,438 978,482 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.650980392156863">
+         <defs>
+          <clipPath id="clip_path_23" clipPathUnits="userSpaceOnUse">
+           <path d="M 967,496 C 967,496 966,496 966,496 966,495 966,495 966,495 966,494 965,494 966,494 966,493 966,493 966,493 966,493 966,492 967,492 967,492 967,492 968,492 L 1051,503 C 1051,503 1051,503 1052,503 1052,504 1052,504 1052,504 1052,504 1052,505 1052,505 1052,505 1052,506 1052,506 1052,506 1052,506 1051,507 1051,507 1051,507 1050,507 L 967,496 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_23)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 1057,498 L 1043,519 978,475 992,454 1057,498 Z "/>
+          <path fill="rgb(210,230,201)" stroke="none" d="M 1051,507 L 1038,527 972,483 986,463 1051,507 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 1046,516 L 1032,536 967,492 980,471 1046,516 Z "/>
+          <path fill="rgb(183,209,170)" stroke="none" d="M 1040,524 L 1026,545 961,500 975,480 1040,524 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.6">
+         <defs>
+          <clipPath id="clip_path_24" clipPathUnits="userSpaceOnUse">
+           <path d="M 1013,428 C 1013,429 1013,429 1013,429 1013,430 1013,430 1013,430 1012,430 1012,431 1012,431 1012,431 1011,431 1011,431 1011,431 1010,431 1010,431 1010,430 1010,430 1010,430 L 983,374 C 983,374 983,374 983,373 983,373 983,373 983,372 983,372 983,372 984,372 984,372 984,372 985,372 985,372 985,372 985,372 986,372 986,372 986,373 L 1013,428 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_24)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 1035,397 L 1021,418 974,387 988,365 1035,397 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 1028,406 L 1014,428 967,396 982,375 1028,406 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 1022,416 L 1008,437 961,406 975,384 1022,416 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.6">
+         <defs>
+          <clipPath id="clip_path_25" clipPathUnits="userSpaceOnUse">
+           <path d="M 1011,431 C 1011,431 1010,431 1010,431 1010,430 1010,430 1010,430 1009,430 1009,429 1009,429 1009,429 1009,428 1010,428 1010,428 1010,428 1010,428 1011,427 1011,427 1011,427 L 1073,431 C 1073,431 1073,431 1074,432 1074,432 1074,432 1074,432 1074,432 1074,433 1074,433 1074,433 1074,434 1074,434 1074,434 1074,434 1073,435 1073,435 1073,435 1073,435 L 1011,431 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_25)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 1079,427 L 1065,448 1018,416 1032,395 1079,427 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 1073,436 L 1058,458 1011,426 1026,405 1073,436 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 1066,446 L 1052,467 1005,436 1019,414 1066,446 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.549019607843137">
+         <defs>
+          <clipPath id="clip_path_26" clipPathUnits="userSpaceOnUse">
+           <path d="M 1053,369 C 1053,369 1053,370 1053,370 1053,370 1053,370 1052,371 1052,371 1052,371 1052,371 1052,371 1051,371 1051,371 1051,371 1050,371 1050,371 1050,370 1050,370 1050,370 L 1039,336 C 1039,336 1039,336 1039,335 1039,335 1039,335 1039,335 1039,334 1039,334 1040,334 1040,334 1040,334 1041,334 1041,334 1041,334 1041,334 1041,335 1042,335 1042,335 L 1053,369 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_26)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 1070,345 L 1055,367 1029,350 1044,328 1070,345 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 1063,355 L 1048,378 1022,360 1037,338 1063,355 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.549019607843137">
+         <defs>
+          <clipPath id="clip_path_27" clipPathUnits="userSpaceOnUse">
+           <path d="M 1051,371 C 1051,371 1051,371 1051,371 1050,371 1050,371 1050,370 1050,370 1050,370 1050,370 1050,369 1050,369 1050,369 1050,369 1050,368 1050,368 1051,368 1051,368 1051,368 L 1087,366 C 1087,366 1087,366 1088,366 1088,366 1088,366 1088,366 1088,366 1088,367 1088,367 1088,367 1088,368 1088,368 1088,368 1088,368 1088,368 1088,369 1087,369 1087,369 L 1051,371 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_27)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 1093,361 L 1078,383 1052,365 1067,343 1093,361 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 1086,371 L 1071,393 1045,376 1060,354 1086,371 Z "/>
+         </g>
+        </g>
+        <defs>
+         <clipPath id="clip_path_28" clipPathUnits="userSpaceOnUse">
+          <path d="M 800,674 C 898,598 940,484 918,362 906,240 857,141 800,88 742,141 693,240 681,362 659,484 701,598 800,674 L 800,674 Z "/>
+         </clipPath>
+        </defs>
+        <g clip-path="url(#clip_path_28)">
+         <path fill="rgb(107,155,110)" stroke="none" d="M 924,61 L 924,155 675,155 675,61 924,61 Z "/>
+         <path fill="rgb(101,150,105)" stroke="none" d="M 924,102 L 924,195 675,195 675,102 924,102 Z "/>
+         <path fill="rgb(95,145,101)" stroke="none" d="M 924,142 L 924,235 675,235 675,142 924,142 Z "/>
+         <path fill="rgb(89,140,96)" stroke="none" d="M 924,182 L 924,276 675,276 675,182 924,182 Z "/>
+         <path fill="rgb(84,136,92)" stroke="none" d="M 924,223 L 924,316 675,316 675,223 924,223 Z "/>
+         <path fill="rgb(78,131,87)" stroke="none" d="M 924,263 L 924,356 675,356 675,263 924,263 Z "/>
+         <path fill="rgb(72,126,82)" stroke="none" d="M 924,303 L 924,397 675,397 675,303 924,303 Z "/>
+         <path fill="rgb(66,121,78)" stroke="none" d="M 924,344 L 924,437 675,437 675,344 924,344 Z "/>
+         <path fill="rgb(60,116,73)" stroke="none" d="M 924,384 L 924,475 675,475 675,384 924,384 Z "/>
+         <path fill="rgb(56,109,68)" stroke="none" d="M 924,422 L 924,512 675,512 675,422 924,422 Z "/>
+         <path fill="rgb(51,102,64)" stroke="none" d="M 924,459 L 924,550 675,550 675,459 924,459 Z "/>
+         <path fill="rgb(47,95,59)" stroke="none" d="M 924,497 L 924,588 675,588 675,497 924,497 Z "/>
+         <path fill="rgb(43,89,55)" stroke="none" d="M 924,535 L 924,626 675,626 675,535 924,535 Z "/>
+         <path fill="rgb(39,82,50)" stroke="none" d="M 924,573 L 924,663 675,663 675,573 924,573 Z "/>
+         <path fill="rgb(34,75,46)" stroke="none" d="M 924,610 L 924,701 675,701 675,610 924,610 Z "/>
+        </g>
+        <path fill="none" stroke="rgb(22,50,31)" stroke-width="6" stroke-linejoin="miter" d="M 800,674 C 898,598 940,484 918,362 906,240 857,141 800,88 742,141 693,240 681,362 659,484 701,598 800,674 Z "/>
+        <path fill="rgb(255,255,255)" fill-opacity="0.161" stroke="none" d="M 777,172 C 754,286 746,400 769,534 788,476 811,343 777,172 L 777,172 Z "/>
+        <g style="opacity: 0.850980392156863">
+         <defs>
+          <clipPath id="clip_path_29" clipPathUnits="userSpaceOnUse">
+           <path d="M 803,669 C 803,670 802,670 802,671 801,671 800,671 799,671 799,671 798,671 797,670 797,670 796,670 796,669 795,668 795,668 795,667 797,572 798,476 798,381 798,286 797,191 795,96 795,95 795,94 796,93 796,93 797,92 797,92 798,92 799,91 799,91 800,91 801,91 802,92 802,92 803,93 803,93 803,94 804,95 804,95 806,191 807,286 807,381 807,476 806,572 804,667 804,668 803,668 803,669 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_29)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 807,65 L 807,156 795,156 795,65 807,65 Z "/>
+          <path fill="rgb(219,237,212)" stroke="none" d="M 807,103 L 807,195 795,195 795,103 807,103 Z "/>
+          <path fill="rgb(216,235,208)" stroke="none" d="M 807,142 L 807,234 795,234 795,142 807,142 Z "/>
+          <path fill="rgb(212,232,204)" stroke="none" d="M 807,181 L 807,272 795,272 795,181 807,181 Z "/>
+          <path fill="rgb(209,229,199)" stroke="none" d="M 807,219 L 807,311 795,311 795,219 807,219 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 807,258 L 807,350 795,350 795,258 807,258 Z "/>
+          <path fill="rgb(201,224,191)" stroke="none" d="M 807,297 L 807,388 795,388 795,297 807,297 Z "/>
+          <path fill="rgb(198,221,187)" stroke="none" d="M 807,335 L 807,427 795,427 795,335 807,335 Z "/>
+          <path fill="rgb(194,218,183)" stroke="none" d="M 807,374 L 807,466 795,466 795,374 807,374 Z "/>
+          <path fill="rgb(191,215,179)" stroke="none" d="M 807,413 L 807,504 795,504 795,413 807,413 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 807,451 L 807,543 795,543 795,451 807,451 Z "/>
+          <path fill="rgb(183,210,171)" stroke="none" d="M 807,490 L 807,582 795,582 795,490 807,490 Z "/>
+          <path fill="rgb(180,207,166)" stroke="none" d="M 807,529 L 807,620 795,620 795,529 807,529 Z "/>
+          <path fill="rgb(176,204,162)" stroke="none" d="M 807,567 L 807,659 795,659 795,567 807,567 Z "/>
+          <path fill="rgb(173,202,158)" stroke="none" d="M 807,606 L 807,698 795,698 795,606 807,606 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_30" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,573 C 801,574 802,574 802,574 802,575 802,575 802,576 802,576 802,577 801,577 801,577 801,578 800,578 800,578 800,578 799,578 799,578 798,578 798,577 L 726,524 C 725,524 725,523 725,523 725,523 725,522 725,522 725,521 725,521 725,521 725,520 726,520 726,520 727,520 727,520 727,520 728,520 728,520 729,520 L 801,573 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_30)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 802,500 L 802,569 725,569 725,500 802,500 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 802,529 L 802,598 725,598 725,529 802,529 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_31" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,577 C 801,578 800,578 800,578 799,578 799,578 799,578 798,578 798,577 798,577 797,577 797,576 797,576 797,575 797,575 797,574 797,574 798,574 798,573 L 870,520 C 871,520 871,520 872,520 872,520 872,520 873,520 873,520 874,520 874,521 874,521 874,521 874,522 874,522 874,523 874,523 874,523 874,524 873,524 L 801,577 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_31)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 874,500 L 874,569 797,569 797,500 874,500 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 874,529 L 874,598 797,598 797,529 874,529 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_32" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,474 C 801,474 801,475 802,475 802,476 802,476 802,476 802,477 802,477 802,478 801,478 801,478 801,479 800,479 800,479 800,479 799,479 799,479 798,479 L 703,425 C 703,425 702,425 702,424 702,424 702,424 702,423 702,423 702,422 702,422 702,421 703,421 703,421 703,421 704,421 704,421 705,421 705,421 706,421 L 801,474 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_32)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 802,405 L 802,455 702,455 702,405 802,405 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 802,425 L 802,475 702,475 702,425 802,425 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 802,444 L 802,494 702,494 702,444 802,444 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.698039215686275">
+         <defs>
+          <clipPath id="clip_path_33" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,479 C 800,479 800,479 799,479 799,479 799,479 798,479 798,478 798,478 797,478 797,477 797,477 797,476 797,476 797,476 797,475 798,475 798,474 798,474 L 893,421 C 894,421 894,421 895,421 895,421 896,421 896,421 896,421 897,421 897,422 897,422 897,423 897,423 897,424 897,424 897,424 897,425 896,425 896,425 L 801,479 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_33)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 897,405 L 897,455 797,455 797,405 897,405 Z "/>
+          <path fill="rgb(205,226,195)" stroke="none" d="M 897,425 L 897,475 797,475 797,425 897,425 Z "/>
+          <path fill="rgb(187,213,175)" stroke="none" d="M 897,444 L 897,494 797,494 797,444 897,444 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.650980392156863">
+         <defs>
+          <clipPath id="clip_path_34" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,375 C 801,375 801,376 801,376 802,376 802,377 802,377 802,378 802,378 802,378 801,379 801,379 801,379 800,379 800,380 800,380 799,380 799,380 798,379 L 707,334 C 707,334 706,333 706,333 706,333 706,332 706,332 706,331 706,331 706,331 706,330 707,330 707,330 707,330 708,329 708,329 708,329 709,329 709,330 L 801,375 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_34)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 802,315 L 802,368 706,368 706,315 802,315 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 802,341 L 802,394 706,394 706,341 802,341 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.650980392156863">
+         <defs>
+          <clipPath id="clip_path_35" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,379 C 800,380 800,380 799,380 799,380 799,379 798,379 798,379 798,379 797,378 797,378 797,378 797,377 797,377 797,376 798,376 798,376 798,375 798,375 L 890,330 C 890,329 891,329 891,329 891,329 892,330 892,330 892,330 893,330 893,331 893,331 893,331 893,332 893,332 893,333 893,333 893,333 892,334 892,334 L 801,379 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_35)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 893,315 L 893,368 797,368 797,315 893,315 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 893,341 L 893,394 797,394 797,341 893,341 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.6">
+         <defs>
+          <clipPath id="clip_path_36" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,280 C 801,281 801,281 801,281 802,281 802,282 802,282 802,283 801,283 801,283 801,284 801,284 801,284 800,284 800,284 799,284 799,284 799,284 798,284 L 734,246 C 733,246 733,245 733,245 733,245 733,244 733,244 733,244 733,243 733,243 733,243 733,242 734,242 734,242 734,242 735,242 735,242 736,242 736,242 L 801,280 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_36)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 802,226 L 802,279 733,279 733,226 802,226 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 802,247 L 802,300 733,300 733,247 802,247 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.6">
+         <defs>
+          <clipPath id="clip_path_37" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,284 C 800,284 800,284 800,284 799,284 799,284 798,284 798,284 798,284 798,283 798,283 797,283 797,282 797,282 797,281 798,281 798,281 798,281 798,280 L 863,242 C 863,242 864,242 864,242 865,242 865,242 865,242 866,242 866,243 866,243 866,243 866,244 866,244 866,244 866,245 866,245 866,245 866,246 865,246 L 801,284 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_37)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 866,226 L 866,279 797,279 797,226 866,226 Z "/>
+          <path fill="rgb(196,220,185)" stroke="none" d="M 866,247 L 866,300 797,300 797,247 866,247 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.549019607843137">
+         <defs>
+          <clipPath id="clip_path_38" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,193 C 801,193 801,193 801,194 801,194 801,194 801,195 801,195 801,195 801,196 801,196 801,196 800,196 800,196 800,196 799,196 799,196 799,196 798,196 L 764,169 C 764,169 764,169 763,169 763,168 763,168 763,168 763,167 764,167 764,167 764,166 764,166 765,166 765,166 765,166 765,166 766,166 766,166 766,166 L 801,193 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_38)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 801,145 L 801,218 763,218 763,145 801,145 Z "/>
+         </g>
+        </g>
+        <g style="opacity: 0.549019607843137">
+         <defs>
+          <clipPath id="clip_path_39" clipPathUnits="userSpaceOnUse">
+           <path d="M 801,196 C 800,196 800,196 800,196 799,196 799,196 799,196 798,196 798,196 798,196 798,195 798,195 798,195 798,194 798,194 798,194 798,193 798,193 798,193 L 833,166 C 833,166 833,166 834,166 834,166 834,166 834,166 835,166 835,166 835,167 835,167 836,167 836,168 836,168 836,168 836,169 835,169 835,169 835,169 L 801,196 Z "/>
+          </clipPath>
+         </defs>
+         <g clip-path="url(#clip_path_39)">
+          <path fill="rgb(223,240,216)" stroke="none" d="M 836,145 L 836,218 798,218 798,145 836,145 Z "/>
+         </g>
+        </g>
+       </g>
+      </g>
+     </g>
+    </g>
+   </g>
+  </g>
+ </g>
+</svg>

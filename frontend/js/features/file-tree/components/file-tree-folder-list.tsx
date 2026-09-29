@@ -3,9 +3,9 @@ import classNames from 'classnames'
 import FileTreeDoc from './file-tree-doc'
 import FileTreeFolder from './file-tree-folder'
 import { fileCollator } from '../util/file-collator'
-import { Folder } from '../../../../../services/web/types/folder'
-import { Doc } from '../../../../../services/web/types/doc'
-import { FileRef } from '../../../../../services/web/types/file-ref'
+import { Folder } from '../../../../types/folder'
+import { Doc } from '../../../../types/doc'
+import { FileRef } from '../../../../types/file-ref'
 import { ConnectDropTarget } from 'react-dnd'
 
 type ExtendedFileRef = FileRef & { isFile: true }

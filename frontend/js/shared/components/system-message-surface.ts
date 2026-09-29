@@ -1,4 +1,4 @@
-import type { SystemMessage } from '../../../../services/web/types/system-message'
+import type { SystemMessage } from '../../../types/system-message'
 
 /**
  * #17b (owner 2026-09-13): per-message placement.

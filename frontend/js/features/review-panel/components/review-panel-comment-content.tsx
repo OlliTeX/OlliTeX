@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState } from 'react'
-import { Change, CommentOperation } from '../../../../../services/web/types/change'
+import { Change, CommentOperation } from '../../../../types/change'
 import { ReviewPanelMessage } from './review-panel-message'
 import { useTranslation } from 'react-i18next'
 import { useThreadsContext } from '../context/threads-context'
@@ -8,11 +8,11 @@ import {
   MentionsInputHandle,
 } from '@/shared/components/mentions-input'
 import ReviewPanelResolvedMessage from './review-panel-resolved-message'
-import { ReviewPanelResolvedCommentThread } from '../../../../../services/web/types/review-panel/comment-thread'
+import { ReviewPanelResolvedCommentThread } from '../../../../types/review-panel/comment-thread'
 import {
   CommentId,
   ThreadId,
-} from '../../../../../services/web/types/review-panel/review-panel'
+} from '../../../../types/review-panel/review-panel'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 
 export const ReviewPanelCommentContent = memo<{

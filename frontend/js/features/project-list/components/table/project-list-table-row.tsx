@@ -5,7 +5,7 @@ import LastUpdatedCell from './cells/last-updated-cell'
 import ActionsCell from './cells/actions-cell'
 import ActionsDropdown from '../dropdown/actions-dropdown'
 import { getOwnerName } from '../../util/project'
-import { Project } from '../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../types/project/dashboard/api'
 import { ProjectCheckbox } from './project-checkbox'
 import { ProjectListOwnerName } from '@/features/project-list/components/table/project-list-owner-name'
 

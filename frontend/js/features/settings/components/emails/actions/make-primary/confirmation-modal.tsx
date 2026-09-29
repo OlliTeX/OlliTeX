@@ -1,5 +1,5 @@
 import { useTranslation, Trans } from 'react-i18next'
-import { MergeAndOverride } from '../../../../../../../../services/web/types/utils'
+import { MergeAndOverride } from '../../../../../../../types/utils'
 import OLButton from '@/shared/components/ol/ol-button'
 import {
   OLModal,
@@ -8,7 +8,7 @@ import {
   OLModalHeader,
   OLModalTitle,
 } from '@/shared/components/ol/ol-modal'
-import { type UserEmailData } from '../../../../../../../../services/web/types/user-email'
+import { type UserEmailData } from '../../../../../../../types/user-email'
 
 type ConfirmationModalProps = MergeAndOverride<
   React.ComponentProps<typeof OLModal>,

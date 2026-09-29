@@ -37,7 +37,7 @@
 @import 'editor/editor-floating-menu';
 @import 'editor/table-generator';
 @import 'editor/math-preview';
-@import '../../../services/web/modules/latex-editor/frontend/stylesheets/equation-editor'; // [IVc]
+@import '../../modules/latex-editor/frontend/stylesheets/equation-editor'; // [IVc]
 @import 'editor/references-search';
 @import 'editor/editor-survey';
 @import 'editor/themed-tooltip';
@@ -58,12 +58,12 @@
 @import 'onboarding';
 @import 'admin/admin';
 @import 'admin/project-url-lookup';
-@import '../../../services/web/modules/ce-ui/frontend/styles/ce-navbar-consistent'; // CE fork (round 10): app navbar = solid user pages / red admin consoles (both themes)
+@import '../../modules/ce-ui/frontend/styles/ce-navbar-consistent'; // CE fork (round 10): app navbar = solid user pages / red admin consoles (both themes)
 // 2026-09 (P, owner): the gold card recipe (light surface in BOTH themes,
 // readable text/inputs) must be available on EVERY page family (llm pages,
 // mysettings, instance-stats, manage pages) — it was previously only loaded
 // inside the admin.scss bundle.
-@import '../../../services/web/modules/ce-ui/frontend/styles/ce-admin-ui';
+@import '../../modules/ce-ui/frontend/styles/ce-admin-ui';
 // 2026-09 (P/7, owner): the down-left account menu (.ds-nav-icon-dropdown,
 // .ds-nav-sidebar-lower) is part of the gold DS-nav family — make its look
 // GLOBAL so /admin/project (broken), /admin/llm/settings, /user/llm-settings
@@ -115,7 +115,7 @@
     }
   }
 }
-@import '../../../services/web/modules/ce-ui/frontend/styles/ce-admin-shells'; // CE fork (round 11): /admin/panel + /user/mysettings shells + theme selector
+@import '../../modules/ce-ui/frontend/styles/ce-admin-shells'; // CE fork (round 11): /admin/panel + /user/mysettings shells + theme selector
 @import 'add-secondary-email-prompt';
 @import 'bonus';
 @import 'portals';

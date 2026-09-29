@@ -5,7 +5,7 @@ import LeaveProjectModal from '../../../modals/leave-project-modal'
 import useIsMounted from '../../../../../../shared/hooks/use-is-mounted'
 import { useProjectListContext } from '../../../../context/project-list-context'
 import { leaveProject } from '../../../../util/api'
-import { Project } from '../../../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../../../types/project/dashboard/api'
 
 function LeaveProjectsButton() {
   const { t } = useTranslation()

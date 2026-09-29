@@ -36,7 +36,7 @@ import {
   DuplicateFilenameError,
   DuplicateFilenameMoveError,
 } from '../errors'
-import { Folder } from '../../../../../services/web/types/folder'
+import { Folder } from '../../../../types/folder'
 import { useReferencesContext } from '@/features/ide-react/context/references-context'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { FileTreeEntity } from '@ol-types/file-tree-entity'

@@ -11,7 +11,7 @@ import {
   AnyOperation,
   Change,
   DeleteOperation,
-} from '../../../../../services/web/types/change'
+} from '../../../../types/change'
 import { debugConsole } from '@/utils/debugging'
 import {
   isCommentOperation,

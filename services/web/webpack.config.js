@@ -10,30 +10,31 @@ const {
 } = require('./webpack-plugins/lezer-grammar-compiler')
 
 const PackageVersions = require('./app/src/infrastructure/PackageVersions.js')
-const invalidateBabelCacheIfNeeded = require('../../frontend/macros/invalidate-babel-cache-if-needed')
+const invalidateBabelCacheIfNeeded = require('./macros/invalidate-babel-cache-if-needed')
 
 // Make sure that babel-macros are re-evaluated after changing the modules config
 invalidateBabelCacheIfNeeded()
 
 // Generate a hash of entry points, including modules
 const entryPoints = {
-  bootstrap: '../../frontend/js/bootstrap.ts',
-  devToolbar: '../../frontend/js/dev-toolbar.ts',
-  'ide-detached': '../../frontend/js/ide-detached.ts',
-  marketing: '../../frontend/js/marketing.ts',
-  'main-style': '../../frontend/stylesheets/main-style.scss',
+  bootstrap: './js/bootstrap.ts',
+  devToolbar: './js/dev-toolbar.ts',
+  'ide-detached': './js/ide-detached.ts',
+  marketing: './js/marketing.ts',
+  'main-style': './stylesheets/main-style.scss',
   // OlliTeX kit (Option B): dedicated Tailwind stylesheet — see
   // frontend/stylesheets/olkit.scss + tailwind.config.js. Loaded as its own
   // file (layout-base.pug) so the Bootstrap app CSS stays untouched.
-  'olkit-style': '../../frontend/stylesheets/olkit.scss',
-  tracking: '../../frontend/js/infrastructure/tracking.ts',
-  'linkedin-insight': '../../frontend/js/infrastructure/linkedin-insight.ts',
-  highlight: '../../frontend/js/highlight.js',
+  'olkit-style': './stylesheets/olkit.scss',
+  tracking: './js/infrastructure/tracking.ts',
+  'linkedin-insight': './js/infrastructure/linkedin-insight.ts',
+  highlight: './js/highlight.js',
 }
 
 // Add entrypoints for each "page"
 globSync(
-  path.join(__dirname, 'modules/*/frontend/js/pages/**/*.{js,jsx,ts,tsx}')
+  path.join(__dirname, 'modules/*/frontend/js/pages/**/*.{js,jsx,ts,tsx}'),
+  { follow: true } // module frontend dirs are consolidated under frontend/ via symlinks
 ).forEach(page => {
   // in: /workspace/services/web/modules/foo/frontend/js/pages/bar.js
   // out: modules/foo/pages/bar
@@ -45,12 +46,13 @@ globSync(
 })
 
 globSync(
-  path.join(__dirname, '../../frontend/js/pages/**/*.{js,jsx,ts,tsx}')
+  path.join(__dirname, 'js/pages/**/*.{js,jsx,ts,tsx}'),
+  { follow: true } // js/ is a symlink to the consolidated app source (frontend/js)
 ).forEach(page => {
   // in: /workspace/services/web/frontend/js/pages/marketing/homepage.ts
   // out: pages/marketing/homepage
   const name = path
-    .relative(path.join(__dirname, '../../frontend/js/'), page)
+    .relative(path.join(__dirname, 'js/'), page)
     .replace(/.(js|jsx|ts|tsx)$/, '')
   entryPoints[name] = './' + path.relative(__dirname, page)
 })
@@ -78,7 +80,7 @@ try {
 const pyodideDir = getModuleDirectory('pyodide')
 const highlightJsDir = getModuleDirectory('highlight.js')
 
-const vendorDir = path.join(__dirname, '../../frontend/js/vendor')
+const vendorDir = path.join(__dirname, 'js/vendor')
 
 const MATHJAX_VERSION = require('mathjax/package.json').version
 if (MATHJAX_VERSION !== PackageVersions.version.mathjax) {
@@ -115,7 +117,7 @@ module.exports = {
   // Note: webpack-dev-server does not write the bundle to disk, instead it is
   // kept in memory for speed
   output: {
-    path: path.join(__dirname, '../../public'),
+    path: path.join(__dirname, '../../public'), // repo-root public/ (nginx root /overleaf/public)
 
     publicPath: '/',
     workerPublicPath: '/',
@@ -348,7 +350,7 @@ module.exports = {
         test: /locales\/(\w{2}(-\w{2})?)\.json$/,
         use: [
           {
-            loader: path.join(__dirname, '../../frontend/translations-loader.js'),
+            loader: path.join(__dirname, 'translations-loader.js'),
           },
         ],
       },
@@ -357,11 +359,10 @@ module.exports = {
   resolve: {
     tsconfig: path.resolve(__dirname, 'tsconfig.json'),
     alias: {
-      // ---- App path aliases (deterministic; mirror services/web/tsconfig.json 'paths').
-      // The app source moved from services/web/frontend/ to repo-root frontend/, so
-      // '@' -> ../../frontend/js; the others remained inside services/web. Webpack
-      // uses the LONGEST matching prefix, so '@shared/*' binds '@shared', not '@'.
-      '@': path.join(__dirname, '../../frontend/js'),
+      // ---- App path aliases (deterministic; mirror frontend/tsconfig.json 'paths').
+      // The consolidated frontend lives in this package root: '@' -> ./js.
+      // Webpack uses the LONGEST matching prefix, so '@shared/*' binds '@shared', not '@'.
+      '@': path.join(__dirname, 'js'),
       '@shared': path.join(__dirname, 'shared'),
       '@modules': path.join(__dirname, 'modules'),
       '@ol-types': path.join(__dirname, 'types'),

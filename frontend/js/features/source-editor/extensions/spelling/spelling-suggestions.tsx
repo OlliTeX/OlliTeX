@@ -14,7 +14,7 @@ import { sendMB } from '@/infrastructure/event-tracking'
 import { SpellingSuggestionsLanguage } from './spelling-suggestions-language'
 import { captureException } from '@/infrastructure/error-reporter'
 import { debugConsole } from '@/utils/debugging'
-import { SpellCheckLanguage } from '../../../../../../services/web/types/project-settings'
+import { SpellCheckLanguage } from '../../../../../types/project-settings'
 import {
   OLDropdown,
   OLDropdownDivider,

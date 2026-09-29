@@ -30,8 +30,9 @@ const WEB_ROOT = Path.resolve(HERE, '../..')
 // locales/ AND frontend/ to the repo root but missed this linter — its
 // paths scanned nothing (ENOENT is swallowed by walk()) or ENOENT'd on
 // en.json, so the repo-root ci gate (`make all`) was red while the
-// direction was half-skewed. HERE = services/web/scripts/translations;
-// the repo root is four levels up.
+// direction was half-skewed. 2026-09-29 (frontend consolidation):
+// HERE = services/web/scripts/translations (canonical location); the repo
+// root is four levels up (the linter scans the repo-root frontend/ + locales/).
 const REPO_ROOT = Path.resolve(HERE, '../../../..')
 const EN_PATH = Path.join(REPO_ROOT, 'locales/en.json')
 const EXTRACTED_PATH = Path.join(
@@ -90,15 +91,19 @@ function scanDir(dir, files = []) {
  * Keys must look like translation keys (no whitespace).
  */
 const LITERAL = /(?:\bt|translate)\(\s*(['"`])([A-Za-z0-9_.\-]+)\1(?!\s*,\s*(['"`]))/g
+// The build host now IS the consolidated frontend package, so its scripts/
+// tooling (including this linter's own doc comments, which carry t('...')
+// examples) must stay out of the scan scope.
+const SKIP_SCRIPTS = Path.join(WEB_ROOT, 'scripts')
 const SOURCE_DIRS = [
   Path.join(REPO_ROOT, 'frontend'),
-  Path.join(WEB_ROOT, 'modules'),
-  Path.join(WEB_ROOT, 'app'),
+  Path.join(REPO_ROOT, 'services/web/app'), // Node-app reference code keeps its legacy strings
 ]
 
 function extractUsedKeys(files) {
   const used = new Map() // key -> first file:line
   for (const file of files) {
+    if (file.startsWith(SKIP_SCRIPTS + Path.sep)) continue
     let text
     try {
       text = fs.readFileSync(file, 'utf8')

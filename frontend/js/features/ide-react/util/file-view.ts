@@ -1,4 +1,4 @@
-import { FileRef } from '../../../../../services/web/types/file-ref'
+import { FileRef } from '../../../../types/file-ref'
 import { BinaryFile } from '@/features/file-view/types/binary-file'
 
 export function convertFileRefToBinaryFile(fileRef: FileRef): BinaryFile {

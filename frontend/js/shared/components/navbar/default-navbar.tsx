@@ -15,7 +15,7 @@ import { UserProvider } from '@/shared/context/user-context'
 import { X } from '@phosphor-icons/react'
 import overleafWhiteLogo from '@/shared/svgs/overleaf-white.svg'
 import overleafGreenLogo from '@/shared/svgs/overleaf-green.svg'
-import type { CSSPropertiesWithVariables } from '../../../../../services/web/types/css-properties-with-variables'
+import type { CSSPropertiesWithVariables } from '../../../../types/css-properties-with-variables'
 
 function DefaultNavbar(
   props: DefaultNavbarMetadata & { overleafLogo?: string }

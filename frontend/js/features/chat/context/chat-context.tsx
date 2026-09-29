@@ -27,7 +27,7 @@ import useBrowserWindow from '../../../shared/hooks/use-browser-window'
 import { useIdeContext } from '@/shared/context/ide-context'
 import getMeta from '@/utils/meta'
 import { debugConsole } from '@/utils/debugging'
-import { User } from '../../../../../services/web/types/user'
+import { User } from '../../../../types/user'
 import { useRailContext } from '@/features/ide-react/context/rail-context'
 
 const PAGE_SIZE = 50

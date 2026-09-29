@@ -1,5 +1,5 @@
-import { Folder } from '../../../../../services/web/types/folder'
-import { DocId, MainDocument } from '../../../../../services/web/types/project-settings'
+import { Folder } from '../../../../types/folder'
+import { DocId, MainDocument } from '../../../../types/project-settings'
 
 function findAllDocsInFolder(folder: Folder, path = '') {
   const docs = folder.docs.map<MainDocument>(doc => ({

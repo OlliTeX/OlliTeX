@@ -18,8 +18,8 @@ import { countFiles } from '../../features/file-tree/util/count-in-tree'
 import useDeepCompareEffect from '../../shared/hooks/use-deep-compare-effect'
 import { docsInFolder } from '@/features/file-tree/util/docs-in-folder'
 import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
-import { Folder } from '../../../../services/web/types/folder'
-import { MainDocument } from '../../../../services/web/types/project-settings'
+import { Folder } from '../../../types/folder'
+import { MainDocument } from '../../../types/project-settings'
 import { FindResult } from '@/features/file-tree/util/path'
 import {
   StubSnapshotUtils,

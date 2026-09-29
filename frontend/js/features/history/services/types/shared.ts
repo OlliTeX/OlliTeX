@@ -1,4 +1,4 @@
-import { Nullable } from '../../../../../../services/web/types/utils'
+import { Nullable } from '../../../../../types/utils'
 
 export interface User {
   first_name: string

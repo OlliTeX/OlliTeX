@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Project } from '../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../types/project/dashboard/api'
 import { getUserFacingMessage } from '../../../../infrastructure/fetch-json'
 import useIsMounted from '../../../../shared/hooks/use-is-mounted'
 import * as eventTracking from '../../../../infrastructure/event-tracking'

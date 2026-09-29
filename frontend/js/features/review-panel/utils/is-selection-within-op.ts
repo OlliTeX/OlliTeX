@@ -1,4 +1,4 @@
-import { AnyOperation } from '../../../../../services/web/types/change'
+import { AnyOperation } from '../../../../types/change'
 import { SelectionRange } from '@codemirror/state'
 import { visibleTextLength } from '@/utils/operations'
 

@@ -13,7 +13,7 @@ import {
   buildThemePatch,
   getAppliedHubTheme,
   onAppliedHubThemeChange,
-} from '../../../../services/web/modules/ollitex-hub/frontend/js/hub/hub-theme'
+} from '../../../modules/ollitex-hub/frontend/js/hub/hub-theme'
 
 /**
  * Shared Mantine 9.6.0 shell for OlliTeX pages (hubs, settings, admin).

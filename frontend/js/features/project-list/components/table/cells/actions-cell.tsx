@@ -1,4 +1,4 @@
-import { Project } from '../../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../../types/project/dashboard/api'
 import { CopyProjectButtonTooltip } from './action-buttons/copy-project-button'
 import { ArchiveProjectButtonTooltip } from './action-buttons/archive-project-button'
 import { TrashProjectButtonTooltip } from './action-buttons/trash-project-button'

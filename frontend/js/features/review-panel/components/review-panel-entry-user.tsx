@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { buildName } from '@/shared/utils/build-name'
-import { ReviewPanelUser } from '../../../../../services/web/types/review-panel/review-panel'
+import { ReviewPanelUser } from '../../../../types/review-panel/review-panel'
 import { ChangesUser } from '@/shared/context/changes-users-context'
 import { getBackgroundColorForUserId } from '@/shared/utils/colors'
 import { useTranslation } from 'react-i18next'

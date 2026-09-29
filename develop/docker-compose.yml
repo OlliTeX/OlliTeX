@@ -123,10 +123,11 @@ services:
       target: webpack
     command:
       ["npx", "webpack", "serve", "--config", "webpack.config.dev-env.js"]
+    working_directory: /overleaf/frontend  # consolidated build host
     ports:
       - "127.0.0.1:80:3808"
     volumes:
-      - ./webpack.config.dev-env.js:/overleaf/services/web/webpack.config.dev-env.js
+      - ./webpack.config.dev-env.js:/overleaf/frontend/webpack.config.dev-env.js
 
   git-bridge:
     # D14 (2026-09-26): 1:1 Go git-bridge (go/services/gitbridge) replaces the

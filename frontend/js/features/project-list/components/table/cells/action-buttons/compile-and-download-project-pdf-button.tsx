@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { memo, useCallback, useState } from 'react'
-import { Project } from '../../../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../../../types/project/dashboard/api'
 import * as eventTracking from '../../../../../../infrastructure/event-tracking'
 import { useLocation } from '../../../../../../shared/hooks/use-location'
 import useAbortController from '../../../../../../shared/hooks/use-abort-controller'

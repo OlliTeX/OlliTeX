@@ -8,7 +8,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@": new URL("../js", import.meta.url).pathname,
+      "@": new URL("./js", import.meta.url).pathname,
     },
   },
   esbuild: {

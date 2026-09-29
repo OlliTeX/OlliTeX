@@ -4,7 +4,7 @@ import MakePrimary from './actions/make-primary/make-primary'
 import Remove from './actions/remove'
 import useAsync from '../../../../shared/hooks/use-async'
 import { useUserEmailsContext } from '../../context/user-email-context'
-import { UserEmailData } from '../../../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../../../types/user-email'
 
 type ActionsProps = {
   userEmailData: UserEmailData

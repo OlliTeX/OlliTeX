@@ -1,4 +1,4 @@
-import { Project } from '../../../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../../../types/project/dashboard/api'
 import { useTranslation } from 'react-i18next'
 import { memo, useCallback, useState } from 'react'
 import useIsMounted from '@/shared/hooks/use-is-mounted'

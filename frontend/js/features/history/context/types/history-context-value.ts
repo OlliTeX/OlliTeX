@@ -1,4 +1,4 @@
-import { Nullable } from '../../../../../../services/web/types/utils'
+import { Nullable } from '../../../../../types/utils'
 import { LoadedUpdate } from '../../services/types/update'
 import { LoadedLabel } from '../../services/types/label'
 import { Selection } from '../../services/types/selection'

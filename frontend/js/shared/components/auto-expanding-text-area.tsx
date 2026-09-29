@@ -1,6 +1,6 @@
 import { ChangeEvent, useCallback, useEffect, useRef } from 'react'
 import { callFnsInSequence } from '../../utils/functions'
-import { MergeAndOverride } from '../../../../services/web/types/utils'
+import { MergeAndOverride } from '../../../types/utils'
 
 type AutoExpandingTextAreaProps = MergeAndOverride<
   React.ComponentProps<'textarea'>,

@@ -19,21 +19,21 @@ $footer-width-delta: 320px;
   --footer-background: var(--bg-dark-primary);
   --footer-content: var(--content-secondary-dark);
   --footer-link: var(--content-secondary-dark);
-  --footer-logo-url: url('../../../frontend/js/shared/svgs/overleaf-green.svg');
+  --footer-logo-url: url('../../js/shared/svgs/overleaf-green.svg');
 }
 
 @mixin footer-light {
   --footer-background: var(--bg-light-secondary);
   --footer-content: var(--content-primary);
   --footer-link: var(--content-primary);
-  --footer-logo-url: url('../../../frontend/js/shared/svgs/overleaf-green.svg');
+  --footer-logo-url: url('../../js/shared/svgs/overleaf-green.svg');
 }
 
 @mixin footer-dark {
   --footer-background: var(--bg-dark-primary);
   --footer-content: var(--content-primary-dark);
   --footer-link: var(--content-placeholder-dark);
-  --footer-logo-url: url('../../../frontend/js/shared/svgs/overleaf-white.svg');
+  --footer-logo-url: url('../../js/shared/svgs/overleaf-white.svg');
 }
 
 @mixin socials-light {

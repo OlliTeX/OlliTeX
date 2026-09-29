@@ -7,7 +7,7 @@ import {
   useContext,
   useState,
 } from 'react'
-import { DocId } from '../../../../../services/web/types/project-settings'
+import { DocId } from '../../../../types/project-settings'
 import useExposedState from '@/shared/hooks/use-exposed-state'
 import { DocumentContainer } from '@/features/ide-react/editor/document-container'
 

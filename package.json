@@ -219,13 +219,13 @@
     "services/templates",
     "services/third-party-datastore",
     "services/third-party-references",
-    "services/web",
-    "services/web/scripts/plan-prices",
-    "services/web/scripts/ukamf",
     "tools/dependency-management",
     "tools/npm-overrides-helper",
     "tools/saas-e2e",
     "tools/migrations",
+    "services/web",
+    "services/web/scripts/ukamf",
+    "services/web/scripts/plan-prices",
     "frontend"
   ],
   "dependenciesMeta": {

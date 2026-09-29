@@ -1,5 +1,5 @@
 import type { Message } from '@/features/chat/context/chat-context'
-import { User } from '../../../../../services/web/types/user'
+import { User } from '../../../../types/user'
 import {
   getBackgroundColorForUserId,
   hslStringToLuminance,

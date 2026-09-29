@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { UserEmailData } from '../../../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../../../types/user-email'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import ResendConfirmationCodeModal from '@/features/settings/components/emails/resend-confirmation-code-modal'
 import { useUserEmailsContext } from '@/features/settings/context/user-email-context'

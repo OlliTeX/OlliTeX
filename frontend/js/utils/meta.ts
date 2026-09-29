@@ -1,73 +1,73 @@
-import { User, Features, FeatureUsage } from '../../../services/web/types/user'
-import { User as MinimalUser } from '../../../services/web/types/admin/user'
-import { User as ManagedUser } from '../../../services/web/types/group-management/user'
-import { UserSettings } from '../../../services/web/types/user-settings'
-import { OAuthProviders } from '../../../services/web/types/oauth-providers'
-import { ExposedSettings } from '../../../services/web/types/exposed-settings'
+import { User, Features, FeatureUsage } from '../../types/user'
+import { User as MinimalUser } from '../../types/admin/user'
+import { User as ManagedUser } from '../../types/group-management/user'
+import { UserSettings } from '../../types/user-settings'
+import { OAuthProviders } from '../../types/oauth-providers'
+import { ExposedSettings } from '../../types/exposed-settings'
 import {
   type ImageName,
   OverallThemeMeta,
   ProjectCompiler,
   type SpellCheckLanguage,
-} from '../../../services/web/types/project-settings'
-import { CurrencyCode } from '../../../services/web/types/subscription/currency'
-import { PricingFormState } from '../../../services/web/types/subscription/payment-context-value'
-import { LocalIndividualPlans, Plan } from '../../../services/web/types/subscription/plan'
-import { Affiliation } from '../../../services/web/types/affiliation'
-import type { PortalTemplate } from '../../../services/web/types/portal-template'
-import { UserEmailData } from '../../../services/web/types/user-email'
+} from '../../types/project-settings'
+import { CurrencyCode } from '../../types/subscription/currency'
+import { PricingFormState } from '../../types/subscription/payment-context-value'
+import { LocalIndividualPlans, Plan } from '../../types/subscription/plan'
+import { Affiliation } from '../../types/affiliation'
+import type { PortalTemplate } from '../../types/portal-template'
+import { UserEmailData } from '../../types/user-email'
 import {
   GroupsAndEnterpriseBannerVariant,
   Institution as InstitutionType,
   Notification as NotificationType,
   PendingGroupSubscriptionEnrollment,
   USGovBannerVariant,
-} from '../../../services/web/types/project/dashboard/notification'
-import { Survey } from '../../../services/web/types/project/dashboard/survey'
-import { GetProjectsResponseBody } from '../../../services/web/types/project/dashboard/api'
+} from '../../types/project/dashboard/notification'
+import { Survey } from '../../types/project/dashboard/survey'
+import { GetProjectsResponseBody } from '../../types/project/dashboard/api'
 import { Tag } from '../../../services/web/app/src/Features/Tags/types'
-import { Institution } from '../../../services/web/types/institution'
+import { Institution } from '../../types/institution'
 import {
   GroupPolicy,
   GroupSubscription,
   ManagedGroupSubscription,
   MemberGroupSubscription,
   StripePaymentProviderService,
-} from '../../../services/web/types/subscription/dashboard/subscription'
-import { SplitTestInfo } from '../../../services/web/types/split-test'
-import { ValidationStatus } from '../../../services/web/types/group-management/validation'
-import { ManagedInstitution } from '../../../services/web/types/subscription/dashboard/managed-institution'
-import { OnboardingFormData } from '../../../services/web/types/onboarding'
+} from '../../types/subscription/dashboard/subscription'
+import { SplitTestInfo } from '../../types/split-test'
+import { ValidationStatus } from '../../types/group-management/validation'
+import { ManagedInstitution } from '../../types/subscription/dashboard/managed-institution'
+import { OnboardingFormData } from '../../types/onboarding'
 import { GroupSSOTestResult } from '../../../services/web/modules/group-settings/frontend/js/utils/types'
 import {
   AccessToken,
   InstitutionLink,
   SAMLError,
-} from '../../../services/web/types/settings-page'
-import { SuggestedLanguage } from '../../../services/web/types/system-message'
-import type { TeamInvite } from '../../../services/web/types/team-invite'
+} from '../../types/settings-page'
+import { SuggestedLanguage } from '../../types/system-message'
+import type { TeamInvite } from '../../types/team-invite'
 import {
   GroupPlans,
   GroupPlansData,
-} from '../../../services/web/types/subscription/dashboard/group-plans'
+} from '../../types/subscription/dashboard/group-plans'
 import {
   GroupSSOLinkingStatus,
   SSOConfig,
-} from '../../../services/web/types/subscription/sso'
-import { PasswordStrengthOptions } from '../../../services/web/types/password-strength-options'
-import { Subscription as ProjectDashboardSubscription } from '../../../services/web/types/project/dashboard/subscription'
-import { ThirdPartyIds } from '../../../services/web/types/third-party-ids'
-import { Publisher } from '../../../services/web/types/subscription/dashboard/publisher'
-import { SubscriptionChangePreview } from '../../../services/web/types/subscription/subscription-change-preview'
-import { SubscriptionCreationPreview } from '../../../services/web/types/subscription/subscription-creation-preview'
+} from '../../types/subscription/sso'
+import { PasswordStrengthOptions } from '../../types/password-strength-options'
+import { Subscription as ProjectDashboardSubscription } from '../../types/project/dashboard/subscription'
+import { ThirdPartyIds } from '../../types/third-party-ids'
+import { Publisher } from '../../types/subscription/dashboard/publisher'
+import { SubscriptionChangePreview } from '../../types/subscription/subscription-change-preview'
+import { SubscriptionCreationPreview } from '../../types/subscription/subscription-creation-preview'
 import { DefaultNavbarMetadata } from '@/shared/components/types/default-navbar-metadata'
 import { FooterMetadata } from '@/shared/components/types/footer-metadata'
 import type { ScriptLogType } from '../../../services/web/modules/admin-panel/frontend/js/features/script-logs/script-log'
-import { Subscription as AdminSubscription } from '../../../services/web/types/admin/subscription'
-import { AdminCapability } from '../../../services/web/types/admin-capabilities'
+import { Subscription as AdminSubscription } from '../../types/admin/subscription'
+import { AdminCapability } from '../../types/admin-capabilities'
 import { AlgoliaConfig } from '../../../services/web/modules/algolia-search/frontend/js/types'
 import { WritefullPublicEnv } from '@wf/domain/writefull-public-env'
-import { UserNotificationPreferences } from '../../../services/web/types/notifications'
+import { UserNotificationPreferences } from '../../types/notifications'
 import { SharingPermissions } from '../../../services/web/modules/sharing-permissions/app/src/types'
 import { FullHistoryFailure } from '@ol-types/history/projectHistory'
 

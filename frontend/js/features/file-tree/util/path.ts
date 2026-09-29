@@ -1,8 +1,8 @@
-import { Folder } from '../../../../../services/web/types/folder'
-import { FileTreeEntity } from '../../../../../services/web/types/file-tree-entity'
-import { Doc } from '../../../../../services/web/types/doc'
-import { FileRef } from '../../../../../services/web/types/file-ref'
-import { PreviewPath } from '../../../../../services/web/types/preview-path'
+import { Folder } from '../../../../types/folder'
+import { FileTreeEntity } from '../../../../types/file-tree-entity'
+import { Doc } from '../../../../types/doc'
+import { FileRef } from '../../../../types/file-ref'
+import { PreviewPath } from '../../../../types/preview-path'
 
 type DocFindResult = {
   entity: Doc

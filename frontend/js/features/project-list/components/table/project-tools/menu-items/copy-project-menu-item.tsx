@@ -5,7 +5,7 @@ import CloneProjectModal from '../../../../../clone-project-modal/components/clo
 import useIsMounted from '../../../../../../shared/hooks/use-is-mounted'
 import { useProjectListContext } from '../../../../context/project-list-context'
 import * as eventTracking from '../../../../../../infrastructure/event-tracking'
-import { ClonedProject } from '../../../../../../../../services/web/types/project/dashboard/api'
+import { ClonedProject } from '../../../../../../../types/project/dashboard/api'
 import { useProjectTags } from '@/features/project-list/hooks/use-project-tags'
 import { isSmallDevice } from '../../../../../../infrastructure/event-tracking'
 

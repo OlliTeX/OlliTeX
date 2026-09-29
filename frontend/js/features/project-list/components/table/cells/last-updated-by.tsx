@@ -1,5 +1,5 @@
 import { FC } from 'react'
-import { UserRef } from '../../../../../../../services/web/types/project/dashboard/api'
+import { UserRef } from '../../../../../../types/project/dashboard/api'
 import { useTranslation } from 'react-i18next'
 import { getUserName } from '@/features/project-list/util/user'
 

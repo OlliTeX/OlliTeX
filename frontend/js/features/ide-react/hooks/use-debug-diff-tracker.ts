@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { DocumentContainer } from '../editor/document-container'
-import { DocId } from '../../../../../services/web/types/project-settings'
+import { DocId } from '../../../../types/project-settings'
 import { debugConsole } from '@/utils/debugging'
 import { diffChars } from 'diff'
 

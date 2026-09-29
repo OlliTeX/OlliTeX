@@ -1,5 +1,5 @@
 import React from 'react'
-import { CompileOutputFile } from '../../../../../services/web/types/compile'
+import { CompileOutputFile } from '../../../../types/compile'
 
 export type LogEntry = {
   raw: string

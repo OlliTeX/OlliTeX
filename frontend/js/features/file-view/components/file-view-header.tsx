@@ -5,7 +5,7 @@ import { formatTime, relativeDate } from '../../utils/format-date'
 import { useFileTreeData } from '@/shared/context/file-tree-data-context'
 import { useProjectContext } from '@/shared/context/project-context'
 
-import { Nullable } from '../../../../../services/web/types/utils'
+import { Nullable } from '../../../../types/utils'
 import importOverleafModules from '../../../../macros/import-overleaf-module.macro'
 import { LinkedFileIcon } from './file-view-icons'
 import { BinaryFile, hasProvider, LinkedFile } from '../types/binary-file'

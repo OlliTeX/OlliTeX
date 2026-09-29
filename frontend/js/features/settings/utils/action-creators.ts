@@ -7,9 +7,9 @@ import {
   ActionSetEmailAffiliationBeingEdited,
   ActionUpdateAffiliation,
 } from '../context/user-email-context'
-import { UserEmailData } from '../../../../../services/web/types/user-email'
-import { Nullable } from '../../../../../services/web/types/utils'
-import { Affiliation } from '../../../../../services/web/types/affiliation'
+import { UserEmailData } from '../../../../types/user-email'
+import { Nullable } from '../../../../types/utils'
+import { Affiliation } from '../../../../types/affiliation'
 
 export const setData = (data: UserEmailData[]): ActionSetData => ({
   type: Actions.SET_DATA,

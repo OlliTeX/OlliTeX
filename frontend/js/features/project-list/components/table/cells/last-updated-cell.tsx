@@ -1,5 +1,5 @@
 import { formatDate, fromNowDate } from '../../../../../utils/dates'
-import { Project } from '../../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../../types/project/dashboard/api'
 import { LastUpdatedBy } from '@/features/project-list/components/table/cells/last-updated-by'
 import OLTooltip from '@/shared/components/ol/ol-tooltip'
 

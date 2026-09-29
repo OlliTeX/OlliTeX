@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState } from 'react'
-import { Change, CommentOperation } from '../../../../../services/web/types/change'
+import { Change, CommentOperation } from '../../../../types/change'
 import {
   useThreadsActionsContext,
   useThreadsContext,
@@ -10,7 +10,7 @@ import { ReviewPanelCommentContent } from './review-panel-comment-content'
 import {
   CommentId,
   ThreadId,
-} from '../../../../../services/web/types/review-panel/review-panel'
+} from '../../../../types/review-panel/review-panel'
 import { useModalsContext } from '@/features/ide-react/context/modals-context'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { useTranslation } from 'react-i18next'

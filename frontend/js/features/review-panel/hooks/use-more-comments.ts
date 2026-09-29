@@ -4,7 +4,7 @@ import {
   Change,
   CommentOperation,
   EditOperation,
-} from '../../../../../services/web/types/change'
+} from '../../../../types/change'
 import { DecorationSet, EditorView } from '@codemirror/view'
 import { EditorSelection } from '@codemirror/state'
 import _ from 'lodash'

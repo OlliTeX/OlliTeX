@@ -1,5 +1,5 @@
 import { Form, FormCheckProps } from 'react-bootstrap'
-import { MergeAndOverride } from '../../../../../services/web/types/utils'
+import { MergeAndOverride } from '../../../../types/utils'
 import { FormText } from './ol-form-text'
 
 type OLFormCheckboxProps = MergeAndOverride<

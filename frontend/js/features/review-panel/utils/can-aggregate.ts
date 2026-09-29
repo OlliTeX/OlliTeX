@@ -2,7 +2,7 @@ import {
   Change,
   DeleteOperation,
   InsertOperation,
-} from '../../../../../services/web/types/change'
+} from '../../../../types/change'
 
 export const canAggregate = (
   deletion: Change<DeleteOperation>,

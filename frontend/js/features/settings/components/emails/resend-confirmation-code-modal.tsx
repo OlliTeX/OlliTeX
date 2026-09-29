@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FetchError, postJSON } from '@/infrastructure/fetch-json'
 import useAsync from '../../../../shared/hooks/use-async'
-import { UserEmailData } from '../../../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../../../types/user-email'
 import OLButton from '@/shared/components/ol/ol-button'
 import {
   OLModal,

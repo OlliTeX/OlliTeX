@@ -2,7 +2,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import Notification from '../notification'
 import getMeta from '../../../../../utils/meta'
 import { useProjectListContext } from '../../../context/project-list-context'
-import { UserEmailData } from '../../../../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../../../../types/user-email'
 import ResendConfirmationCodeModal from '@/features/settings/components/emails/resend-confirmation-code-modal'
 import { ReactNode, useState } from 'react'
 

@@ -10,7 +10,7 @@ import {
   StateEffect,
   StateField,
 } from '@codemirror/state'
-import { Annotation } from '../../../../../services/web/types/annotation'
+import { Annotation } from '../../../../types/annotation'
 import { debugConsole } from '@/utils/debugging'
 import { sendMB } from '@/infrastructure/event-tracking'
 import importOverleafModules from '../../../../macros/import-overleaf-module.macro'

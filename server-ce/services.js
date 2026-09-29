@@ -1,6 +1,7 @@
 module.exports = [
   {
     name: 'web',
+    dir: 'frontend', // consolidated build host (services/web retired in the frontend consolidation reorg)
   },
   {
     name: 'clsi',

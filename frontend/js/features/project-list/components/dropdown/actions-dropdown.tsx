@@ -13,7 +13,7 @@ import UnarchiveProjectButton from '../table/cells/action-buttons/unarchive-proj
 import UntrashProjectButton from '../table/cells/action-buttons/untrash-project-button'
 import LeaveProjectButton from '../table/cells/action-buttons/leave-project-button'
 import DeleteProjectButton from '../table/cells/action-buttons/delete-project-button'
-import { Project } from '../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../types/project/dashboard/api'
 import CompileAndDownloadProjectPDFButton from '../table/cells/action-buttons/compile-and-download-project-pdf-button'
 import RenameProjectButton from '../table/cells/action-buttons/rename-project-button'
 import MaterialIcon from '@/shared/components/material-icon'

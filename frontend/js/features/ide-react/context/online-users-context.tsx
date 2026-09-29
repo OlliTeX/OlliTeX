@@ -11,7 +11,7 @@ import { useIdeReactContext } from '@/features/ide-react/context/ide-react-conte
 import { useConnectionContext } from '@/features/ide-react/context/connection-context'
 import { CursorPosition } from '@/features/ide-react/types/cursor-position'
 import { omit } from 'lodash'
-import { Doc } from '../../../../../services/web/types/doc'
+import { Doc } from '../../../../types/doc'
 import { useFileTreeData } from '@/shared/context/file-tree-data-context'
 import { findDocEntityById } from '@/features/ide-react/util/find-doc-entity-by-id'
 import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'

@@ -10,7 +10,7 @@ import {
   State,
   useUserEmailsContext,
 } from '../../../../context/user-email-context'
-import { UserEmailData } from '../../../../../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../../../../../types/user-email'
 import { UseAsyncReturnType } from '../../../../../../shared/hooks/use-async'
 import { ssoAvailableForInstitution } from '../../../../utils/sso'
 import ConfirmationModal from './confirmation-modal'

@@ -1,6 +1,6 @@
 import MaterialIcon from '@/shared/components/material-icon'
 import { Trans, useTranslation } from 'react-i18next'
-import { GroupSSOLinkingStatus } from '../../../../../services/web/types/subscription/sso'
+import { GroupSSOLinkingStatus } from '../../../../types/subscription/sso'
 import getMeta from '../../../utils/meta'
 
 function SecuritySection() {

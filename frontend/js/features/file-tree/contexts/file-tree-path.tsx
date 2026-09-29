@@ -1,5 +1,5 @@
 import { createContext, FC, useCallback, useContext, useMemo } from 'react'
-import { Folder } from '../../../../../services/web/types/folder'
+import { Folder } from '../../../../types/folder'
 import { useFileTreeData } from '@/shared/context/file-tree-data-context'
 import getMeta from '@/utils/meta'
 import {
@@ -9,7 +9,7 @@ import {
   FindResult,
   pathInFolder,
 } from '@/features/file-tree/util/path'
-import { PreviewPath } from '../../../../../services/web/types/preview-path'
+import { PreviewPath } from '../../../../types/preview-path'
 
 type FileTreePathContextValue = {
   pathInFolder: (id: string) => string | null

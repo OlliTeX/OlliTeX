@@ -1,6 +1,6 @@
 import * as React from 'react'
 import useSafeDispatch from './use-safe-dispatch'
-import { Nullable } from '../../../../services/web/types/utils'
+import { Nullable } from '../../../types/utils'
 import { FetchError } from '../../infrastructure/fetch-json'
 
 type State<T, E> = {

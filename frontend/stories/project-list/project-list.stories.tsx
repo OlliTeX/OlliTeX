@@ -4,9 +4,9 @@ import useFetchMock from '../hooks/use-fetch-mock'
 import {
   copyableProject,
   projectsData,
-} from '../../../services/web/test/frontend/features/project-list/fixtures/projects-data'
+} from '../../test/frontend/features/project-list/fixtures/projects-data'
 import { useMeta } from '../hooks/use-meta'
-import { tags } from '../../../services/web/test/frontend/features/project-list/fixtures/tags-data'
+import { tags } from '../../test/frontend/features/project-list/fixtures/tags-data'
 import { v4 as uuid } from 'uuid'
 
 const MOCK_DELAY = 500

@@ -1,7 +1,7 @@
 import OLTooltip from '@/shared/components/ol/ol-tooltip'
 import MaterialIcon from '@/shared/components/material-icon'
 import { useTranslation } from 'react-i18next'
-import { Cobranding } from '../../../../../../services/web/types/cobranding'
+import { Cobranding } from '../../../../../types/cobranding'
 
 type ToolbarLogosProps = {
   cobranding?: Cobranding

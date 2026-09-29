@@ -10,7 +10,7 @@ import { Snapshot } from 'overleaf-editor-core'
 import { useProjectContext } from '@/shared/context/project-context'
 import { debugConsole } from '@/utils/debugging'
 import importOverleafModules from '../../../../macros/import-overleaf-module.macro'
-import { Folder } from '../../../../../services/web/types/folder'
+import { Folder } from '../../../../types/folder'
 
 export const StubSnapshotUtils = {
   SnapshotUpdater: class SnapshotUpdater {

@@ -2,7 +2,7 @@ import { FC, useCallback, useRef, useState } from 'react'
 import {
   CommentId,
   ReviewPanelCommentThreadMessage,
-} from '../../../../../services/web/types/review-panel/review-panel'
+} from '../../../../types/review-panel/review-panel'
 import { useTranslation } from 'react-i18next'
 import { FormatTimeBasedOnYear } from '@/shared/components/format-time-based-on-year'
 import OLTooltip from '@/shared/components/ol/ol-tooltip'

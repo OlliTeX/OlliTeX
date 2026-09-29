@@ -1,6 +1,6 @@
 import { TrackedDeletes } from '@/features/source-editor/utils/tracked-deletes'
-import { UserId } from '../../../../../services/web/types/user'
-import { ThreadId } from '../../../../../services/web/types/review-panel/review-panel'
+import { UserId } from '../../../../types/user'
+import { ThreadId } from '../../../../types/review-panel/review-panel'
 import { Ranges } from '@/features/review-panel/context/ranges-context'
 import { StringFileData } from 'overleaf-editor-core'
 import { ProjectSnapshot } from '@/infrastructure/project-snapshot'

@@ -40,7 +40,7 @@ import { useFeatureFlag } from '@/shared/context/split-test-context'
 import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
 import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
 import { getJSON } from '@/infrastructure/fetch-json'
-import { CompileResponseData } from '../../../../services/web/types/compile'
+import { CompileResponseData } from '../../../types/compile'
 import {
   PdfScrollPosition,
   usePdfScrollPosition,
@@ -54,7 +54,7 @@ import {
 import { captureException } from '@/infrastructure/error-reporter'
 import OError from '@overleaf/o-error'
 import getMeta from '@/utils/meta'
-import type { Annotation } from '../../../../services/web/types/annotation'
+import type { Annotation } from '../../../types/annotation'
 import { useProjectSettingsContext } from '@/features/ide-settings/context/project-settings-context'
 import {
   ActiveOverallTheme,

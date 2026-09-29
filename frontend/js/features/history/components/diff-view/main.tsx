@@ -1,4 +1,4 @@
-import { Nullable } from '../../../../../../services/web/types/utils'
+import { Nullable } from '../../../../../types/utils'
 import { Diff } from '../../services/types/doc'
 import DocumentDiffViewer from './document-diff-viewer'
 import LoadingSpinner from '../../../../shared/components/loading-spinner'

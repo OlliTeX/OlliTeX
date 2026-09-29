@@ -1,7 +1,7 @@
 import moment from 'moment'
 import type { Message as MessageType } from '@/features/chat/context/chat-context'
 import { useUserContext } from '@/shared/context/user-context'
-import { User } from '../../../../../services/web/types/user'
+import { User } from '../../../../types/user'
 import MessageGroup from '@/features/chat/components/message-group'
 
 const FIVE_MINUTES = 5 * 60 * 1000

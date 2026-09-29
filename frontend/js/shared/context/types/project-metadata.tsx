@@ -1,8 +1,8 @@
-import { UserId } from '../../../../../services/web/types/user'
-import { PublicAccessLevel } from '../../../../../services/web/types/public-access-level'
+import { UserId } from '../../../../types/user'
+import { PublicAccessLevel } from '../../../../types/public-access-level'
 import { ProjectSettings } from '@/features/ide-settings/utils/api'
-import { Folder } from '../../../../../services/web/types/folder'
-import { ExtractStrict } from '../../../../../services/web/types/utils'
+import { Folder } from '../../../../types/folder'
+import { ExtractStrict } from '../../../../types/utils'
 
 export type ProjectMember = {
   _id: UserId

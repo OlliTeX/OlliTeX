@@ -6,7 +6,7 @@ import ArchiveProjectModal from '../../../modals/archive-project-modal'
 import useIsMounted from '../../../../../../shared/hooks/use-is-mounted'
 import { useProjectListContext } from '../../../../context/project-list-context'
 import { archiveProject } from '../../../../util/api'
-import { Project } from '../../../../../../../../services/web/types/project/dashboard/api'
+import { Project } from '../../../../../../../types/project/dashboard/api'
 
 function ArchiveProjectsButton() {
   const { selectedProjects, toggleSelectedProject, updateProjectViewData } =

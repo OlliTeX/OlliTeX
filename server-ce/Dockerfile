@@ -59,11 +59,11 @@ RUN --mount=type=cache,target=/root/.cache \
     --mount=type=tmpfs,target=/tmp node genScript install | bash
 
 # Add the actual source files
-# P7 step 5/6: the web app source (frontend/), locales/, and static public/ now
-# live at the MONOREPO ROOT (not under services/web/). webpack (workdir
-# /overleaf/services/web) reads `../../frontend/` -> /overleaf/frontend and emits
-# bundles into `../public` -> /overleaf/public; the Node+Go runtimes read
-# /overleaf/locales. So all three root dirs are copied alongside services/.
+# P7 step 5/6 + frontend consolidation: the web app source (frontend/),
+# locales/, and static public/ live at the MONOREPO ROOT. webpack runs from
+# /overleaf/frontend (the consolidated build host) and emits bundles into
+# ../public -> /overleaf/public; the Node+Go runtimes read /overleaf/locales.
+# All three root dirs are copied alongside services/.
 COPY --parents libraries/ services/ tools/migrations/ docs/RELEASE_NOTES.md frontend/ locales/ public/ /overleaf/
 
 # Pre-stage the PnP cache zips for the three git-sourced codemirror dev deps
@@ -93,8 +93,8 @@ RUN rm -rf /overleaf/public/js /overleaf/public/minjs /overleaf/public/styleshee
 RUN --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/root/.yarn/berry/cache,id=server-ce-yarn-cache \
     --mount=type=cache,target=/usr/local/share/.cache/yarn,id=server-ce-yarn-fallback-cache \
-    --mount=type=tmpfs,target=/overleaf/services/web/node_modules/.cache \
-    --mount=type=tmpfs,target=/overleaf/services/web/.cache \
+    --mount=type=tmpfs,target=/overleaf/frontend/node_modules/.cache \
+    --mount=type=tmpfs,target=/overleaf/frontend/.cache \
     --mount=type=tmpfs,target=/tmp \
     node genScript compile | bash
 

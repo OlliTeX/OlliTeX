@@ -1,6 +1,6 @@
 import { FileDiff, FileUnchanged } from './file'
 import { UpdateRange } from './update'
-import { Nullable } from '../../../../../../services/web/types/utils'
+import { Nullable } from '../../../../../types/utils'
 
 export interface Selection {
   updateRange: UpdateRange | null

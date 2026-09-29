@@ -7,7 +7,7 @@ import {
   FC,
   useState,
 } from 'react'
-import { UserSettings } from '../../../../services/web/types/user-settings'
+import { UserSettings } from '../../../types/user-settings'
 import getMeta from '@/utils/meta'
 
 export const defaultSettings: UserSettings = {

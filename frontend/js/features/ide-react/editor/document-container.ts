@@ -39,7 +39,7 @@ import {
   Change,
   CommentOperation,
   EditOperation,
-} from '../../../../../services/web/types/change'
+} from '../../../../types/change'
 
 // Same structural shape the old OT container exposed for the ranges
 // extension (the review-panel contexts map over these arrays).

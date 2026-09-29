@@ -1,6 +1,6 @@
 import ReCAPTCHA from 'react-google-recaptcha'
 import getMeta from '@/utils/meta'
-import { ExposedSettings } from '../../../../services/web/types/exposed-settings'
+import { ExposedSettings } from '../../../types/exposed-settings'
 
 interface ReCaptcha2Props extends Pick<
   React.ComponentProps<typeof ReCAPTCHA>,

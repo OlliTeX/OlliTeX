@@ -1,6 +1,6 @@
 import { useProjectListContext } from '../context/project-list-context'
-import { Sort } from '../../../../../services/web/types/project/dashboard/api'
-import { SortingOrder } from '../../../../../services/web/types/sorting-order'
+import { Sort } from '../../../../types/project/dashboard/api'
+import { SortingOrder } from '../../../../types/sorting-order'
 
 const toggleSort = (order: SortingOrder): SortingOrder => {
   return order === 'asc' ? 'desc' : 'asc'

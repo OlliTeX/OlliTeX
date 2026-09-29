@@ -11,7 +11,7 @@ import { useIdeReactContext } from '@/features/ide-react/context/ide-react-conte
 import { useModalsContext } from '@/features/ide-react/context/modals-context'
 import { debugConsole } from '@/utils/debugging'
 import { useCallback } from 'react'
-import { PublicAccessLevel } from '../../../../../services/web/types/public-access-level'
+import { PublicAccessLevel } from '../../../../types/public-access-level'
 import { useLocation } from '@/shared/hooks/use-location'
 
 function useSocketListeners() {

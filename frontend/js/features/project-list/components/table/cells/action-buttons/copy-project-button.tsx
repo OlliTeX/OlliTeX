@@ -7,7 +7,7 @@ import * as eventTracking from '../../../../../../infrastructure/event-tracking'
 import {
   ClonedProject,
   Project,
-} from '../../../../../../../../services/web/types/project/dashboard/api'
+} from '../../../../../../../types/project/dashboard/api'
 import { useProjectTags } from '@/features/project-list/hooks/use-project-tags'
 import { isSmallDevice } from '../../../../../../infrastructure/event-tracking'
 import OLTooltip from '@/shared/components/ol/ol-tooltip'

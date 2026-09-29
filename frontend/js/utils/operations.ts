@@ -6,7 +6,7 @@ import {
   EditOperation,
   InsertOperation,
   Operation,
-} from '../../../services/web/types/change'
+} from '../../types/change'
 
 export const isInsertOperation = (op: Operation): op is InsertOperation =>
   'i' in op

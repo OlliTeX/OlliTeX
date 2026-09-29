@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { formatUserName } from '../../utils/history-details'
 import { User } from '../../services/types/shared'
-import { Nullable } from '../../../../../../services/web/types/utils'
+import { Nullable } from '../../../../../types/utils'
 import { getBackgroundColorForUserId } from '@/shared/utils/colors'
 
 type UserNameWithColoredBadgeProps = {

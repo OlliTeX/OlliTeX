@@ -1,7 +1,7 @@
 import AddAffiliation from '../../js/features/project-list/components/add-affiliation'
 import { ProjectListProvider } from '../../js/features/project-list/context/project-list-context'
 import useFetchMock from '../hooks/use-fetch-mock'
-import { projectsData } from '../../../services/web/test/frontend/features/project-list/fixtures/projects-data'
+import { projectsData } from '../../test/frontend/features/project-list/fixtures/projects-data'
 import getMeta from '@/utils/meta'
 
 export const Add = (args: any) => {

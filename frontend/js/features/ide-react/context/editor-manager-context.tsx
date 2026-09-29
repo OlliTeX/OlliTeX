@@ -17,7 +17,7 @@ import { DocumentContainer } from '@/features/ide-react/editor/document-containe
 import { useLayoutContext } from '@/shared/context/layout-context'
 import { useUserContext } from '@/shared/context/user-context'
 import { GotoLineOptions } from '@/features/ide-react/types/goto-line-options'
-import { Doc } from '../../../../../services/web/types/doc'
+import { Doc } from '../../../../types/doc'
 import { useFileTreeData } from '@/shared/context/file-tree-data-context'
 import {
   findDocEntityById,
@@ -30,7 +30,7 @@ import { useTranslation } from 'react-i18next'
 import customLocalStorage from '@/infrastructure/local-storage'
 import useEventListener from '@/shared/hooks/use-event-listener'
 import { EditorType } from '@/features/ide-react/editor/types/editor-type'
-import { DocId } from '../../../../../services/web/types/project-settings'
+import { DocId } from '../../../../types/project-settings'
 import { Update } from '@/features/history/services/types/update'
 import { useDebugDiffTracker } from '../hooks/use-debug-diff-tracker'
 import { convertFileRefToBinaryFile } from '@/features/ide-react/util/file-view'

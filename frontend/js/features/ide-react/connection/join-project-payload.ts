@@ -1,4 +1,4 @@
-import { Project } from '../../../../../services/web/types/project'
+import { Project } from '../../../../types/project'
 import { PermissionsLevel } from '@/features/ide-react/types/permissions'
 
 export type JoinProjectPayloadProject = Pick<

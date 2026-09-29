@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { File, FileOrDirectory, filterFolders } from '../utils/file'
 import { useFileTreeData } from '@/shared/context/file-tree-data-context'
-import { Folder } from '../../../../../services/web/types/folder'
-import { Doc } from '../../../../../services/web/types/doc'
-import { FileRef } from '../../../../../services/web/types/file-ref'
+import { Folder } from '../../../../types/folder'
+import { Doc } from '../../../../types/doc'
+import { FileRef } from '../../../../types/file-ref'
 
 function docAdapter(doc: Doc): FileOrDirectory {
   return {

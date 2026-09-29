@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { HistoryContextValue } from '../../../context/types/history-context-value'
 import type { Diff } from '../../../services/types/doc'
-import type { Nullable } from '../../../../../../../services/web/types/utils'
+import type { Nullable } from '../../../../../../types/utils'
 
 type ToolbarFileInfoProps = {
   diff: Nullable<Diff>

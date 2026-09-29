@@ -1,4 +1,4 @@
-import { UserId } from '../../../../../services/web/types/user'
+import { UserId } from '../../../../types/user'
 import {
   createContext,
   FC,

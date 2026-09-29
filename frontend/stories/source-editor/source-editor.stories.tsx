@@ -7,7 +7,7 @@ import { FileTreePathContext } from '@/features/file-tree/contexts/file-tree-pat
 import RangesTracker from '@overleaf/ranges-tracker'
 import useExposedState from '@/shared/hooks/use-exposed-state'
 import { EditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
-import { DocId } from '../../../services/web/types/project-settings'
+import { DocId } from '../../types/project-settings'
 import { StoryObj } from '@storybook/react-webpack5'
 import { DocumentContainer } from '@/features/ide-react/editor/document-container'
 import { EditorPropertiesContext } from '@/features/ide-react/context/editor-properties-context'

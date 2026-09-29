@@ -4,7 +4,7 @@ import {
   Facet,
   TransactionSpec,
 } from '@codemirror/state'
-import { PreviewPath } from '../../../../../services/web/types/preview-path'
+import { PreviewPath } from '../../../../types/preview-path'
 
 export type PreviewByPath = (path: string) => PreviewPath | null
 

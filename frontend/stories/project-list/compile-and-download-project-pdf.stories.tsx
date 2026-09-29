@@ -1,7 +1,7 @@
 import ProjectListTable from '../../js/features/project-list/components/table/project-list-table'
 import { ProjectListProvider } from '../../js/features/project-list/context/project-list-context'
 import useFetchMock from '../hooks/use-fetch-mock'
-import { projectsData } from '../../../services/web/test/frontend/features/project-list/fixtures/projects-data'
+import { projectsData } from '../../test/frontend/features/project-list/fixtures/projects-data'
 
 export const Successful = (args: any) => {
   window.metaAttributesCache.set('ol-user_id', '624333f147cfd8002622a1d3')

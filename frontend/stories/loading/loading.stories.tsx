@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-webpack5'
 import { LoadingUI } from '@/features/ide-react/components/loading'
-import { EditorProviders } from '../../../services/web/test/frontend/helpers/editor-providers'
+import { EditorProviders } from '../../test/frontend/helpers/editor-providers'
 import { PartialMeta } from '@/utils/meta'
 
 const meta: Meta<typeof LoadingUI> = {

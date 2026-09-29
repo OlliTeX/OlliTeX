@@ -1,4 +1,4 @@
-import type { Nullable } from '../../../../../../../services/web/types/utils'
+import type { Nullable } from '../../../../../../types/utils'
 import type { Diff } from '../../../services/types/doc'
 import type { HistoryContextValue } from '../../../context/types/history-context-value'
 import ToolbarDatetime from './toolbar-datetime'

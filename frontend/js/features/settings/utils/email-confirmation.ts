@@ -1,5 +1,5 @@
 import getMeta from '@/utils/meta'
-import { Affiliation } from '../../../../../services/web/types/affiliation'
+import { Affiliation } from '../../../../types/affiliation'
 import { ssoAvailableForInstitution } from './sso'
 
 export const emailMustBeConfirmedViaSAML = (

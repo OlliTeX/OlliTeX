@@ -15,7 +15,7 @@ import {
   CommentOperation,
   DeleteOperation,
   EditOperation,
-} from '../../../../../services/web/types/change'
+} from '../../../../types/change'
 import {
   useCodeMirrorStateContext,
   useCodeMirrorViewContext,

@@ -22,7 +22,7 @@ export function collabEndpoint(
   base?: string,
 ): CollabEndpoint {
   const b =
-    base ?? (typeof location !== "undefined" ? location.href : undefined);
+    base ?? (typeof window !== "undefined" ? window.location.href : undefined);
   return {
     wsBaseUrl: wsBaseUrl(b),
     room: `collab/${encodeURIComponent(projectId)}`,

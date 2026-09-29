@@ -1,5 +1,5 @@
 import { EditorState } from '@codemirror/state'
-import { Change, EditOperation } from '../../../../../../services/web/types/change'
+import { Change, EditOperation } from '../../../../../types/change'
 import { isDeleteOperation, isInsertOperation } from '@/utils/operations'
 import { DocumentContainer } from '@/features/ide-react/editor/document-container'
 import { trackChangesAnnotation } from '@/features/source-editor/extensions/realtime'

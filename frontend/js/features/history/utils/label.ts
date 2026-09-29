@@ -4,7 +4,7 @@ import {
   Label,
   PseudoCurrentStateLabel,
 } from '../services/types/label'
-import { Nullable } from '../../../../../services/web/types/utils'
+import { Nullable } from '../../../../types/utils'
 import { Selection } from '../services/types/selection'
 import { Update } from '../services/types/update'
 

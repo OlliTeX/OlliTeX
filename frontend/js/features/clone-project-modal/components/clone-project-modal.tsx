@@ -1,7 +1,7 @@
 import React, { memo, useCallback, useState } from 'react'
 import CloneProjectModalContent from './clone-project-modal-content'
 import { OLModal } from '@/shared/components/ol/ol-modal'
-import { ClonedProject } from '../../../../../services/web/types/project/dashboard/api'
+import { ClonedProject } from '../../../../types/project/dashboard/api'
 import { Tag } from '../../../../../services/web/app/src/Features/Tags/types'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
 

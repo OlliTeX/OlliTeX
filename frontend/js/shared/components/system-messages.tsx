@@ -4,7 +4,7 @@ import TranslationMessage from './translation-message'
 import useAsync from '../hooks/use-async'
 import { getJSON } from '@/infrastructure/fetch-json'
 import getMeta from '../../utils/meta'
-import { SystemMessage as TSystemMessage } from '../../../../services/web/types/system-message'
+import { SystemMessage as TSystemMessage } from '../../../types/system-message'
 import {
   detectMessageSurface,
   messageVisibleForSurface,

@@ -2,7 +2,7 @@ import { Tag } from '../../../../../services/web/app/src/Features/Tags/types'
 import {
   GetProjectsResponseBody,
   Sort,
-} from '../../../../../services/web/types/project/dashboard/api'
+} from '../../../../types/project/dashboard/api'
 import { deleteJSON, postJSON } from '../../../infrastructure/fetch-json'
 
 export function getProjects(sortBy: Sort): Promise<GetProjectsResponseBody> {

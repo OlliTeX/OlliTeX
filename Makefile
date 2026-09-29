@@ -26,6 +26,7 @@ SHELL := /bin/bash
 YARN  ?= yarn
 export MAKEFLAGS := --no-print-directory
 
+WEB := frontend
 SERVICES_WEB := services/web
 E2E_DIR      := tests/e2e
 IMAGE_DIR    := server-ce
@@ -39,16 +40,17 @@ help: ## Show this help
 		awk 'BEGIN {FS = ":.*?## "} {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: build
-build: ## Webpack production bundle (services/web)
-	cd $(SERVICES_WEB) && $(YARN) webpack:production
+build: ## Webpack production bundle (frontend)
+	cd $(WEB) && $(YARN) webpack:production
 
 .PHONY: unit
-unit: ## Full frontend unit + integration suite (vitest, all projects)
+unit: ## Full unit + integration suite (Node-app suite in services/web, frontend suite in frontend/)
 	cd $(SERVICES_WEB) && $(YARN) test:unit
+	cd $(WEB) && $(YARN) test:unit
 
 .PHONY: hub
 hub: ## /hub frontend integration suite only (vitest project HubFrontend)
-	cd $(SERVICES_WEB) && $(YARN) vitest run --project=HubFrontend
+	cd $(WEB) && $(YARN) vitest run --config vitest.config.js --project=HubFrontend
 
 .PHONY: i18n
 i18n: ## Translation linter: code -> locales/en.json -> extracted-translations (bundle chain)
@@ -56,7 +58,7 @@ i18n: ## Translation linter: code -> locales/en.json -> extracted-translations (
 
 .PHONY: lint
 lint: ## ESLint (zero-warning policy)
-	cd $(SERVICES_WEB) && $(YARN) lint
+	cd $(WEB) && $(YARN) lint
 
 .PHONY: format
 format: ## Prettier check

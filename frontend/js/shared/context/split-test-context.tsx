@@ -1,6 +1,6 @@
 import { createContext, FC, useContext, useMemo } from 'react'
 import getMeta from '../../utils/meta'
-import { SplitTestInfo } from '../../../../services/web/types/split-test'
+import { SplitTestInfo } from '../../../types/split-test'
 
 export const SplitTestContext = createContext<
   | {

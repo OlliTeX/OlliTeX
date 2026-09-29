@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useUserSettingsContext } from '@/shared/context/user-settings-context'
 import useSetOverallTheme from './use-set-overall-theme'
 import useSaveUserSettings from './use-save-user-settings'
-import { UserSettings } from '../../../../../services/web/types/user-settings'
+import { UserSettings } from '../../../../types/user-settings'
 
 export default function useUserWideSettings() {
   const saveUserSettings = useSaveUserSettings()

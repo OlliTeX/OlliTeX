@@ -1,6 +1,6 @@
 import React, { FC, useEffect, useState } from 'react'
-import { User, UserId } from '../../../services/web/types/user'
-import { Project } from '../../../services/web/types/project'
+import { User, UserId } from '../../types/user'
+import { Project } from '../../types/project'
 import {
   mockBuildFile,
   mockCompile,

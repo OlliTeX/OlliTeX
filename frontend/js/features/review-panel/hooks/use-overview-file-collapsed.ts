@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { DocId } from '../../../../../services/web/types/project-settings'
+import { DocId } from '../../../../types/project-settings'
 import { useProjectContext } from '../../../shared/context/project-context'
 import usePersistedState from '../../../shared/hooks/use-persisted-state'
 import { debugConsole } from '@/utils/debugging'

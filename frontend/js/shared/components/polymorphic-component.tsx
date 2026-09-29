@@ -1,4 +1,4 @@
-import { MergeAndOverride } from '../../../../services/web/types/utils'
+import { MergeAndOverride } from '../../../types/utils'
 
 type PolymorphicComponentOwnProps<E extends React.ElementType> = {
   as?: E

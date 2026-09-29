@@ -441,7 +441,7 @@ export default async function (webRouter, privateApiRouter, publicApiRouter) {
       const {
         default: TemplateAuthorizationHelper,
       } = await import(
-        '../../../modules/template-gallery/app/src/TemplateAuthorizationHelper.mjs'
+        '../../../frontend/modules/template-gallery/app/src/TemplateAuthorizationHelper.mjs'
       )
       canManageTemplatesMenu = !!(
         await TemplateAuthorizationHelper.hasTemplateAdminAccess(

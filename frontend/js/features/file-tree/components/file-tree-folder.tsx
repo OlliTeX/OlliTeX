@@ -10,9 +10,9 @@ import { useDroppable } from '../contexts/file-tree-draggable'
 import FileTreeItemInner from './file-tree-item/file-tree-item-inner'
 import FileTreeFolderList from './file-tree-folder-list'
 import usePersistedState from '../../../shared/hooks/use-persisted-state'
-import { Folder } from '../../../../../services/web/types/folder'
-import { Doc } from '../../../../../services/web/types/doc'
-import { FileRef } from '../../../../../services/web/types/file-ref'
+import { Folder } from '../../../../types/folder'
+import { Doc } from '../../../../types/doc'
+import { FileRef } from '../../../../types/file-ref'
 import FileTreeFolderIcons from './file-tree-folder-icons'
 
 function FileTreeFolder({

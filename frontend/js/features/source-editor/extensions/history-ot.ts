@@ -22,7 +22,7 @@ import {
   TrackedChangeList,
 } from 'overleaf-editor-core'
 import { DocumentContainer } from '@/features/ide-react/editor/document-container'
-import { HistoryOTShareDoc } from '../../../../../services/web/types/share-doc'
+import { HistoryOTShareDoc } from '../../../../types/share-doc'
 import {
   TrackedDeletes,
   trackedDeletesFromState,

@@ -1,5 +1,5 @@
 import OError from '@overleaf/o-error'
-import { Folder } from '../../../../../services/web/types/folder'
+import { Folder } from '../../../../types/folder'
 import { FileTreeFindResult } from '@/features/ide-react/types/file-tree'
 
 export function findInTreeOrThrow(tree: Folder, id: string) {

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { UserEmailData } from '../../../../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../../../../types/user-email'
 import { useUserEmailsContext } from '../../../context/user-email-context'
 import { postJSON } from '../../../../../infrastructure/fetch-json'
 import { UseAsyncReturnType } from '../../../../../shared/hooks/use-async'

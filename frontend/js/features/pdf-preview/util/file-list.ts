@@ -2,7 +2,7 @@ import {
   CompileOutputFile,
   CompileResponseData,
   PDFFile,
-} from '../../../../../services/web/types/compile'
+} from '../../../../types/compile'
 import { PdfFileDataList } from '@/features/pdf-preview/util/types'
 
 const topFileTypes = ['bbl', 'gls', 'ind']

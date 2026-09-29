@@ -1,4 +1,4 @@
-import { ScopeValueStore } from '../../../../../services/web/types/ide/scope-value-store'
+import { ScopeValueStore } from '../../../../types/ide/scope-value-store'
 import _ from 'lodash'
 import customLocalStorage from '../../../infrastructure/local-storage'
 import { debugConsole } from '@/utils/debugging'

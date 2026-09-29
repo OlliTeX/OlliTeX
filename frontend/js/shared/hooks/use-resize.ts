@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import usePersistedState from './use-persisted-state'
-import { Nullable } from '../../../../services/web/types/utils'
+import { Nullable } from '../../../types/utils'
 
 type Pos = Nullable<{
   x: number

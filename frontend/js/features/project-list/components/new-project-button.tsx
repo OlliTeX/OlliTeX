@@ -6,7 +6,7 @@ import NewProjectButtonModal, {
   NewProjectButtonModalVariant,
 } from './new-project-button/new-project-button-modal'
 import AddAffiliation, { useAddAffiliation } from './add-affiliation'
-import { Nullable } from '../../../../../services/web/types/utils'
+import { Nullable } from '../../../../types/utils'
 import { sendMB } from '../../../infrastructure/event-tracking'
 import importOverleafModules from '../../../../macros/import-overleaf-module.macro'
 import {
@@ -19,7 +19,7 @@ import {
 } from '@/shared/components/ol/ol-dropdown-menu'
 import type { OLDropdownProps } from '@/shared/components/types/dropdown-menu-props'
 import { useSendProjectListMB } from '@/features/project-list/components/project-list-events'
-import type { PortalTemplate } from '../../../../../services/web/types/portal-template'
+import type { PortalTemplate } from '../../../../types/portal-template'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
 import { useProjectListContext } from '@/features/project-list/context/project-list-context'
 import { NestableDropdownContextProvider } from '@/shared/context/nestable-dropdown-context'

@@ -1,0 +1,60 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "jsx": "preserve",
+    "noEmit": true,
+    "strict": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./js/*"],
+      "@shared/*": ["./shared/*"],
+      "@modules/*": ["./modules/*"],
+      "@overleaf/o-error": ["../libraries/o-error"],
+      "@overleaf/ranges-tracker": ["../libraries/ranges-tracker"],
+      "@overleaf/validation-tools": ["../libraries/validation-tools"],
+      "overleaf-editor-core": ["../libraries/overleaf-editor-core"],
+      "overleaf-editor-core/*": ["../libraries/overleaf-editor-core/*"],
+
+      "@ol-types/*": ["./types/*"],
+      "@ol-storybook/*": ["./.storybook/*"],
+      "@wf/*": ["./modules/writefull/frontend/js/integration/src/*"],
+      "@wf-tests/*": ["./modules/writefull/frontend/js/integration/tests/*"]
+    },
+    "types": [
+      "cypress",
+      "@testing-library/cypress",
+      "reflect-metadata",
+      "vitest/globals",
+      "@testing-library/jest-dom",
+      "@types/dom-speech-recognition"
+    ]
+  },
+  "include": [
+    "js/**/*.*",
+    "shared/**/*.*",
+    "modules/**/frontend/js/**/*.*",
+    "modules/*/shared/**/*.*",
+    "test/frontend/**/*.*",
+    "modules/**/test/frontend/**/*.*",
+    "stories/**/*.*",
+    "modules/**/stories/**/*.*",
+    ".storybook/*.*",
+    "cypress",
+    "types"
+  ],
+  "exclude": [
+    "**/*.min.js",
+    "modules/writefull/frontend/js/integration/src/vite-env.d.ts"
+  ]
+}

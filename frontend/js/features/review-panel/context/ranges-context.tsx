@@ -12,7 +12,7 @@ import {
   Change,
   CommentOperation,
   EditOperation,
-} from '../../../../../services/web/types/change'
+} from '../../../../types/change'
 import { rejectChanges } from '@/features/source-editor/extensions/changes/reject-changes'
 import { useCodeMirrorViewContext } from '@/features/source-editor/components/codemirror-context'
 import { postJSON } from '@/infrastructure/fetch-json'

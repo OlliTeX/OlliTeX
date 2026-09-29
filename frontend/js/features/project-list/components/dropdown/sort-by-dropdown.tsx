@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import useSort from '../../hooks/use-sort'
 import withContent, { SortBtnProps } from '../sort/with-content'
 import { useProjectListContext } from '../../context/project-list-context'
-import { Sort } from '../../../../../../services/web/types/project/dashboard/api'
+import { Sort } from '../../../../../types/project/dashboard/api'
 import {
   OLDropdown,
   OLDropdownHeader,

@@ -1,5 +1,5 @@
 import { createContext, FC, useContext, useEffect, useMemo } from 'react'
-import { ScopeValueStore } from '../../../../services/web/types/ide/scope-value-store'
+import { ScopeValueStore } from '../../../types/ide/scope-value-store'
 import { Socket } from '@/features/ide-react/connection/types/socket'
 import { useUserSettingsContext } from './user-settings-context'
 import { userStyles } from '../utils/styles'

@@ -1,6 +1,6 @@
-import { FileRef } from '../../../../../services/web/types/file-ref'
-import { Folder } from '../../../../../services/web/types/folder'
-import { Doc } from '../../../../../services/web/types/doc'
+import { FileRef } from '../../../../types/file-ref'
+import { Folder } from '../../../../types/folder'
+import { Doc } from '../../../../types/doc'
 
 export type FileTreeFolderFindResultType = 'folder' | 'doc' | 'fileRef'
 

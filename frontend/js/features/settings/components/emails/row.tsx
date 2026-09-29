@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import { UserEmailData } from '../../../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../../../types/user-email'
 import Email from './email'
 import InstitutionAndRole from './institution-and-role'
 import EmailCell from './cell'

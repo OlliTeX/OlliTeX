@@ -1,4 +1,4 @@
-import type { Nullable } from '../../../../../services/web/types/utils'
+import type { Nullable } from '../../../../types/utils'
 import type { FileDiff } from '../services/types/file'
 import type { FileOperation } from '../services/types/file-operation'
 import type { LoadedUpdate, Version } from '../services/types/update'

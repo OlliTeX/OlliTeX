@@ -1,26 +1,57 @@
-# Overview
+# Logo Tools
 
-We assume that two files exist:
+Generates the logo and favicon assets used by the project from two source
+files:
 
-* logo.svg (short version of the logo)
-* logo_full.svg (wide version of the logo with e.g. University of Somewhere)
+- `logo.svg`: short logo
+- `logo_full.svg`: wide logo
 
-# 1_convert.sh
+## Requirements
 
-It does a lot of converting logos from one format to another and scales & changes colors of the logo for producing the required set of files.
+- Docker, plus the repo's Go builder image
+  `ollitex/golang-builder-amd64-alpine:1.27.1` (built automatically from
+  `images/golang-builder-amd64-alpine/` if missing).
+- Rasterization uses the pure-Go packages `oksvg` and `rasterx`. There are
+  **no external conversion tools** — no Inkscape, ImageMagick, Python, or a
+  host Go installation needed (this replaced the previous
+  `python3 + inkscape + imagemagick` pipeline).
 
-In the moment it mainly uses inkscape and imagemagick as tools.
+## Generate Assets
 
-# 2_install.sh
+```sh
+make assets     # = build static logo-generator binary in the builder
+                # container, then run it here (deterministic output)
+make test       # parity check vs the committed assets (must be exit 0)
+make build      # just compile the binary (logo-generator)
+make clean      # remove the binary
+```
 
-This script copies the files to the correct positions before compilation. I seperated the scripts, since you may want to check the logos beforehand. Or do changes by hand.
-e.g. I don't like overleaf-a-ds-solution-mallard.svg as a long logo.
+The generator creates (in `tools/logo/`):
 
-# 3_remove_branding_from_projectpage.sh
+- PNG icons: Android (192/512), Apple Touch (180), favicons (16/32),
+  Open Graph logo, wide logo
+- `favicon.ico`
+- Favicon status variants (build status): `favicon-compiled.svg`,
+  `favicon-compiling.svg`, `favicon-error.svg`
+- Colour variants: black / white / grey / dark, plus `logo_sw.svg`
+- Wide and standard brand logos under `img/ol-brand/`
 
-This script is a maintenance utility designed to modify the project list sidebar by removing specific branding elements from the frontend source code.
+The generated files under `tools/logo/` (PNG/SVG/ICO/`img/`) are
+**committed** in this repo — the docker images bake them in via `public/`.
 
-Target File: services/web/frontend/js/features/project-list/components/sidebar/sidebar-ds-nav.tsx
+## Install Assets
 
-Action:  Removes the <div ... className="ds-nav-ds-name" ...>...</div> block
+```sh
+make install    # copies generated assets into public/ (repo-root) and
+                # frontend/js/shared/svgs/
+```
 
+Review the generated output before installing — the committed `public/`
+assets are the current final art; `make install` overwrites them with
+freshly rasterized copies. `make test` proves the rasterizer reproduces
+the committed set (SVG variants byte-identical, PNG dimensions equal).
+
+## Source art
+
+The source SVGs themselves are owned by `BRANDING.md`; this tool only
+derives the icon/variant set.

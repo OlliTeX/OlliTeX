@@ -17,7 +17,7 @@ import { useProjectContext } from '../../../../../shared/context/project-context
 import ErrorMessage from '../error-message'
 import * as eventTracking from '../../../../../infrastructure/event-tracking'
 import { File } from '@/features/source-editor/utils/file'
-import { Project } from '../../../../../../../services/web/types/project'
+import { Project } from '../../../../../../types/project'
 import getMeta from '@/utils/meta'
 import OLButton from '@/shared/components/ol/ol-button'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'

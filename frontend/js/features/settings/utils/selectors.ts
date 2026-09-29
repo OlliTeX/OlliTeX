@@ -1,5 +1,5 @@
 import { State } from '../context/user-email-context'
-import { UserEmailData } from '../../../../../services/web/types/user-email'
+import { UserEmailData } from '../../../../types/user-email'
 
 export const inReconfirmNotificationPeriod = (userEmailData: UserEmailData) => {
   return userEmailData.affiliation?.inReconfirmNotificationPeriod
