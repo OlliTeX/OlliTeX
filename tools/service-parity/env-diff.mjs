@@ -9,7 +9,7 @@
  *
  * Exit 0 = clean (all gaps explained); 1 = unexplained drift.
  *
- * Run:  node tools/service-parity/env-diff.mjs [service] [service …]   (default: all nine)
+ * Run:  node tools/service-parity/env-diff.mjs [service] [service …]   (default: all live services)
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -17,8 +17,8 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const SVCS = [
-  'chat', 'datamanipulator', 'docstore', 'dropboxinterface', 'filestore',
-  'githubinterface', 'linked-url-proxy', 'notifications', 'webdavinterface',
+  'chat', 'datamanipulator', 'docstore', 'filestore', 'linked-url-proxy',
+  'notifications',
 ]
 
 function walk(dir, out = []) {

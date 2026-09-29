@@ -78,20 +78,8 @@ filestore GO_EXTRA OVERLEAF_HISTORY_BLOBS_BUCKET Node reads via shared settings 
 filestore GO_EXTRA OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET Node reads via shared settings layer (outside scan)
 filestore GO_EXTRA PORT shadow-run port escape hatch (Phase A4); Node binds 3009 internally
 
-# --- githubinterface ---------------------------------------------------------
-githubinterface GHIF_TEST_DEBUG Node test-only debug flag; not a runtime input
-# Node bounds per-request git buffers via this; Go streams git subprocess IO
-# through bounded buffers internally (see go/services/githubinterface git.go).
-githubinterface GITHUBINTERFACE_MAX_BUFFER_MB Go implements an internal bounded buffer for git subprocess IO
-
 # --- linked-url-proxy --------------------------------------------------------
 linked-url-proxy GO_EXTRA PORT shadow-run port escape hatch (Phase A4); Node uses services.web.api.port
 
 # --- notifications -----------------------------------------------------------
 notifications TEST_NAME_PATTERN Node test-config (mocha spec filter); not a runtime input
-
-# --- dropboxinterface --------------------------------------------------------
-# Go env overrides for the upstream base (test/parity shadowing; Node reads
-# the same config keys via the shared settings layer, so not a behaviour gap).
-dropboxinterface GO_EXTRA DROPBOX_API_BASE test/shadow override for the DropBase API base (Node: shared settings layer)
-dropboxinterface GO_EXTRA DROPBOX_CONTENT_BASE test/shadow override for the Content API base (Node: shared settings layer)

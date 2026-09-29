@@ -1,6 +1,6 @@
 // Package pbhttp holds the small set of shared HTTP helpers used across the
 // OlliTeX Go service conversions. Keeping them in one package lets each
-// service package (filestore, dropboxinterface, …) reuse a single JSON writer
+// service package (filestore, webdavinterface, …) reuse a single JSON writer
 // and the SHARED_SERVICE_TOKEN middleware without redeclaring them (redeclaring
 // across one shared package caused build failures when the services lived in a
 // single flat package).

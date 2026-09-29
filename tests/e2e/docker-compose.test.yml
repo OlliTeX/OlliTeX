@@ -204,12 +204,10 @@ services:
       GIT_BRIDGE_HOST: git-bridge
       WEBDAV_ENABLED: 'true'
       DROPBOX_ENABLED: 'true'
-      DROPBOXINTERFACE_API_URL: http://localhost:4003
       LANGUAGE_TOOL_URL: http://languagetool:8010
       ZOTERO_CLIENT_KEY: e2e-dummy-client-key
       ZOTERO_CLIENT_SECRET: e2e-dummy-client-secret
-      # fixed container constant (web + in-container githubinterface share it)
-      GITHUBINTERFACE_WORKDIR_ROOT: /var/lib/overleaf/ghif
+      GITHUBINTERFACE_WORKDIR_ROOT: /var/lib/overleaf/ghif  # 2026-09-29: legacy shared-workdir constant (in-container githubinterface retired with the TPDS->web merge; kept for env-diff parity)
       LOG_LEVEL: info
     volumes:
       - ol-data:/var/lib/overleaf

@@ -27,7 +27,7 @@ COPY cmd/ ./cmd/
 RUN --mount=type=cache,id=ol-go-mod,target=/gocache/mod \
     --mount=type=cache,id=ol-go-build,target=/gocache/build \
     set -e; mkdir -p /usr/local/bin/go-services; \
-    for s in linked-url-proxy webdavinterface dropboxinterface githubinterface filestore notifications chat docstore web seaweed-migrate configdb cronmail collab realtime historyv1 project-history clsitex; do \
+    for s in linked-url-proxy filestore notifications chat docstore web seaweed-migrate configdb cronmail collab realtime historyv1 project-history clsitex; do \
       CGO_ENABLED=1 GOOS=linux go build -o /usr/local/bin/go-services/$s ./cmd/$s; \
     done; \
     echo "built go-services: $(ls /usr/local/bin/go-services | tr '\n' ' ')"
@@ -130,20 +130,25 @@ ADD server-ce/config/env.sh /etc/overleaf/env.sh
 # them at start via /etc/overleaf/env.sh. Pre-created so no runtime fs race.
 RUN mkdir -p /etc/overleaf/env.d && chown www-data:www-data /etc/overleaf/env.d && chmod 775 /etc/overleaf/env.d
 
-# Go microservice binaries — the CANONICAL implementations of the nine
-# microservices (chat, docstore, filestore, notifications, linked-url-proxy,
-# datamanipulator, webdavinterface, dropboxinterface, githubinterface); the
-# Node versions were removed from the tree after the Node==Go contract gates
-# went green (GO_CUTOVER_PLAN Phase C/D, 2026-09-16). Built on the host by
-# `make go-build` (offline box — no golang stage in the image) and shipped
-# whole; the runit scripts exec /usr/local/bin/go-services/<svc>
-# unconditionally.
+# Go microservice binaries — the CANONICAL implementations of the
+# microservices (chat, docstore, filestore, notifications,
+# linked-url-proxy); the Node versions were removed from the tree after the
+# Node==Go contract gates went green (GO_CUTOVER_PLAN Phase C/D,
+# 2026-09-16). Built on the host by `make go-build` (offline box — no
+# golang stage in the image) and shipped whole; the runit scripts exec
+# /usr/local/bin/go-services/<svc> unconditionally.
+# 2026-09-29 (TPDS->web merge): webdavinterface/dropboxinterface/
+# githubinterface are no longer standalone services — the Go web absorbs
+# those surfaces in-process (features/webdav, features/dropbox, the tpds*
+# routes); their runit dirs + cmds were junked (junk/runit-* + junk/cmd-*),
+# the go/services/* packages remain as oracle references + contract tests.
 # Go microservice binaries (chat, docstore, filestore, notifications,
-# linked-url-proxy, datamanipulator, webdavinterface, dropboxinterface,
-# githubinterface, web, seaweed-migrate, configdb) — the CANONICAL
+# linked-url-proxy, web, seaweed-migrate, configdb) — the CANONICAL
 # implementations. Now compiled in the `gobuilder` stage above (ollitex Go
 # builder, host-persisted Go cache) — no host `make go-build` / `bin/` needed.
 # The runit scripts exec /usr/local/bin/go-services/<svc> unconditionally.
+# (webdav/dropbox/github interfaces: retired 2026-09-29 to in-web features;
+# datamanipulator: library-only, no standalone service binary.)
 COPY --from=gobuilder /usr/local/bin/go-services /usr/local/bin/go-services
 RUN chmod 755 /usr/local/bin/go-services/*
 
