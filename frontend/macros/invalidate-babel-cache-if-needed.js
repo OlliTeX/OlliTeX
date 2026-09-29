@@ -3,7 +3,14 @@ const Path = require('path')
 const Settings = require('@overleaf/settings')
 
 module.exports = function invalidateBabelCacheIfNeeded() {
-  const cacheDir = Path.join(__dirname, '../../.cache')
+  // 2026-09-29 (candidate B build-verification): the cache directory is the
+// loader's OWN cacheDirectory — services/web/.cache/babel-loader (webpack
+// config `path.join(__dirname, '.cache/babel-loader')` with this file at
+// services/web/macros/). The old `../../.cache` resolved to the repo root
+// and silently never purged the real cache, so overleafModuleImports
+// changes did not reach the bundle until a manual cache wipe. One level up
+// is correct.
+const cacheDir = Path.join(__dirname, '../.cache')
   const cachePath = Path.join(cacheDir, 'babel-loader')
   const statePath = Path.join(cacheDir, 'last-overleafModuleImports.json')
   let lastState = ''
