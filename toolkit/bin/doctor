@@ -283,6 +283,7 @@ function check_config_files() {
         fi
 
         print_point 2 "LANGUAGE_TOOL_ENABLED: ${LANGUAGE_TOOL_ENABLED:-false}"
+        print_point 2 "SEAWEEDFS_ENABLED: ${SEAWEEDFS_ENABLED:-false}"
 
       elif [[ "$config_file" == "config/variables.env" ]]; then
         print_point 1 "values"

@@ -40,6 +40,9 @@ function build_environment() {
   if [[ "${LANGUAGE_TOOL_ENABLED:-false}" == "true" ]]; then
     set_languagetool_vars
   fi
+  if [[ "${SEAWEEDFS_ENABLED:-false}" == "true" ]]; then
+    set_seaweedfs_vars
+  fi
 
   # Include docker-compose.override.yml if it is present
   if [[ -f "$TOOLKIT_ROOT/config/docker-compose.override.yml" ]]; then
@@ -182,6 +185,15 @@ function set_languagetool_vars() {
   export LANGUAGE_TOOL_IMAGE
   export LANGUAGE_TOOL_DATA_PATH
   export LANGUAGE_TOOL_PORT
+}
+
+# Set environment variables for docker-compose.seaweedfs.yml
+function set_seaweedfs_vars() {
+  DOCKER_COMPOSE_FLAGS+=(-f "$TOOLKIT_ROOT/lib/docker-compose.seaweedfs.yml")
+
+  # Data paths under the shared overleaf data dir (master/volume/filer each
+  # mount a subdirectory; see docker-compose.seaweedfs.yml).
+  export OVERLEAF_DATA_PATH
 }
 
 function print_debug_info() {
