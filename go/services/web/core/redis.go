@@ -10,7 +10,6 @@
 package core
 
 import (
-	"bufio"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
@@ -20,11 +19,13 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"net"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"context"
+	"github.com/redis/go-redis/v9"
 )
 
 // ---------- crypto primitives (Node-parity) ----------
@@ -163,339 +164,346 @@ func EtagWeakBody(body string) string {
 	return fmt.Sprintf("W/%q", strconv.FormatInt(int64(len([]byte(body))), 16)+"-"+raw)
 }
 
-// ---------- minimal Redis (RESP2) client ----------
+// ---------- Redis client (go-redis/v9) ----------
 //
-// The web app talks to Redis for sessions (connect-redis 6.1.3: key
-// "sess:<sid>", JSON value, SET … NX EX for new sessions, SET … XX EX for
-// in-place updates, TTL derived from cookie.expires) and rate limiting.
-// No Go redis driver is available in the offline module cache, so this is
-// the minimal client (RESP2, one connection guarded by a mutex).
+// Owner directive D (2026-09-30) + audit C3: the old hand-rolled RESP2
+// client (single net.Conn behind one sync.Mutex, no I/O deadlines,
+// Close-without-lock race, SCAN truncated at 10000 iterations) is
+// replaced by github.com/redis/go-redis/v9 — connection pool,
+// dial/read/write deadlines, race-free Close. The PUBLIC SURFACE
+// (type RedisClient, the struct-literal fields Addr/Password/DB,
+// DialRedis, and every method) is unchanged, so the session store,
+// rate limiter and all callers are untouched. Lazy construction is
+// preserved (cmd/web keeps booting when redis is down and re-dials per
+// command — the shadow-service contract).
 
+// RedisError — kept for API compatibility with code compiled against the
+// old client; the go-redis-backed implementation returns go-redis error
+// types (redis.Nil for missing keys) instead of this one.
 type RedisError struct{ Msg string }
 
 func (e *RedisError) Error() string { return "redis: " + e.Msg }
 
+// RedisClient — go-redis/v9-backed wrapper with the historical surface.
 type RedisClient struct {
-	mu sync.Mutex
-	c  net.Conn
-	br *bufio.Reader
-	// Addr is the redis endpoint; retained so a dropped connection can be
-	// re-established transparently (the web app tolerates a transient
-	// redis outage instead of crashing — better than the Node hard exit
-	// for shadow operation, and indistinguishable when redis is healthy).
+	// Addr is the redis endpoint (host:port). Retained for the public
+	// struct-literal contract (&RedisClient{Addr: ...}) and lazy rebuild.
 	Addr string
-	// Password/DB mirror the Node REDIS_PASSWORD / REDIS_DB contract
-	// (AUTH then SELECT on (re)connect).
+	// Password mirrors the Node REDIS_PASSWORD contract (AUTH).
 	Password string
-	// DB is the logical database index (0 = default).
+	// DB is the logical database index (0 = default, Node REDIS_DB).
 	DB string
+
+	mu sync.Mutex
+	rc *redis.Client
 }
 
-func DialRedis(addr string) (*RedisClient, error) {
-	r := &RedisClient{Addr: addr}
-	if err := r.connect(); err != nil {
-		return nil, err
+// newRedisOptions — audit C3: the OLD client had NO I/O deadlines;
+// go-redis gets explicit dial/read/write bounds so a hung redis degrades
+// requests instead of stalling the process. DisableIndentity keeps the
+// handshake at bare AUTH/SELECT (interoperable with the minimal RESP
+// test fakes, no CLIENT SETINFO).
+func newRedisOptions(addr, password, db string) *redis.Options {
+	o := &redis.Options{
+		Addr:             addr,
+		Password:         password,
+		DisableIndentity: true,
+		DialTimeout:      5 * time.Second,
+		ReadTimeout:      10 * time.Second,
+		WriteTimeout:     10 * time.Second,
 	}
-	return r, nil
-}
-
-func (r *RedisClient) connect() error {
-	c, err := net.DialTimeout("tcp", r.Addr, 5*time.Second)
-	if err != nil {
-		return err
-	}
-	r.c = c
-	r.br = bufio.NewReaderSize(c, 64*1024)
-	if r.Password != "" {
-		if _, err := r.commandNoLock("AUTH", r.Password); err != nil {
-			return err
+	if db != "" && db != "0" {
+		if n, err := strconv.Atoi(db); err == nil {
+			o.DB = n
 		}
 	}
-	if db := r.DB; db != "" && db != "0" {
-		if _, err := r.commandNoLock("SELECT", db); err != nil {
-			return err
-		}
-	}
-	return nil
+	return o
 }
 
-// commandNoLock runs one command WITHOUT taking the lock (used while the
-// caller already holds it — connect/auth).
-func (r *RedisClient) commandNoLock(args ...string) (any, error) {
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "*%d\r\n", len(args))
-	for _, a := range args {
-		fmt.Fprintf(&sb, "$%d\r\n%s\r\n", len(a), a)
-	}
-	if _, err := io.WriteString(r.c, sb.String()); err != nil {
-		r.c = nil
-		return nil, err
-	}
-	v, err := r.readReply()
-	if err != nil {
-		r.c = nil
-	}
-	return v, err
-}
-
-func (r *RedisClient) Close() error {
-	if r.c != nil {
-		return r.c.Close()
-	}
-	return nil
-}
-
-func (r *RedisClient) command(args ...string) (any, error) {
+// ensureClient lazily builds the go-redis client (shadow-service
+// contract: a failed boot dial must not kill the service — each command
+// retries). Safe for concurrent use.
+func (r *RedisClient) ensureClient() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.c == nil {
-		if err := r.connect(); err != nil {
-			return nil, err
-		}
+	if r.rc != nil {
+		return nil
 	}
-	// refresh a broken connection transparently
-	var sb strings.Builder
-	sb.WriteByte('*')
-	sb.WriteString(strconv.Itoa(len(args)))
-	sb.WriteString("\r\n")
-	for _, a := range args {
-		sb.WriteByte('$')
-		sb.WriteString(strconv.Itoa(len(a)))
-		sb.WriteString("\r\n")
-		sb.WriteString(a)
-		sb.WriteString("\r\n")
+	if r.Addr == "" {
+		return &RedisError{Msg: "redis addr unset"}
 	}
-	if _, err := io.WriteString(r.c, sb.String()); err != nil {
-		r.c = nil // force re-dial on next command
-		return nil, err
-	}
-	v, err := r.readReply()
-	if err != nil {
-		r.c = nil
-	}
-	return v, err
+	r.rc = redis.NewClient(newRedisOptions(r.Addr, r.Password, r.DB))
+	return nil
 }
 
-func (r *RedisClient) readReply() (any, error) {
-	line, err := r.br.ReadString('\n')
-	if err != nil {
+// DialRedis builds the client and PINGs it. A failure here does NOT mean
+// the service must die (cmd/web falls back to a lazy RedisClient).
+func DialRedis(addr string) (*RedisClient, error) {
+	rc := redis.NewClient(newRedisOptions(addr, "", ""))
+	err := rc.Ping(context.Background()).Err()
+	if err == nil {
+		return &RedisClient{Addr: addr, rc: rc}, nil
+	}
+	_ = rc.Close()
+	return nil, err
+}
+
+// Close releases the pool (race-free in go-redis, unlike the old
+// Close-without-mutex — audit M4).
+func (r *RedisClient) Close() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.rc == nil {
+		return nil
+	}
+	e := r.rc.Close()
+	r.rc = nil
+	return e
+}
+
+// raw — generic command path (kept for the historical `command()` call
+// shape used by core tests; maps to go-redis Do).
+func (r *RedisClient) raw(ctx context.Context, args ...any) (any, error) {
+	if err := r.ensureClient(); err != nil {
 		return nil, err
 	}
-	line = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
-	if line == "" {
-		return nil, &RedisError{Msg: "empty reply"}
+	return r.rc.Do(ctx, args...).Result()
+}
+
+// command — historical unexported surface (core test uses PING through
+// it); delegates to the pooled client.
+func (r *RedisClient) command(args ...string) (any, error) {
+	ctx := context.Background()
+	if err := r.ensureClient(); err != nil {
+		return nil, err
 	}
-	switch line[0] {
-	case '+':
-		return line[1:], nil
-	case '-':
-		return nil, &RedisError{Msg: line[1:]}
-	case ':':
-		n, err := strconv.ParseInt(line[1:], 10, 64)
-		return n, err
-	case '$':
-		n, err := strconv.Atoi(line[1:])
-		if err != nil {
-			return nil, err
-		}
-		if n < 0 {
-			return nil, nil // null bulk
-		}
-		buf := make([]byte, n+2) // trailing CRLF
-		if _, err := io.ReadFull(r.br, buf); err != nil {
-			return nil, err
-		}
-		return string(buf[:n]), nil
-	case '*':
-		n, err := strconv.Atoi(line[1:])
-		if err != nil {
-			return nil, err
-		}
-		if n < 0 {
-			return nil, nil
-		}
-		out := make([]any, 0, n)
-		for i := 0; i < n; i++ {
-			v, err := r.readReply()
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, v)
-		}
-		return out, nil
-	}
-	return nil, &RedisError{Msg: "bad reply: " + line}
+	return r.rc.Do(ctx, toAny(args)...).Result()
 }
 
 // PING implements the node-redis healthCheck().
 func (r *RedisClient) PING() error {
-	v, err := r.command("PING")
+	if err := r.ensureClient(); err != nil {
+		return err
+	}
+	pong, err := r.rc.Ping(context.Background()).Result()
 	if err != nil {
 		return err
 	}
-	if v != "PONG" {
-		return &RedisError{Msg: "expected PONG, got " + fmt.Sprint(v)}
+	if pong != "PONG" {
+		return &RedisError{Msg: "expected PONG, got " + pong}
 	}
 	return nil
 }
 
-// ---------- set commands (P3.3 UserSessions parity) ----------
+func (r *RedisClient) require() (*redis.Client, error) {
+	if err := r.ensureClient(); err != nil {
+		return nil, err
+	}
+	return r.rc, nil
+}
 
 // SADD adds members to a set (Node rclient.sadd / multi.sadd).
 func (r *RedisClient) SADD(key string, members ...string) error {
-	args := append([]string{"SADD", key}, members...)
-	if _, err := r.command(args...); err != nil {
+	c, err := r.require()
+	if err != nil {
 		return err
 	}
-	return nil
+	_, err = c.SAdd(context.Background(), key, toAny(members)...).Result()
+	return err
 }
 
-// SREM removes members from a set (Node rclient.srem — variadic, one call
-// for many members per Node's `srem(key, keysToDelete)`).
+// SREM removes members from a set (Node rclient.srem — variadic).
 func (r *RedisClient) SREM(key string, members ...string) error {
-	args := append([]string{"SREM", key}, members...)
-	if _, err := r.command(args...); err != nil {
+	c, err := r.require()
+	if err != nil {
 		return err
 	}
-	return nil
+	_, err = c.SRem(context.Background(), key, toAny(members)...).Result()
+	return err
 }
 
-// SMEMBERS returns the full set (Node rclient.smembers — order: redis
-// hash order; Node iterates in that order; gates compare as sets).
+// SMEMBERS returns the full set (redis hash order, as the Node client saw).
 func (r *RedisClient) SMEMBERS(key string) ([]string, error) {
-	v, err := r.command("SMEMBERS", key)
+	c, err := r.require()
 	if err != nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	arr, ok := v.([]any)
-	if !ok {
-		return nil, &RedisError{Msg: "SMEMBERS: bad reply type"}
-	}
-	out := make([]string, 0, len(arr))
-	for _, e := range arr {
-		s, ok := e.(string)
-		if !ok {
-			return nil, &RedisError{Msg: "SMEMBERS: bad member type"}
-		}
-		out = append(out, s)
-	}
-	return out, nil
+	return c.SMembers(context.Background(), key).Result()
 }
 
-// PEXPIRE sets a millisecond TTL (Node rclient.pexpire with the
-// cookieSessionLength ms pin).
+// PEXPIRE sets a millisecond TTL (Node rclient.pexpire).
 func (r *RedisClient) PEXPIRE(key string, ms int64) error {
-	_, err := r.command("PEXPIRE", key, strconv.FormatInt(ms, 10))
+	c, err := r.require()
+	if err != nil {
+		return err
+	}
+	_, err = c.PExpire(context.Background(), key, time.Duration(ms)*time.Millisecond).Result()
 	return err
 }
 
+// GET — (value, found, err); redis.Nil maps to found=false.
 func (r *RedisClient) GET(key string) (string, bool, error) {
-	v, err := r.command("GET", key)
+	c, err := r.require()
 	if err != nil {
 		return "", false, err
 	}
-	if v == nil {
+	v, err := c.Get(context.Background(), key).Result()
+	if err == redis.Nil {
 		return "", false, nil
 	}
-	s, ok := v.(string)
-	return s, ok, nil
+	if err != nil {
+		return "", false, err
+	}
+	return v, true, nil
 }
 
-// SETNXEX is SET key value NX EX seconds — the connect-redis
-// CustomSetRedisClient 'NX' path (initial set of a brand-new session).
+// SETNXEX is SET key value NX EX seconds (connect-redis 'NX' path).
+// Byte-identical wire format to the OLD client (uppercase NX/EX, seconds
+// unit) — pinned by the core fake + tests. Nil-bulk reply (key already
+// existed) is the OLD client's SUCCESS no-op (readReply mapped "$-1" →
+// (nil, nil)), NOT an error — preserved: the session store's XX-then-NX
+// double-save relies on it.
 func (r *RedisClient) SETNXEX(key, value string, ttl time.Duration) error {
-	_, err := r.command("SET", key, value, "NX", "EX", strconv.Itoa(int(ttl/time.Second)))
-	return err
+	ok, err := r.setNXEXReply(key, value, ttl)
+	if err == redis.Nil {
+		return nil // key already existed — no-op success (Node parity)
+	}
+	if err != nil {
+		return err
+	}
+	_ = ok
+	return nil
 }
 
-// SETNXEXReply is SET key value NX EX seconds with the reply surfaced:
-// true ⇒ the key was set now; false ⇒ it already existed (nil reply).
-// Node pattern: CompileManager._checkIfRecentlyCompiled does
-// rclient.set(key, true, 'EX', n, 'NX') and treats "OK" as not-recent
-// (anything else = recently compiled). Connection/protocol errors are
-// returned as error.
+// SETNXEXReply — true ⇒ set now; false ⇒ already existed (nil reply).
 func (r *RedisClient) SETNXEXReply(key, value string, ttl time.Duration) (bool, error) {
-	reply, err := r.command("SET", key, value, "NX", "EX", strconv.Itoa(int(ttl/time.Second)))
+	ok, err := r.setNXEXReply(key, value, ttl)
+	if err == redis.Nil {
+		return false, nil
+	}
+	return ok, err
+}
+
+func (r *RedisClient) setNXEXReply(key, value string, ttl time.Duration) (bool, error) {
+	c, err := r.require()
 	if err != nil {
 		return false, err
 	}
-	return reply == "OK", nil
+	res, err := c.Do(context.Background(), "SET", key, value, "NX", "EX", ttlSeconds(ttl)).Result()
+	if err == redis.Nil {
+		return false, redis.Nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return res == "OK", nil
 }
 
-// SETXXEX is SET key value XX EX seconds — the 'XX' path (in-place update
-// of an already-existing session).
+// SETXXEX is SET key value XX EX seconds (in-place update of an
+// already-existing session). Nil-bulk reply (key absent) is the OLD
+// client's SUCCESS no-op — preserved (persist() then falls back to NX).
 func (r *RedisClient) SETXXEX(key, value string, ttl time.Duration) error {
-	_, err := r.command("SET", key, value, "XX", "EX", strconv.Itoa(int(ttl/time.Second)))
+	c, err := r.require()
+	if err != nil {
+		return err
+	}
+	_, err = c.Do(context.Background(), "SET", key, value, "XX", "EX", ttlSeconds(ttl)).Result()
+	if err == redis.Nil {
+		return nil // key absent — no-op success (Node parity)
+	}
 	return err
 }
 
-func (r *RedisClient) DEL(key string) error { _, err := r.command("DEL", key); return err }
+func (r *RedisClient) DEL(key string) error {
+	c, err := r.require()
+	if err != nil {
+		return err
+	}
+	_, err = c.Del(context.Background(), key).Result()
+	return err
+}
 
-// Publish implements redis PUBLISH. The Node SystemMessageManager listens
-// on the 'refresh-system-messages' channel (notifyOtherPods) and refreshes
-// its in-memory list cache; the Go mutations must announce the same way or
-// the unflipped GET /system/messages (Node-served) goes stale.
+// Publish — redis PUBLISH (system-message refresh fan-out).
 func (r *RedisClient) Publish(channel, message string) error {
-	_, err := r.command("PUBLISH", channel, message)
+	c, err := r.require()
+	if err != nil {
+		return err
+	}
+	_, err = c.Publish(context.Background(), channel, message).Result()
 	return err
 }
 
+// TTL — remaining seconds (redis semantics: -1 no TTL, -2 missing key).
 func (r *RedisClient) TTL(key string) (int64, error) {
-	v, err := r.command("TTL", key)
+	c, err := r.require()
 	if err != nil {
 		return 0, err
 	}
-	n, _ := v.(int64)
-	return n, nil
+	d, err := c.TTL(context.Background(), key).Result()
+	if err == redis.Nil {
+		return -2, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	if d < 0 {
+		// -1s / -2s → -1 / -2 (redis integer semantics)
+		if d <= -time.Second && d > -2*time.Second {
+			return -1, nil
+		}
+		return -2, nil
+	}
+	return int64(d.Round(time.Second) / time.Second), nil
 }
 
-// INCR for the rate-limit family (P2): Node's rate-limiter-flexible
-// issueKeyCount = plain INCR.
+// INCR / INCRBY — rate-limit family.
 func (r *RedisClient) INCR(key string) (int64, error) { return r.INCRBY(key, 1) }
 
-// EXPIRE for the rate-limit window (P2) + redis ops parity probes.
-func (r *RedisClient) EXPIRE(key string, sec int64) error {
-	_, err := r.command("EXPIRE", key, strconv.FormatInt(sec, 10))
-	return err
-}
-
-// SCAN (MATCH, COUNT) — removeSessionsFromRedis parity (P2): the Node
-// helper scans the whole keyspace for session docs, not a prefix filter.
-func (r *RedisClient) SCAN(match string, count int) (keys []string, err error) {
-	cursor := "0"
-	for i := 0; i < 10000; i++ {
-		v, e := r.command("SCAN", cursor, "MATCH", match, "COUNT", strconv.Itoa(count))
-		if e != nil {
-			return nil, e
-		}
-		arr, ok := v.([]any)
-		if !ok || len(arr) != 2 {
-			return nil, fmt.Errorf("SCAN reply shape: %T", v)
-		}
-		c, _ := arr[0].(string)
-		items, _ := arr[1].([]any)
-		for _, it := range items {
-			if s, ok := it.(string); ok {
-				keys = append(keys, s)
-			}
-		}
-		if c == "0" {
-			return keys, nil
-		}
-		cursor = c
-	}
-	return keys, nil
-}
-
-// INCRBY for the rate-limit family (P1).
 func (r *RedisClient) INCRBY(key string, n int64) (int64, error) {
-	v, err := r.command("INCRBY", key, strconv.FormatInt(n, 10))
+	c, err := r.require()
 	if err != nil {
 		return 0, err
 	}
-	i, _ := v.(int64)
-	return i, nil
+	return c.IncrBy(context.Background(), key, n).Result()
+}
+
+// EXPIRE — rate-limit window.
+func (r *RedisClient) EXPIRE(key string, sec int64) error {
+	c, err := r.require()
+	if err != nil {
+		return err
+	}
+	_, err = c.Expire(context.Background(), key, time.Duration(sec)*time.Second).Result()
+	return err
+}
+
+// SCAN — full cursor loop (audit C3: the OLD 10000-iteration cap silently
+// truncated the keyspace; go-redis walks to cursor 0).
+func (r *RedisClient) SCAN(match string, count int) (keys []string, err error) {
+	c, err := r.require()
+	if err != nil {
+		return nil, err
+	}
+	it := c.Scan(context.Background(), 0, match, int64(count)).Iterator()
+	for it.Next(context.Background()) {
+		keys = append(keys, it.Val())
+	}
+	return keys, it.Err()
+}
+
+// ---- small helpers ----
+
+func toAny(ss []string) []any {
+	out := make([]any, len(ss))
+	for i, s := range ss {
+		out[i] = s
+	}
+	return out
+}
+
+func ttlSeconds(d time.Duration) int {
+	if d <= 0 {
+		return 0
+	}
+	return int(d / time.Second)
 }
