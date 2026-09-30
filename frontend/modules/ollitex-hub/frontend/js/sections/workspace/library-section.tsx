@@ -16,6 +16,13 @@ import {
   Tooltip,
 } from '@mantine/core'
 import { notify } from '../../shared/notify'
+// The bib-editor components carry their own stylesheets (the SaaS library
+// page imports the same two). The hub bundles LibrarySection directly, so
+// the stylesheets need the same side-effect imports here — without them the
+// Add-optional-field combobox (and related rows) render unstyled in the
+// portal modal (owner audit 032: broken suggestion formatting).
+import '@modules/bib-editor/frontend/stylesheets/bib-saas.css'
+import '@modules/bib-editor/frontend/stylesheets/bib-library.css'
 import BibEntryForm from '@modules/bib-editor/frontend/js/components/bib-entry-form'
 import type { BibEntry } from '@modules/bib-editor/frontend/js/utils/bib-types'
 import {
@@ -259,7 +266,7 @@ function PasteImportModal({
   }
 
   return (
-    <Modal opened={open} onClose={onClose} size="lg" title={<Text fw={700}>Paste references</Text>} withinPortal>
+    <Modal opened={open} onClose={onClose} size="lg" data-testid="bib-import-modal" title={<Text fw={700}>Paste references</Text>} withinPortal>
       <Stack gap="md">
         <Textarea
           label="BibTeX entries, DOIs, or a mix (one DOI per line)"
@@ -882,7 +889,7 @@ function ManualEntryModal({
   }
 
   return (
-    <Modal opened={open} onClose={onClose} size="lg" title={<Text fw={700}>{editing ? `Edit “${editing.key}”` : 'Enter reference manually'}</Text>} withinPortal>
+    <Modal opened={open} onClose={onClose} size="lg" data-testid="bib-library-manual-modal" title={<Text fw={700}>{editing ? `Edit “${editing.key}”` : 'Enter reference manually'}</Text>} withinPortal>
       {editing ? (
         <BibEntryForm
           entry={entry}
