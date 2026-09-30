@@ -10,8 +10,15 @@ import { EditorView } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
 import { sendHeartbeat } from './tracker';
 
-export const extension: Extension = EditorView.updateListener.of((update) => {
-  if (update.docChanged) {
-    sendHeartbeat().catch(() => undefined);
-  }
-});
+// sourceEditorExtensions contract (host: frontend/js/features/
+// source-editor/extensions/index.ts) calls each provider as
+// `extension(options) => Extension` (bib-editor / languagetool / llm all
+// export the function form). Exporting the bare Extension object crashes
+// the editor on boot with "TypeError: t is not a function" in the
+// moduleExtensions.map pass — the function form is mandatory here.
+export const extension = (_options: Record<string, any>): Extension =>
+  EditorView.updateListener.of((update) => {
+    if (update.docChanged) {
+      sendHeartbeat().catch(() => undefined);
+    }
+  });

@@ -52,6 +52,7 @@
 package dockerrunner
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"regexp"
@@ -154,7 +155,36 @@ type Engine interface {
 type ContainerInfo struct {
 	ID      string `json:"Id"`
 	Name    string `json:"Name"`
-	Running bool   `json:"State"`
+	Running bool   `json:"-"`
+}
+
+// UnmarshalJSON — the Docker Engine `/containers/{id}/json` response carries
+// `State` as an OBJECT ({"Status":"running","Running":true, ...}), not the
+// bool dockerode-era clients expect. The 2026-09-30 live audit hit exactly
+// this ("cannot unmarshal object into Go struct field ContainerInfo.State of
+// type bool") on the first sandboxed compile. Accept the engine object and
+// keep the legacy bool for tolerance.
+func (c *ContainerInfo) UnmarshalJSON(b []byte) error {
+	var wire struct {
+		ID    string `json:"Id"`
+		Name  string `json:"Name"`
+		State any    `json:"State"`
+	}
+	if err := json.Unmarshal(b, &wire); err != nil {
+		return err
+	}
+	c.ID, c.Name, c.Running = wire.ID, wire.Name, false
+	switch s := wire.State.(type) {
+	case map[string]any:
+		if r, ok := s["Running"].(bool); ok {
+			c.Running = r
+		}
+	case bool:
+		c.Running = s
+	case string:
+		c.Running = s == "running"
+	}
+	return nil
 }
 
 // CreateOpts: container creation document (dockerode wire keys).

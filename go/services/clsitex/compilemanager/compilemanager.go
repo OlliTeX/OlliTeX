@@ -11,6 +11,7 @@ package compilemanager
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -298,9 +299,28 @@ func New(runner commandrunner.Runner, latex *latexrunner.LatexRunner) *Manager {
 		TikzCheck:                  tikzmanager.CheckMainFile,
 		TikzInject:                 tikzmanager.InjectOutputFile,
 		DownloadLatestCompileCache: clsicachehandler.DownloadLatestCompileCache,
-		InstanceType:               func() string { return c.APIs.Compile.InstanceType },
-		Zone:                       func() string { return c.APIs.Compile.Zone },
-		IsSpot:                     func() bool { return c.APIs.Compile.IsSpotInstance },
+		// syncFromCode-only syncTeX restore from the CLSI cache (Node:
+		// ClsiCacheHandler.promises.outputDotSynctexFromCompileCache).
+		DownloadOutputDotSynctex: clsicachehandler.DownloadOutputDotSynctexFromCompileCache,
+		// Node: fsPromises.mkdir(compileDir, {recursive: true}) === compileDir
+		// (true only when this call CREATED the directory). Unwired here this
+		// is a nil function seam: the first compile request panics with a nil
+		// pointer dereference (live 500 on /compile, 2026-09-30 live audit).
+		MkdirAll: func(dir string) (bool, error) {
+			existed := false
+			if _, lerr := os.Lstat(dir); lerr == nil {
+				existed = true
+			} else if !os.IsNotExist(lerr) {
+				return false, lerr
+			}
+			if merr := os.MkdirAll(dir, 0o755); merr != nil {
+				return false, merr
+			}
+			return !existed, nil
+		},
+		InstanceType: func() string { return c.APIs.Compile.InstanceType },
+		Zone:         func() string { return c.APIs.Compile.Zone },
+		IsSpot:       func() bool { return c.APIs.Compile.IsSpotInstance },
 	}
 
 	ocmM := ocm.New()
