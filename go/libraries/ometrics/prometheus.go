@@ -9,8 +9,11 @@ package ometrics
 // dependency-free by design; Prometheus scrapes this text natively).
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -160,6 +163,26 @@ func (s *statusRecorder) WriteHeader(code int) {
 		s.status = code
 	}
 	s.ResponseWriter.WriteHeader(code)
+}
+
+// Hijack / Flush — the middleware's writer MUST forward the extension
+// interfaces or every hijack-based path dies: gorilla's Upgrader does
+// `w.(http.Hijacker)` and 500-returnErrors when the assertion fails
+// (B-defect #2: the editor's socket.io WS upgrade was failing with exactly
+// this 500 through this wrapper; embedding the http.ResponseWriter
+// interface does NOT promote its concrete methods to *statusRecorder).
+func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := s.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("statusRecorder: underlying writer does not support hijacking")
+	}
+	return h.Hijack()
+}
+
+func (s *statusRecorder) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // HTTPMiddleware records one counter and one summary per HTTP request using
