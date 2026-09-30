@@ -70,11 +70,16 @@ var (
 
 // Feature registers the git-bridge web routes.
 //
-// Node gates the whole module on GIT_BRIDGE_ENABLED=true (modules/git-bridge/index.mjs)
-// — the Go feature mirrors that (env unset → the feature registers no routes,
-// so both stacks 404 identically).
+// Node gates the whole module on GIT_BRIDGE_ENABLED=true (modules/git-bridge/index.mjs).
+// In the Node stack that env is DERIVED from site settings (`git-integration.enabled`
+// -> GIT_BRIDGE_ENABLED true/false by the settings build — EnvHydrator.mjs); the Go
+// feature ports the same derivation: env "true"/"false" wins when set, otherwise the
+// site_settings `git-integration.enabled` flag (default disabled) decides. Live audit
+// 006 (Git Provider sync "Sorry, something went wrong"): the env was never set, so
+// the whole feature silently registered NO routes and every git-bridge UI call 404/500'd
+// even though site settings had git-integration enabled.
 func Feature(a *core.App) core.Feature {
-	if os.Getenv("GIT_BRIDGE_ENABLED") != "true" {
+	if gbEnabled(a) != "true" {
 		return core.Feature{Name: "gitbridge"}
 	}
 	limit := core.NewRateLimiter(a.Redis, "oauth-token-info", 30, 60)
@@ -1140,4 +1145,30 @@ func gbValidateFileName(name string) map[string]any {
 		return map[string]any{"file": name, "cleanFile": norm}
 	}
 	return nil
+}
+
+// gbEnabled — GIT_BRIDGE_ENABLED env, ELSE site settings git-integration.enabled
+// (Node parity: settings build derived the env from that flag). "true"/"false".
+func gbEnabled(a *core.App) string {
+	if v := os.Getenv("GIT_BRIDGE_ENABLED"); v == "true" || v == "false" {
+		return v
+	}
+	if a == nil || a.Mongo == nil {
+		return "false"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if db, err := a.Mongo.DB(ctx); err == nil {
+		var sdoc struct {
+			GitInt struct {
+				Enabled bool `bson:"enabled"`
+			} `bson:"git-integration"`
+		}
+		if db.Collection("site_settings").FindOne(ctx, bson.D{{Key: "_id", Value: "global"}}).Decode(&sdoc) == nil {
+			if sdoc.GitInt.Enabled {
+				return "true"
+			}
+		}
+	}
+	return "false"
 }
