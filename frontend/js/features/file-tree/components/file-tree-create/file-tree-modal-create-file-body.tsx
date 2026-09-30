@@ -18,9 +18,15 @@ const allCreateFileModeModules = importOverleafModules('createFileModes') as {
   path: string
 }[]
 const zoteroEnabled = getMeta('ol-ExposedSettings').zoteroEnabled
+// live-audit 010: Mendeley appears in "Add files" even though the admin
+// settings were never configured (no site_settings `mendeley` section; the
+// module API is not in the stack). Gate it exactly like zotero — on the
+// exposed setting, which resolves from site_settings (mendeley.go).
+const mendeleyEnabled = Boolean(getMeta('ol-ExposedSettings').mendeleyEnabled)
 const createFileModeModules = allCreateFileModeModules.filter(
   ({ path }) =>
-    zoteroEnabled || !path.includes('zotero-create-file')
+    (zoteroEnabled || !path.includes('zotero-create-file')) &&
+    (mendeleyEnabled || !path.includes('mendeley-create-file'))
 )
 
 const FileTreeUploadDoc = lazy(() => import('./modes/file-tree-upload-doc'))

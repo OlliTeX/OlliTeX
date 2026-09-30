@@ -40,7 +40,7 @@ func HubFooterJSON(siteURL string) string {
 // ExposedSettingsJSON — the `ol-ExposedSettings` meta. In this stack the
 // only per-user field is canManageTemplatesMenu (admin true / member false;
 // pinned P6.1 oracle diff).
-func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDebug bool) string {
+func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDebug bool, mendeleyEnabled bool) string {
 	s := withSiteURL(pinned_ol_ExposedSettings, siteURL)
 	if isAdmin {
 		// pinned constant is the member (false) form; admin flips one field
@@ -59,6 +59,11 @@ func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDeb
 	}()) +
 		`,"wakaTimeDebugLogging":` + (func() string {
 		if wakaDebug {
+			return "true"
+		}
+		return "false"
+	}()) + `,"mendeleyEnabled":` + (func() string {
+		if mendeleyEnabled {
 			return "true"
 		}
 		return "false"

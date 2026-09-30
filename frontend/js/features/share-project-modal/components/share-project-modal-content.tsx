@@ -16,7 +16,6 @@ import OLSpinner from '@/shared/components/ol/ol-spinner'
 import MaterialIcon from '@/shared/components/material-icon'
 import CopySharingLinkButton from '@/features/share-project-modal/components/copy-sharing-link-button'
 import ErrorMessage from '@/features/share-project-modal/components/error-message'
-import GiveFeedbackLink from '@/features/share-project-modal/components/give-feedback-link'
 import classNames from 'classnames'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
 import { useShareProjectContext } from '@/features/share-project-modal/components/share-project-modal'
@@ -107,7 +106,6 @@ function ShareProjectModalContentInner({
                 : t('share_project')}
             </OLModalTitle>
           )}
-          {isSharingUpdatesEnabled && isProjectOwner && <GiveFeedbackLink />}
         </div>
       </OLModalHeader>
       <OLModalBody

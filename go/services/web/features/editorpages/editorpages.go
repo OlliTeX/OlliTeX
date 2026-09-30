@@ -260,7 +260,7 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 		d.JSON = map[string]string{
 			"ol-ab":                 pinned_ol_ab,
 			"ol-i18n":               pinned_ol_i18n,
-			"ol-ExposedSettings":    ExposedSettingsJSON(cxt.SiteURL, templates.MenuGrant(ctx, cxt), wakatime.ResolveEnabled(ctx, a), wakatime.DebugLogging()),
+			"ol-ExposedSettings":    ExposedSettingsJSON(cxt.SiteURL, templates.MenuGrant(ctx, cxt), wakatime.ResolveEnabled(ctx, a), wakatime.DebugLogging(), sitesettings.MendeleyEnabled(a, ctx)),
 			"ol-splitTestVariants":  pinned_ol_splitTestVariants,
 			"ol-splitTestInfo":      pinned_ol_splitTestInfo,
 			"ol-navbar":             navbarJSON(cxt.SiteURL, currentURL, email, isAdmin, sitesettings.RegistrationEnabled(a, ctx)),
@@ -321,7 +321,10 @@ func loadUserDoc(a *core.App, ctx context.Context, uid string) (map[string]any, 
 		ctx, bson.D{{Key: "_id", Value: primitiveObjectID(uid)}}).Decode(&doc); err != nil {
 		return nil, false
 	}
-	return doc, true
+	// driver-v2 shape: nested docs decode as bson.D — normalize once so the
+	// map[string]any readers (subM, ace.*/features.*) see plain maps
+	// (live-audit 001: ace.overallTheme was invisible → theme always "system").
+	return core.LooseDoc(doc), true
 }
 
 type projDoc struct {

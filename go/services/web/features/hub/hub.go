@@ -149,7 +149,7 @@ func hubPage(a *core.App) func(*core.Cxt, *core.Res) {
 			HubAdmin:   isAdmin,
 			GitBridge:  os.Getenv("OVERLEAF_GITBRIDGE_ENABLED") == "true",
 			JSON: map[string]string{
-				"ol-ExposedSettings": editorpages.ExposedSettingsJSON(cxt.SiteURL, isAdmin, wakatime.ResolveEnabled(cxt.Req.Context(), cxt.A), wakatime.DebugLogging()),
+				"ol-ExposedSettings": editorpages.ExposedSettingsJSON(cxt.SiteURL, isAdmin, wakatime.ResolveEnabled(cxt.Req.Context(), cxt.A), wakatime.DebugLogging(), sitesettings.MendeleyEnabled(cxt.A, cxt.Req.Context())),
 				"ol-navbar":          hubNavbar(a, ctx, email, cxt.Req.URL.Path, isAdmin),
 				"ol-footer":          editorpages.HubFooterJSON(cxt.SiteURL),
 				"ol-user":            serializeHubUser(uid, email, udoc, aceRaw),
@@ -1165,5 +1165,5 @@ func loadUserDoc(a *core.App, ctx context.Context, uid string) (map[string]any, 
 		bson.D{{Key: "_id", Value: oid}}).Decode(&doc); err != nil {
 		return nil, nil, false
 	}
-	return doc, aceRaw, true
+	return core.LooseDoc(doc), aceRaw, true
 }

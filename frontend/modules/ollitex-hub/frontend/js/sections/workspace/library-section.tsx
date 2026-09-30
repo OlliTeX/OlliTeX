@@ -550,7 +550,7 @@ function OrcidImportModal({
                         {Array.isArray(r.institutionNames) && r.institutionNames.length ? ` · ${r.institutionNames.join(', ').slice(0, 90)}` : ''}
                       </Text>
                     </div>
-                    <Button size="xs" variant="light" color="ollitex" onClick={() => void pickOrcid(r.orcid)}>
+                    <Button size="xs" variant="light" color="ollitex" onClick={() => void pickOrcid(r.orcid)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
                       Browse works
                     </Button>
                   </Group>

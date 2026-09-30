@@ -14,14 +14,24 @@ export default function RailPanelHeader({
   onClose?: () => void
 }) {
   const { t } = useTranslation()
-  const { handlePaneCollapse } = useRailContext()
+  const { handlePaneCollapse, selectedTab, selectTab } = useRailContext()
 
   const handleClose = useCallback(() => {
+    // live-audit 023 (symbol palette "X closes the railbar tab instead"): the
+    // modern rail is multi-tab (rail-panel.tsx renders one Tab.Pane per rail
+    // entry), so the pane header's X must close the ACTIVE PANE — return to
+    // the default tab (file-tree) and keep the rail open — not collapse the
+    // whole rail from inside a pane. X on the default tab itself falls back
+    // to the previous collapse behaviour.
+    if (selectedTab !== 'file-tree') {
+      selectTab('file-tree')
+      return
+    }
     handlePaneCollapse()
     if (onClose) {
       onClose()
     }
-  }, [handlePaneCollapse, onClose])
+  }, [selectedTab, selectTab, handlePaneCollapse, onClose])
 
   return (
     <div className="rail-panel-header">

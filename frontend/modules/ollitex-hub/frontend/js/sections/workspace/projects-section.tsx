@@ -707,35 +707,44 @@ export default function ProjectsSection({
               </Button>
             </Menu.Target>
             <Menu.Dropdown>
+              {/* live-audit 030 + 031: separate TeX and Typst project sections,
+                  and always offer the TeX example (backend 'example' template,
+                  P4.7b) — not only when a gallery template happens to exist. */}
+              <Menu.Label>TeX project</Menu.Label>
               <Menu.Item
                 leftSection={<Icon name="article" size={16} />}
                 onClick={() => openWithTemplate(undefined)}
               >
                 Blank project
               </Menu.Item>
+              <Menu.Item
+                leftSection={<Icon name="menu_book" size={16} />}
+                onClick={() => openWithTemplate('example')}
+              >
+                Example project
+              </Menu.Item>
               {typstEnabled ? (
-                <Menu.Item
-                  leftSection={<Icon name="functions" size={16} />}
-                  onClick={() => openWithTemplate('typst:basic')}
-                >
-                  Blank Typst project
-                </Menu.Item>
-              ) : null}
-              {typstEnabled ? (
-                <Menu.Item
-                  leftSection={<Icon name="menu_book" size={16} />}
-                  onClick={() => openWithTemplate('typst:article')}
-                >
-                  Typst article (bibliography)
-                </Menu.Item>
-              ) : null}
-              {typstEnabled ? (
-                <Menu.Item
-                  leftSection={<Icon name="photo" size={16} />}
-                  onClick={() => openWithTemplate('typst:example')}
-                >
-                  Typst example project
-                </Menu.Item>
+                <>
+                  <Menu.Label>Typst project</Menu.Label>
+                  <Menu.Item
+                    leftSection={<Icon name="functions" size={16} />}
+                    onClick={() => openWithTemplate('typst:basic')}
+                  >
+                    Blank Typst project
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<Icon name="menu_book" size={16} />}
+                    onClick={() => openWithTemplate('typst:article')}
+                  >
+                    Typst article (bibliography)
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<Icon name="photo" size={16} />}
+                    onClick={() => openWithTemplate('typst:example')}
+                  >
+                    Typst example project
+                  </Menu.Item>
+                </>
               ) : null}
               <Menu.Divider>Import</Menu.Divider>
               <Menu.Item leftSection={<Icon name="folder_zip" size={16} />} onClick={() => setZipOpen(true)}>
@@ -1034,10 +1043,12 @@ export default function ProjectsSection({
               value={start}
               onChange={e => setStart(e.currentTarget.value)}
               data={[
+                { value: '__tex', label: 'TeX', disabled: true },
                 { value: '', label: 'Blank project' },
                 { value: 'example', label: 'Example project' },
                 ...(typstEnabled
                   ? [
+                      { value: '__typst', label: 'Typst', disabled: true },
                       { value: 'typst:basic', label: 'Blank Typst project' },
                       { value: 'typst:article', label: 'Typst article (bibliography)' },
                       { value: 'typst:example', label: 'Typst example project' },

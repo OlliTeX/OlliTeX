@@ -49,7 +49,10 @@ func userDoc(a *core.App, ctx context.Context, uid string) (map[string]any, bool
 	if err != nil {
 		return nil, false
 	}
-	return doc, true
+	// driver-v2 shape: nested docs decode as bson.D — normalize once so the
+	// map[string]any readers (settings sections, refProviders, aiFeatures)
+	// see plain maps (live-audit 001 cluster).
+	return core.LooseDoc(doc), true
 }
 
 // ---------- GET /user/settings ----------
