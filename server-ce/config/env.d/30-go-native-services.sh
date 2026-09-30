@@ -40,11 +40,15 @@ export REDIS_PORT="${REDIS_PORT:-6379}"
 export LOG_LEVEL="${LOG_LEVEL:-info}"
 
 # 3. storage backends (S3 / SeaweedFS toolkit convention)
+# NOTE (2026-09-30 live fix): the toolkit SeaweedFS stack has NO IAM database
+# — anonymous requests are full-access, while ANY Authorization header gets
+# checked against the (empty) IAM store and 403s bucket auto-creation
+# ("requires Admin permission" — the 2026-09-30 12:30 frog.jpg blob-write
+# failure). So credentials default to EMPTY (anonymous) here; operators with
+# a real S3 gateway that requires auth still win via explicit compose env.
 export OVERLEAF_FILESTORE_BACKEND="${OVERLEAF_FILESTORE_BACKEND:-s3}"
 export OVERLEAF_FILESTORE_S3_ENDPOINT="${OVERLEAF_FILESTORE_S3_ENDPOINT:-http://172.17.0.1:8333}"
 export AWS_S3_ENDPOINT="${AWS_S3_ENDPOINT:-http://172.17.0.1:8333}"
-export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-admin}"
-export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-password}"
 export BACKEND="${BACKEND:-s3}"
 export BUCKET_NAME="${BUCKET_NAME:-archives}"
 export TEMPLATE_FILES_BUCKET_NAME="${TEMPLATE_FILES_BUCKET_NAME:-template}"
