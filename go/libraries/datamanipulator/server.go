@@ -96,7 +96,7 @@ func (h *DMHandlers) Mux() http.Handler {
 	// admin-configurable (config-DB: DATAMANIPULATOR_MAX_BODY_MB, default 10).
 	bodyBytes := int64(configres.Int(configres.Open(), "DATAMANIPULATOR_MAX_BODY_MB", "DATAMANIPULATOR_MAX_BODY_MB", 10)) << 20
 	return pbhttp.LimitBody(pbhttp.AuthGate(mux, cfg.ServiceToken, func() {
-		fmt.Println("SHARED_SERVICE_TOKEN is unset; accepting unauthenticated requests (should be restricted to in-container callers)")
+		fmt.Println("datamanipulator: SHARED_SERVICE_TOKEN is unset — gate is DEFAULT-DENY (audit C4); set the token to arm this service")
 	}, "/health"), bodyBytes)
 }
 

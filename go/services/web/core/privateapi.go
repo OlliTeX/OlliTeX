@@ -1,6 +1,7 @@
 package core
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"os"
 	"strconv"
@@ -22,6 +23,20 @@ import (
 // Settings.httpAuthUsers for the basic-auth gate.
 func privateAPICreds() (user, pass string) {
 	return os.Getenv("WEB_API_USER"), os.Getenv("WEB_API_PASSWORD")
+}
+
+// basicCredsMatch — audit H4: constant-time credential compare (crypto/subtle)
+// so a wrong-credential probe cannot time-discriminate partial username/password
+// matches the way Go's string `==` can (early-exit on first differing byte).
+// Both field comparisons ALWAYS run (no early return between them) so total
+// timing does not leak which field mismatched first.
+func basicCredsMatch(au, p, eu, ep string) bool {
+	if eu == "" {
+		return false // no creds configured → never admit (parity with `eu != ""`)
+	}
+	usrOK := subtle.ConstantTimeCompare([]byte(au), []byte(eu)) == 1
+	passOK := subtle.ConstantTimeCompare([]byte(p), []byte(ep)) == 1
+	return usrOK && passOK
 }
 
 // NewAPISessionCookie issues the fresh overleaf.sid that Node's session
@@ -104,7 +119,7 @@ func (a *App) APIBasicGate(cxt *Cxt, res *Res, req *http.Request) bool {
 	}
 	if au, p, has := req.BasicAuth(); has {
 		eu, ep := privateAPICreds()
-		if eu != "" && au == eu && p == ep {
+		if basicCredsMatch(au, p, eu, ep) {
 			return true
 		}
 		send401() // wrong basic → unconditional 401 (no Accept negotiation)
@@ -147,7 +162,7 @@ func (a *App) APIBasicGate401(cxt *Cxt, res *Res, req *http.Request) bool {
 	}
 	if au, p, has := req.BasicAuth(); has {
 		eu, ep := privateAPICreds()
-		if eu != "" && au == eu && p == ep {
+		if basicCredsMatch(au, p, eu, ep) {
 			return true
 		}
 		send401()
@@ -194,5 +209,5 @@ func (a *App) basicAuthValid(req *http.Request) bool {
 		return false
 	}
 	eu, ep := privateAPICreds()
-	return eu != "" && au == eu && p == ep
+	return basicCredsMatch(au, p, eu, ep)
 }

@@ -349,12 +349,6 @@ func (f *fs) adminGet(cxt *core.Cxt, res *core.Res) {
 		"reviewSystemPrompt", s.str("reviewSystemPrompt"),
 		"askAiActionPrompts", mergeActionPrompts(mustGet(s.raw, "askAiActionPrompts")),
 	)
-	promptDefaults := jobj(
-		"askAiSystemPrompt", "",
-		"errorPrompt", "",
-		"reviewSystemPrompt", "",
-		"askAiActionPrompts", actionPromptsObj(),
-	)
 	// effective prompts (Node: settings.X || DEFAULT)
 	eAskAi := s.str("askAiSystemPrompt")
 	if eAskAi == "" {
@@ -371,14 +365,9 @@ func (f *fs) adminGet(cxt *core.Cxt, res *core.Res) {
 		eRev = defReviewSystemPrompt
 	}
 	o = o.set("reviewSystemPrompt", eRev)
-	// promptDefaults with the real defaults (positions after, Node order)
-	promptDefaults = jobj(
-		"askAiSystemPrompt", defAskAiSystemPrompt,
-		"errorPrompt", defErrorPrompt,
-		"reviewSystemPrompt", defReviewSystemPrompt,
-		"askAiActionPrompts", actionPromptsObj(),
-	)
-	_ = promptDefaults
+	// promptDefaults with the real defaults (positions after, Node order).
+	// audit M2: the old port built this object TWICE into a never-read local
+	// (`_ = promptDefaults`) — deleted; the single used instance stays inline.
 	o = o.set("promptDefaults", jobj(
 		"askAiSystemPrompt", defAskAiSystemPrompt,
 		"errorPrompt", defErrorPrompt,

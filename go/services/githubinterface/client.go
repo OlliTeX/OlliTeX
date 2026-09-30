@@ -72,7 +72,7 @@ func (g *GHI) Clone(ctx context.Context, repoUrl, ref, targetDir, serverUrl, use
 	if serverUrl != "" {
 		eu, _ := url.Parse(serverUrl)
 		fu, _ := url.Parse(repoUrl)
-		if strings.ToLower(fu.Hostname()) != strings.ToLower(eu.Hostname()) {
+		if !strings.EqualFold(fu.Hostname(), eu.Hostname()) {
 			return 400, map[string]interface{}{"error": "repo_url host must match server_url"}
 		}
 	} else {

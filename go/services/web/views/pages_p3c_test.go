@@ -15,9 +15,9 @@ func TestP3CSettingsSlots(t *testing.T) {
 		CSRFToken:      "csrf-token-xyz",
 		Nonce:          "nonce",
 		Origin:         "http://127.0.0.1:7420/",
-		UserEmail:      "e2e-user@e2e.test",
+		UserEmail:      "zoe@example.com",
 		UserID:         "6aa4b8b573ef0e5094f4cbc0",
-		UserMetaJSON:   `{"id":"6aa4b8b573ef0e5094f4cbc0","isAdmin":false,"email":"e2e-user@e2e.test","first_name":"Zoe","last_name":"P33","alphaProgram":false,"betaProgram":true,"labsProgram":false,"features":{},"refProviders":{"mendeley":false,"zotero":false,"papers":false}}`,
+		UserMetaJSON:   `{"id":"6aa4b8b573ef0e5094f4cbc0","isAdmin":false,"email":"zoe@example.com","first_name":"Zoe","last_name":"P33","alphaProgram":false,"betaProgram":true,"labsProgram":false,"features":{},"refProviders":{"mendeley":false,"zotero":false,"papers":false}}`,
 		SamlBeta:       "true",
 		HasPassword:    true,
 		ShowAiFeatures: true,
@@ -26,7 +26,7 @@ func TestP3CSettingsSlots(t *testing.T) {
 	out := rec.Body.String()
 	for _, c := range []string{
 		`<meta name="ol-csrfToken" content="csrf-token-xyz">`,
-		`ol-usersEmail" content="e2e-user@e2e.test"`,
+		`ol-usersEmail" content="zoe@example.com"`,
 		`ol-user_id" content="6aa4b8b573ef0e5094f4cbc0"`,
 		`ol-hasPassword" data-type="boolean" content>`,
 		`ol-showAiFeatures" data-type="boolean" content>`,
@@ -85,7 +85,7 @@ func TestP3CSessionsSlots(t *testing.T) {
 	d := PageData{
 		CSRFToken: "tok", Nonce: "n",
 		Origin:             "http://127.0.0.1:7420/",
-		UserEmail:          "e2e-user@e2e.test",
+		UserEmail:          "zoe@example.com",
 		UserID:             "6aa4b8b573ef0e5094f4cbc0",
 		SessionsCurrentRow: "<tr><td>1.2.3.4</td><td>14th Sep 2026, 8:56 am UTC</td></tr>",
 		SessionsOtherRows:  "<tr><td>9.9.9.9</td><td>1st Jan 2000, 12:00 pm UTC</td></tr>",

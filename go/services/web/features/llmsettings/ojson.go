@@ -81,7 +81,9 @@ func (o obj) array(key string) []any {
 	if !ok {
 		return nil
 	}
-	a, ok := v.([]any)
+	// audit M2: ok of the conversion is intentionally ignored — non-[]any
+	// values yield nil (same as the old type-guard).
+	a, _ := v.([]any)
 	return a
 }
 

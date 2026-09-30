@@ -132,5 +132,26 @@ func dmResolveProjectPath(projectDir, relativePath string) (string, error) {
 	if resolved != root && !strings.HasPrefix(resolved, root+string(os.PathSeparator)) {
 		return "", errors.New("Path must stay within the project directory")
 	}
+	// audit C4: a lexical prefix check alone is escapable via a pre-seeded
+	// symlink (root/evil -> /outside). Walk down to the deepest EXISTING
+	// ancestor and require its real path to remain inside the real root.
+	if realRoot, err := filepath.EvalSymlinks(root); err == nil {
+		dir := resolved
+		for {
+			if _, lerr := os.Lstat(dir); lerr == nil {
+				break // exists (file, dir, or symlink)
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break // reached filesystem root without finding an ancestor
+			}
+			dir = parent
+		}
+		if eval, err := filepath.EvalSymlinks(dir); err == nil {
+			if eval != realRoot && !strings.HasPrefix(eval, realRoot+string(os.PathSeparator)) {
+				return "", errors.New("Path must stay within the project directory")
+			}
+		}
+	}
 	return resolved, nil
 }

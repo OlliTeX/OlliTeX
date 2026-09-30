@@ -238,13 +238,13 @@ func (c *wdClient) list(ctx context.Context, p string) ([]wdListItem, error) {
 			ps = &r.Propstats[i]
 			break
 		}
-		name := ""
+		// audit M2: the old port read ps.Displayname into a local `name` that never
+		// made it into the (pinned) item shape — deleted.
 		isDir := true
 		size := int64(0)
 		var etag *string
 		var mod *string
 		if ps != nil {
-			name = ps.Displayname
 			isDir = ps.Resourcetype != nil && ps.Resourcetype.Collexists
 			size = parseInt64(ps.ContentLen)
 			if ps.ETag != "" {
@@ -256,13 +256,6 @@ func (c *wdClient) list(ctx context.Context, p string) ([]wdListItem, error) {
 				mod = &t
 			}
 		}
-		if name == "" {
-			name = basename(href)
-		}
-		abs := href
-		if !strings.HasPrefix(abs, "/") {
-			abs = path + "/" + href
-		}
 		items = append(items, wdListItem{
 			path:        joinOnce(parent, basename(href)),
 			isDirectory: isDir,
@@ -270,7 +263,6 @@ func (c *wdClient) list(ctx context.Context, p string) ([]wdListItem, error) {
 			modifiedAt:  mod,
 			size:        size,
 		})
-		_ = abs
 	}
 	return items, nil
 }

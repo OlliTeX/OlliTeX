@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -135,7 +136,7 @@ func NewServer(b *Bus) *Server {
 	return &Server{
 		Bus:        b,
 		Log:        log,
-		wsUpgrader: websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }},
+		wsUpgrader: websocket.Upgrader{CheckOrigin: originAllowed},
 		handshakes: map[string]*handshake{},
 		active:     map[string]*wsTransport{},
 		polls:      map[string]*pollSession{},
@@ -631,8 +632,42 @@ func remoteIP(r *http.Request) string {
 	return host
 }
 
+// originAllowed — audit H3: by default ONLY same-site Origins are admitted
+// (browser WS + credentialed HTTP endpoints). The OLD accept-all +
+// Allow-Credentials:true echo let ANY cross-origin site read the realtime
+// HTTP surface with cookies. Non-browser clients (Go e2e WS probes) send no
+// Origin at all → allowed (no browser-side exploit surface; matches the
+// internal-transport contract). Cross-origin deployments extend the list via
+// OVERLEAF_REALTIME_ALLOWED_ORIGINS (comma-separated exact origins).
+func originAllowed(r *http.Request) bool {
+	o := r.Header.Get("Origin")
+	if o == "" {
+		return true
+	}
+	if allowed := os.Getenv("OVERLEAF_REALTIME_ALLOWED_ORIGINS"); allowed != "" {
+		for _, a := range strings.Split(allowed, ",") {
+			if strings.TrimSpace(a) == o {
+				return true
+			}
+		}
+	}
+	return r.Host != "" && originHost(o) == r.Host
+}
+
+// originHost — "http(s)://host[:port][/...]" → "host[:port]".
+func originHost(o string) string {
+	rest := o
+	if i := strings.Index(o, "://"); i >= 0 {
+		rest = o[i+3:]
+	}
+	if i := strings.IndexByte(rest, '/'); i >= 0 {
+		rest = rest[:i]
+	}
+	return rest
+}
+
 func (s *Server) cors(w http.ResponseWriter, r *http.Request) {
-	if o := r.Header.Get("Origin"); o != "" {
+	if o := r.Header.Get("Origin"); o != "" && originAllowed(r) {
 		w.Header().Set("Access-Control-Allow-Origin", o)
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 	}

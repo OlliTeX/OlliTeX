@@ -803,7 +803,9 @@ func writeTarEntry(compileDir string, tr *tar.Reader, hdr *tar.Header) error {
 			return rerr
 		}
 		return os.Symlink(hdr.Linkname, name)
-	case tar.TypeReg, tar.TypeRegA:
+	case tar.TypeReg, tar.TypeRegA: // audit M7 vs parity: TypeRegA ('7', old BSD a.out) is deprecated
+		// (staticcheck SA1019), but the Node tar-stream oracle maps it to "file" —
+		// 1:1 parity wins; the SA1019 warning here is accepted deliberately.
 		if merr := os.MkdirAll(filepath.Dir(name), 0o755); merr != nil {
 			return merr
 		}
@@ -832,7 +834,9 @@ func writeTarEntry(compileDir string, tr *tar.Reader, hdr *tar.Header) error {
 // so warn logs and the abort hook match Node.
 func tarEntryType(hdr *tar.Header) string {
 	switch hdr.Typeflag {
-	case tar.TypeReg, tar.TypeRegA:
+	case tar.TypeReg, tar.TypeRegA: // audit M7 vs parity: TypeRegA ('7', old BSD a.out) is deprecated
+		// (staticcheck SA1019), but the Node tar-stream oracle maps it to "file" —
+		// 1:1 parity wins; the SA1019 warning here is accepted deliberately.
 		return "file"
 	case '1':
 		return "link"

@@ -9,6 +9,16 @@ LOG_FILE=/var/lib/overleaf/data/history/doc-version-recovery.log
 RESYNCS_NEEDED_FILE=/var/lib/overleaf/data/history/doc-version-recovery-resyncs-5.0.3.log
 
 echo "Checking for doc version recovery. This can take a while if needed. Logs are in $LOG_FILE"
+# 2026-09-30 (build-infra): the Node services/history-v1 tree was retired in
+# 134afebcc0 (S5, owner directive) and replaced by the Go historyv1 service.
+# This one-time 5.0.2/5.0.3 doc-versions recovery already ran to completion
+# before the retirement (history/doc-version-recovery.log ends "Done."; no
+# doc-version-recovery-resyncs-5.0.3.log pending file), so when the Node tree
+# no longer ships in the image, skip this hotfix instead of failing boot.
+if [ ! -d /overleaf/services/history-v1 ]; then
+  echo "910: services/history-v1 (Node) not present in this build — skipping one-time 5.0.x doc-versions recovery (completed before retirement)."
+  exit 0
+fi
 cd /overleaf/services/history-v1
 LOG_LEVEL=info DOC_VERSION_RECOVERY_RESYNCS_NEEDED_FILE="$RESYNCS_NEEDED_FILE" /sbin/setuser www-data node storage/scripts/recover_doc_versions.js 2>&1 | tee -a "$LOG_FILE"
 

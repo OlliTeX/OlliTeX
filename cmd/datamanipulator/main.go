@@ -30,8 +30,12 @@ func main() {
 		ServiceToken: os.Getenv("SHARED_SERVICE_TOKEN"),
 	}
 	listen := firstNonEmpty(os.Getenv("DATAMANIPULATOR_PORT"), "4001")
+	// audit C4: a data-mutating endpoint must not be reachable from other
+	// interfaces by default — bind loopback unless the operator explicitly
+	// sets DATAMANIPULATOR_HOST (e.g. 0.0.0.0 for a dedicated netns).
+	host := firstNonEmpty(os.Getenv("DATAMANIPULATOR_HOST"), "127.0.0.1")
 	srv := &http.Server{
-		Addr:         ":" + listen,
+		Addr:         host + ":" + listen,
 		Handler:      datamanipulator.NewDMHandlers(cfg).Mux(),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,

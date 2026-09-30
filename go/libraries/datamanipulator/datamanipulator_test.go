@@ -386,14 +386,44 @@ func dmMux(t *testing.T, token string) *httptest.Server {
 	if err := os.WriteFile(filepath.Join(dir, "main.tex"), []byte("hello"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// audit C4: default-deny makes an unconfigured gate 401 everything;
+	// these handler tests target endpoint logic, so arm the gate with a test
+	// token (sent by dmGet/dmPost/dmDel below) without weakening the gate
+	// contract.
+	if token == "" {
+		token = dmTestToken
+	}
 	mux := NewDMHandlers(DMConfig{ProjectsRoot: root, ServiceToken: token}).Mux()
 	return httptest.NewServer(mux)
+}
+
+const dmTestToken = "dm-test-token"
+
+// dmGet/dmPost/dmDel — audit C4 test support: the gate is default-deny, so
+// handler-logic tests must send a token; these inject dmTestToken.
+func dmGet(url string) (*http.Response, error) {
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("X-Service-Token", dmTestToken)
+	return http.DefaultClient.Do(req)
+}
+
+func dmPost(url, body string) (*http.Response, error) {
+	req, _ := http.NewRequest("POST", url, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Service-Token", dmTestToken)
+	return http.DefaultClient.Do(req)
+}
+
+func dmDel(url string) (*http.Response, error) {
+	req, _ := http.NewRequest("DELETE", url, nil)
+	req.Header.Set("X-Service-Token", dmTestToken)
+	return http.DefaultClient.Do(req)
 }
 
 func TestDMHealth(t *testing.T) {
 	srv := dmMux(t, "")
 	defer srv.Close()
-	resp, err := http.Get(srv.URL + "/health")
+	resp, err := dmGet(srv.URL + "/health")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +436,7 @@ func TestDMHealth(t *testing.T) {
 func TestDMTreeEndpoint(t *testing.T) {
 	srv := dmMux(t, "")
 	defer srv.Close()
-	resp, err := http.Get(srv.URL + "/tree?project_id=0123456789ab")
+	resp, err := dmGet(srv.URL + "/tree?project_id=0123456789ab")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +450,7 @@ func TestDMTreeEndpoint(t *testing.T) {
 func TestDMTreeInvalidId(t *testing.T) {
 	srv := dmMux(t, "")
 	defer srv.Close()
-	resp, err := http.Get(srv.URL + "/tree?project_id=../etc")
+	resp, err := dmGet(srv.URL + "/tree?project_id=../etc")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,7 +463,7 @@ func TestDMTreeInvalidId(t *testing.T) {
 func TestDMFilePostMissingContent(t *testing.T) {
 	srv := dmMux(t, "")
 	defer srv.Close()
-	resp, err := http.Post(srv.URL+"/file?project_id=0123456789ab&path=x.txt", "application/json", strings.NewReader("{}"))
+	resp, err := dmPost(srv.URL+"/file?project_id=0123456789ab&path=x.txt", "{}")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,7 +476,7 @@ func TestDMFilePostMissingContent(t *testing.T) {
 func TestDMPush501(t *testing.T) {
 	srv := dmMux(t, "")
 	defer srv.Close()
-	resp, err := http.Post(srv.URL+"/push?project_id=0123456789ab", "application/json", strings.NewReader(`{"remote_files":[]}`))
+	resp, err := dmPost(srv.URL+"/push?project_id=0123456789ab", `{"remote_files":[]}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -494,7 +524,7 @@ func dmRead(t *testing.T, r *http.Response) string {
 func TestDM_HandlerFileGet(t *testing.T) {
 	srv := dmMux(t, "")
 	defer srv.Close()
-	r, err := http.Get(srv.URL + "/file?project_id=0123456789ab&path=main.tex")
+	r, err := dmGet(srv.URL + "/file?project_id=0123456789ab&path=main.tex")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -503,7 +533,7 @@ func TestDM_HandlerFileGet(t *testing.T) {
 	if r.StatusCode != 200 || !strings.Contains(body, "content_base64") || !strings.Contains(body, wantB64) {
 		t.Fatalf("fileGet = %d %s (want 200 + b64)", r.StatusCode, body)
 	}
-	r2, err := http.Get(srv.URL + "/file?project_id=0123456789ab&path=missing.tex")
+	r2, err := dmGet(srv.URL + "/file?project_id=0123456789ab&path=missing.tex")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -516,7 +546,8 @@ func TestDM_HandlerFileGet(t *testing.T) {
 func TestDM_HandlerFileDelete(t *testing.T) {
 	srv := dmMux(t, "")
 	defer srv.Close()
-	req, _ := http.NewRequest("DELETE", srv.URL+"/file?project_id=0123456789ab&path=main.tex", nil)
+	req, err := http.NewRequest("DELETE", srv.URL+"/file?project_id=0123456789ab&path=main.tex", nil)
+	req.Header.Set("X-Service-Token", dmTestToken)
 	r, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -526,6 +557,7 @@ func TestDM_HandlerFileDelete(t *testing.T) {
 		t.Fatalf("fileDelete = %d %s (want 200 success)", r.StatusCode, body)
 	}
 	req2, _ := http.NewRequest("DELETE", srv.URL+"/file?project_id=0123456789ab&path=missing", nil)
+	req2.Header.Set("X-Service-Token", dmTestToken)
 	r2, err := http.DefaultClient.Do(req2)
 	if err != nil {
 		t.Fatal(err)
@@ -540,7 +572,7 @@ func TestDM_HandlerPull(t *testing.T) {
 	srv := dmMux(t, "")
 	defer srv.Close()
 	body := `{"remote_files":[{"relative_path":"new.txt","content_base64":"aGk=","size":2}],"confirm_remote_deletions":false}`
-	r, err := http.Post(srv.URL+"/pull?project_id=0123456789ab", "application/json", strings.NewReader(body))
+	r, err := dmPost(srv.URL+"/pull?project_id=0123456789ab", body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -555,7 +587,7 @@ func TestDM_HandlerCompare(t *testing.T) {
 	defer srv.Close()
 	tree := `{"entries":[{"relative_path":"a.txt","checksum":"x"}],"totalFiles":1}`
 	body := `{"left_tree":` + tree + `,"right_tree":` + tree + `}`
-	r, err := http.Post(srv.URL+"/compare", "application/json", strings.NewReader(body))
+	r, err := dmPost(srv.URL+"/compare", body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,7 +606,7 @@ func TestDM_HandlerSyncFull(t *testing.T) {
 	srv := dmMux(t, "")
 	defer srv.Close()
 	body := `{"remote_files":[{"relative_path":"sync.txt","content_base64":"aGk=","size":2}]}`
-	r, err := http.Post(srv.URL+"/sync/full?project_id=0123456789ab", "application/json", strings.NewReader(body))
+	r, err := dmPost(srv.URL+"/sync/full?project_id=0123456789ab", body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -609,5 +641,31 @@ func TestDM_GateOrder(t *testing.T) {
 	z2.Body.Close()
 	if z2.StatusCode != 404 || !strings.Contains(string(z2b), "Cannot GET /zq") {
 		t.Fatalf("unknown ok-token expected Express 404 page, got %d (%s)", z2.StatusCode, z2b)
+	}
+}
+
+// TestDM_SymlinkEscape_C4 — audit C4: a symlink INSIDE the project dir that
+// points OUT must be rejected by dmResolveProjectPath.
+func TestDM_SymlinkEscape_C4(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("hidden"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// pre-seed escaper symlink
+	if err := os.Symlink(outside, filepath.Join(root, "evil")); err != nil {
+		t.Skipf("symlink unsupported on this fs: %v", err)
+	}
+	// lexical prefix passes, but the real path leaves the root → reject
+	if _, err := dmResolveProjectPath(root, "evil/secret.txt"); err == nil {
+		t.Fatal("symlink escape to outside project dir was ALLOWED (want error)")
+	}
+	// legit relative path inside → allowed
+	if _, err := dmResolveProjectPath(root, "sub/ok.txt"); err != nil {
+		t.Fatalf("legit path rejected: %v", err)
+	}
+	// classic traversal still rejected
+	if _, err := dmResolveProjectPath(root, "../etc"); err == nil {
+		t.Fatal("traversal was ALLOWED (want error)")
 	}
 }

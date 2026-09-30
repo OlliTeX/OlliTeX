@@ -449,6 +449,15 @@ func (b *Bridge) Push(oauth2 *data.Oauth2, projectName string, directoryContents
 // the file-count limit, creates the postback key and candidate snapshot,
 // pushes to the snapshot API and — on success — waits for the postback and
 // approves the snapshot.
+// redactKey — audit H6: show only a short prefix of a bearer-capability key
+// (postback keys) in logs; never the full value.
+func redactKey(k string) string {
+	if len(k) <= 4 {
+		return "****"
+	}
+	return k[:4]
+}
+
 func (b *Bridge) pushCritical(oauth2 *data.Oauth2, projectName string, directoryContents, oldDirectoryContents *filestore.RawDirectory) error {
 	if rs := b.config.RepoStore; rs != nil && rs.MaxFileNum != nil {
 		if n := len(directoryContents.FileTable); n > int(*rs.MaxFileNum) {
@@ -459,7 +468,9 @@ func (b *Bridge) pushCritical(oauth2 *data.Oauth2, projectName string, directory
 	wglog.Debug("[%s] Pushing files (%d new, %d old)", projectName,
 		len(directoryContents.FileTable), len(oldDirectoryContents.FileTable))
 	postbackKey := b.postbackManager.MakeKeyForProject(projectName)
-	wglog.Debug("[%s] Created postback key: %s", projectName, postbackKey)
+	// audit H6: the postback key is a bearer capability (it authorizes
+	// snapshot postback) — never log it in full. Prefix + length hint only.
+	wglog.Debug("[%s] Created postback key (len=%d, prefix=%s…)", projectName, len(postbackKey), redactKey(postbackKey))
 	candidate, err := b.createCandidateSnapshot(projectName, directoryContents, oldDirectoryContents)
 	if err != nil {
 		return err

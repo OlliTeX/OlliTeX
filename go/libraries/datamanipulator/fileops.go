@@ -97,10 +97,11 @@ func dmWriteFile(projectDir, relativePath string, content []byte) (map[string]in
 	if err != nil {
 		return nil, err
 	}
-	if derr := os.MkdirAll(filepath.Dir(fullPath), 0o777); derr != nil {
+	// audit C4: project files are user content — never world-writable.
+	if derr := os.MkdirAll(filepath.Dir(fullPath), 0o755); derr != nil {
 		return nil, derr
 	}
-	if werr := os.WriteFile(fullPath, content, 0o666); werr != nil {
+	if werr := os.WriteFile(fullPath, content, 0o644); werr != nil {
 		return nil, werr
 	}
 	return dmFileMetadata(relativePath, content), nil

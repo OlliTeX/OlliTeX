@@ -1,6 +1,9 @@
 package authpages
 
 import (
+	"log"
+	"strings"
+
 	"ollitex/go/services/web/core"
 )
 
@@ -19,20 +22,52 @@ func postLogout(a *core.App) func(*core.Cxt, *core.Res) {
 				// PEXPIRE) around session.destroy.
 				sid := cxt.Sess.SessID
 				uid := cxt.Sess.UserIDHex()
-				_ = a.Store.Destroy(sid)
+				// audit L5: a Destroy failure otherwise leaves the session doc
+				// (and tracking entry) alive after "logout" — surface it.
+				if derr := a.Store.Destroy(sid); derr != nil {
+					log.Printf("logout: session destroy %s failed: %v", sid, derr)
+				}
 				if uid != "" {
 					a.UntrackSession(uid, sid)
 				}
 			} else {
-				_ = a.Store.Destroy(cxt.Sess.SessID)
+				if derr := a.Store.Destroy(cxt.Sess.SessID); derr != nil {
+					log.Printf("logout: anonymous session destroy %s failed: %v", cxt.Sess.SessID, derr)
+				}
 			}
 		}
-		target := body.Redirect
-		if target == "" {
+		target := strings.TrimSpace(body.Redirect)
+		// audit C2 (open-redirect): only root-relative paths are honored;
+		// anything else (absolute URL, protocol-relative //evil, backslash
+		// tricks) falls back to /login. Node's `res.redirect(body.redirect ||
+		// '/login')` had no validation — Go hardens this (Go-first security).
+		if !validLogoutRedirect(target) {
 			target = "/login"
 		}
 		res.Redirect(cxt.Req, 302, target)
 	}
+}
+
+// validLogoutRedirect — audit C2: a post-logout Location must be a
+// same-origin, root-relative path (`/...`). Rejects: empty (caller handles
+// default), any scheme (`http:`/`javascript:`), protocol-relative (`//x`),
+// and single-leading-slash violations.
+func validLogoutRedirect(t string) bool {
+	if t == "" || t[0] != '/' {
+		return false
+	}
+	if len(t) > 1 && t[1] == '/' { // protocol-relative → browser treats as host
+		return false
+	}
+	// a scheme like `foo/...` is impossible here (must start with /), but
+	// guard against injection tricks: backslash (browsers normalize /\x → //
+	// x, reopening protocol-relative) and control/whitespace characters.
+	for i := 0; i < len(t); i++ {
+		if t[i] == '\\' || t[i] < 0x20 || t[i] == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 // ---- POST /login (password) ----

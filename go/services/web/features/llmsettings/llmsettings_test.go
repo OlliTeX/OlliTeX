@@ -179,3 +179,31 @@ func TestBlockedURLs(t *testing.T) {
 		}
 	}
 }
+
+// TestChSplitRubric_C1 — audit C1: bullet parsing must compile AND work.
+// (The old inline `\u2022` escape made regexp.MustCompile panic; this calls
+// the real path including the unicode bullet.)
+func TestChSplitRubric_C1(t *testing.T) {
+	// unicode bullet list
+	pre, req := chSplitRubric("intro line\n\u2022 one\n\u2022 two")
+	_ = pre
+	if len(req) != 2 {
+		t.Fatalf("bullet list: got %d reqs %v", len(req), req)
+	}
+	if req[0] != "\u2022 one" || req[1] != "\u2022 two" {
+		t.Fatalf("bullet rows: %v", req)
+	}
+	// numbered list (marker retained in row, Node-parity)
+	pre2, req2 := chSplitRubric("1. alpha\n2. beta\n3) gamma")
+	_ = pre2
+	if len(req2) != 3 {
+		t.Fatalf("numbered: got %d reqs %v", len(req2), req2)
+	}
+	if req2[0] != "1. alpha" || req2[2] != "3) gamma" {
+		t.Fatalf("numbered rows: %v", req2)
+	}
+	// prose (single marker) → whole
+	if _, req3 := chSplitRubric("Just prose."); len(req3) != 1 || req3[0] != "Just prose." {
+		t.Fatalf("prose: %v", req3)
+	}
+}

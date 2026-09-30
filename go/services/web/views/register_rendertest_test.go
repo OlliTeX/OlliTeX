@@ -55,17 +55,17 @@ func TestRegisterAnonParity(t *testing.T) {
 // TestRegisterLoggedInParity — logged-in render fills the 3 user fields.
 func TestRegisterLoggedInFill(t *testing.T) {
 	d := PageData{CSRFToken: "c", Nonce: "n", Origin: "http://127.0.0.1:7420",
-		UserEmail: "someone@e2e.test", UserID: "6aa4b8b573ef0e5094f4cbc0"}
+		UserEmail: "someone@example.com", UserID: "6aa4b8b573ef0e5094f4cbc0"}
 	w := httptest.NewRecorder()
 	RegisterPage(w, d)
 	out := w.Body.String()
-	if !strings.Contains(out, `ol-usersEmail" content="someone@e2e.test"`) {
+	if !strings.Contains(out, `ol-usersEmail" content="someone@example.com"`) {
 		t.Errorf("usersEmail not filled")
 	}
 	if !strings.Contains(out, `ol-user_id" content="6aa4b8b573ef0e5094f4cbc0"`) {
 		t.Errorf("user_id content not filled")
 	}
-	if !strings.Contains(out, `sessionUser&quot;:{&quot;email&quot;:&quot;someone@e2e.test&quot;}`) {
+	if !strings.Contains(out, `sessionUser&quot;:{&quot;email&quot;:&quot;someone@example.com&quot;}`) {
 		t.Errorf("sessionUser fragment not filled")
 	}
 }

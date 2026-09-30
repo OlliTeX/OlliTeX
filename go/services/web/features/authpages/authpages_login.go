@@ -185,7 +185,13 @@ func postLogin(a *core.App) func(*core.Cxt, *core.Res) {
 		if raw, ok := old.GetRaw("postLoginRedirect"); ok && len(raw) >= 2 {
 			var s string
 			if json.Unmarshal(raw, &s) == nil && s != "" {
-				target = s
+				// audit C2 (defense-in-depth): the value is normally the
+				// server-stashed r.URL.Path, but it lives in the session store
+				// (a legacy Node session / tampering could carry a hostile
+				// absolute URL) — only same-origin root-relative paths pass.
+				if validLogoutRedirect(s) {
+					target = s
+				}
 			}
 		}
 		redirOrJSON(cxt, res, target)

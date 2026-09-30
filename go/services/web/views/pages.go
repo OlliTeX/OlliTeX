@@ -16,6 +16,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -333,7 +334,56 @@ func (p PageData) finalize(html string) string {
 	if orig != "" {
 		out = strings.ReplaceAll(out, capturedOrigin, orig)
 	}
+	out = sanitizeCaptureArtifacts(out, p.CSRFToken, orig)
 	return out
+}
+
+// sanitizeCaptureArtifacts — audit H2 (problems_30092026, 2026-09-30):
+// the view skeletons were captured from e2e runs with a LIVE e2e session,
+// so stale literals leaked through finalize regardless of slot coverage.
+// This terminal pass (single choke point for every Page-family render) removes them:
+//
+//  1. literal `_csrf` form values (dead e2e tokens — would 403 a real
+//     user's POST and leak capture tokens) → the CURRENT request's csrf token
+//  2. any `@e2e.test` emails (e2e sessionUser remnants) → "" (guest shape;
+//     the hydrated UI re-renders from the live session)
+//  3. baked e2e project ids (info leak in alternate links / meta / JSON) → ""
+//  4. captured origin when the request Origin is empty → root-relative
+//     (otherwise a bare host render keeps the 127.0.0.1:7420 leak)
+//
+// Compiled once (package scope; RE2 — no lazy quantifiers).
+var (
+	// `name="_csrf"` (raw HTML attr or JSON-escaped `\"` attr) … `value="TOKEN"`
+	csrfLiteralRe = regexp.MustCompile(`((?:name=\\?"_csrf\\?"[^>]{0,80}?value=)\\?")([A-Za-z0-9_-]{6,60})(\\?")`)
+	// exact capture-artifact emails (surgical: a real user may own any other
+	// @e2e.test address; these three are the e2e-run session remnants baked
+	// into the captured skeletons)
+	e2eEmails     = []string{"e2e-user@e2e.test", "admin@e2e.test", "someone@e2e.test"}
+	e2eProjectIDs = []string{"6aa4b8c973ef0e5094f4cc02", "1234567890abcdefgh"}
+)
+
+func sanitizeCaptureArtifacts(in, csrfToken, origin string) string {
+	if csrfLiteralRe.MatchString(in) {
+		// ${n} braces are mandatory: $1 + a token char run is parsed as ONE
+		// (named) group reference and silently expands to "".
+		in = csrfLiteralRe.ReplaceAllString(in, "${1}"+csrfToken+"${3}")
+	}
+	for _, em := range e2eEmails {
+		if strings.Contains(in, em) {
+			in = strings.ReplaceAll(in, em, "")
+		}
+	}
+	for _, id := range e2eProjectIDs {
+		if strings.Contains(in, id) {
+			in = strings.ReplaceAll(in, id, "")
+		}
+	}
+	// captured origin → the current request origin (empty → root-relative;
+	// never serve a 127.0.0.1:7420 literal to a real user).
+	if strings.Contains(in, capturedOrigin) {
+		in = strings.ReplaceAll(in, capturedOrigin, origin)
+	}
+	return in
 }
 
 // boolAttr — pug `content=bool` renders the ATTRIBUTE PRESENT (bare, empty

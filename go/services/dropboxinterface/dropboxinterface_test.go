@@ -382,6 +382,7 @@ func strPtr(s string) *string { return &s }
 // --- handler wiring (service token + missing fields) ------------------------
 
 func TestDBX_HandlerHealthAndAuth(t *testing.T) {
+	dbxDefaultToken = ""
 	f := dbxStart(t)
 	h := &DropboxHandlers{Cfg: DropboxConfig{ServiceToken: "svc", APIBase: f.srv.URL, ContentBase: f.srv.URL}}
 	srv := httptest.NewServer(h.Mux())
@@ -403,7 +404,8 @@ func TestDBX_HandlerHealthAndAuth(t *testing.T) {
 
 func TestDBX_HandlerListMissingToken(t *testing.T) {
 	f := dbxStart(t)
-	h := &DropboxHandlers{Cfg: DropboxConfig{APIBase: f.srv.URL, ContentBase: f.srv.URL}}
+	dbxDefaultToken = "dbx-test-token"
+	h := &DropboxHandlers{Cfg: DropboxConfig{ServiceToken: dbxDefaultToken, APIBase: f.srv.URL, ContentBase: f.srv.URL}}
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()
 	code := dbxHTTP(srv.URL+"/list", map[string]interface{}{"path": "/"}, nil)
@@ -414,7 +416,8 @@ func TestDBX_HandlerListMissingToken(t *testing.T) {
 
 func TestDBX_HandlerFileGet(t *testing.T) {
 	f := dbxStart(t)
-	h := &DropboxHandlers{Cfg: DropboxConfig{APIBase: f.srv.URL, ContentBase: f.srv.URL}}
+	dbxDefaultToken = "dbx-test-token"
+	h := &DropboxHandlers{Cfg: DropboxConfig{ServiceToken: dbxDefaultToken, APIBase: f.srv.URL, ContentBase: f.srv.URL}}
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()
 	code := dbxDo("GET", srv.URL+"/file?path=/docs/x.bin", nil, map[string]string{"X-Access-Token": f.goodToken})
@@ -425,7 +428,8 @@ func TestDBX_HandlerFileGet(t *testing.T) {
 
 func TestDBX_HandlerFileDeleteNotFound(t *testing.T) {
 	f := dbxStart(t)
-	h := &DropboxHandlers{Cfg: DropboxConfig{APIBase: f.srv.URL, ContentBase: f.srv.URL}}
+	dbxDefaultToken = "dbx-test-token"
+	h := &DropboxHandlers{Cfg: DropboxConfig{ServiceToken: dbxDefaultToken, APIBase: f.srv.URL, ContentBase: f.srv.URL}}
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()
 	code := dbxDo("DELETE", srv.URL+"/file?path=/missing", nil, map[string]string{"X-Access-Token": f.goodToken})
@@ -440,6 +444,9 @@ func dbxHTTP(url string, body map[string]interface{}, header map[string]string) 
 	return dbxDo("POST", url, body, header)
 }
 
+// dbxDefaultToken — audit C4 test support: handler tests run a token-ARMED gate.
+var dbxDefaultToken = ""
+
 func dbxDo(method, url string, body map[string]interface{}, header map[string]string) int {
 	var rd io.Reader
 	if body != nil {
@@ -447,6 +454,9 @@ func dbxDo(method, url string, body map[string]interface{}, header map[string]st
 		rd = strings.NewReader(string(b))
 	}
 	req, _ := http.NewRequest(method, url, rd)
+	if dbxDefaultToken != "" {
+		req.Header.Set("X-Service-Token", dbxDefaultToken)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -473,6 +483,9 @@ func dbxBody(method, url string, body map[string]interface{}, header map[string]
 	if err != nil {
 		panic(err)
 	}
+	if dbxDefaultToken != "" {
+		req.Header.Set("X-Service-Token", dbxDefaultToken)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -492,7 +505,8 @@ func dbxBody(method, url string, body map[string]interface{}, header map[string]
 
 func TestDBX_HandlerMkdir(t *testing.T) {
 	f := dbxStart(t)
-	h := &DropboxHandlers{Cfg: DropboxConfig{APIBase: f.srv.URL, ContentBase: f.srv.URL}}
+	dbxDefaultToken = "dbx-test-token"
+	h := &DropboxHandlers{Cfg: DropboxConfig{ServiceToken: dbxDefaultToken, APIBase: f.srv.URL, ContentBase: f.srv.URL}}
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()
 	code := dbxHTTP(srv.URL+"/mkdir", map[string]interface{}{"access_token": f.goodToken, "path": "/hnew"}, nil)
@@ -511,7 +525,8 @@ func TestDBX_HandlerMkdir(t *testing.T) {
 
 func TestDBX_HandlerMove(t *testing.T) {
 	f := dbxStart(t)
-	h := &DropboxHandlers{Cfg: DropboxConfig{APIBase: f.srv.URL, ContentBase: f.srv.URL}}
+	dbxDefaultToken = "dbx-test-token"
+	h := &DropboxHandlers{Cfg: DropboxConfig{ServiceToken: dbxDefaultToken, APIBase: f.srv.URL, ContentBase: f.srv.URL}}
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()
 	code, body := dbxBody("POST", srv.URL+"/move", map[string]interface{}{"access_token": f.goodToken, "src": "/a", "dst": "/b"}, nil)
@@ -526,7 +541,8 @@ func TestDBX_HandlerMove(t *testing.T) {
 
 func TestDBX_HandlerFilePost(t *testing.T) {
 	f := dbxStart(t)
-	h := &DropboxHandlers{Cfg: DropboxConfig{APIBase: f.srv.URL, ContentBase: f.srv.URL}}
+	dbxDefaultToken = "dbx-test-token"
+	h := &DropboxHandlers{Cfg: DropboxConfig{ServiceToken: dbxDefaultToken, APIBase: f.srv.URL, ContentBase: f.srv.URL}}
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()
 	cb := base64.StdEncoding.EncodeToString([]byte("file bytes"))

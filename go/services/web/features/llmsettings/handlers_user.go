@@ -358,7 +358,8 @@ func (f *fs) addProvider(cxt *core.Cxt, res *core.Res) {
 	if parsed.apiKey != "" {
 		apiKey = f.crypto.encrypt(parsed.apiKey)
 	}
-	rowObj = rowObj.set("apiKey", apiKey)
+	// audit M2: the old port wrote `rowObj.set(...)` AFTER snapshotting `row` —
+	// a dead store; the public row shape is `row`, so only that is updated.
 	row["apiKey"] = apiKey
 	row["id"] = rowId
 	row["createdAt"] = nowISO()

@@ -419,7 +419,7 @@ func (s *Service) createProjectBlob(w http.ResponseWriter, r *http.Request) {
 	// Node blobHashFromFile = raw sha1 hex of the payload (NOT the git blob
 	// hash). Case-insensitive hex compare (both sides lowercased).
 	h1 := sha1.Sum(data)
-	if actual := hex.EncodeToString(h1[:]); strings.ToLower(actual) != strings.ToLower(hash) {
+	if actual := hex.EncodeToString(h1[:]); !strings.EqualFold(actual, hash) {
 		conflict(w, "File hash mismatch")
 		return
 	}

@@ -42,12 +42,18 @@ func ExpressNotFound(w http.ResponseWriter, r *http.Request) {
 // unchecked), and any failure is answered with the exact Node 401 JSON
 // `{"error":"Invalid or missing service token"}` — including requests for
 // unknown paths, which Node's app-level middleware short-circuits. A valid
-// (or absent-requirement) token falls through to the wrapped handler.
+// token (or an openPath) falls through to the wrapped handler.
 //
 // The Node token is read from X-Service-Token or `Authorization: Bearer ...`
 // and compared in constant time; openPaths is the Node per-service exemption
 // list (dropboxinterface/datamanipulator exempt /health, webdavinterface
 // exempts nothing).
+//
+// DEFAULT-DENY (audit C4, Go-first hardening): when expected is EMPTY the
+// gate denies everything not in openPaths (401) instead of opening wide.
+// An unconfigured token means "not armed", never "no auth" — these are
+// data-mutating internal endpoints. Operators arm the gate with
+// SHARED_SERVICE_TOKEN (already set in production compose).
 func AuthGate(next http.Handler, expected string, warn func(), openPaths ...string) http.Handler {
 	open := make(map[string]bool, len(openPaths))
 	for _, p := range openPaths {
@@ -55,13 +61,13 @@ func AuthGate(next http.Handler, expected string, warn func(), openPaths ...stri
 	}
 	var warned sync.Once
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if expected == "" {
-			warned.Do(func() { warn() })
+		if open[r.URL.Path] {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if open[r.URL.Path] {
-			next.ServeHTTP(w, r)
+		if expected == "" {
+			warned.Do(func() { warn() })
+			WriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "Invalid or missing service token"})
 			return
 		}
 		cand := r.Header.Get("X-Service-Token")

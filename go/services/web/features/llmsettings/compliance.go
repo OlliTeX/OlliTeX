@@ -24,6 +24,8 @@ package llmsettings
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"regexp"
 	"sort"
 	"strings"
@@ -424,26 +426,36 @@ func chStripLatexComments(text string) string {
 	return strings.Join(lines, "\n")
 }
 
+// chNumberedRe / chBulletRe — audit C1 (problems_30092026): the original
+// per-call `regexp.MustCompile(` + `[-*\u2022]`)` used a \u escape which Go's
+// RE2 rejects — the panic escaped the plain `go f.chPerform` goroutine and
+// killed the ENTIRE web process (DoS on each compliance check, post-200).
+// Now: package-scoped (compiled ONCE at init), bullet via RE2's `\x{2022}`
+// unicode hex escape (valid), and chPerform recovers any future panic into a
+// clean job error.
+var (
+	chNumberedRe = regexp.MustCompile(`^\s*\d{1,3}[.)]\s+`)
+	chBulletRe   = regexp.MustCompile(`^\s*[-*\x{2022}]\s+`)
+)
+
 // chSplitRubric — Node splitRubric (numbered/bulleted parsing; prose → whole).
 func chSplitRubric(text string) (preamble string, requirements []string) {
 	raw := strings.TrimSpace(text)
 	if raw == "" {
 		return "", []string{""}
 	}
-	numbered := regexp.MustCompile(`^\s*\d{1,3}[.)]\s+`)
-	bullet := regexp.MustCompile(`^\s*[-*\u2022]\s+`)
 	lines := strings.Split(text, "\n")
 	count := 0
 	for _, l := range lines {
-		if numbered.MatchString(l) {
+		if chNumberedRe.MatchString(l) {
 			count++
 		}
 	}
 	var marker *regexp.Regexp
 	if count >= 2 {
-		marker = numbered
+		marker = chNumberedRe
 	} else {
-		marker = bullet
+		marker = chBulletRe
 	}
 	var cur []string
 	var preambleLines []string
@@ -498,6 +510,14 @@ func chBuildScanHints(stripped []projDoc) string {
 // chPerform — one pass per requirement; each structured call fails locally in
 // this build → status:'na' items; summary attempt fails → ”.
 func (f *fs) chPerform(ctx context.Context, j *chJob) {
+	// audit C1 (c): a panic anywhere downstream (bad regex, malformed JSON,
+	// any future bug) must surface as a job error, never kill the process.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("llmsettings: compliance check crashed (recovered): %v", r)
+			f.chFinish(ctx, j, "error", "internal-error", "Compliance check crashed: "+fmt.Sprint(r), obj{})
+		}
+	}()
 	defer func() {
 		chQMu.Lock()
 		for i, id := range chQ {

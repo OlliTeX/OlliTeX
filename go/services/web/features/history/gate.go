@@ -2,10 +2,12 @@ package history
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
@@ -103,7 +105,11 @@ func (h *svc) loadProject(cxt *core.Cxt, oid bson.ObjectID) (*projDoc, error) {
 	var d bson.D
 	if err := db.Collection("projects").FindOne(ctx,
 		bson.D{{Key: "_id", Value: oid}}).Decode(&d); err != nil {
-		if err.Error() == "mongo: no documents in result" || err.Error() == "mongo: no documents in result" {
+		// audit M1: the old form compared the driver's error STRING twice
+		// (`== "mongo: no documents in result" || == ...` — a tautology that
+		// silently breaks if the driver's wording changes). errors.Is is the
+		// robust idiom: nil project is the expected not-found path.
+		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, nil
 		}
 		return nil, err

@@ -32,12 +32,15 @@ func NewOneTimeTokens(m *MongoLazy) *OneTimeTokens { return &OneTimeTokens{DB: m
 var TokenUnknownErr = errors.New("one-time token unknown")
 
 // coll resolves the `tokens` collection handle.
-func (o *OneTimeTokens) coll(ctx context.Context) *mongo.Collection {
+// audit H5: the old version panicked on a DB-handle error — a panic inside
+// a request goroutine is an avoidable process crash; propagate the error
+// (request-side 500) instead.
+func (o *OneTimeTokens) coll(ctx context.Context) (*mongo.Collection, error) {
 	db, err := o.DB.DB(ctx)
 	if err != nil {
-		panic(err) // unreachable in the wired deployments
+		return nil, err
 	}
-	return db.Collection("tokens")
+	return db.Collection("tokens"), nil
 }
 
 // New inserts a fresh token (64 hex chars), returns it. data carries
@@ -55,7 +58,11 @@ func (o *OneTimeTokens) NewWithExp(ctx context.Context, use string, data bson.M,
 	}
 	token := hex.EncodeToString(tok)
 	now := time.Now().UTC()
-	_, err := o.coll(ctx).InsertOne(ctx, bson.M{
+	coll, err := o.coll(ctx)
+	if err != nil {
+		return "", err
+	}
+	_, err = coll.InsertOne(ctx, bson.M{
 		"use":       use,
 		"token":     token,
 		"data":      data,
@@ -70,6 +77,10 @@ func (o *OneTimeTokens) NewWithExp(ctx context.Context, use string, data bson.M,
 // password flow maps all three onto the same Node 404 — battery-confirmed
 // indistinguishable in CE).
 func (o *OneTimeTokens) Peek(ctx context.Context, use, token string) (bson.M, int, error) {
+	coll, err := o.coll(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
 	filter := bson.M{
 		"use":       use,
 		"token":     token,
@@ -80,7 +91,7 @@ func (o *OneTimeTokens) Peek(ctx context.Context, use, token string) (bson.M, in
 		Data      bson.M `bson:"data"`
 		PeekCount int    `bson:"peekCount"`
 	}
-	err := o.coll(ctx).FindOneAndUpdate(ctx, filter,
+	err = coll.FindOneAndUpdate(ctx, filter,
 		bson.M{"$inc": bson.M{"peekCount": 1}}).Decode(&out)
 	if err != nil {
 		return nil, 0, TokenUnknownErr
@@ -89,11 +100,17 @@ func (o *OneTimeTokens) Peek(ctx context.Context, use, token string) (bson.M, in
 }
 
 // Expire marks the token used (Node's `expire`: $set usedAt — the doc
-// lingers, battery-pinned).
-func (o *OneTimeTokens) Expire(ctx context.Context, use, token string) {
-	_, _ = o.coll(ctx).UpdateOne(ctx,
+// lingers, battery-pinned). audit H5: returns the DB error instead of
+// panicking in coll.
+func (o *OneTimeTokens) Expire(ctx context.Context, use, token string) error {
+	coll, err := o.coll(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = coll.UpdateOne(ctx,
 		bson.M{"use": use, "token": token},
 		bson.M{"$set": bson.M{"usedAt": time.Now().UTC()}})
+	return err
 }
 
 // ObjectIdHex converts a mongo id (ObjectID or hex string) to hex —

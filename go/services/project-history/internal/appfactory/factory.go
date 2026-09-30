@@ -620,9 +620,7 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 			if err != nil {
 				return nil, err
 			}
-			if out == nil {
-				out = []byte{}
-			}
+			_ = out // audit M2: FetchNothing's contract is to DROP the response body (Node parity); discard explicitly
 			return &webapimanager.Response{Status: status}, nil
 		},
 		FetchJson: func(ctx context.Context, url string, _ time.Duration) (map[string]any, error) {

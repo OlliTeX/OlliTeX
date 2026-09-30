@@ -25,7 +25,7 @@ func (h *WebDAVHandlers) Mux() http.Handler {
 	cfg.withDefaults()
 
 	warnFn := func() {
-		fmt.Println("warn: SHARED_SERVICE_TOKEN is unset; accepting unauthenticated requests (should be restricted to in-container callers)")
+		fmt.Println("warn: SHARED_SERVICE_TOKEN is unset — gate is DEFAULT-DENY (audit C4); set the token to arm this service")
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/check", h.check)

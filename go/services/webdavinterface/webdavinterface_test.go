@@ -551,7 +551,8 @@ func TestWD_ServiceTokenAuth(t *testing.T) {
 }
 
 func TestWD_HandlerMissingFields(t *testing.T) {
-	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	wdDefaultToken = "wd-test-token"
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{ServiceToken: wdDefaultToken, Sleep: func(time.Duration) {}}}
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()
 	// /check missing password
@@ -566,7 +567,8 @@ func TestWD_HandlerMissingFields(t *testing.T) {
 
 func TestWD_HandlerListEndToEnd(t *testing.T) {
 	f, fsrv := wdStart(t)
-	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	wdDefaultToken = "wd-test-token"
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{ServiceToken: wdDefaultToken, Sleep: func(time.Duration) {}}}
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()
 	code, body := wdDo(t, "POST", srv.URL+"/list", map[string]interface{}{
@@ -597,6 +599,11 @@ func base64StdDecode(s string) (string, error) {
 }
 
 // wdDo POSTs a JSON body and returns the status code + body string.
+// wdDefaultToken — audit C4 test support: handler tests run a token-ARMED
+// gate (default-deny for unconfigured is the new contract). Tests that pin
+// the no-token 401 path (GateOrderAnd404) leave this empty.
+var wdDefaultToken = ""
+
 func wdDo(t *testing.T, method, url string, body map[string]interface{}, header map[string]string) (int, string) {
 	t.Helper()
 	var rd io.Reader
@@ -607,6 +614,9 @@ func wdDo(t *testing.T, method, url string, body map[string]interface{}, header 
 	req, err := http.NewRequest(method, url, rd)
 	if err != nil {
 		t.Fatalf("req: %v", err)
+	}
+	if wdDefaultToken != "" {
+		req.Header.Set("X-Service-Token", wdDefaultToken)
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -631,7 +641,8 @@ const wdBasicAuth = "Basic " + "dXU6cA==" // base64("u:p")
 
 func TestWD_HandlerMkdir(t *testing.T) {
 	_, srv := wdStart(t)
-	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	wdDefaultToken = "wd-test-token"
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{ServiceToken: wdDefaultToken, Sleep: func(time.Duration) {}}}
 	mux := httptest.NewServer(h.Mux())
 	defer mux.Close()
 	code, body := wdDo(t, "POST", mux.URL+"/mkdir", map[string]interface{}{"server_url": srv.URL, "username": "u", "password": "p", "path": "/hdir"}, nil)
@@ -650,7 +661,8 @@ func TestWD_HandlerMkdir(t *testing.T) {
 
 func TestWD_HandlerMove(t *testing.T) {
 	_, srv := wdStart(t)
-	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	wdDefaultToken = "wd-test-token"
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{ServiceToken: wdDefaultToken, Sleep: func(time.Duration) {}}}
 	mux := httptest.NewServer(h.Mux())
 	defer mux.Close()
 	code, body := wdDo(t, "POST", mux.URL+"/move", map[string]interface{}{"server_url": srv.URL, "username": "u", "password": "p", "src": "/notes.txt", "dst": "/renamed.txt"}, nil)
@@ -669,7 +681,8 @@ func TestWD_HandlerMove(t *testing.T) {
 
 func TestWD_HandlerFileGet(t *testing.T) {
 	_, srv := wdStart(t)
-	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	wdDefaultToken = "wd-test-token"
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{ServiceToken: wdDefaultToken, Sleep: func(time.Duration) {}}}
 	mux := httptest.NewServer(h.Mux())
 	defer mux.Close()
 	hdr := map[string]string{"X-Server-Url": srv.URL, "X-Username": "u", "Authorization": wdBasicAuth}
@@ -690,7 +703,8 @@ func TestWD_HandlerFileGet(t *testing.T) {
 
 func TestWD_HandlerFilePost(t *testing.T) {
 	_, srv := wdStart(t)
-	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	wdDefaultToken = "wd-test-token"
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{ServiceToken: wdDefaultToken, Sleep: func(time.Duration) {}}}
 	mux := httptest.NewServer(h.Mux())
 	defer mux.Close()
 	cb := base64.StdEncoding.EncodeToString([]byte("uploaded bytes"))
@@ -706,7 +720,8 @@ func TestWD_HandlerFilePost(t *testing.T) {
 
 func TestWD_HandlerFileDelete(t *testing.T) {
 	_, srv := wdStart(t)
-	h := &WebDAVHandlers{Cfg: WebDAVConfig{Sleep: func(time.Duration) {}}}
+	wdDefaultToken = "wd-test-token"
+	h := &WebDAVHandlers{Cfg: WebDAVConfig{ServiceToken: wdDefaultToken, Sleep: func(time.Duration) {}}}
 	mux := httptest.NewServer(h.Mux())
 	defer mux.Close()
 	hdr := map[string]string{"X-Server-Url": srv.URL, "X-Username": "u", "Authorization": wdBasicAuth}
@@ -725,6 +740,7 @@ func TestWD_HandlerFileDelete(t *testing.T) {
 // gate has none), so unknown paths answer 401 without a token, and Express's
 // 404 page with a valid token.
 func TestWD_GateOrderAnd404(t *testing.T) {
+	wdDefaultToken = ""
 	h := &WebDAVHandlers{Cfg: WebDAVConfig{ServiceToken: "sekret", Sleep: func(time.Duration) {}}}
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()

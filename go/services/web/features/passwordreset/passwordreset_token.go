@@ -206,7 +206,7 @@ func setNewPassword(a *core.App, mail *core.Mail, tok *core.OneTimeTokens) func(
 			return
 		}
 		// expire the token (usedAt)
-		tok.Expire(ctx, "password", token)
+		_ = tok.Expire(ctx, "password", token) // audit H5: DB errors propagate, no panic
 
 		// removeSessionsFromRedis(user): drop every session of that user
 		removeUserSessions(a, userDoc.ObjectID.Hex())

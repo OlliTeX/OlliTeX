@@ -794,8 +794,11 @@ func v8dateParse(str []rune, out *v8dateResult) bool {
 			} else {
 				return false
 			}
-		} else if (token.isSign() || token.isSymbol(')')) && (token == token && hasReadNumber) {
-			// Extra sign or ')' is illegal if a number has been read.
+		} else if (token.isSign() || token.isSymbol(')')) && hasReadNumber {
+			// Extra sign or ')' is illegal after a number (V8 oracle:
+			// dateparser.cc `else if ((in.IsAsciiSign() || in.Is(")")) &&
+			// in.HasReadNumber()) return false`; the old `token == token`
+			// tautology — staticcheck SA4000 — is removed, semantics unchanged).
 			return false
 		}
 		// Other characters and whitespace are ignored.

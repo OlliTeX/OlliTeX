@@ -17,6 +17,15 @@ if [ -z "${DATABASE_URL:-}" ]; then
   exit 0
 fi
 
+# 2026-09-30 (build-infra): the Node services/history-v1 tree was retired in
+# 134afebcc0 (S5, owner directive); the Go historyv1 service owns the schema in
+# PG-plane deployments. Skip the Node knex migrations when the tree is not in
+# the image instead of failing boot.
+if [ ! -d /overleaf/services/history-v1 ]; then
+  echo "890: services/history-v1 (Node) not present in this build — skipping Node knex migrations (retired; Go historyv1 owns the schema)."
+  exit 0
+fi
+
 cd /overleaf/services/history-v1
 LOG_FILE=/var/lib/overleaf/data/history/migrations.log
 mkdir -p "$(dirname "$LOG_FILE")"

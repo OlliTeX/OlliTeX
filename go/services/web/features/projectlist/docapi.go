@@ -492,7 +492,8 @@ func docapiPostHandler(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			res.JSON(400, colVa("Invalid input: expected object, received string", "body", 400))
 			return
 		}
-		if body.Lines == nil || len(*body.Lines) < 0 {
+		if body.Lines == nil { // audit M6: the old `len(*body.Lines) < 0` clause was
+			// always false (SA4024) — deleted; nil is the real non-array signal
 			res.JSON(400, colVa("Invalid input: expected array, received string", "body.lines", 400))
 			return
 		}

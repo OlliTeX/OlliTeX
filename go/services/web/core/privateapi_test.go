@@ -87,3 +87,23 @@ func TestAPIBasicGateMatrix(t *testing.T) {
 		t.Fatalf("valid-cred body=%q want OK", b)
 	}
 }
+
+// TestBasicCredsMatch_H4 — audit H4: constant-time compare semantics.
+func TestBasicCredsMatch_H4(t *testing.T) {
+	cases := []struct {
+		au, p, eu, ep string
+		want          bool
+	}{
+		{"user", "pass", "user", "pass", true},
+		{"user", "wrong", "user", "pass", false},
+		{"wrong", "pass", "user", "pass", false},
+		{"", "", "user", "pass", false},
+		{"user", "pass", "", "pass", false}, // unconfigured → never admit
+		{"", "pass", "", "pass", false},
+	}
+	for i, c := range cases {
+		if got := basicCredsMatch(c.au, c.p, c.eu, c.ep); got != c.want {
+			t.Errorf("case %d: got %v want %v", i, got, c.want)
+		}
+	}
+}

@@ -209,7 +209,7 @@ func invMember(uid string, doc bson.D) bool {
 }
 
 func invMemberLevel(uid string, doc bson.D) string {
-	if strings.ToLower(asStr(dget(doc, "owner_ref"))) == strings.ToLower(uid) {
+	if strings.EqualFold(asStr(dget(doc, "owner_ref")), uid) {
 		return "owner"
 	}
 	if invA(dget(doc, "collaberator_refs"), uid) {
@@ -826,7 +826,7 @@ func tokensHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		_ = uid
 
 		tokens := map[string]any{}
-		if strings.ToLower(strOrHex(dget(*doc, "owner_ref"))) == strings.ToLower(uid) {
+		if strings.EqualFold(strOrHex(dget(*doc, "owner_ref")), uid) {
 			t := dget(*doc, "tokens")
 			if t == nil {
 				res.SendStatus(403) // Node: !tokens (undefined) -> sendStatus(403)
