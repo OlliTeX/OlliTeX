@@ -5,6 +5,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"regexp"
 	"testing"
+
+	"ollitex/go/services/web/core"
 )
 
 func mustJSON(t *testing.T, v any) string {
@@ -304,5 +306,24 @@ func TestCanRead(t *testing.T) {
 	// site admin always reads
 	if !canRead(bson.D{{Key: "owner_ref", Value: owner}}, uid, true) {
 		t.Fatal("admin read should pass")
+	}
+}
+
+func TestWordcountRouteShape(t *testing.T) {
+	if !wordcountPat.MatchString("/project/6ab8778fc0daeab0cd7f53cf/wordcount") {
+		t.Fatal("lowercase path must match (frontend uses lowercase; Express is case-insensitive)")
+	}
+	if !wordcountPat.MatchString("/Project/6ab8778fc0daeab0cd7f53cf/wordcount") {
+		t.Fatal("Node-case path must match (oracle route constant)")
+	}
+	f := Feature(&core.App{}).Routes
+	found := false
+	for _, r := range f {
+		if r.Method == "GET" && r.Pattern == wordcountPat {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("GET /project/:id/wordcount route must be registered on the compile feature")
 	}
 }

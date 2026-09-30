@@ -267,6 +267,12 @@ ENV GIT_BRIDGE_REPOSTORE_MAX_FILE_SIZE=52428800
 COPY server-ce/static/bin/tex-fmt /usr/local/bin/tex-fmt
 RUN chmod 755 /usr/local/bin/tex-fmt
 
+# CLSI word count: vendored texcount (perl script + wrapper). Runs on the
+# Alpine perl (perl-core deps only). See server-ce/static/bin/README.md.
+COPY server-ce/static/bin/texcount /usr/bin/texcount
+COPY server-ce/static/bin/texcount.pl /usr/bin/texcount.pl
+RUN chmod 755 /usr/bin/texcount && chmod 644 /usr/bin/texcount.pl
+
 EXPOSE 80
 
 ENTRYPOINT ["/sbin/my_init"]

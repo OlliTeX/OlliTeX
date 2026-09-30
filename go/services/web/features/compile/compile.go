@@ -122,6 +122,16 @@ import (
 // case-insensitive).
 var compilePat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/compile$`)
 var stopPat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/compile/stop$`)
+var wordcountPat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/wordcount$`)
+
+// wcResEntry — the word-count compile body's resource entries (same JSON
+// shape as the compile path's local resEntry).
+type wcResEntry struct {
+	Path     string `json:"path"`
+	Content  string `json:"content,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Modified *int64 `json:"modified,omitempty"`
+}
 
 var validOID = regexp.MustCompile(`^[0-9a-fA-F]{24}$`)
 
@@ -169,6 +179,8 @@ func Feature(a *core.App) core.Feature {
 		Routes: []core.Route{
 			{Method: "POST", Pattern: compilePat, Handler: compileHandler(a)},
 			{Method: "POST", Pattern: stopPat, Handler: stopHandler(a)},
+			// Word-count (Node CompileController.wordCount; read-auth, no limiter).
+			{Method: "GET", Pattern: wordcountPat, Handler: wordCountHandler(a)},
 			// P5.2b — output read (download-PDF button + clsi-cache shapes)
 			{Method: "GET", Pattern: pdfDownloadPattern, Handler: pdfDownloadHandler(a)},
 			{Method: "GET", Pattern: cachedJSONPattern, Handler: cachedBuildJSONHandler(a)},
@@ -1043,5 +1055,220 @@ func stopHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 		res.SendStatus(200)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GET /project/:id/wordcount — Node CompileController.wordCount
+// ---------------------------------------------------------------------------
+//
+// Oracle (services/web/app/src/router.mjs + Features/Compile/
+// CompileController.mjs + ClsiManager.mjs, wordCount):
+//
+//	Given a project the user can READ (ensureUserCanReadProject; invalid
+//	ObjectId -> 404 JSON, absent -> 404 HTML, non-member -> 403 restricted —
+//	same chain as every other compile route here):
+//	  1. filename = query.file || the resolved root resource path
+//	     (_buildRequest: rootResourcePath override, else the root doc).
+//	  2. req = _buildRequest(null, pid, uid, {...limits, compileFromHistory,
+//	     compileFromClsiCache, metricsPath: 'wordcount'}) — i.e. a full
+//	     compile-shaped body (resources + root + options) so the CLSI can
+//	     (re)write the compile dir when it has none.
+//	  3. POST `<clsi>/project/:pid/user/:uid/wordcount?
+//	     compileBackendClass=&compileGroup=&file=<filename>` with that body
+//	     (Node requestWordCount POST first, json: req).
+//	  4. 409 with baseHistoryVersion undefined -> parse baseHistoryVersion
+//	     from the 409 JSON and retry ONCE (Node retry-from version).
+//	     404 | 413 | 423 -> GET fallback (no body; count what is on disk);
+//	     any other status -> throw -> 500 (Node RequestFailedError path).
+//	  5. Success -> res.json(body) passthrough: {"texcount": {...}}.
+//
+// The CLSI side is the Go clsitex port (Wordcount/WordcountWithSync):
+// texcount -nocol -inc $COMPILE_DIR/<file> — texcount must be installed
+// (server-ce/static/bin/texcount, Dockerfile -> /usr/bin/texcount).
+func wordCountHandler(a *core.App) func(*core.Cxt, *core.Res) {
+	return func(cxt *core.Cxt, res *core.Res) {
+		if cxt.Sess == nil || cxt.Sess.UserIDHex() == "" {
+			denyRead(cxt, res) // defense in depth; the core gate bounces first
+			return
+		}
+		uid := cxt.Sess.UserIDHex()
+		p, ok := preflight(cxt, res, a, cxt.Params["1"])
+		if !ok {
+			return
+		}
+		ctx := cxt.Req.Context()
+		pid := cxt.Params["1"]
+
+		// ---- 1) filename (Node: file || req.compile.rootResourcePath)
+		filename := cxt.Req.URL.Query().Get("file")
+		root := ""
+		rootFolder, _ := dget(*p, "rootFolder").(bson.A)
+		docs, files := walk(rootFolder)
+		rootDocID := oidHex(dget(*p, "rootDoc_id"))
+		for _, d := range docs {
+			if d.ID != "" && d.ID == rootDocID {
+				root = d.Path
+				break
+			}
+		}
+		if root == "" {
+			for _, d := range docs {
+				if d.Path == "main.tex" {
+					root = d.Path
+					break
+				}
+			}
+		}
+		if filename == "" {
+			filename = root
+		}
+		if filename == "" {
+			res.JSON(500, []byte(internal500)) // Node: _buildRequest OError -> 500
+			return
+		}
+
+		// ---- 2) compile-shaped body (the docstore path: _buildRequestFromMongo
+		//         equivalent; CE default, no compileFromHistory bootstrap here)
+		ownerHex := oidHex(dget(*p, "owner_ref"))
+		var ownerDoc *bson.D
+		if ownerHex != "" && a.Mongo != nil {
+			if ooid, oerr := bson.ObjectIDFromHex(ownerHex); oerr == nil {
+				if db, derr := a.Mongo.DB(ctx); derr == nil {
+					var od bson.D
+					if db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: ooid}}).Decode(&od) == nil {
+						ownerDoc = &od
+					}
+				}
+			}
+		}
+		projectCompiler, _ := dget(*p, "compiler").(string)
+		lim := computeLimits(ownerDoc, projectCompiler)
+		dispatch := lim.CompilerRaw
+		if dispatch == "" {
+			dispatch = "latex"
+		}
+		bid := genBuildId()
+
+		lines, derr := getDocLines(ctx, strings.ToLower(pid))
+		if derr != nil {
+			res.JSON(500, []byte(internal500))
+			return
+		}
+		resources := []wcResEntry{}
+		historyID := ""
+		if ov, o2 := dget(*p, "overleaf").(bson.D); o2 {
+			if h, h2 := dget(ov, "history").(bson.D); h2 {
+				if s, s2 := dget(h, "id").(string); s2 {
+					historyID = s
+				}
+			}
+		}
+		for _, d := range docs {
+			if l, lok := lines[d.ID]; lok && len(l) > 0 {
+				resources = append(resources, wcResEntry{Path: d.Path, Content: strings.Join(l, "\n")})
+			}
+			// zero-line stub docs: omitted, same rule as the compile path
+		}
+		for _, f := range files {
+			e := wcResEntry{Path: f.Path}
+			if f.Hash != "" && historyID != "" {
+				e.URL = filestoreBase() + "/history/project/" + historyID + "/hash/" + f.Hash
+				if f.Created > 0 {
+					ms := f.Created
+					e.Modified = &ms
+				}
+			}
+			resources = append(resources, e)
+		}
+
+		// Node wordCount option additions on top of the standard set.
+		options := compileOptionsOf(lim, dispatch)
+		options["buildId"] = bid
+		options["compileFromClsiCache"] = true
+		options["metricsPath"] = "wordcount"
+
+		mkBody := func(baseHistoryVersion *int64) []byte {
+			compile := map[string]any{
+				"options":          options,
+				"resources":        resources,
+				"rootResourcePath": root,
+			}
+			if baseHistoryVersion != nil {
+				compile["baseHistoryVersion"] = *baseHistoryVersion
+			}
+			b, _ := json.Marshal(map[string]any{"compile": compile, "userId": uid})
+			return b
+		}
+
+		base := clsiBase()
+		if dispatch == "typst" {
+			base = clsiTypstBase()
+		}
+		u := base + "/project/" + pid + "/user/" + uid + "/wordcount" +
+			"?compileBackendClass=" + url.QueryEscape(lim.BackendClass) +
+			"&compileGroup=" + url.QueryEscape(lim.CompileGroup) +
+			"&file=" + url.QueryEscape(filename)
+
+		call := func(method string, body []byte) (int, []byte, error) {
+			var rdr *strings.Reader
+			if body != nil {
+				rdr = strings.NewReader(string(body))
+			} else {
+				rdr = strings.NewReader("")
+			}
+			req, rerr := http.NewRequest(method, u, rdr)
+			if rerr != nil {
+				return 0, nil, rerr
+			}
+			req.Header.Set("Accept", "application/json")
+			if body != nil {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			cctx, cancel := context.WithTimeout(ctx, 300*time.Second)
+			defer cancel()
+			resp, e2 := http.DefaultClient.Do(req.WithContext(cctx))
+			if e2 != nil {
+				return 0, nil, e2
+			}
+			defer resp.Body.Close()
+			b2, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+			return resp.StatusCode, b2, nil
+		}
+
+		// ---- 3/4) POST first; 409 -> one retry with the asked version;
+		//            404/413/423 -> GET fallback; anything else -> 500.
+		code, body, cerr := call("POST", mkBody(nil))
+		if cerr != nil {
+			res.JSON(500, []byte(internal500))
+			return
+		}
+		if code == 409 {
+			var eb struct {
+				BaseHistoryVersion int64 `json:"baseHistoryVersion"`
+			}
+			if jerr := json.Unmarshal(body, &eb); jerr == nil {
+				bv := eb.BaseHistoryVersion
+				code2, body2, cerr2 := call("POST", mkBody(&bv))
+				if cerr2 != nil {
+					res.JSON(500, []byte(internal500))
+					return
+				}
+				code, body = code2, body2
+			}
+		}
+		if code == 404 || code == 413 || code == 423 {
+			code2, body2, cerr2 := call("GET", nil)
+			if cerr2 != nil {
+				res.JSON(500, []byte(internal500))
+				return
+			}
+			code, body = code2, body2
+		}
+		if code != 200 {
+			res.JSON(500, []byte(internal500)) // Node: RequestFailedError -> 500 page
+			return
+		}
+		res.JSON(200, body)
 	}
 }

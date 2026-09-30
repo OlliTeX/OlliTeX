@@ -1,0 +1,5 @@
+#!/bin/sh
+# texcount wrapper (CTAN/texlive-style): run the co-located texcount.pl.
+# Resolves its own directory so PATH invocations work.
+here="$(cd "$(dirname "$0")" && pwd)"
+exec perl "$here/texcount.pl" "$@"
