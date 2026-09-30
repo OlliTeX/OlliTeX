@@ -38,14 +38,16 @@ func TestFactoryUnknownBackend(t *testing.T) {
 	}
 }
 
-func TestFactoryFSRetired(t *testing.T) {
-	// G2 (STOR-1): fs is retired -> actionable error, not a backend.
-	_, err := Create(Settings{Backend: "fs", UseSubdirectories: true}, Adapters{})
+func TestFactoryFSRemoved(t *testing.T) {
+	// A (owner queue 2026-09-30): the fs backend is REMOVED in-tree
+	// (S3/SeaweedFS is the only object-store backend) — "fs" now lands in
+	// the unknown-backend path.
+	_, err := Create(Settings{Backend: "fs"}, Adapters{})
 	if err == nil {
-		t.Fatal("want retired-backend error")
+		t.Fatal("want unknown-backend error")
 	}
-	if !strings.Contains(err.Error(), "retired") {
-		t.Fatalf("error should mention retirement: %v", err)
+	if !strings.Contains(err.Error(), "unknown backend") {
+		t.Fatalf("error should be the unknown-backend one: %v", err)
 	}
 }
 

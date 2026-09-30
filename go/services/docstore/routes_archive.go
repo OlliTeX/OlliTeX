@@ -61,10 +61,12 @@ func (s *Server) hDestroy(ctx context.Context, w http.ResponseWriter, p routePar
 
 // ---- archive flows (DocArchiveManager 1:1) ---------------------------------------------------
 
-// archiveEnabled = _isArchivingEnabled 1:1 (the archive runs against the
-// configured object persistor: fs or s3/SeaweedFS backend).
+// archiveEnabled = _isArchivingEnabled (the archive runs against the
+// configured object persistor). A (owner queue 2026-09-30): the fs
+// archive backend is REMOVED in-tree — cmd/docstore fatals on any
+// BACKEND != s3 at boot, so only the s3/SeaweedFS path remains.
 func (s *Server) archiveEnabled() bool {
-	return s.cfg.Backend == "fs" || s.cfg.Backend == "s3"
+	return s.cfg.Backend == "s3"
 }
 
 func (s *Server) nonArchivedDocIDs(ctx context.Context, pid string) ([]string, error) {

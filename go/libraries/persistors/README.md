@@ -31,7 +31,7 @@ persistor only overrides what its backend supports.
 ## The backends
 | Type | Built with | Notes |
 | --- | --- | --- |
-| ~~`NewFSPersistor`~~ | RETIRED (G2 STOR-1, S3-only durable backend) — factory now returns an actionable `fs backend is retired` SettingsError |
+| ~~`NewFSPersistor`~~ | **REMOVED** (A, owner queue 2026-09-30; originally G2 STOR-1) — the fs backend no longer exists; factory returns the `unknown backend` SettingsError |
 | `func NewS3Persistor(…)` | `s3_seam.S3Client` | the SeaweedFS/S3 backend (the `go/s3x` zero-dep client is a host-injected `S3Client`; keeps keys verbatim, hex-md5 → base64 `Content-MD5`) |
 | `func NewGcsPersistor(…)` | `gcs_seam.GCSStorage` | the Google Cloud Storage backend |
 | `func NewPerProjectEncryptedS3Persistor(…)` | S3 + `RootKeyEncryptionKey` | **per-project encryption** (SSE-C) |
@@ -64,7 +64,7 @@ wrap with a `MigrationPersistor` (the two-backend migration path).
 
 ## Testing & coverage
 `go test ./go/libraries/persistors/ -count=1 -cover` — oracle-pinned to the Node
-`object-persistor` suite, over fake `S3Client`/`GCSStorage` (fs retired in G2
+`object-persistor` suite, over fake `S3Client`/`GCSStorage` (fs removed in A (2026-09-30)
 against a temp dir, S3/GCS against the fakes, the encryption + migration paths).
 **Coverage: 88.6%** (above the 85% gate; **no live cloud required**).
 

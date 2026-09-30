@@ -36,8 +36,8 @@ go/
 
 cmd/
 └── <service>/main.go   # one binary per service (same names as above)
-    ├── docstore/           # + archive backend selection (fs | s3/SeaweedFS)
-    ├── filestore/          # + store backend selection (fs | s3/SeaweedFS)
+    ├── docstore/           # + archive backend selection (s3/SeaweedFS only; fs removed — A 2026-09-30)
+    ├── filestore/          # + store backend selection (s3/SeaweedFS only; fs removed — A 2026-09-30)
     └── seaweed-migrate/    # fs ↔ SeaweedFS conversion tool (to-seaweed / from-seaweed / list / health)
 ```
 
