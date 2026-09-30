@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import {
   createContext,
   FC,
@@ -14,6 +15,7 @@ import {
   EditOperation,
 } from '../../../../types/change'
 import { rejectChanges } from '@/features/source-editor/extensions/changes/reject-changes'
+import { getJSON } from '@/infrastructure/fetch-json'
 import { useCodeMirrorViewContext } from '@/features/source-editor/components/codemirror-context'
 import { postJSON } from '@/infrastructure/fetch-json'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
@@ -110,6 +112,8 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
   const { currentDocument } = useEditorOpenDocContext()
   const { socket } = useConnectionContext()
   const { sendEvent } = useEditorAnalytics()
+  const { openDocName } = useEditorOpenDocContext()
+  const hydratedRef = useRef(false)
   const [ranges, setRanges] = useState<Ranges | undefined>(() =>
     buildRanges(currentDocument)
   )
@@ -125,6 +129,77 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
       }
     }
   }, [currentDocument])
+
+  // audit 005/029 (2026-09-30): the Yjs engine (D25/D40) carries comments in
+  // the room's Y.Doc, not in a document-native RangesTracker — so
+  // buildRanges() above yields an EMPTY tracker and the review panel shows
+  // no entries even though the server holds the threads. D40's shipping
+  // contract is the REST surface (Go web features/review: /ranges returns
+  // the exact CommentShape/ChangeShape the panel renders, keyed by content
+  // doc — 'main.tex' P1). Hydrate the ranges context from that endpoint
+  // whenever the native tracker is empty for the open document.
+  useEffect(() => {
+    if (!currentDocument) {
+      return
+    }
+    const native = buildRanges(currentDocument)
+    const nativeHasEntries =
+      !!native && (native.comments.length > 0 || native.changes.length > 0)
+    if (nativeHasEntries) {
+      return
+    }
+    if (hydratedRef.current) {
+      return
+    }
+    let cancelled = false
+    hydratedRef.current = true
+    getJSON<Array<{ id: string; ranges?: { changes?: any[]; comments?: any[] } }>>(
+      `/project/${projectId}/ranges`
+    )
+      .then(items => {
+        if (cancelled || !items?.length) {
+          return
+        }
+        const docId = openDocName || ''
+        const pick =
+          items.find(it => (it.id || '') === docId) ||
+          items.find(
+            it =>
+              (it.ranges?.comments?.length ?? 0) > 0 ||
+              (it.ranges?.changes?.length ?? 0) > 0
+          )
+        if (!pick) {
+          setRanges({
+            docId: currentDocument.doc_id,
+            changes: [],
+            comments: [],
+          })
+          return
+        }
+        setRanges({
+          docId: currentDocument.doc_id,
+          changes: (pick.ranges?.changes ?? []).map(c => ({
+            id: (c as any).id,
+            op: (c as any).op,
+            state: (c as any).state,
+            metadata: (c as any).metadata,
+          })),
+          comments: (pick.ranges?.comments ?? []).map(c => ({
+            id: (c as any).id,
+            op: (c as any).op,
+            resolved: (c as any).resolved,
+            metadata: (c as any).metadata,
+          })),
+        })
+      })
+      .catch(() => {
+        // keep the (empty) native ranges; panel shows the empty state
+      })
+    return () => {
+      cancelled = true
+      hydratedRef.current = false
+    }
+  }, [currentDocument, openDocName, projectId])
 
   useEffect(() => {
     if (currentDocument && currentDocument.isHistoryOT()) {
