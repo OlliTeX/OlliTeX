@@ -130,6 +130,19 @@ ADD server-ce/config/env.sh /etc/overleaf/env.sh
 # them at start via /etc/overleaf/env.sh. Pre-created so no runtime fs race.
 RUN mkdir -p /etc/overleaf/env.d && chown www-data:www-data /etc/overleaf/env.d && chmod 775 /etc/overleaf/env.d
 
+# Baked Go-native service defaults (history flips, vendor data-plane, S3
+# backends, CLSI working dirs) — ${VAR:-...}-guarded, compose env wins.
+# Fragment number 30 keeps alphabetical/numeric ordering ahead of any
+# operator-written runtime fragments.
+ADD server-ce/config/env.d/30-go-native-services.sh /etc/overleaf/env.d/30-go-native-services.sh
+
+# CLSI working-dir base must exist inside the image layout (the data
+# volume /var/lib/overleaf overlays this; pre-create for first boot).
+RUN mkdir -p /var/lib/overleaf/data/compiles /var/lib/overleaf/data/output \
+            /var/lib/overleaf/data/cache /var/lib/overleaf/data/uploads \
+    && chown -R www-data:www-data /var/lib/overleaf/data \
+    && chmod -R 775 /var/lib/overleaf/data
+
 # Go microservice binaries — the CANONICAL implementations of the
 # microservices (chat, docstore, filestore, notifications,
 # linked-url-proxy); the Node versions were removed from the tree after the
