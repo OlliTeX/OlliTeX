@@ -21,8 +21,20 @@ server {
 	location / {
 		proxy_pass http://127.0.0.1:4000;
 		proxy_http_version 1.1;
-		proxy_set_header Upgrade $http_upgrade;
-		proxy_set_header Connection "upgrade";
+		# B (owner queue 2026-09-30, def #1): the unconditional
+		# `Connection "upgrade"` header was a copy-paste from the socket.io
+		# block — it forced nginx into pass-through framing for EVERY proxied
+		# response (API + HTML + static) even though none of them are
+		# websockets. Removed: plain HTTP/1.1 proxy.
+		# B (def #1, root cause): with proxy buffering ON, nginx spills
+		# upstream responses (~32KB+) into /var/lib/nginx/tmp/proxy — which
+		# www-data cannot write (permission denied, [crit] in
+		# error.log): every spilling response (e.g. the 394KB /js pages
+		# chunk) intermittently truncated with a 200 + full Content-Length
+		# → browser ERR_CONTENT_LENGTH_MISMATCH → dead editor. Pass-through
+		# is the right mode for a same-host Go upstream anyway (fast, no
+		# temp files, no ownership coupling).
+		proxy_buffering off;
 		proxy_set_header Host $host;
 		proxy_set_header X-Forwarded-Host $host;
 		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -92,6 +104,19 @@ server {
 	}
 
 	location /img {
+		expires 1y;
+	}
+
+	# B (owner queue 2026-09-30): the webpack JS chunks + fonts are plain
+	# files in /overleaf/public — serve them static from nginx (sendfile,
+	# native ETag/Range/304) instead of proxying through the Go web.
+	# The /js proxy path was the truncation casualty above; static serving
+	# also keeps the Go web free of the heaviest read traffic.
+	location ^~ /js {
+		expires 1y;
+	}
+
+	location ^~ /fonts {
 		expires 1y;
 	}
 

@@ -162,6 +162,15 @@ ADD server-ce/nginx/clsi-nginx.conf /etc/nginx/sites-enabled/clsi-nginx.conf
 # FLIP_GO_WEB_P0=1 (default off → inert).
 ADD server-ce/nginx/flips /usr/local/share/overleaf-flips
 RUN chmod 644 /usr/local/share/overleaf-flips/web-p0.conf
+# B (owner queue 2026-09-30, def #1 hardening): this image runs the nginx
+# workers as www-data (user directive), but the base image ships
+# /var/lib/nginx owned nginx:nginx 700 → www-data cannot create the
+# proxy/client-body temp files there → responses spilling past
+# proxy_buffers (~32KB) FAIL intermittently (nginx [crit] Permission
+# denied while reading upstream; client gets a 200 + partial body + full
+# Content-Length = browser ERR_CONTENT_LENGTH_MISMATCH — the dead-editor
+# defect). Give the runtime user ownership of the temp tree.
+RUN chown -R www-data:www-data /var/lib/nginx && chmod 755 /var/lib/nginx
 
 
 # Configure log rotation
