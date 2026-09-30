@@ -143,6 +143,13 @@ func Feature(a *core.App) core.Feature {
 			// internal-only (docker network; the HAProxy edge never forwards
 			// /internal/*), machine caller, no CSRF/auth by design.
 			{Method: "POST", Path: "/internal/alerts", Handler: alertWebhook(a, mail)},
+			// audit 002 (2026-09-30): cron collector — re-implementation of the
+			// retired Node module's /internal/collect-instance-stats (Node tree
+			// gone with P7 step-4; its crontab pointed at a dead route, which
+			// is why the hub stats series were empty). Private-API basic-auth
+			// gated (WEB_API_USER/PASSWORD), NoSession = Node privateApiRouter
+			// parity (no session/csrf middleware; machine caller).
+			{Method: "POST", Path: "/internal/collect-instance-stats", NoSession: true, Handler: collectHandler(a)},
 		},
 	}
 }

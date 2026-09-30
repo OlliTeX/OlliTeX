@@ -201,6 +201,14 @@ RUN chmod 600 /etc/cron.d/crontab-deletion
 # [IV] notifications: email dispatch cron (see server-ce/cron/*-notification*.sh)
 ADD server-ce/config/crontab-notifications /etc/cron.d/crontab-notifications
 RUN chmod 600 /etc/cron.d/crontab-notifications
+# audit 002 (2026-09-30): instance-stats collector crontab (was never baked —
+# the collector route also had to be re-implemented on the Go private API;
+# see go/services/web/features/instancestats/collector.go). The server-ce/runit/cron
+# service (copied by the `ADD server-ce/runit /etc/service` line above) keeps
+# the cron DAEMON alive — it never ran in the image, which is why the crons
+# (this one + history + deletion + notifications) were all dead.
+ADD server-ce/config/crontab-instance-stats /etc/cron.d/crontab-instance-stats
+RUN chmod 600 /etc/cron.d/crontab-instance-stats
 
 # Copy Phusion Image startup and shutdown scripts to their locations
 # ------------------------------------------------------------------

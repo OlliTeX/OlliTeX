@@ -7,7 +7,7 @@ echo "Collecting instance stats"
 echo "-------------------------"
 date
 
-WEB_URL='http://127.0.0.1:3000'
+WEB_URL='http://127.0.0.1:4000' # Go web (owner #23 flip): the collector route lives on the Go private API; the legacy Node api profile (127.0.0.1:3000) no longer serves it
 
 # Same private-API credentials as the other cron scripts
 # (WEB_API_USER / WEB_API_PASSWORD are set on the container environment).

@@ -270,6 +270,13 @@ func (r *RedisClient) raw(ctx context.Context, args ...any) (any, error) {
 	return r.rc.Do(ctx, args...).Result()
 }
 
+// RawDo — the exported generic command path (audit 002: the instance-stats
+// collector needs INFO memory/persistence from outside core). Same
+// semantics as raw: raw go-redis Do result.
+func (r *RedisClient) RawDo(ctx context.Context, args ...any) (any, error) {
+	return r.raw(ctx, args...)
+}
+
 // command — historical unexported surface (core test uses PING through
 // it); delegates to the pooled client.
 func (r *RedisClient) command(args ...string) (any, error) {

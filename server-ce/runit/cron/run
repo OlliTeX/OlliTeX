@@ -1,0 +1,11 @@
+#!/bin/bash
+# audit 002 (2026-09-30): the image baked crontab files (history / deletion /
+# notifications / instance-stats) but never started a cron daemon — the crons
+# were dead, which is why the hub instance statistics never collected. This
+# runit service keeps cron(8) alive (supervised by runsvdir, restart-on-crash
+# semantics like the other services).
+#
+# crond -f runs in the foreground (runit contract). cron.d files are installed
+# with mode 600 above (Dockerfile); cron(8) honours /etc/cron.d in addition to
+# /etc/crontab.
+exec /usr/sbin/crond -f
