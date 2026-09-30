@@ -73,4 +73,7 @@ export type ExposedSettings = {
     llmAvailableForUser: boolean
     ltAvailable: boolean
   }
+  // Candidate F (WakaTime, 2026-09-29): instance opt-in gate + debug flag.
+  wakaTimeEnabled?: boolean
+  wakaTimeDebugLogging?: boolean
 }

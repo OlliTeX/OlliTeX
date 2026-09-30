@@ -40,13 +40,29 @@ func HubFooterJSON(siteURL string) string {
 // ExposedSettingsJSON — the `ol-ExposedSettings` meta. In this stack the
 // only per-user field is canManageTemplatesMenu (admin true / member false;
 // pinned P6.1 oracle diff).
-func ExposedSettingsJSON(siteURL string, isAdmin bool) string {
+func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDebug bool) string {
 	s := withSiteURL(pinned_ol_ExposedSettings, siteURL)
 	if isAdmin {
 		// pinned constant is the member (false) form; admin flips one field
 		// (pinned P6.1 oracle diff: canManageTemplatesMenu false → true).
 		s = strings.ReplaceAll(s, `"canManageTemplatesMenu":false`, `"canManageTemplatesMenu":true`)
 	}
+	// Candidate F (owner-adopted 2026-09-29): WakaTime integration gate +
+	// debug logging (reference module settings surface), appended at the
+	// object end (pinned constant unchanged).
+	s = strings.TrimSuffix(s, `}`)
+	s += `,"wakaTimeEnabled":` + (func() string {
+		if wakaEnabled {
+			return "true"
+		}
+		return "false"
+	}()) +
+		`,"wakaTimeDebugLogging":` + (func() string {
+		if wakaDebug {
+			return "true"
+		}
+		return "false"
+	}()) + `}`
 	return s
 }
 

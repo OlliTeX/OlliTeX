@@ -47,6 +47,7 @@ import (
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/sitesettings"
 	"ollitex/go/services/web/features/templates"
+	"ollitex/go/services/web/features/wakatime"
 	"ollitex/go/services/web/views"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -259,7 +260,7 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 		d.JSON = map[string]string{
 			"ol-ab":                 pinned_ol_ab,
 			"ol-i18n":               pinned_ol_i18n,
-			"ol-ExposedSettings":    ExposedSettingsJSON(cxt.SiteURL, templates.MenuGrant(ctx, cxt)),
+			"ol-ExposedSettings":    ExposedSettingsJSON(cxt.SiteURL, templates.MenuGrant(ctx, cxt), wakatime.ResolveEnabled(ctx, a), wakatime.DebugLogging()),
 			"ol-splitTestVariants":  pinned_ol_splitTestVariants,
 			"ol-splitTestInfo":      pinned_ol_splitTestInfo,
 			"ol-navbar":             navbarJSON(cxt.SiteURL, currentURL, email, isAdmin, sitesettings.RegistrationEnabled(a, ctx)),

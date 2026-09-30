@@ -1,7 +1,12 @@
 module.exports = [
   {
     name: 'web',
-    dir: 'frontend', // consolidated build host (services/web retired in the frontend consolidation reorg)
+    // Consolidated build host (frontend consolidation reorg): the webpack
+    // chain (webpack.config.*.js + webpack-plugins + babel + macros + tsconfig)
+    // is self-contained under frontend/; 2026-09-29 bake completed the reorg
+    // by landing the missing config files there (they were symlinked from
+    // services/web, which docker's build context cannot follow).
+    dir: 'services/web', // build host (Settings.js + build macro are CWD-anchored to services/web)
   },
 ]
 // node clsi was retired to the Go service (go/services/clsitex, run via

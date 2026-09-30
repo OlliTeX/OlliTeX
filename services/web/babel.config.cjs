@@ -1,1 +1,1 @@
-/data_1/image_mining/the_diff/overleaf/frontend/babel.config.cjs
+../../frontend/babel.config.cjs

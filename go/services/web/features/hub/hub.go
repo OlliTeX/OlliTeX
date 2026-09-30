@@ -52,6 +52,7 @@ import (
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/editorpages"
 	"ollitex/go/services/web/features/sitesettings"
+	"ollitex/go/services/web/features/wakatime"
 	"ollitex/go/services/web/views"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -148,7 +149,7 @@ func hubPage(a *core.App) func(*core.Cxt, *core.Res) {
 			HubAdmin:   isAdmin,
 			GitBridge:  os.Getenv("OVERLEAF_GITBRIDGE_ENABLED") == "true",
 			JSON: map[string]string{
-				"ol-ExposedSettings": editorpages.ExposedSettingsJSON(cxt.SiteURL, isAdmin),
+				"ol-ExposedSettings": editorpages.ExposedSettingsJSON(cxt.SiteURL, isAdmin, wakatime.ResolveEnabled(cxt.Req.Context(), cxt.A), wakatime.DebugLogging()),
 				"ol-navbar":          hubNavbar(a, ctx, email, cxt.Req.URL.Path, isAdmin),
 				"ol-footer":          editorpages.HubFooterJSON(cxt.SiteURL),
 				"ol-user":            serializeHubUser(uid, email, udoc, aceRaw),

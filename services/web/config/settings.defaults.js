@@ -1133,6 +1133,13 @@ function buildSettings() {
         __dirname,
         '../../../frontend/modules/bib-editor/frontend/js/extensions/bib-editor-extension'
       ),
+      // Candidate F (owner-adopted 2026-09-29): WakaTime/Wakapi edit
+      // tracking — throttled heartbeats via the Go web relay; no-op unless
+      // the instance flag is on and the user linked an account.
+      Path.resolve(
+        __dirname,
+        '../../../frontend/modules/wakatime/frontend/js/wakatime-extension'
+      ),
       // overleaf-lab (LLM port): inline LaTeX completion.
       Path.resolve(
         __dirname,
@@ -1250,6 +1257,11 @@ function buildSettings() {
     Path.resolve(
       __dirname,
       '../../../frontend/modules/github-sync/frontend/js/components/github-sync-widget.tsx'
+    ),
+    // Candidate F: WakaTime account card for the project settings page.
+    Path.resolve(
+      __dirname,
+      '../../../frontend/modules/wakatime/frontend/js/components/wakatime-card.tsx'
     ),
       // [III]: WebDAV (Nextcloud) + Dropbox project mirroring widgets
     Path.resolve(

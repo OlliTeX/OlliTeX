@@ -29,7 +29,6 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
-	"ollitex/go/services/web/features/editorpages"
 	"ollitex/go/services/web/views"
 )
 
@@ -138,15 +137,15 @@ func adminPage(a *core.App) func(*core.Cxt, *core.Res) {
 		p := views.AdminShellParams{
 			// i18n wave C: the shell-page locale pass (zero = exact English
 			// bytes when the bundle is unwired — the oracle tests stay green).
-			I18n:           views.ShellI18n(cxt.A, cxt),
-			Nonce:          views.NewNonce(),
-			CSRF:           sess.CsrfToken(),
-			Email:          email,
-			UID:            uid,
-			OverallTheme:   theme,
-			Origin:         cxt.SiteURL,
-			CurrentURL:     cxt.Req.URL.Path,
-			Exposed:        editorpages.ExposedSettingsJSON(cxt.SiteURL, true),
+			I18n:         views.ShellI18n(cxt.A, cxt),
+			Nonce:        views.NewNonce(),
+			CSRF:         sess.CsrfToken(),
+			Email:        email,
+			UID:          uid,
+			OverallTheme: theme,
+			Origin:       cxt.SiteURL,
+			CurrentURL:   cxt.Req.URL.Path,
+
 			LLMEnabled:     llmPageEnabled(a, ctx),
 			SystemMessages: msgs,
 		}

@@ -64,6 +64,7 @@ import (
 	"ollitex/go/services/web/features/tokenaccess"
 	"ollitex/go/services/web/features/trackchanges"
 	"ollitex/go/services/web/features/userpages"
+	"ollitex/go/services/web/features/wakatime"
 	"ollitex/go/services/web/features/webdav"
 	"ollitex/go/services/web/features/zotero"
 	"ollitex/go/services/web/views"
@@ -197,6 +198,7 @@ func main() {
 	// is the server-side tracking-injection predicate.
 	app.RegisterFeature(consent.Feature(app))
 	app.RegisterFeature(projectinspection.Feature(app))
+	app.RegisterFeature(wakatime.Feature(app))
 
 	// P6.4a surface: OlliTeX llm module settings surface (BYO provider rows,
 	// selected model, compliance rubrics, usage, grammar prefs, admin LLM
