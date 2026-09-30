@@ -188,6 +188,17 @@ export class ProjectSnapshot {
       } else {
         await this.loadChanges()
       }
+    } catch (e) {
+      // audit 020 (2026-09-30): projects without V1 history (no
+      // overleaf.history.id) get a parity 500 from latest/history; several
+      // consumers await refresh() without a catch -> unhandled FetchError in
+      // the console. Degrade to an empty snapshot (the S2 source of truth is
+      // the collab document; snapshot consumers already tolerate empty) and
+      // keep retrying on the next refresh (initialize() still runs).
+      console.warn(
+        '[project-snapshot] V1 history unavailable, degrading to empty snapshot',
+        e
+      )
     } finally {
       this.refreshing = false
     }

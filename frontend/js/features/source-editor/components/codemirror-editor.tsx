@@ -17,6 +17,7 @@ import {
 import MathPreviewTooltip from './math-preview-tooltip'
 import { getVisualEditorComponent } from '../utils/visual-editor'
 import EditorContextMenu from './editor-context-menu'
+import EditorFloatingMenu from '@/features/editor-floating-menu/editor-floating-menu'
 import { useToolbarMenuBarEditorCommands } from '@/features/source-editor/hooks/use-toolbar-menu-editor-commands'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
 import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
@@ -98,6 +99,11 @@ function CodeMirrorEditorComponents({
 
       <MathPreviewTooltip />
       <EditorContextMenu />
+      {/* audit 021 (2026-09-30): the selection floating menu (Add comment +
+          the LLM module's "Ask AI") was built + styled but never mounted —
+          upstream renders it alongside EditorContextMenu. Mounting it here
+          (inside the CodeMirror provider tree it needs for its contexts). */}
+      <EditorFloatingMenu />
       {/* S4 flip (D25) — SUPERSEDED by D40 (owner directive 10, 2026-09-26):
           comments + tracked changes are re-attached on the Y.Doc-native model
           (room-doc domain ops + Go web REST, go/services/web/features/review).
