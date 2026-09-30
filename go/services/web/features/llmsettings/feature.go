@@ -268,6 +268,16 @@ func asMap(v any) (map[string]any, bool) {
 			out[k] = x
 		}
 		return out, true
+	case bson.D:
+		// mongo driver v2 decodes NESTED documents inside interface{} targets
+		// as bson.D (not bson.M) — without this case asMap dropped every
+		// rootFolder node and the LLM "no readable document file" 422 fired
+		// on live (audit 014/015/016).
+		out := make(map[string]any, len(t))
+		for _, e := range t {
+			out[e.Key] = e.Value
+		}
+		return out, true
 	case obj:
 		out := make(map[string]any, len(t))
 		for _, e := range t {
