@@ -808,18 +808,30 @@ func compileHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 		}
 		for _, d := range docs {
-			if l, ok := lines[d.ID]; ok {
+			if l, ok := lines[d.ID]; ok && len(l) > 0 {
+				// Node oracle (ClssiManager ~L1159): a doc with lines == null is
+				// a stub entry and is NOT added to resources. Go's docstore
+				// reports the same stub as lines: [] (empty) — an empty content
+				// string is omitempty-erased, leaving a path-only resource that
+				// CLSI rejects ("all resources should have either a url or content
+				// attribute"). Skip zero-line docs to match Node's effective set.
 				resources = append(resources, resEntry{Path: d.Path, Content: strings.Join(l, "\n")})
 			}
 		}
 		for _, f := range files {
+			if f.Hash == "" || historyID == "" {
+				// A fileRef without a hash (or a project without a history id)
+				// cannot be fetched; Node only ever produces hash-bearing file
+				// resources. Emitting a path-only entry makes CLSI reject the
+				// WHOLE compile ("all resources should have either a url or
+				// content attribute") — skip the stub resource instead.
+				continue
+			}
 			e := resEntry{Path: f.Path}
-			if f.Hash != "" && historyID != "" {
-				e.URL = filestoreBase() + "/history/project/" + historyID + "/hash/" + f.Hash
-				if f.Created > 0 {
-					ms := f.Created
-					e.Modified = &ms
-				}
+			e.URL = filestoreBase() + "/history/project/" + historyID + "/hash/" + f.Hash
+			if f.Created > 0 {
+				ms := f.Created
+				e.Modified = &ms
 			}
 			resources = append(resources, e)
 		}

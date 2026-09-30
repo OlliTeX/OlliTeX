@@ -42,7 +42,7 @@ import (
 //   - invalid (non-hex) id -> 404 application/json malformed (not accept-dep)
 //   - valid id, absent     -> 404 HTML general/404 (not accept-dep)
 //   - present, no read access -> 403 json {"message":"restricted"} | html Restricted
-var archPat = regexp.MustCompile(`^/Project/([^/]+)/archive$`)
+var archPat = regexp.MustCompile(`^(?i)/project/([^/]+)/archive$`)
 var trashPat = regexp.MustCompile(`^/project/([^/]+)/trash$`)
 
 // flagOp is one of the four set operations (the exact Node $addToSet/$pull).

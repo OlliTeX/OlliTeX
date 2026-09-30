@@ -79,7 +79,7 @@ import (
 	"ollitex/go/services/web/views"
 )
 
-var upPat = regexp.MustCompile(`^/Project/([^/]+)/upload$`)
+var upPat = regexp.MustCompile(`^(?i)/project/([^/]+)/upload$`) // case-insensitive (Express default; frontend calls /project/<id>/upload)
 var upHexRX = regexp.MustCompile(`^[0-9a-fA-F]{24}$`)
 var upSplitRX = regexp.MustCompile(`\r\n|\n|\r`)
 

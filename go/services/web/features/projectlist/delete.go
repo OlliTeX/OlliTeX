@@ -63,7 +63,7 @@ import (
 )
 
 var delPat = regexp.MustCompile(`^/Project/([^/]+)$`)
-var restPat = regexp.MustCompile(`^/Project/([^/]+)/restore$`)
+var restPat = regexp.MustCompile(`^(?i)/project/([^/]+)/restore$`)
 
 // S4 (owner RETIRE document-updater): the DU service base + the delete-flow
 // DEL {DU}/project/{pid} flush fallback are removed — content truth is the

@@ -36,7 +36,7 @@ import (
 	"ollitex/go/services/web/views"
 )
 
-var docdlPat = regexp.MustCompile(`^/Project/([^/]+)/doc/([^/]+)/download$`)
+var docdlPat = regexp.MustCompile(`^(?i)/project/([^/]+)/doc/([^/]+)/download$`)
 
 // docdlFindDoc walks the raw rootFolder for a doc element id — element
 // arrays before recursive folders (ProjectLocator.findElement order).

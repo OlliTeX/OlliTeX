@@ -5,11 +5,13 @@ package historyv1
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -416,9 +418,16 @@ func (s *Service) createProjectBlob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	blob := s.Blob.ForProject(pid)
-	// Node blobHashFromFile = raw sha1 hex of the payload (NOT the git blob
-	// hash). Case-insensitive hex compare (both sides lowercased).
-	h1 := sha1.Sum(data)
+	// Node oracle (overleaf-editor-core/lib/blob_utils.js, used by Node
+	// history-v1 createProjectBlob): blobHashFromFile =
+	//     sha1("blob " + byteLength + "\x00" + content)
+	// i.e. the GIT BLOB hash, not a raw payload sha1. The web upload caller
+	// (upGitBlobHash) and the stored fileRef.hash fields are all git blob
+	// hashes, so they only ever match this form.
+	// Case-insensitive hex compare (both sides lowercased).
+	var hdr bytes.Buffer
+	fmt.Fprintf(&hdr, "blob %d\x00", len(data))
+	h1 := sha1.Sum(append(hdr.Bytes(), data...))
 	if actual := hex.EncodeToString(h1[:]); !strings.EqualFold(actual, hash) {
 		conflict(w, "File hash mismatch")
 		return

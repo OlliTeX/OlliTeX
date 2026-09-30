@@ -75,7 +75,7 @@ import (
 	"ollitex/go/services/web/views"
 )
 
-var clonePat = regexp.MustCompile(`^/Project/([^/]+)/clone$`)
+var clonePat = regexp.MustCompile(`^(?i)/project/([^/]+)/clone$`)
 
 type clParseResult struct {
 	bare    bool   // express.json strict: bare 400 application/json {}

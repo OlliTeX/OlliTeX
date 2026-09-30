@@ -33,7 +33,7 @@ import (
 	"ollitex/go/services/web/views"
 )
 
-var fproxyPat = regexp.MustCompile(`^/Project/([^/]+)/file/([^/]+)$`)
+var fproxyPat = regexp.MustCompile(`^(?i)/project/([^/]+)/file/([^/]+)$`)
 
 func fproxyEmpty(res *core.Res, code int) {
 	// Node: res.status(code).end() → empty body, no content-type.
