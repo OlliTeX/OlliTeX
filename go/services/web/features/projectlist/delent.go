@@ -268,6 +268,17 @@ func delEntityHandler(a *core.App, kind string) func(cxt *core.Cxt, res *core.Re
 		// S3c: deleted entity = removed op (its FS path).
 		yopsAppend(a, ctx, pidHex, history.YopRemove, loc.fsPath, "", uid)
 
+		// Node EditorController.deleteEntity: emitToRoom(projectId,
+		// 'removeEntity', entityId, source) after the subtree cleanup. The
+		// modern tree removes the entity only on this socket event
+		// (file-tree-socket-listener.ts 'removeEntity'); without it the delete
+		// succeeds but the entry stays on screen (parity gap, live-audit 008
+		// cluster: file operations invisible to the UI until reload).
+		if a != nil && a.Redis != nil {
+			entEmitEvent(a, pidHex, "removeEntity",
+				`"`+entJSONEsc(eidHex)+`","editor"`)
+		}
+
 		res.NoContent()
 	}
 }

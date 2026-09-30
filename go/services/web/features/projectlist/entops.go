@@ -89,6 +89,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -488,15 +489,33 @@ func entLockRun(a *core.App, pidHex string, res *core.Res, cxt *core.Cxt, fn fun
 var entEmitCount int64
 
 func entEmitEvent(a *core.App, pidHex, message, payloadJSON string) {
-	rdb := a.Redis
-	if rdb == nil {
+	if a == nil {
 		return
 	}
-	host, _ := os.Hostname()
-	blob := fmt.Sprintf(`{"room_id":"%s","message":"%s","payload":[%s],"_id":"web:%s:%08x-%d"}`,
-		pidHex, message, payloadJSON, host, entLockRand, entEmitCount)
-	entEmitCount++
-	_ = rdb.Publish("editor-events", blob)
+	// Live relay path (pinned from the D40 review relay, review.go prodEmit):
+	// realtime bus POST /project/:pid/message/:name, body = args array →
+	// the event reaches the project room's socket.io clients. (The Node-era
+	// Redis `editor-events` pub/sub channel is NOT subscribed by the Go
+	// realtime service, so publishing there would reach no one.)
+	base := a.Cfg.RealtimeURL
+	if base == "" {
+		base = "http://127.0.0.1:3026"
+	}
+	url := strings.TrimSuffix(base, "/") + "/project/" + pidHex + "/message/" + message
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url,
+		bytes.NewReader([]byte("["+payloadJSON+"]")))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
 }
 
 // ---------- docstore (Node DocstoreManager) ----------

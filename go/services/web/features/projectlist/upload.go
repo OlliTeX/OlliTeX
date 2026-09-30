@@ -703,6 +703,16 @@ func upJSONFile(entityID, hash string) []byte {
 	return []byte(`{"success":true,"entity_id":"` + entityID + `","entity_type":"file","hash":"` + hash + `"}`)
 }
 
+// upEmitNewDoc — Node emitToRoom(projectId, 'reciveNewDoc', folderId,
+// {name,_id}, source, userId) for the upload-created doc paths.
+func upEmitNewDoc(a *core.App, pj, folderID, name, docID, uid string) {
+	if a == nil || a.Redis == nil {
+		return
+	}
+	entEmitEvent(a, pj, "reciveNewDoc",
+		`"`+entJSONEsc(folderID)+`",{"name":"`+entJSONEsc(name)+`","_id":"`+entJSONEsc(docID)+`"},"upload","`+entJSONEsc(uid)+`"`)
+}
+
 // ---------- handler --------------------------------------------------------------
 
 func uploadHandler(a *core.App) func(*core.Cxt, *core.Res) {
@@ -885,6 +895,11 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 			return
 		} // D41 slice-2: DU structure op removed — the mongo swap (upSwapFileToDoc)
 		// already wrote the tree; DU's version creation defers to the Yjs hybrid.
+		// Node swap flow: 'removeEntity' (old file) + 'reciveNewDoc'.
+		if a != nil {
+			entEmitEvent(a, pj, "removeEntity", `"`+entJSONEsc(tgt.existingFile.idHex)+`","upload"`)
+			upEmitNewDoc(a, pj, tgt.folderID, name, newDocID.Hex(), uid)
+		}
 		res.JSON(200, upJSONDoc(newDocID.Hex()))
 		return
 	}
@@ -902,6 +917,9 @@ func upDoDoc(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj strin
 	// D41 slice-2: DU add-doc structure op removed ($push docs done above).
 	// S3c: new doc from upload = added op.
 	yopsAppend(a, cxt.Req.Context(), pj, history.YopAdd, strings.TrimPrefix(tgt.fsPath, "/")+"/"+name, "", uid)
+	// Node EditorController.addDoc (upload path): 'reciveNewDoc'
+	// [folderId, {name,_id}, source, userId] — required by the modern tree.
+	upEmitNewDoc(a, pj, tgt.folderID, name, newDocID.Hex(), uid)
 	res.JSON(200, upJSONDoc(newDocID.Hex()))
 }
 
@@ -926,6 +944,14 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 			return
 		}
 		// D41 slice-2: DU structure op removed ($set new id + $inc done above).
+		// Node EditorController.replaceFile: 'removeEntity' (old id) then
+		// 'reciveNewFile' [folderId,newFile,source,linkedFileData,userId] —
+		// the modern tree applies both socket events (file-tree-socket-listener.ts).
+		if a != nil {
+			oldFileID := tgt.existingFile.idHex
+			entEmitEvent(a, pj, "removeEntity", `"`+entJSONEsc(oldFileID)+`","upload"`)
+			upEmitNewFile(a, pj, tgt.folderID, name, newFileID.Hex(), hash, uid)
+		}
 		res.JSON(200, upJSONFile(newFileID.Hex(), hash))
 		return
 	}
@@ -945,6 +971,11 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 			return
 		}
 		// D41 slice-2: DU structure op removed (upSwapDocToFile done above).
+		// Node swap flow: 'removeEntity' (old doc) + 'reciveNewFile'.
+		if a != nil {
+			entEmitEvent(a, pj, "removeEntity", `"`+entJSONEsc(tgt.existingDoc.idHex)+`","upload"`)
+			upEmitNewFile(a, pj, tgt.folderID, name, newFileID.Hex(), hash, uid)
+		}
 		res.JSON(200, upJSONFile(newFileID.Hex(), hash))
 		return
 	}
@@ -958,7 +989,23 @@ func upDoFile(a *core.App, cxt *core.Cxt, res *core.Res, fail500 func(), pj stri
 	// S3c: new file from upload = added op (hash known → the wire carries it
 	// as the overleaf file hash when the op is shaped at read time).
 	yopsAppend(a, cxt.Req.Context(), pj, history.YopAdd, strings.TrimPrefix(tgt.fsPath, "/")+"/"+name, "", uid)
+	// Node EditorController.addFile: 'reciveNewFile' after the push — the
+	// modern tree adds the upload only on this socket event; without it the
+	// upload succeeds (200) but never appears in the file tree (live-audit
+	// 007/009 cluster: files not visible until reload).
+	upEmitNewFile(a, pj, tgt.folderID, name, newFileID.Hex(), hash, uid)
 	res.JSON(200, upJSONFile(newFileID.Hex(), hash))
+}
+
+// upEmitNewFile — Node emitToRoom(projectId, 'reciveNewFile', folderId,
+// file, source, linkedFileData, userId). linkedFileData is null for plain
+// uploads (the listener only uses it for linked-file selection).
+func upEmitNewFile(a *core.App, pj, folderID, name, fileID, hash, uid string) {
+	if a == nil || a.Redis == nil {
+		return
+	}
+	entEmitEvent(a, pj, "reciveNewFile",
+		`"`+entJSONEsc(folderID)+`",{"name":"`+entJSONEsc(name)+`","hash":"`+entJSONEsc(hash)+`","_id":"`+entJSONEsc(fileID)+`"},"upload",null,"`+entJSONEsc(uid)+`"`)
 }
 
 func nullElement() *entElement { return (*entElement)(nil) }

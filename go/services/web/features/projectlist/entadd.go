@@ -469,6 +469,25 @@ func addEntityHandler(a *core.App, kind string) func(*core.Cxt, *core.Res) {
 		// S3c: new entity = added op (docs and folders are both tree ops).
 		yopsAppend(a, cxt.Req.Context(), cxt.Params["1"], history.YopAdd, fsPath+"/"+name, "", uid)
 
+		// Node EditorController (EditorRealTimeController.emitToRoom) broadcasts
+		// 'reciveNewDoc' [folderId,{name,_id},"editor",userId] / 'reciveNewFolder'
+		// [folderId,folder,userId] to the project room. The modern file tree only
+		// adds the entity to its local tree when it receives those socket events
+		// (file-tree-socket-listener.ts), so without them the create API succeeds
+		// but the new file never appears (live-audit 009: new SVG file "not
+		// created" even though POST /doc returned 200).
+		if a != nil {
+			pidHex := strings.ToLower(oidHex(oid))
+			fid := `"` + entJSONEsc(parentHex) + `"`
+			if isDoc {
+				entEmitEvent(a, pidHex, "reciveNewDoc",
+					fid+`,{"name":"`+entJSONEsc(name)+`","_id":"`+newDocID.Hex()+`"},"editor","`+entJSONEsc(uid)+`"`)
+			} else {
+				entEmitEvent(a, pidHex, "reciveNewFolder",
+					fid+`,{"name":"`+entJSONEsc(name)+`","_id":"`+newFoldID.Hex()+`","docs":[],"fileRefs":[],"folders":[]},"`+entJSONEsc(uid)+`"`)
+			}
+		}
+
 		if isDoc {
 			res.JSON(200, []byte(`{"name":`+jstr(name)+`,"_id":"`+newDocID.Hex()+`"}`))
 		} else {
