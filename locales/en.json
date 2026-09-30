@@ -4711,5 +4711,6 @@
   "wakatime_privacy_note": "Your API key is stored encrypted on this instance and used only to report your heartbeats to your own WakaTime/Wakapi account. The editor keeps working if the connection fails.",
   "wakatime_cancel": "Cancel",
   "wakatime_error_api_key_required": "Please paste your WakaTime API key.",
-  "wakatime_error_link": "Could not verify the API key."
+  "wakatime_error_link": "Could not verify the API key.",
+  "project_inspection": "Project inspection"
 }

@@ -1,31 +1,53 @@
 import React, { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
+import { useProjectContext } from '@/shared/context/project-context'
 import { postJSON, getJSON } from '@/infrastructure/fetch-json'
 // Resolve the project's root documents (id + path), walking rootFolder
 // exactly like the Go feature's entity walker.
-export async function resolveEntryDocs(projectId: string): Promise<string[]> {
+async function resolveProject(projectId: string): Promise<any> {
+  // audit 019 (2026-09-30): the editor's join payload (project context) is
+  // the same rootFolder model and is ALWAYS present; a bare GET
+  // /project/:id is not an editor route (HTML 302 on the Go web), so it
+  // used to silently yield zero entry points -> "entry point invalid".
   try {
-    const project = await getJSON<any>(`/project/${projectId}`)
-    const out: string[] = []
-    const walk = (folder: any): void => {
-      if (!folder) {
-        return
-      }
-      for (const d of folder.docs ?? []) {
-        if (d?._id && /\.(tex|typ)$/.test(d?.name ?? '')) {
-          out.push(d._id)
-        }
-      }
-      for (const f of folder.folders ?? []) {
-        walk(f)
+    const { useProjectContext } = await import('@/shared/context/project-context')
+    const { project } = useProjectContext() as unknown as { project?: any }
+    if (project && project.rootFolder) {
+      return project
+    }
+  } catch {
+    // outside the provider tree (storybook/tests) — fall through
+  }
+  try {
+    return await getJSON<any>(`/project/${projectId}`)
+  } catch {
+    return null
+  }
+}
+
+export async function resolveEntryDocs(project: any): Promise<string[]> {
+  const out: string[] = []
+  const walk = (folder: any): void => {
+    if (!folder) {
+      return
+    }
+    for (const d of folder.docs ?? []) {
+      if (d?._id && /\.(tex|typ)$/.test(d?.name ?? '')) {
+        out.push(d._id)
       }
     }
-    walk(project?.rootFolder?.[0])
-    return out.slice(0, 50)
-  } catch {
-    return []
+    for (const f of folder.folders ?? []) {
+      walk(f)
+    }
   }
+  const rf = project?.rootFolder
+  if (Array.isArray(rf)) {
+    walk(rf[0])
+  } else {
+    walk(rf)
+  }
+  return out.slice(0, 50)
 }
 
 // OlliTeX — Project inspection panel (candidate G, owner-adopted
@@ -95,6 +117,7 @@ function viewItems(ids: string[], issueBy: Record<string, Issue>): string[] {
 
 export default function ProjectInspectionPanel(_props: { order?: number }) {
   const { projectId } = useIdeReactContext()
+  const { project } = useProjectContext()
   const { t } = useTranslation()
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<InspectionResult | null>(null)
@@ -109,7 +132,9 @@ export default function ProjectInspectionPanel(_props: { order?: number }) {
       // entry points: the project's root-level documents (.tex/.typ) —
       // resolved from the standard project JSON (same rootFolder model the
       // Go reader consumes); the server re-validates every id.
-      const docIds: string[] = await resolveEntryDocs(projectId)
+      const projectIdRef = projectId
+      void projectIdRef
+      const docIds = await resolveEntryDocs(project ?? (await resolveProject(projectId)))
       if (docIds.length === 0) {
         throw { status: 400, error: 'INVALID_ENTRY_POINT' }
       }

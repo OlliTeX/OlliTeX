@@ -1232,14 +1232,9 @@ function buildSettings() {
     ),
     ],
     mainEditorLayoutPanels: [
-      // Candidate G (2026-09-29, owner-adopted): project inspection rail
-      // panel (engine: services/web/modules/project-inspection —
-      // yu-i-i/overleaf-cep#245, AGPL-3.0; API: go/services/web/features/
-      // projectinspection). Rail panel after editor+PDF (order 3).
-      Path.resolve(
-        __dirname,
-        '../../../frontend/modules/project-inspection/frontend/js/panel'
-      ),
+      // audit 019 (2026-09-30): project inspection moved into the rail tab
+      // bar (rail.tsx 'project-inspection' tab) per owner directive — no
+      // longer a separate layout pane.
     ],
     pythonRunner: [
       // python-runner module (ported from ayakaleaf-pro, owner-provided 2026-09-06):

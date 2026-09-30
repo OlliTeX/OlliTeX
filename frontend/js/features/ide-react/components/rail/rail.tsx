@@ -12,6 +12,7 @@ import ChatIndicator from '@/features/chat/components/chat-indicator'
 import getMeta from '@/utils/meta'
 import classNames from 'classnames'
 import IntegrationsPanel from '@/features/integrations-panel/integrations-panel'
+import ProjectInspectionPanel from '@modules/project-inspection/frontend/js/panel'
 import { useChatContext } from '@/features/chat/context/chat-context'
 import { useEditorAnalytics } from '@/shared/hooks/use-editor-analytics'
 import {
@@ -137,6 +138,18 @@ export const RailLayout = () => {
         title: t('review_panel'),
         component: null,
         hide: !features.trackChangesVisible,
+        disabled: view !== 'editor',
+      },
+      {
+        // audit 019 (2026-09-30): project inspection moves from a separate
+        // bottom/right layout pane into the rail tab bar (owner directive),
+        // next to File tree / Chat / Integrations. Engine + API unchanged
+        // (services/web/modules/project-inspection + Go projectinspection).
+        key: 'project-inspection',
+        icon: 'monitoring',
+        title: t('project_inspection_title'),
+        component: <ProjectInspectionPanel />,
+        hide: false,
         disabled: view !== 'editor',
       },
       {
