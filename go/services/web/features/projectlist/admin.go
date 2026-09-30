@@ -619,11 +619,15 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 			// returns false -> caller 500s.
 			var r row
 			doc := *dcast(p)
-			idv, ok := doc[0].Value.(bson.ObjectID)
-			if !ok {
+			// _id by KEY, not position: live deletedProjects.project subdocs
+			// carry _id as the LAST element (audit 003 — positional read of
+			// doc[0] 500'd the whole admin list on that one row).
+			idv, okid := dg(doc, "_id")
+			oidv, isO := idv.(bson.ObjectID)
+			if !okid || !isO {
 				return false
 			}
-			r.id = idv.Hex()
+			r.id = oidv.Hex()
 			if v, okm := dg(doc, "name"); okm {
 				if s, isS := v.(string); isS {
 					r.name, r.nameHas = s, true
@@ -664,19 +668,25 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 				if !validOID.MatchString(r.owner) {
 					return false // isTrashed: new ObjectId throws -> 500
 				}
-				oo, _ := bson.ObjectIDFromHex(strings.ToLower(r.owner))
 				if tvRaw, okTr := dg(doc, "trashed"); okTr {
 					arr, isA := tvRaw.(bson.A)
 					if !isA {
 						return false // Node: (trashed||[]).some TypeError -> 500
 					}
 					for _, tv := range arr {
-						to, isO := tv.(bson.ObjectID)
-						if !isO {
-							return false // Node: id.equals TypeError -> 500
-						}
-						if to == oo {
-							r.trashed = true
+						// Node (mongoose) casts ObjectIDs AND hex strings in `trashed` before
+						// .equals — live data holds both shapes (audit 003: 19/185 projects
+						// carry string entries, which the strict ObjectID-only cast turned
+						// into a 500 for the whole admin list).
+						switch o := tv.(type) {
+						case bson.ObjectID:
+							if o.Hex() == strings.ToLower(r.owner) {
+								r.trashed = true
+							}
+						case string:
+							if strings.ToLower(o) == strings.ToLower(r.owner) {
+								r.trashed = true
+							}
 						}
 					}
 				}
