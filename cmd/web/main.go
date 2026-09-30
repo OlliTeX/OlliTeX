@@ -28,6 +28,7 @@ import (
 	"ollitex/go/services/web/features/adminusers"
 	"ollitex/go/services/web/features/analytics"
 	"ollitex/go/services/web/features/authpages"
+	"ollitex/go/services/web/features/chatbridge"
 	"ollitex/go/services/web/features/collabhistory"
 	"ollitex/go/services/web/features/compile"
 	"ollitex/go/services/web/features/consent"
@@ -286,6 +287,11 @@ func main() {
 	// P5.2a surface: compile control plane (POST /Project/:id/compile +
 	// /compile/stop) — clsi stays Node; Go is the orchestration/response layer.
 	app.RegisterFeature(compile.Feature(app))
+
+	// Chat bridge: the Node chat router proxy routes onto the Go chat
+	// service (127.0.0.1:3010) — list/send/delete/edit project messages.
+	// (live audit 004: the web route was never ported, so the pane 404'd.)
+	app.RegisterFeature(chatbridge.Feature(app))
 
 	// P6 surface (P6.1): ollitex-hub module (/hub page, /hub legacy
 	// redirects, /api/hub-theme theme API, /api/hub/health, /api/hub/notes).
