@@ -64,8 +64,11 @@ server {
 		proxy_http_version 1.1;
 		proxy_set_header Upgrade $http_upgrade;
 		proxy_set_header Connection "upgrade";
-		proxy_set_header Host $host;
-		proxy_set_header X-Forwarded-Host $host;
+		# H3 (D36 pattern from /collab): forward $http_host (port kept) — the
+		# realtime same-origin check compares host-parts and tolerates the
+		# proxy-stripped case either way.
+		proxy_set_header Host $http_host;
+		proxy_set_header X-Forwarded-Host $http_host;
 		proxy_set_header X-Forwarded-Proto $scheme;
 		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 		proxy_read_timeout 10m;

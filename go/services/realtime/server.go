@@ -651,7 +651,7 @@ func originAllowed(r *http.Request) bool {
 			}
 		}
 	}
-	return r.Host != "" && originHost(o) == r.Host
+	return r.Host != "" && sameOriginHost(originHost(o), r.Host)
 }
 
 // originHost — "http(s)://host[:port][/...]" → "host[:port]".
@@ -664,6 +664,53 @@ func originHost(o string) string {
 		rest = rest[:i]
 	}
 	return rest
+}
+
+// sameOriginHost — true when the Origin and the request Host identify the
+// same origin for SAME-ORIGIN purposes across a reverse proxy. nginx
+// forwards `Host: $host` (port STRIPPED) to /socket.io but `Host: $http_host`
+// (port kept) to /collab, so the Origin (which the browser always sends with
+// its port) and r.Host may differ only in that one side carries the port.
+// Contract:
+//   - host parts must be equal (case-insensitive) — cross-host is rejected;
+//   - if BOTH carry a port the ports must be equal (distinct-port origins —
+//     a browser treats host:8080 and host:7420 as different origins);
+//   - if EXACTLY one carries a port it is a proxy-stripped/added port and is
+//     accepted (the live /socket.io 403 regression).
+func sameOriginHost(origin, host string) bool {
+	oh, op := splitHostPort(origin)
+	rh, rp := splitHostPort(host)
+	if oh == "" || rh == "" || !strings.EqualFold(oh, rh) {
+		return false
+	}
+	if op != "" && rp != "" {
+		return op == rp
+	}
+	return true
+}
+
+// splitHostPort — "host[:port]" → (host, port). Handles bracketed IPv6
+// ([::1]:80 → "::1","80"); a bare IPv6 ([::1] → "::1","").
+func splitHostPort(h string) (string, string) {
+	h = strings.TrimSpace(h)
+	if strings.HasPrefix(h, "[") {
+		if j := strings.IndexByte(h, ']'); j >= 0 {
+			host := h[1:j]
+			rest := h[j+1:]
+			if strings.HasPrefix(rest, ":") {
+				return host, rest[1:]
+			}
+			return host, ""
+		}
+		return h, ""
+	}
+	if i := strings.LastIndexByte(h, ':'); i >= 0 {
+		if strings.Count(h, ":") >= 2 {
+			return h, "" // bare IPv6, no port
+		}
+		return h[:i], h[i+1:]
+	}
+	return h, ""
 }
 
 func (s *Server) cors(w http.ResponseWriter, r *http.Request) {

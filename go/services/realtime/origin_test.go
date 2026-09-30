@@ -22,6 +22,13 @@ func TestOriginAllowed_H3(t *testing.T) {
 		{"not-allowlisted", "http://attacker.example", "web.example", "http://app.example", false},
 		{"origin-path ignored", "http://127.0.0.1:7420/editor", "127.0.0.1:7420", "", true},
 		{"different port rejected", "http://127.0.0.1:8080", "127.0.0.1:7420", "", false},
+		// H3 proxy regression: nginx forwards `Host: $host` (port stripped)
+		// to /socket.io — the browser Origin always carries its port. Both
+		// directions of the one-sided port must be accepted.
+		{"proxy-stripped host (origin has port)", "http://127.0.0.1:4000", "127.0.0.1", "", true},
+		{"proxy-kept host (both have port)", "http://127.0.0.1:4000", "127.0.0.1:4000", "", true},
+		{"cross-host different port rejected", "http://evil.example:4000", "127.0.0.1", "", false},
+		{"ipv6 origin + stripped host", "http://[::1]:4000", "::1", "", true},
 	}
 	for _, c := range cases {
 		t.Setenv("OVERLEAF_REALTIME_ALLOWED_ORIGINS", c.allowEnv)
