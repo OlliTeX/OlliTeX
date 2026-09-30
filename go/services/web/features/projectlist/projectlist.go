@@ -123,6 +123,10 @@ func Feature(a *core.App) core.Feature {
 			{Method: "DELETE", Pattern: accDeclPat, Handler: declineReqHandler(a)},
 			{Method: "POST", Pattern: accGrantPat, Handler: grantReqHandler(a)},
 			{Method: "POST", Pattern: xferPat, Handler: transferOwnerHandler(a)},
+			// P4.10c project settings writes (Node POST /project/:id/settings,
+			// ProjectController.updateProjectSettings -> 204). Live audit 027
+			// (rename) hits {name} here.
+			{Method: "POST", Pattern: settingsPat, Handler: projectSettingsHandler(a)},
 			// P4.10b invites + sharing links (web-p4inv flip; Node route order)
 			{Method: "POST", Pattern: invCreatePat, Handler: inviteCreateHandler(a, gateAdmin)},
 			{Method: "GET", Pattern: invListPat, Handler: inviteListHandler(a, gateAdmin)},
