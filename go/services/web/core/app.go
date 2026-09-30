@@ -325,13 +325,27 @@ func (w *recWriter) Write(b []byte) (int, error) {
 // session + csrf + routes + fallbacks), pinned in the P0 gate.
 func (a *App) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Wrap first in the writes-tracking writer so RecoverPanic can tell
+		// whether a clean 500 can still be produced.
+		var rw *recWriter
+		if existing, ok := w.(*recWriter); ok {
+			rw = existing
+		} else {
+			rw = &recWriter{ResponseWriter: w}
+		}
+		w = rw
+		// Part B (audit): a handler panic must become a logged 500 (clean,
+		// when the response has not started) — never a lost worker or a
+		// bare client-connection reset (the B9 otc-decode path). Node models
+		// the same with express error middleware.
+		defer RecoverPanic(rw)
 		// D22 A2: the Prometheus scrape surface — the ONLY route that bypasses
 		// the core pipeline (no session/CSRF/static/CSP): Prometheus scrapers
 		// are stateless and this port is docker-internal (the HAProxy edge
 		// does not forward /metrics). Additive route: zero existing-path
 		// impact on the byte-pinned battery.
 		if a.MetricsHTTP != nil && r.Method == http.MethodGet && r.URL.Path == "/metrics" {
-			a.MetricsHTTP.ServeHTTP(w, r)
+			a.MetricsHTTP.ServeHTTP(rw, r)
 			return
 		}
 		// x-powered-by: Node sends it ONLY on the express res.send() paths
@@ -342,17 +356,10 @@ func (a *App) Handler() http.Handler {
 		// csrf-403 + BareWrite sites, NOT globally.
 		if a.Cfg.ExpoHostname {
 			if host, err := os.Hostname(); err == nil {
-				w.Header().Set("X-Served-By", host)
+				rw.Header().Set("X-Served-By", host)
 			}
 		}
-		var rw *recWriter
-		if existing, ok := w.(*recWriter); ok {
-			rw = existing
-		} else {
-			rw = &recWriter{ResponseWriter: w}
-			w = rw
-		}
-		a.serve(w, r, rw)
+		a.serve(rw, r, rw)
 	})
 }
 

@@ -358,8 +358,16 @@ var (
 	// exact capture-artifact emails (surgical: a real user may own any other
 	// @e2e.test address; these three are the e2e-run session remnants baked
 	// into the captured skeletons)
-	e2eEmails     = []string{"e2e-user@e2e.test", "admin@e2e.test", "someone@e2e.test"}
-	e2eProjectIDs = []string{"6aa4b8c973ef0e5094f4cc02", "1234567890abcdefgh"}
+	// csrfMetaRe (Part B 1.1): <meta name="ol-csrfToken" content="TOKEN">.
+	csrfMetaRe = regexp.MustCompile(`(<meta name=\\?"ol-csrfToken\\?" content=\\?")([A-Za-z0-9_-]{6,60})(\\?")`)
+	// authE2e patterns (Part B 1.1): ol-auth-config entry objects whose
+	// domain ends in "e2e.test" (the capture artifact). The shipped baked
+	// constants carry HTML-escaped JSON (&quot;), so the quote atom covers
+	// both raw and escaped shapes; stripE2EDomainEntries does the comma
+	// bookkeeping (not-first / first / sole entry).
+	authE2eEntryRe = regexp.MustCompile(e2eDomainEntryPattern())
+	e2eEmails      = []string{"e2e-user@e2e.test", "admin@e2e.test", "someone@e2e.test"}
+	e2eProjectIDs  = []string{"6aa4b8c973ef0e5094f4cc02", "1234567890abcdefgh"}
 )
 
 func sanitizeCaptureArtifacts(in, csrfToken, origin string) string {
@@ -383,6 +391,42 @@ func sanitizeCaptureArtifacts(in, csrfToken, origin string) string {
 	if strings.Contains(in, capturedOrigin) {
 		in = strings.ReplaceAll(in, capturedOrigin, origin)
 	}
+	// Part B 1.1 (sessions page): the <meta name="ol-csrfToken"> can be a
+	// BAKED literal (not the runtime slot) — React pages read their CSRF
+	// token from this meta (getMeta), so a stale literal = every XHR on
+	// that page 403s. Rewrite it to the current session token exactly like
+	// the _csrf inputs above. (Runtime slots contain control-char markers
+	// and never match the token-shape class.)
+	if csrfMetaRe.MatchString(in) {
+		in = csrfMetaRe.ReplaceAllString(in, "${1}"+csrfToken+"${3}")
+	}
+	// Part B 1.1 (register page): the baked ol-auth-config lists the
+	// capture's registration-domain restriction ("e2e.test") — real users
+	// must not see e2e.test as a live domain restriction. Drop the e2e.test
+	// entries (leaves a valid empty domains array; a pathological real
+	// domain ending in ".e2e.test" is the only collateral).
+	in = stripE2EDomainEntries(in)
+	return in
+}
+
+// e2eDomainEntryPattern — one ol-auth-config entry object (raw JSON or
+// HTML-escaped &quot; quotes).
+func e2eDomainEntryPattern() string {
+	q := `(?:"|&quot;)`
+	// quotes wrap KEYS and STRING VALUES only; the booleans are bare.
+	return `\{` + q + `domain` + q + `:` + q + `[0-9A-Za-z*._-]*e2e\.test` + q +
+		`,` + q + `exact` + q + `:` + `(?:true|false)` +
+		`,` + q + `subdomains` + q + `:` + `(?:true|false)` + `\}`
+}
+
+// stripE2EDomainEntries — remove every e2e.test auth-config entry with
+// correct array comma bookkeeping, pass order: entry with a preceding
+// comma (not-first), then a following comma (first), then bare (sole).
+func stripE2EDomainEntries(in string) string {
+	ep := e2eDomainEntryPattern()
+	in = regexp.MustCompile(`\s*,\s*`+ep).ReplaceAllString(in, "")
+	in = regexp.MustCompile(ep+`\s*,?\s*`).ReplaceAllString(in, "")
+	in = regexp.MustCompile(ep).ReplaceAllString(in, "")
 	return in
 }
 

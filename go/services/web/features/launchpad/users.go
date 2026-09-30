@@ -32,7 +32,7 @@ func randomUUID() string {
 
 func bcryptRounds() int {
 	if v := os.Getenv("BCRYPT_ROUNDS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 4 {
+		if n, err := strconv.Atoi(v); err == nil && n >= 10 {
 			return n
 		}
 	}

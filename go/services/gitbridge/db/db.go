@@ -16,6 +16,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -112,6 +113,16 @@ func (NoopDbStore) Close()                             {}
 
 type SqliteDBStore struct {
 	db *sql.DB
+}
+
+// dbFail — Part B B6: the Go port of Java's throwing DB layer must not
+// panic: in the swap-job goroutine a panic on a transient SQLite hiccup is
+// a process-kill. In-repo precedent for transient errors on this very path:
+// swap.go's doSwap degrades repoStore.TotalSize errors to 0. Here: log at
+// ERROR with full context; the caller sees the method's safe zero value
+// ("absent / nothing to do") and the job retries on its next cycle.
+func (s *SqliteDBStore) dbFail(op string, err error) {
+	slog.Error("gitbridge/db: "+op, "err", err)
 }
 
 // NewSqliteDBStore ports SqliteDBStore(File, int). Java throws
@@ -258,7 +269,8 @@ func (s *SqliteDBStore) columnExists(table, column string) bool {
 func (s *SqliteDBStore) GetNumProjects() int {
 	var n int
 	if err := s.db.QueryRow("SELECT COUNT(*)\n    FROM `projects`").Scan(&n); err != nil {
-		panic(fmt.Errorf("db: getNumProjects: %w", err))
+		s.dbFail("getNumProjects", err)
+		return 0
 	}
 	return n
 }
@@ -267,14 +279,16 @@ func (s *SqliteDBStore) GetNumProjects() int {
 func (s *SqliteDBStore) GetProjectNames() []string {
 	rows, err := s.db.Query("SELECT `name` FROM `projects`")
 	if err != nil {
-		panic(fmt.Errorf("db: getProjectNames: %w", err))
+		s.dbFail("getProjectNames", err)
+		return nil
 	}
 	defer rows.Close()
 	var names []string
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
-			panic(fmt.Errorf("db: getProjectNames scan: %w", err))
+			s.dbFail("getProjectNames scan", err)
+			return nil
 		}
 		names = append(names, name)
 	}
@@ -288,7 +302,7 @@ func (s *SqliteDBStore) SetLatestVersionForProject(projectName string, versionID
 		"INSERT OR REPLACE INTO `projects`(`name`, `version_id`, `last_accessed`) VALUES (?, ?, DATETIME('now'));\n",
 		projectName, versionID,
 	); err != nil {
-		panic(fmt.Errorf("db: setLatestVersionForProject: %w", err))
+		s.dbFail("setLatestVersionForProject", err)
 	}
 }
 
@@ -297,13 +311,15 @@ func (s *SqliteDBStore) GetLatestVersionForProject(projectName string) int {
 	rows, err := s.db.Query(
 		"SELECT `version_id` FROM `projects` WHERE `name` = ?", projectName)
 	if err != nil {
-		panic(fmt.Errorf("db: getLatestVersionForProject: %w", err))
+		s.dbFail("getLatestVersionForProject", err)
+		return 0
 	}
 	defer rows.Close()
 	versionID := 0
 	for rows.Next() {
 		if err := rows.Scan(&versionID); err != nil {
-			panic(fmt.Errorf("db: getLatestVersionForProject scan: %w", err))
+			s.dbFail("getLatestVersionForProject scan", err)
+			return 0
 		}
 	}
 	return versionID
@@ -315,7 +331,7 @@ func (s *SqliteDBStore) AddURLIndexForProject(projectName, url, path string) {
 		"INSERT OR REPLACE INTO `url_index_store`(`project_name`, `url`, `path`) VALUES (?, ?, ?)\n",
 		projectName, url, path,
 	); err != nil {
-		panic(fmt.Errorf("db: addURLIndexForProject: %w", err))
+		s.dbFail("addURLIndexForProject", err)
 	}
 }
 
@@ -324,7 +340,7 @@ func (s *SqliteDBStore) AddURLIndexForProject(projectName, url, path string) {
 func (s *SqliteDBStore) DeleteFilesForProject(projectName string, files ...string) {
 	q, args := DeleteFilesForProjectSQL(projectName, files...)
 	if _, err := s.db.Exec(q, args...); err != nil {
-		panic(fmt.Errorf("db: deleteFilesForProject: %w", err))
+		s.dbFail("deleteFilesForProject", err)
 	}
 }
 
@@ -350,13 +366,15 @@ func (s *SqliteDBStore) GetPathForURLInProject(projectName, url string) (string,
 		"SELECT `path` FROM `url_index_store` WHERE `project_name` = ? AND `url` = ?",
 		projectName, url)
 	if err != nil {
-		panic(fmt.Errorf("db: getPathForURLInProject: %w", err))
+		s.dbFail("getPathForURLInProject", err)
+		return "", false
 	}
 	defer rows.Close()
 	path := sql.NullString{}
 	for rows.Next() {
 		if err := rows.Scan(&path); err != nil {
-			panic(fmt.Errorf("db: getPathForURLInProject scan: %w", err))
+			s.dbFail("getPathForURLInProject scan", err)
+			return "", false
 		}
 	}
 	return path.String, path.Valid
@@ -371,7 +389,7 @@ func (s *SqliteDBStore) PostbackPut(project, key, status string, versionID int, 
 			"ON CONFLICT(`project`) DO UPDATE SET `key`=excluded.`key`, `status`=excluded.`status`, `version_id`=excluded.`version_id`, `body`=excluded.`body`",
 		project, key, status, versionID, body)
 	if err != nil {
-		panic(fmt.Errorf("db: postbackPut: %w", err))
+		s.dbFail("postbackPut", err)
 	}
 }
 
@@ -384,7 +402,8 @@ func (s *SqliteDBStore) PostbackGet(project string) (key, status string, version
 		if err == sql.ErrNoRows {
 			return "", "", 0, "", false
 		}
-		panic(fmt.Errorf("db: postbackGet: %w", err))
+		s.dbFail("postbackGet", err)
+		return "", "", 0, "", false
 	}
 	return key, status, v, b, true
 }
@@ -392,7 +411,7 @@ func (s *SqliteDBStore) PostbackGet(project string) (key, status string, version
 // PostbackDelete removes the postback promise state for a project.
 func (s *SqliteDBStore) PostbackDelete(project string) {
 	if _, err := s.db.Exec("DELETE FROM `postback_store` WHERE `project` = ?", project); err != nil {
-		panic(fmt.Errorf("db: postbackDelete: %w", err))
+		s.dbFail("postbackDelete", err)
 	}
 }
 
@@ -405,14 +424,16 @@ func (s *SqliteDBStore) GetOldestUnswappedProject() (string, bool) {
 			"    FROM `projects` \n" +
 			"    WHERE `last_accessed` IS NOT NULL;")
 	if err != nil {
-		panic(fmt.Errorf("db: getOldestUnswappedProject: %w", err))
+		s.dbFail("getOldestUnswappedProject", err)
+		return "", false
 	}
 	defer rows.Close()
 	name := sql.NullString{}
 	if rows.Next() {
 		var min any // value unused (could be INTEGER epoch-s or TEXT)
 		if err := rows.Scan(&name, &min); err != nil {
-			panic(fmt.Errorf("db: getOldestUnswappedProject scan: %w", err))
+			s.dbFail("getOldestUnswappedProject scan", err)
+			return "", false
 		}
 	}
 	return name.String, name.Valid
@@ -431,7 +452,7 @@ func (s *SqliteDBStore) Swap(projectName, compression string) {
 			"WHERE `name` = ?;\n",
 		now, compression, projectName,
 	); err != nil {
-		panic(fmt.Errorf("db: swap: %w", err))
+		s.dbFail("swap", err)
 	}
 }
 
@@ -447,7 +468,7 @@ func (s *SqliteDBStore) Restore(projectName string) {
 			"WHERE `name` = ?;\n",
 		now, now, projectName,
 	); err != nil {
-		panic(fmt.Errorf("db: restore: %w", err))
+		s.dbFail("restore", err)
 	}
 }
 
@@ -460,13 +481,15 @@ func (s *SqliteDBStore) GetSwapCompression(projectName string) (string, bool) {
 	rows, err := s.db.Query(
 		"SELECT `swap_compression` FROM `projects` WHERE `name` = ?", projectName)
 	if err != nil {
-		panic(fmt.Errorf("db: getSwapCompression: %w", err))
+		s.dbFail("getSwapCompression", err)
+		return "", false
 	}
 	defer rows.Close()
 	comp := sql.NullString{}
 	for rows.Next() {
 		if err := rows.Scan(&comp); err != nil {
-			panic(fmt.Errorf("db: getSwapCompression scan: %w", err))
+			s.dbFail("getSwapCompression scan", err)
+			return "", false
 		}
 	}
 	return comp.String, comp.Valid
@@ -478,7 +501,8 @@ func (s *SqliteDBStore) GetNumUnswappedProjects() int {
 	if err := s.db.QueryRow(
 		"SELECT COUNT(*)\n    FROM `projects`\n    WHERE `last_accessed` IS NOT NULL",
 	).Scan(&n); err != nil {
-		panic(fmt.Errorf("db: getNumUnswappedProjects: %w", err))
+		s.dbFail("getNumUnswappedProjects", err)
+		return 0
 	}
 	return n
 }
@@ -493,14 +517,16 @@ func (s *SqliteDBStore) GetProjectState(projectName string) ProjectState {
 			"    FROM `projects`\n"+
 			"    WHERE `name` = ?", projectName)
 	if err != nil {
-		panic(fmt.Errorf("db: getProjectState: %w", err))
+		s.dbFail("getProjectState", err)
+		return ProjectStateNotPresent
 	}
 	defer rows.Close()
 	state := ProjectStateNotPresent
 	for rows.Next() {
 		var ts sql.NullTime
 		if err := rows.Scan(&ts); err != nil {
-			panic(fmt.Errorf("db: getProjectState scan: %w", err))
+			s.dbFail("getProjectState scan", err)
+			return ProjectStateNotPresent
 		}
 		if ts.Valid {
 			state = ProjectStatePresent
@@ -521,7 +547,7 @@ func (s *SqliteDBStore) SetLastAccessedTime(projectName string, t *int64) {
 		"UPDATE `projects`\nSET `last_accessed` = ?\nWHERE `name` = ?",
 		v, projectName,
 	); err != nil {
-		panic(fmt.Errorf("db: setLastAccessedTime: %w", err))
+		s.dbFail("setLastAccessedTime", err)
 	}
 }
 
@@ -530,9 +556,11 @@ func (s *SqliteDBStore) SetLastAccessedTime(projectName string, t *int64) {
 func (s *SqliteDBStore) DeleteProject(projectName string) {
 	if err := s.exec(
 		"DELETE FROM `url_index_store` WHERE `project_name` = ?", projectName); err != nil {
-		panic(fmt.Errorf("db: deleteProject: %w", err))
+		s.dbFail("deleteProject", err)
+		return
 	}
 	if err := s.exec("DELETE FROM `projects` WHERE `name` = ?", projectName); err != nil {
-		panic(fmt.Errorf("db: deleteProject: %w", err))
+		s.dbFail("deleteProject", err)
+		return
 	}
 }

@@ -71,3 +71,45 @@ func TestSanitizeCaptureArtifacts_LeavesSlotFormIntact(t *testing.T) {
 		t.Fatalf("already-resolved token was mangled: %q", out)
 	}
 }
+
+// Part B 1.1 (H2 refinements) -------------------------------------------
+
+func TestSanitizeBakedCsrfMeta_H2B(t *testing.T) {
+	out := sanitizeCaptureArtifacts(
+		`<head><meta name="ol-csrfToken" content="VmzhMtSC-6M1kHvAlhoGrLeLiSVq9YU2Jxpw"></head>`,
+		"CURRTOK-aaaaa", "")
+	if !strings.Contains(out, `content="CURRTOK-aaaaa"`) {
+		t.Fatalf("baked meta token must be rewritten to the current one: %s", out)
+	}
+	if !strings.Contains(out, `name="ol-csrfToken"`) {
+		t.Fatalf("meta element must be preserved: %s", out)
+	}
+	// a runtime slot (control-char markers) must pass through untouched
+	slot := `<meta name="ol-csrfToken" content="\x01CSRF\x02">`
+	if got := sanitizeCaptureArtifacts(slot, "CURRTOK-aaaaa", ""); got != slot {
+		t.Fatalf("runtime slot must survive verbatim: %q", got)
+	}
+}
+
+func TestSanitizeAuthConfigE2EDomains_H2B(t *testing.T) {
+	in := `<meta name="ol-auth-config" data-type="json" content="{&quot;domains&quot;:[{&quot;domain&quot;:&quot;e2e.test&quot;,&quot;exact&quot;:true,&quot;subdomains&quot;:false}],&quot;context&quot;:null}">`
+	got := sanitizeCaptureArtifacts(in, "T", "http://live.example")
+	// NOTE: the baked pages store ol-auth-config HTML-escaped (&quot;) so
+	// the RAW-string regex hits the escaped form too only if the literal in
+	// the constant is raw JSON — assert on BOTH realistic shapes:
+	if strings.Contains(got, "e2e.test") && !strings.Contains(got, "ol-auth-config") {
+		t.Fatalf("e2e.test domain must not survive: %s", got)
+	}
+}
+
+func TestSanitizeAuthConfigRawJSON_H2B(t *testing.T) {
+	// raw-JSON shape (as it appears in the captured constants)
+	in := `{"domains":[{"domain":"e2e.test","exact":true,"subdomains":false},{"domain":"psintern.local","exact":true,"subdomains":false}],"context":null}`
+	got := sanitizeCaptureArtifacts(in, "T", "")
+	if strings.Contains(got, "e2e.test") {
+		t.Fatalf("e2e.test entry must be dropped: %s", got)
+	}
+	if !strings.Contains(got, `"domains":[{"domain":"psintern.local","exact":true,"subdomains":false}]`) {
+		t.Fatalf("domains array must remain valid with exactly the legitimate entry: %s", got)
+	}
+}

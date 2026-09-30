@@ -802,6 +802,7 @@ func tplDeleteFlow(ctx context.Context, a *core.App, res *core.Res, tid string, 
 		_, _ = db.Collection("templates").DeleteOne(ctx, bson.D{{Key: "_id", Value: oid}})
 		base := tplFilestoreBase() + "/template/" + oid.Hex() + "/v/" + version
 		go func() {
+			defer core.GoroutineGuard("templates: filestore template cache delete")
 			for _, p := range []string{"/zip", "/pdf"} {
 				req, err := http.NewRequest("DELETE", base+p, nil)
 				if err != nil {

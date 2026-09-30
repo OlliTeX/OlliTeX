@@ -106,41 +106,23 @@ func TestNewSqliteDBStoreCannotCreateParent(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Error branches: call each method after Close(); the closed handle makes the
-// underlying Query/Exec error, which is panicked and recovered here.
+// Error branches: Part B B6 rewired the closed-handle (DB-error) class from
+// panic to a logged safe-default — a panic in the gitbridge swap-job
+// goroutine is a process-kill on a transient hiccup. Every method must now
+// return its zero value without panicking.
 // ---------------------------------------------------------------------------
 
-func assertPanicsWithDBPrefix(t *testing.T, name string, fn func()) {
+func assertNoPanicsNow(t *testing.T, name string, fn func()) {
 	t.Helper()
 	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatalf("%s: expected a panic after the DB was closed", name)
-		}
-		msg := ""
-		if errVal, ok := r.(error); ok {
-			msg = errVal.Error()
-		}
-		if errVal, ok := r.(interface{ Error() string }); ok {
-			msg = errVal.Error()
-		}
-		if msg != "" && !containsStr(msg, "db:") {
-			t.Fatalf("%s: recovery error does not carry the db: prefix: %q", name, msg)
+		if r := recover(); r != nil {
+			t.Fatalf("%s: panicked on DB error (Part B B6: must degrade safely): %v", name, r)
 		}
 	}()
 	fn()
 }
 
-func containsStr(hay, needle string) bool {
-	for i := 0; i+len(needle) <= len(hay); i++ {
-		if hay[i:i+len(needle)] == needle {
-			return true
-		}
-	}
-	return false
-}
-
-func TestSqliteDBStorePanicsAfterClose(t *testing.T) {
+func TestSqliteDBStoreSafeAfterClose(t *testing.T) {
 	s, err := openTempStore(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
@@ -152,21 +134,60 @@ func TestSqliteDBStorePanicsAfterClose(t *testing.T) {
 		t.Fatalf("close: %v", err)
 	}
 
-	assertPanicsWithDBPrefix(t, "GetNumProjects", func() { s.GetNumProjects() })
-	assertPanicsWithDBPrefix(t, "GetProjectNames", func() { s.GetProjectNames() })
-	assertPanicsWithDBPrefix(t, "SetLatestVersionForProject", func() { s.SetLatestVersionForProject("p", 1) })
-	assertPanicsWithDBPrefix(t, "GetLatestVersionForProject", func() { s.GetLatestVersionForProject("p") })
-	assertPanicsWithDBPrefix(t, "AddURLIndexForProject", func() { s.AddURLIndexForProject("p", "u", "f") })
-	assertPanicsWithDBPrefix(t, "DeleteFilesForProject", func() { s.DeleteFilesForProject("p", "f") })
-	assertPanicsWithDBPrefix(t, "GetPathForURLInProject", func() { s.GetPathForURLInProject("p", "u") })
-	assertPanicsWithDBPrefix(t, "GetOldestUnswappedProject", func() { s.GetOldestUnswappedProject() })
-	assertPanicsWithDBPrefix(t, "Swap", func() { s.Swap("p", "bzip2") })
-	assertPanicsWithDBPrefix(t, "Restore", func() { s.Restore("p") })
-	assertPanicsWithDBPrefix(t, "GetSwapCompression", func() { s.GetSwapCompression("p") })
-	assertPanicsWithDBPrefix(t, "GetNumUnswappedProjects", func() { s.GetNumUnswappedProjects() })
-	assertPanicsWithDBPrefix(t, "GetProjectState", func() { s.GetProjectState("p") })
-	assertPanicsWithDBPrefix(t, "SetLastAccessedTime", func() { s.SetLastAccessedTime("p", ptr(1)) })
-	assertPanicsWithDBPrefix(t, "DeleteProject", func() { s.DeleteProject("p") })
+	assertNoPanicsNow(t, "GetNumProjects", func() {
+		if got := s.GetNumProjects(); got != 0 {
+			t.Fatalf("GetNumProjects: expected safe 0, got %d", got)
+		}
+	})
+	assertNoPanicsNow(t, "GetProjectNames", func() {
+		if got := s.GetProjectNames(); got != nil {
+			t.Fatalf("GetProjectNames: expected safe nil, got %v", got)
+		}
+	})
+	assertNoPanicsNow(t, "SetLatestVersionForProject", func() { s.SetLatestVersionForProject("p", 1) })
+	assertNoPanicsNow(t, "GetLatestVersionForProject", func() {
+		if got := s.GetLatestVersionForProject("p"); got != 0 {
+			t.Fatalf("GetLatestVersionForProject: expected safe 0, got %d", got)
+		}
+	})
+	assertNoPanicsNow(t, "AddURLIndexForProject", func() { s.AddURLIndexForProject("p", "u", "f") })
+	assertNoPanicsNow(t, "DeleteFilesForProject", func() { s.DeleteFilesForProject("p", "f") })
+	assertNoPanicsNow(t, "GetPathForURLInProject", func() {
+		if p, ok := s.GetPathForURLInProject("p", "u"); p != "" || ok {
+			t.Fatalf("GetPathForURLInProject: expected safe empty, got (%q, %v)", p, ok)
+		}
+	})
+	assertNoPanicsNow(t, "GetOldestUnswappedProject", func() {
+		if n, ok := s.GetOldestUnswappedProject(); n != "" || ok {
+			t.Fatalf("GetOldestUnswappedProject: expected safe empty, got (%q, %v)", n, ok)
+		}
+	})
+	assertNoPanicsNow(t, "Swap", func() { s.Swap("p", "bzip2") })
+	assertNoPanicsNow(t, "Restore", func() { s.Restore("p") })
+	assertNoPanicsNow(t, "GetSwapCompression", func() {
+		if c, ok := s.GetSwapCompression("p"); c != "" || ok {
+			t.Fatalf("GetSwapCompression: expected safe empty, got (%q, %v)", c, ok)
+		}
+	})
+	assertNoPanicsNow(t, "GetNumUnswappedProjects", func() {
+		if got := s.GetNumUnswappedProjects(); got != 0 {
+			t.Fatalf("GetNumUnswappedProjects: expected safe 0, got %d", got)
+		}
+	})
+	assertNoPanicsNow(t, "GetProjectState", func() {
+		if got := s.GetProjectState("p"); got != ProjectStateNotPresent {
+			t.Fatalf("GetProjectState: expected safe NOT_PRESENT, got %v", got)
+		}
+	})
+	assertNoPanicsNow(t, "SetLastAccessedTime", func() { s.SetLastAccessedTime("p", ptr(1)) })
+	assertNoPanicsNow(t, "DeleteProject", func() { s.DeleteProject("p") })
+	assertNoPanicsNow(t, "PostbackPut", func() { s.PostbackPut("p", "k", "s", 1, "b") })
+	assertNoPanicsNow(t, "PostbackGet", func() {
+		if _, _, _, _, found := s.PostbackGet("p"); found {
+			t.Fatalf("PostbackGet: expected safe found=false")
+		}
+	})
+	assertNoPanicsNow(t, "PostbackDelete", func() { s.PostbackDelete("p") })
 }
 
 func TestExecErrorBranch(t *testing.T) {

@@ -362,6 +362,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	go func() {
+		defer core.GoroutineGuard("web: graceful shutdown")
 		<-ctx.Done()
 		log.Printf("webgo: shutting down")
 		shctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

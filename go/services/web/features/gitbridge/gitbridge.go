@@ -304,6 +304,7 @@ func (p *pats) userIDForToken(ctx context.Context, token string) (string, error)
 	// non-blocking lastUsedAt (Node fire-and-forget)
 	now := time.Now()
 	go func() {
+		defer core.GoroutineGuard("gitbridge: token lastUsedAt update")
 		ctx2, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		c, err2 := p.tokens(ctx2)
@@ -670,6 +671,7 @@ func (p *pats) patCreate(cxt *core.Cxt, res *core.Res) {
 		if tmErr == nil {
 			body := tmpl.Subject + "\n\n" + tmpl.Text // wire: SendExact(email, "", BODY)
 			go func() {
+				defer core.GoroutineGuard("gitbridge: token email send")
 				_ = p.mail.SendExact(email, "", body)
 			}()
 		}

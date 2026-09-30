@@ -202,6 +202,23 @@ type nzipEntry struct {
 	data []byte
 }
 
+// nzipReadEntry — Part B B2: read one zip entry's bytes with a hard ceiling
+// on ACTUAL consumption. The declared-size pre-check bounds `total`, but a
+// data-descriptor (bit-3) zip's real stream can be larger than its declared
+// sizes, so the read itself must be bounded; overflow reports back instead
+// of silently growing memory.
+func nzipReadEntry(rc io.Reader, max int64) (b []byte, overflow bool) {
+	r := io.LimitReader(rc, max+1)
+	d, err := io.ReadAll(r)
+	if err != nil {
+		return nil, false
+	}
+	if int64(len(d)) > max {
+		return nil, true
+	}
+	return d, false
+}
+
 // nzipExtract — _isZipTooLarge + _extractZipFiles semantics.
 // kind: 0 ok | 1 invalid_zip | 2 zip_contents_too_large | 3 empty_zip.
 func nzipExtract(r *zip.Reader) ([]nzipEntry, int) {
@@ -228,6 +245,7 @@ func nzipExtract(r *zip.Reader) ([]nzipEntry, int) {
 		return nil, 1
 	}
 	var out []nzipEntry
+	var actual int64 // Part B B2: ACTUAL consumed bytes (declared sizes can lie)
 	for _, f := range r.File {
 		if nzipIgnore(f.Name) {
 			continue
@@ -240,10 +258,14 @@ func nzipExtract(r *zip.Reader) ([]nzipEntry, int) {
 		if oerr != nil {
 			return nil, 1
 		}
-		data, rerr := io.ReadAll(rc)
+		data, over := nzipReadEntry(rc, nzipUncompMax)
 		rc.Close()
-		if rerr != nil {
-			return nil, 1
+		if over {
+			return nil, 2 // Part B B2: actual stream exceeded the budget (declared sizes can lie — data-descriptor zips)
+		}
+		actual += int64(len(data))
+		if actual > nzipUncompMax {
+			return nil, 2 // Part B B2: cumulative ACTUAL bytes bounded, not just declared
 		}
 		out = append(out, nzipEntry{path: rel, data: data})
 	}

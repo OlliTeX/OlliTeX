@@ -370,7 +370,13 @@ func (f *fs) llmComplianceStart(cxt *core.Cxt, res *core.Res) {
 	chPersistJob(f, ctx, job, true)
 
 	jres(200, res, jobj("ok", true, "jobId", job.id, "status", "running", "position", 0))
-	go f.chPerform(ctx, job)
+	// Part B B5/B7: a panic in job execution (not just the C1 regexp one)
+	// must not kill the process — plain-`go func` panics have no
+	// per-request recovery like handler panics do.
+	go func() {
+		defer core.GoroutineGuard("llmsettings: chPerform")
+		f.chPerform(ctx, job)
+	}()
 }
 
 func itoa(n int) string {

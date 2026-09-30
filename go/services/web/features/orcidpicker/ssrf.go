@@ -112,11 +112,19 @@ func mappedIPv4InIPv6(s string) (string, bool) {
 }
 
 // checkHostNotPrivate — Node: dns.promises.lookup(hostname, { all: true })
-// then reject if ANY record is non-public (mitigates DNS-rebind at request
-// time; safeFetch re-checks per redirect hop).
+// then reject if ANY record is non-public.
 //
 // Go: net.Resolver.LookupHost with a nil (system) resolver — the same
 // resolver the container uses, so the decision agrees with Node's.
+//
+// ACCEPTED RISK (audit Part B B3): this is a check-then-use guard, not a
+// pinned dialer with a post-dial IP re-check, so an attacker-controlled
+// nameserver can REBIND a name between this lookup and the actual dial
+// (the classic DNS-rebinding TOCTOU). The window is kept small by
+// safeFetch's per-redirect-hop re-check (client.go) and the fixed 10 s
+// hop timeout; a full mitigation (Resolver+DialContext with IP pinning)
+// is deliberately not implemented — it diverges from the Node oracle
+// (which has the same residual window).
 func checkHostNotPrivate(ctx context.Context, host string) error {
 	if err := ctx.Err(); err != nil {
 		return &orcidErr{msg: transportText(ctx, err)}

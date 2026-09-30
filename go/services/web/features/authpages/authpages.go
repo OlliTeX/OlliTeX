@@ -17,11 +17,23 @@ import (
 
 // Feature wires the auth routes.
 func Feature(a *core.App) core.Feature {
+	// B1 (Part B audit): login brute-force throttle — the only auth path
+	// left without rate limiting (audit B1: registration 5/60, password
+	// reset 6/60, token-access 10/60 all gated, login was not). Per-IP,
+	// 10 attempts / 60s, redis-backed like every other house limiter, and
+	// fail-open on redis outage (the house limiter contract).
+	loginLim := core.NewRateLimiter(a.Redis, "login_attempts", 10, 60)
 	return core.Feature{
 		Name: "authpages",
 		Routes: []core.Route{
 			{Method: "GET", Path: "/login", NoLogin: true, Handler: pageHandler(views.LoginPage)},
-			{Method: "POST", Path: "/login", NoLogin: true, Handler: postLogin(a)},
+			{Method: "POST", Path: "/login", NoLogin: true, Handler: func(cxt *core.Cxt, res *core.Res) {
+				if !loginLim.Consume(core.ClientIP(cxt.Req)) {
+					core.Send429(res, "Rate limit reached, please try again later")
+					return
+				}
+				postLogin(a)(cxt, res)
+			}},
 			// GET /register → registrationpage feature (P3.4, P3.3-era move).
 			{Method: "GET", Path: "/logout", Handler: getLogoutPage},
 			{Method: "POST", Path: "/logout", Handler: postLogout(a)},

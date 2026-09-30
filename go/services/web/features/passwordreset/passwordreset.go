@@ -230,7 +230,7 @@ func sanitizePw(p string) string {
 func bcryptRounds() int {
 	if v := os.Getenv("BCRYPT_ROUNDS"); v != "" {
 		var n int
-		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n >= 4 {
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n >= 10 {
 			return n
 		}
 	}
