@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"ollitex/go/libraries/ometrics"
@@ -122,7 +123,7 @@ func (s *svc) analyze(cxt *core.Cxt, res *core.Res) {
 
 	// {ok:true,result} | {ok:false,error:{code,message}}
 	var wr struct {
-		OK     bool       `json:"ok"`
+		OK     bool           `json:"ok"`
 		Result map[string]any `json:"result"`
 		Error  *struct {
 			Code    string `json:"code"`
@@ -226,7 +227,15 @@ func canRead(uid string, isAdmin bool, proj *bson.D) bool {
 		return false
 	}
 	d := *proj
-	if dget(d, "owner_ref") == uid ||
+	owner := oidHex(dget(d, "owner_ref"))
+	if owner == "" {
+		owner = oidHex(dget(d, "owner"))
+	}
+	uidLow := strings.ToLower(uid)
+	// Node's spelling wins (collab_refs typo included — live data uses it);
+	// owner_ref/collab refs are ObjectIDs in the store, so compare hex.
+	if (owner != "" && strings.ToLower(owner) == uidLow) ||
+		inList("collab_refs", d, uid) ||
 		inList("collaberator_refs", d, uid) ||
 		inList("reviewer_refs", d, uid) ||
 		inList("readOnly_refs", d, uid) {
@@ -248,11 +257,23 @@ func canRead(uid string, isAdmin bool, proj *bson.D) bool {
 }
 
 func inList(key string, d bson.D, uid string) bool {
-	l, _ := dget(d, key).(bson.A)
+	l := dgetArrRef(key, d)
+	uidLow := strings.ToLower(uid)
 	for _, v := range l {
-		if s, ok := v.(string); ok && s == uid {
+		if oidHex(v) != "" && strings.ToLower(oidHex(v)) == uidLow {
 			return true
 		}
 	}
 	return false
+}
+
+// dgetArrRef — tolerant array read (driver v2: bson.A; some stores: []any).
+func dgetArrRef(key string, d bson.D) []any {
+	switch v := dget(d, key).(type) {
+	case bson.A:
+		return v
+	case []any:
+		return v
+	}
+	return nil
 }
