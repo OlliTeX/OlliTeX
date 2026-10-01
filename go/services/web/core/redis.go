@@ -430,6 +430,51 @@ func (r *RedisClient) DEL(key string) error {
 	return err
 }
 
+// SETEX — SET key value EX seconds (024/federation: OP adapter TTL docs).
+func (r *RedisClient) SETEX(key, value string, sec int64) error {
+	c, err := r.require()
+	if err != nil {
+		return err
+	}
+	_, err = c.SetEx(context.Background(), key, value, time.Duration(sec)*time.Second).Result()
+	return err
+}
+
+// SETPX — SET key value PX milliseconds (024/federation: OP adapter ms docs).
+func (r *RedisClient) SETPX(key, value string, ms int64) error {
+	c, err := r.require()
+	if err != nil {
+		return err
+	}
+	_, err = c.Do(context.Background(), "SETPX", key, value, ms).Result()
+	return err
+}
+
+// SCARD — set cardinality (024/federation: OP adapter index trim gate).
+func (r *RedisClient) SCARD(key string) (int64, error) {
+	c, err := r.require()
+	if err != nil {
+		return 0, err
+	}
+	return c.SCard(context.Background(), key).Result()
+}
+
+// PTTL — remaining milliseconds (redis: -1 no TTL, -2 missing).
+func (r *RedisClient) PTTL(key string) (int64, error) {
+	c, err := r.require()
+	if err != nil {
+		return 0, err
+	}
+	ms, err := c.PTTL(context.Background(), key).Result()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return ms.Milliseconds(), nil
+}
+
 // Publish — redis PUBLISH (system-message refresh fan-out).
 func (r *RedisClient) Publish(channel, message string) error {
 	c, err := r.require()

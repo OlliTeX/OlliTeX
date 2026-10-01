@@ -204,6 +204,12 @@ type Route struct {
 	// no overleaf.sid cookie while /login does).
 	NoSession bool
 
+	// NoCSRF = mounted on Node's nonCsrfRouter (the WEB router, session
+	// ON, but the csurf middleware skipped): machine POSTs + op-redirect
+	// landings (federation S2S/op token, RP callback; Csrf.mjs
+	// disableDefaultCsrfProtection). Default false.
+	NoCSRF bool
+
 	// APIOnly = mounted on Node's privateApiRouter / publicApiRouter but NOT
 	// on webRouter (e.g. GET /project/:id/details, POST /user/:id/project/new,
 	// POST /tpds/folder-update). Served on the api profile; the web profile
@@ -447,7 +453,10 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 			}
 		}
 
-		if mustCsrf(r.Method) {
+		// routeNoCSRF mirrors the non-csrfRouter mount: WEB router (session ON)
+		// but csurf skipped (machine POSTs + op-redirect landings).
+		touchedByNoCSRF := a.routeNoCSRF(r)
+		if mustCsrf(r.Method) && !touchedByNoCSRF {
 			token := csrfTokenFrom(r)
 			if token == "" || !VerifyCsrfToken(sess.CsrfSecret(), token) {
 				// Node: the 403 goes out WITH the freshly issued session
@@ -753,6 +762,23 @@ func (a *App) acceptsJSON(r *http.Request) bool {
 }
 
 // ---- csrf plumbing ----
+
+func (a *App) routeNoCSRF(r *http.Request) bool {
+	web := a.Cfg.Profile == "web"
+	for _, f := range a.feats {
+		for i := range f.Routes {
+			rt := &f.Routes[i]
+			if web && rt.APIOnly {
+				continue
+			}
+			if (rt.Path == r.URL.Path && rt.Method == r.Method) ||
+				(rt.Pattern != nil && rt.Pattern.MatchString(r.URL.Path) && rt.Method == r.Method) {
+				return rt.NoCSRF
+			}
+		}
+	}
+	return false
+}
 
 func mustCsrf(method string) bool {
 	switch method {

@@ -36,6 +36,7 @@ import (
 	"ollitex/go/services/web/features/dropbox"
 	"ollitex/go/services/web/features/editorpages"
 	"ollitex/go/services/web/features/emailtemplates"
+	"ollitex/go/services/web/features/federation"
 	ghsvc "ollitex/go/services/web/features/ghsync"
 	"ollitex/go/services/web/features/gitbridge"
 	"ollitex/go/services/web/features/healthcheck"
@@ -263,6 +264,11 @@ func main() {
 	// GET  /project/:pid/collab/history, /collab/history/:v, GET /collab/doc,
 	// POST /collab/history/:v/restore. Role-gated (owner/collab RW, readOnly RO).
 	app.RegisterFeature(collabhistory.Feature(app))
+
+	// OIDF 1.0 pairwise identity federation (Node services/web/modules/federation
+	// Go port). Gated: FEDERATION_ENABLED env (default OFF; config.go reads it
+	// per route) — mounted like the S2S 200 `federation-off` envelope contract.
+	app.RegisterFeature(federation.Feature(app))
 
 	// P6.15 surface: LanguageTool proxy (languages, check, admin connection
 	// check).
