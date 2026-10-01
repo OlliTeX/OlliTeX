@@ -25,6 +25,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"path"
 	"regexp"
@@ -622,7 +623,40 @@ type chatErr struct{ code, msg string }
 
 func (e *chatErr) Error() string { return e.msg }
 
-func llmCall(lr *laneRef, timeout time.Duration, attempts int) (string, error) {
+// llmPayload — Node LLMClient.chatText wire shape (AI SDK openai/compatible):
+// { model, messages, max_tokens } (+temperature when the caller sets one).
+// Anthropic /v1/messages moves the leading system message into `system`.
+func llmPayload(lr *laneRef, messages []map[string]any, maxTokens int, temperature float64) []byte {
+	var sys string
+	rest := make([]map[string]any, 0, len(messages))
+	for _, m := range messages {
+		if lr.ptype == "anthropic" && m["role"] == "system" {
+			if s, ok := m["content"].(string); ok {
+				if sys != "" {
+					sys += "\n\n"
+				}
+				sys += s
+			}
+			continue
+		}
+		rest = append(rest, m)
+	}
+	payload := map[string]any{
+		"model":      lr.model,
+		"messages":   rest,
+		"max_tokens": maxTokens,
+	}
+	if temperature > 0 {
+		payload["temperature"] = temperature
+	}
+	if sys != "" {
+		payload["system"] = sys
+	}
+	out, _ := json.Marshal(payload)
+	return out
+}
+
+func llmCall(lr *laneRef, timeout time.Duration, attempts int, messages []map[string]any, maxTokens int, temperature float64) (string, error) {
 	base := strings.TrimSpace(lr.base)
 	base = stripSlash.ReplaceAllString(base, "")
 	isAnt := lr.ptype == "anthropic"
@@ -639,9 +673,10 @@ func llmCall(lr *laneRef, timeout time.Duration, attempts int) (string, error) {
 		uStr = base + "/chat/completions"
 	}
 	client := &http.Client{Timeout: timeout}
+	raw := llmPayload(lr, messages, maxTokens, temperature)
 	var lastErr error
 	for i := 0; i < attempts; i++ {
-		req, err := http.NewRequest("POST", uStr, strings.NewReader(`{"messages":[{"role":"user","content":"ok"}],"max_tokens":32}`))
+		req, err := http.NewRequest("POST", uStr, strings.NewReader(string(raw)))
 		if err != nil {
 			lastErr = err
 			continue
@@ -707,6 +742,14 @@ func innerCause(err error) string {
 	return msg
 }
 
+var thinkRe = regexp.MustCompile(`(?i)</?think[^>]*>`)
+
+// stripThinkTags — Node LLMClient.stripThinkTags (Ollama/Qwen3 leaks
+// reasoning into `content`; the visible text keeps none of it).
+func stripThinkTags(s string) string {
+	return thinkRe.ReplaceAllString(s, "")
+}
+
 func parseChatText(isAnt bool, body []byte) (string, error) {
 	var v map[string]any
 	if json.Unmarshal(body, &v) != nil {
@@ -714,19 +757,29 @@ func parseChatText(isAnt bool, body []byte) (string, error) {
 	}
 	if isAnt {
 		if arr, ok := v["content"].([]any); ok && len(arr) > 0 {
-			if m, ok2 := arr[0].(map[string]any); ok2 {
-				if s, ok3 := m["text"].(string); ok3 && strings.TrimSpace(s) != "" {
-					return s, nil
+			for _, c := range arr {
+				if m, ok2 := c.(map[string]any); ok2 {
+					if s, ok3 := m["text"].(string); ok3 {
+						t := stripThinkTags(s)
+						if strings.TrimSpace(t) != "" {
+							return t, nil
+						}
+					}
 				}
 			}
 		}
 		return "", errors.New("empty")
 	}
 	if ch, ok := v["choices"].([]any); ok && len(ch) > 0 {
-		if m, ok2 := ch[0].(map[string]any); ok2 {
-			if mm, ok3 := m["message"].(map[string]any); ok3 {
-				if s, ok4 := mm["content"].(string); ok4 && strings.TrimSpace(s) != "" {
-					return s, nil
+		for _, c := range ch {
+			if m, ok2 := c.(map[string]any); ok2 {
+				if mm, ok3 := m["message"].(map[string]any); ok3 {
+					if s, ok4 := mm["content"].(string); ok4 {
+						t := stripThinkTags(s)
+						if strings.TrimSpace(t) != "" {
+							return t, nil
+						}
+					}
 				}
 			}
 		}
@@ -1105,9 +1158,49 @@ func (f *fs) llmChat(cxt *core.Cxt, res *core.Res) {
 		sendErr(res, le, 400)
 		return
 	}
-	if text, err := llmCall(lr, 300*time.Second, 2); err != nil {
+	// Node LLMChatController.chat: system preamble (admin site prompt +
+	// language instruction) merged with a client system message when present.
+	langInstr := "Reply in the same language as the user's latest message (for example, answer in Italian if the user writes in Italian)."
+	preamble := langInstr
+	if lr.lane == "site" {
+		if sp := readAdminFile(f.adminPath()).str("systemPrompt"); sp != "" {
+			preamble = sp + "\n\n" + langInstr
+		}
+	}
+	type msgRC struct{ role, content string }
+	var src []msgRC
+	for _, e := range msgs.([]any) {
+		mo, okv := e.(obj)
+		if !okv {
+			continue
+		}
+		m := msgRC{}
+		if rv, ok2 := mo.get("role"); ok2 {
+			m.role = jsStrCoerce(rv)
+		}
+		if cv, ok2 := mo.get("content"); ok2 {
+			m.content = jsStrCoerce(cv)
+		}
+		src = append(src, m)
+	}
+	final := make([]map[string]any, 0, len(src)+1)
+	if len(src) > 0 && src[0].role == "system" {
+		final = append(final, map[string]any{"role": "system", "content": preamble + "\n\n" + src[0].content})
+		for i := 1; i < len(src); i++ {
+			final = append(final, map[string]any{"role": src[i].role, "content": src[i].content})
+		}
+	} else {
+		final = append(final, map[string]any{"role": "system", "content": preamble})
+		for i := 0; i < len(src); i++ {
+			final = append(final, map[string]any{"role": src[i].role, "content": src[i].content})
+		}
+	}
+	if text, err := llmCall(lr, 300*time.Second, 2, final, 8192, 0.7); err != nil {
 		ce, ok2 := err.(*chatErr)
 		if ok2 {
+			if ce.code == "empty-response" {
+				ce = &chatErr{code: "empty-response", msg: "The model returned no visible text. Reasoning models may spend the whole output budget on thinking - raise the output budget or disable reasoning for this task."}
+			}
 			sendErr(res, &laneErr{code: ce.code, message: ce.msg}, 502)
 		} else {
 			sendErr(res, &laneErr{"llm-error", "LLM request failed: " + err.Error()}, 502)
@@ -1214,18 +1307,22 @@ func (f *fs) llmCompletion(cxt *core.Cxt, res *core.Res) {
 			lastErr = le
 			continue
 		}
-		if _, err := llmCall(lr, 15*time.Second, 2); err != nil {
-			if ce, ok2 := err.(*chatErr); ok2 {
+		text, cerr := llmCall(lr, 15*time.Second, 2, []map[string]any{
+			{"role": "system", "content": "/no_think\nYou are a text completion engine. Output ONLY the missing text, in the same language as the surrounding text. No thinking, no explanation, no markdown, no code fences, no tags. Just the raw continuation characters."},
+			{"role": "user", "content": "Complete the text at [CURSOR]. Output only the few words that replace [CURSOR]:\n\n" + left + "[CURSOR]" + right},
+		}, clampedLength(b), 0.2)
+		if cerr != nil {
+			if ce, ok2 := cerr.(*chatErr); ok2 {
 				lastErr = &laneErr{code: ce.code, message: ce.msg}
 			} else {
-				lastErr = &laneErr{"llm-error", err.Error()}
+				lastErr = &laneErr{"llm-error", cerr.Error()}
 			}
 			continue
 		}
-		jres(200, res, jobj("success", true, "data", "", "model", lr.model, "lane", lr.lane))
+		jres(200, res, jobj("success", true, "data", text, "model", lr.model, "lane", lr.lane))
 		return
 	}
-	if lastErr == nil {
+	if lastErr == nil { //nolint:nilnil // Node parity: chain exhausted
 		lastErr = &laneErr{"llm-disabled", "No usable LLM backend configured"}
 	}
 	if lastErr.code == "disabled" || lastErr.code == "llm-bad-row" {
@@ -1242,6 +1339,162 @@ func (f *fs) llmCompletion(cxt *core.Cxt, res *core.Res) {
 }
 
 func (a siteAdmin) lookupStr(k string) string { return "" }
+
+// parseCompileFixObject — Node LLMCompileFix.validateCompileFixObject (cross-field
+// invariants) over the first balanced JSON object in the model text; fences
+// and leading prose are tolerated (prompt-based flakiness per Node comment).
+func parseCompileFixObject(content string) (struct {
+	explanation  string
+	suggestedOld string
+	suggestedNew string
+	span         [2]int
+}, bool) {
+	var out struct {
+		explanation  string
+		suggestedOld string
+		suggestedNew string
+		span         [2]int
+	}
+	start := strings.Index(content, "{")
+	end := strings.LastIndex(content, "}")
+	if start == -1 || end <= start {
+		return out, false
+	}
+	var v map[string]any
+	if json.Unmarshal([]byte(content[start:end+1]), &v) != nil {
+		return out, false
+	}
+	if s, ok := v["explanation"].(string); ok {
+		out.explanation = strings.TrimSpace(s)
+		if len(out.explanation) > 6000 {
+			out.explanation = out.explanation[:6000]
+		}
+	}
+	if s, ok := v["suggestedOld"].(string); ok {
+		out.suggestedOld = s
+	}
+	if s, ok := v["suggestedNew"].(string); ok {
+		out.suggestedNew = strings.TrimSpace(s)
+	}
+	if len(out.suggestedOld) > 8000 || len(out.suggestedNew) > 8000 {
+		return out, false
+	}
+	if out.suggestedOld == "" && out.suggestedNew == "" {
+		return out, false
+	}
+	if arr, ok := v["span"].([]any); ok && len(arr) == 2 {
+		if fa, ok2 := asNum(arr[0]); ok2 && fa >= 1 {
+			if fb, ok3 := asNum(arr[1]); ok3 && fb >= fa {
+				out.span = [2]int{int(fa), int(fb)}
+			}
+		}
+	}
+	return out, true
+}
+
+func asNum(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		if n == float64(int64(n)) {
+			return n, true
+		}
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	}
+	return 0, false
+}
+
+// clampedLength — Node `Math.max(16, Math.min(1024, parseInt(maxLength, 10) || 320))`.
+func clampedLength(b bodyIn) int {
+	s := strings.TrimSpace(bodyStr(b, "maxLength"))
+	mt := 320
+	if v, err := strconv.Atoi(strings.TrimSpace(s)); err == nil {
+		mt = v
+	} else if s == "" {
+		mt = 320
+	}
+	if mt < 16 {
+		mt = 16
+	}
+	if mt > 1024 {
+		mt = 1024
+	}
+	return mt
+}
+
+type grammarSpan struct{ spanID, text string }
+
+// parseGrammarSuggestions — Node LLMGrammar.parseGrammarSuggestions: strip
+// fences, take the first '[' .. last ']' JSON array, validate every item
+// against the (possibly truncated) span list actually sent to the model.
+func parseGrammarSuggestions(content string, spans []grammarSpan) []any {
+	out := []any{}
+	spansByID := map[string]string{}
+	for _, s := range spans {
+		spansByID[s.spanID] = s.text
+	}
+	codeRe := regexp.MustCompile("```[a-z]*\\n?")
+	cleaned := strings.TrimSpace(codeRe.ReplaceAllString(content, ""))
+	start := strings.Index(cleaned, "[")
+	end := strings.LastIndex(cleaned, "]")
+	if start == -1 || end <= start {
+		return out
+	}
+	var items []map[string]any
+	if json.Unmarshal([]byte(cleaned[start:end+1]), &items) != nil {
+		return out
+	}
+	type numItem struct {
+		id         any
+		start      any
+		end        any
+		message    any
+		suggestion any
+	}
+	for _, it := range items {
+		if it == nil {
+			continue
+		}
+		var ni numItem
+		if idv, ok2 := it["id"]; ok2 {
+			ni.id = idv
+		}
+		if sv, ok2 := it["start"]; ok2 {
+			ni.start = sv
+		}
+		if ev, ok2 := it["end"]; ok2 {
+			ni.end = ev
+		}
+		if mv, ok2 := it["message"]; ok2 {
+			ni.message = mv
+		}
+		if vv, ok2 := it["suggestion"]; ok2 {
+			ni.suggestion = vv
+		}
+		idStr, _ := ni.id.(string)
+		if idStr == "" {
+			continue
+		}
+		spanText, okSp := spansByID[idStr]
+		if !okSp {
+			continue
+		}
+		sv, okS := asNum(ni.start)
+		ev, okE := asNum(ni.end)
+		if !okS || !okE {
+			continue
+		}
+		if sv < 0 || ev > float64(len(spanText)) || ev <= sv {
+			continue
+		}
+		msg, _ := ni.message.(string)
+		sgt, _ := ni.suggestion.(string)
+		out = append(out, jobj("spanId", idStr, "start", int64(sv), "end", int64(ev), "message", msg, "suggestion", sgt))
+	}
+	return out
+}
 
 // ---------------------------------------------------------------------------
 // POST /project/:id/llm/compile-fix
@@ -1270,6 +1523,34 @@ func (f *fs) llmCompileFix(cxt *core.Cxt, res *core.Res) {
 	if file == "" || !liOK || line < 1 {
 		jres(400, res, jobj("ok", false, "error", "bad_request", "message", "file and line are required"))
 		return
+	}
+	level := bodyStr(b, "level")
+	if level == "" {
+		level = "error"
+	}
+	message := bodyStr(b, "message")
+	if len(message) > 2000 {
+		message = message[:2000]
+	}
+	hint := ""
+	if hv, okv := bodyGet(b, "hint"); okv {
+		if hm, okm := hv.(obj); okm {
+			ho := ""
+			hn := ""
+			if v, ok2 := hm.get("old"); ok2 {
+				ho = jsStrCoerce(v)
+				if len(ho) > 3000 {
+					ho = ho[:3000]
+				}
+			}
+			if v, ok2 := hm.get("new"); ok2 {
+				hn = jsStrCoerce(v)
+				if len(hn) > 3000 {
+					hn = hn[:3000]
+				}
+			}
+			hint = ho + "\u0000" + hn
+		}
 	}
 	if ge := f.budgetGate(uid); ge != nil {
 		sendErr(res, ge, 429)
@@ -1308,16 +1589,80 @@ func (f *fs) llmCompileFix(cxt *core.Cxt, res *core.Res) {
 			part.WriteString("\n")
 		}
 	}
-	if _, err := llmCall(lr, 120*time.Second, 1); err != nil {
-		ce, ok2 := err.(*chatErr)
-		if ok2 {
-			sendErr(res, &laneErr{code: ce.code, message: ce.msg}, 502)
-		} else {
-			sendErr(res, &laneErr{"llm-error", "LLM request failed: " + err.Error()}, 502)
+	contract := strings.Join([]string{
+		"You are an expert LaTeX assistant fixing a compile error/warning in an Overleaf project.",
+		"You receive: the log entry, its file and line, and a numbered window of the actual source lines (\" > \" marks the failing line).",
+		"Return the object described by the schema. Rules:",
+		"- Keep the fix MINIMAL: change only what is needed to resolve the entry; never rewrite untouched code, do not add comments or explanations to suggestedNew.",
+		"- suggestedOld MUST be an exact copy of the current text (same whitespace, same case). For single-line fixes use a contiguous part of that line (often the whole line); for multi-line fixes join the lines with newlines exactly as they appear and also set span = [firstLine, lastLine].",
+		"- suggestedNew is what replaces suggestedOld. If the fix is to REMOVE text, set suggestedNew to an empty string (a pure deletion). Do not use markdown code fences anywhere.",
+		"- If an alternative fix genuinely does not exist, a minimal valid change (e.g. pure deletion of the offending characters) is better than no change.",
+		"- The answer is a JSON object: inside string values every backslash MUST be escaped (write one backslash as \\\\). Newlines inside strings must be \\u000a or \\n.",
+		"- Reply in the same language as the log message.",
+	}, "\n")
+	userParts := []string{}
+	if lr.lane == "site" {
+		if ep := readAdminFile(f.adminPath()).str("errorPrompt"); ep != "" {
+			userParts = append(userParts, "Deployment instruction from the site administrator (apply its spirit):\n"+ep)
 		}
+	}
+	if hint != "" {
+		parts := strings.SplitN(hint, "\u0000", 2)
+		userParts = append(userParts, "The user asked for a DIFFERENT suggestion. A previous (unsatisfactory) suggestion was:\n  old: "+parts[0]+"\n  new: "+parts[1]+"\nDo NOT repeat it. Suggest an alternative fix.")
+	}
+	msg0 := message
+	if msg0 == "" {
+		msg0 = "(no message text)"
+	}
+	userParts = append(userParts, "Log entry ("+level+") at "+file+", line "+strconv.Itoa(line)+":\n"+msg0)
+	userParts = append(userParts, "Numbered source lines (the line marked \" > \" is line "+strconv.Itoa(line)+"):\n"+part.String())
+	userParts = append(userParts, "Return only the JSON object — no prose outside the object.")
+	userContent := strings.Join(userParts, "\n\n")
+	messages1 := []map[string]any{
+		{"role": "system", "content": contract},
+		{"role": "user", "content": userContent},
+	}
+	nudged := []map[string]any{
+		{"role": "system", "content": contract},
+		{"role": "user", "content": userContent + "\n\nREMINDER: answer with ONLY the JSON object described in the system prompt — no fences, no prose, all four fields."},
+	}
+	var lastFixErr error
+	for attempt := 1; attempt <= 2; attempt++ {
+		msgs := messages1
+		if attempt == 2 {
+			msgs = nudged
+		}
+		text, err := llmCall(lr, 180*time.Second, 1, msgs, 8000, 0.4)
+		if err != nil {
+			lastFixErr = err
+			continue
+		}
+		if cfo, okFix := parseCompileFixObject(text); okFix {
+			base := []any{
+				"ok", true,
+				"file", file,
+				"line", int64(line),
+				"startLine", int64(start + 1),
+				"snippet", part.String(),
+				"explanation", cfo.explanation,
+				"suggestedOld", cfo.suggestedOld,
+				"suggestedNew", cfo.suggestedNew,
+				"model", lr.model,
+				"lane", lr.lane,
+			}
+			if cfo.span[0] > 0 {
+				base = append(base, "span", []any{int64(cfo.span[0]), int64(cfo.span[1])})
+			}
+			jres(200, res, jobj(base...))
+			return
+		}
+		lastFixErr = &chatErr{code: "llm-bad-fix", msg: "compile-fix: no valid JSON object in the model response"}
+	}
+	if ce, okFix := lastFixErr.(*chatErr); okFix {
+		sendErr(res, &laneErr{code: ce.code, message: ce.msg}, 502)
 		return
 	}
-	jres(200, res, jobj("ok", true, "suggestion", "(live)"))
+	sendErr(res, &laneErr{"llm-bad-fix", "The model did not return a valid fix"}, 502)
 }
 
 // ---------------------------------------------------------------------------
@@ -1357,7 +1702,63 @@ func (f *fs) llmGrammar(cxt *core.Cxt, res *core.Res) {
 		sendErr(res, le, 400)
 		return
 	}
-	if _, err := llmCall(lr, 120*time.Second, 2); err != nil {
+	// Node LLMGrammar: sanitizeGrammarSpans (50 spans / 15k chars caps).
+	spans := make([]grammarSpan, 0, len(arr))
+	for i, e := range arr {
+		if i >= 50 {
+			break
+		}
+		sp := grammarSpan{}
+		if mo, okv := e.(obj); okv {
+			id := ""
+			if v, ok2 := mo.get("spanId"); ok2 {
+				id = jsStrCoerce(v)
+			}
+			if id == "" {
+				if v, ok2 := mo.get("id"); ok2 {
+					id = jsStrCoerce(v)
+				}
+			}
+			sp.spanID = id
+			if v, ok2 := mo.get("text"); ok2 {
+				sp.text = jsStrCoerce(v)
+			}
+		}
+		if sp.spanID == "" {
+			sp.spanID = "s" + strconv.Itoa(i)
+		}
+		spans = append(spans, sp)
+	}
+	totalChars := 0
+	for _, s := range spans {
+		totalChars += len(s.text)
+	}
+	if totalChars > 15000 {
+		scale := 15000.0 / float64(totalChars)
+		for i := range spans {
+			ceil := int(math.Ceil(float64(len(spans[i].text)) * scale))
+			if ceil > 0 {
+				spans[i].text = spans[i].text[:ceil]
+			}
+		}
+	}
+	userPrompt := "Check the following numbered text excerpts for grammar errors. For each excerpt, respond with entries referencing its id."
+	for _, s := range spans {
+		userPrompt += "\n--- id: " + s.spanID + " ---\n" + s.text
+	}
+	userPrompt += "\n\nRespond with the JSON array exactly as described."
+	mt := int(math.Ceil(float64(totalChars) / 2))
+	if mt < 512 {
+		mt = 512
+	}
+	if mt > 4096 {
+		mt = 4096
+	}
+	text, err := llmCall(lr, 120*time.Second, 2, []map[string]any{
+		{"role": "system", "content": "You are a grammar and style corrector for short prose excerpts taken from a LaTeX document.\nYou only fix grammar, spelling and wording problems. You never change meaning, LaTeX commands, math, formatting, terminology, or tone.\nYou MUST reply with a single JSON array and nothing else. Each element is an object:\n{\"id\": <span id>, \"start\": <start offset, inclusive>, \"end\": <end offset, exclusive>, \"message\": <short explanation>, \"suggestion\": <corrected replacement for the range start..end>}\nOffsets are zero-based character offsets into the raw span text. Only include spans that actually contain an error. Reply with \"[]\" when there are no errors."},
+		{"role": "user", "content": userPrompt},
+	}, mt, 0)
+	if err != nil {
 		ce, ok2 := err.(*chatErr)
 		if ok2 {
 			sendErr(res, &laneErr{code: ce.code, message: ce.msg}, 502)
@@ -1366,7 +1767,7 @@ func (f *fs) llmGrammar(cxt *core.Cxt, res *core.Res) {
 		}
 		return
 	}
-	jres(200, res, jobj("success", true, "suggestions", []any{}))
+	jres(200, res, jobj("success", true, "suggestions", parseGrammarSuggestions(text, spans)))
 }
 
 // ---------------------------------------------------------------------------
@@ -1374,6 +1775,37 @@ func (f *fs) llmGrammar(cxt *core.Cxt, res *core.Res) {
 // ---------------------------------------------------------------------------
 
 var generatorTypes = []string{"title", "abstract", "keywords"}
+
+type llmGenerator struct {
+	maxOut      int
+	temp        float64
+	instruction string
+}
+
+var generators = map[string]llmGenerator{
+	"title": {
+		maxOut: 4000,
+		temp:   0.4,
+		instruction: "Write ONE concise, grammatically correct title for the document below, in the same language as the document's main body text. " +
+			"Return ONLY the title text — no quotes, no numbering, no explanation.",
+	},
+	"abstract": {
+		maxOut: 8000,
+		temp:   0.3,
+		instruction: "Write a structured abstract (150–250 words) for the document below, in the same language as the document's main body text: " +
+			"purpose, methods, key results/findings, and conclusion in that order. " +
+			"Return ONLY the abstract text — no heading, no quotes, no explanation.",
+	},
+	"keywords": {
+		maxOut: 4000,
+		temp:   0.2,
+		instruction: "Generate 5–8 keyword phrases for the document below that capture its " +
+			"core topics, methods, and domain, in the same language as the document's main body text. Return ONLY the keywords, " +
+			"separated by commas, in order of importance.",
+	},
+}
+
+var toolishRe = regexp.MustCompile(`(?im)^(tool|function)\s*call\b|^\s*get_[a-z0-9_]+\(`)
 
 func (f *fs) llmGenerate(cxt *core.Cxt, res *core.Res) {
 	_, oid, ok := f.llmPref(cxt, res, cxt.Params["1"])
@@ -1463,16 +1895,57 @@ func (f *fs) llmGenerate(cxt *core.Cxt, res *core.Res) {
 		jres(422, res, jobj("ok", false, "error", "no_document", "message", "The project contains no readable document file"))
 		return
 	}
-	if _, err := llmCall(lr, 300*time.Second, 2); err != nil {
-		ce, ok2 := err.(*chatErr)
-		if ok2 {
-			sendErr(res, &laneErr{code: ce.code, message: ce.msg}, 502)
-		} else {
-			sendErr(res, &laneErr{"llm-error", "LLM request failed: " + err.Error()}, 502)
+	gen := generators[typ]
+	noTools := " Do not call, name, or simulate any tool, function, or API (never output lines such as \"tool call: ...\" or \"function ...\"). Answer directly with the requested text only."
+	system := ""
+	if lr.lane == "site" {
+		system = readAdminFile(f.adminPath()).str("systemPrompt")
+	}
+	tplVal, _ := readAdminFile(f.adminPath()).get("askAiActionPrompts")
+	tplObj := mergeActionPrompts(tplVal)
+	baseUser := ""
+	if v, okAp := tplObj.get(typ); okAp {
+		baseUser += "STYLE GUIDANCE from the author's template: " + strings.TrimSpace(jsStrCoerce(v)) + "\n\n"
+	}
+	baseUser += gen.instruction + "\n\nDOCUMENT:\n" + docText + noTools
+	prefix := make([]map[string]any, 0, 1)
+	if system != "" {
+		prefix = append(prefix, map[string]any{"role": "system", "content": system})
+	}
+	var gotText string
+	toolish := false
+	for attempt := 1; attempt <= 2 && gotText == ""; attempt++ {
+		userContent := baseUser
+		if attempt == 2 {
+			userContent = baseUser + "\n\nReminder (second attempt): produce the plain " + typ + " text now. No tool calls, no function names, no placeholders, no code fences."
 		}
+		callMsgs := make([]map[string]any, 0, len(prefix)+1)
+		callMsgs = append(callMsgs, prefix...)
+		callMsgs = append(callMsgs, map[string]any{"role": "user", "content": userContent})
+		text, err := llmCall(lr, 300*time.Second, 1, callMsgs, gen.maxOut, gen.temp)
+		if err != nil {
+			ce, ok2 := err.(*chatErr)
+			if ok2 {
+				sendErr(res, &laneErr{code: ce.code, message: ce.msg}, 502)
+			} else {
+				sendErr(res, &laneErr{"llm-error", "LLM request failed: " + err.Error()}, 502)
+			}
+			return
+		}
+		toolish = toolishRe.MatchString(strings.TrimSpace(text))
+		if !toolish {
+			gotText = strings.TrimSpace(text)
+		}
+	}
+	if toolish {
+		sendErr(res, &laneErr{"llm-tool-call-output", "The model answered with a tool-call-like response instead of the requested text. Choose a different model (File → Select LLM Model) and try again."}, 502)
 		return
 	}
-	jres(200, res, jobj("ok", true, "text", "(live)", "type", typ, "included", included))
+	if gotText == "" {
+		sendErr(res, &laneErr{"empty-response", "The model returned no visible text. Reasoning models may spend the whole output budget on thinking - raise the output budget or disable reasoning for this task."}, 502)
+		return
+	}
+	jres(200, res, jobj("ok", true, "type", typ, "output", gotText, "model", lr.model, "lane", lr.lane, "files", int64(included)))
 }
 
 // keep the package import set stable.
