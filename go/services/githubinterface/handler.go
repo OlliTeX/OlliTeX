@@ -170,8 +170,12 @@ func (h *GHIHandlers) dispatch(name string, w http.ResponseWriter, r *http.Reque
 		var files []string
 		if fl, ok := m["files"].([]interface{}); ok {
 			for _, f := range fl {
-				if fm, ok := f.(map[string]interface{}); ok {
-					if p, ok := fm["path"].(string); ok && p != "" {
+				// 1:1 with the Node git-bridge: plain path strings; the
+				// {path} object form is accepted for forward compatibility.
+				if s, ok2 := f.(string); ok2 && s != "" {
+					files = append(files, s)
+				} else if fm, ok2 := f.(map[string]interface{}); ok2 {
+					if p, ok3 := fm["path"].(string); ok3 && p != "" {
 						files = append(files, p)
 					}
 				}

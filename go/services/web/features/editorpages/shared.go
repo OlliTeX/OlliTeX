@@ -40,7 +40,7 @@ func HubFooterJSON(siteURL string) string {
 // ExposedSettingsJSON — the `ol-ExposedSettings` meta. In this stack the
 // only per-user field is canManageTemplatesMenu (admin true / member false;
 // pinned P6.1 oracle diff).
-func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDebug bool, mendeleyEnabled bool, pandocConversions bool) string {
+func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDebug bool, mendeleyEnabled bool, pandocConversions bool, githubSync bool) string {
 	s := withSiteURL(pinned_ol_ExposedSettings, siteURL)
 	if isAdmin {
 		// pinned constant is the member (false) form; admin flips one field
@@ -73,6 +73,14 @@ func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDeb
 		}
 		return "false"
 	}()) + `}`
+	// audit 006: flip the pinned githubSyncEnabled at runtime (the fixture
+	// constant stays `false`; same approach as canManageTemplatesMenu).
+	s = strings.ReplaceAll(s, `"githubSyncEnabled":false`, `"githubSyncEnabled":`+func() string {
+		if githubSync {
+			return "true"
+		}
+		return "false"
+	}()+`"`)
 	return s
 }
 

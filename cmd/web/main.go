@@ -36,6 +36,7 @@ import (
 	"ollitex/go/services/web/features/dropbox"
 	"ollitex/go/services/web/features/editorpages"
 	"ollitex/go/services/web/features/emailtemplates"
+	ghsvc "ollitex/go/services/web/features/ghsync"
 	"ollitex/go/services/web/features/gitbridge"
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/history"
@@ -205,6 +206,7 @@ func main() {
 	// selected model, compliance rubrics, usage, grammar prefs, admin LLM
 	// settings file + check/scan/usage; chat/completion/review is P6.4b).
 	app.RegisterFeature(llmsettings.Feature(app))
+	app.RegisterFeature(ghsvc.Feature())
 
 	// P6.5 surface: bib-editor library (GET/POST/… /library/references*,
 	// PATCH /library/references/:key, + the two /library pages).

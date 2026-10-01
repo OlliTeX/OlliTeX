@@ -935,98 +935,109 @@ func newzipHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 
-		// strip the single top-level dir (findTopLevelDirectory)
+		// strip the single top-level dir (findTopLevelDirectory) + create the
+		// project (nzipCreate — also the gsync import entry point).
 		top := nzipTopLevel(entries)
-		if top != "" {
-			prefix := top + "/"
-			strip := make([]nzipEntry, 0, len(entries))
-			for _, e := range entries {
-				if strings.HasPrefix(e.path, prefix) {
-					strip = append(strip, nzipEntry{path: e.path[len(prefix):], data: e.data})
-				}
-			}
-			entries = strip
+		if pj, okp := nzipCreate(a, cxt, uid, name, top, entries, failImported); okp {
+			res.JSON(200, []byte(`{"success":true,"project_id":"`+pj.Hex()+`"}`))
 		}
-
-		rootRel, rootContent, hasRoot := nzipFindRootDoc(entries)
-		_ = rootRel
-		projectName := ""
-		if hasRoot {
-			projectName = nzipTitle(rootContent)
-		}
-		if projectName == "" {
-			projectName = name
-			if projectName == "" {
-				projectName = "Untitled"
-			}
-		}
-		uniqueName := nzipEnsureUnique(nzipUserNames(a, cxt, uid), nzipFixName(projectName))
-
-		// createBlankProject (P4.7 shape; blank: no docs/files, rootDoc null,
-		// version 0 — the P4.8-style structure write below then $inc → 1).
-		pj := bson.NewObjectID()
-		rootID := bson.NewObjectID()
-		u, okU := loadOwnerUser(a, cxt, uid)
-		if !okU {
-			u = crOwnerUser{spellCheckLanguage: "en"}
-		}
-		crInsertProject(a, cxt, pj, rootID, nil, uniqueName, uid,
-			u.spellCheckLanguage, "pdflatex", bson.A{}, bson.A{}, 0)
-		crInitHistory(cxt, pj.Hex())
-
-		cleanup := func() {
-			nzipFailCleanup(a, cxt, pj, uid, "")
-			failImported()
-		}
-
-		// import (walk order = zip entry order — Node readdir of the freshly
-		// extracted linear ext4 dir matches entry order; SafePath check per
-		// file as in importFile/_validateProjectPath)
-		var docs []nzipDocE
-		var files []nzipFileE
-		for _, e := range entries {
-			projPath := "/" + e.path
-			if !nzipCleanPath(projPath) {
-				cleanup()
-				return
-			}
-			kind2, lines2 := upClassify(e.data, e.path, false)
-			if kind2 == "doc" {
-				docID := bson.NewObjectID()
-				if _, okps := upDocstorePut(pj.Hex(), docID.Hex(), lines2); !okps {
-					cleanup()
-					return
-				}
-				docs = append(docs, nzipDocE{id: docID, path: projPath, rel: e.path, name: nzipBase(e.path), ln: lines2})
-			} else {
-				fileID := bson.NewObjectID()
-				hash := upGitBlobHash(e.data)
-				if !upPutBlob(pj.Hex(), hash, e.data) {
-					cleanup()
-					return
-				}
-				files = append(files, nzipFileE{id: fileID, path: projPath, rel: e.path, name: nzipBase(e.path), hash: hash})
-			}
-		}
-
-		root := nzipBuildTree(docs, files)
-		if !nzipWriteStructure(a, cxt, pj, root) {
-			cleanup()
-			return
-		}
-
-		// D41 slice-2: DU structure op removed — nzipWriteStructure (mongo)
-		// above is the tree of record; DU versioning defers to the Yjs hybrid.
-
-		if hasRoot {
-			if !nzipSetRootDoc(a, cxt, pj, rootRel) {
-				cleanup()
-				return
-			}
-		}
-
-		res.JSON(200, []byte(`{"success":true,"project_id":"`+pj.Hex()+`"}`))
 	}
+}
+
+// nzipCreate — the import body (newzip.go:1018-1106), shared with gsync
+// (GitHub/project-create-from-repo passes an in-memory entry list).
+// fail is called (alongside nzipFailCleanup) on any failure path.
+func nzipCreate(a *core.App, cxt *core.Cxt, uid, name, top string, entries []nzipEntry, fail func()) (bson.ObjectID, bool) {
+	var pj bson.ObjectID
+	if top != "" {
+		prefix := top + "/"
+		strip := make([]nzipEntry, 0, len(entries))
+		for _, e := range entries {
+			if strings.HasPrefix(e.path, prefix) {
+				strip = append(strip, nzipEntry{path: e.path[len(prefix):], data: e.data})
+			}
+		}
+		entries = strip
+	}
+
+	rootRel, rootContent, hasRoot := nzipFindRootDoc(entries)
+	projectName := ""
+	if hasRoot {
+		projectName = nzipTitle(rootContent)
+	}
+	if projectName == "" {
+		projectName = name
+		if projectName == "" {
+			projectName = "Untitled"
+		}
+	}
+	uniqueName := nzipEnsureUnique(nzipUserNames(a, cxt, uid), nzipFixName(projectName))
+
+	// createBlankProject (P4.7 shape; blank: no docs/files, rootDoc null,
+	// version 0 — the P4.8-style structure write below then $inc → 1). Also
+	// the zero-entry (empty repo) path: same shape, structure write is the
+	// empty tree — Node Node() → blank project.
+	pj = bson.NewObjectID()
+	rootID := bson.NewObjectID()
+	u, okU := loadOwnerUser(a, cxt, uid)
+	if !okU {
+		u = crOwnerUser{spellCheckLanguage: "en"}
+	}
+	crInsertProject(a, cxt, pj, rootID, nil, uniqueName, uid,
+		u.spellCheckLanguage, "pdflatex", bson.A{}, bson.A{}, 0)
+	crInitHistory(cxt, pj.Hex())
+
+	cleanup := func() {
+		nzipFailCleanup(a, cxt, pj, uid, "")
+		fail()
+	}
+
+	// import (walk order = zip entry order — Node readdir of the freshly
+	// extracted linear ext4 dir matches entry order; SafePath check per
+	// file as in importFile/_validateProjectPath)
+	var docs []nzipDocE
+	var files []nzipFileE
+	for _, e := range entries {
+		projPath := "/" + e.path
+		if !nzipCleanPath(projPath) {
+			cleanup()
+			return pj, false
+		}
+		kind2, lines2 := upClassify(e.data, e.path, false)
+		if kind2 == "doc" {
+			docID := bson.NewObjectID()
+			if _, okps := upDocstorePut(pj.Hex(), docID.Hex(), lines2); !okps {
+				cleanup()
+				return pj, false
+			}
+			docs = append(docs, nzipDocE{id: docID, path: projPath, rel: e.path, name: nzipBase(e.path), ln: lines2})
+		} else {
+			fileID := bson.NewObjectID()
+			hash := upGitBlobHash(e.data)
+			if !upPutBlob(pj.Hex(), hash, e.data) {
+				cleanup()
+				return pj, false
+			}
+			files = append(files, nzipFileE{id: fileID, path: projPath, rel: e.path, name: nzipBase(e.path), hash: hash})
+		}
+	}
+
+	root := nzipBuildTree(docs, files)
+	if !nzipWriteStructure(a, cxt, pj, root) {
+		cleanup()
+		return pj, false
+	}
+
+	// D41 slice-2: DU structure op removed — nzipWriteStructure (mongo)
+	// above is the tree of record; DU versioning defers to the Yjs hybrid.
+
+	if hasRoot {
+		if !nzipSetRootDoc(a, cxt, pj, rootRel) {
+			cleanup()
+			return pj, false
+		}
+	}
+	return pj, true
 }
 
 // ---------- SafePath path validation (importFile._validateProjectPath) --------

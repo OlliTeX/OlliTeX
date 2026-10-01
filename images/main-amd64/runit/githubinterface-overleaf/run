@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# githubinterface is served by its Go implementation (cutover plan, Phase C complete
+# 2026-09-16: Node==Go contract gates green on e2e + live). The Node version
+# was removed from this tree; Go is the canonical implementation.
+source /etc/overleaf/env.sh
+
+# 006 (2026-10-02): pin the work root so the web layer (gsWorkRoot) and the
+# bridge (resolveWorkDir) ALWAYS agree on where clone/commit/push trees live.
+# Default is <tmpdir>/ghif on both sides, but an inherited TMPDIR would skew
+# one side; pinning removes that class of drift.
+export GITHUBINTERFACE_WORKDIR_ROOT="${GITHUBINTERFACE_WORKDIR_ROOT:-/var/lib/overleaf/ghif}"
+
+exec /sbin/setuser www-data /usr/local/bin/go-services/githubinterface >> /var/log/overleaf/githubinterface.log 2>&1
