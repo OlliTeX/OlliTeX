@@ -179,3 +179,24 @@ services:
 
     volumes:
       - ./ngrams:/ngrams:ro
+
+  # audit 035 (2026-09-30): Wakapi (self-hosted WakaTime server) in the dev
+  # stack — the official quick-start contract (ghcr.io/muety/wakapi, /data
+  # volume, generated WAKAPI_PASSWORD_SALT). Host 127.0.0.1:5001 →
+  # container :3000; the dev 'web' container can also reach it as
+  # http://wakapi:3000 on the compose network.
+  wakapi:
+    image: "${WAKAPI_IMAGE:-ghcr.io/muety/wakapi:latest}"
+    container_name: wakapi
+    hostname: wakapi
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5001:3000"
+    volumes:
+      - ./data/wakapi:/data
+    environment:
+      WAKAPI_PASSWORD_SALT: "${WAKAPI_PASSWORD_SALT:-}"
+      WAKAPI_DB_TYPE: "${WAKAPI_DB_TYPE:-sqlite3}"
+      WAKAPI_DB_NAME: "${WAKAPI_DB_NAME:-/data/wakapi.db}"
+      WAKAPI_BOOTSTRAP_ADMIN_EMAIL: "${WAKAPI_ADMIN_EMAIL:-admin@localhost.localdomain}"
+      WAKAPI_BOOTSTRAP_ADMIN_PASSWORD: "${WAKAPI_ADMIN_PASSWORD:-}"

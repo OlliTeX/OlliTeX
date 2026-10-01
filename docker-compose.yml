@@ -192,6 +192,44 @@ services:
     depends_on:
       - prometheus
 
+  # audit 035 (2026-09-30): Wakapi — the self-hosted WakaTime server for the
+  # OlliTeX WakaTime integration (frontend/modules/wakatime + Go web
+  # /user/wakatime routes). In the DEFAULT stack so a fresh OlliTeX instance
+  # ships with a working WakaTime backend out of the box:
+  #   • image: ghcr.io/muety/wakapi (official; pin a version tag in
+  #     production via WAKAPI_IMAGE=ghcr.io/muety/wakapi:<tag>)
+  #   • WAKAPI_PASSWORD_SALT — generated at deploy time (official
+  #     quick-start pattern; the "generated salt"), WAKAPI_DATA_DIR →
+  #     persistent /data volume (SQLite at /data/wakapi.db)
+  #   • bootstrap admin is GENERATED on first boot (no default-weak
+  #     password baked in) and persisted in that volume — read it from the
+  #     container log once:  `docker logs wakapi 2>&1 | grep -i bootstrap`
+  #     then override WAKAPI_ADMIN_EMAIL / WAKAPI_ADMIN_PASSWORD if you
+  #     want fixed credentials;
+  #   • host :5001 → container :3000 (no clashes with the stack);
+  #   • pin the image in production: WAKAPI_IMAGE=ghcr.io/muety/wakapi:<tag>
+  wakapi:
+    restart: always
+    image: "${WAKAPI_IMAGE:-ghcr.io/muety/wakapi:latest}"
+    container_name: wakapi
+    volumes:
+      - ${WAKAPI_DATA_DIR:-$HOME/wakapi_data}:/data
+    ports:
+      - "5001:3000"
+    environment:
+      # the official quick-start contract: persistent /data volume (SQLite at
+      # /data/wakapi.db) + a GENERATED password salt (32 alphanumerics):
+      #   SALT=$$(cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+      WAKAPI_PASSWORD_SALT: "${WAKAPI_PASSWORD_SALT:-}"
+      WAKAPI_DB_TYPE: "${WAKAPI_DB_TYPE:-sqlite3}"
+      WAKAPI_DB_NAME: "${WAKAPI_DB_NAME:-/data/wakapi.db}"
+      # bootstrap admin identity (the PASSWORD is managed via the Wakapi UI;
+      # never bake a weak default in — the salt is what makes its hashing sound)
+      WAKAPI_BOOTSTRAP_ADMIN_EMAIL: "${WAKAPI_ADMIN_EMAIL:-admin@localhost.localdomain}"
+      WAKAPI_BOOTSTRAP_ADMIN_PASSWORD: "${WAKAPI_ADMIN_PASSWORD:-}"
+      WAKAPI_URL: "${WAKAPI_URL:-}"
+      TZ: "${TZ:-UTC}"
+
   # D22 (8cbc1526) phase C — Grafana (shared datasource + repo-shipped
   # dashboards via provisioning; host :3180 -> container :3000 so it never
   # collides with the web-api internal :3000). Internal/observability UI only;
