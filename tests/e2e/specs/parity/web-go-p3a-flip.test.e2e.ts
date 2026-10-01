@@ -499,8 +499,8 @@ test.describe.serial('web-go P3.1 flip gate (WEB_GO_PLAN P3.1 serveradmin)', () 
       }
     }
     execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'bin/web'), `${overleafC}:/usr/local/bin/go-services/web`])
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/runit/web-go-overleaf/run'), `${overleafC}:/tmp/webgo-run`])
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/nginx/flips/web-p3a.conf'), `${overleafC}:/tmp/web-p3a.conf`])
+    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/runit/web-go-overleaf/run'), `${overleafC}:/tmp/webgo-run`])
+    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p3a.conf'), `${overleafC}:/tmp/web-p3a.conf`])
     dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips /etc/service/web-go-overleaf && cp /tmp/webgo-run /etc/service/web-go-overleaf/run && chmod 755 /etc/service/web-go-overleaf/run && cp /tmp/web-p3a.conf /usr/local/share/overleaf-flips/web-p3a.conf`)
     const t0 = Date.now()
     for (;;) {

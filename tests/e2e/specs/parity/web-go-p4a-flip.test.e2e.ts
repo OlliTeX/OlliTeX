@@ -186,7 +186,7 @@ test.describe.serial('web-go P4.1 flip gate (WEB_GO_PLAN P4.1 project list)', ()
     const repoBin = path.resolve(REPO_ROOT, 'bin/web')
     execFileSync('docker', ['cp', repoBin, `${overleafC}:/usr/local/bin/go-services/web`])
     dexe(overleafC, 'chown www-data:www-data /usr/local/bin/go-services/web && chmod 755 /usr/local/bin/go-services/web')
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/nginx/flips/web-p4a.conf'), `${overleafC}:/tmp/web-p4a.conf`])
+    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p4a.conf'), `${overleafC}:/tmp/web-p4a.conf`])
     dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && cp /tmp/web-p4a.conf /usr/local/share/overleaf-flips/web-p4a.conf')
     dexe(overleafC, 'sv restart web-go-overleaf', true)
     for (;;) {

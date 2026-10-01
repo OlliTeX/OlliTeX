@@ -241,7 +241,7 @@ test.describe.serial('web-go P1 auth flip gate (WEB_GO_PLAN P1)', () => {
     // started: this spec manipulates the vhost directly (P0 pattern),
     // and an env-off flip service would strip it within its 5s cycle.
     try {
-      execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/runit/web-go-overleaf/run'), `${overleafC}:/tmp/webgo-run`])
+      execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/runit/web-go-overleaf/run'), `${overleafC}:/tmp/webgo-run`])
       dexe(overleafC, `mkdir -p /etc/service/web-go-overleaf && cp /tmp/webgo-run /etc/service/web-go-overleaf/run && chmod 755 /etc/service/web-go-overleaf/run`)
     } catch (e) {
       // already present — fine (runsvdir keeps the live one)

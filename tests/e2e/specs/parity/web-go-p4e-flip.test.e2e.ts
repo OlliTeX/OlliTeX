@@ -173,7 +173,7 @@ test.describe.serial('web-go P4.5 flip gate (WEB_GO_PLAN P4.5 rename)', () => {
     const repoBin = path.resolve(REPO_ROOT, 'bin/web')
     execFileSync('docker', ['cp', repoBin, `${overleafC}:/usr/local/bin/go-services/web`])
     dexe(overleafC, 'chown www-data:www-data /usr/local/bin/go-services/web && chmod 755 /usr/local/bin/go-services/web')
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/nginx/flips/web-p4e.conf'), `${overleafC}:/tmp/web-p4e.conf`])
+    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p4e.conf'), `${overleafC}:/tmp/web-p4e.conf`])
     dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && cp /tmp/web-p4e.conf /usr/local/share/overleaf-flips/web-p4e.conf')
     dexe(overleafC, 'sv restart web-go-overleaf', true)
     for (;;) { const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim(); if (code === '200') break; await sleep(500) }

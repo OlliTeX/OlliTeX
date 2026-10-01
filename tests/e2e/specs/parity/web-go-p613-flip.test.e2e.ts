@@ -58,7 +58,7 @@ const LEG1_PATH = '/tmp/web-go-p613-leg1.json'
 const overleafC = 'ol-e2e-overleaf-1'
 // Cumulative through P6.13.
 const FLIPCONFS = ['web-p64a.conf', 'web-p64b.conf', 'web-p65.conf', 'web-p66.conf', 'web-p67.conf', 'web-p68.conf', 'web-p69.conf', 'web-p610.conf', 'web-p611.conf', 'web-p612.conf', 'web-p613.conf']
-const FLIPSRC = `${process.cwd()}/../../server-ce/nginx/flips`
+const FLIPSRC = `${process.cwd()}/../../images/main-amd64/nginx/flips`
 const BASE = 'http://127.0.0.1:7420'
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 const ADMIN = { email: 'e2e-admin@e2e.test', password: 'Ol-Fixture-9x7K' }

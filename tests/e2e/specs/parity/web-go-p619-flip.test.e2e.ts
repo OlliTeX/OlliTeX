@@ -19,7 +19,7 @@
  * (127.0.0.1:3000), which the e2e nginx plane does not route (nginx
  * `location /` → :4000; the git-bridge service talks to :3000 directly).
  * It is A/B-verified out-of-band (2026-09-20, pinned log in
- * server-ce/nginx/flips/web-p619.conf): 18-case battery zero-diff plus
+ * images/main-amd64/nginx/flips/web-p619.conf): 18-case battery zero-diff plus
  * deep-push parity (accepted / postback upToDate+latestVerId /
  * entity swap / hash-based history versions / atts snapshots). On the
  * nginx plane the docs paths fall through to Node on every leg (parity
@@ -60,7 +60,7 @@ const overleafC = 'ol-e2e-overleaf-1'
 const mongoC = 'ol-e2e-mongo-1'
 // Cumulative through P6.19.
 const FLIPCONFS = ['web-p64a.conf', 'web-p64b.conf', 'web-p65.conf', 'web-p66.conf', 'web-p67.conf', 'web-p68.conf', 'web-p69.conf', 'web-p610.conf', 'web-p611.conf', 'web-p612.conf', 'web-p613.conf', 'web-p614.conf', 'web-p615.conf', 'web-p616.conf', 'web-p617.conf', 'web-p618.conf', 'web-p619.conf']
-const FLIPSRC = `${process.cwd()}/../../server-ce/nginx/flips`
+const FLIPSRC = `${process.cwd()}/../../images/main-amd64/nginx/flips`
 const BASE = 'http://127.0.0.1:7420'
 const USER = 'e2e-user@e2e.test'
 const ADMIN = 'e2e-admin@e2e.test'

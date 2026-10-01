@@ -13,7 +13,7 @@ services:
   clsi:
     # Go clsi service (node services/clsi retired 2026-09-29) — same dev
     # pattern as the other Go services (baked binary in the main image;
-    # rebuild first: (cd server-ce && make all)).
+    # rebuild first: (from the repo root: run `make images`).
     image: ollitex/ollitex:main
     command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/clsitex"]
     env_file:
@@ -43,7 +43,7 @@ services:
   real-time:
     # D28a: the event bus is a Go service (socket.io 0.9 wire, 1:1 with the
     # retired Node services/real-time). Runs the baked binary from the main
-    # image — build it first: (cd server-ce && make all).
+    # image — build it first (from the repo root: run `make images`).
     image: ollitex/ollitex:main
     command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/realtime"]
     env_file:

@@ -254,7 +254,7 @@ test.describe('@local web-go P4.13a (upload) parity', () => {
   test.beforeAll(async () => {
     test.setTimeout(300_000)
     dexe(overleafC, FLIP(FLIPCONF, 'strip'), true); await nginxSettled()
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/nginx/flips/' + FLIPCONF), `${overleafC}:/tmp/${FLIPCONF}`])
+    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/' + FLIPCONF), `${overleafC}:/tmp/${FLIPCONF}`])
     dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips && cp /tmp/${FLIPCONF} /usr/local/share/overleaf-flips/${FLIPCONF}`)
     for (;;) { const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim(); if (code === '200') break; await sleep(500) }
     U = await login(USER)

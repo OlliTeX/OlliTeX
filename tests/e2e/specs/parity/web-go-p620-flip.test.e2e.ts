@@ -65,7 +65,7 @@ const FLIPCONFS = [
   'web-p69.conf',
   'web-p620.conf',
 ]
-const FLIPSRC = `${process.cwd()}/../../server-ce/nginx/flips`
+const FLIPSRC = `${process.cwd()}/../../images/main-amd64/nginx/flips`
 const BASE = 'http://127.0.0.1:7420'
 const SINK = process.env.E2E_SMTP_SINK || 'http://127.0.0.1:18025'
 const ADMIN = { email: 'e2e-admin@e2e.test', password: 'Ol-Fixture-9x7K' }

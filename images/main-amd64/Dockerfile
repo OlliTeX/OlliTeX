@@ -40,7 +40,7 @@ WORKDIR /overleaf
 # Add required source files for yarn install
 # -------------------------------------------
 COPY --parents libraries/*/package.json .yarn/patches/ services/*/package.json tools/migrations/ package.json frontend/package.json yarn.lock .yarnrc.yml .pnp.register.mjs /overleaf/
-COPY server-ce/genScript.js server-ce/services.js /overleaf/
+COPY images/main-amd64/genScript.js images/main-amd64/services.js /overleaf/
 
 # Pre-install yarn via corepack so it is available at runtime for all users
 # -------------------------------------------------------------------------
@@ -105,7 +105,7 @@ ENV NODE_OPTIONS="--require /overleaf/.pnp.cjs --import /overleaf/.pnp.register.
 
 # Copy runit service startup scripts to its location
 # --------------------------------------------------
-ADD server-ce/runit /etc/service
+ADD images/main-amd64/runit /etc/service
 
 # P7 cutover (2026-09-24): after the Go web drop-in, `web-overleaf` and
 # `web-api-overleaf` are the CANONICAL web services (they exec
@@ -114,7 +114,7 @@ ADD server-ce/runit /etc/service
 # default (web-go-overleaf/web-go-flip run non-executable ./run → runit
 # "access denied" crash-loop + log spam; web-go-api-overleaf is a redundant
 # shadow instance). Their definitions are preserved under /etc/service.disabled
-# for MANUAL re-enable (flips: server-ce/nginx/flips/*) if a future A/B is
+# for MANUAL re-enable (flips: images/main-amd64/nginx/flips/*) if a future A/B is
 # needed.
 RUN mkdir -p /etc/service.disabled \
  && for s in web-go-overleaf web-go-flip web-go-api-overleaf; do \
@@ -123,7 +123,7 @@ RUN mkdir -p /etc/service.disabled \
 
 # Copy runit global settings to its location
 # ------------------------------------------
-ADD server-ce/config/env.sh /etc/overleaf/env.sh
+ADD images/main-amd64/config/env.sh /etc/overleaf/env.sh
 
 # Admin-managed env fragments (hub → Site → Storage etc.): www-data (the web
 # service user) writes the fragments on save; every runit service sources
@@ -134,7 +134,7 @@ RUN mkdir -p /etc/overleaf/env.d && chown www-data:www-data /etc/overleaf/env.d 
 # backends, CLSI working dirs) — ${VAR:-...}-guarded, compose env wins.
 # Fragment number 30 keeps alphabetical/numeric ordering ahead of any
 # operator-written runtime fragments.
-ADD server-ce/config/env.d/30-go-native-services.sh /etc/overleaf/env.d/30-go-native-services.sh
+ADD images/main-amd64/config/env.d/30-go-native-services.sh /etc/overleaf/env.d/30-go-native-services.sh
 
 # CLSI working-dir base must exist inside the image layout (the data
 # volume /var/lib/overleaf overlays this; pre-create for first boot).
@@ -167,13 +167,13 @@ RUN chmod 755 /usr/local/bin/go-services/*
 
 # Configure nginx
 # ---------------
-ADD server-ce/nginx/nginx.conf.template /etc/nginx/templates/nginx.conf.template
-ADD server-ce/nginx/overleaf.conf.template /etc/nginx/templates/overleaf.conf.template
-ADD server-ce/nginx/clsi-nginx.conf /etc/nginx/sites-enabled/clsi-nginx.conf
+ADD images/main-amd64/nginx/nginx.conf.template /etc/nginx/templates/nginx.conf.template
+ADD images/main-amd64/nginx/overleaf.conf.template /etc/nginx/templates/overleaf.conf.template
+ADD images/main-amd64/nginx/clsi-nginx.conf /etc/nginx/sites-enabled/clsi-nginx.conf
 # Ollitex Go web flips (WEB_GO_PLAN.md): exact-path location blocks that
 # the web-go-flip runit service injects into the overleaf vhost ONLY when
 # FLIP_GO_WEB_P0=1 (default off → inert).
-ADD server-ce/nginx/flips /usr/local/share/overleaf-flips
+ADD images/main-amd64/nginx/flips /usr/local/share/overleaf-flips
 RUN chmod 644 /usr/local/share/overleaf-flips/web-p0.conf
 # B (owner queue 2026-09-30, def #1 hardening): this image runs the nginx
 # workers as www-data (user directive), but the base image ships
@@ -188,36 +188,36 @@ RUN chown -R www-data:www-data /var/lib/nginx && chmod 755 /var/lib/nginx
 
 # Configure log rotation
 # ----------------------
-ADD server-ce/logrotate/overleaf /etc/logrotate.d/overleaf
+ADD images/main-amd64/logrotate/overleaf /etc/logrotate.d/overleaf
 RUN chmod 644 /etc/logrotate.d/overleaf
 
 # Configure cron tasks
 # ----------------------
-ADD server-ce/cron /overleaf/cron
-ADD server-ce/config/crontab-history /etc/cron.d/crontab-history
+ADD images/main-amd64/cron /overleaf/cron
+ADD images/main-amd64/config/crontab-history /etc/cron.d/crontab-history
 RUN chmod 600 /etc/cron.d/crontab-history
-ADD server-ce/config/crontab-deletion /etc/cron.d/crontab-deletion
+ADD images/main-amd64/config/crontab-deletion /etc/cron.d/crontab-deletion
 RUN chmod 600 /etc/cron.d/crontab-deletion
-# [IV] notifications: email dispatch cron (see server-ce/cron/*-notification*.sh)
-ADD server-ce/config/crontab-notifications /etc/cron.d/crontab-notifications
+# [IV] notifications: email dispatch cron (see images/main-amd64/cron/*-notification*.sh)
+ADD images/main-amd64/config/crontab-notifications /etc/cron.d/crontab-notifications
 RUN chmod 600 /etc/cron.d/crontab-notifications
 # audit 002 (2026-09-30): instance-stats collector crontab (was never baked —
 # the collector route also had to be re-implemented on the Go private API;
-# see go/services/web/features/instancestats/collector.go). The server-ce/runit/cron
-# service (copied by the `ADD server-ce/runit /etc/service` line above) keeps
+# see go/services/web/features/instancestats/collector.go). The images/main-amd64/runit/cron
+# service (copied by the `ADD images/main-amd64/runit /etc/service` line above) keeps
 # the cron DAEMON alive — it never ran in the image, which is why the crons
 # (this one + history + deletion + notifications) were all dead.
-ADD server-ce/config/crontab-instance-stats /etc/cron.d/crontab-instance-stats
+ADD images/main-amd64/config/crontab-instance-stats /etc/cron.d/crontab-instance-stats
 RUN chmod 600 /etc/cron.d/crontab-instance-stats
 
 # Copy Phusion Image startup and shutdown scripts to their locations
 # ------------------------------------------------------------------
-COPY server-ce/init_scripts/ /etc/my_init.d/
-COPY server-ce/init_preshutdown_scripts/ /etc/my_init.pre_shutdown.d/
+COPY images/main-amd64/init_scripts/ /etc/my_init.d/
+COPY images/main-amd64/init_preshutdown_scripts/ /etc/my_init.pre_shutdown.d/
 
 # Copy app settings files
 # -----------------------
-COPY server-ce/config/settings.js /etc/overleaf/settings.js
+COPY images/main-amd64/config/settings.js /etc/overleaf/settings.js
 
 # (historical: Node history-v1 config COPY — retired with the Node
 # history-v1/project-history/document-updater trees; Go services own
@@ -225,7 +225,7 @@ COPY server-ce/config/settings.js /etc/overleaf/settings.js
 
 # Copy grunt thin wrapper
 # -----------------------
-ADD server-ce/bin/grunt /usr/local/bin/grunt
+ADD images/main-amd64/grunt /usr/local/bin/grunt
 RUN chmod +x /usr/local/bin/grunt
 
 # Copy history helper scripts
@@ -233,7 +233,7 @@ RUN chmod +x /usr/local/bin/grunt
 
 # Copy Latexmkrc
 # -----------------------
-COPY server-ce/config/latexmkrc /usr/local/share/latexmk/LatexMk
+COPY images/main-amd64/config/latexmkrc /usr/local/share/latexmk/LatexMk
 
 # File that controls open|closed status of the site
 # -------------------------------------------------
@@ -269,16 +269,16 @@ ENV GIT_BRIDGE_HOST=git-bridge
 ENV GIT_BRIDGE_PORT=8000
 ENV GIT_BRIDGE_REPOSTORE_MAX_FILE_SIZE=52428800
 # tex-autoformatter module: tex-fmt binary (vendored static x86_64 build,
-# v0.5.7; see server-ce/static/bin/README.md for the SHA256 provenance).
+# v0.5.7; see images/main-amd64/static/bin/README.md for the SHA256 provenance).
 # Installed after the app copy so it persists regardless of node_modules
 # reinstalls.
-COPY server-ce/static/bin/tex-fmt /usr/local/bin/tex-fmt
+COPY images/main-amd64/static/bin/tex-fmt /usr/local/bin/tex-fmt
 RUN chmod 755 /usr/local/bin/tex-fmt
 
 # CLSI word count: vendored texcount (perl script + wrapper). Runs on the
-# Alpine perl (perl-core deps only). See server-ce/static/bin/README.md.
-COPY server-ce/static/bin/texcount /usr/bin/texcount
-COPY server-ce/static/bin/texcount.pl /usr/bin/texcount.pl
+# Alpine perl (perl-core deps only). See images/main-amd64/static/bin/README.md.
+COPY images/main-amd64/static/bin/texcount /usr/bin/texcount
+COPY images/main-amd64/static/bin/texcount.pl /usr/bin/texcount.pl
 RUN chmod 755 /usr/bin/texcount && chmod 644 /usr/bin/texcount.pl
 
 EXPOSE 80

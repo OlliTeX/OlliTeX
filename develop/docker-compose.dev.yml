@@ -6,7 +6,7 @@
 services:
   clsi:
     # Go clsi (node app retired 2026-09-29): baked binary from the main
-    # image (rebuild first: (cd server-ce && make all)).
+    # image (rebuild first from the repo root: run `make images`).
     image: ollitex/ollitex:main
     command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/clsitex"]
     environment:
@@ -16,7 +16,7 @@ services:
 
   real-time:
     # D28a: Go bus — static binary, no hot-mounts. After changing
-    # go/services/realtime (or cmd/realtime): (cd server-ce && make all)
+    # go/services/realtime (or cmd/realtime) — build from the repo root: `make images`
     # then `docker compose -f docker-compose.yml -f docker-compose.dev.yml
     # up -d real-time`.
     command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/realtime"]

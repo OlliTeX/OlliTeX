@@ -244,7 +244,7 @@ test.describe('@local web-go P4.11 (entities add) parity', () => {
       dexe(overleafC, 'chown www-data:www-data /usr/local/bin/go-services/web && chmod 755 /usr/local/bin/go-services/web')
       dexe(overleafC, 'sv restart web-go-overleaf', true)
     }
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/nginx/flips/web-p411a.conf'), `${overleafC}:/tmp/web-p411a.conf`])
+    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p411a.conf'), `${overleafC}:/tmp/web-p411a.conf`])
     dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && cp /tmp/web-p411a.conf /usr/local/share/overleaf-flips/web-p411a.conf')
     for (;;) { const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim(); if (code === '200') break; await sleep(500) }
     U = await login(USER)

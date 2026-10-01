@@ -13,7 +13,9 @@
 #   make e2e           stack up + playwright suite
 #   make wiki-shots    regenerate docs/wiki screenshots (needs the e2e stack)
 #   make wiki-check    wiki docs gate (links + data-safety scan) for CI
-#   make image         rebuild the server-ce docker image
+#   make image         rebuild the ollitex docker image set (base + app +
+#                      pandoc/pdftocairo/png2pdf — from the images/ tree;
+#                      the former server-ce/Makefile merged here 2026-10-01)
 #   make hooks-install install the repo git pre-push fast gate
 #
 # Notes:
@@ -29,10 +31,192 @@ export MAKEFLAGS := --no-print-directory
 WEB := frontend
 SERVICES_WEB := services/web
 E2E_DIR      := tests/e2e
-IMAGE_DIR    := server-ce
 
 TEST_STACK   ?= ol-e2e-overleaf-1
 STACK_PORT   ?= 7420
+
+# ----------------------------------------------------------------------------
+# Docker image builds (merged from server-ce/Makefile 2026-10-01, owner
+# directive: one Makefile controls everything; retired to junk/).
+# All images live under images/&lt;name&gt;/Dockerfile (2026-10-01 reorg) with
+# THIS repo root as the build context.
+# ----------------------------------------------------------------------------
+export MONOREPO_REVISION := $(shell git rev-parse HEAD)
+export BRANCH_NAME ?= $(shell git rev-parse --abbrev-ref HEAD)
+export BRANCH_NAME_TAG_SAFE ?= $(subst /,--,$(BRANCH_NAME))
+export OVERLEAF_BASE_BRANCH ?= ollitex/base:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_BASE_LATEST ?= ollitex/base
+export OVERLEAF_BASE_TAG ?= ollitex/base:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export OVERLEAF_BRANCH ?= ollitex/ollitex:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_LATEST ?= ollitex/ollitex
+export OVERLEAF_TAG ?= ollitex/ollitex:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export OVERLEAF_PANDOC_BRANCH ?= ollitex/pandoc:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_PANDOC_LATEST ?= ollitex/pandoc
+export OVERLEAF_PANDOC_TAG ?= ollitex/pandoc:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export OVERLEAF_PDFTOCAIRO_BRANCH ?= ollitex/pdftocairo:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_PDFTOCAIRO_LATEST ?= ollitex/pdftocairo
+export OVERLEAF_PDFTOCAIRO_TAG ?= ollitex/pdftocairo:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export OVERLEAF_PNG2PDF_BRANCH ?= ollitex/png2pdf:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_PNG2PDF_LATEST ?= ollitex/png2pdf
+export OVERLEAF_PNG2PDF_TAG ?= ollitex/png2pdf:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+
+# Optional extra --cache-from references (overridable). The branch tags only
+# exist LOCALLY (they are never pushed to Docker Hub), so pulling them as cache
+# sources fails with 404/"insufficient_scope" on Docker Hub. The builds rely
+# on the local inline cache (BUILDKIT_INLINE_CACHE=1) + locally tagged images
+# instead. Default: no remote cache-from at all (2026-08-31, build 49 failure).
+CACHE_FROM_BASE ?=
+CACHE_FROM_COMMUNITY ?=
+CACHE_FROM_PANDOC ?=
+CACHE_FROM_PDFTOCAIRO ?=
+CACHE_FROM_PNG2PDF ?=
+
+# Which base Dockerfile build-base uses. Alpine:3.24 is the CANONICAL base
+# (cutover 2026-09-28, owner directive: alpine if it works — e2e gate GREEN,
+# image smaller: 6.43GB vs 6.7GB ubuntu). The ubuntu file is retired in
+# junk/Dockerfile-base-ubuntu26.04; override BASE_FILE to restore it.
+# (moved to images/base-amd64 with the 2026-10-01 images/ reorg)
+BASE_FILE ?= images/base-amd64/Dockerfile
+
+# Which Go builder the app image compiles on (cutover 2026-09-28: the musl
+# alpine:3.24 builder is the default; the glibc one is retired in
+# junk/images-golang-builder-amd64-ubuntu and can be passed back via
+# GO_BUILDER_TAG if ever needed).
+GO_BUILDER_TAG ?= ollitex/golang-builder-amd64-alpine:1.27.1
+
+.PHONY: images
+images: build-base build-community build-pandoc build-pdftocairo build-png2pdf ## Build ALL ollitex docker images (base + app + pandoc/pdftocairo/png2pdf)
+
+.PHONY: refresh-cache
+refresh-cache: refresh-cache-branch refresh-cache-latest ## Pull locally-tagged image refs as remote cache sources (best effort)
+
+.PHONY: refresh-cache-branch
+refresh-cache-branch:
+	docker inspect $(OVERLEAF_BASE_BRANCH) > /dev/null && docker pull $(OVERLEAF_BASE_BRANCH) || true
+	docker inspect $(OVERLEAF_BRANCH) > /dev/null && docker pull $(OVERLEAF_BRANCH) || true
+	docker inspect $(OVERLEAF_PANDOC_BRANCH) > /dev/null && docker pull $(OVERLEAF_PANDOC_BRANCH) || true
+	docker inspect $(OVERLEAF_PDFTOCAIRO_BRANCH) > /dev/null && docker pull $(OVERLEAF_PDFTOCAIRO_BRANCH) || true
+	docker inspect $(OVERLEAF_PNG2PDF_BRANCH) > /dev/null && docker pull $(OVERLEAF_PNG2PDF_BRANCH) || true
+
+.PHONY: refresh-cache-latest
+refresh-cache-latest:
+	docker inspect $(OVERLEAF_BASE_LATEST) > /dev/null && docker pull $(OVERLEAF_BASE_LATEST) || true
+	docker inspect $(OVERLEAF_LATEST) > /dev/null && docker pull $(OVERLEAF_LATEST) || true
+	docker inspect $(OVERLEAF_PANDOC_LATEST) > /dev/null && docker pull $(OVERLEAF_PANDOC_LATEST) || true
+	docker inspect $(OVERLEAF_PDFTOCAIRO_LATEST) > /dev/null && docker pull $(OVERLEAF_PDFTOCAIRO_LATEST) || true
+	docker inspect $(OVERLEAF_PNG2PDF_LATEST) > /dev/null && docker pull $(OVERLEAF_PNG2PDF_LATEST) || true
+
+.PHONY: build-base
+build-base: ## Build the ollitex/base image (alpine + TeX Live) from images/base-amd64
+	docker build \
+	  --build-arg BUILDKIT_INLINE_CACHE=1 \
+	  --progress=plain \
+	  --file $(BASE_FILE) \
+	  --pull \
+	  $(CACHE_FROM_BASE) \
+	  --tag $(OVERLEAF_BASE_TAG) \
+	  --tag $(OVERLEAF_BASE_BRANCH) \
+	  --network=host \
+	  .
+
+.PHONY: build-community
+build-community: ## Build the ollitex/ollitex app image from images/main-amd64 (yarn + Go + webpack inside)
+	docker build \
+	  --build-arg BUILDKIT_INLINE_CACHE=1 \
+	  --progress=plain \
+	  --build-arg OVERLEAF_BASE_TAG \
+	  --build-arg GO_BUILDER_TAG \
+	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
+	  $(CACHE_FROM_COMMUNITY) \
+	  --file images/main-amd64/Dockerfile \
+	  --tag $(OVERLEAF_TAG) \
+	  --tag $(OVERLEAF_BRANCH) \
+	  --network=host \
+	  .
+
+.PHONY: build-pandoc
+build-pandoc: ## Build the ollitex/pandoc image from images/pandoc-amd64
+	docker build \
+	  --build-arg BUILDKIT_INLINE_CACHE=1 \
+	  --progress=plain \
+	  --build-arg OVERLEAF_BASE_TAG \
+	  --build-arg GO_BUILDER_TAG \
+	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
+	  $(CACHE_FROM_PANDOC) \
+	  --file images/pandoc-amd64/Dockerfile \
+	  --tag $(OVERLEAF_PANDOC_TAG) \
+	  --tag $(OVERLEAF_PANDOC_BRANCH) \
+	  --network=host \
+	  .
+
+# pdftocairo replacement for quay.io/sharelatex/pdftocairo:24.02 (clsitex
+# PDF→JPEG). Standalone alpine with no COPY, so no .dockerignore needed.
+.PHONY: build-pdftocairo
+build-pdftocairo: ## Build the ollitex/pdftocairo image from images/pdftocairo-amd64
+	docker build \
+	  --build-arg BUILDKIT_INLINE_CACHE=1 \
+	  --progress=plain \
+	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
+	  $(CACHE_FROM_PDFTOCAIRO) \
+	  --file images/pdftocairo-amd64/Dockerfile \
+	  --tag $(OVERLEAF_PDFTOCAIRO_TAG) \
+	  --tag $(OVERLEAF_PDFTOCAIRO_BRANCH) \
+	  --network=host \
+	  .
+
+# png2pdf replacement for quay.io/sharelatex/png2pdf:2026-06-24 (clsitex
+# PNG->PDF slow-PNG optimisation). python:3.14-alpine + img2pdf (pinned git
+# commit) + the png2pdf.sh CLI shim (images/png2pdf-amd/png2pdf.sh, copied
+# from the root context, which uses the root .dockerignore like the other
+# COPY-based targets).
+.PHONY: build-png2pdf
+build-png2pdf: ## Build the ollitex/png2pdf image from images/png2pdf-amd
+	docker build \
+	  --build-arg BUILDKIT_INLINE_CACHE=1 \
+	  --progress=plain \
+	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
+	  $(CACHE_FROM_PNG2PDF) \
+	  --file images/png2pdf-amd/Dockerfile \
+	  --tag $(OVERLEAF_PNG2PDF_TAG) \
+	  --tag $(OVERLEAF_PNG2PDF_BRANCH) \
+	  --network=host \
+	  .
+
+.PHONY: clean-images
+clean-images: ## Remove the locally-built ollitex docker image tags (docker rmi)
+	-docker rmi --force $(OVERLEAF_BASE_TAG) $(OVERLEAF_TAG) $(OVERLEAF_PANDOC_TAG) $(OVERLEAF_PDFTOCAIRO_TAG) $(OVERLEAF_PNG2PDF_TAG)
+
+.PHONY: image-push
+image-push: ## Push the ollitex image tags (owner gate — run on purpose)
+	docker push $(OVERLEAF_BASE_TAG)
+	docker push $(OVERLEAF_BASE_BRANCH)
+	docker push $(OVERLEAF_TAG)
+	docker push $(OVERLEAF_BRANCH)
+	docker push $(OVERLEAF_PANDOC_TAG)
+	docker push $(OVERLEAF_PDFTOCAIRO_TAG)
+	docker push $(OVERLEAF_PNG2PDF_TAG)
+
+SHELLCHECK_OPTS = \
+	--shell=bash \
+	--external-sources \
+	--exclude=SC1091
+SHELLCHECK_COLOR := $(if $(CI),--color=never,--color)
+SHELLCHECK_FILES := { git ls-files "*.sh" -z; git grep -Plz "\A\#\!.*bash"; } | sort -zu
+
+.PHONY: shellcheck
+shellcheck: ## Shellcheck all shell scripts (dockerized koalaman/shellcheck)
+	@echo "[shellcheck] $(subst :, ,$(notdir $(SHELLCHECK_FILES)))"
+	$(SHELLCHECK_FILES) | xargs -0 -r docker run --rm -v $(CURDIR):/mnt -w /mnt \
+		koalaman/shellcheck:stable $(SHELLCHECK_OPTS) $(SHELLCHECK_COLOR)
+
+.PHONY: shellcheck-fix
+shellcheck-fix: ## Shellcheck --format=diff applied per file (review output before accepting)
+	@$(SHELLCHECK_FILES) | while IFS= read -r -d '' file; do \
+		diff=$$(docker run --rm -v $(CURDIR):/mnt -w /mnt koalaman/shellcheck:stable $(SHELLCHECK_OPTS) --format=diff "$$file" 2>/dev/null); \
+		if [ -n "$$diff" ] && ! echo "$$diff" | patch -p1 &>/dev/null 2>&1; then echo "\033[31m$$file\033[0m"; \
+		elif [ -n "$$diff" ]; then echo "$$file"; \
+		else echo "\033[2m$$file\033[0m"; fi \
+	done
 
 .PHONY: help
 help: ## Show this help
@@ -102,8 +286,7 @@ deploy-test: build ## Deploy the bundle into the test stack + restart (web cache
 	echo "test stack not ready after 120s" && exit 1
 
 .PHONY: image
-image: go-build ## Rebuild the server-ce docker image (make all); ensure Go binaries are fresh
-	cd $(IMAGE_DIR) && make all
+image: go-build images ## Rebuild the app docker image set (base + ollitex + pandoc/pdftocairo/png2pdf); ensure Go binaries are fresh
 
 .PHONY: clean
 clean: ## Remove local caches (prettier/eslint) + Go binaries

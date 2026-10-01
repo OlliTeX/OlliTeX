@@ -22,7 +22,7 @@ const mongoC = 'ol-e2e-mongo-1'
 // union); the library battery never touches LLM state, so P6.4a/P6.4b
 // flips are inert here — they only prove coexistence.
 const FLIPCONFS = ['web-p64a.conf', 'web-p64b.conf', 'web-p65.conf']
-const FLIPSRC = `${process.cwd()}/../../server-ce/nginx/flips`
+const FLIPSRC = `${process.cwd()}/../../images/main-amd64/nginx/flips`
 const BASE = 'http://127.0.0.1:7420'
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 const UA = 'p65-gate'

@@ -41,7 +41,7 @@ RUN apk update \
 # paths and start with '-'), temp-file + atomic replace (input must survive
 # a failed conversion — CLSI renames the untouched original as fallback),
 # and the "Converted <f> to PDF" stdout line Go counts.
-COPY server-ce/png2pdf.sh /usr/local/bin/png2pdf
+COPY images/png2pdf-amd/png2pdf.sh /usr/local/bin/png2pdf
 RUN chmod 0755 /usr/local/bin/png2pdf
 
 # The Go runner passes the arg list ["--in-place", "--", ...] as the container

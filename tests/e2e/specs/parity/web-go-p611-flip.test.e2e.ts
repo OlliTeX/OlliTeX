@@ -43,7 +43,7 @@ const overleafC = 'ol-e2e-overleaf-1'
 const mongoC = 'ol-e2e-mongo-1'
 // Cumulative: P7 ships the union — leg 2 exercises the full flipped so far.
 const FLIPCONFS = ['web-p64a.conf', 'web-p64b.conf', 'web-p65.conf', 'web-p66.conf', 'web-p67.conf', 'web-p68.conf', 'web-p69.conf', 'web-p610.conf', 'web-p611.conf']
-const FLIPSRC = `${process.cwd()}/../../server-ce/nginx/flips`
+const FLIPSRC = `${process.cwd()}/../../images/main-amd64/nginx/flips`
 const BASE = 'http://127.0.0.1:7420'
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 const UA = 'p611-gate'

@@ -17,7 +17,7 @@
 #   - no unattended-upgrades (build-time `apk update` only)
 #   - no gnupg (no deb.nodesource GPG dearmor)
 #   - python-is-python3 → explicit /usr/bin/python symlink
-#   - my_init (server-ce/bin/my_init) requires python3 stdlib only — OK.
+#   - my_init (images/base-amd64/my_init) requires python3 stdlib only — OK.
 #   - runit from the `runit` apk package (sv/runsv/runsvdir) instead of
 #     Debian's `runit` (runit-helper phusion layout). my_init is stdlib
 #     python and drives runsvdir the same way.
@@ -94,13 +94,13 @@ RUN adduser -S -D -u 33 -s /sbin/nologin www-data \
 # Process manager entrypoint + lifecycle dirs (same vendored my_init as the
 # ubuntu base — stdlib-only python3, drives runsvdir over /etc/service and
 # the /etc/my_init*.d hooks the app relies on).
-COPY server-ce/bin/my_init /sbin/my_init
+COPY images/base-amd64/my_init /sbin/my_init
 RUN chmod 755 /sbin/my_init \
     && mkdir -p /etc/service /etc/my_init.d /etc/my_init.pre_shutdown.d /etc/my_init.post_shutdown.d \
     && install -d -m 700 -o root -g root /etc/container_environment
 
 # phusion-compatible privilege-drop helper (POSIX sh — portable across bases).
-COPY server-ce/bin/setuser /sbin/setuser
+COPY images/base-amd64/setuser /sbin/setuser
 RUN chmod 755 /sbin/setuser
 
 # TeX Live: intentionally NOT installed (owner #10, 2026-09-16) — same as

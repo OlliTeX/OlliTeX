@@ -481,7 +481,7 @@ test.describe.serial('web-go P4.10b invites flip gate', () => {
       dexe(overleafC, 'chown www-data:www-data /usr/local/bin/go-services/web && chmod 755 /usr/local/bin/go-services/web')
       dexe(overleafC, 'sv restart web-go-overleaf', true)
     }
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/nginx/flips/web-p4inv.conf'), `${overleafC}:/tmp/web-p4inv.conf`])
+    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p4inv.conf'), `${overleafC}:/tmp/web-p4inv.conf`])
     dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && cp /tmp/web-p4inv.conf /usr/local/share/overleaf-flips/web-p4inv.conf')
     for (;;) { const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim(); if (code === '200') break; await sleep(500) }
     dexe(overleafC, FLIP('web-p4inv.conf', 'strip'), true); await nginxSettled()

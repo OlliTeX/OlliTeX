@@ -9,7 +9,7 @@
  *                         logged-in + 404), the consent page/moves, and a
  *                         rate-limit 429 burst — captured as canonical.
  *   leg 2  FLIP ON        the identical battery answered by the Go shadow
- *                         via server-ce/nginx/flips/web-p2.conf — every
+ *                         via images/main-amd64/nginx/flips/web-p2.conf — every
  *                         response must match the Node baseline
  *                         byte-for-byte after nonce/csrf normalization.
  *   leg 3  FLIP OFF       re-runs on Node and matches again (reversal).
@@ -365,8 +365,8 @@ test.describe.serial('web-go P2 flip gate (WEB_GO_PLAN P2)', () => {
   test.beforeAll(async () => {
     overleafC = runningContainer('ol-e2e-overleaf')
     execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'bin/web'), `${overleafC}:/usr/local/bin/go-services/web`])
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/runit/web-go-overleaf/run'), `${overleafC}:/tmp/webgo-run`])
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'server-ce/nginx/flips/web-p2.conf'), `${overleafC}:/tmp/web-p2.conf`])
+    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/runit/web-go-overleaf/run'), `${overleafC}:/tmp/webgo-run`])
+    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p2.conf'), `${overleafC}:/tmp/web-p2.conf`])
     dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips /etc/service/web-go-overleaf && cp /tmp/webgo-run /etc/service/web-go-overleaf/run && chmod 755 /etc/service/web-go-overleaf/run && cp /tmp/web-p2.conf /usr/local/share/overleaf-flips/web-p2.conf`)
     const t0 = Date.now()
     for (;;) {
