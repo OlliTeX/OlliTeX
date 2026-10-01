@@ -279,6 +279,7 @@ func main() {
 	// The /logout chain + password-login hooks are wired inside
 	// sso.Feature (core hooks — authpages calls them).
 	app.RegisterFeature(sso.Feature(app))
+	app.RegisterFeature(sso.FeatureAdmin(app))
 
 	// P6.15 surface: LanguageTool proxy (languages, check, admin connection
 	// check).

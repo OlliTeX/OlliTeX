@@ -26,7 +26,15 @@ func Feature(a *core.App) core.Feature {
 	return core.Feature{
 		Name: "authpages",
 		Routes: []core.Route{
-			{Method: "GET", Path: "/login", NoLogin: true, Handler: pageHandler(views.LoginPage)},
+			{Method: "GET", Path: "/login", NoLogin: true, Handler: func(cxt *core.Cxt, res *core.Res) {
+				// fedgap-2: ol-auth-config SSO slot (Node SSOAdminRouter use('/login'))
+				// — the sso feature hook builds the enabled-provider buttons.
+				pd := pageData(cxt)
+				if s := a.LoginSlotJSON(cxt); s != "" {
+					pd.AuthConfig = s
+				}
+				views.LoginPage(res.W, pd)
+			}},
 			{Method: "POST", Path: "/login", NoLogin: true, Handler: func(cxt *core.Cxt, res *core.Res) {
 				if !loginLim.Consume(core.ClientIP(cxt.Req)) {
 					core.Send429(res, "Rate limit reached, please try again later")

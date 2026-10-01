@@ -193,6 +193,11 @@ type PageData struct {
 	// core.NavSiteAdmin). Replaces the baked `false` literals in the
 	// page-data navbar renders.
 	NavSiteAdmin bool
+	// fedgap-2 (SSO login slot): the /login ol-auth-config meta content
+	// (HTML-escaped JSON `{&quot;sso&quot;:[...],&quot;ldapEnabled&quot;:false}`),
+	// computed per request by the sso feature's hook. Empty = the baked
+	// anonymous default (byte-identical: sso:[] + ldapEnabled:false).
+	AuthConfig string
 	// P2 dynamic slots (empty strings render the anonymous/absent shape):
 	ResetErr   string // passwordReset meta: "" | "password_reset_token_expired"
 	EmailField string // setPassword form email input
@@ -299,6 +304,15 @@ func (p PageData) finalize(html string) string {
 	} else {
 		out = strings.ReplaceAll(out, "\x01LOGINUID\x02", ` content="`+htmlAttrEsc(p.UserID)+`"`)
 	}
+	// fedgap-2 (SSO login slot): the /login ol-auth-config meta — the sso
+	// feature's hook builds the per-request JSON (enabled providers);
+	// empty renders the anonymous default (byte-identical to the baked
+	// shape: sso:[] + ldapEnabled:false).
+	authCfg := p.AuthConfig
+	if authCfg == "" {
+		authCfg = `{&quot;sso&quot;:[],&quot;ldapEnabled&quot;:false}`
+	}
+	out = strings.ReplaceAll(out, "\x01SSOCONFIG\x02", authCfg)
 	// U9: navbar showSignUpLink (JSON boolean in the ol-navbar metas).
 	if p.ShowSignUpLink {
 		out = strings.ReplaceAll(out, "\x01SUPLINK\x02", "true")

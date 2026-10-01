@@ -19,8 +19,17 @@ type SSOLogoutHook func(cxt *Cxt, res *Res) bool
 // the last-SSO provider marker (Node P1c: non-SSO login => 'local').
 type PasswordLoginHook func(cxt *Cxt)
 
+// LoginSlotHook — the /login page ol-auth-config slot builder (fedgap-2,
+// Node SSOAdminRouter webRouter.use('/login') res.locals.ssoProviders parity).
+// Returns the HTML-escaped JSON meta content (e.g.
+// `{&quot;sso&quot;:[{&quot;label&quot;:...,&quot;href&quot;:...}],&quot;ldapEnabled&quot;:false}`);
+// nil/"" renders the anonymous default (sso:[] + ldapEnabled:false).
+// Registered by the sso feature; called by authpages' /login handler.
+type LoginSlotHook func(cxt *Cxt) string
+
 func (a *App) SetSSOLogoutHook(h SSOLogoutHook)         { a.ssoLogoutHook = h }
 func (a *App) SetPasswordLoginHook(h PasswordLoginHook) { a.passwordLoginHook = h }
+func (a *App) SetLoginSlotHook(h LoginSlotHook)         { a.loginSlotHook = h }
 
 // SSOLogout — call from the /logout handler before the default flow.
 func (a *App) SSOLogout(cxt *Cxt, res *Res) bool {
@@ -35,4 +44,12 @@ func (a *App) PasswordLoginHooked(cxt *Cxt) {
 	if a.passwordLoginHook != nil {
 		a.passwordLoginHook(cxt)
 	}
+}
+
+// LoginSlotJSON — the /login ol-auth-config meta content ("" when no hook).
+func (a *App) LoginSlotJSON(cxt *Cxt) string {
+	if a.loginSlotHook != nil {
+		return a.loginSlotHook(cxt)
+	}
+	return ""
 }

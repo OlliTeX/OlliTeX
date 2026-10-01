@@ -248,6 +248,7 @@ var (
 func Feature(a *core.App) core.Feature {
 	a.SetSSOLogoutHook(ssoLogoutHook(a))
 	a.SetPasswordLoginHook(clearSSOMarker(a))
+	a.SetLoginSlotHook(func(c *core.Cxt) string { return loginSlotJSON(a, c) })
 	return core.Feature{
 		Name: "sso",
 		Routes: []core.Route{
