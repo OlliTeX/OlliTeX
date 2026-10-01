@@ -6,7 +6,7 @@ import baseConfig from '../eslint.config.mjs'
 const ROOT_DIR = path.resolve(import.meta.dirname, '..')
 
 export default defineConfig([
-  globalIgnores(['**/hotfix/', '**/develop/']),
+  globalIgnores(['**/develop/']),
   {
     basePath: ROOT_DIR,
     extends: baseConfig,
