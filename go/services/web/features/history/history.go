@@ -26,9 +26,10 @@
 //     (zip -> 402 plain "Payment Required").
 //   - changes?paginated=true -> {"changes":[...],"hasMore":false};
 //     plain -> bare array.
-//   - diff: V2 passthrough (non-2xx -> Node 500 page). doc/:doc_id/diff and
-//     filetree/diff: S2 Yjs-first (d5dd23dd, D41-b1) with V2 passthrough
-//     fallback for unseeded rooms / OT-era ranges.
+//   - diff: audit 011 Yjs-first (same wire as doc diff; room-covers range)
+//     with V2 passthrough fallback (non-2xx upstream -> Node 500 page).
+//     doc/:doc_id/diff and filetree/diff: S2 Yjs-first (d5dd23dd, D41-b1)
+//     with V2 passthrough fallback for unseeded rooms / OT-era ranges.
 //   - labels: GET -> [labels + user_display_name appended]; POST
 //     {comment,version} -> 200 created label JSON; DELETE -> 204;
 //     400 body validation (body.comment / body.version).
@@ -133,7 +134,7 @@ func Feature(a *core.App) core.Feature {
 	h := &svc{a: a}
 	return core.Feature{Name: "history", Routes: []core.Route{
 		{Method: "GET", Pattern: updatesPat, Handler: h.updates},
-		{Method: "GET", Pattern: diffPat, Handler: h.proxy},
+		{Method: "GET", Pattern: diffPat, Handler: h.projectDiff},
 		{Method: "GET", Pattern: docDiffPat, Handler: h.docDiff},
 		{Method: "GET", Pattern: filetreePat, Handler: h.filetreeDiff},
 		{Method: "GET", Pattern: latestPat, Handler: h.latestHistory},

@@ -199,6 +199,19 @@ func (h *svc) filetreeDiff(cxt *core.Cxt, res *core.Res) {
 	h.yjsDiff(cxt, res, false)
 }
 
+// projectDiff — audit 011 (2026-10-01) Yjs-first: the per-file diff
+// (GET /project/:id/diff?from&to[&pathname]) renders the same {diff:[u|i|d,
+// meta?]} wire as the doc diff. This stack's version store of record is the
+// collab room (root doc; the single-doc Yjs plane — per-doc rooms arrive
+// with 024 option B), so the pathname is accepted but the rendered doc is
+// the room's root. Uncovered range → byte-pinned legacy V2 passthrough.
+// The S3b unified-filetree diff (yjsFiletreeDiffS3, same feed) is what
+// surfaces the per-pathname FileDiff list; the plain /diff route stays
+// doc-diff, exactly the Node wire for a single file content diff.
+func (h *svc) projectDiff(cxt *core.Cxt, res *core.Res) {
+	h.yjsDiff(cxt, res, true)
+}
+
 // yjsDiff — the shared Yjs-first diff dispatcher (doc or filetree shape).
 func (h *svc) yjsDiff(cxt *core.Cxt, res *core.Res, doc bool) {
 	if _, _, ok := h.gate(cxt, res, "read"); !ok {
