@@ -181,6 +181,11 @@ func postLogin(a *core.App) func(*core.Cxt, *core.Res) {
 		// session doc key into UserSessions:<uid> + PEXPIRE (5-day set pin).
 		a.TrackSession(idString(u.ID), created.SessID)
 
+		// P1c (ssoRoleEvaluator parity): a PASSWORD login is never an SSO
+		// login — clear user.ssoLoginProviderId (the SSO feature registers
+		// the hook; no-op when no SSO providers exist).
+		a.PasswordLoginHooked(cxt)
+
 		target := "/project"
 		if raw, ok := old.GetRaw("postLoginRedirect"); ok && len(raw) >= 2 {
 			var s string

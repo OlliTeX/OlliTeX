@@ -12,6 +12,13 @@ import (
 // Pinned: 302 Location /login, "Found. Redirecting to /login", old cookie dead.
 func postLogout(a *core.App) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
+		// SSO logout chain (Node modules/authentication/logout.mjs):
+		// user.externalAuth saml|oidc ⇒ provider SLO redirect AFTER the
+		// session destroy (the hook performs the destroy — doLogout
+		// parity) and owns the response.
+		if a.SSOLogout(cxt, res) {
+			return
+		}
 		var body struct {
 			Redirect string `json:"redirect"`
 		}

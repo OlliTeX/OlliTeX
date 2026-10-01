@@ -58,6 +58,7 @@ import (
 	"ollitex/go/services/web/features/review"
 	"ollitex/go/services/web/features/serveradmin"
 	"ollitex/go/services/web/features/sitesettings"
+	"ollitex/go/services/web/features/sso"
 	"ollitex/go/services/web/features/staticpages"
 	"ollitex/go/services/web/features/status"
 	"ollitex/go/services/web/features/systemmessages"
@@ -269,6 +270,15 @@ func main() {
 	// Go port). Gated: FEDERATION_ENABLED env (default OFF; config.go reads it
 	// per route) — mounted like the S2S 200 `federation-off` envelope contract.
 	app.RegisterFeature(federation.Feature(app))
+
+	// N-provider SSO login surface (Node modules/authentication/saml+oidc
+	// Go port; P1c attrFilter roles included). Routes: /saml/login[/
+	// :providerId], /saml/login/callback (single ACS), /saml/meta,
+	// /saml/logout/callback, /oidc/login[/:providerId],
+	// /oidc/login/callback, /oidc/logout/callback, /user/oauth-unlink.
+	// The /logout chain + password-login hooks are wired inside
+	// sso.Feature (core hooks — authpages calls them).
+	app.RegisterFeature(sso.Feature(app))
 
 	// P6.15 surface: LanguageTool proxy (languages, check, admin connection
 	// check).

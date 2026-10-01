@@ -267,6 +267,11 @@ type App struct {
 	// hitting /metrics with a nil surface fall through to the normal 404
 	// (tests that never initialise metrics keep passing unchanged).
 	MetricsHTTP http.Handler
+
+	// SSO seams (hooks.go): nil until the features/sso feature registers
+	// them (Node modules/authentication/logout.mjs + P1c finishLogin parity).
+	ssoLogoutHook     SSOLogoutHook
+	passwordLoginHook PasswordLoginHook
 }
 
 func (a *App) SetRender404(f fnPage) { a.Render404Web = f }
