@@ -178,6 +178,11 @@ func Feature(a *core.App) core.Feature {
 		Name: "compile",
 		Routes: []core.Route{
 			{Method: "POST", Pattern: compilePat, Handler: compileHandler(a)},
+			// audit-013: Word/Markdown/HTML export (Node
+			// ProjectDownloadsController.exportProjectConversion +
+			// downloadPreparedProjectExport).
+			{Method: "GET", Pattern: convCreatePat, Handler: exportConvCreateHandler(a)},
+			{Method: "GET", Pattern: convDownloadPat, Handler: exportConvDownloadHandler(a)},
 			{Method: "POST", Pattern: stopPat, Handler: stopHandler(a)},
 			// Word-count (Node CompileController.wordCount; read-auth, no limiter).
 			{Method: "GET", Pattern: wordcountPat, Handler: wordCountHandler(a)},

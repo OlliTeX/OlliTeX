@@ -40,7 +40,7 @@ func HubFooterJSON(siteURL string) string {
 // ExposedSettingsJSON — the `ol-ExposedSettings` meta. In this stack the
 // only per-user field is canManageTemplatesMenu (admin true / member false;
 // pinned P6.1 oracle diff).
-func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDebug bool, mendeleyEnabled bool) string {
+func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDebug bool, mendeleyEnabled bool, pandocConversions bool) string {
 	s := withSiteURL(pinned_ol_ExposedSettings, siteURL)
 	if isAdmin {
 		// pinned constant is the member (false) form; admin flips one field
@@ -67,7 +67,27 @@ func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDeb
 			return "true"
 		}
 		return "false"
+	}()) + `,"enablePandocConversions":` + (func() string {
+		if pandocConversions {
+			return "true"
+		}
+		return "false"
 	}()) + `}`
+	return s
+}
+
+// splitTestVariants — audit-013: when the owner enables pandoc
+// conversions, the export-docx/export-markdown/export-html split-test flags
+// flip "default" → "enabled" (front-end isSplitTestEnabled requires exactly
+// "enabled" to render the Export items); otherwise the pinned constants are
+// served unchanged.
+func SplitTestVariants(pandocConversions bool) string {
+	if !pandocConversions {
+		return pinned_ol_splitTestVariants
+	}
+	s := strings.ReplaceAll(pinned_ol_splitTestVariants, `"export-docx":"default"`, `"export-docx":"enabled"`)
+	s = strings.ReplaceAll(s, `"export-markdown":"default"`, `"export-markdown":"enabled"`)
+	s = strings.ReplaceAll(s, `"export-html":"default"`, `"export-html":"enabled"`)
 	return s
 }
 

@@ -48,6 +48,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"ollitex/go/services/clsitex/conversionoutputcleaner"
@@ -330,6 +331,51 @@ func sendStatus(res http.ResponseWriter, code int) {
 	res.WriteHeader(code)
 	body := strconv.Itoa(code) + " " + http.StatusText(code) + "\n"
 	_, _ = res.Write([]byte(body))
+}
+
+// GetOutputFile serves a staged conversion artifact from
+// OutputDir/{project}/generated-files/{build}/{file} (Node CLSI getOutputFile)
+// — the web plane streams it back as the attachment (output.docx / the
+// markdown+html output.zip).
+func (c *Controller) GetOutputFile(res http.ResponseWriter, projectID, buildID, file string) (int, error) {
+	if projectID == "" || buildID == "" || file == "" ||
+		strings.Contains(file, "..") || strings.HasPrefix(file, "/") {
+		sendStatus(res, http.StatusNotFound)
+		return http.StatusNotFound, nil
+	}
+	baseDir := filepath.Join(c.Config.OutputDir, projectID, "generated-files", buildID)
+	fullPath := filepath.Join(baseDir, filepath.Clean("/"+file))
+	// traversal guard: the joined path must stay under baseDir.
+	if fullPath == baseDir || !strings.HasPrefix(fullPath, baseDir+string(filepath.Separator)) {
+		sendStatus(res, http.StatusNotFound)
+		return http.StatusNotFound, nil
+	}
+	info, err := os.Stat(fullPath)
+	if err != nil || !info.Mode().IsRegular() {
+		sendStatus(res, http.StatusNotFound)
+		return http.StatusNotFound, nil
+	}
+	f, err := os.Open(fullPath)
+	if err != nil {
+		sendStatus(res, http.StatusNotFound)
+		return http.StatusNotFound, nil
+	}
+	defer f.Close()
+	// Node getOutputFile: res.attachment(filename) (basename) + the
+	// Content-Type by extension + nosniff.
+	switch strings.ToLower(filepath.Ext(fullPath)) {
+	case ".docx":
+		res.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+	case ".zip":
+		res.Header().Set("Content-Type", "application/zip")
+	default:
+		res.Header().Set("Content-Type", "application/octet-stream")
+	}
+	res.Header().Set("Content-Disposition", "attachment; filename="+info.Name())
+	res.Header().Set("X-Content-Type-Options", "nosniff")
+	res.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
+	io.Copy(res, f) // nolint:errcheck — the write loop ends the request
+	return http.StatusOK, nil
 }
 
 // streamDownload mirrors the Node streaming block:

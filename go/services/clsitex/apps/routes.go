@@ -135,6 +135,22 @@ func (a *App) convertRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /convert/pdf-to-jpeg", a.convertPDFToJPEG)
 	mux.HandleFunc("POST /project/{project_id}/user/{user_id}/download/project-to-document",
 		a.convertProject)
+	// audit-013: prepared conversion artifact (Node CLSI getOutputFile) —
+	// the web conversion-download route streams this back. Deliberately NOT
+	// under /build/{id}/output/{file}: Go ServeMux gives the literal
+	// /output/output.zip routes (server.go, the compile-flow zips) precedence
+	// over a {filepath...} wildcard, which would shadow markdown/html exports.
+	mux.HandleFunc("GET /project/{project_id}/user/{user_id}/download/build/{build_id}/output/{filepath...}",
+		a.convertOutputFile)
+	mux.HandleFunc("GET /project/{project_id}/download/build/{build_id}/output/{filepath...}",
+		a.convertOutputFile)
+}
+
+func (a *App) convertOutputFile(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func(w http.ResponseWriter) (int, error) {
+		return a.CV.GetOutputFile(w, r.PathValue("project_id"),
+			r.PathValue("build_id"), r.PathValue("filepath"))
+	})
 }
 
 func (a *App) convertDocx(w http.ResponseWriter, r *http.Request) {
