@@ -21,6 +21,54 @@ import (
 
 const bodyLimit = 1 << 20 // heartbeat bodies are tiny; cap anyway
 
+// wakaLanguageForEntity — maps the active file (entity) to a WakaTime
+// language name (audit 035: the upstream API requires `language`; the
+// frontend only knows the file name). Unrecognized → "Other" (WakaTime's
+// catch-all).
+func wakaLanguageForEntity(entity string) string {
+	ext := strings.ToLower(extname(entity))
+	switch ext {
+	case "tex", "sty":
+		return "LaTeX"
+	case "bib":
+		return "BibTeX"
+	case "typ":
+		return "Typst"
+	case "md", "markdown":
+		return "Markdown"
+	case "js", "mjs", "cjs":
+		return "JavaScript"
+	case "ts":
+		return "TypeScript"
+	case "py":
+		return "Python"
+	case "go":
+		return "Go"
+	case "sh":
+		return "Shell"
+	case "yaml", "yml":
+		return "YAML"
+	case "json":
+		return "JSON"
+	case "toml":
+		return "TOML"
+	case "html":
+		return "HTML"
+	case "css":
+		return "CSS"
+	default:
+		return "Other"
+	}
+}
+
+func extname(p string) string {
+	i := strings.LastIndex(p, ".")
+	if i < 0 || i == len(p)-1 {
+		return ""
+	}
+	return p[i+1:]
+}
+
 // status — GET /user/wakatime/status (login).
 func (s *svc) status(cxt *core.Cxt, res *core.Res) {
 	ctx := cxt.Req.Context()
@@ -178,8 +226,35 @@ func (s *svc) handleHeartbeats(cxt *core.Cxt, res *core.Res, bulk bool) {
 	}
 	// server-side project fill (reference: the client never supplies
 	// `project`; it is set from the project name).
-	for _, hb := range hbs {
+	//
+	// audit 035 (Wakapi v2.18 live contract, verified against a running
+	// ghcr.io/muety/wakapi): the WakaTime v1 endpoint requires `language`
+	// and `category` as STRINGS (arrays are rejected), and the frontend
+	// only sends `{entity,time,isWrite}`. Build the canonical WakaTime
+	// payload here — works against both wakatime.com and self-hosted
+	// Wakapi — and drop fields the API does not accept (`isWrite`).
+	canon := func(m map[string]any) map[string]any {
+		out := map[string]any{"category": "Development"}
+		if p, ok := m["project"].(string); ok && p != "" {
+			out["project"] = p
+		}
+		if t, ok := m["time"].(float64); ok {
+			out["time"] = int64(t)
+		} else {
+			out["time"] = time.Now().Unix()
+		}
+		entity, _ := m["entity"].(string)
+		lang := wakaLanguageForEntity(entity)
+		if l, ok := m["language"].(string); ok && l != "" {
+			lang = l
+		}
+		out["language"] = lang
+		return out
+	}
+	for i, hb := range hbs {
+		hb = canon(hb)
 		hb["project"] = gate.projectName
+		hbs[i] = hb
 	}
 	var ferr error
 	if bulk {
@@ -317,7 +392,7 @@ func canReadProject(uid string, isAdmin bool, p bson.D) bool {
 		return false
 	}
 	if dgetStringVal(p, "owner_ref") == uid ||
-		inListStr(p, "collaborator_refs", uid) || inListStr(p, "reviewer_refs", uid) ||
+		inListStr(p, "collab_refs", uid) || inListStr(p, "collaborator_refs", uid) || inListStr(p, "reviewer_refs", uid) ||
 		inListStr(p, "readOnly_refs", uid) {
 		return true
 	}
@@ -354,9 +429,21 @@ func dgetString(d bson.D, key string) (string, bool) {
 	return "", false
 }
 
+func strOrOidHex(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case bson.ObjectID:
+		return x.Hex()
+	}
+	return ""
+}
+
 func dgetStringVal(d bson.D, key string) string {
-	if v, ok := dgetString(d, key); ok {
-		return v
+	for _, e := range d {
+		if e.Key == key {
+			return strOrOidHex(e.Value)
+		}
 	}
 	return ""
 }
@@ -371,7 +458,7 @@ func inListStr(p bson.D, key string, uid string) bool {
 			continue
 		}
 		for _, v := range l {
-			if vstr, ok := v.(string); ok && vstr == uid {
+			if strOrOidHex(v) == uid {
 				return true
 			}
 		}

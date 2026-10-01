@@ -245,6 +245,14 @@ func seedCreds(t *testing.T, s *svc) {
 		if hb["project"] != "WakaProj" {
 			return errUpstream
 		}
+		// audit 035: the relay must hand the upstream a canonical WakaTime
+		// payload (Wakapi v2.18 rejects the raw frontend shape).
+		if hb["category"] != "Development" || hb["language"] == "" {
+			return errBadAPI
+		}
+		if _, has := hb["time"]; !has {
+			return errBadAPI
+		}
 		return nil
 	}
 	s.wakaBulk = func(ctx context.Context, cr wakaCreds, hbs []map[string]any) error { return nil }
