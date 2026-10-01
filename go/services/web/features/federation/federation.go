@@ -41,5 +41,9 @@ func sRoutes(a *core.App) []core.Route {
 	routes = append(routes, s10Routes(a)...)
 	routes = append(routes, s11Routes(a)...)
 	routes = append(routes, s12Routes(a)...)
+	// fedgap-4 surfaces (overleaf-fed admin/S2S parity):
+	routes = append(routes, sAdminRoutes(a)...)
+	routes = append(routes, s2sRoutes(a)...)
+	routes = append(routes, sUserFedRoutes(a)...) // A-side invite + export + RP
 	return routes
 }
