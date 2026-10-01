@@ -32,11 +32,19 @@ CACHE_FROM_PANDOC ?=
 CACHE_FROM_PDFTOCAIRO ?=
 CACHE_FROM_PNG2PDF ?=
 
+# Dockerfile layout (2026-10-01 reorg): every image lives in images/<name>-
+# amd64/Dockerfile (siblings: golang-builder-amd64[-alpine], nodejs-builder-
+# amd64). --file paths are relative to THIS FILE's directory (make runs here);
+# the build context stays the monorepo root so the Dockerfiles' COPY/ADD
+# paths (server-ce/*, go/*, ...) are unchanged.
+IMAGES := $(MONOREPO_ROOT)images
+
 # Which base Dockerfile build-base uses. Alpine:3.24 is the CANONICAL base
 # (cutover 2026-09-28, owner directive: alpine if it works — e2e gate GREEN,
 # image smaller: 6.43GB vs 6.7GB ubuntu). The ubuntu file is retired in
 # junk/Dockerfile-base-ubuntu26.04; override BASE_FILE to restore it.
-BASE_FILE ?= Dockerfile-base
+# (default moved to images/base-amd64 with the 2026-10-01 images/ reorg)
+BASE_FILE ?= $(IMAGES)/base-amd64/Dockerfile
 
 # Which Go builder the app image compiles on (cutover 2026-09-28: the musl
 # alpine:3.24 builder is the default; the glibc one is retired in
@@ -88,7 +96,7 @@ build-community:
 	  --build-arg GO_BUILDER_TAG \
 	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
 	  $(CACHE_FROM_COMMUNITY) \
-	  --file Dockerfile \
+	  --file $(IMAGES)/main-amd64/Dockerfile \
 	  --tag $(OVERLEAF_TAG) \
 	  --tag $(OVERLEAF_BRANCH) \
 	  --network=host \
@@ -103,32 +111,31 @@ build-pandoc:
 	  --build-arg GO_BUILDER_TAG \
 	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
 	  $(CACHE_FROM_PANDOC) \
-	  --file Dockerfile-pandoc \
+	  --file $(IMAGES)/pandoc-amd64/Dockerfile \
 	  --tag $(OVERLEAF_PANDOC_TAG) \
 	  --tag $(OVERLEAF_PANDOC_BRANCH) \
 	  --network=host \
 	  $(MONOREPO_ROOT)
 
 # pdftocairo replacement for quay.io/sharelatex/pdftocairo:24.02 (clsitex
-# PDF→JPEG). Dockerfile-pdftocairo is standalone alpine with no COPY, so
-# no .dockerignore needed.
+# PDF→JPEG). Standalone alpine with no COPY, so no .dockerignore needed.
 build-pdftocairo:
 	docker build \
 	  --build-arg BUILDKIT_INLINE_CACHE=1 \
 	  --progress=plain \
 	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
 	  $(CACHE_FROM_PDFTOCAIRO) \
-	  --file Dockerfile-pdftocairo \
+	  --file $(IMAGES)/pdftocairo-amd64/Dockerfile \
 	  --tag $(OVERLEAF_PDFTOCAIRO_TAG) \
 	  --tag $(OVERLEAF_PDFTOCAIRO_BRANCH) \
 	  --network=host \
 	  $(MONOREPO_ROOT)
 
 # png2pdf replacement for quay.io/sharelatex/png2pdf:2026-06-24 (clsitex
-# PNG->PDF slow-PNG optimisation). Dockerfile-png2pdf: python:3.14-alpine
-# + img2pdf (pinned git commit) + the png2pdf.sh CLI shim (COPYs from
-# server-ce/, so a .dockerignore at the root context is needed like the
-# other COPY-based targets).
+# PNG->PDF slow-PNG optimisation). python:3.14-alpine + img2pdf (pinned git
+# commit) + the png2pdf.sh CLI shim (COPYs server-ce/png2pdf.sh from the root
+# context, so a .dockerignore at the root context is needed like the other
+# COPY-based targets).
 build-png2pdf:
 	cp .dockerignore $(MONOREPO_ROOT)
 	docker build \
@@ -136,7 +143,7 @@ build-png2pdf:
 	  --progress=plain \
 	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
 	  $(CACHE_FROM_PNG2PDF) \
-	  --file Dockerfile-png2pdf \
+	  --file $(IMAGES)/png2pdf-amd/Dockerfile \
 	  --tag $(OVERLEAF_PNG2PDF_TAG) \
 	  --tag $(OVERLEAF_PNG2PDF_BRANCH) \
 	  --network=host \

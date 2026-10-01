@@ -14,7 +14,7 @@
  * so explicit container/compose env ALWAYS wins over the admin UI value
  * (same semantics as the existing ${OVERLEAF_APP_NAME:-OlliTeX} pattern).
  *
- * The dir pre-exists (www-data-owned; server-ce/Dockerfile) so saving from
+ * The dir pre-exists (www-data-owned; images/main-amd64/Dockerfile) so saving from
  * the hub is a plain file write by the web service (www-data). Changes
  * apply on the next container cycle (D2 convention across this hub).
  *
@@ -140,7 +140,7 @@ export async function writeStorageEnv(section) {
     if (err && (err.code === 'EPERM' || err.code === 'EACCES')) {
       throw new Error(
         `Storage: cannot write ${target} (permissions — the dir must be writable ` +
-        'by the web service user www-data; see server-ce/Dockerfile env.d setup)'
+        'by the web service user www-data; see images/main-amd64/Dockerfile env.d setup)'
       )
     }
     throw err

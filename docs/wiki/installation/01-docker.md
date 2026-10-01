@@ -16,10 +16,12 @@ cd server-ce
 make all                 # builds sharelatex/sharelatex:<branch> (+ the TeX Live base image)
 ```
 
-The [`Dockerfile-base`](../../../server-ce/Dockerfile-base) builds the
+The [base image Dockerfile](../../../images/base-amd64/Dockerfile) builds the
 `sharelatex/sharelatex-base` image (dependencies + TeX Live); the
-[`Dockerfile`](../../../server-ce/Dockerfile) builds the application image
-on top.
+[application image Dockerfile](../../../images/main-amd64/Dockerfile) builds
+the application image on top. (All image Dockerfiles live under `images/`,
+next to the golang/nodejs builder images; `make all` in `server-ce` drives
+them.)
 
 The included deployment example
 ([`develop/docker-compose.yml`](../../../develop/docker-compose.yml)) gives

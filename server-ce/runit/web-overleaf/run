@@ -7,7 +7,7 @@
 # The Node implementation (exec /usr/bin/node /overleaf/services/web/app.mjs)
 # is replaced by the Go binary; the env contract is otherwise identical to the
 # Node run-script LISTEN_ADDRESS/ENABLED_SERVICES/WEB_PORT. GIT_BRIDGE_* is
-# inherited from the container env (server-ce/Dockerfile) exactly like Node —
+# inherited from the container env (images/main-amd64/Dockerfile) exactly like Node —
 # not hardcoded here, so the service stays portable across stacks.
 [ -x /usr/local/bin/go-services/web ] || { echo "go web binary missing" >&2; exit 1; }
 

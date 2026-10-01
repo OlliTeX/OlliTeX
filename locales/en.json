@@ -475,7 +475,7 @@
   "adminSite.miscUserDelay": "User hard-deletion delay days (OVERLEAF_USER_HARD_DELETION_DELAY)",
   "adminSite.miscellaneous": "Miscellaneous",
   "adminSite.pandoc": "Pandoc",
-  "adminSite.pandocBuildNote": "The pandoc image can be built inside server-ce (Dockerfile-pandoc + Makefile target added in R9) instead of pulling a community image.",
+  "adminSite.pandocBuildNote": "The pandoc image can be built with the repo Makefile (images/pandoc-amd64/Dockerfile, build-pandoc target) instead of pulling a community image.",
   "adminSite.pandocDesc": "Pandoc conversion of source projects (ENABLE_PANDOC_CONVERSIONS / PANDOC_IMAGE).",
   "adminSite.pandocEnable": "Enable pandoc conversions",
   "adminSite.pandocImage": "Pandoc container image (PANDOC_IMAGE)",

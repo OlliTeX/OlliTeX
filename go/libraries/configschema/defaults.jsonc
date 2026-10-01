@@ -119,7 +119,7 @@
     "TEX_LIVE_DOCKER_IMAGE": "texlive/texlive:latest-full", // Default TeXLive image
     "COMPILE_TYPEST_ENABLED": true, // Enable Typst compilation
     "ENABLE_PANDOC_CONVERSIONS": false, // Enable pandoc (Markdown→LaTeX) conversions
-    "PANDOC_IMAGE": "ollitex/pandoc", // Pandoc compile image (locally built via server-ce/Dockerfile-pandoc)
+    "PANDOC_IMAGE": "ollitex/pandoc", // Pandoc compile image (locally built via images/pandoc-amd64/Dockerfile)
     "FILE_IGNORE_PATTERN": null, // File ignore pattern for sync/compile
     "ENABLE_PYTHON_RUNNER": false, // Enable the Python runner
     "ENABLE_PDF_CACHING": true, // Enable PDF caching
@@ -133,7 +133,7 @@
     "PNG2PDF_IMAGE": "quay.io/sharelatex/png2pdf:2026-06-24", // PNG→PDF compile image (clsitex)
     "PNG2PDF_MIN_FILE_SIZE_BYTES": 1048576, // Skip PNGs smaller than this (bytes, clsitex)
     "ENABLE_PDF_CONVERSIONS": false, // Enable PDF (pdftocairo) conversions (clsitex)
-    "PDFTOCAIRO_IMAGE": "ollitex/pdftocairo", // pdftocairo (PDF-to-JPEG) conversion image (locally built via server-ce/Dockerfile-pdftocairo)
+    "PDFTOCAIRO_IMAGE": "ollitex/pdftocairo", // pdftocairo (PDF-to-JPEG) conversion image (locally built via images/pdftocairo-amd64/Dockerfile)
     "CLSI_CONVERSION_TIMEOUT_SECONDS": 60, // Conversion job timeout, seconds (clsitex)
     "PRECIOUS_FILE_PATTERN": null, // Precious-file glob kept on cache clears (clsitex)
     "TEXLIVE_OPENOUT_ANY": null, // Openout-any file whitelist (clsitex)

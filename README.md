@@ -1,7 +1,4 @@
 <h1 align="center">
-  <br>
-  <img src="doc/logo.svg" alt="OlliTeX" width="190">
-  <br><br>
   <img src="doc/logo-horizontal.png" alt="OlliTeX — real-time collaborative authoring" width="340">
 </h1>
 
@@ -115,9 +112,11 @@ cd server-ce
 make all          # builds sharelatex/sharelatex:ext-6.3.0-port (+ TeX Live base image)
 ```
 
-The [`Dockerfile-base`](server-ce/Dockerfile-base) builds the
-`sharelatex/sharelatex-base:*` image (dependencies + TeX Live) and
-[`Dockerfile`](server-ce/Dockerfile) builds the application image on top.
+The [base image Dockerfile](images/base-amd64/Dockerfile) builds the
+`sharelatex/sharelatex-base:*` image (dependencies + TeX Live) and the
+[application image Dockerfile](images/main-amd64/Dockerfile) builds the
+application image on top. (All image Dockerfiles live under `images/`,
+next to the builder images; `make all` in `server-ce/` drives them.)
 Configuration lives in [`server-ce/config/env.sh`](server-ce/config/env.sh)
 (plus toolkit seeds under `toolkit`) — one place for site name, URL,
 auth providers, LLM admin gates, compile images, and so on.

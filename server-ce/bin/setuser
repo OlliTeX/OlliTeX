@@ -2,7 +2,7 @@
 # setuser — phusion-baseimage-compatible privilege-dropping helper.
 #
 #   phusion/baseimage ships /sbin/setuser; a plain Ubuntu base does not, so
-#   OlliTeX ships an equivalent here (installed by Dockerfile-base →
+#   OlliTeX ships an equivalent here (installed by images/base-amd64/Dockerfile →
 #   /sbin/setuser). It accepts the invocation shape our runit run scripts
 #   use:
 #

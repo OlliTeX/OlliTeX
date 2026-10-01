@@ -143,7 +143,7 @@ export function PandocSection() {
       })}
     >
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start', width: '100%' }}>
-        <Field label="Docker image" required value={String(v.image || '')} onChange={x => up({ image: x })} placeholder="ollitex/pandoc" hint="e.g. ollitex/pandoc — build it via server-ce/Dockerfile-pandoc (pandoc/core:3.10.0.0-ubuntu + zip)." width="100%" />
+        <Field label="Docker image" required value={String(v.image || '')} onChange={x => up({ image: x })} placeholder="ollitex/pandoc" hint="e.g. ollitex/pandoc — build it via images/pandoc-amd64/Dockerfile (pandoc/core:3.10.0.0-ubuntu + zip)." width="100%" />
       </Group>
     </SectionShell>
   )

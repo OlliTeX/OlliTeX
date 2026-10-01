@@ -11,7 +11,7 @@
 # the flags CLSI uses (-jpeg -jpegopt -singlefile -scale-to-x -scale-to-y), and
 # the image is tiny.
 #
-# Dockerfile-pandoc is the sibling (pandoc/core + zip). Same pattern:
+# images/pandoc-amd64/Dockerfile is the sibling (pandoc/core + zip). Same pattern:
 # ENTRYPOINT [] because CLSI docker-runs with an explicit command (no
 # --entrypoint override).
 
