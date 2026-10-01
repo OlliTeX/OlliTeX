@@ -103,6 +103,20 @@ var (
 	errTooMany   = errWaka(http.StatusTooManyRequests, "Rate limit exceeded")
 	errBadAPI    = errWaka(http.StatusInternalServerError, "Something wrong with WakaTime request")
 	errUpstream  = errWaka(http.StatusInternalServerError, "WakaTime request error")
+
+	// audit 034-N4 (LOW, dead-shape cleanup): both sentinels intentionally
+	// collapse to 500 at the response boundary (Node oracle: the
+	// controller catch-all renders every non-mapped failure as 500). The
+	// sentinels stay DISTINCT in-process: errBadAPI = the request itself
+	// was bad (undialable URL shape / marshal failure), errUpstream = the
+	// upstream connection existed but the response read failed. Tests and
+	// logging rely on that distinction; the HTTP surface parity does not.
+
+	// audit 034-N1: endpoint policy rejects (user-supplied API URL failed
+	// the instance policy — shape, host lockdown, or private-IP rejection).
+	// 400 shape: the REQUEST is what's bad, not the upstream.
+	errInvalidURL  = errWaka(http.StatusBadRequest, "Invalid WakaTime API URL")
+	errHostBlocked = errWaka(http.StatusBadRequest, "WakaTime API host is not allowed on this instance")
 )
 
 func writeWakaError(res *core.Res, err error) {

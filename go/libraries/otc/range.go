@@ -13,12 +13,25 @@ type Range struct {
 }
 
 // NewRange builds a Range (Node: `new Range(pos, length)`). Panics on
-// pos < 0 or length < 0 (Node: throws an OError).
+// pos < 0 or length < 0 (Node: throws an OError) — for TRUSTED
+// programmatic construction only. Untrusted wire data must use
+// NewRangeSafe (audit B9: a crafted raw pos/length must become an error,
+// not a panic-on-wire that can crash a service goroutine).
 func NewRange(pos, length int) Range {
 	if pos < 0 || length < 0 {
 		panic(fmt.Sprintf("Invalid range (pos=%d length=%d)", pos, length))
 	}
 	return Range{Pos: pos, Length: length}
+}
+
+// NewRangeSafe — the untrusted/decode-path constructor (audit B9 fix):
+// invalid coordinates return ok=false instead of panicking so wire-level
+// callers can surface a proper error response.
+func NewRangeSafe(pos, length int) (Range, bool) {
+	if pos < 0 || length < 0 {
+		return Range{}, false
+	}
+	return Range{Pos: pos, Length: length}, true
 }
 
 // Start returns the range start (Node: `get start()`).

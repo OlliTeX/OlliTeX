@@ -1,5 +1,7 @@
 package otc
 
+import "fmt"
+
 // The Go package exposes ToRaw() as idiomatic typed values ([]map[string]any,
 // []map[string]int, map[string]any), but the raw form decoded from JSON (or an
 // external producer) uses []any. These helpers tolerate both so that
@@ -68,18 +70,35 @@ func asRawObjects(v any) []map[string]any {
 }
 
 // asRawRanges extracts a list of Ranges from a raw array (elements may be
-// map[string]any or map[string]int).
+// map[string]any or map[string]int) — legacy lenient wrapper (invalid
+// elements are skipped); wire paths must use asRawRangesErr so malformed
+// data becomes a proper error instead of a NewRange panic (audit B9).
 func asRawRanges(v any) []Range {
+	out, _ := asRawRangesErr(v)
+	return out
+}
+
+// asRawRangesErr — the decode-path variant (audit B9): a raw range with
+// pos < 0 or length < 0 is a protocol error, returned (Node: `new Range`
+// throws the matching OError), not a panic.
+func asRawRangesErr(v any) ([]Range, error) {
 	out := []Range{}
 	for _, e := range toAnySlice(v) {
+		var pos, length int
 		switch m := e.(type) {
 		case map[string]any:
-			pos, _ := numberToInt(m["pos"])
-			length, _ := numberToInt(m["length"])
-			out = append(out, NewRange(pos, length))
+			pos, _ = numberToInt(m["pos"])
+			length, _ = numberToInt(m["length"])
 		case map[string]int:
-			out = append(out, NewRange(m["pos"], m["length"]))
+			pos, length = m["pos"], m["length"]
+		default:
+			continue
 		}
+		r, ok := NewRangeSafe(pos, length)
+		if !ok {
+			return nil, gop(fmt.Sprintf("invalid range (pos=%d length=%d)", pos, length))
+		}
+		out = append(out, r)
 	}
-	return out
+	return out, nil
 }

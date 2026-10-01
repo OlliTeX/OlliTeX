@@ -81,6 +81,13 @@ func (s *svc) link(cxt *core.Cxt, res *core.Res) {
 		apiURL = DefaultAPIURL
 	}
 	cr := wakaCreds{APIURL: apiURL, APIKey: body.APIKey}
+	// audit 034-N1: reject a non-conformant endpoint NOW (400) instead of
+	// dialling it and/or persisting it — the persisted URL would keep
+	// receiving heartbeats for the lifetime of the account.
+	if perr := checkCredsPolicy(ctx, cr); perr != nil {
+		writeWakaError(res, perr)
+		return
+	}
 	if verr := s.verify(ctx, cr); verr != nil {
 		writeWakaError(res, verr)
 		return

@@ -99,14 +99,20 @@ server {
 	}
 
 	location /stylesheets {
+		# audit N3: explicit root — do not rely on server-level inheritance
+		# (a forked template / different base image would silently 404 all
+		# editor JS and the editor would fail to load with no error page).
+		root /overleaf/public/;
 		expires 1y;
 	}
 
 	location /minjs {
+		root /overleaf/public/; # audit N3
 		expires 1y;
 	}
 
 	location /img {
+		root /overleaf/public/; # audit N3
 		expires 1y;
 	}
 
@@ -116,10 +122,12 @@ server {
 	# The /js proxy path was the truncation casualty above; static serving
 	# also keeps the Go web free of the heaviest read traffic.
 	location ^~ /js {
+		root /overleaf/public/; # audit N3: load-bearing for the editor to load
 		expires 1y;
 	}
 
 	location ^~ /fonts {
+		root /overleaf/public/; # audit N3
 		expires 1y;
 	}
 

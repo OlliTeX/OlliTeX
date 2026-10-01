@@ -165,7 +165,11 @@ func FromRawComment(raw map[string]any) (*Comment, error) {
 	id, _ := raw["id"].(string)
 	var ranges []Range
 	if v, ok := raw["ranges"]; ok && v != nil {
-		ranges = asRawRanges(v)
+		var rerr error
+		ranges, rerr = asRawRangesErr(v) // audit B9: wire data → error, not panic
+		if rerr != nil {
+			return nil, rerr
+		}
 	}
 	resolved, _ := raw["resolved"].(bool)
 	return NewComment(id, ranges, resolved), nil

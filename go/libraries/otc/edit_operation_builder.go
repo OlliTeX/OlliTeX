@@ -14,7 +14,10 @@ func FromJSONEditOperation(raw map[string]any) (EditOperation, error) {
 	}
 	if isRawAddComment(raw) {
 		id, _ := raw["commentId"].(string)
-		ranges := asRawRanges(raw["ranges"])
+		ranges, rerr := asRawRangesErr(raw["ranges"])
+		if rerr != nil {
+			return nil, rerr // audit B9: malformed range → error, not panic
+		}
 		resolved, _ := raw["resolved"].(bool)
 		return NewAddCommentOp(id, ranges, resolved)
 	}

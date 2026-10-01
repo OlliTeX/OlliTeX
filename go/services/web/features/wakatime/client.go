@@ -45,7 +45,15 @@ func normalizeAPIURL(apiURL string) string {
 	return strings.TrimRight(apiURL, "/")
 }
 
+// do — audited N1: the destination URL passes the instance policy (shape
+// + host lockdown + private-IP rejection when configured) IMMEDIATELY
+// before the dial, so even a credential stored before a policy tightening
+// cannot reach a forbidden host. Policy rejects are surfaced to the
+// caller as errHostBlocked/errInvalidURL (400 shape).
 func (c *wakaClient) do(ctx context.Context, cr wakaCreds, method, u string, body []byte) (int, []byte, error) {
+	if perr := checkCredsPolicy(ctx, wakaCreds{APIURL: u}); perr != nil {
+		return 0, nil, perr
+	}
 	req, err := http.NewRequestWithContext(ctx, method, u, bytes.NewReader(body))
 	if err != nil {
 		return 0, nil, errBadAPI
