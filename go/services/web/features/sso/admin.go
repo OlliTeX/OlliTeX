@@ -57,6 +57,7 @@ func FeatureAdmin(a *core.App) core.Feature {
 			{Method: "POST", Pattern: mustRegexp(`^/admin/sso/test/ldap$`), Handler: adminTestLdap(a)},
 			{Method: "POST", Pattern: mustRegexp(`^/admin/sso/test/attr-filter$`), Handler: adminTestAttrFilter(a)},
 			{Method: "POST", Pattern: mustRegexp(`^/admin/sso/test/provider/([A-Za-z0-9][A-Za-z0-9_-]{1,63})$`), Handler: adminTestProvider(a)},
+			{Method: "GET", Pattern: mustRegexp(`^/admin/sso/cert-expiry$`), Handler: adminCertExpiry(a)},
 		},
 	}
 }
@@ -526,8 +527,25 @@ func adminTestProvider(a *core.App) func(*core.Cxt, *core.Res) {
 	}
 }
 
-// ---- masking / sanitizing (Node _maskConfig/_sanitizeConfig parity) ----
+// adminCertExpiry — GET /admin/sso/cert-expiry: classify every SSO certificate
+// (SP cert + IdP certs) against the warn window; warnCount > 0 means at least
+// one is expired/expiring (the boot sweep logs this the same way).
+func adminCertExpiry(a *core.App) func(*core.Cxt, *core.Res) {
+	return func(cxt *core.Cxt, res *core.Res) {
+		if !adminGate(a, cxt, res) {
+			return
+		}
+		rows, warn := ssoCertExpiry(a, cxt)
+		payload, _ := json.Marshal(map[string]any{
+			"certificates": rows,
+			"warnCount":    warn,
+			"warnDays":     ssoCertExpiryWarnDays(),
+		})
+		res.JSON(200, payload)
+	}
+}
 
+// ---- masking / sanitizing (Node _maskConfig/_sanitizeConfig parity) ----
 func maskConfigDoc(doc bson.M) bson.M {
 	out := bson.M{}
 	for k, v := range doc {
