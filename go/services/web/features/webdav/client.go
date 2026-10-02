@@ -197,7 +197,13 @@ type wdPropstat struct {
 	ETag         string   `xml:"prop>getetag"`
 }
 type rdRes struct {
-	Collexists bool `xml:"collection"`
+	// RFC 4918: <resourcetype><collection/></resourcetype> marks a collection by
+	// ELEMENT PRESENCE. Go's encoding/xml decodes `bool` from element TEXT —
+	// empty text → ParseBool("") fails → always false (audit bug found by the
+	// tests/tools/webdav fixture: every listed entry looked like a file, the
+	// PROPFIND self-entry imported with GET → 404 "Not Found"). Pointer =
+	// present, nil = absent.
+	Collection *struct{} `xml:"collection"`
 }
 type rdMultistatus struct {
 	XMLName   xml.Name `xml:"multistatus"`
@@ -239,6 +245,11 @@ func (c *wdClient) list(ctx context.Context, p string) ([]wdListItem, error) {
 		href := strings.TrimPrefix(r.Href, "<")
 		href = strings.TrimSuffix(href, ">")
 		href, _ = url.QueryUnescape(href)
+		// RFC 4918: a Depth:1 response also carries the target ITSELF. Skip it —
+		// recursing/GET-ing it would be unbounded or a 404 (fixture B4 pin).
+		if strings.TrimSuffix(href, "/") == parent {
+			continue
+		}
 		var ps *wdPropstat
 		for i := range r.Propstats {
 			ps = &r.Propstats[i]
@@ -251,7 +262,7 @@ func (c *wdClient) list(ctx context.Context, p string) ([]wdListItem, error) {
 		var etag *string
 		var mod *string
 		if ps != nil {
-			isDir = ps.Resourcetype != nil && ps.Resourcetype.Collexists
+			isDir = ps.Resourcetype != nil && ps.Resourcetype.Collection != nil
 			size = parseInt64(ps.ContentLen)
 			if ps.ETag != "" {
 				t := ps.ETag

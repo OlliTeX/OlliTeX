@@ -77,7 +77,7 @@ python3 tests/tools/webdav/run_webdav_test.py
    (harness auto-detects: OLI_WEBDAV_URL > container name on shared net >
    gateway > host base).
 
-## Product bug fixed by this fixture (2026-10-02)
+## Product bugs fixed by this fixture (2026-10-02)
 
 `wdClient.wdOnce` declared `var rdr *bytes.Reader` and passed a **typed nil**
 to `http.NewRequestWithContext` for every **bodyless** op (GET / DELETE /
@@ -86,6 +86,23 @@ nil → **panic** (surfaced as 500 "Internal Server Error" from the recovered
 handler). Import/pull (both read file bodies remote→local via `cl.get`) were
 therefore broken in production. Fix: body is an `io.Reader` (untyped nil);
 regression `TestWdClientBodylessOps` in `webdav_test.go`.
+2. **resourcetype collection-element never parsed** — Go `encoding/xml` decodes
+`bool` from element TEXT; the RFC 4918 marker is an EMPTY ELEMENT (presence-
+based), so directory entries (and the PROPFIND self-entry, carried by every
+Depth:1 response) all looked like files. Import then `GET <self-path>` →
+404 "Not Found" (observed in the nginx access log); directory recursion would
+have been unbounded. Fix: presence pointer + self-entry skip in `list()`;
+regression `TestWdListMultistatusParse`.
+
+## Product gap pinned by this fixture (2026-10-02, owner-aware — NOT fixed)
+
+- **Import does not create the project** — `hImport` → `wdImportFiles(projectID="")`
+→ `wdWriteEntity` rejects the empty project ID and skips every entry, while the
+handler still answers 200 `{"success":true,"message":"Import completed"}`. The
+Node oracle (`importRemoteProject`) creates the project first. Pinned in the
+harness (B4) as response-contract-only; the sync surface (push/pull/unlink) is
+exercised against a project created via `POST /project/new` (B4c). Owner
+decision: implement creation, or pin the response to failure.
 
 ## Files
 

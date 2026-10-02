@@ -20,6 +20,61 @@ import (
 )
 
 // TestWdClientBodylessOps — regression (2026-10-02, fixture B4 import):
+
+// TestWdListMultistatusParse — regression (2026-10-02, fixture B4 import):
+// the live nginx multistatus carries (a) the PROPFIND target ITSELF and (b)
+// the RFC 4918 collection marker as an EMPTY ELEMENT. The old parse decoded
+// `bool` from element text (ParseBool("") → always false — every entry looked
+// like a file) and kept the self-entry in items (import then GET <self> →
+// 404 "Not Found"; directory recursion would be unbounded). Fixed: presence
+// pointer + self-entry skip.
+func TestWdListMultistatusParse(t *testing.T) {
+	const listing = `<?xml version="1.0" encoding="utf-8" ?>
+<D:multistatus xmlns:D="DAV:">
+<D:response>
+<D:href>/Overleaf/proj</D:href>
+<D:propstat><D:prop><D:getlastmodified>Fri, 02 Oct 2026 20:44:47 GMT</D:getlastmodified><D:resourcetype><D:collection/></D:resourcetype></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat>
+</D:response>
+<D:response>
+<D:href>/Overleaf/proj/hello.txt</D:href>
+<D:propstat><D:prop><D:getcontentlength>22</D:getcontentlength><D:resourcetype></D:resourcetype></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat>
+</D:response>
+<D:response>
+<D:href>/Overleaf/proj/sub/</D:href>
+<D:propstat><D:prop><D:getlastmodified>Fri, 02 Oct 2026 20:44:47 GMT</D:getlastmodified><D:resourcetype><D:collection/></D:resourcetype></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat>
+</D:response>
+</D:multistatus>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+		w.WriteHeader(207)
+		_, _ = w.Write([]byte(listing))
+	}))
+	defer srv.Close()
+
+	cl, err := wdNewCredsClient(`{"baseUrl":"` + srv.URL + `","rootPath":"/"}`)
+	if err != nil {
+		t.Fatalf("wdNewCredsClient: %v", err)
+	}
+	items, lerr := cl.list(context.Background(), "/Overleaf/proj")
+	if lerr != nil {
+		t.Fatalf("list: %v", lerr)
+	}
+	if len(items) != 2 {
+		t.Fatalf("want 2 items (self-entry skipped), got %d: %+v", len(items), items)
+	}
+	byPath := map[string]wdListItem{}
+	for _, it := range items {
+		byPath[strings.TrimSuffix(it.path, "/")] = it
+	}
+	f, ok := byPath["/Overleaf/proj/hello.txt"]
+	if !ok || f.isDirectory {
+		t.Fatalf("hello.txt: want file, got %+v (present=%v)", f, ok)
+	}
+	s, ok := byPath["/Overleaf/proj/sub"]
+	if !ok || !s.isDirectory {
+		t.Fatalf("sub: want directory, got %+v (present=%v)", s, ok)
+	}
+}
 // bodyless ops (GET / DELETE / MKCOL) panicked inside net/http — wdOnce
 // declared `var rdr *bytes.Reader` and passed a TYPED-NIL to
 // NewRequestWithContext; net/http's type switch matched *bytes.Reader and
