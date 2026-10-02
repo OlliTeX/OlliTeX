@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+oidc-conform-report/
+/.report/
