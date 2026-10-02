@@ -461,35 +461,16 @@ func adminTestProvider(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		if oidcP != nil {
 			// OIDC discovery probe (Node _testOIDCProvider).
-			issuer := strings.TrimRight(oidcP.Issuer, "/")
-			if issuer == "" {
-				res.JSON(200, []byte(`{"success":false,"message":"No issuer URL configured"}`))
-				return
-			}
 			ctx, cancel := context.WithTimeout(cxt.Req.Context(), 10*time.Second)
 			defer cancel()
-			req, _ := http.NewRequestWithContext(ctx, "GET", issuer+"/.well-known/openid-configuration", nil)
-			resp, err := http.DefaultClient.Do(req)
+			disc, err := fetchOIDCDiscovery(ctx, oidcP.Issuer)
 			if err != nil {
-				res.JSON(200, []byte(fmt.Sprintf(`{"success":false,"message":"OIDC discovery failed: %s"}`, jsonQuote(err.Error()))))
+				res.JSON(200, []byte(fmt.Sprintf(`{"success":false,"message":%q}`, jsonQuote(err.Error()))))
 				return
 			}
-			defer resp.Body.Close()
-			data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-			if resp.StatusCode != 200 {
-				res.JSON(200, []byte(fmt.Sprintf(`{"success":false,"message":"OIDC discovery failed: HTTP %d"}`, resp.StatusCode)))
-				return
-			}
-			var disc struct {
-				Auth string `json:"authorization_endpoint"`
-				Tok  string `json:"token_endpoint"`
-				User string `json:"userinfo_endpoint"`
-				Iss  string `json:"issuer"`
-			}
-			_ = json.Unmarshal(data, &disc)
 			res.JSON(200, []byte(fmt.Sprintf(
 				`{"success":true,"message":"OIDC discovery successful. Issuer: %s","details":{"authorization_endpoint":%q,"token_endpoint":%q,"userinfo_endpoint":%q}}`,
-				jsonQuote(disc.Iss), disc.Auth, disc.Tok, disc.User)))
+				jsonQuote(disc.Issuer), disc.Auth, disc.Token, disc.Userinfo)))
 			return
 		}
 		if samlP != nil {
@@ -516,6 +497,12 @@ func adminTestProvider(a *core.App) func(*core.Cxt, *core.Res) {
 				return
 			}
 			data, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+			if meta, perr := parseSAMLIdPMetadata(data); perr == nil {
+				res.JSON(200, []byte(fmt.Sprintf(
+					`{"success":true,"message":"SAML metadata fetched (parsed)","details":{"entityID":%q,"sso":%q,"slo":%q,"certCount":%d}}`,
+					jsonQuote(meta.EntityID), jsonQuote(meta.SSO), jsonQuote(meta.SLO), meta.CertCount)))
+				return
+			}
 			if !bytes.Contains(data, []byte("EntityDescriptor")) {
 				res.JSON(200, []byte(`{"success":false,"message":"SAML metadata: no EntityDescriptor element"}`))
 				return
