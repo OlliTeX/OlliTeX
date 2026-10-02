@@ -27,8 +27,9 @@ services:
       - LDAP_READONLY_USER=false
     volumes:
       - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d   # persist the in-memory config too (matches the DB across restarts; osixia refuses to start if config is empty while /var/lib/ldap has data)
     healthcheck:
-      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -b dc=example,dc=com -s base || exit 1"]
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -D cn=admin,dc=example,dc=com -w admin_password -b dc=example,dc=com -s base >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -52,7 +53,9 @@ services:
     ports:
       - "4100:4000"
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4000/api/health',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      # boxyhq listens on the container's eth0 (not loopback), so the probe must go out via the compose
+      # network DNS name (which resolves to eth0) — 127.0.0.1 is refused inside the container.
+      test: ["CMD", "node", "-e", "require('http').get('http://sso-test-saml-1:4000/api/health',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -66,8 +69,6 @@ services:
       - "25:25"
     environment:
       - myhostname=mailsink
-    cap_add:
-      - NET_BIND
     healthcheck:
       test: ["CMD", "nc", "-z", "127.0.0.1", "25"]
       interval: 10s
@@ -80,3 +81,4 @@ networks:
 
 volumes:
   ldap-data:
+  ldap-config:
