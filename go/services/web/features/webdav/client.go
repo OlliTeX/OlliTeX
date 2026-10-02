@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -136,7 +137,12 @@ func (c *wdClient) wdDo(ctx context.Context, method, absPath string, body []byte
 }
 
 func (c *wdClient) wdOnce(ctx context.Context, method, u string, body []byte, hdr map[string]string, etag *string) (int, []byte, error) {
-	var rdr *bytes.Reader
+	// rdr is an io.Reader (UNtyped-nil when body is nil) — NOT *bytes.Reader:
+	// a typed-nil *bytes.Reader makes net/http's type switch match that case
+	// and call .Len() on nil → "invalid memory address" panic (reproduced: GET
+	// / MKCOL / DELETE all pass a nil body). io.Reader(nil) matches `case nil`
+	// instead.
+	var rdr io.Reader
 	if body != nil {
 		rdr = bytes.NewReader(body)
 	}

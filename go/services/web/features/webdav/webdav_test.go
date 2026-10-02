@@ -5,7 +5,10 @@
 package webdav
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +18,54 @@ import (
 
 	"ollitex/go/services/web/features/sitesettings"
 )
+
+// TestWdClientBodylessOps — regression (2026-10-02, fixture B4 import):
+// bodyless ops (GET / DELETE / MKCOL) panicked inside net/http — wdOnce
+// declared `var rdr *bytes.Reader` and passed a TYPED-NIL to
+// NewRequestWithContext; net/http's type switch matched *bytes.Reader and
+// called .Len() on nil → "invalid memory address or nil pointer"
+// (500 "Internal Server Error" from the recovered panic). First caught by the
+// tests/tools/webdav fixture (wdImportFiles → cl.get). Fix: body is an
+// io.Reader (untyped nil matches `case nil`).
+func TestWdClientBodylessOps(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			_, _ = w.Write([]byte("file-bytes"))
+		case "DELETE":
+			w.WriteHeader(204)
+		case "MKCOL":
+			w.WriteHeader(201)
+		case "PUT":
+			w.WriteHeader(201)
+		default:
+			w.WriteHeader(500)
+		}
+	}))
+	defer srv.Close()
+
+	plain := `{"baseUrl":"` + srv.URL + `","username":"u","password":"p","rootPath":"/"}`
+	cl, err := wdNewCredsClient(plain)
+	if err != nil {
+		t.Fatalf("wdNewCredsClient: %v", err)
+	}
+	ctx := context.Background()
+
+	b, gerr := cl.get(ctx, "/x.txt")
+	if gerr != nil || string(b) != "file-bytes" {
+		t.Fatalf("get: body=%q err=%v (want file-bytes, nil)", b, gerr)
+	}
+	if derr := cl.remove(ctx, "/x.txt"); derr != nil {
+		t.Fatalf("remove: %v", derr)
+	}
+	if derr := cl.createDirectory(ctx, "/d"); derr != nil {
+		t.Fatalf("createDirectory: %v", derr)
+	}
+	// the bodied path keeps working (no regression on the other side)
+	if perr := cl.put(ctx, "/y.txt", []byte("z"), nil); perr != nil {
+		t.Fatalf("put: %v", perr)
+	}
+}
 
 // TestWdCipherRoundTrip — a token encrypted under the webdav per-provider key
 // file decrypts with the SAME key (V3 scheme parity) and NOT with a different

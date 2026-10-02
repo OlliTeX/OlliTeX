@@ -1,0 +1,39 @@
+# tests/tools/webdav — a representative WebDAV (RFC 4918) test fixture
+#
+# Purpose (same shape as the ../forgejo fixture):
+#  Part A — the fixture server itself, verified with raw DAV verbs against
+#           the exact request surface the Overleaf webdav feature sends
+#           (PROPFIND depth 0/1, MKCOL, PUT (+If-Match), GET, DELETE,
+#           basic auth) — oracle: go/services/web/features/webdav/client.go
+#  Part B — the Go web's webdav module (connect/status/import/push/pull/
+#           unlink) talking to THIS server — enabled on a dev/e2e overleaf
+#           stack via base URL + fixture identity (Part B env-gated).
+#
+# Server: sfuhrm/docker-nginx-webdav — nginx + ngx_http_dav_module with
+# dav_methods PUT DELETE MKCOL COPY MOVE + dav_ext_methods PROPFIND OPTIONS,
+# basic auth (env USERNAME/PASSWORD → htpasswd), data root /media/data/
+# (MUST be a mounted dir — the entrypoint exits otherwise).
+#
+# Identities are TEST-ONLY dummies (house policy, same as ../forgejo and
+# tests/e2e credentials): never a real credential, never real content.
+#
+# NOTE: host port 8095 is the fixture's published port — verify it is free
+# on a new machine before `docker compose up -d`.
+
+services:
+  webdav-test:
+    image: sfuhrm/docker-nginx-webdav:latest
+    container_name: webdav-test
+    environment:
+      USERNAME: oltest
+      PASSWORD: "Ol-Fixture-Wd7q"
+    ports:
+      - "127.0.0.1:8095:80"
+    volumes:
+      # /media/data is the image's required data root (entrypoint checks it)
+      - webdav-test-data:/media/data
+    # no special healthcheck needed: the harness' A1 probes PROPFIND (207)
+    restart: unless-stopped
+
+volumes:
+  webdav-test-data:
