@@ -41,7 +41,8 @@ func TestSsoProbeLive(t *testing.T) {
 
 	samlURL := os.Getenv("LIVE_SAML_META_URL")
 	if samlURL == "" {
-		samlURL = "http://127.0.0.1:8081/saml/idp/metadata"
+		// Default = tools/sso-test boxyhq/mock-saml IdP metadata (or point LIVE_SAML_META_URL elsewhere).
+		samlURL = "http://127.0.0.1:4100/api/saml/metadata"
 	}
 	t.Run("SAML metadata parse (live IdP)", func(t *testing.T) {
 		data := httpGetBytes(t, samlURL)
@@ -65,7 +66,8 @@ func TestSsoProbeLive(t *testing.T) {
 
 	issuer := os.Getenv("LIVE_OIDC_ISSUER")
 	if issuer == "" {
-		issuer = "http://127.0.0.1:8080/sso/realms/master"
+		// Default = tools/sso-test soluto oidc-server-mock (root issuer, no realm path).
+		issuer = "http://127.0.0.1:8080"
 	}
 	t.Run("OIDC discovery (live IdP)", func(t *testing.T) {
 		d, err := fetchOIDCDiscovery(ctx, issuer)
