@@ -294,13 +294,13 @@ Blocked on yarn-PnP surgery (frontend/package.json + yarn.lock + .pnp.cjs) — r
 Evidence (all observed this arc):
 - Full Go tree in one pass: `go test ./go/... ./cmd/...` → **203 packages ok, 0 FAIL**.
 - `go build ./go/... ./cmd/...` exit 0 · `go vet` (arc pkgs) exit 0 · `gofmt` clean.
-- **Live local service E2E 4/4** (real `clsitypst` service 127.0.0.1:3014 + real docker compile + patched `olletex/typst`): compile→`output.pdf`+`output.sourcemap.json`; `GET …/sync/code`→PDF box; `GET …/sync/pdf`→`{file,line}`; `GET …/wordcount`→`texcount.textWords:19`.
+- **Live local service E2E 4/4** (real `clsitypst` service 127.0.0.1:3014 + real docker compile + patched `ollitex/typst`): compile→`output.pdf`+`output.sourcemap.json`; `GET …/sync/code`→PDF box; `GET …/sync/pdf`→`{file,line}`; `GET …/wordcount`→`texcount.textWords:19`.
 - **Shape parity** = the real frontend consumer: `HighlightData {page,h,v,width,height}` (`buildHighlightElement` reads those keys); sync-pdf returns `{code:[{file,line}]}` = `use-synctex.ts:245`.
 - **TeX no-regression, provable**: `clsitex` is **byte-identical** to `ed332c7f64` (`git diff --stat HEAD -- go/services/clsitex/` = empty) and its suite is 43/43 green.
 - **Nothing pushed / baked / cycled** onto the live stack (owner-gated).
 
 ### M1 → M2 → M3 — owner-gated runbook (morning; do NOT run unattended)
-1. **M1 bake + live E2E:** `make build-typst` → `olletex/typst`; `make build-community` (gobuilder bakes `clsitypst`; the `go build` behind it is already verified exit 0). At deploy **set `TYPST_IMAGE=olletex/typst`** — the committed runit default (`images/main-amd64/runit/clsi_typst-overleaf/run:73`) is the *safe vanilla* `pandoc/typst:latest-alpine@sha256:ae9df…` (compiles, no synctex). Cycle the live `overleafserver` container (your standard cycle — **not** `docker cp`, the ≥41 MB exec quirk). Then browser E2E: create a Typst project, compile, assert **click-to-source + click-to-PDF + wordcount**, plus a **TeX** compile (no-regression). Credentials from env only.
+1. **M1 bake + live E2E:** `make build-typst` → `ollitex/typst:main`; `make build-community` (gobuilder bakes `clsitypst`; the `go build` behind it is already verified exit 0). At deploy **set `TYPST_IMAGE=ollitex/typst:main`** — the committed runit default (`images/main-amd64/runit/clsi_typst-overleaf/run:73`) is the *safe vanilla* `pandoc/typst:latest-alpine@sha256:ae9df…` (compiles, no synctex). Cycle the live `overleafserver` container (your standard cycle — **not** `docker cp`, the ≥41 MB exec quirk). Then browser E2E: create a Typst project, compile, assert **click-to-source + click-to-PDF + wordcount**, plus a **TeX** compile (no-regression). Credentials from env only.
 2. **M2 live flip (c09):** confirm the running stack now serves Go `clsitypst` (Node `services/clsi_typst/` stays in-tree as rollback until M1 is green, then retire).
 3. **M3 promotion (c12):** `make image-push` (Makefile line 217 — explicitly the owner-gate push) + final bake/cycle.
 

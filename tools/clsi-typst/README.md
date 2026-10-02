@@ -2,7 +2,7 @@
 
 `e2e.mjs` proves the **crown jewel — Synctex for Typst** — end-to-end against a
 **running** `clsitypst` (typst clsi) service and a **real docker compile** with the
-**patched** `olletex/typst` image. The same script works **locally** and on the **live**
+**patched** `ollitex/typst` image. The same script works **locally** and on the **live**
 stack, so it doubles as the owner's M1 live-E2E check.
 
 ## What it asserts (4 signals)
@@ -49,8 +49,8 @@ manual TeX compile (no-regression) in the browser.
 
 ## Note on the image (crown jewel)
 
-Synctex **requires** the patched `olletex/typst` image (emits `output.sourcemap.json`).
+Synctex **requires** the patched `ollitex/typst` image (emits `output.sourcemap.json`).
 If `TYPST_IMAGE` is the vanilla `pandoc/typst:latest-alpine`, compile still succeeds but
 the **sidecar + both synctex signals FAIL** — that is the expected, correct behavior, and
-the harness reports it clearly. For the live stack, bake `olletex/typst` and set
-`TYPST_IMAGE=olletex/typst` at deploy (see `images/main-amd64/runit/clsi_typst-overleaf/run`).
+the harness reports it clearly. For the live stack, run `make build-typst` (which tags the **canonical `ollitex/typst:main`**) and set
+`TYPST_IMAGE=ollitex/typst:main` at deploy (see `images/main-amd64/runit/clsi_typst-overleaf/run`).

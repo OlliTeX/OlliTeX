@@ -83,7 +83,7 @@ try {
   const sidecar = of.some(p => /sourcemap/i.test(String(p)));
   ck("compile -> success + output.pdf", ok, `http=${c.status} status=${cc.status} outFiles=${JSON.stringify(of)}`);
   if (COMPILER === "typst") ck("compile -> output.sourcemap.json present (crown-jewel sidecar)", sidecar,
-    sidecar ? "sidecar present" : "MISSING sidecar (TYPST_IMAGE must be the patched olletex/typst, not vanilla)");
+    sidecar ? "sidecar present" : "MISSING sidecar (TYPST_IMAGE must be the patched ollitex/typst, not vanilla)");
 } catch (e) { ck("compile", false, "" + e); }
 
 // 2) /sync/code click-to-source (unique phrase on TARGET_LINE)
