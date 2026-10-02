@@ -2,9 +2,11 @@
 
 Synchronizes Overleaf projects with repositories on **GitHub, GitLab, Gitea,
 or Forgejo** using the user's personal access token (PAT). The git wire
-protocols (clone/push/commit) and provider REST calls are proxied through the
-`githubinterface` microservice, which keeps the PAT out of the main web
-process.
+protocols (clone/push/commit) and provider REST calls run **in-process** via
+the `go/services/githubinterface` package (TPDS→web merge — no separate
+`githubinterface` binary, no loopback hop; see
+`junk/runit-githubinterface-overleaf/RETIRED.md`). The PAT stays in the web
+process memory and is stored V3-cipher-encrypted.
 
 ## Supported providers
 
@@ -14,15 +16,21 @@ process.
 | Export project → new repo (push) | ✅ | ✅ | ✅ | ✅ |
 | Import repo → new project (pull) | ✅ | ✅ | ✅ | ✅ |
 | Merge overview (remote commits since last sync) | ✅ | ✅ | ✅ | ✅ |
-| Auto-merge remote commits into project | ✅ | ❌ 501 | ❌ 501 | ❌ 501 |
+| Merge remote-only advance into project | ✅ | ✅* | ✅ | ✅ |
 
-The merge engine uses the GitHub v3 **git-data REST API** (`git/ref`,
-`git/blobs`, `git/trees`, `git/commits`, `POST /merges`). GitLab does not
-expose that API. Gitea/Forgejo ship a GitHub-compatible `/api/v3`, but it
-**lacks the git-data endpoints** (verified 2026-08: `git/ref`, `git/blobs`,
-`git/trees`, `merges` all 404 on gitea.com and v15.next.forgejo.org), so for
-every non-GitHub provider the merge endpoint returns a 501 with a clear
-message while import (pull) and export (push) continue to work.
+\* The merge engine fetches the remote tree via the provider **contents-style
+REST API** (GitHub `contents` / Gitea-Forgejo `api/v1` / GitLab `repository/
+files`+`tree`) — it does **not** require the GitHub v3 git-data API (`git/ref`,
+`git/blobs`, …). GitLab therefore works through that API surface too; servers
+that expose none of these fall back to 500 `unsupported git server for merge`
+(`gitRESTBase`). A remote-only advance (no local edits since last sync) merges
+cleanly as `200 {"status":"merged"}`; local+remote divergence records
+`{"status":"conflict"}` for the merge UI (no three-way auto-merge — the D41
+history-plane base snapshot is not in scope). Historical note: an earlier
+draft of this table claimed `501` auto-merge refusal on all non-GitHub
+providers (git-data API era); the shipped Go engine supersedes that — 006
+owner E2E (gittest26-itp, 2026-10-01) and this repo's forgejo fixture
+B5/B6 (2026-10-02) pinned the merging behavior.
 
 ## Configuration
 
@@ -48,11 +56,20 @@ OAuth slot; PAT rows are removed via `DELETE /user/git-servers/:id`. The OAuth
 slot's login is resolved via GitHub `/user` at link time and stored on the
 slot so the account shows correctly in selection lists (`GitHub (davrot) — OAuth`).
 
-### Required: microservice endpoint
+### Git-bridge (in-process)
 
-| Variable | Default |
-| --- | --- |
-| `GITHUBINTERFACE_API_URL` | `http://localhost:4013` |
+The git-protocol operations (check/clone/push/commit/create-repo/list-repos/
+branch-head/can-push/commits) run **in-process** via the
+`go/services/githubinterface` package (TPDS→web merge, owner-approved
+2026-09-29). There is no separate bridge service, no `GITHUBINTERFACE_API_URL`,
+no port to expose, and no service token to configure (the standalone
+`githubinterface` service was retired; see
+`junk/runit-githubinterface-overleaf/RETIRED.md`). The only related knobs:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GSYNC_GHIF_WORK_ROOT` / `GITHUBINTERFACE_WORKDIR_ROOT` | `/var/lib/overleaf/ghif` | git work root shared by import/export + bridge ops (keeps them on one tree) |
+| `GITHUBINTERFACE_MAX_OPS` | `8` | concurrent git-op cap (busy → 503) |
 
 ### Encryption
 
@@ -77,7 +94,7 @@ variable is needed at runtime.
 | `POST` | `/project/:project_id/github-sync/export` | Export the project to a new repo |
 | `GET` | `/project/:project_id/github-sync/state` | Sync state (`mergeStatus`, `repoFullName`, …) |
 | `GET` | `/project/:project_id/github-sync/merge/overview` | Commits on the remote branch since `lastSyncCommit` + divergence flag |
-| `POST` | `/project/:project_id/github-sync/merge` | Merge remote commits in (GitHub only) |
+| `POST` | `/project/:project_id/github-sync/merge` | Merge remote-only advance in (contents-API; conflict state when local+remote diverged) |
 | `DELETE` | `/project/:project_id/github-sync` | Unlink project (removes state; repo stays) |
 | `GET` | `/user/github-sync/oauth2` | Start GitHub OAuth flow (only meaningful when configured) |
 | `GET` | `/user/github-sync/oauth2/callback` | OAuth callback; token stored in the GitHub OAuth slot (login resolved via `/user` and stored on the slot) |

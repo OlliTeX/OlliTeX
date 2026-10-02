@@ -1,0 +1,58 @@
+# Forgejo v15 TEST instance — the "test representative" git-provider for the
+# git-provider sync integration (go/services/web/features/ghsync +
+# go/services/githubinterface, UI module frontend/modules/github-sync).
+#
+# We cannot host a live test instance of every git provider; Forgejo
+# (Gitea-compatible, GitHub-flavored /api/v1 + git-over-http) is the local
+# stand-in for NON-GITHUB providers. Per the module contract
+# (frontend/modules/github-sync/README.md):
+#
+#   import (pull)        ✅ works — plain git clone + contents API
+#   export (push)        ✅ works — plain git push
+#   merge OVERVIEW       ✅ works — commits-since listing
+#   auto-merge           ❌ GRACEFUL REFUSAL (501 per README / 500 "unsupported
+#                        git server for merge" per code path) — Forgejo lacks
+#                        the GitHub git-data API (git/ref, git/blobs, git/trees,
+#                        POST /merges; verified 2026-08 on v15).
+#
+# SQLite by default: "If no database is configured, it will default to using
+# SQLite." (forgejo.org/docs/v15.0/admin/installation/docker/) → single
+# service, no DB container. Good enough for testing.
+#
+#   up:       docker compose -f tests/tools/forgejo/docker-compose.yml up -d
+#   web/api:  http://127.0.0.1:3000        (UI + REST v1 + git-over-http with PAT)
+#   test:     python3 tests/tools/forgejo/run_forgejo_test.py
+#   reset:    docker compose -f tests/tools/forgejo/docker-compose.yml down -v
+#
+# First-boot bootstrap (install page → fixture admin → PAT → seed repo) is
+# performed by the harness — no UI clicking. State lives in the named volume
+# forgejo-data; `down -v` resets to a blank slate (fresh admin needed).
+#
+# NOTE: host port 3000 is Forgejo's canonical port. Verify it is free on a
+# shared box before `up` (it was free on this machine when this was written).
+name: forgejo-test
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:15
+    container_name: forgejo-test
+    ports:
+      - "3000:3000"
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      # test-only fixed identity (compose env, not app-level secrets)
+      - FORGEJO__server__DOMAIN=${FORGEJO_DOMAIN:-127.0.0.1}
+      - FORGEJO__server__ROOT_URL=${FORGEJO_ROOT_URL:-http://127.0.0.1:3000/}
+      - FORGEJO__repository__DEFAULT_BRANCH=main
+    volumes:
+      - forgejo-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null --spider http://127.0.0.1:3000/ 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  forgejo-data:

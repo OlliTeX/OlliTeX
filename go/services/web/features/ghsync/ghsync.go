@@ -5,13 +5,21 @@
 // githubSyncProjectStates, GitSyncErrors, GitMerge, GitHubApiClient,
 // HistoryManager, UpdateMerger/TpdsController seam).
 //
-// Architecture (1:1 with Node):
+// Architecture (in-process per the TPDS→web merge, owner-approved 2026-09-29):
 //   - web layer (this package) owns: user credential store (V3-cipher PATs
 //     per provider/server/username), connection state, project sync state,
 //     import/export orchestration, and the git-data REST merge engine.
-//   - githubinterface microservice (go/services/githubinterface, runit on
-//     127.0.0.1:4013) owns the git protocol ops: /check /clone /push
-//     /pull /commit /create-repo /list-repos /branch-head /can-push.
+//   - git protocol ops (check/clone/push/commit/create-repo/list-repos/
+//     branch-head/can-push/commits) run IN-PROCESS via the
+//     go/services/githubinterface package (*GHI — the same op surface its
+//     Node-wire mux exposes; the standalone service was retired — see
+//     junk/runit-githubinterface-overleaf). No separate bridge process,
+//     no :4013 hop; the former MaxOps busy-limit is kept as an in-process
+//     semaphore (503 parity).
+//   - work root: gsWorkRoot() (GSYNC_GHIF_WORK_ROOT ||
+//     GITHUBINTERFACE_WORKDIR_ROOT || /var/lib/overleaf/ghif) — shared by
+//     this package's import/export dirs and the githubinterface git dirs
+//     (006 drift pin).
 //
 // Wire parity notes (pinned from the Node oracles, 2026-10-02):
 //

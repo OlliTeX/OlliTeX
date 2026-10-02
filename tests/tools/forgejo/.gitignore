@@ -1,0 +1,5 @@
+# The minted fixture PAT (value is shown exactly once by forgejo; cached here
+# so re-runs stay stable). Test-only dummy in a disposable container — never
+# point this at a real forgejo.
+.pat
+__pycache__/

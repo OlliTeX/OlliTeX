@@ -22,19 +22,12 @@ import (
 // ---------- config ----------
 
 type gsCfg struct {
-	bridgeBase string // GITHUBINTERFACE_API_URL || http://localhost:4013
-	serviceTok string // SHARED_SERVICE_TOKEN (x-service-token header)
-	histBase   string // Node Settings.apis.project_history.url
+	histBase string // Node Settings.apis.project_history.url
 }
 
 func gsConfig() *gsCfg {
 	c := &gsCfg{
-		bridgeBase: strings.TrimRight(os.Getenv("GITHUBINTERFACE_API_URL"), "/"),
-		serviceTok: os.Getenv("SHARED_SERVICE_TOKEN"),
-		histBase:   strings.TrimRight(os.Getenv("PROJECT_HISTORY_URL"), "/"),
-	}
-	if c.bridgeBase == "" {
-		c.bridgeBase = "http://127.0.0.1:4013"
+		histBase: strings.TrimRight(os.Getenv("PROJECT_HISTORY_URL"), "/"),
 	}
 	if c.histBase == "" {
 		c.histBase = "http://127.0.0.1:3054"
@@ -192,7 +185,7 @@ func firstOf(vals ...string) string {
 func gsEncrypt(plain string) (string, error) { return gsCipher().EncryptText(plain) }
 func gsDecrypt(tok string) (string, bool)    { return gsCipher().DecryptText(tok) }
 
-// ---------- credential store (githubSyncUserCredits) ----------
+// ---------- credential store (githubSyncUserCredentials) ----------
 //
 //	Node document (githubSyncUserCredentials.mjs + TokenManager.mjs):
 //
@@ -226,7 +219,11 @@ var (
 	errGsDecrypt = errors.New("failed to decrypt token")
 )
 
-const gsCredsColl = "githubSyncUserCredits"
+// Node oracle: services/web/app/src/infrastructure/mongodb.mjs —
+// `githubSyncUserCredentials: internalDb.collection('githubSyncUserCredentials')`
+// (the 's' collection, NOT 'sc(s)redits' — a rename would orphan every
+// credential doc linked under the Node era).
+const gsCredsColl = "githubSyncUserCredentials"
 
 func gsGetCredsDoc(ctx context.Context, a *core.App, uid string) *gsCredsDoc {
 	if a.Mongo == nil || uid == "" {

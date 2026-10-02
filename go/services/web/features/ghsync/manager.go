@@ -238,6 +238,9 @@ func gsGetPATCred(ctx context.Context, a *core.App, uid, provider, serverUrl, us
 // gsOAuthSlotToken — returns (encryptedToken, username) from the github
 // slot (string legacy or object).
 func gsOAuthSlotToken(doc *gsCredsDoc) (string, string) {
+	if doc == nil {
+		return "", ""
+	}
 	switch v := doc.GitHub.(type) {
 	case string:
 		return v, ""
@@ -265,7 +268,12 @@ func gsOAuthSlotToken(doc *gsCredsDoc) (string, string) {
 }
 
 // gsGetOAuth — Node getOAuth: {linked, username}.
+// nil-safe: a user WITHOUT a credential doc (fresh account) must read as
+// unlinked, not panic (statusHandler passes the raw query result).
 func gsGetOAuth(doc *gsCredsDoc) (bool, string) {
+	if doc == nil {
+		return false, ""
+	}
 	switch v := doc.GitHub.(type) {
 	case string:
 		return true, ""
