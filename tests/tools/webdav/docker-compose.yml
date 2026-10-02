@@ -22,7 +22,9 @@
 
 services:
   webdav-test:
-    image: sfuhrm/docker-nginx-webdav:latest
+    # digest-pinned (house convention: no floating :latest — see forgejo:15).
+    # Local image id 2026-10-02: sha256:6443214008bd...
+    image: sfuhrm/docker-nginx-webdav@sha256:6443214008bdc9d34a7ff65b41820e5b3d374154348cfb626f7f22a06715108c
     container_name: webdav-test
     environment:
       USERNAME: oltest
