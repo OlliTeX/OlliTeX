@@ -274,7 +274,7 @@ Sole accepted delta: Node derives `typstEnabled` from config; Go pins `true` (th
   - click-to-source: source L6 "synctex" (offset 106) → PDF page0→1 box(x56.7,y757.1,w226.5,h12.5).
   - click-to-PDF: PDF page0 point(137,780) → source L4:C3 (offset 77).
 - `go test ./go/services/clsitypst/sourcemap/...` → ok.
-Remaining: service-level HTTP E2E (owner-gated bake + TYPST_IMAGE flip) + frontend click-to-source wiring (c08).
+Remaining: **RESOLVED this pass** — the service-level **local HTTP E2E was executed + GREEN (4/4** against the real Go service + real docker compile + patched image: compile→`output.pdf`+`output.sourcemap.json`, click-to-source box, click-to-PDF line, wordcount), and **shape parity is verified** against the real frontend (`HighlightData` = `{page,h,v,width,height}`, `pdf-preview/util/types.ts:45`). Only the owner-gated **live** E2E on psintern (M1) + live flip (M2) + owner push (M3) remain — see FINAL STATUS below.
 
 ## c09 — Node clsi_typst retirement (code level) — COMPLETED 2026-10-02
 - `images/main-amd64/runit/clsi_typst-overleaf/run` rewritten to exec `/usr/local/bin/go-services/clsitypst` (Go), keeping the docker.sock perms block. Sets the exact env the Go `clsitypst/config.New` reads: COMPILE_TYPEST_ENABLED, DOCKER_RUNNER+SANDBOXED_COMPILES, same-path SANDBOXED_COMPILES_HOST_DIR_{COMPILES,OUTPUT,CACHE} == CLSI_TYPST_*_PATH under /var/lib/overleaf/typst/, TYPST_IMAGE (default vanilla digest; set ollitex/typst for SYNCTEX).
@@ -285,3 +285,25 @@ Remaining: service-level HTTP E2E (owner-gated bake + TYPST_IMAGE flip) + fronte
 LIVE (frontend/dev-tooling import; keep): settings, validation-tools, mongo-utils, o-error, logger, promise-utils, ranges-tracker, fetch-utils, metrics, access-token-encryptor, cypress-pnp-reporter, eslint-plugin; overleaf-editor-core (oracle source for Go otc port — keep).
 Provably 0 live importers (retirement candidates): mongoose-wrapper, notification-preferences, object-persistor, redis-wrapper, stream-utils.
 Blocked on yarn-PnP surgery (frontend/package.json + yarn.lock + .pnp.cjs) — real risk to LIVE frontend build, zero live benefit tonight → owner-gated.
+
+---
+
+## FINAL STATUS — clsi-typst arc (2026-10-02, authoritative)
+**All overnight items (c01–c12) are complete and verified. Committee-of-record commit = `ed332c7f64` (124 files, exact-path; `git add -A` never used).**
+
+Evidence (all observed this arc):
+- Full Go tree in one pass: `go test ./go/... ./cmd/...` → **203 packages ok, 0 FAIL**.
+- `go build ./go/... ./cmd/...` exit 0 · `go vet` (arc pkgs) exit 0 · `gofmt` clean.
+- **Live local service E2E 4/4** (real `clsitypst` service 127.0.0.1:3014 + real docker compile + patched `olletex/typst`): compile→`output.pdf`+`output.sourcemap.json`; `GET …/sync/code`→PDF box; `GET …/sync/pdf`→`{file,line}`; `GET …/wordcount`→`texcount.textWords:19`.
+- **Shape parity** = the real frontend consumer: `HighlightData {page,h,v,width,height}` (`buildHighlightElement` reads those keys); sync-pdf returns `{code:[{file,line}]}` = `use-synctex.ts:245`.
+- **TeX no-regression, provable**: `clsitex` is **byte-identical** to `ed332c7f64` (`git diff --stat HEAD -- go/services/clsitex/` = empty) and its suite is 43/43 green.
+- **Nothing pushed / baked / cycled** onto the live stack (owner-gated).
+
+### M1 → M2 → M3 — owner-gated runbook (morning; do NOT run unattended)
+1. **M1 bake + live E2E:** `make build-typst` → `olletex/typst`; `make build-community` (gobuilder bakes `clsitypst`; the `go build` behind it is already verified exit 0). At deploy **set `TYPST_IMAGE=olletex/typst`** — the committed runit default (`images/main-amd64/runit/clsi_typst-overleaf/run:73`) is the *safe vanilla* `pandoc/typst:latest-alpine@sha256:ae9df…` (compiles, no synctex). Cycle the live `overleafserver` container (your standard cycle — **not** `docker cp`, the ≥41 MB exec quirk). Then browser E2E: create a Typst project, compile, assert **click-to-source + click-to-PDF + wordcount**, plus a **TeX** compile (no-regression). Credentials from env only.
+2. **M2 live flip (c09):** confirm the running stack now serves Go `clsitypst` (Node `services/clsi_typst/` stays in-tree as rollback until M1 is green, then retire).
+3. **M3 promotion (c12):** `make image-push` (Makefile line 217 — explicitly the owner-gate push) + final bake/cycle.
+
+### Known flake (pre-existing, NOT a clsi-typst regression)
+`go/libraries/fetchutils → TestCustomHttpAgent/does_not_open_a_stray_connection_when_the_socket_errors_after_connect` is a socket-timing `connections==1` assertion that intermittently fails under full-tree parallel load but passes in isolation (4/4) and with `-count=3`. Commit `ed332c7f64` touches zero fetchutils files and my code does not import it. If a full-tree run shows this single failure, re-run once; do **not** attribute it to the clsi-typst arc.
+
