@@ -202,7 +202,9 @@ type LDAPProvider struct {
 	EmailAtt                 string     `bson:"emailAtt,omitempty"`
 	FirstNameAtt             string     `bson:"firstNameAtt,omitempty"`
 	LastNameAtt              string     `bson:"lastNameAtt,omitempty"`
+	NameAtt                  string     `bson:"nameAtt,omitempty"`
 	IsAdminAtt               string     `bson:"isAdminAtt,omitempty"`
+	ValAdmin                 string     `bson:"valAdmin,omitempty"`
 	UpdateUserDetailsOnLogin bool       `bson:"updateUserDetailsOnLogin"`
 	Timeout                  int        `bson:"timeout,omitempty"`
 	AttrFilter               []AttrRule `bson:"attrFilter,omitempty"`
