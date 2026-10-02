@@ -1,18 +1,19 @@
 #!/bin/bash
 
-NODE_PARAMS=""
-if [ "$DEBUG_NODE" == "true" ]; then
-    echo "running debug - clsi_typst"
-    NODE_PARAMS="--inspect=0.0.0.0:30131"
-fi
+# clsi_typst (Typst compile service) — GO SERVICE (go/services/clsitypst),
+# baked at /usr/local/bin/go-services/clsitypst by images/main-amd64/Dockerfile
+# (gobuilder loop). Node services/clsi_typst RETIRED from the runit dispatch
+# 2026-10-02 (c09; 1:1 Go port, oracle-verified). The Node dir is left in the
+# tree as rollback until the Go path is proven live (c11+c12 bake), but it is
+# no longer exec'd here.
 
 # Set permissions on docker.sock if present,
-# To enable sibling-containers (see entrypoint.sh in clsi project)
+# To enable sibling-containers (docker.sock is mounted into the overleaf
+# container; www-data must be able to create the typst compile containers).
+# busybox (alpine) needs addgroup/adduser; shadow-utils (Debian) groupadd/usermod.
 if [ -e '/var/run/docker.sock' ]; then
   echo ">> Setting permissions on docker socket"
   DOCKER_GROUP=$(stat -c '%g' /var/run/docker.sock)
-  # portable: groupadd/usermod are shadow-utils (Debian); the alpine base
-  # (busybox) needs addgroup/adduser instead (proven 2026-09-28 alpine spike).
   if command -v groupadd 2>/dev/null; then
     groupadd --non-unique --gid "${DOCKER_GROUP}" dockeronhost || true
     usermod -aG dockeronhost www-data
@@ -25,29 +26,50 @@ fi
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 
-# clsi_typst MUST compile through the sandboxed DockerRunner: typst exists
-# only in the digest-pinned pandoc/typst image (it is NOT installed inside
-# the overleaf container, so the local runner would fail — verified live
-# 2026-09-10). DOCKER_RUNNER=true is scoped to this service (the tex clsi
-# keeps its local-runner CE mode); settings.defaults.cjs then applies the
-# typst docker image + allowedImages gate (clsi docker.sock permissions
-# are set above).
+# ---- typst compile feature gate ------------------------------------------------
+# ON by default (owner: Typst is a first-class always-on feature; the Go config
+# reads COMPILE_TYPEST_ENABLED, default true unless "false").
+export COMPILE_TYPEST_ENABLED="${COMPILE_TYPEST_ENABLED:-true}"
+
+# ---- sandboxed-Docker compile runner (the SAME-PATH contract) -----------------
+# The Go service (config.New) REQUIRES DOCKER_RUNNER/SANDBOXED_COMPILES plus a
+# SANDBOXED_COMPILES_HOST_DIR_COMPILES, and DockerRunner binds
+#   <SANDBOXED_COMPILES_HOST_DIR_COMPILES>/<proj>/<user>/<name>  ->  /compile
+# inside the typst container. The service's own compiles view therefore must be
+# the SAME absolute string (the classic clsi same-path contract), so the host
+# bind and the service write target coincide. Defaults follow the overleaf data
+# root; a deployment WITHOUT the matching bind must keep the two in agreement
+# (or the service refuses to start, which is the safe failure).
 export DOCKER_RUNNER=true
+export SANDBOXED_COMPILES=true
 
-# Sandbox compile dirs — DockerRunner's SAME-PATH contract: the host path
-# (for the docker daemon's bind) and the service's view must be the same
-# absolute string, so deployments bind each TYPST_*_DIR at the identical
-# container path (compose_cep + e2e compose do this). Defaults follow the
-# overleaf data root; a deployment WITHOUT the matching bind must set
-# TYPST_COMPILES_DIR/TYPST_OUTPUT_DIR (or leave the flag off, where the
-# service answers 501 and the menu is hidden by the web gate).
-export COMPILES_DIR="${TYPST_COMPILES_DIR:-/var/lib/overleaf/typst/compiles}"
-export SANDBOXED_COMPILES_HOST_DIR_COMPILES="$COMPILES_DIR"
-export TYPST_OUTPUT_DIR="${TYPST_OUTPUT_DIR:-/var/lib/overleaf/typst/output}"
-export SANDBOXED_COMPILES_HOST_DIR_OUTPUT="$TYPST_OUTPUT_DIR"
-mkdir -p "$COMPILES_DIR" "$TYPST_OUTPUT_DIR" 2>/dev/null || true
+_TYPSF_COMPILES="${TYPSF_COMPILES_DIR:-/var/lib/overleaf/typst/compiles}"
+_TYPSF_OUTPUT="${TYPSF_OUTPUT_DIR:-/var/lib/overleaf/typst/output}"
+_TYPSF_CACHE="${TYPSF_CACHE_DIR:-/var/lib/overleaf/typst/cache}"
+_TYPSF_UPLOAD="${TYPSF_UPLOAD_DIR:-/var/lib/overleaf/typst/uploads}"
 
-# typst compile service (plan §4/§5: runit sibling of clsi-overleaf,
-# digest-pinned pandoc/typst image runs as host docker child process,
-# uid 33, network-disabled sandbox)
-exec /sbin/setuser www-data /usr/bin/node $NODE_PARAMS /overleaf/services/clsi_typst/app.js >> /var/log/overleaf/clsi_typst.log 2>&1
+# service-view dirs (what the Go binary reads as c.Path.*)
+export CLSI_TYPST_COMPILES_PATH="$_TYPSF_COMPILES"
+export CLSI_TYPST_OUTPUT_PATH="$_TYPSF_OUTPUT"
+export CLSI_TYPST_CACHE_PATH="$_TYPSF_CACHE"
+export CLSI_TYPST_UPLOAD_PATH="$_TYPSF_UPLOAD"
+# host-side bind dirs (docker daemon view) — same strings (same-path contract)
+export SANDBOXED_COMPILES_HOST_DIR_COMPILES="$_TYPSF_COMPILES"
+export SANDBOXED_COMPILES_HOST_DIR_OUTPUT="$_TYPSF_OUTPUT"
+export SANDBOXED_COMPILES_HOST_DIR_CACHE="$_TYPSF_CACHE"
+
+mkdir -p "$_TYPSF_COMPILES" "$_TYPSF_OUTPUT" "$_TYPSF_CACHE" "$_TYPSF_UPLOAD" 2>/dev/null || true
+
+# ---- typst image --------------------------------------------------------------
+# The typst binary lives in the pinned typst docker image (it is NOT installed
+# inside the overleaf container; the compile runs as a docker child process).
+# TYPST_IMAGE / TYPST_DOCKER_IMAGE select the image; the default is the
+# digest-pinned VANILLA pandoc/typst (safe: compiles, no synctex). For the
+# SYNCTEX crown jewel (click-to-source via output.sourcemap.json) the deployment
+# MUST set:
+#   TYPST_IMAGE=ollitex/typst:<ref>
+# which is the image built from images/typst-amd64/Dockerfile (typst fork
+# 0.15.1-with-extras + the clsi-sourcemap patch). Never synctex on vanilla.
+export TYPST_IMAGE="${TYPST_IMAGE:-pandoc/typst:latest-alpine@sha256:ae9dfa3c58cae72d363484442993b761ff4bc30202ec12823bc1e59fa952c892}"
+
+exec /sbin/setuser www-data /usr/local/bin/go-services/clsitypst >> /var/log/overleaf/clsi_typst.log 2>&1

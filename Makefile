@@ -59,6 +59,9 @@ export OVERLEAF_PDFTOCAIRO_TAG ?= ollitex/pdftocairo:$(BRANCH_NAME_TAG_SAFE)-$(M
 export OVERLEAF_PNG2PDF_BRANCH ?= ollitex/png2pdf:$(BRANCH_NAME_TAG_SAFE)
 export OVERLEAF_PNG2PDF_LATEST ?= ollitex/png2pdf
 export OVERLEAF_PNG2PDF_TAG ?= ollitex/png2pdf:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
+export OVERLEAF_TYPSF_BRANCH ?= ollitex/typst:$(BRANCH_NAME_TAG_SAFE)
+export OVERLEAF_TYPSF_LATEST ?= ollitex/typst
+export OVERLEAF_TYPSF_TAG ?= ollitex/typst:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
 
 # Optional extra --cache-from references (overridable). The branch tags only
 # exist LOCALLY (they are never pushed to Docker Hub), so pulling them as cache
@@ -70,6 +73,7 @@ CACHE_FROM_COMMUNITY ?=
 CACHE_FROM_PANDOC ?=
 CACHE_FROM_PDFTOCAIRO ?=
 CACHE_FROM_PNG2PDF ?=
+CACHE_FROM_TYPSF ?=
 
 # Which base Dockerfile build-base uses. Alpine:3.24 is the CANONICAL base
 # (cutover 2026-09-28, owner directive: alpine if it works — e2e gate GREEN,
@@ -85,7 +89,7 @@ BASE_FILE ?= images/base-amd64/Dockerfile
 GO_BUILDER_TAG ?= ollitex/golang-builder-amd64-alpine:1.27.1
 
 .PHONY: images
-images: build-base build-community build-pandoc build-pdftocairo build-png2pdf ## Build ALL ollitex docker images (base + app + pandoc/pdftocairo/png2pdf)
+images: build-base build-community build-pandoc build-pdftocairo build-png2pdf build-typst ## Build ALL ollitex docker images (base + app + pandoc/pdftocairo/png2pdf/typst)
 
 .PHONY: refresh-cache
 refresh-cache: refresh-cache-branch refresh-cache-latest ## Pull locally-tagged image refs as remote cache sources (best effort)
@@ -182,9 +186,32 @@ build-png2pdf: ## Build the ollitex/png2pdf image from images/png2pdf-amd
 	  --network=host \
 	  .
 
+# typst compiler image (D21 sourcemap fork) for the Go clsi_typst service
+# (go/services/clsitypst). Self-contained rust:alpine build that re-clones
+# typst at a pinned SHA and applies the sourcemap patch
+# (images/typst-amd64/patches/0001-clsi-sourcemap.patch, COPYd from the repo
+# ROOT context — see that Dockerfile, where the path is therefore
+# root-relative). No BASE/BUILDER build-args (unlike pandoc). The vanilla
+# `pandoc/typst` image remains the service default (config
+# DefaultDockerImage); this tag is the sync/sourcemap-capable fork the
+# deployment selects via TYPST_IMAGE/TYPST_DOCKER_IMAGE when it wants
+# click-to-source.
+.PHONY: build-typst
+build-typst: ## Build the ollitex/typst (D21 sourcemap fork) image from images/typst-amd64
+	docker build \
+	  --build-arg BUILDKIT_INLINE_CACHE=1 \
+	  --progress=plain \
+	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
+	  $(CACHE_FROM_TYPSF) \
+	  --file images/typst-amd64/Dockerfile \
+	  --tag $(OVERLEAF_TYPSF_TAG) \
+	  --tag $(OVERLEAF_TYPSF_BRANCH) \
+	  --network=host \
+	  .
+
 .PHONY: clean-images
 clean-images: ## Remove the locally-built ollitex docker image tags (docker rmi)
-	-docker rmi --force $(OVERLEAF_BASE_TAG) $(OVERLEAF_TAG) $(OVERLEAF_PANDOC_TAG) $(OVERLEAF_PDFTOCAIRO_TAG) $(OVERLEAF_PNG2PDF_TAG)
+	-docker rmi --force $(OVERLEAF_BASE_TAG) $(OVERLEAF_TAG) $(OVERLEAF_PANDOC_TAG) $(OVERLEAF_PDFTOCAIRO_TAG) $(OVERLEAF_PNG2PDF_TAG) $(OVERLEAF_TYPSF_TAG)
 
 .PHONY: image-push
 image-push: ## Push the ollitex image tags (owner gate — run on purpose)
@@ -195,6 +222,7 @@ image-push: ## Push the ollitex image tags (owner gate — run on purpose)
 	docker push $(OVERLEAF_PANDOC_TAG)
 	docker push $(OVERLEAF_PDFTOCAIRO_TAG)
 	docker push $(OVERLEAF_PNG2PDF_TAG)
+	docker push $(OVERLEAF_TYPSF_TAG)
 
 SHELLCHECK_OPTS = \
 	--shell=bash \

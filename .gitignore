@@ -64,3 +64,9 @@ tests/e2e/parity/reference/
 /frontend/js/features/source-editor/lezer-latex/latex.terms.mjs
 /frontend/js/features/source-editor/lezer-bibtex/bibtex.mjs
 /frontend/js/features/source-editor/lezer-bibtex/bibtex.terms.mjs
+
+# Clsitypst (Go typst compile service) local test/runtime cache artifacts —
+# created by urlcache/resourcewriter tests under the package-local cache dir;
+# generated locally, never committed (GH 100MB limit / non-reproducible values).
+go/services/clsitypst/resourcewriter/cache/
+go/services/clsitypst/urlcache/cache/
