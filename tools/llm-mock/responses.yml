@@ -1,0 +1,20 @@
+# Deterministic Olli LLM responses for local testing (no external LLM).
+#
+# mockllm does EXACT key-match on the LAST user message content. Keys below are
+# chosen to cover the Olli flows; anything unmapped falls through to
+# defaults.unknown_response (also deterministic), so every request is reproducible.
+responses:
+  # Olli's admin "check connection" chat probe (client.go chatProbe) — returns a
+  # clean non-empty word so the non-empty assertion passes.
+  "Reply with the single word OK.": "OK"
+  "ping": "pong"
+  "say hello": "Hello from the Olli deterministic LLM mock."
+
+defaults:
+  # Returned for any prompt not explicitly keyed above (deterministic).
+  unknown_response: "This is a deterministic response from the Olli mockLLM test server (no external model was used)."
+
+settings:
+  # Disable artificial lag for fast, reproducible tests.
+  lag_enabled: false
+  lag_factor: 10

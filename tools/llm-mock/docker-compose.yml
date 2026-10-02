@@ -1,0 +1,24 @@
+# Olli LLM mock test server (deterministic, reproducible) — see README.md.
+#
+#   cd tools/llm-mock
+#   docker compose up -d --build        # mockllm on host :8600
+#   python run_llm_mock_test.py         # deterministic OpenAI + Anthropic verification
+#
+# Point Olli's LLM at it (SSRF-guard-compliant: use a LAN name, NOT localhost):
+#   LLM_API_URL="http://<this-host-lan-ip>:8600/v1"   + model ollitex-small
+services:
+  llm-mock:
+    build: { context: ., dockerfile: Dockerfile }
+    image: ollitex/llm-mock:main
+    container_name: ollitex-llm-mock
+    ports:
+      - "8600:8000"
+    environment:
+      MOCKLLM_MODELS: "ollitex-small,ollitex-large"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/v1/models"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
