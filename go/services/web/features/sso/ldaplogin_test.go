@@ -93,3 +93,55 @@ func TestLdapMapProfile(t *testing.T) {
 		}
 	})
 }
+
+// Oracle: searchScope default 'sub' + one / base mapping.
+func TestLdapScope(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int
+	}{
+		{"sub", 2},
+		{"one", 1},
+		{"base", 0},
+		{"", 2},     // default 'sub'
+		{"SUB", 2},  // case-insensitive
+		{"sub ", 2}, // trim
+		{"wat", 2},  // unknown → default 'sub'
+	}
+	for _, c := range cases {
+		if got := ldapScope(c.in); got != c.want {
+			t.Errorf("ldapScope(%q) = %d; want %d", c.in, got, c.want)
+		}
+	}
+}
+
+// Oracle + safety: search filter is (attr=escaped-username); special chars are
+// RFC4515-escaped so a malicious username cannot inject filter syntax.
+func TestLdapBuildSearchFilter(t *testing.T) {
+	if got := ldapBuildSearchFilter("uid", "alice"); got != "(uid=alice)" {
+		t.Errorf("filter = %q; want (uid=alice)", got)
+	}
+	// `a)b` must not break out of the filter (paren is escaped to \29).
+	if got := ldapBuildSearchFilter("uid", "a)b"); got != "(uid=a\\29b)" {
+		t.Errorf("filter = %q; want (uid=a\\29b)", got)
+	}
+	// `*` → \2a, `\\` → \5c, `(` → \28.
+	if got := ldapBuildSearchFilter("sAMAccountName", "*"); got != "(sAMAccountName=\\2a)" {
+		t.Errorf("filter = %q; want (sAMAccountName=\\2a)", got)
+	}
+	if got := ldapBuildSearchFilter("uid", `a\b`); got != "(uid=a\\5cb)" {
+		t.Errorf("filter = %q; want (uid=a\\5cb)", got)
+	}
+	if got := ldapBuildSearchFilter("uid", "a(b"); got != "(uid=a\\28b)" {
+		t.Errorf("filter = %q; want (uid=a\\28b)", got)
+	}
+}
+
+func TestLdapUsernameAttr(t *testing.T) {
+	if got := ldapUsernameAttr(&LDAPProvider{BindProperty: "sAMAccountName"}); got != "sAMAccountName" {
+		t.Errorf("attr = %q; want sAMAccountName", got)
+	}
+	if got := ldapUsernameAttr(&LDAPProvider{}); got != "uid" {
+		t.Errorf("attr = %q; want uid (default)", got)
+	}
+}

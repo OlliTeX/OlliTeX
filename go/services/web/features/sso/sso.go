@@ -198,6 +198,8 @@ type LDAPProvider struct {
 	BindCredentials          string     `bson:"bindCredentials"`
 	SearchFilter             string     `bson:"searchFilter,omitempty"`
 	SearchScope              string     `bson:"searchScope,omitempty"`
+	BindProperty             string     `bson:"bindProperty,omitempty"`
+	StartTLS                 bool       `bson:"starttls"`
 	Placeholder              string     `bson:"placeholder,omitempty"`
 	EmailAtt                 string     `bson:"emailAtt,omitempty"`
 	FirstNameAtt             string     `bson:"firstNameAtt,omitempty"`
@@ -263,6 +265,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: oidcProviderPattern, NoLogin: true, Handler: oidcLogin(a)},
 			{Method: "GET", Pattern: oidcCBPattern, NoLogin: true, NoCSRF: true, Handler: oidcCallback(a)},
 			{Method: "GET", Pattern: oidcLogoutPattern, NoLogin: true, NoCSRF: true, Handler: oidcLogoutCallbackH(a)},
+			{Method: "POST", Pattern: mustRegexp(`^/sso/ldap/login$`), NoLogin: true, Handler: ldapLogin(a)},
 			{Method: "POST", Pattern: unlinkPattern, Handler: oauthUnlink(a)},
 		},
 	}

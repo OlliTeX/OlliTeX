@@ -22,6 +22,7 @@ require (
 
 require (
 	filippo.io/mldsa v0.0.0-20260711112038-ff3f469cee29 // indirect
+	github.com/Azure/go-ntlmssp v0.1.1 // indirect
 	github.com/TwiN/gocache/v2 v2.4.0 // indirect
 	github.com/adam-hanna/arrayOperations v1.0.1 // indirect
 	github.com/andybalholm/brotli v1.2.2 // indirect
@@ -43,7 +44,9 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/eclipse-keypont/crypto11 v1.6.8 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
+	github.com/go-asn1-ber/asn1-ber v1.5.8 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-ldap/ldap/v3 v3.4.14 // indirect
 	github.com/go-oidfed/lib v0.11.3-0.20260831135259-3130444ef6a3 // indirect
 	github.com/go-resty/resty/v2 v2.17.2 // indirect
 	github.com/gofiber/fiber/v2 v2.52.15 // indirect

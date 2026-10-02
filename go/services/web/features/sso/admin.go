@@ -327,14 +327,42 @@ func adminTestLdap(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 		cfg := loadSSOConfig(db, cxt)
-		if cfg == nil || cfg.Ldap == nil || !cfg.Ldap.Enabled {
+		p := cfg.Ldap
+		if p == nil || !p.Enabled {
 			res.JSON(200, []byte(`{"success":false,"message":"LDAP is not enabled"}`))
 			return
 		}
-		// LDAP bind probe (6b: go-ldap). For now: report that the
-		// LDAP transport is pending (feature 6b) — the node equivalent
-		// binds and returns success/failure.
-		res.JSON(200, []byte(`{"success":false,"message":"LDAP transport pending (6b)"}`))
+		// With a test user (body {username|email, password}): a full
+		// authenticate (dial→bind→search→bind-as-user). Otherwise a
+		// connectivity + service-account bind probe (Node _testLDAP parity:
+		// bind and return success/failure).
+		username, password := "", ""
+		if bb, _ := io.ReadAll(io.LimitReader(cxt.Req.Body, 1<<20)); len(bb) > 0 {
+			var body struct {
+				Username string `json:"username"`
+				Email    string `json:"email"`
+				Password string `json:"password"`
+			}
+			_ = json.Unmarshal(bb, &body)
+			username = body.Username
+			if username == "" {
+				username = body.Email
+			}
+			password = body.Password
+		}
+		if username != "" && password != "" {
+			if _, aerr := ldapAuthenticate(cxt.Req.Context(), p, username, password); aerr != nil {
+				res.JSON(200, []byte(`{"success":false,"message":"LDAP connection failed: invalid user or password"}`))
+				return
+			}
+			res.JSON(200, []byte(`{"success":true,"message":"LDAP connection successful. User authenticated."}`))
+			return
+		}
+		if perr := ldapProbe(p); perr != nil {
+			res.JSON(200, []byte(`{"success":false,"message":"LDAP connection failed"}`))
+			return
+		}
+		res.JSON(200, []byte(`{"success":true,"message":"LDAP connection successful"}`))
 	}
 }
 
