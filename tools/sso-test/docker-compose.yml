@@ -1,0 +1,86 @@
+# Self-contained SSO test identities for the OlliTeX TEST stack (see README.md).
+# Reuses the already-built local images when present; falls back to building
+# from the committed sources (oidc/saml Flask apps + postfix mailsink). The
+# osixia ldap image is pulled once.
+services:
+  ldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      - LDAP_ORGANISATION=Example Inc
+      - LDAP_DOMAIN=example.com
+      - LDAP_ADMIN_PASSWORD=admin_password
+      - LDAP_READONLY_USER=true
+      - LDAP_READONLY_USER_USERNAME=ldap_reader
+      - LDAP_READONLY_USER_PASSWORD=GoodNewsEveryone
+      - LDAP_TLS=false
+    ports:
+      - "389:389"
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://127.0.0.1:389 -D 'cn=admin,dc=example,dc=com' -w admin_password -b 'dc=example,dc=com' -s base '(objectClass=*)' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 4
+      start_period: 20s
+    networks: [sso-test]
+
+  oidc:
+    image: oidc-oidc:latest
+    build:
+      context: ./oidc
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/sso/realms/master/.well-known/openid-configuration"]
+      interval: 15s
+      timeout: 10s
+      retries: 4
+      start_period: 10s
+    networks: [sso-test]
+
+  saml:
+    image: saml-saml:latest
+    build:
+      context: ./saml
+    environment:
+      - IDP_ENTITY_ID=https://overleaf.local/saml/idp
+      - SP_ENTITY_ID=MyOverleaf
+      - SP_ACS_URL=https://overleaf.local/saml/login/callback
+      - SP_SLS_URL=https://overleaf.local/saml/logout/callback
+      - ATTR_EMAIL=email
+      - ATTR_GIVEN_NAME=givenName
+      - ATTR_SURNAME=lastName
+      - ATTR_MAIL=mail
+      - ATTR_IS_ADMIN=is_admin
+      - CERT_DIR=/app/certs
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8081/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 4
+      start_period: 15s
+    networks: [sso-test]
+
+  mailsink:
+    image: mailsink-mailsink:latest
+    build:
+      context: ./mailsink
+    volumes:
+      - ./mailsink/main.cf:/config/main.cf:ro
+      - mailsink-mail:/var/mail
+    ports:
+      - "25:25"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "25"]
+      interval: 10s
+      timeout: 5s
+      retries: 4
+    networks: [sso-test]
+
+volumes:
+  mailsink-mail:
+
+networks:
+  sso-test:
+    driver: bridge
