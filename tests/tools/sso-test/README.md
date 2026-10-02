@@ -12,7 +12,7 @@ well‑used upstream images instead of hand‑rolled identity code (mirrors the 
 | **MAILSINK** | postfix catch‑all (`./mailsink`) | `smtp://localhost:25` |
 
 ```
-docker compose -f tools/sso-test/docker-compose.yml up -d
+docker compose -f tests/tools/sso-test/docker-compose.yml up -d
 ```
 
 > Port note: boxyhq is mapped host **4100**→c:4000 (the live `overleafserver` owns host :4000 here); soluto

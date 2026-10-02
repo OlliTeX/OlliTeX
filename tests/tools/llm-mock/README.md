@@ -19,7 +19,7 @@ so every response is stable across runs (no network, no model non-determinism).
 ## Run
 
 ```bash
-cd tools/llm-mock
+cd tests/tools/llm-mock
 docker compose up -d --build      # ollitex/llm-mock on host :8600 (container :8000)
 python3 run_llm_mock_test.py       # verify OpenAI + Anthropic + /v1/models deterministic
 docker compose down                 # stop

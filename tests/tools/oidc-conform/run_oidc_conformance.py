@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drive the official OIDF conformance suite (running at tools/oidc-conform) to certify an OIDC IdP.
+"""Drive the official OIDF conformance suite (running at tests/tools/oidc-conform) to certify an OIDC IdP.
 
 Creates an OIDC Core plan against the IdP-under-test (by its discovery URL), starts the
 oidcc conformance modules, waits for each, and exports the HTML/JSON report.

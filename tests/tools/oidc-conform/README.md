@@ -17,7 +17,7 @@ Reach the suite at **https://localhost:8443** (self‑signed CN=localhost → ac
 HTMLUnit is built‑in, so core OIDC front‑channel tests run **without** an external Chrome.
 
 ```bash
-docker compose -f tools/oidc-conform/docker-compose.yml up -d
+docker compose -f tests/tools/oidc-conform/docker-compose.yml up -d
 # UI:      https://localhost:8443/
 # Swagger: https://localhost:8443/api-document.html
 ```
@@ -43,7 +43,7 @@ Admin‑bearer (a token created via the UI): `GET /api/currentuser` verifies it.
    ```bash
    CONFORMANCE_TOKEN=<token> \
    OIDP_DISCOVERY="https://localhost:8443/oidc-idp-discovery" \
-   python3 tools/oidc-conform/run_oidc_conformance.py
+   python3 tests/tools/oidc-conform/run_oidc_conformance.py
    ```
    (point `OIDP_DISCOVERY` at whichever IdP you want certified — our `oidc-idp`, a real IdP, etc.;
    the suite drives it end‑to‑end + writes `plan.html` / `plan.json` to `./oidc-conform-report/`)

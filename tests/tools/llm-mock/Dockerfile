@@ -5,7 +5,7 @@
 #
 # Base: python:3.14-alpine3.24 (verified: `pip install mockllm` + tiktoken work
 # here; alpine is lighter than the glibc slim fallback). Build:
-#   docker build -t ollitex/llm-mock:main tools/llm-mock
+#   docker build -t ollitex/llm-mock:main tests/tools/llm-mock
 ARG PYTHON_IMAGE=python:3.14-alpine3.24
 FROM ${PYTHON_IMAGE}
 

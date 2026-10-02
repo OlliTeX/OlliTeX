@@ -13,9 +13,9 @@
 // stack (point CTY_BASE_URL at :3014 on psintern) — that is M1's live E2E.
 //
 // Usage:
-//   node tools/clsi-typst/e2e.mjs                      # local default
-//   CTY_BASE_URL=http://<host>:3014 node tools/clsi-typst/e2e.mjs   # live
-//   CTY_DOC=/path/to/main.typ node tools/clsi-typst/e2e.mjs         # custom doc
+//   node tests/tools/clsi-typst/e2e.mjs                      # local default
+//   CTY_BASE_URL=http://<host>:3014 node tests/tools/clsi-typst/e2e.mjs   # live
+//   CTY_DOC=/path/to/main.typ node tests/tools/clsi-typst/e2e.mjs         # custom doc
 //   CTY_LINE=<n>                                           # the unique phrase line (1-based)
 //
 // Exit code: 0 iff ALL 4 signals PASS, 1 otherwise.

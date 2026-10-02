@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Olli LLM mock test server (tools/llm-mock) — deterministic +
+"""Verify the Olli LLM mock test server (tests/tools/llm-mock) — deterministic +
 reproducible responses on the exact surfaces Olli calls:
 
   * GET  <base>/v1/models           (Olli listModels discovery)

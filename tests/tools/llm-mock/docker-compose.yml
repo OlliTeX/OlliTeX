@@ -1,6 +1,6 @@
 # Olli LLM mock test server (deterministic, reproducible) — see README.md.
 #
-#   cd tools/llm-mock
+#   cd tests/tools/llm-mock
 #   docker compose up -d --build        # mockllm on host :8600
 #   python run_llm_mock_test.py         # deterministic OpenAI + Anthropic verification
 #

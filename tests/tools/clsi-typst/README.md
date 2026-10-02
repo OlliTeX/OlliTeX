@@ -35,13 +35,13 @@ The harness does **not** start the service or touch docker — the service does.
 up `clsitypst` on `127.0.0.1:3014` with the **patched** image, then:
 
 ```bash
-node tools/clsi-typst/e2e.mjs
+node tests/tools/clsi-typst/e2e.mjs
 ```
 
 ## Run LIVE (M1, psintern — owner-gated)
 
 ```bash
-CTY_BASE_URL=http://<psintern>:3014 node tools/clsi-typst/e2e.mjs
+CTY_BASE_URL=http://<psintern>:3014 node tests/tools/clsi-typst/e2e.mjs
 ```
 
 This is the "live typst compile + synctex + wordcount" half of M1's E2E. Pair it with a
