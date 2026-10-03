@@ -60,13 +60,23 @@ var (
 	errBodyReceiveAdv = []byte("001f# service=git-receive-pack\n0000" + string(pktErrBody))
 )
 
-// handleGitServlet — entry from handleGitCtx (post-filter).
-func (s *Server) handleGitServlet(w http.ResponseWriter, r *http.Request, path, token string) {
+// handleGitServlet — entry from handleGitCtx (post-filter). tokenScope is
+// the 2c (09 §3) resolved-token scope ("" = legacy/unknown).
+func (s *Server) handleGitServlet(w http.ResponseWriter, r *http.Request, path, token, tokenScope string) {
 	// repoName = first path segment minus ".git" (Java: WLRepositoryResolver
 	// open(request, name) gets the JGit pathInfo segment; the Oauth2Filter
 	// already validated the id shape).
 	repoName := gitRepoName(path)
 	route := gitRouteFor(r, path)
+
+	// 2c (09 §3, Node GitBridgeAuthMiddleware): a federated export PAT
+	// (scope prefix `federation:`) is READ-ONLY — WRITE (receive-pack
+	// advertisement + push) is refused with 403. String prefix check only —
+	// NO federation module import (09 §3 "WITHOUT importing federation").
+	if readonlyExportWrite(route, tokenScope) {
+		s.readOnlyWrite403(w, r)
+		return
+	}
 
 	// Resolve (lock + fetch doc + materialise the repo). Live mock has no
 	// seeded doc → error → per-route 403 (byte-captured grid).
@@ -77,6 +87,27 @@ func (s *Server) handleGitServlet(w http.ResponseWriter, r *http.Request, path, 
 		return
 	}
 	s.gitServe(w, r, repo, route, repoName, token)
+}
+
+// readonlyExportWrite — the 2c guard predicate (pure): WRITE routes
+// (receive-pack advertisement + push) are refused for tokens whose scope
+// starts with `federation:`; every other route/scope passes (legacy
+// `git_bridge` + scope-unknown included).
+func readonlyExportWrite(route gitRoute, tokenScope string) bool {
+	return (route == routeReceiveAdv || route == routeReceivePush) &&
+		strings.HasPrefix(tokenScope, "federation:")
+}
+
+// readOnlyWrite403 — the 2c guard response (Node: 403; the Node
+// middleware pins the status, not the body — this body is the Go pin).
+func (s *Server) readOnlyWrite403(w http.ResponseWriter, r *http.Request) {
+	// drain the request body (keep-alive hygiene, as gitErr does for POST).
+	if r.Body != nil {
+		_, _ = io.Copy(io.Discard, r.Body)
+	}
+	w.Header().Set("Pragma", "no-cache")
+	w.WriteHeader(http.StatusForbidden)
+	w.Write([]byte("Forbidden: read-only export token (write not allowed)\n")) //nolint:errcheck
 }
 
 // gitRepoName — the project id from the git path's first segment

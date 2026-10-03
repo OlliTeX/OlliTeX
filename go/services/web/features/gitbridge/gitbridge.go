@@ -268,43 +268,47 @@ func (p *pats) tokens(ctx context.Context) (*mongo.Collection, error) {
 	return db.Collection("oauthAccessTokens"), nil
 }
 
-// userIDForToken — Node GitBridgePATManager.getUserId.
-func (p *pats) userIDForToken(ctx context.Context, token string) (string, error) {
+// tokenResolved — PAT lookup shared by the user-id and scope surfaces
+// (Node GitBridgePATManager: the PAT query regex /\bgit_bridge\b/ matches
+// BOTH `git_bridge` and `federation:git_bridge` — 09 §3 2c — so the scope
+// is returned and the token-info surface distinguishes them).
+func (p *pats) tokenResolved(ctx context.Context, token string) (tokenID, userID bson.ObjectID, scope string, err error) {
 	if !strings.HasPrefix(token, "olp_") {
-		return "", nil
+		return
 	}
 	sum := sha256.Sum256([]byte(token))
-	coll, err := p.tokens(ctx)
-	if err != nil {
-		return "", err
+	coll, err2 := p.tokens(ctx)
+	if err2 != nil {
+		return bson.ObjectID{}, bson.ObjectID{}, "", err2
 	}
 	var row struct {
 		ID     bson.ObjectID `bson:"_id"`
 		UserID bson.ObjectID `bson:"user_id"`
+		Scope  string        `bson:"scope"`
 	}
-	if err := coll.FindOne(ctx, bson.M{
+	if err2 := coll.FindOne(ctx, bson.M{
 		"accessToken": hex.EncodeToString(sum[:]),
 		"type":        "personal_access_token",
 		"scope":       patQuery,
 		"expiresAt":   bson.M{"$gt": time.Now()},
-	}).Decode(&row); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return "", nil
+	}).Decode(&row); err2 != nil {
+		if err2 == mongo.ErrNoDocuments {
+			return bson.ObjectID{}, bson.ObjectID{}, "", nil
 		}
-		return "", err
+		return bson.ObjectID{}, bson.ObjectID{}, "", err2
 	}
-	db, err := p.app.Mongo.DB(ctx)
-	if err != nil {
-		return "", err
+	db, err2 := p.app.Mongo.DB(ctx)
+	if err2 != nil {
+		return bson.ObjectID{}, bson.ObjectID{}, "", err2
 	}
 	var u struct {
 		ID bson.ObjectID `bson:"_id"`
 	}
-	if err := db.Collection("users").FindOne(ctx, bson.M{"_id": row.UserID}).Decode(&u); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return "", nil // deleted user -> token invalid
+	if err2 := db.Collection("users").FindOne(ctx, bson.M{"_id": row.UserID}).Decode(&u); err2 != nil {
+		if err2 == mongo.ErrNoDocuments {
+			return bson.ObjectID{}, bson.ObjectID{}, "", nil // deleted user → token invalid
 		}
-		return "", err
+		return bson.ObjectID{}, bson.ObjectID{}, "", err2
 	}
 	// non-blocking lastUsedAt (Node fire-and-forget)
 	now := time.Now()
@@ -312,14 +316,39 @@ func (p *pats) userIDForToken(ctx context.Context, token string) (string, error)
 		defer core.GoroutineGuard("gitbridge: token lastUsedAt update")
 		ctx2, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		c, err2 := p.tokens(ctx2)
-		if err2 != nil {
+		c, err3 := p.tokens(ctx2)
+		if err3 != nil {
 			return
 		}
 		_, _ = c.UpdateOne(ctx2, bson.M{"_id": row.ID},
 			bson.M{"$set": bson.M{"lastUsedAt": now}})
 	}()
-	return row.UserID.Hex(), nil
+	return row.ID, row.UserID, row.Scope, nil
+}
+
+// userIDForToken — Node GitBridgePATManager.getUserId.
+func (p *pats) userIDForToken(ctx context.Context, token string) (string, error) {
+	_, uid, _, err := p.tokenResolved(ctx, token)
+	if err != nil {
+		return "", err
+	}
+	if uid.IsZero() {
+		return "", nil
+	}
+	return uid.Hex(), nil
+}
+
+// userIDForTokenAndScope — 2c (09 §3): like userIDForToken, plus the
+// resolved PAT scope (`git_bridge` vs `federation:git_bridge`).
+func (p *pats) userIDForTokenAndScope(ctx context.Context, token string) (string, string, error) {
+	_, uid, scope, err := p.tokenResolved(ctx, token)
+	if err != nil {
+		return "", "", err
+	}
+	if uid.IsZero() {
+		return "", "", nil
+	}
+	return uid.Hex(), scope, nil
 }
 
 // =================================================================== //
@@ -506,7 +535,7 @@ func (g *gb) tokenInfo(limit *core.RateLimiter) func(*core.Cxt, *core.Res) {
 			res.SendStatus(401)
 			return
 		}
-		uid, err := p.userIDForToken(cxt.Req.Context(), parts[1])
+		uid, scope, err := p.userIDForTokenAndScope(cxt.Req.Context(), parts[1])
 		if err != nil {
 			res.SendStatus(500)
 			return
@@ -515,7 +544,11 @@ func (g *gb) tokenInfo(limit *core.RateLimiter) func(*core.Cxt, *core.Res) {
 			res.SendStatus(401)
 			return
 		}
-		res.SendStatus(200)
+		// 2c (09 §3): expose the resolved token SCOPE — the git-bridge
+		// service's read-only export-PAT guard (scope `federation:*
+		// → WRITE 403) consumes it. Additive: the 200 body was empty before
+		// (git clients ignore 2xx bodies).
+		res.JSON(200, oj2("user_id", uid, "scope", scope))
 	}
 }
 

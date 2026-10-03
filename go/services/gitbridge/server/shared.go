@@ -39,6 +39,11 @@ type Server struct {
 	receiveHost string
 	origins     originSet
 	oauthClient OAuthClient
+
+	// oauthScopedClient — 2c (09 §3): the token seam that also returns the
+	// resolved scope ("git_bridge" vs "federation:git_bridge"). Nil = legacy
+	// behavior (scope unknown → the read-only write guard stays off).
+	oauthScopedClient OAuthScopedClient
 }
 
 // NewServer builds the full dispatch handler. hookBinary is the path of the
@@ -54,6 +59,14 @@ func NewServer(cfg *config.Config, br *bridge.Bridge, gitBinary, hookBinary stri
 // recvHost is the HOST handler-contract value (Go: os.Hostname port 1:1 from
 // Java), oauthClient the token-info HTTP client (nil = HTTP to cfg.Oauth2Server).
 func NewServerWithSeams(cfg *config.Config, br *bridge.Bridge, gitBinary, hookBinary string, recvHost string, oauthClient OAuthClient) http.Handler {
+	return NewServerWithScopedSeams(cfg, br, gitBinary, hookBinary, recvHost, oauthClient, nil)
+}
+
+// NewServerWithScopedSeams — NewServerWithSeams + the 2c (09 §3) scoped
+// token seam. oauthScopedClient nil = legacy behavior (scope unknown → the
+// read-only export-PAT write guard stays off, exactly as against a legacy
+// OAuth server without the scope in the 200 body).
+func NewServerWithScopedSeams(cfg *config.Config, br *bridge.Bridge, gitBinary, hookBinary string, recvHost string, oauthClient OAuthClient, oauthScopedClient OAuthScopedClient) http.Handler {
 	s := &Server{
 		cfg:         cfg,
 		br:          br,
@@ -63,6 +76,8 @@ func NewServerWithSeams(cfg *config.Config, br *bridge.Bridge, gitBinary, hookBi
 		origins:     newOriginSet(cfg.AllowedCorsOrigins),
 		receiveHost: recvHost,
 		oauthClient: oauthClient,
+
+		oauthScopedClient: oauthScopedClient,
 	}
 	return http.HandlerFunc(s.dispatch)
 }
@@ -245,14 +260,14 @@ var lfsBatchBody = []byte("{\"message\": \"ERROR: Git LFS is not supported on Ov
 func (s *Server) handleGitCtx(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	if s.cfg.Oauth2Server != "" {
-		proceed, token := s.handleOauth2(w, r, path)
+		proceed, token, scope := s.handleOauth2(w, r, path)
 		if !proceed {
 			return
 		}
-		s.handleGitServlet(w, r, path, token)
+		s.handleGitServlet(w, r, path, token, scope)
 		return
 	}
 	// Filter disabled: straight to the servlet (token empty → resolver treats
 	// it unauthed in the live grid; the 200 flow requires the filter).
-	s.handleGitServlet(w, r, path, "")
+	s.handleGitServlet(w, r, path, "", "")
 }

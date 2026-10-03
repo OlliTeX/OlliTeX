@@ -44,43 +44,75 @@ import (
 // only in the 400 <= code < 500 range per Java parseErrorCode.
 type OAuthClient func(token string, clientIp string) (int, string)
 
+// OAuthScopedClient — 2c (09 §3, Node GitBridgeAuthMiddleware +
+// GitBridgePATManager.getUserIdAndScope): the token-check seam that also
+// returns the RESOLVED TOKEN SCOPE ("git_bridge" vs "federation:git_bridge"
+// — the PAT query regex /\bgit_bridge\b/ matches both, so the guard must
+// distinguish) via the 200 body. Scope "" = legacy OAuth server (no scope
+// in the body) → the read-only write guard stays off (legacy behavior).
+type OAuthScopedClient func(token string, clientIp string) (code int, errorCode, scope string)
+
 // oauthHTTPFunc adapts a raw func into the seam (identity conversion; keeps
 // the shared.go call site unchanged).
 func oauthHTTPFunc(f func(token string, clientIp string) (int, string)) OAuthClient {
 	return OAuthClient(f)
 }
 
-// checkAccessTokenHTTP performs GET <oauth2Server>/oauth/token/info?client_ip=
-// <ip> with "Authorization: Bearer <token>". Java sets
+// tokenInfoHTTP — GET <oauth2Server>/oauth/token/info?client_ip=<ip> with
+// "Authorization: Bearer <token>". Java sets
 // setThrowExceptionOnExecuteError(false): transport-level failures surface
 // as whatever the library reports — Go maps an HTTP/exec failure to 500
-// (the "unexpected OAuth server" branch).
-func checkAccessTokenHTTP(oauth2Server string, token, clientIp string) (int, string) {
+// (the "unexpected OAuth server" branch). Returns (status, error_code for
+// 4xx, best-effort parsed 2xx body — nil when absent).
+func tokenInfoHTTP(oauth2Server, token, clientIp string) (int, string, map[string]any) {
 	u := oauth2Server + "/oauth/token/info?client_ip=" + url.QueryEscape(clientIp)
 	req, err := http.NewRequest(http.MethodGet, u, nil)
 	if err != nil {
-		return 500, ""
+		return 500, "", nil
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return 500, ""
+		return 500, "", nil
 	}
 	defer resp.Body.Close()
 	code := resp.StatusCode
+	raw, _ := io.ReadAll(resp.Body)
 	errorCode := ""
 	if code >= 400 && code < 500 {
 		// Java parseErrorCode: parse body as a JSON object, read the
 		// "error_code" string, null on any parse error / missing field.
-		body, _ := io.ReadAll(resp.Body)
 		var obj map[string]interface{}
-		if err := json.Unmarshal(body, &obj); err == nil {
+		if json.Unmarshal(raw, &obj) == nil {
 			if v, ok := obj["error_code"].(string); ok && v != "" {
 				errorCode = v
 			}
 		}
 	}
-	return code, errorCode
+	var bodyObj map[string]any
+	if code >= 200 && code < 300 {
+		_ = json.Unmarshal(raw, &bodyObj)
+	}
+	return code, errorCode, bodyObj
+}
+
+// checkAccessTokenHTTP — OAuthClient default (status + error_code only).
+func checkAccessTokenHTTP(oauth2Server string, token, clientIp string) (int, string) {
+	code, ec, _ := tokenInfoHTTP(oauth2Server, token, clientIp)
+	return code, ec
+}
+
+// checkAccessTokenHTTPScoped — 2c (09 §3): same semantics + the scope of a
+// resolved token (200 body {user_id, scope}; "" when absent = legacy server).
+func checkAccessTokenHTTPScoped(oauth2Server string, token, clientIp string) (int, string, string) {
+	code, ec, body := tokenInfoHTTP(oauth2Server, token, clientIp)
+	if body == nil {
+		return code, ec, ""
+	}
+	if v, ok := body["scope"].(string); ok {
+		return code, ec, v
+	}
+	return code, ec, ""
 }
 
 // credResult is the tri-state from the Basic-auth credential parse.
@@ -152,12 +184,12 @@ func b64Lenient(s string) (b []byte, ok bool) {
 //   - (false, "") — the filter short-circuited and has written a response.
 //   - (true, token) — proceed to the servlet; token is the bearer password
 //     (Java passes this as a servlet attribute consumed by the resolver).
-func (s *Server) handleOauth2(w http.ResponseWriter, r *http.Request, path string) (proceed bool, token string) {
+func (s *Server) handleOauth2(w http.ResponseWriter, r *http.Request, path string) (proceed bool, token, scope string) {
 	// Step 1: "/project" prefix (checked before credential parse).
 	if strings.HasPrefix(path, "/project") {
 		sendOauthText(w, http.StatusNotFound,
 			"Invalid Project ID (must not have a '/project' prefix)")
-		return false, ""
+		return false, "", ""
 	}
 	// Step 2: projectId from the first URI segment minus ".git".
 	// Java "​".split("/") drops trailing empties, so "/" alone → [""] and
@@ -167,7 +199,7 @@ func (s *Server) handleOauth2(w http.ResponseWriter, r *http.Request, path strin
 		// ProductionErrorHandler 500 grid (28B, NO Content-Type — Java/Jetty
 		// writes no CT; grid() keeps Go from defaulting to text/plain).
 		grid(w, http.StatusInternalServerError)
-		return false, ""
+		return false, "", ""
 	}
 	project := util.RemoveAllSuffixes(segs[1], ".git")
 
@@ -176,10 +208,10 @@ func (s *Server) handleOauth2(w http.ResponseWriter, r *http.Request, path strin
 	switch res {
 	case cred500:
 		grid(w, http.StatusInternalServerError)
-		return false, ""
+		return false, "", ""
 	case credNone:
 		sendNoAuth(w)
-		return false, ""
+		return false, "", ""
 	}
 	// credOK: user/pass set.
 
@@ -193,7 +225,7 @@ func (s *Server) handleOauth2(w http.ResponseWriter, r *http.Request, path strin
 			"",
 			"If this is unexpected, please contact us at support@overleaf.com, or",
 			"see https://www.overleaf.com/learn/how-to/Git_integration for more information.")
-		return false, ""
+		return false, "", ""
 	}
 	// Step 5: not a valid project id.
 	if !util.IsProjectID(project) {
@@ -202,24 +234,24 @@ func (s *Server) handleOauth2(w http.ResponseWriter, r *http.Request, path strin
 			"",
 			"If this is unexpected, please contact us at support@overleaf.com, or",
 			"see https://www.overleaf.com/learn/how-to/Git_integration for more information.")
-		return false, ""
+		return false, "", ""
 	}
 
-	// Step 6: username == "git" → token-validity check.
+	// Step 6: username == "git" → token-validity check (+ 2c scope capture).
 	if user == "git" {
-		code, errorCode := s.oauth()(pass, util.ClientIp(r))
+		code, errorCode, scope := s.oauthScopedCheck(pass, util.ClientIp(r))
 		switch {
 		case code == 429:
 			sendOauthText(w, http.StatusTooManyRequests,
 				"Rate limit exceeded. Please wait and try again later.")
-			return false, ""
+			return false, "", ""
 		case code == 401 && errorCode == "token_expired":
 			sendOauthText(w, http.StatusUnauthorized,
 				"Your Overleaf Git authentication token has expired.",
 				"",
 				"Generate a new authentication token in your Overleaf Account Settings,",
 				"then run the git command again.")
-			return false, ""
+			return false, "", ""
 		case code == 401:
 			sendOauthText(w, http.StatusUnauthorized,
 				"Enter your Git authentication token when prompted for a password.",
@@ -229,14 +261,15 @@ func (s *Server) handleOauth2(w http.ResponseWriter, r *http.Request, path strin
 				"",
 				"See our help page for more support:",
 				"https://www.overleaf.com/learn/how-to/Git_integration")
-			return false, ""
+			return false, "", ""
 		case code >= 400:
 			sendOauthText(w, http.StatusInternalServerError,
 				"Unexpected server error. Please try again later.")
-			return false, ""
+			return false, "", ""
 		}
-		// 2xx/3xx → pass-through with the bearer token.
-		return true, pass
+		// 2xx/3xx → pass-through with the bearer token (scope carried for the
+		// 2c read-only write guard).
+		return true, pass, scope
 	}
 
 	// Step 7: username != "git".
@@ -250,11 +283,11 @@ func (s *Server) handleOauth2(w http.ResponseWriter, r *http.Request, path strin
 				line1,
 				"Please make sure your Git URL is correctly formatted. For example: https://git@git.overleaf.com/<YOUR_PROJECT_ID> or https://git:<AUTHENTICATION_TOKEN>@git.overleaf.com/<YOUR_PROJECT_ID>")
 		}
-		return false, ""
+		return false, "", ""
 	}
 	// userPasswordEnabled not set (live grid) → need-authorization 401.
 	sendNoAuth(w)
-	return false, ""
+	return false, "", ""
 }
 
 // oauth resolves the token-check seam (default: HTTP to cfg.Oauth2Server).
@@ -266,6 +299,17 @@ func (s *Server) oauth() OAuthClient {
 	return oauthHTTPFunc(func(token string, clientIp string) (int, string) {
 		return checkAccessTokenHTTP(u, token, clientIp)
 	})
+}
+
+// oauthScopedCheck — 2c (09 §3): the token check with the resolved scope
+// (injected seam when wired; plain OAuthClient fallback → scope ""
+// = legacy behavior, the read-only write guard stays off).
+func (s *Server) oauthScopedCheck(token, clientIp string) (int, string, string) {
+	if s.oauthScopedClient != nil {
+		return s.oauthScopedClient(token, clientIp)
+	}
+	code, ec := s.oauth()(token, clientIp)
+	return code, ec, ""
 }
 
 // sendOauthText ports Oauth2Filter.sendResponse: CT text/plain;charset=
