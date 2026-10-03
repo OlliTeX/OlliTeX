@@ -75,12 +75,16 @@ func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDeb
 	}()) + `}`
 	// audit 006: flip the pinned githubSyncEnabled at runtime (the fixture
 	// constant stays `false`; same approach as canManageTemplatesMenu).
+	// NOTE: the value is a JSON *boolean* — no surrounding quotes; the
+	// earlier version appended a stray `"` ("githubSyncEnabled":true" —
+	// invalid JSON), crashing every IDE/hub load with JSON.parse
+	// SyntaxError @1413 (owner WDV-F capture 2026-10-03).
 	s = strings.ReplaceAll(s, `"githubSyncEnabled":false`, `"githubSyncEnabled":`+func() string {
 		if githubSync {
 			return "true"
 		}
 		return "false"
-	}()+`"`)
+	}())
 	return s
 }
 
