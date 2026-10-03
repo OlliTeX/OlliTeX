@@ -448,33 +448,31 @@ func tplPrivileged(ctx context.Context, a *core.App, cxt *core.Cxt) bool {
 	if dterr != nil {
 		return false
 	}
-	if err := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&bson.D{}); err == nil {
-		var d bson.D
-		if db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&d) == nil {
-			if isAdmin, ok := tplDocVal(&d, "isAdmin"); ok {
-				if b, ok2 := isAdmin.(bool); ok2 && b {
-					return true
-				}
-			}
-			if flags, ok := tplDocVal(&d, "flags"); ok {
-				if fd, ok2 := flags.(*bson.D); ok2 {
-					if c, ok3 := tplDocVal(fd, "canManageTemplates"); ok3 {
-						if b, ok4 := c.(bool); ok4 && b {
-							return true
-						}
-					}
-				}
-			}
+	var udoc struct {
+		IsAdmin bool `bson:"isAdmin"`
+		Flags   *struct {
+			CanManageTemplates bool `bson:"canManageTemplates"`
+		} `bson:"flags"`
+	}
+	if err := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&udoc); err == nil {
+		if udoc.IsAdmin {
+			return true
+		}
+		if udoc.Flags != nil && udoc.Flags.CanManageTemplates {
+			// Node hasAdminAccess: flags.canManageTemplates is the template
+			// ladder — the old port asserted flags.(*bson.D), which fails on
+			// driver-v2 map-decoded subdocs and denied every tpladmin.
+			return true
 		}
 	}
-	var sd bson.D
-	if db.Collection("site_settings").FindOne(ctx, bson.D{{Key: "_id", Value: "global"}}).Decode(&sd) == nil {
-		if sec, ok := tplSecField(&sd, "templates"); ok {
-			if au, ok2 := tplDocVal(sec, "allUsersCanManageTemplates"); ok2 {
-				if b, ok3 := au.(bool); ok3 && b {
-					return true
-				}
-			}
+	var sdoc struct {
+		Templates *struct {
+			AllUsersCanManageTemplates bool `bson:"allUsersCanManageTemplates"`
+		} `bson:"templates"`
+	}
+	if db.Collection("site_settings").FindOne(ctx, bson.D{{Key: "_id", Value: "global"}}).Decode(&sdoc) == nil {
+		if sdoc.Templates != nil && sdoc.Templates.AllUsersCanManageTemplates {
+			return true
 		}
 	}
 	return false
