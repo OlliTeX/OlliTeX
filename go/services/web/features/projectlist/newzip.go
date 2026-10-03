@@ -561,7 +561,10 @@ type nzipFileE struct {
 type nzipFolder struct {
 	id      bson.ObjectID
 	name    string
-	folders []nzipFolder
+	folders []*nzipFolder // pointers: child mutations (docs/files/folders) must
+						// be visible through the parent's slice (a value copy
+						// silently empties subfolders at render — 2026-10-03
+						// zip-import repro: sub/{doc,file} dropped)
 	docs    []bson.D
 	files   []bson.D
 }
@@ -588,7 +591,7 @@ func nzipBuildTree(docs []nzipDocE, files []nzipFileE) bson.D {
 				continue
 			}
 			f := &nzipFolder{id: bson.NewObjectID(), name: part}
-			cur.folders = append(cur.folders, *f)
+			cur.folders = append(cur.folders, f)
 			fmap[acc2] = f
 			cur = f
 			acc = acc2
@@ -624,8 +627,8 @@ func nzipBuildTree(docs []nzipDocE, files []nzipFileE) bson.D {
 	var render func(f *nzipFolder) bson.D
 	render = func(f *nzipFolder) bson.D {
 		folders := make([]bson.D, 0, len(f.folders))
-		for i := range f.folders {
-			folders = append(folders, render(&f.folders[i]))
+		for _, ch := range f.folders {
+			folders = append(folders, render(ch))
 		}
 		docs := f.docs
 		if docs == nil {
