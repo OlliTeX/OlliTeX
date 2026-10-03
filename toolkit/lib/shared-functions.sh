@@ -31,6 +31,16 @@ function read_config() {
   export MONGO_DOCKER_IMAGE
   : "${REDIS_IMAGE:=redis:8.6-alpine}"
   export REDIS_IMAGE
+  : "${POSTGRES_IMAGE:=postgres:18-alpine}"
+  export POSTGRES_IMAGE
+  : "${POSTGRES_DOCKER_IMAGE:=${POSTGRES_IMAGE:-postgres:18-alpine}}"
+  export POSTGRES_DOCKER_IMAGE
+  : "${POSTGRES_USER:=overleaf}"
+  export POSTGRES_USER
+  : "${POSTGRES_DB:=overleaf}"
+  export POSTGRES_DB
+  : "${PSQL:=pg}"
+  export PSQL
   : "${NGINX_IMAGE:=nginx:1.30-alpine}"
   export NGINX_IMAGE
 }

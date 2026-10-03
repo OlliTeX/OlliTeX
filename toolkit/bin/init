@@ -40,6 +40,17 @@ function tls_config_exists() {
 function set_up_config_files() {
   echo "Copying config files to 'config/'"
   cp "$TOOLKIT_ROOT/lib/config-seed/overleaf.rc" "$TOOLKIT_ROOT/config/"
+
+  # Postgres credential: generate once (config/overleaf.rc) — never inline,
+  # never committed (owner rail: credentials from env/config files only).
+  if grep -q '^POSTGRES_ENABLED=true' "$TOOLKIT_ROOT/config/overleaf.rc" 2>/dev/null; then
+    if ! grep -q '^POSTGRES_PASSWORD=.' "$TOOLKIT_ROOT/config/overleaf.rc" 2>/dev/null; then
+      PG_PW="$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' | head -c 24)"
+      sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD="$PG_PW"|" "$TOOLKIT_ROOT/config/overleaf.rc"
+      chmod 600 "$TOOLKIT_ROOT/config/overleaf.rc"
+      echo "  generated POSTGRES_PASSWORD (random 24 chars) in config/overleaf.rc"
+    fi
+  fi
   cp "$TOOLKIT_ROOT/lib/config-seed/variables.env" "$TOOLKIT_ROOT/config/"
   cp "$TOOLKIT_ROOT/lib/config-seed/version" "$TOOLKIT_ROOT/config/"
   local invite_token_secret

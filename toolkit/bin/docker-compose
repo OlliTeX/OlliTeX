@@ -61,6 +61,15 @@ function canonicalize_data_paths() {
   if [[ "${REDIS_ENABLED:-false}" == "true" && -n "${REDIS_DATA_PATH:-}" ]]; then
     REDIS_DATA_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$REDIS_DATA_PATH")
   fi
+  if [[ "${POSTGRES_ENABLED:-false}" == "true" && -n "${POSTGRES_DATA_PATH:-}" ]]; then
+    POSTGRES_DATA_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$POSTGRES_DATA_PATH")
+  fi
+  # postgres:18+ runs as uid 70 on the host-bind mount (image-managed ./data
+  # subdir) — pre-own it so the first boot never fights a root-owned dir.
+  if [[ "${POSTGRES_ENABLED:-false}" == "true" && -n "${POSTGRES_DATA_PATH:-}" ]]; then
+    mkdir -p "$TOOLKIT_ROOT/$POSTGRES_DATA_PATH"
+    chown 70:70 "$TOOLKIT_ROOT/$POSTGRES_DATA_PATH" 2>/dev/null || true
+  fi
   if [[ "${LANGUAGE_TOOL_ENABLED:-false}" == "true" && -n "${LANGUAGE_TOOL_DATA_PATH:-}" ]]; then
     LANGUAGE_TOOL_DATA_PATH=$(cd "$TOOLKIT_ROOT"; realpath "$LANGUAGE_TOOL_DATA_PATH")
   fi
@@ -118,6 +127,19 @@ function set_mongo_vars() {
   export MONGO_DATA_PATH
   export MONGO_DOCKER_IMAGE
   export MONGOSH
+}
+
+# Set environment variables for docker-compose.postgres.yml
+# (owner decision 2026-10-04: Postgres = the shared config DB, single source
+# of truth; also the DSN plane historyv1's chunk/blob stores use).
+function set_postgres_vars() {
+  DOCKER_COMPOSE_FLAGS+=(-f "$TOOLKIT_ROOT/lib/docker-compose.postgres.yml")
+  export POSTGRES_DATA_PATH
+  export POSTGRES_DOCKER_IMAGE
+  export POSTGRES_USER
+  export POSTGRES_PASSWORD
+  export POSTGRES_DB
+  export PSQL
 }
 
 # Set environment variables for docker-compose.sibling-containers.yml

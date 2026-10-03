@@ -403,7 +403,13 @@ tidy: ## go mod tidy
 
 .PHONY: test-go
 test-go: ## Run the Go service test suite (race detector + coverage)
+	@if command -v pg_isready >/dev/null 2>/dev/null && pg_isready -h 127.0.0.1 -p 5432 -q 2>/dev/null; then \
+		PGPASSWORD=overleaf psql -h 127.0.0.1 -p 5432 -U overleaf -d overleaf-history-v1 -c 'CREATE DATABASE configstore_test' >/dev/null 2>&1 || true; \
+		echo "test-go: using e2e Postgres for the configstore PG gates (127.0.0.1:5432)"; \
+		export CONFIGSTORE_TEST_PG_DSN='postgres://overleaf:overleaf@127.0.0.1:5432/configstore_test?sslmode=disable'; \
+	fi; \
 	$(GO) test -race -cover -count=1 $(GO_PKGS)
+	@-if [ -z "$$CONFIGSTORE_TEST_PG_DSN" ]; then echo "(configstore PG gates skipped — no Postgres at 127.0.0.1:5432; 'make e2e-up' or a scratch postgres:18-alpine enables them)"; fi
 
 .PHONY: test
 test: test-go ## Run repo tests (Go services; node front-end uses 'unit'/'hub')

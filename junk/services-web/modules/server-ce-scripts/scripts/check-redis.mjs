@@ -12,7 +12,11 @@ import net from 'node:net';
 
 // REDIS_URL looks like redis://overleafredis:6379 (compose env), optionally
 // redis://user:pass@host:port.
-const raw = process.env.REDIS_URL || 'redis://overleafredis:6379';
+// Env chain: REDIS_URL → REDIS_HOST/OVERSEAF_REDIS_HOST (+port/db) → default host name.
+const rawHost = process.env.REDIS_HOST || process.env.OVERSEAF_REDIS_HOST || 'overleafredis';
+const rawPort = process.env.REDIS_PORT || '6379';
+const rawDb = process.env.REDIS_DB || '0';
+const raw = process.env.REDIS_URL || `redis://${rawHost}:${rawPort}/${rawDb}`;
 const u = new URL(raw);
 const host = u.hostname || 'overleafredis';
 const port = Number(u.port) || 6379;

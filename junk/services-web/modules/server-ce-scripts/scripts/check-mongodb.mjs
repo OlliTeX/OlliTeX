@@ -10,7 +10,10 @@
 // (mongodb-legacy is declared in this workspace's package.json, no app tree).
 import mongodb from 'mongodb-legacy';
 
-const url = process.env.MONGO_URL || 'mongodb://overleafmongo:27017';
+// Env chain (all deploy styles): toolkit MONGO_URL → CE OVERLEAF_MONGO_URL →
+// MONGO_CONNECTION_STRING; last resort = the shared-network default container name.
+const url = process.env.MONGO_URL || process.env.OVERLEAF_MONGO_URL ||
+  process.env.MONGO_CONNECTION_STRING || 'mongodb://overleafmongo:27017';
 console.log(`mongo check: ${url.replace(/\/\/[^\s@/]+@/, '//***@')}`);
 
 const client = await mongodb.MongoClient.connect(url, { serverSelectionTimeoutMS: 5000 });
