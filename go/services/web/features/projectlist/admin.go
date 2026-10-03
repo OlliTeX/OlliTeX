@@ -1264,7 +1264,16 @@ func adminPurge(a *core.App) func(*core.Cxt, *core.Res) {
 					if hdd := dcast(hv); hdd != nil {
 						if hid, isS := dget(*hdd, "id").(string); isS && hid != "" {
 							u, p := "staging", os.Getenv("STAGING_PASSWORD")
-							if !fireBasic(cxt, "DELETE", strings.TrimSuffix(os.Getenv("V1_HISTORY_URL"), "/")+"/projects/"+hid, "staging", p) {
+							if !fireBasic(cxt, "DELETE", func() string {
+			base := os.Getenv("V1_HISTORY_URL")
+			if base == "" {
+				// Node settings.js: url: process.env.V1_HISTORY_URL ||
+				// 'http://127.0.0.1:3100/api' — the purge 500'd without this
+				// default (relative URL → request error).
+				base = "http://127.0.0.1:3100/api"
+			}
+			return strings.TrimSuffix(base, "/")
+		}()+"/projects/"+hid, "staging", p) {
 								aPage500(cxt, res)
 								return
 							}
