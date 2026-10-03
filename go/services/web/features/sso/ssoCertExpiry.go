@@ -76,7 +76,11 @@ func certFingerprint(c *x509.Certificate) string {
 // classifyCertExpiry — pure: expired (<= now) / expiring (<= now+warnDays) / ok.
 func classifyCertExpiry(notAfter, now time.Time, warnDays int) (status string, daysLeft int) {
 	na := notAfter.UTC()
-	days := int(time.Until(na).Hours() / 24)
+	// daysLeft is measured from the caller's `now` (the same clock the
+	// status switch below uses) — NOT the wall clock: the injectable-clock
+	// contract (tests + any caller with a reference time) pins it, and
+	// production passes time.Now() so behavior is unchanged there.
+	days := int(na.Sub(now).Hours() / 24) // na-now measured from the caller's `now` (positive while valid)
 	switch {
 	case !na.After(now):
 		status = CertExpired
