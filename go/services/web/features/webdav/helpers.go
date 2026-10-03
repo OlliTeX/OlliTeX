@@ -69,6 +69,12 @@ func ioReadAll(r io.Reader, limit int64) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(r, limit))
 }
 
-var propfindDepth0 = []byte(`<?xml version="1.0" encoding="utf-8"?><d:prop xmlns:d="DAV:"><d:resourcetype/><d:displayname/><d:getcontentlength/><d:getlastmodified/><d:getetag/></d:prop>`)
+// RFC 4918 §14.2: a qualified PROPFIND body MUST be a <propfind> element
+// containing the <prop> request. The bare-<prop> form that was previously
+// sent here is invalid — lenient servers (nginx dav, rshs) accepted it, but
+// a conformant server (Apache mod_dav 2.4.66) answers 400 Bad Request, which
+// broke list()/check()/import against any strict provider. (Fixture-caught,
+// 2026-10-03.)
+var propfindDepth0 = []byte(`<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:displayname/><d:getcontentlength/><d:getlastmodified/><d:getetag/></d:prop></d:propfind>`)
 
-var propfindDepth1 = []byte(`<?xml version="1.0" encoding="utf-8"?><d:prop xmlns:d="DAV:"><d:resourcetype/><d:displayname/><d:getcontentlength/><d:getlastmodified/><d:getetag/></d:prop>`)
+var propfindDepth1 = []byte(`<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:displayname/><d:getcontentlength/><d:getlastmodified/><d:getetag/></d:prop></d:propfind>`)

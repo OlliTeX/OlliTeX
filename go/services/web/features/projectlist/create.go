@@ -364,6 +364,19 @@ func newProjectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 	}
 }
 
+// CreateBasicProject — basic 'New Project' creation, exported for in-service
+// callers that must create a project without going through the HTTP route
+// (Node parity: WebdavHandler.importRemoteProject creates the project via
+// the Projects service; the Go in-process equivalent of that call). Returns
+// the new project id; ok=false when the owner user could not be loaded.
+func CreateBasicProject(a *core.App, cxt *core.Cxt, name, uid string) (bson.ObjectID, bool) {
+	u, ok := loadOwnerUser(a, cxt, uid)
+	if !ok {
+		return bson.ObjectID{}, false
+	}
+	return crCreateBasicProject(a, cxt, name, uid, u), true
+}
+
 // crCreateBasicProject: basic 'New Project' (mainbasic.tex -> main.tex).
 func crCreateBasicProject(a *core.App, cxt *core.Cxt, name, uid string, u crOwnerUser) bson.ObjectID {
 	pid := bson.NewObjectID()

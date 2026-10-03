@@ -16,6 +16,7 @@
 package webdav
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -241,18 +242,31 @@ func wdWriteEntity(ctx context.Context, a *core.App, uid, projectID, relPath str
 		return false
 	}
 	if isDoc {
-		// docstore updateDoc (the element-creation contract).
+		// Node contract: docstore create/update is POST /project/:pid/doc/:did
+		// with {lines, version, ranges}. (The Go docstore rejects PUT —
+		// "Cannot PUT ..." — so the earlier PUT attempt silently lost every
+		// imported .tex body.)
 		ctx2, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		req, rerr := http.NewRequestWithContext(ctx2, "PUT",
+		payload, _ := json.Marshal(struct {
+			Lines   []string       `json:"lines"`
+			Version float64        `json:"version"`
+			Ranges  map[string]any `json:"ranges"`
+		}{
+			Lines:   strings.Split(string(body), "\n"),
+			Version: 1,
+			Ranges:  map[string]any{},
+		})
+		req, rerr := http.NewRequestWithContext(ctx2, "POST",
 			wdDocstoreBase()+"/project/"+strings.ToLower(projectID)+"/doc/"+newID.Hex(),
-			strings.NewReader(string(body)))
+			bytes.NewReader(payload))
 		if rerr == nil {
 			req.Header.Set("Content-Type", "application/json")
 			if rresp, derr := wdSyncHTTP.Do(req); derr == nil {
 				rresp.Body.Close()
+				cancel()
 			}
 		}
+		cancel()
 	}
 	return true
 }
@@ -450,6 +464,8 @@ func wdResolveConflictWork(ctx context.Context, a *core.App, uid, projectID, pat
 }
 
 // wdImportRemote — Node WebdavHandler.importRemoteProject (best-effort).
-func wdImportRemote(ctx context.Context, a *core.App, uid string, cl *wdClient, root, projectName string) (int, error) {
-	return wdImportFiles(ctx, a, uid, "", cl, root, projectName)
+// projectID is the REAL project created by the caller (import flow); Node
+// parity — the import handler creates the project first, then ingests.
+func wdImportRemote(ctx context.Context, a *core.App, projectID, uid string, cl *wdClient, root, projectName string) (int, error) {
+	return wdImportFiles(ctx, a, uid, projectID, cl, root, projectName)
 }

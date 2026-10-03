@@ -76,11 +76,14 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
+	pl "ollitex/go/services/web/features/projectlist"
 	"ollitex/go/services/web/views"
 )
 
@@ -734,12 +737,39 @@ func hImport(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(500, []byte(`{"error":`+wdJSString(cerr.Error())+`}`))
 			return
 		}
+		// Node parity (WebdavHandler.importRemoteProject): the import CREATES
+		// the project (same basic template as POST /project/new), ingests the
+		// remote <rootPath>/<projectName>/ tree into it, writes the sync state
+		// row, and returns the new project id.
+		pid, ok := pl.CreateBasicProject(a, cxt, projectName, uid)
+		if !ok {
+			res.JSON(500, []byte(`{"message":"internal error"}`))
+			return
+		}
 		root := wdRemotePath(rootPath, projectName)
-		if _, ierr := wdImportRemote(ctx, a, uid, cl, root, projectName); ierr != nil {
+		if _, ierr := wdImportRemote(ctx, a, pid.Hex(), uid, cl, root, projectName); ierr != nil {
 			res.JSON(500, []byte(`{"error":`+wdJSString(ierr.Error())+`}`))
 			return
 		}
-		res.JSON(200, []byte(`{"success":true,"message":"Import completed"}`))
+		// State row (fresh import is the authoritative state; upsert keyed on
+		// projectId, ownerId = the importing user — the unlink + status paths
+		// own this shape).
+		now := bson.NewDateTimeFromTime(time.Now())
+		if db, derr := a.Mongo.DB(ctx); derr == nil {
+			_, _ = db.Collection(wdStatesColl).UpdateOne(ctx,
+				bson.D{{Key: "projectId", Value: strings.ToLower(pid.Hex())}},
+				bson.D{{Key: "$set", Value: bson.D{
+					{Key: "ownerId", Value: uid},
+					{Key: "projectName", Value: projectName},
+					{Key: "lastSyncAt", Value: now},
+					{Key: "lastSyncError", Value: nil},
+					{Key: "lastConflict", Value: nil},
+					{Key: "mergeStatus", Value: "clean"},
+				}}},
+				options.UpdateOne().SetUpsert(true),
+			)
+		}
+		res.JSON(200, []byte(`{"success":true,"message":"Import completed","projectId":"`+pid.Hex()+`"}`))
 	}
 }
 

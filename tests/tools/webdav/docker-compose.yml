@@ -1,41 +1,33 @@
-# tests/tools/webdav — a representative WebDAV (RFC 4918) test fixture
+# WebDAV test fixture server — packaged Apache 2 (2.4.66) on Ubuntu 26.04.
 #
-# Purpose (same shape as the ../forgejo fixture):
-#  Part A — the fixture server itself, verified with raw DAV verbs against
-#           the exact request surface the Overleaf webdav feature sends
-#           (PROPFIND depth 0/1, MKCOL, PUT (+If-Match), GET, DELETE,
-#           basic auth) — oracle: go/services/web/features/webdav/client.go
-#  Part B — the Go web's webdav module (connect/status/import/push/pull/
-#           unlink) talking to THIS server — enabled on a dev/e2e overleaf
-#           stack via base URL + fixture identity (Part B env-gated).
+# Server selection record (measured on this host; full table in README.md):
+#   * nginx-dav: noslash MKCOL → 301/409 (trac #1966) → Go client's
+#     createDirectory (405 tolerance) structurally blocked → push 500.
+#   * mogeko/rshs: PROPFIND ignores Depth:1 → list() degenerate.
+#   * httpd:2.4-alpine / Debian apache2 (bookworm/trixie): DAV lock store
+#     unusable (apr_dbm_* undefined / DBD wiring dead end).
+#   * apachewebdav (2.4.43): protocol gates pass, but non-deterministic
+#     Basic-auth windows under repeated probes → not a deterministic oracle.
+#   * CHOOSEN Ubuntu 26.04 apache2: dav_lock = DAVGenericLockDB (DBM store),
+#     packaged apr-util 1.6.3 carries the apr_dbm API, all product gates +
+#     15/15 Go-client contract + 20/20 stability loops verified 2026-10-03.
 #
-# Server: sfuhrm/docker-nginx-webdav — nginx + ngx_http_dav_module with
-# dav_methods PUT DELETE MKCOL COPY MOVE + dav_ext_methods PROPFIND OPTIONS,
-# basic auth (env USERNAME/PASSWORD → htpasswd), data root /media/data/
-# (MUST be a mounted dir — the entrypoint exits otherwise).
-#
-# Identities are TEST-ONLY dummies (house policy, same as ../forgejo and
-# tests/e2e credentials): never a real credential, never real content.
-#
-# NOTE: host port 8095 is the fixture's published port — verify it is free
-# on a new machine before `docker compose up -d`.
+# Identity (oltest) is baked at build time; data dir is the named volume.
 
 services:
   webdav-test:
-    # digest-pinned (house convention: no floating :latest — see forgejo:15).
-    # Local image id 2026-10-02: sha256:6443214008bd...
-    image: sfuhrm/docker-nginx-webdav@sha256:6443214008bdc9d34a7ff65b41820e5b3d374154348cfb626f7f22a06715108c
+    image: webdav-ubuntu2604:fixture
+    build: .
     container_name: webdav-test
-    environment:
-      USERNAME: oltest
-      PASSWORD: "Ol-Fixture-Wd7q"
+    restart: unless-stopped
     ports:
       - "127.0.0.1:8095:80"
     volumes:
-      # /media/data is the image's required data root (entrypoint checks it)
-      - webdav-test-data:/media/data
-    # no special healthcheck needed: the harness' A1 probes PROPFIND (207)
-    restart: unless-stopped
+      - webdav-test-data:/var/www/dav
+    # The overleaf dev stack (separate bridge) must be able to reach this
+    # container BY NAME for the in-container bridge URL (Part B):
+    #   docker network connect <overleaf-network> webdav-test
+    # (the harness auto-detects name resolution via overleafserver)
 
 volumes:
   webdav-test-data:

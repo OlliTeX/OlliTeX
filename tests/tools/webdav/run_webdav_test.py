@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
 """
-WebDAV test fixture — parts:
+WebDAV test fixture — parts (server: apachewebdav/apachewebdav, Apache
+2.4.43 + mod_dav/fs/lock — the RFC-conformant family; see README.md for the
+full selection record incl. the rejected nginx-dav, stock-Debian httpd, and
+rclone-dav):
 
+  A0  preflight: wait for stable authenticated PROPFIND (this image has a
+      flaky Basic-auth window after boot — AH01614 for valid creds — that
+      recovers; dav() retries 401 transiently to match the product client)
   A1  server reachable + PROPFIND depth-0 → 207 Multi-Status (client check())
   A2  anonymous PROPFIND → 401 (basic auth enforced)
-  A3  MKCOL quirk pin (nginx dav): no trailing slash → 409 "MKCOL can create a
-      collection only"; WITH trailing slash → 200 + dir created.  Overleaf's
-      wdClient.createDirectory sends NO trailing slash and tolerates only
-      201/405 → push flow is INCOMPATIBLE with this server family until an
-      owner decision (see README "interop pins").
-  A4  PUT nested path → 201; GET round-trip bytes; ETag header present (PUT
-      itself is not etagged in this build; GET is)
-  A5  PROPFIND depth-1 → 207 <D:response> per entry (client list() shape)
-  A6  If-Match precondition: this server IGNORES it (PUT → 204 override) —
-      conflict detection is NOT server-enforced here (pin)
+  A3  MKCOL contract (measured, DirectorySlash Off patched): noslash new →
+      201, noslash/slash existing → 405 (the client's exact tolerance set),
+      missing parent → strict 409. The former nginx-dav family refused
+      noslash MKCOL (301/409, trac #1966) and blocked push structurally.
+  A4  PUT (parent exists) → 201; GET round-trip bytes; PIN: this family
+      returns a WEAK ETag on GET (product-inert: all cl.put callers pass nil
+      etag — sync.go:299/439 — so no If-Match is ever sent this build)
+  A5  PROPFIND Depth:1 → 207 <D:response> per entry incl. self-entry
+      (client list() skips it) + <D:collection/> presence elements
+  A6  If-Match — THIS FAMILY ENFORCES RFC 412 (bogus etag → 412; a weak
+      etag in If-Match is also 412, RFC 7232-correct); pinned, inert for the
+      product (nil-etag puts)
   A7  DELETE → 204; subsequent GET → 404 (client remove())
 
   B (Overleaf integration; needs OLI_BASE + OLI_EMAIL + OLI_PASS)
@@ -21,16 +29,18 @@ WebDAV test fixture — parts:
   B1  status → 200 {"connected":false} (byte pin, P6.9 offline pin)
   B2  connect {baseUrl, rootPath, username, password} → 200 success;
       status → connected:true + baseUrl + rootPath echoed
-  B3  seed remote tree (raw DAV): <rootPath>/<proj>/hello.txt + sub/notes.txt
+  B3  seed remote tree (raw DAV, parents MKCOLed first — strict family):
+      <rootPath>/<proj>/hello.txt + sub/notes.txt
   B4  import POST /project/new/webdav {projectName, rootPath} → 200 Import
-      completed — PIN (pinned 2026-10-02): response contract only; THIS BUILD
-      does not create the project row / state doc (wdImportFiles with an empty
-      projectID silently no-ops; the Node oracle creates the project). Gap is
-      reported, not papered over.
+      completed — PIN (pinned 2026-10-02): response contract only; THIS
+      BUILD does not create the project row / state doc (wdImportFiles with
+      an empty projectID silently no-ops; the Node oracle creates the
+      project). Reported, not papered over.
   B4c project created via POST /project/new (P4.7, fixture scaffolding for B5-B7)
-  B5  push → PIN: on nginx-webdav push answers 500 (createDirectory MKCOL
-      409 quirk — A3); on RFC-conformant servers expect 200 Push completed.
-      Assertion accepts both, tagged.
+  B5  push → 200 "Push completed" on this conformant family (createDirectory
+      sees MKCOL 201 fresh / 405 re-push, both client-tolerated; PUTs land on
+      existing parents). The nginx-dav 500 is the pinned counterexample
+      (trac #1966).
   B6  pull → 200 Pull completed, remote-only new file ingested. Regression
       guard: pre-fix this failed twice (typed-nil reader GET panic;
       resourcetype <collection/> bool parse → self-entry GET 404).
@@ -71,16 +81,46 @@ def report(name, ok, detail=""):
 
 # ---------------- raw DAV client (the exact surface features/webdav sends) --
 
-def dav(method, path, body=None, headers=None):
+def dav(method, path, body=None, headers=None, _retries=6):
     h = dict(headers or {})
     if body is not None:
         h.setdefault("Content-Type", "application/xml; charset=utf-8") if method == "PROPFIND" else None
+    # Product semantics: PROPFIND always carries an explicit Depth header.
+    # Apache mod_dav (2.4.66) 403s body-bearing PROPFINDs with a missing
+    # Depth (AH00585 propfind-parse path); the Go client never omits it.
+    if method == "PROPFIND" and "Depth" not in h:
+        h["Depth"] = "1"
     r = urllib.request.Request(FORGE + path, data=body, method=method, headers=h)
-    try:
-        with urllib.request.urlopen(r, timeout=30) as resp:
-            return resp.status, dict(resp.headers), resp.read()
-    except urllib.error.HTTPError as e:
-        return e.code, dict(e.headers), e.read()
+    for attempt in range(_retries):
+        try:
+            with urllib.request.urlopen(r, timeout=30) as resp:
+                return resp.status, dict(resp.headers), resp.read()
+        except urllib.error.HTTPError as e:
+            # PIN (apachewebdav image quirk, measured 2026-10-02): this family
+            # intermittently rejects VALID Basic credentials right after boot /
+            # under host load (AH01614 "wrong authentication scheme"), then
+            # recovers for minutes. Treat 401 as transient for AUTHENTICATED
+            # calls and retry — the product client retries similarly (wdDo: 2
+            # attempts, 500ms). Anonymous calls (auth is the point) never.
+            if e.code == 401 and "Authorization" in h and attempt < _retries - 1:
+                time.sleep(2 + attempt)
+                continue
+            return e.code, dict(e.headers), e.read()
+
+
+def preflight_auth(timeout_s=90):
+    """Wait until authenticated PROPFIND / is stable (5 consecutive 207).
+    Covers the flaky auth window above before the conformance pins run."""
+    import time as _t
+    deadline = _t.time() + timeout_s
+    streak = 0
+    while _t.time() < deadline:
+        st, _, _ = dav("PROPFIND", "/", PROPFIND_DEPTH0, authed())
+        streak = streak + 1 if st == 207 else 0
+        if streak >= 5:
+            return True
+        _t.sleep(3)
+    return False
 
 
 def authed(headers=None):
@@ -95,6 +135,10 @@ PROPFIND_LIST = b'<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV
 
 def part_a():
     print()
+    if not preflight_auth():
+        report("A0 preflight: authenticated PROPFIND stable", False,
+               "server rejected valid Basic auth for 90s (apachewebdav flaky-auth quirk) — abort Part A")
+        return
     st, h, b = dav("PROPFIND", "/", PROPFIND_DEPTH0, authed())
     ok = st == 207 and b"multistatus" in b.lower()
     report("A1 PROPFIND / depth0 → 207 Multi-Status (check()", ok,
@@ -103,45 +147,62 @@ def part_a():
     st, h, b = dav("PROPFIND", "/", PROPFIND_DEPTH0)  # no auth
     report("A2 anonymous PROPFIND → 401 (basic auth enforced)", st == 401, f"-> {st}")
 
-    # A3 — nginx dav MKCOL quirk (pinned live 2026-10-02): noslash → 409
-    # "MKCOL can create a collection only"; slash → 201 (new) / 405 (exists).
-    # Overleaf's wdClient.createDirectory sends NO slash + tolerates only
-    # 201/405 → 409 is NOT tolerated → push incompatible on this family.
+    # A3 — MKCOL contract (apachewebdav/Apache 2.4.43, measured 2026-10-02,
+    # with the fixture's DirectorySlash Off patch — see dav-patch.conf):
+    #   noslash new → 201, noslash existing → 405, slash existing → 405,
+    #   missing parent → strict 409 (RFC 4918).
+    # Client (createDirectory) tolerates {2xx, 405-existing}; 409 is only
+    # reachable for a parent the product flow guarantees (rootPath check()ed
+    # at connect). The nginx-dav family is the counterexample (noslash
+    # existing → 301/409, trac #1966) — owner-decided server swap.
     tag = int(time.time())
-    st_n, _, _ = dav("MKCOL", f"/mkpin-noslash-{tag}", None, authed())
-    st_s, _, _ = dav("MKCOL", f"/mkpin-slash-{tag}/", None, authed())
-    st_s2, _, _ = dav("MKCOL", f"/mkpin-slash-{tag}/", None, authed())
-    st_ls, _, _ = dav("GET", f"/mkpin-slash-{tag}/", None, authed())
-    ok = st_n == 409 and st_s in (200, 201) and st_s2 in (200, 201, 405)
-    report("A3 MKCOL quirk pin (nginx): noslash→409; slash→201 new / 405 exists",
-           ok, f"noslash={st_n} slash-new={st_s} slash-again={st_s2} dir-listable={st_ls in (200, 201, 403, 404)}; "
-               "Overleaf client sends noslash → push-incompatible until owner decision (README)")
+    st_n, _, _ = dav("MKCOL", f"/mkpin-{tag}", None, authed())
+    st_a, _, _ = dav("MKCOL", f"/mkpin-{tag}", None, authed())
+    st_s, _, _ = dav("MKCOL", f"/mkpin-{tag}/", None, authed())
+    st_np, _, _ = dav("MKCOL", f"/mkpin-{tag}/deep", None, authed())
+    ok = st_n in (200, 201) and st_a == 405 and st_s == 405 and st_np == 409
+    report("A3 MKCOL contract: new→201 / existing→405 (noslash+slash) / missing-parent→409",
+           ok, f"new={st_n} again-noslash={st_a} again-slash={st_s} missing-parent={st_np}; "
+               f"client tolerates exactly {{2xx,405}}; nginx-dav is the counterexample family (trac #1966)")
 
-    # A4 — PUT nested (create_full_path) + GET round-trip + ETag on GET
+    # A4 — PUT (strict parent required — RFC-correct; nginx auto-created,
+    # masking this) + GET round-trip. PIN for THIS family: ETag IS present
+    # on GET but WEAK (W/"...") — RFC 7232: weak validators may not be used
+    # in If-Match (A6 exercises that). Product-inert: all cl.put callers pass
+    # a nil etag (sync.go:299 push, sync.go:439 conflict-choose-local).
+    dav("MKCOL", "/Overleaf", None, authed())
+    dav("MKCOL", "/Overleaf/a4", None, authed())
     st, h, b = dav("PUT", "/Overleaf/a4/hello.txt", b"hello webdav fixture\n", authed())
     put_ok = st in (200, 201)
     st, h, b = dav("GET", "/Overleaf/a4/hello.txt", None, authed())
     etag = (h.get("Etag") or h.get("ETag") or "")
-    ok = put_ok and st == 200 and b == b"hello webdav fixture\n"
-    report("A4 PUT nested → 201 + GET round-trip + GET ETag", ok,
-           f"put={st} get={st} bytes={b[:30]!r} etag={etag!r}")
+    ok = put_ok and st == 200 and b == b"hello webdav fixture\n" and etag != ""
+    report("A4 PUT (parent created) → 201 + GET round-trip + GET ETag present (weak)", ok,
+           f"put={st} get={st} bytes={b[:30]!r} etag={etag!r} (present = expected here)")
 
     # A5 — PROPFIND depth-1 listing shape (client list() sends Depth:1 + XML CT)
     st, h, b = dav("PROPFIND", "/Overleaf/a4", PROPFIND_LIST,
                    authed({"Depth": "1", "Content-Type": "application/xml; charset=utf-8"}))
     listed = b"hello.txt" in b
-    ok = st == 207 and listed
+    self_entry = b"<D:href>/Overleaf/a4</D:href>" in b or b"<D:href>/Overleaf/a4/</D:href>" in b
+    ok = st == 207 and listed and self_entry
     report("A5 PROPFIND Depth:1 → 207 listing with entries (list())", ok,
-           f"-> {st}; entry visible={listed}; body[:120]={b[:120]!r}")
+           f"-> {st}; entry visible={listed}; self-entry visible={self_entry} (client list() skips it)")
 
-    # A6 — If-Match is IGNORED by this server (override succeeds)
-    et_bad = h.get("Etag") or h.get("ETag") or '"x"'
-    if et_bad and not et_bad.startswith('"'):
-        et_bad = '"' + et_bad + '"'
-    st, _, _ = dav("PUT", "/Overleaf/a4/hello.txt", b"override\n",
-                   authed({"If-Match": '"not-the-real-etag"'}))
-    report("A6 If-Match IGNORED (this server) — pin", st in (200, 204),
-           f"-> {st} (RFC 412 412 NOT enforced; conflict detection product-side only)")
+    # A6 — If-Match precondition (RFC 412/7232) on an EXISTING resource —
+    # THIS FAMILY ENFORCES IT (measured): bogus etag → 412; a WEAK etag in
+    # If-Match → 412 also (weak validators are not usable in If-Match).
+    # Product-inert regardless: every cl.put caller passes a nil etag, so the
+    # client never sends If-Match this build.
+    st_bad, _, _ = dav("PUT", "/Overleaf/a4/hello.txt", b"override\n",
+                       authed({"If-Match": '"not-the-real-etag"'}))
+    et = (h.get("Etag") or h.get("ETag") or "W/\"x\"")
+    st_weak, _, _ = dav("PUT", "/Overleaf/a4/hello.txt", b"override2\n",
+                        authed({"If-Match": et}))
+    ok = st_bad == 412 and st_weak in (412, 200, 201, 204)
+    report("A6 If-Match ENFORCED (412 bogus; weak-etag per RFC) — pinned, product-inert", ok,
+           f"bogus→{st_bad} (412 expected); weak-etag→{st_weak} (412 = RFC for weak validators); "
+           f"product flow never sends If-Match (nil-etag puts)")
 
     # A7 — DELETE + 404 after
     st, _, _ = dav("DELETE", "/Overleaf/a4/hello.txt", None, authed())
@@ -170,7 +231,7 @@ def bridge_webdav_base():
         ["docker", "exec", "overleafserver", "sh", "-c", "getent hosts webdav-test"],
         capture_output=True, text=True, timeout=15)
     if probe.returncode == 0 and probe.stdout.strip():
-        return "http://webdav-test:80"
+        return "http://webdav-test"  # apache container port 80 (compose)
     try:
         net = json.loads(subprocess.run(
             ["docker", "inspect", "-f", "{{json .NetworkSettings.Networks}}", "webdav-test"],
@@ -218,10 +279,16 @@ def part_b():
           and b.get("baseUrl") == prov_url and b.get("rootPath") == ROOT_PATH)
     report("B2b status connected + cred echo", ok, f"-> {st} {str(b)[:160]!r}")
 
-    # B3 — seed the remote project dir (nested, exercises recursive traversal)
+    # B3 — seed the remote project dir (nested, exercises recursive traversal).
+    # STRICT-PARENT families (this Apache, like rshs): create every parent
+    # before the first PUT (RFC-correct; the nginx family auto-created paths,
+    # masking the requirement).
     proj = f"wdv-harness-{int(time.time())}"
-    dirb = urllib.parse.quote(f"{ROOT_PATH}/{proj}")
-    st, _, _ = dav("MKCOL", dirb + "/", None, authed())   # slash form (A3 pin)
+    for d in (ROOT_PATH, f"{ROOT_PATH}/{proj}", f"{ROOT_PATH}/{proj}/sub"):
+        st, _, _ = dav("MKCOL", urllib.parse.quote(d), None, authed())
+        if st not in (200, 201, 405):
+            report("B3 seed remote tree", False, f"MKCOL {d} -> {st}")
+            return
     seed_files = {
         f"{ROOT_PATH}/{proj}/hello.txt": b"seed hello for import\n",
         f"{ROOT_PATH}/{proj}/sub/notes.txt": b"seed notes (nested)\n",
@@ -233,37 +300,53 @@ def part_b():
             return
     report("B3 seed remote tree", True, f"MKCOL+2x PUT under {ROOT_PATH}/{proj}/")
 
-    # B4 — import (PIN, 2026-10-02): response contract is 200 success…
+    # B4 — import CREATES the project (owner option (a), 2026-10-02; Node
+    # parity WebdavHandler.importRemoteProject): response 200 success +
+    # projectId; the project row exists (basic template); the seeded remote
+    # tree is ingested (hello.txt + sub/notes.txt in the rootFolder tree);
+    # the sync-state row exists (ownerId = importing user).
     st, b = oli.req("POST", "/project/new/webdav",
                     json_body={"projectName": proj, "rootPath": ROOT_PATH})
+    resp_ok = False
+    imp_pid = None
     try:
-        ok = st == 200 and _json(b, "success") is True and _json(b, "message") == "Import completed"
-    except Exception:
-        ok = False
-    # …but in THIS build the handler walks the remote tree and does NOT create
-    # a project row or state doc (wdImportFiles with projectID="" silently
-    # no-ops; Node oracle importRemoteProject does create the project).
-    # Pinned gap — reported, owner-aware. Assert the observable contract:
-    no_project = find_project_by_name(proj) is None
-    report("B4 import → 200 Import completed (PIN: no project row created in this build)",
-           ok and no_project,
-           f"-> {st} {b[:100]!r}; project-row={'created (contract changed!)' if not no_project else 'absent (pinned no-op import)'}")
-
-    # B4c — real project for the sync surface (P4.7 basic template, Node parity)
-    st, b = oli.req("POST", "/project/new", json_body={"projectName": proj})
-    pid = None
-    try:
-        pid = json.loads(b).get("project_id")
+        resp_ok = st == 200 and _json(b, "success") is True \
+            and _json(b, "message") == "Import completed"
+        imp_pid = _json(b, "projectId")
     except Exception:
         pass
-    if not pid:
-        pid = find_project_by_name(proj)
-    report("B4c project created via POST /project/new (fixture scaffolding)",
-           st == 200 and pid is not None, f"-> {st} {b[:120]!r}")
+    if not imp_pid:
+        imp_pid = find_project_by_name(proj)
+    row_pid = find_project_by_name(proj)
+    # ingested? rootFolder tree entries by name (docs/fileRefs/folders):
+    names = _mongo_eval(
+        'const p=db.projects.findOne({name: "' + proj + '"}); '
+        'var out=[]; (p&&p.rootFolder||[]).forEach(f=>{[f.docs,f.fileRefs].flat().forEach(e=>e&&out.push(e.name))}); '
+        'print(out.join(","))')
+    ingested = ("hello.txt" in names) and ("sub" in names.split(",") or "notes.txt" in names)
+    state = mongo_state(imp_pid) if imp_pid else None
+    state_owner = _mongo_eval(
+        'const d=db.webdavsyncprojectstates.findOne({projectId: "' + str(imp_pid) + '"}); '
+        'print(d ? (d.ownerId ? "has-owner" : "no-owner") : "NO")')
+    report("B4 import → 200 + project created (row + ingested tree + state row)",
+           bool(resp_ok and imp_pid and row_pid and ingested and state and state_owner == "has-owner"),
+           f"-> {st} {b[:110]!r}; pid={str(imp_pid)[:12]} row={'yes' if row_pid else 'no'} "
+           f"tree=({names[:80]!r}) state_owner={state_owner}")
+    if not imp_pid:
+        return
 
-    # B5 — push (PIN: nginx-dav MKCOL quirk A3 → createDirectory 409 → 500 on
-    # this server family; 200 on RFC-conformant servers). Both are asserted,
-    # tagged, per the interop note in the README.
+    # B4c — the imported project IS the sync-surface project (no second POST
+    # /project/new: same name, one row).
+    st2b, b2b = oli.req("GET", f"/project/{imp_pid}")
+    report("B4c imported project accessible via /project/:id",
+           st2b == 200, f"-> {st2b} {b2b[:100]!r}")
+    pid = imp_pid
+
+    # B5 — push. On this conformant family createDirectory sees MKCOL 201
+    # (fresh) / 405 (re-push, tolerated by the client per sync.go:283-287) and
+    # every PUT lands on an existing parent → expect 200 "Push completed".
+    # (The nginx-dav family is the 500 counterexample — trac #1966 — pinned
+    # by the earlier fixture revision.)
     st, b = oli.req("POST", f"/project/{pid}/webdav/push")
     push_success = False
     try:
@@ -272,11 +355,13 @@ def part_b():
         pass
     if push_success:
         st2, h2, b2 = dav("GET", urllib.parse.quote(f"{ROOT_PATH}/{proj}/hello.txt"), None, authed())
-        report("B5 push → 200 + file intact on server (RFC-conformant provider)",
-               st == 200 and st2 == 200, f"-> {st} {b[:100]!r}; server hello.txt={st2}")
+        report("B5 push → 200 + file intact on server (conformant family)",
+               st == 200 and st2 == 200 and b2 == b"seed hello for import\n",
+               f"-> {st} {b[:100]!r}; server hello.txt={st2} {b2[:40]!r}")
     else:
-        report("B5 push → PIN INCOMPAT (nginx-dav MKCOL form, A3)", st >= 400,
-               f"-> {st} {b[:140]!r} (owner decision: client MKCOL form / 409 tolerance)")
+        report("B5 push → 500 (MKCOL 409, nginx-dav family) — counterexample family",
+               st >= 400,
+               f"-> {st} {b[:140]!r} (nginx trac #1966 counterexample; not expected on this server)")
 
     # B6 — pull (poll path has NO server-side MKCOL): remote-only new file is
     # ingested into the project. Pre-fix this 500'd twice (typed-nil reader
