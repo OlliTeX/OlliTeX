@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/crypto/hkdf"
@@ -67,6 +68,27 @@ func loadCipher() (*cipher, error) {
 	}
 	raw, err := os.ReadFile(file)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Node parity (junk SecretCipher.mjs): a missing cipher file is
+			// BOOTSTRAPPED (random 32-byte base64 password, 0600 file) — the
+			// e2e disposable stack and fresh CE deployments relied on this;
+			// failing here 500'd every site-settings PUT with secrets (sso-saml
+			// seed) that Node used to accept.
+			seed := make([]byte, 32)
+			if _, rerr := rand.Read(seed); rerr != nil {
+				return nil, fmt.Errorf("cipher bootstrap rand: %w", rerr)
+			}
+			pw := base64.StdEncoding.EncodeToString(seed)
+			_ = os.MkdirAll(filepath.Dir(file), 0o755)
+			doc, jerr := json.MarshalIndent(map[string]any{
+				"cipherLabel":     label,
+				"cipherPasswords": map[string]any{label: pw},
+			}, "", "  ")
+			if jerr == nil {
+				_ = os.WriteFile(file, doc, 0o600)
+			}
+			return &cipher{label: label, password: []byte(pw)}, nil
+		}
 		return nil, fmt.Errorf("cipher file unreadable: %w", err)
 	}
 	var doc struct {

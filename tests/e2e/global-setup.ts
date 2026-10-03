@@ -119,9 +119,12 @@ async function trySetPassword(page: any, email: string, password: string): Promi
   const rb = await resp.text().catch(() => '')
   console.log(`[seed-diag] POST /user/password/set -> ${st} ${rb.slice(0, 200)}`)
   if (st !== 200) return false
+  // 2026-10-04 (Go web parity): the Go handler answers 200 "OK" (Node parity,
+  // pinned) AFTER the guarded write — no client-rendered success sentence.
+  // The Node-era text gate matched only the old page wording, so trust the
+  // 200 (the handler only returns it when the hash was actually written).
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {})
-  const after = (await page.locator('body').innerText().catch(() => '')).toLowerCase()
-  return /password updated|successfully changed|log in now/.test(after)
+  return true
 }
 
 async function setFixturePassword(page: any, email: string, password: string): Promise<void> {
