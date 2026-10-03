@@ -1,25 +1,44 @@
-# configstore — SQLite-backed configuration store (P7-post)
+# configstore — shared configuration store (Postgres‑primary, SQLite offline fallback)
 
-The key/value store for the **SQLite config DB** (P7‑post backlog, item 1:
-*"SQLite config DB: env params → SQLite, /hub admin + CLI backup for `go run`"*).
+The key/value store for the OlliTeX **shared config DB** (P7‑post backlog,
+item 1: *"config DB: env params → DB, /hub admin + CLI backup"*). It layers
+over the env‑based Go config (`go/services/web/core/config.go`), so a value
+stored here overrides the env/default for the same key. The **/hub admin
+endpoints** (GET/PUT the managed keys), the **`cmd/configdb` CLI**, and
+**`toolkit/bin/config`** all manage this one logical store.
 
-This is the **first slice** of that item: the store itself (CRUD + dump/restore
-+ persistence). It layers over the env‑based Go config
-(`go/services/web/core/config.go`), so a value stored here overrides the
-env/default for the same key. The **/hub admin endpoints** (GET/PUT the managed
-keys) and the **`go run ./go/cmd/configdb backup|restore` CLI** are later slices
-that use this store.
+## Backends (one contract, `Store`)
+| Backend | When | How |
+| --- | --- | --- |
+| **Postgres (PRIMARY)** | A DSN is in env: `CONFIG_DB_DSN` > `DATABASE_URL` > `HISTORY_CONNECTION_STRING` | table `configdb` (key/value/source/updated_at) in the stack's central DB — the same PG plane `historyv1`'s chunk/blob stores use (pgx v5). `NewPG(dsn)` |
+| **SQLite (offline emergency fallback)** | No DSN in env | file chain `$CONFIG_DB_PATH → $OVERLEAF_HOME/configdb/… → ./configdb/configdb.sqlite3` (WAL, single conn). `New(dbFile)` |
 
-## Why SQLite
-- The `mattn/go-sqlite3` driver is already in `go.mod` and proven in this build
-  by `go/services/gitbridge/db` (same driver, same cgo toolchain).
-- Single file, no server, trivial to back up (`Dump`) / restore
-  (`Restore`) — which is exactly the owner's "CLI backup" requirement.
+Entry points: `Dial()` (env‑based selection), `DialFile(path)`, `DialPG(dsn)`,
+plus `New`/`NewPG` for the explicit forms. `Store.Describe()` names the live
+backend (credentials redacted) for operator output (`configdb doctor`, etc.).
+
+**SQLite → Postgres migration:** `configdb backup file.json` (offline SQLite)
+then `configdb restore file.json` with the DSN in env — `Restore` is
+backend‑agnostic by design.
+
+## Why Postgres primary / SQLite fallback
+- **Postgres** is the stack's existing central store (owner‑pinned
+  `postgres:18-alpine`; `historyv1` already persists chunk/blob metadata and
+  blobs there). The config DB therefore rides the **same plane and DSN** —
+  one shared, backed‑up, horizontally‑reachable store — which is what the
+  horizontal‑scaling requirement needs (a single source of truth from every
+  web instance, not a per‑instance local file).
+- **SQLite** is retained as the **offline/emergency** path (air‑gapped bootstrap,
+  `go run` with no DSN, `mattn/go‑sqlite3` already proven by `gitbridge/db`).
+  Its single‑file `Dump`/`Restore` is the trivial backup/restore story.
 
 ## API (surface used by the later slices)
 | Method | Purpose |
 | --- | --- |
-| `New(dbFile)` | open/create the DB (parents 0o755), create the `config` table, WAL, single connection |
+| `Dial()` | env‑based selection: Postgres (DSN in env) else SQLite file chain |
+| `DialFile(path)` / `DialPG(dsn)` | explicit SQLite / Postgres open |
+| `New(dbFile)` | open/create the SQLite DB (parents 0o755), `config` table, WAL, single connection |
+| `NewPG(dsn)` | connect the Postgres DB, ensure the `configdb` table |
 | `Get(key) (string, error)` | value, or `ErrMissing` |
 | `Has(key) bool` | presence check |
 | `Set(key, value, source)` | upsert; `source` records provenance (e.g. `hub`, `restore`) |
@@ -27,7 +46,8 @@ that use this store.
 | `Keys() ([]string, error)` | sorted keys |
 | `All() (map[string]string, error)` | full map (non‑nil when empty) |
 | `Close()` | close the connection |
-| `Dump(dest)` | JSON backup to `dest` (backs the `backup` CLI) |
+| `Describe()` | backend name with credentials redacted (operator output) |
+| `Dump(dest)` | JSON backup to `dest` (backs the `backup` CLI; identical across backends) |
 | `Restore(src)` | load a JSON backup into the store (backs the `restore` CLI) |
 
 ## Schema

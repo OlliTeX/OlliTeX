@@ -39,9 +39,11 @@ func hubConfigAllowed(key string) bool {
 }
 
 // openHubConfigStore — opens the shared config DB (creating it if needed, so
-// a first /hub write persists), at core's canonical path.
-func openHubConfigStore() (*configstore.ConfigStore, error) {
-	return configstore.New(core.ConfigDBPath())
+// a first /hub write persists). Backend selection via configstore.Dial:
+// Postgres DSN in env → the shared PG config DB (primary); no DSN → the
+// offline SQLite file at core's canonical path.
+func openHubConfigStore() (configstore.Store, error) {
+	return configstore.Dial()
 }
 
 // hubConfigEntry is one row of the GET listing.
@@ -54,7 +56,7 @@ type hubConfigEntry struct {
 }
 
 // buildHubConfigGet assembles the GET payload for the full registry.
-func buildHubConfigGet(store *configstore.ConfigStore) (map[string]hubConfigEntry, error) {
+func buildHubConfigGet(store configstore.Store) (map[string]hubConfigEntry, error) {
 	out := map[string]hubConfigEntry{}
 	for _, p := range configschema.Registry {
 		entry := hubConfigEntry{

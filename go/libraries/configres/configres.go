@@ -49,9 +49,17 @@ func Path() string {
 }
 
 // Open — opens the shared config DB for reading WITHOUT creating it: nil
-// (not an error) when the file is absent or unreadable, which callers treat
-// as the pre-config-DB deployment (env/default chain unchanged).
-func Open() *configstore.ConfigStore {
+// (not an error) when absent or unreachable, which callers treat as the
+// pre-config-DB deployment (env/default chain unchanged).
+// Backend: Postgres DSN in env → shared PG config DB (primary); no DSN → the
+// offline SQLite file at Path().
+func Open() configstore.Store {
+	if configstore.DSNFromEnv() != "" {
+		if s, err := configstore.Dial(); err == nil {
+			return s
+		}
+		return nil // PG unreachable → env/default chain (unchanged)
+	}
 	if st, err := os.Stat(Path()); err != nil || st.IsDir() {
 		return nil
 	}
@@ -63,7 +71,7 @@ func Open() *configstore.ConfigStore {
 }
 
 // Int — config-DB key → env var → dflt.
-func Int(st *configstore.ConfigStore, key, envName string, dflt int) int {
+func Int(st configstore.Store, key, envName string, dflt int) int {
 	if st != nil {
 		if v, err := st.Get(key); err == nil {
 			if n, ok := atoi(v); ok {
@@ -82,7 +90,7 @@ func Int(st *configstore.ConfigStore, key, envName string, dflt int) int {
 }
 
 // String — config-DB key → env var → dflt.
-func String(st *configstore.ConfigStore, key, envName string, dflt string) string {
+func String(st configstore.Store, key, envName string, dflt string) string {
 	if st != nil {
 		if v, err := st.Get(key); err == nil && strings.TrimSpace(v) != "" {
 			return v
@@ -97,7 +105,7 @@ func String(st *configstore.ConfigStore, key, envName string, dflt string) strin
 }
 
 // Bool — config-DB key → env var → dflt (standard parse: 0/1/t/f/true/false).
-func Bool(st *configstore.ConfigStore, key, envName string, dflt bool) bool {
+func Bool(st configstore.Store, key, envName string, dflt bool) bool {
 	if st != nil {
 		if v, err := st.Get(key); err == nil {
 			if b, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {

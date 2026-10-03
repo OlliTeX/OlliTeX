@@ -36,18 +36,6 @@ func main() {
 	}
 }
 
-// dbPath resolves the config DB file: $CONFIG_DB_PATH, else
-// $OVERLEAF_HOME/configdb/configdb.sqlite3, else ./configdb/configdb.sqlite3.
-func dbPath() string {
-	if p := os.Getenv("CONFIG_DB_PATH"); p != "" {
-		return p
-	}
-	if h := os.Getenv("OVERLEAF_HOME"); h != "" {
-		return h + "/configdb/configdb.sqlite3"
-	}
-	return "configdb/configdb.sqlite3"
-}
-
 // run parses args and executes one command, writing all normal output to out
 // (os.Stdout in main; a buffer in tests) — so the CLI is testable without
 // capturing the process stdout.
@@ -69,8 +57,14 @@ func run(args []string, out io.Writer) error {
 }
 
 func dispatch(cmd string, args []string, out io.Writer) error {
-	s, err := configstore.New(dbPath())
+	// Backend selection — Postgres DSN in env (CONFIG_DB_DSN || DATABASE_URL ||
+	// HISTORY_CONNECTION_STRING) → the shared PG config DB (primary); no DSN →
+	// the offline SQLite file. Same CLI either way.
+	s, err := configstore.Dial()
 	if err != nil {
+		if configstore.DSNFromEnv() != "" {
+			return fmt.Errorf("open PG config DB: %w (backend: postgres; check the DSN + server)", err)
+		}
 		return err
 	}
 	defer func() { _ = s.Close() }()
@@ -233,7 +227,7 @@ func validateKind(key, value string) error {
 	return nil
 }
 
-func listRegistry(s *configstore.ConfigStore, out io.Writer) error {
+func listRegistry(s configstore.Store, out io.Writer) error {
 	fmt.Fprintln(out, "GROUP           KEY                                     KIND    STATUS")
 	for _, p := range configschema.Registry {
 		status := "default"
@@ -279,7 +273,7 @@ func parseEnvFile(path string) (map[string]string, error) {
 	return m, nil
 }
 
-func importEnvFile(s *configstore.ConfigStore, path string, out io.Writer) error {
+func importEnvFile(s configstore.Store, path string, out io.Writer) error {
 	m, err := parseEnvFile(path)
 	if err != nil {
 		return err
@@ -303,7 +297,7 @@ func importEnvFile(s *configstore.ConfigStore, path string, out io.Writer) error
 // $CONFIGDB_DEFAULTS_FILE when set) — first-boot population. NEVER clobbers a
 // key already present in the store; null entries (no static default) are
 // skipped; unknown keys are skipped + counted.
-func importDefaults(s *configstore.ConfigStore, out io.Writer) error {
+func importDefaults(s configstore.Store, out io.Writer) error {
 	var (
 		def map[string]any
 		err error
@@ -362,7 +356,7 @@ func rawValueString(v any) string {
 	return ""
 }
 
-func initStore(s *configstore.ConfigStore, out io.Writer) error {
+func initStore(s configstore.Store, out io.Writer) error {
 	if raw := os.Getenv(configstore.EncryptionKeyEnv); raw != "" {
 		if _, err := configstore.ParseKey(raw); err != nil {
 			return fmt.Errorf("encryption key present but invalid: %w", err)
@@ -400,11 +394,11 @@ func initStore(s *configstore.ConfigStore, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "db ready: %s (now %d keys; env-seeded %d, defaults-seeded per line above, existing values untouched)\n", dbPath(), len(keys), imported)
+	fmt.Fprintf(out, "db ready: %s (now %d keys; env-seeded %d, defaults-seeded per line above, existing values untouched)\n", s.Describe(), len(keys), imported)
 	return nil
 }
 
-func doctor(s *configstore.ConfigStore, out io.Writer) error {
+func doctor(s configstore.Store, out io.Writer) error {
 	if raw := os.Getenv(configstore.EncryptionKeyEnv); raw == "" {
 		fmt.Fprintln(out, "encryption: NOT configured (plain-text store)")
 	} else if _, err := configstore.ParseKey(raw); err != nil {
@@ -414,10 +408,10 @@ func doctor(s *configstore.ConfigStore, out io.Writer) error {
 	}
 	keys, err := s.Keys()
 	if err != nil {
-		fmt.Fprintf(out, "db: %s (UNREADABLE: %v — encrypted values need the key)\n", dbPath(), err)
+		fmt.Fprintf(out, "db: %s (UNREADABLE: %v — encrypted values need the key)\n", s.Describe(), err)
 		return nil
 	}
-	fmt.Fprintf(out, "db: %s (%d keys)\n", dbPath(), len(keys))
+	fmt.Fprintf(out, "db: %s (%d keys)\n", s.Describe(), len(keys))
 	if m, err := s.All(); err == nil {
 		fmt.Fprintf(out, "read-back: OK (%d values readable)\n", len(m))
 	} else {
@@ -427,7 +421,11 @@ func doctor(s *configstore.ConfigStore, out io.Writer) error {
 }
 
 func usage(w io.Writer) error {
-	_, err := fmt.Fprint(w, `configdb — CLI for the overleaf SQLite config DB (P7-post item 1).
+	_, err := fmt.Fprint(w, `configdb — CLI for the OlliTeX shared config DB.
+
+Backends (same CLI, one logical store):
+  * Postgres (PRIMARY): set CONFIG_DB_DSN, DATABASE_URL, or HISTORY_CONNECTION_STRING.
+  * SQLite (offline emergency fallback): no DSN in env → CONFIG_DB_PATH file chain.
 
 Usage:
   configdb list                      list configured keys
@@ -445,7 +443,8 @@ Usage:
   configdb doctor                    key/db/read-back health
   configdb help                      this help
 
-DB path: $CONFIG_DB_PATH, or $OVERLEAF_HOME/configdb/configdb.sqlite3, or ./configdb/configdb.sqlite3.
+DB location: Postgres DSN ($CONFIG_DB_DSN || $DATABASE_URL || $HISTORY_CONNECTION_STRING, primary);
+offline fallback SQLite: $CONFIG_DB_PATH, or $OVERLEAF_HOME/configdb/configdb.sqlite3, or ./configdb/configdb.sqlite3.
 Encryption: $CONFIG_DB_ENCRYPTION_KEY (hex-64 or base64-44, 32 bytes) — field encryption of stored
 values (AES-256-GCM); the key itself is never stored in the DB.
 `)

@@ -45,14 +45,21 @@ func configDBPath() string {
 }
 
 // applyConfigDBOverrides applies curated config-DB values to cfg. It is a
-// no-op when the store is absent, unreadable, or has none of the curated keys
-// (the caller keeps the env-derived values).
+// no-op when the store is absent, unreachable, or has none of the curated
+// keys (the caller keeps the env-derived values).
+//
+// Backend (configstore.Dial): a Postgres DSN in env selects the shared PG
+// config DB (primary — same plane as historyv1's chunk/blob stores); no DSN
+// → the offline SQLite file. A PG that cannot be reached at boot is an
+// honest no-op (env values stay).
 func applyConfigDBOverrides(cfg *Config) {
-	path := configDBPath()
-	if st, err := os.Stat(path); err != nil || st.IsDir() {
-		return // no config DB → env-only behavior (unchanged)
+	if configstore.DSNFromEnv() == "" {
+		path := configDBPath()
+		if st, err := os.Stat(path); err != nil || st.IsDir() {
+			return // no offline config DB → env-only behavior (unchanged)
+		}
 	}
-	store, err := configstore.New(path)
+	store, err := configstore.Dial()
 	if err != nil {
 		return // cannot open → env-only behavior (unchanged)
 	}

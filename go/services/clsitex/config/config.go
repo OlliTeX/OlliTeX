@@ -319,7 +319,7 @@ func New() (*Config, error) {
 // dockerFromEnv mirrors the settings.clsi.docker block exactly. The runner is
 // always present in Go so the Node "DockerRunner.mjs exists" gate passes by
 // construction.
-func dockerFromEnv(st *configstore.ConfigStore) (Docker, error) {
+func dockerFromEnv(st configstore.Store) (Docker, error) {
 	var d Docker
 	d.Runtime = os.Getenv("DOCKER_RUNTIME")
 	image := envOr("TEXLIVE_IMAGE", configres.String(st, "TEX_LIVE_DOCKER_IMAGE", "TEX_LIVE_DOCKER_IMAGE", ""))

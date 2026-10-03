@@ -19,7 +19,6 @@ package configstore
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,10 +32,12 @@ import (
 // error.
 var ErrMissing = fmt.Errorf("configstore: key not present")
 
-// ConfigStore is a SQLite-backed key/value configuration store.
+// ConfigStore is a SQLite-backed key/value configuration store (the OFFLINE
+// emergency fallback backend; Postgres is primary — see store.go/pg.go).
 type ConfigStore struct {
-	db  *sql.DB
-	key []byte // nil == store created before/without encryption (legacy plaintext)
+	db   *sql.DB
+	key  []byte // nil == store created before/without encryption (legacy plaintext)
+	path string // for Describe()
 }
 
 // New opens (creating if needed) the SQLite database at dbFile and ensures
@@ -99,8 +100,24 @@ func newWithKey(dbFile string, key []byte) (*ConfigStore, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("configstore: create table: %w", err)
 	}
-	return &ConfigStore{db: conn, key: key}, nil
+	return &ConfigStore{db: conn, key: key, path: dbFile}, nil
 }
+
+// SQLitePath resolves the offline SQLite file chain (the original P7-loc
+// contract): $CONFIG_DB_PATH → $OVERLEAF_HOME/configdb/configdb.sqlite3 →
+// ./configdb/configdb.sqlite3.
+func SQLitePath() string {
+	if p := os.Getenv("CONFIG_DB_PATH"); p != "" {
+		return p
+	}
+	if h := os.Getenv("OVERLEAF_HOME"); h != "" {
+		return h + "/configdb/configdb.sqlite3"
+	}
+	return "./configdb/configdb.sqlite3"
+}
+
+// Describe identifies the store for operator output.
+func (s *ConfigStore) Describe() string { return "sqlite:" + s.path }
 
 // Close closes the underlying connection.
 func (s *ConfigStore) Close() error { return s.db.Close() }
@@ -209,38 +226,18 @@ func (s *ConfigStore) All() (map[string]string, error) {
 }
 
 // Dump writes a JSON backup of the current store (key -> value) to dest and
-// returns the map. It is the backing for the `go run` backup CLI.
+// returns the map. It is the backing for the CLI `backup` command.
 func (s *ConfigStore) Dump(dest string) (map[string]string, error) {
 	m, err := s.All()
 	if err != nil {
 		return nil, err
 	}
-	buf, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("configstore: dump marshal: %w", err)
-	}
-	if err := os.WriteFile(dest, buf, 0o644); err != nil {
-		return nil, fmt.Errorf("configstore: dump write %s: %w", dest, err)
-	}
-	return m, nil
+	return writeDump(m, dest)
 }
 
 // Restore loads a JSON backup (a key -> value map) from src and upserts every
 // entry into the store (source recorded as "restore"). It returns the count
 // of keys restored.
 func (s *ConfigStore) Restore(src string) (int, error) {
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return 0, fmt.Errorf("configstore: restore read %s: %w", src, err)
-	}
-	var m map[string]string
-	if err := json.Unmarshal(data, &m); err != nil {
-		return 0, fmt.Errorf("configstore: restore parse %s: %w", src, err)
-	}
-	for k, v := range m {
-		if err := s.Set(k, v, "restore"); err != nil {
-			return 0, err
-		}
-	}
-	return len(m), nil
+	return restoreInto(s, src)
 }

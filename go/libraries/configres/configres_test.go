@@ -115,7 +115,7 @@ func TestIntPrecedence(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			var st *configstore.ConfigStore
+			var st configstore.Store
 			if c.dbVal != "-" {
 				s, _ := newTempStore(t)
 				if c.dbVal != "" {
