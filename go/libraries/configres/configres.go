@@ -34,40 +34,40 @@ import (
 	"ollitex/go/libraries/configstore"
 )
 
-// Path — the canonical SQLite config-DB location (same file core.ConfigDBPath
-// and cmd/configdb manage):
-//
-//	$CONFIG_DB_PATH → $OVERLEAF_HOME/configdb/configdb.sqlite3 → ./configdb/configdb.sqlite3
-func Path() string {
-	if p := os.Getenv("CONFIG_DB_PATH"); p != "" {
-		return p
-	}
-	if h := os.Getenv("OVERLEAF_HOME"); h != "" {
-		return h + "/configdb/configdb.sqlite3"
-	}
-	return "configdb/configdb.sqlite3"
-}
+// Path — the explicit offline-emergency SQLite file (CONFIG_DB_PATH). It is
+// NEVER an implicit fallback: Postgres (DSN in env) is the single source of
+// truth for the shared config DB; this file is for operator-named offline
+// bootstrap only.
+func Path() string { return configstore.OfflinePath() }
 
-// Open — opens the shared config DB for reading WITHOUT creating it: nil
-// (not an error) when absent or unreachable, which callers treat as the
-// pre-config-DB deployment (env/default chain unchanged).
-// Backend: Postgres DSN in env → shared PG config DB (primary); no DSN → the
-// offline SQLite file at Path().
+// Open — opens the shared config DB WITHOUT creating it:
+//   - Postgres DSN in env  → that store IS the config DB (single source of
+//     truth). Configured but unreachable = HARD ERROR (panic at the caller's
+//     boot path) — never a silent env-only fallback (owner decision
+//     2026-10-03: "feels dangerous, violates the one source of truth").
+//   - Explicit CONFIG_DB_PATH (offline emergency, operator-named) → that
+//     SQLite file (absent/unreadable → nil / hard error respectively).
+//   - Neither configured → nil: pre-config-DB deployment, env/default chain.
 func Open() configstore.Store {
-	if configstore.DSNFromEnv() != "" {
-		if s, err := configstore.Dial(); err == nil {
-			return s
+	if dsn := configstore.DSNFromEnv(); dsn != "" {
+		s, err := configstore.DialPG(dsn)
+		if err != nil {
+			panic("configres: shared config DB (Postgres) is configured but unreachable: " + err.Error() +
+				" — refusing env-only fallback (single source of truth)")
 		}
-		return nil // PG unreachable → env/default chain (unchanged)
+		return s
 	}
-	if st, err := os.Stat(Path()); err != nil || st.IsDir() {
-		return nil
+	if p := configstore.OfflinePath(); p != "" {
+		if st, err := os.Stat(p); err != nil || st.IsDir() {
+			return nil // offline emergency DB not (yet) initialized → env chain
+		}
+		s, err := configstore.New(p)
+		if err != nil {
+			panic("configres: explicit offline config DB (CONFIG_DB_PATH=" + p + ") is set but unreadable: " + err.Error())
+		}
+		return s
 	}
-	s, err := configstore.New(Path())
-	if err != nil {
-		return nil
-	}
-	return s
+	return nil // no config DB configured for this deployment → env/default chain
 }
 
 // Int — config-DB key → env var → dflt.

@@ -1,25 +1,32 @@
 package core
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 
 	"ollitex/go/libraries/configstore"
 )
 
-// SQLite config-DB override (P7-post item 1: "move non-container-boot env
-// params into a SQLite config DB").
+// Postgres config-DB override (single source of truth — owner decision
+// 2026-10-03: the SQLite "fallback" is DANGEROUS and violates one-source-of-
+// truth, so the runtime contract is now):
+//   - Postgres DSN in env → that store IS the config DB (primary, shared by
+//     all instances — same plane as historyv1's chunk/blob stores).
+//     Configured but unreachable = HARD BOOT ERROR (never a silent env-only
+//     fallback with a potentially divergent view).
+//   - No DSN + explicit CONFIG_DB_PATH → the operator-named OFFLINE EMERGENCY
+//     SQLite file (loud, never auto-selected).
+//   - Neither → env-only (pre-config-DB deployments unchanged).
 //
 // LoadConfig first reads the env contract (container-boot params keep
-// working), THEN applies overrides from the SQLite config DB for a curated
-// set of NON-SECRET, NON-INFRA keys. The override is opt-in and additive:
-//   - If the DB file is absent, env-only behavior is completely unchanged.
+// working), THEN applies overrides from the config DB for a curated set of
+// NON-SECRET, NON-INFRA keys:
 //   - Only clearly-safe site/feature keys may be overridden.
 //   - All infra (MongoURI, Redis*, ports, API endpoints) and secrets (session
 //     secrets, API credentials, cookie name/domain) and security toggles
 //     (AllowPublicAccess) are EXCLUDED — they are container-boot, security,
-//     or credential parameters that must not be changed through the admin
-//     config DB.
+//     or credential parameters that must not be changed through the config DB.
 //
 // The curated set is a conservative starter pending owner curation; extend it
 // only by review.
@@ -28,43 +35,43 @@ import (
 // be SQLite-overridden. This set is intentionally small and non-secret.
 var curatedConfigDBKeys = []string{"AppName", "SiteURL", "CacheStaticAssets"}
 
-// configDBPath resolves the SQLite config-DB file in precedence order:
-//
-//	CONFIG_DB_PATH → $OVERLEAF_HOME/configdb/configdb.sqlite3 → ./configdb/configdb.sqlite3
-//
-// (same contract as the cmd/configdb operator CLI, so the /hub admin and the
-// CLI manage the SAME database file).
-func configDBPath() string {
-	if p := os.Getenv("CONFIG_DB_PATH"); p != "" {
-		return p
-	}
-	if h := os.Getenv("OVERLEAF_HOME"); h != "" {
-		return h + "/configdb/configdb.sqlite3"
-	}
-	return "./configdb/configdb.sqlite3"
-}
+// configDBPath — the explicit offline-emergency SQLite file (CONFIG_DB_PATH);
+// "" when unset. Postgres (DSN in env) is the single source of truth; this
+// file is the operator-named offline bootstrap only, never an implicit
+// fallback.
+func configDBPath() string { return configstore.OfflinePath() }
 
-// applyConfigDBOverrides applies curated config-DB values to cfg. It is a
-// no-op when the store is absent, unreachable, or has none of the curated
-// keys (the caller keeps the env-derived values).
-//
-// Backend (configstore.Dial): a Postgres DSN in env selects the shared PG
-// config DB (primary — same plane as historyv1's chunk/blob stores); no DSN
-// → the offline SQLite file. A PG that cannot be reached at boot is an
-// honest no-op (env values stay).
-func applyConfigDBOverrides(cfg *Config) {
-	if configstore.DSNFromEnv() == "" {
-		path := configDBPath()
-		if st, err := os.Stat(path); err != nil || st.IsDir() {
-			return // no offline config DB → env-only behavior (unchanged)
+// applyConfigDBOverrides applies curated config-DB values to cfg (single
+// source of truth: configured store MUST be readable, else boot error).
+func applyConfigDBOverrides(cfg *Config) error {
+	if dsn := configstore.DSNFromEnv(); dsn != "" {
+		store, err := configstore.DialPG(dsn)
+		if err != nil {
+			return fmt.Errorf("config: shared config DB (Postgres) configured but unreachable: %w", err)
 		}
+		defer store.Close()
+		applyFromStore(cfg, store)
+		return nil
 	}
-	store, err := configstore.Dial()
+
+	p := configDBPath()
+	if p == "" {
+		return nil // no config store configured for this deployment → env-only
+	}
+	if st, err := os.Stat(p); err != nil || st.IsDir() {
+		return nil // offline emergency DB not (yet) initialized → env-only
+	}
+	store, err := configstore.New(p)
 	if err != nil {
-		return // cannot open → env-only behavior (unchanged)
+		return fmt.Errorf("config: explicit offline config DB (CONFIG_DB_PATH=%s) set but unreadable: %w", p, err)
 	}
 	defer store.Close()
+	applyFromStore(cfg, store)
+	return nil
+}
 
+// applyFromStore reads the curated keys out of store onto cfg.
+func applyFromStore(cfg *Config, store configstore.Store) {
 	for _, key := range curatedConfigDBKeys {
 		v, err := store.Get(key)
 		if err != nil || v == "" {
@@ -83,9 +90,10 @@ func applyConfigDBOverrides(cfg *Config) {
 	}
 }
 
-// ConfigDBPath — the resolved SQLite config-DB path, shared by the /hub
-// admin, the operator CLI (cmd/configdb), and this env→override layer — so
-// all three manage the SAME database file.
+// ConfigDBPath — the explicit offline-emergency SQLite file ("" when unset),
+// shared by the /hub registry admin and the operator CLI. Postgres (DSN in
+// env) is the single source of truth; this file is the operator-named
+// offline bootstrap only.
 func ConfigDBPath() string { return configDBPath() }
 
 // ConfigDBOverridableKeys — a copy of the curated non-secret keys the /hub

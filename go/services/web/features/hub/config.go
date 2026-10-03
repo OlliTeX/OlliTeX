@@ -2,6 +2,7 @@ package hub
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 	"strconv"
@@ -38,12 +39,18 @@ func hubConfigAllowed(key string) bool {
 	return configschema.Known(key)
 }
 
-// openHubConfigStore — opens the shared config DB (creating it if needed, so
-// a first /hub write persists). Backend selection via configstore.Dial:
-// Postgres DSN in env → the shared PG config DB (primary); no DSN → the
-// offline SQLite file at core's canonical path.
+// openHubConfigStore — opens the shared config DB (creating objects if
+// needed, so a first /hub write persists). Single source of truth:
+// Postgres DSN in env = the config DB (hard error if unreachable); otherwise
+// the explicit offline-emergency file (CONFIG_DB_PATH) if named.
 func openHubConfigStore() (configstore.Store, error) {
-	return configstore.Dial()
+	if dsn := configstore.DSNFromEnv(); dsn != "" {
+		return configstore.DialPG(dsn)
+	}
+	if p := configstore.OfflinePath(); p != "" {
+		return configstore.New(p)
+	}
+	return nil, fmt.Errorf("no config store: set CONFIG_DB_DSN/DATABASE_URL (Postgres — single source of truth) or CONFIG_DB_PATH (explicit offline-emergency SQLite file)")
 }
 
 // hubConfigEntry is one row of the GET listing.

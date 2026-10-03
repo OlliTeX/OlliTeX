@@ -28,10 +28,10 @@ func set(t *testing.T, s *configstore.ConfigStore, k, v string) {
 	}
 }
 
-// clearEnv removes the two boot vars a test must not inherit.
+// clearEnv removes the store-selection vars a test must not inherit.
 func clearEnv(t *testing.T) {
 	t.Helper()
-	for _, k := range []string{"CONFIG_DB_PATH", "OVERLEAF_HOME"} {
+	for _, k := range []string{"CONFIG_DB_PATH", "OVERLEAF_HOME", "CONFIG_DB_DSN", "DATABASE_URL", "HISTORY_CONNECTION_STRING"} {
 		if old, ok := os.LookupEnv(k); ok {
 			t.Cleanup(func() { os.Setenv(k, old) })
 		}
@@ -39,27 +39,45 @@ func clearEnv(t *testing.T) {
 	}
 }
 
-func TestPathContract(t *testing.T) {
-	t.Run("explicit path wins", func(t *testing.T) {
+func TestPathContractSingleSource(t *testing.T) {
+	// Owner decision 2026-10-03: the implicit fallback file chain is GONE —
+	// Path() is the EXPLICIT offline-emergency file, "" when unset (Postgres
+	// DSN in env is the single source of truth; this file is never
+	// auto-selected).
+	t.Run("explicit offline file", func(t *testing.T) {
 		t.Setenv("CONFIG_DB_PATH", "/x/y/db.sqlite3")
-		os.Unsetenv("OVERLEAF_HOME")
 		if got := Path(); got != "/x/y/db.sqlite3" {
 			t.Fatalf("Path() = %q", got)
 		}
 	})
-	t.Run("OVERLEAF_HOME", func(t *testing.T) {
+	t.Run("unset → empty (no implicit fallback file)", func(t *testing.T) {
 		os.Unsetenv("CONFIG_DB_PATH")
-		t.Setenv("OVERLEAF_HOME", "/home/o")
-		if got := Path(); got != "/home/o/configdb/configdb.sqlite3" {
-			t.Fatalf("Path() = %q", got)
+		if got := Path(); got != "" {
+			t.Fatalf("Path() = %q, want \"\" (no implicit fallback)", got)
 		}
 	})
-	t.Run("default", func(t *testing.T) {
-		clearEnv(t)
-		if got := Path(); got != "configdb/configdb.sqlite3" {
-			t.Fatalf("Path() = %q", got)
+}
+
+// TestDSNConfiguredUnreachableIsHardError — the owner's A regression:
+// "store falls back to the offline SQLite file chain — feels dangerous and
+// violates the one source of truth". With a DSN configured, an unreachable
+// store MUST be a hard error — never a silent env-only fallback.
+func TestDSNConfiguredUnreachableIsHardError(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("CONFIG_DB_DSN", "postgres://nouser:nowhere@127.0.0.1:59999/never?sslmode=disable")
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("Open() with a configured-but-unreachable DSN must hard-error (single source of truth; env-only is not a fallback)")
 		}
-	})
+	}()
+	Open()
+}
+
+func TestOpenNoStoreConfiguredIsNil(t *testing.T) {
+	clearEnv(t)
+	if s := Open(); s != nil {
+		t.Fatal("Open() with no store configured should be nil (pre-config-DB env chain)")
+	}
 }
 
 func TestOpenAbsentReturnsNilAndCreatesNothing(t *testing.T) {

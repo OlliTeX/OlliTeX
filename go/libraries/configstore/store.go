@@ -17,6 +17,7 @@
 package configstore
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"strings"
@@ -66,22 +67,38 @@ func DSNFromEnv() string {
 	return ""
 }
 
-// Dial resolves the configured backend and opens it (creating objects if
-// needed): Postgres when a DSN is in env, otherwise the SQLite file chain.
-// This is the single entry point for the web service, the /hub admin, and the
-// operator CLI.
+// Dial opens the shared config DB — Postgres ONLY (the single source of
+// truth). It errors when no DSN is configured (never silently picks a
+// second store): SQLite is reachable only via the explicit offline
+// emergency form DialOffline(path).
 func Dial() (Store, error) {
-	if dsn := DSNFromEnv(); dsn != "" {
-		return NewPG(dsn)
+	dsn := DSNFromEnv()
+	if dsn == "" {
+		return nil, fmt.Errorf(
+			"configstore: no Postgres DSN configured (single source of truth). " +
+				"Set CONFIG_DB_DSN (or DATABASE_URL / HISTORY_CONNECTION_STRING). " +
+				"Offline SQLite emergency mode requires an explicit CONFIG_DB_PATH (use DialOffline)")
 	}
-	return New(SQLitePath())
+	return NewPG(dsn)
 }
+
+// DialOffline is the EXPLICIT offline SQLite emergency form (air-gapped
+// bootstrap, `go run` with no database). It is never auto-selected: the
+// caller has to name the file. The single source of truth remains Postgres.
+func DialOffline(dbFile string) (Store, error) { return New(dbFile) }
 
 // DialFile is the explicit SQLite form (offline emergency path, tests).
 func DialFile(dbFile string) (Store, error) { return New(dbFile) }
 
 // DialPG is the explicit Postgres form (key from CONFIG_DB_ENCRYPTION_KEY).
 func DialPG(dsn string) (Store, error) { return NewPG(dsn) }
+
+// SQLiteEnv is the explicit offline-emergency file env var (never an
+// implicit fallback: when set, it names the SQLite file used in offline mode).
+const SQLiteEnv = "CONFIG_DB_PATH"
+
+// OfflinePath returns the explicit offline SQLite file ("" when unset).
+func OfflinePath() string { return os.Getenv(SQLiteEnv) }
 
 // describeDSN redacts credentials from a connection string for operator
 // output (user:pass@… → user:****@…).

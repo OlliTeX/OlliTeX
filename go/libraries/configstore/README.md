@@ -11,7 +11,7 @@ endpoints** (GET/PUT the managed keys), the **`cmd/configdb` CLI**, and
 | Backend | When | How |
 | --- | --- | --- |
 | **Postgres (PRIMARY)** | A DSN is in env: `CONFIG_DB_DSN` > `DATABASE_URL` > `HISTORY_CONNECTION_STRING` | table `configdb` (key/value/source/updated_at) in the stack's central DB — the same PG plane `historyv1`'s chunk/blob stores use (pgx v5). `NewPG(dsn)` |
-| **SQLite (offline emergency fallback)** | No DSN in env | file chain `$CONFIG_DB_PATH → $OVERLEAF_HOME/configdb/… → ./configdb/configdb.sqlite3` (WAL, single conn). `New(dbFile)` |
+| **SQLite (EXPLICIT offline emergency only)** | `CONFIG_DB_PATH=<file>` set (name the file) | SQLite at that path (WAL, single conn) — a loud, operator-named air-gapped mode via `New(dbFile)`. **Never an implicit fallback:** a configured Postgres that is down is a hard error (the one source of truth). |
 
 Entry points: `Dial()` (env‑based selection), `DialFile(path)`, `DialPG(dsn)`,
 plus `New`/`NewPG` for the explicit forms. `Store.Describe()` names the live

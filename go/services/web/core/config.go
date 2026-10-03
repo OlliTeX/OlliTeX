@@ -205,10 +205,12 @@ func LoadConfig() (*Config, error) {
 		APIUser:           os.Getenv("WEB_API_USER"),
 		APIPassword:       os.Getenv("WEB_API_PASSWORD"),
 	}
-	// SQLite config-DB override (P7-post item 1): apply curated, non-secret,
-	// non-infra keys from the SQLite config DB on top of the env contract.
-	// Opt-in + no-op when the DB is absent — see configdb_override.go.
-	applyConfigDBOverrides(cfg)
+	// config-DB override (single source of truth): curated non-secret keys
+	// from the Postgres config DB (DSN) or the explicit offline file, on top
+	// of the env contract. Configured but unreachable = boot error.
+	if err := applyConfigDBOverrides(cfg); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 

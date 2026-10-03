@@ -57,15 +57,30 @@ func run(args []string, out io.Writer) error {
 }
 
 func dispatch(cmd string, args []string, out io.Writer) error {
-	// Backend selection — Postgres DSN in env (CONFIG_DB_DSN || DATABASE_URL ||
-	// HISTORY_CONNECTION_STRING) → the shared PG config DB (primary); no DSN →
-	// the offline SQLite file. Same CLI either way.
-	s, err := configstore.Dial()
-	if err != nil {
-		if configstore.DSNFromEnv() != "" {
-			return fmt.Errorf("open PG config DB: %w (backend: postgres; check the DSN + server)", err)
+	// SINGLE SOURCE OF TRUTH (owner decision 2026-10-03): Postgres DSN is the
+	// config DB. SQLite is reachable only EXPLICITLY via CONFIG_DB_PATH
+	// (loud offline-emergency mode) — never auto-selected as a fallback.
+	var s configstore.Store
+	var offline bool
+	if dsn := configstore.DSNFromEnv(); dsn != "" {
+		var err error
+		s, err = configstore.DialPG(dsn)
+		if err != nil {
+			return fmt.Errorf("open PG config DB: %w (single source of truth: CONFIG_DB_DSN ‖ DATABASE_URL ‖ HISTORY_CONNECTION_STRING; check the DSN + server)", err)
 		}
-		return err
+	} else if p := configstore.OfflinePath(); p != "" {
+		var err error
+		s, err = configstore.New(p)
+		if err != nil {
+			return fmt.Errorf("open explicit offline config DB (%s): %w", p, err)
+		}
+		offline = true
+	} else {
+		return fmt.Errorf("no config DB: set CONFIG_DB_DSN (Postgres — the single source of truth) or CONFIG_DB_PATH (EXPLICIT offline-emergency SQLite file; never an implicit fallback)")
+	}
+	if offline {
+		// stderr — keep the value-producing stdout stream machine-clean.
+		fmt.Fprintln(os.Stderr, "⚠ OFFLINE EMERGENCY MODE: local SQLite file — NOT the shared config DB (single source of truth is the Postgres DSN)")
 	}
 	defer func() { _ = s.Close() }()
 
@@ -423,9 +438,11 @@ func doctor(s configstore.Store, out io.Writer) error {
 func usage(w io.Writer) error {
 	_, err := fmt.Fprint(w, `configdb — CLI for the OlliTeX shared config DB.
 
-Backends (same CLI, one logical store):
-  * Postgres (PRIMARY): set CONFIG_DB_DSN, DATABASE_URL, or HISTORY_CONNECTION_STRING.
-  * SQLite (offline emergency fallback): no DSN in env → CONFIG_DB_PATH file chain.
+Backends (one logical store, SAME CLI):
+  * Postgres = THE config DB (single source of truth): CONFIG_DB_DSN, DATABASE_URL,
+    or HISTORY_CONNECTION_STRING in env.
+  * SQLite = EXPLICIT offline-emergency mode only: set CONFIG_DB_PATH=<file>
+    (never an implicit fallback — a configured PG that is down is a hard error).
 
 Usage:
   configdb list                      list configured keys
@@ -443,8 +460,9 @@ Usage:
   configdb doctor                    key/db/read-back health
   configdb help                      this help
 
-DB location: Postgres DSN ($CONFIG_DB_DSN || $DATABASE_URL || $HISTORY_CONNECTION_STRING, primary);
-offline fallback SQLite: $CONFIG_DB_PATH, or $OVERLEAF_HOME/configdb/configdb.sqlite3, or ./configdb/configdb.sqlite3.
+DB location: Postgres DSN ($CONFIG_DB_DSN || $DATABASE_URL || $HISTORY_CONNECTION_STRING) —
+the single source of truth. EXPLICIT offline emergency: $CONFIG_DB_PATH=<file> (SQLite; a loud,
+operator-named air-gap mode — never auto-selected).
 Encryption: $CONFIG_DB_ENCRYPTION_KEY (hex-64 or base64-44, 32 bytes) — field encryption of stored
 values (AES-256-GCM); the key itself is never stored in the DB.
 `)
