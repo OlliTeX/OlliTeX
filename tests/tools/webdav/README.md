@@ -113,12 +113,36 @@ Part B (Overleaf `webdav` module; needs a live overleaf + dev user):
 - B0/B1 disconnect + `status` (`{"connected":false}`)
 - B2 `connect{baseUrl,rootPath,username,password}` + status echo
 - B3 seed remote tree (parents MKCOL'd — strict family) under
-  `<rootPath>/<proj>/` (`hello.txt`, `sub/notes.txt`)
+  `<rootPath>/<proj>/` (`hello.txt`, `sub/notes.txt`, `chapter.tex`)
 - B4 `import POST /project/new/webdav` → `200` + project **created**
-  (project row + ingested remote tree + `webdavsyncprojectstates` row
-  owned by the importer)
+  (project row + ingested remote tree — `hello.txt`/`notes.txt` in
+  `files[]`, `chapter.tex` in `docs[]` — + `webdavsyncprojectstates`
+  row owned by the importer)
 - B5 `push` → `200 Push completed`, files intact on the server
   (`createDirectory` sees `MKCOL 201` fresh / `405` re-push, both tolerated)
+- B5b `push .tex` → remote `chapter.tex` body == docstore seed
+  (docstore-backed parity: import writes `docs[]` + docstore body from the
+  remote `.tex`; push exports `docs[]` back from docstore — exact
+  `\n`-split/join round-trip)
 - B6 `pull` → `200 Pull completed`, remote-only new file ingested
 - B7 unlink state; (OLI_CLEANUP=1) `DELETE /Project/:id`
 - B8 disconnect → status `connected:false`
+
+## Documented parity status (2026-10-03, live-verified)
+
+- **`.tex` import + push: WORKING** — import ingests the remote `.tex` into
+  `docs[]` + a docstore body; push exports `docs[]` back from docstore
+  (B5b pins byte-parity). Measured: docstore vN → push 200 → remote body
+  identical.
+- **non-`.tex` file bodies: documented gap** — import writes the tree entry
+  (`files[]`) only; the filestore body is not materialized. Push therefore
+  SKIPS contentless non-`.tex` entries (nil-body guard in `wdSyncProject`) —
+  it never PUTs an empty body that would truncate the remote file.
+- **nested imports = flat basenames** — `sub/notes.txt` ingests as
+  `notes.txt` in `files[]`; folder nesting is not materialized (parity gap
+  under owner option (a) import-creates).
+- **mongo driver v2 gotcha (product)** — BSON arrays decode as `bson.A`
+  (a defined type): `[]interface{}` assertions silently fail. The push
+  walker went through this (exported zero entries ⇒ push 200 with zero
+  PUTs). `wdAsSlice` accepts both shapes; `tree_shape_test.go` pins the
+  `docs[]`/`files[]` export contract.
