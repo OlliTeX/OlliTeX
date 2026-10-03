@@ -247,7 +247,9 @@ func (f *fakeRedis) SETEXReply(key, value string, ttl time.Duration) (bool, erro
 func (f *fakeRedis) SETEX(key, value string, ttl time.Duration) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.setnx[key] = value
+	// Faithful to real redis: SETEX stores a value that GET can read back
+	// (the NX-flavoured SETEXReply keeps its own setnx slot).
+	f.gets[key] = value
 	return nil
 }
 func (f *fakeRedis) GET(key string) (string, bool, error) {

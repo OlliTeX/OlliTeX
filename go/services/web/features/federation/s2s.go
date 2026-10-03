@@ -57,23 +57,15 @@ func s2sHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			From   string         `json:"from"`
 			To     string         `json:"to"`
 			Action string         `json:"action"`
-			Data   map[string]any `json:"data"`
+			Data   map[string]any `json:"data"` // LOCKED alias: `payload`
 			TS     string         `json:"ts"`
 		}
 		var body []byte
 		if cxt.Req != nil && cxt.Req.Body != nil {
-			buf := make([]byte, 0, 8192)
-			chunk := make([]byte, 8192)
-			for {
-				m, err := cxt.Req.Body.Read(chunk)
-				if m > 0 {
-					buf = append(buf, chunk[:m]...)
-				}
-				if err != nil || len(buf) > 1<<20 {
-					break
-				}
+			buf, rerr := readJSONBody(cxt.Req, 1<<20)
+			if rerr == nil {
+				body = buf
 			}
-			body = buf
 		}
 		if len(body) == 0 {
 			res.JSON(400, []byte(`{"ok":false,"code":"bad-envelope","detail":"missing body"}`))
@@ -83,6 +75,18 @@ func s2sHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(400, []byte(`{"ok":false,"code":"bad-envelope","detail":"body is not a JSON object"}`))
 			return
 		}
+		// LOCKED alias: the overleaf-fed §9 table names the object `payload`;
+		// the 03 §2 pin (S2sRouter) names it `data`. Accept both — the
+		// dispatch reads one map, so the wire stays lenient exactly where the
+		// two in-tree pins disagree.
+		if env.Data == nil {
+			var alt struct {
+				Payload map[string]any `json:"payload"`
+			}
+			if aerr := json.Unmarshal(body, &alt); aerr == nil {
+				env.Data = alt.Payload
+			}
+		}
 		if env.From == "" || env.To == "" || env.Action == "" {
 			res.JSON(400, []byte(`{"ok":false,"code":"bad-envelope","detail":"from/to/action required"}`))
 			return
@@ -91,15 +95,25 @@ func s2sHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(400, []byte(`{"ok":false,"code":"unknown-action","detail":`+jsonQuote(env.Action)+`}`))
 			return
 		}
-		// ③ client-assertion verification (02 §2) — the caller's
-		// assertion is checked against the pinned leaf key; the deep
-		// slices (S9–S11) run the action. Until the full S2S action
-		// registry lands, the envelope answers `action-pending` with
-		// the verified shape (honest: the wire contract is pinned, the
-		// action dispatch is the remaining slice).
-		_ = env.Data
-		_ = env.TS
-		res.JSON(200, []byte(`{"ok":false,"code":"action-pending","detail":"action dispatch lands with the S9–S11 slices"}`))
+		// ③–⑥ S5 dispatch pipeline (LOCKED 03 §6): the `client_assertion`
+		// header (JWT) verifies the caller (401 machine codes) → ④ jti
+		// replay (401 replay-jti) → ⑤ rate budget (429 + Allow-Retry-After,
+		// code rate-limited) → ⑥ action dispatch (200 { ok, code?, detail?,
+		// payload? }) + fire-and-forget audit rows (04 §8).
+		assertion := ""
+		if cxt.Req != nil {
+			assertion = cxt.Req.Header.Get("client_assertion")
+		}
+		out := prodS2sDeps(a, cxt).pipeline(env.Action, env.From, assertion, env.Data)
+		for k, v := range out.headers {
+			res.W.Header().Set(k, v)
+		}
+		b, merr := json.Marshal(out.body)
+		if merr != nil {
+			b = []byte(`{"ok":false,"code":"server-error"}`)
+			out.status = http.StatusInternalServerError
+		}
+		res.JSON(out.status, b)
 	}
 }
 

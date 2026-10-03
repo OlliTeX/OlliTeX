@@ -75,10 +75,12 @@ func TestFedS2S_EnvelopeSanity(t *testing.T) {
 	if w.Code != 400 || !strings.Contains(w.Body.String(), `"unknown-action"`) {
 		t.Errorf("unknown action: %d %s", w.Code, w.Body.String())
 	}
-	// known action → 200 (dispatch pending envelope)
+	// known action WITHOUT a client assertion → 401 bad-signature (S5
+	// dispatch wiring replaced the `action-pending` stub pin: the
+	// assertion is the signature, 03 §2).
 	w = doFed(t, a, "POST", "/federation/s2s", `{"from":"b","to":"a","action":"invited","data":{"projectId":"p1"}}`, nil)
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `"action-pending"`) {
-		t.Errorf("invited: %d %s", w.Code, w.Body.String())
+	if w.Code != 401 || !strings.Contains(w.Body.String(), `"bad-signature"`) {
+		t.Errorf("invited no-assertion: %d %s", w.Code, w.Body.String())
 	}
 }
 

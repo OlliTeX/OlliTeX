@@ -102,3 +102,19 @@ func Audit(log *slog.Logger, w AuditWriter, operation string, meta map[string]an
 		log.Error("federation: audit write failed", "operation", operation, "err", err)
 	}
 }
+
+// AuditProject — project-scoped rows (federation_invite_*,
+// federation_export_*): like Audit, but carries the optional projectId
+// (Node ProjectAuditLogEntry.projectId is an optional indexed ObjectId).
+func AuditProject(log *slog.Logger, w AuditWriter, operation string, meta map[string]any, projectId *string, initiatorId, ipAddress string) {
+	if w == nil {
+		return
+	}
+	info := FilterMeta(meta)
+	if log != nil {
+		log.Info("federation audit", "operation", operation)
+	}
+	if err := w.WriteAudit(context.Background(), operation, projectId, info, initiatorId, ipAddress); err != nil && log != nil {
+		log.Error("federation: audit write failed", "operation", operation, "err", err)
+	}
+}
