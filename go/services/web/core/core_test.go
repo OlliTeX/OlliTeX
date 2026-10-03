@@ -609,6 +609,60 @@ func TestAppCsrfGoodTokenPasses(t *testing.T) {
 	}
 }
 
+// TestAppFormBodySurvivesCsrf — regression (2026-10-04): the csurf
+// body._csrf path (r.FormValue) CONSUMES urlencoded request bodies (Go
+// ParseForm behavior), so every form-POST handler read an EMPTY body
+// (e2e symptom: /user/password/set 400 invalid-password on a valid form).
+// Node buffers the form body (body-parser) BEFORE csurf runs — restore that
+// contract: the handler must see the full form payload after the csrf check.
+func TestAppFormBodySurvivesCsrf(t *testing.T) {
+	app, fr, _ := newTestApp(t, "web", "sec")
+	app.RegisterFeature(Feature{
+		Name: "formbody",
+		Routes: []Route{
+			{Method: "POST", Path: "/some-post", NoLogin: true, Handler: func(c *Cxt, r *Res) {
+				raw, _ := io.ReadAll(c.Req.Body)
+				r.PlainText(200, "body:"+string(raw))
+			}},
+		},
+	})
+	// issue the session cookie + secret via the 403 path (parity flow,
+	// same as TestAppCsrfGoodTokenPasses)
+	w1 := doReq(t, app.Handler(), "POST", "/some-post", map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, "_csrf=garbage")
+	sidCookie := w1.Header().Get("Set-Cookie")
+	if sidCookie == "" {
+		t.Fatal("403 csrf path must issue the session cookie (secret allocated)")
+	}
+	rawSID := strings.TrimPrefix(strings.SplitN(sidCookie, ";", 2)[0], "overleaf.sid=")
+	secret := ""
+	for k, v := range fr.m {
+		if strings.Contains(k, "sess:") {
+			var d map[string]any
+			if json.Unmarshal([]byte(v), &d) == nil {
+				if cs, ok := d["csrfSecret"].(string); ok {
+					secret = cs
+				}
+			}
+			break
+		}
+	}
+	if secret == "" {
+		t.Fatal("no csrfSecret stored for the anonymous session")
+	}
+	tok := CsrfToken(secret)
+	body := "email=probe%40example.com&password=Ol-Fixture-9x7K&passwordResetToken=TK123"
+	w2 := doReq(t, app.Handler(), "POST", "/some-post",
+		map[string]string{"Cookie": "overleaf.sid=" + rawSID, "Content-Type": "application/x-www-form-urlencoded"},
+		body+"&_csrf="+urlEscape(tok))
+	if w2.Code != 200 {
+		t.Fatalf("valid csrf must pass: %d %s", w2.Code, w2.Body.String())
+	}
+	got := w2.Body.String()
+	if !strings.Contains(got, "email=probe%40example.com") || !strings.Contains(got, "passwordResetToken=TK123") {
+		t.Fatalf("handler must see the full form body (the csrf check must not consume it): %q", got)
+	}
+}
+
 func TestAppAPIProfile404IsExpressPage(t *testing.T) {
 	app, _, _ := newTestApp(t, "api", "sec")
 	app.RegisterFeature(Feature{

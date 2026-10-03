@@ -459,6 +459,28 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 			}
 		}
 
+		// Form-body parity (2026-10-04, pinned by the e2e config-registry gate):
+		// csurf's body._csrf path uses r.FormValue, and Go's ParseForm CONSUMES
+		// urlencoded/multipart request bodies — the handler would then read an
+		// empty body (spurious 400 invalid-password on /user/password/set, same
+		// class for every form POST). Node avoids it because express's
+		// urlencoded body-parser buffers BEFORE csurf runs. Buffer the raw body
+		// now (so csrf still sees the fields) and re-attach a fresh stream for
+		// the handler after the csrf check.
+		var formRaw []byte
+		if ct := strings.ToLower(r.Header.Get("Content-Type")); (strings.Contains(ct, "application/x-www-form-urlencoded") || strings.Contains(ct, "multipart/form-data")) &&
+			(r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch) &&
+			r.Body != nil {
+			if raw, rerr := io.ReadAll(http.MaxBytesReader(w, r.Body, 12*1024*1024)); rerr == nil {
+				formRaw = raw
+				r.Body = io.NopCloser(bytes.NewReader(raw))
+				r.ContentLength = int64(len(raw))
+			} else {
+				badBody413(a, r, res)
+				return
+			}
+		}
+
 		// routeNoCSRF mirrors the non-csrfRouter mount: WEB router (session ON)
 		// but csurf skipped (machine POSTs + op-redirect landings).
 		touchedByNoCSRF := a.routeNoCSRF(r)
@@ -480,6 +502,16 @@ func (a *App) serve(w http.ResponseWriter, r *http.Request, rw *recWriter) {
 				res.SendStatus(403)
 				return
 			}
+		}
+
+		// Re-attach the form body for the handler (the csrf check's ParseForm
+		// consumed the streamed copy; a fresh reader restores the Node contract
+		// where the handler's body-parser view still has the full payload).
+		if formRaw != nil {
+			r.Body = io.NopCloser(bytes.NewReader(formRaw))
+			r.ContentLength = int64(len(formRaw))
+			r.PostForm = nil
+			r.MultipartForm = nil
 		}
 
 		// Server.mjs:322-360 — helmet + conditional no-cache at request
