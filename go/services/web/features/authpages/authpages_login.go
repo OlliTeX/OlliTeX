@@ -8,6 +8,7 @@ import (
 	"log"
 	"ollitex/go/services/web/core"
 	"os"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -333,17 +334,18 @@ func validEmail(s string) bool {
 
 // ---- body decoding (JSON preferred; urlencoded tolerated) ----
 
-// ---- body decoding (JSON preferred; urlencoded tolerated) ----
-
 func decodeBody(cxt *core.Cxt, v any) error {
 	ct := strings.ToLower(cxt.Req.Header.Get("Content-Type"))
 	b, err := io.ReadAll(io.LimitReader(cxt.Req.Body, 1<<20))
 	if err != nil {
 		return err
 	}
-	if strings.Contains(ct, "application/json") || strings.Contains(ct, "application/") {
-		return json.Unmarshal(b, v)
-	}
+	// 2026-10-04 (audit H6 / e2e login 400): match the FORM content types
+	// explicitly first. The old catch-all `Contains(ct, "application/")`
+	// swallowed x-www-form-urlencoded into the JSON branch — form login
+	// 400'd with empty fields, breaking browser login (e2e pin: the seed
+	// login POST is a form). Node contract: express.json parses only the
+	// json content type; the urlencoded parser handles forms.
 	if strings.Contains(ct, "x-www-form-urlencoded") {
 		vals, perr := urlParseForm(string(b))
 		if perr == nil {
@@ -358,32 +360,34 @@ func decodeBody(cxt *core.Cxt, v any) error {
 }
 
 // formFiller maps urlencoded values onto the struct's `json` names.
-
-// formFiller maps urlencoded values onto the struct's `json` names.
+// 2026-10-04 (audit H6): the previous anonymous-struct type switch was a
+// SILENT no-op for named struct types (and any future field) — forms
+// decoded to empty fields with a SUCCESS return. Reflection over the
+// exported string fields (json tag, fallback lower-cased name) is the
+// general contract and pins both cases.
 func formFiller(v any) func(map[string][]string) {
 	return func(vals map[string][]string) {
-		set := []struct {
-			key   string
-			apply string `json:"-"`
-		}{}
-		_ = set
-		// minimal: the two known forms
-		switch m := v.(type) {
-		case *struct {
-			Email    string `json:"email"`
-			Password string `json:"password"`
-		}:
-			if e, ok := vals["email"]; ok && len(e) > 0 {
-				m.Email = e[0]
+		rv := reflect.ValueOf(v)
+		if rv.Kind() != reflect.Ptr {
+			return
+		}
+		vv := reflect.Indirect(rv)
+		if vv.Kind() != reflect.Struct {
+			return
+		}
+		t := vv.Type()
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			if !f.IsExported() || f.Type.Kind() != reflect.String {
+				continue
 			}
-			if p, ok := vals["password"]; ok && len(p) > 0 {
-				m.Password = p[0]
+			name := f.Tag.Get("json")
+			name = strings.SplitN(name, ",", 2)[0]
+			if name == "" || name == "-" {
+				name = strings.ToLower(f.Name)
 			}
-		case *struct {
-			Redirect string `json:"redirect"`
-		}:
-			if r, ok := vals["redirect"]; ok && len(r) > 0 {
-				m.Redirect = r[0]
+			if v0, ok := vals[strings.ToLower(name)]; ok && len(v0) > 0 {
+				vv.Field(i).SetString(v0[0])
 			}
 		}
 	}

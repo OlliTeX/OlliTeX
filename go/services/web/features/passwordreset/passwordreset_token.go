@@ -229,7 +229,12 @@ func setNewPassword(a *core.App, mail *core.Mail, tok *core.OneTimeTokens) func(
 			"$set":   bson.M{"hashedPassword": hash},
 			"$unset": bson.M{"password": true},
 		}
-		if _, uerr := db.Collection("users").UpdateOne(ctx, bson.M{"_id": userDoc.ObjectID}, upd); uerr != nil {
+		ures, uerr := db.Collection("users").UpdateOne(ctx, bson.M{"_id": userDoc.ObjectID}, upd)
+		// audit H7 (2026-10-04): a zero-match update is a silent no-op — the
+		// password did not change but the token IS about to be expired and the
+		// client told "OK". Fail hard instead (matched userDoc was read above,
+		// so a miss means a concurrent delete or an _id type anomaly).
+		if uerr != nil || ures == nil || ures.MatchedCount == 0 {
 			respondJSON(res, 500, `{"message":"An error has occurred while performing your request."}`)
 			return
 		}
