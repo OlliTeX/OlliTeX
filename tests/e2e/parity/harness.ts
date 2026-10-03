@@ -215,13 +215,18 @@ async function ensureTemplateCategories(q: import('@playwright/test').Page, csrf
     const j = (await all.json().catch(() => ({}))) as any
     const sec = (j.templates ?? j.sections?.templates) as any
     const cats = Array.isArray(sec?.categories) ? sec.categories : []
-    if (cats.length > 0) return // already intact
+    // 2026-10-04: the Node AND Go validators BOTH require a string `description`
+    // per category (validateTemplatesSection / sitesettings validators.go) —
+    // description-less categories (legacy seed state) can never round-trip a
+    // section PUT, so treat them as not-intact and re-seed the canonical list.
+    const intact = cats.length > 0 && cats.every((c: any) => c && typeof c.name === 'string' && typeof c.description === 'string')
+    if (intact) return // already intact
   } catch {
     // section not readable (shouldn't happen: admin session) → re-seed anyway
   }
   const canonical = [
-    { key: 'academic-journal', name: 'Academic journals', enabled: true },
-    { key: 'book', name: 'Books', enabled: true },
+    { key: 'academic-journal', name: 'Academic journals', description: 'Academic journal templates', enabled: true },
+    { key: 'book', name: 'Books', description: 'Book and monograph templates', enabled: true },
   ]
   const base = (async () => {
     try {
