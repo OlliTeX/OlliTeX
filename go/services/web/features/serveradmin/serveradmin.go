@@ -45,6 +45,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: adminPageRe, Handler: adminPage(a)},
 			{Method: "GET", Path: "/admin/editor-state", Handler: editorState(a)},
 			{Method: "POST", Path: "/admin/openEditor", Handler: openEditor(a)},
+			{Method: "POST", Path: "/admin/disconnectAllUsers", Handler: disconnectAllUsers(a)},
 			{Method: "POST", Path: "/admin/closeEditor", Handler: closeEditor(a)},
 			{Method: "POST", Path: "/admin/messages", Handler: createMessage(a)},
 			{Method: "POST", Path: "/admin/messages/clear", Handler: clearMessages(a)},
