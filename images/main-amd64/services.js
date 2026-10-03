@@ -6,7 +6,10 @@ module.exports = [
     // is self-contained under frontend/; 2026-09-29 bake completed the reorg
     // by landing the missing config files there (they were symlinked from
     // services/web, which docker's build context cannot follow).
-    dir: 'services/web', // build host (Settings.js + build macro are CWD-anchored to services/web)
+    // P7 step 4 (2026-10-03): the Node web app retired to junk/services-web (owner RETIRE
+    // decision; see junk/services-web/RETIRED.md). It REMAINS the webpack build host — the
+    // webpack config chain (webpack.config.*.js) lives with its package.json there.
+    dir: 'junk/services-web', // build host (webpack chain + Settings.js + build macro are CWD-anchored here)
   },
 ]
 // node clsi was retired to the Go service (go/services/clsitex, run via

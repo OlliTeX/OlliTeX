@@ -207,7 +207,6 @@
     "libraries/*",
     "server-ce/test",
     "services/analytics",
-    "services/clsi_typst",
     "services/clsi-cache",
     "services/clsi-lb",
     "services/clsi-perf",
@@ -222,10 +221,8 @@
     "tools/npm-overrides-helper",
     "tools/saas-e2e",
     "tools/migrations",
-    "services/web",
-    "services/web/scripts/ukamf",
-    "services/web/scripts/plan-prices",
-    "frontend"
+    "frontend",
+    "junk/services-web"
   ],
   "dependenciesMeta": {
     "@babel/helper-string-parser@7.27.1": {

@@ -28,17 +28,17 @@ services:
     ports:
       - "127.0.0.1:9229:9229"
     volumes:
-      - ../services/web/app:/overleaf/services/web/app
-      - ../services/web/app.mjs:/overleaf/services/web/app.mjs
-      - ../services/web/config:/overleaf/services/web/config
+      - ../junk/services-web/app:/overleaf/services/web/app
+      - ../junk/services-web/app.mjs:/overleaf/services/web/app.mjs
+      - ../junk/services-web/config:/overleaf/services/web/config
       - ../locales:/overleaf/locales
       - ../services/web/modules:/overleaf/services/web/modules
       - ../public:/overleaf/public
 
   webpack:
     volumes:
-      - ../services/web/app:/overleaf/services/web/app
-      - ../services/web/config:/overleaf/services/web/config
+      - ../junk/services-web/app:/overleaf/services/web/app
+      - ../junk/services-web/config:/overleaf/services/web/config
       - ../frontend:/overleaf/frontend
       - ../locales:/overleaf/locales
       - ../services/web/modules:/overleaf/services/web/modules

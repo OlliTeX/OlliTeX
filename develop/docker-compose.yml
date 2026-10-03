@@ -65,7 +65,7 @@ services:
   smtpsink:
     build:
       context: ..
-      dockerfile: services/web/Dockerfile
+      dockerfile: junk/services-web/Dockerfile
       target: dev
     # env -u NODE_OPTIONS: the web build preloads its Yarn PnP hooks, which
     # break running a standalone CJS script; the sink needs none of them.
@@ -79,7 +79,7 @@ services:
   web:
     build:
       context: ..
-      dockerfile: services/web/Dockerfile
+      dockerfile: junk/services-web/Dockerfile
       target: dev
     env_file:
       - dev.env
@@ -122,7 +122,7 @@ services:
   webpack:
     build:
       context: ..
-      dockerfile: services/web/Dockerfile
+      dockerfile: junk/services-web/Dockerfile
       target: webpack
     command:
       ["npx", "webpack", "serve", "--config", "webpack.config.dev-env.js"]

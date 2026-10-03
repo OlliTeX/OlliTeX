@@ -39,7 +39,7 @@ WORKDIR /overleaf
 
 # Add required source files for yarn install
 # -------------------------------------------
-COPY --parents libraries/*/package.json .yarn/patches/ services/*/package.json tools/migrations/ package.json frontend/package.json yarn.lock .yarnrc.yml .pnp.register.mjs /overleaf/
+COPY --parents libraries/*/package.json .yarn/patches/ services/*/package.json junk/services-web/package.json tools/migrations/ package.json frontend/package.json yarn.lock .yarnrc.yml .pnp.register.mjs /overleaf/
 COPY images/main-amd64/genScript.js images/main-amd64/services.js /overleaf/
 
 # Pre-install yarn via corepack so it is available at runtime for all users
@@ -64,7 +64,7 @@ RUN --mount=type=cache,target=/root/.cache \
 # /overleaf/frontend (the consolidated build host) and emits bundles into
 # ../public -> /overleaf/public; the Node+Go runtimes read /overleaf/locales.
 # All three root dirs are copied alongside services/.
-COPY --parents libraries/ services/ tools/migrations/ docs/RELEASE_NOTES.md frontend/ locales/ public/ /overleaf/
+COPY --parents libraries/ services/ junk/services-web/ tools/migrations/ docs/RELEASE_NOTES.md frontend/ locales/ public/ /overleaf/
 
 # Pre-stage the PnP cache zips for the three git-sourced codemirror dev deps
 # (byte-identical to the zips shipped in the official 6.3.0 image; checksums

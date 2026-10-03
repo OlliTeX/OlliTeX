@@ -175,7 +175,7 @@ process.env.CDP_PROFILE = '/tmp/cdp-restore-' + Date.now()
 process.env.CDP_PORT = '9620'
 import { pathToFileURL } from 'node:url'
 const cdpDriver = pathToFileURL(
-  new URL('../services/web/modules/bib-editor/test/e2e/cdp.mjs', import.meta.url).pathname
+  new URL('../junk/services-web/modules/bib-editor/test/e2e/cdp.mjs', import.meta.url).pathname
 )
 const { start, stop } = await import(cdpDriver.href)
 const RECOVERY_EMAIL = process.env.RESTORE_USER_EMAIL
