@@ -267,7 +267,11 @@ func samlSPMetadata(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 		}
 		if !ok {
-			res.PlainText(404, "SAML provider 'saml' not found or disabled")
+			// Node getSPMetadata (SAMLAuthenticationController.mjs): no strategy
+			// (fresh instance — stored-only default — or admin-disabled) answers a
+			// CLEAN 503 + actionable JSON, not 404/500. Parity 2026-10-04 (the
+			// hub-owner-batch2 spec pins exactly this).
+			res.JSON(503, []byte(`{"message":"SAML is not configured on this instance yet — set Site settings → SSO → SAML first"}`))
 			return
 		}
 		sp := buildSP(p, cfgSPConfig(cfg), cxt.SiteURL)
