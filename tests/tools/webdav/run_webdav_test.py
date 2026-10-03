@@ -159,7 +159,9 @@ def part_a():
     st_n, _, _ = dav("MKCOL", f"/mkpin-{tag}", None, authed())
     st_a, _, _ = dav("MKCOL", f"/mkpin-{tag}", None, authed())
     st_s, _, _ = dav("MKCOL", f"/mkpin-{tag}/", None, authed())
-    st_np, _, _ = dav("MKCOL", f"/mkpin-{tag}/deep", None, authed())
+    # missing-parent: the parent path must be TRULY absent — a child of the
+    # just-created {tag} is a legitimate MKCOL (201), not a 409 case.
+    st_np, _, _ = dav("MKCOL", f"/mkpin-{tag}-missing/deep", None, authed())
     ok = st_n in (200, 201) and st_a == 405 and st_s == 405 and st_np == 409
     report("A3 MKCOL contract: new→201 / existing→405 (noslash+slash) / missing-parent→409",
            ok, f"new={st_n} again-noslash={st_a} again-slash={st_s} missing-parent={st_np}; "
@@ -318,12 +320,15 @@ def part_b():
     if not imp_pid:
         imp_pid = find_project_by_name(proj)
     row_pid = find_project_by_name(proj)
-    # ingested? rootFolder tree entries by name (docs/fileRefs/folders):
+    # ingested? The Go build keeps tree entries in p.docs / p.files / p.folders
+    # (Node's rootFolder is the legacy equivalent). Note: nested imports land as
+    # flat basenames in files[] (sub/notes.txt → "notes.txt") — folder nesting
+    # fidelity is a documented parity gap, so expect basenames, not paths.
     names = _mongo_eval(
         'const p=db.projects.findOne({name: "' + proj + '"}); '
-        'var out=[]; (p&&p.rootFolder||[]).forEach(f=>{[f.docs,f.fileRefs].flat().forEach(e=>e&&out.push(e.name))}); '
+        'var out=[]; [p&&p.docs,p&&p.files,p&&p.folders].flat().forEach(function(e){e&&e.name&&out.push(e.name)}); '
         'print(out.join(","))')
-    ingested = ("hello.txt" in names) and ("sub" in names.split(",") or "notes.txt" in names)
+    ingested = ("hello.txt" in names.split(",")) and ("notes.txt" in names.split(","))
     state = mongo_state(imp_pid) if imp_pid else None
     state_owner = _mongo_eval(
         'const d=db.webdavsyncprojectstates.findOne({projectId: "' + str(imp_pid) + '"}); '
