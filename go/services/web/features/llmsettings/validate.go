@@ -2,6 +2,7 @@ package llmsettings
 
 import (
 	"fmt"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"regexp"
 	"strings"
 )
@@ -181,7 +182,25 @@ func validateRow(body obj, isArr bool) (*rowField, []zissue) {
 	// models: required array(string trim min1 max200) min(1) max(100)
 	models := make([]string, 0)
 	if v, ok := body.get("models"); ok {
-		if a, isArr := v.([]any); isArr {
+		// mongo driver v2 decodes stored arrays to the named type bson.A, so
+		// a bare v.([]any) assertion fails on round-tripped rows and every
+		// provider toggle 400'd (models: expected array, received undefined).
+		var a []any
+		switch t := v.(type) {
+		case []any:
+			a = t
+		case bson.A:
+			a = make([]any, len(t))
+			copy(a, t)
+		case []string:
+			a = make([]any, len(t))
+			for i, x := range t {
+				a[i] = x
+			}
+		}
+		if a == nil {
+			add("models", expArray(v, v != nil))
+		} else {
 			for i, e := range a {
 				if s, isStr := e.(string); isStr {
 					models = append(models, strings.TrimSpace(s))
@@ -194,8 +213,6 @@ func validateRow(body obj, isArr bool) (*rowField, []zissue) {
 			} else if len(a) > 100 {
 				add("models", "Invalid input: expected array, received array")
 			}
-		} else {
-			add("models", expArray(v, v != nil))
 		}
 	} else {
 		add("models", "Invalid input: expected array, received undefined")
