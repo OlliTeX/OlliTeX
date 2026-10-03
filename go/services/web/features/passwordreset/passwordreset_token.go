@@ -69,6 +69,34 @@ func generateAndEmailResetToken(cxt *core.Cxt, a *core.App, mail *core.Mail, tok
 	return "primary", nil
 }
 
+// parseSetBody decodes a POST /user/password/set body in EITHER JSON or
+// urlencoded form (Node req.body parity: the e2e global-setup posts the
+// form urlencoded; a JSON-only parse dropped every form field and produced
+// a spurious invalid-password 400. Regression: 2026-10-04, caught by the
+// config-registry e2e gate on the rebaked image). JSON wins when present.
+func parseSetBody(body []byte) (email, pw, token string) {
+	var in struct {
+		Email              string `json:"email"`
+		Password           string `json:"password"`
+		PasswordResetToken string `json:"passwordResetToken"`
+	}
+	_ = json.Unmarshal(body, &in)
+	if in.Password == "" || in.PasswordResetToken == "" || in.Email == "" {
+		if q, err := url.ParseQuery(string(body)); err == nil {
+			if in.Email == "" {
+				in.Email = q.Get("email")
+			}
+			if in.Password == "" {
+				in.Password = q.Get("password")
+			}
+			if in.PasswordResetToken == "" {
+				in.PasswordResetToken = q.Get("passwordResetToken")
+			}
+		}
+	}
+	return in.Email, in.Password, in.PasswordResetToken
+}
+
 // setNewPassword is the POST /user/password/set handler constructor.
 func setNewPassword(a *core.App, mail *core.Mail, tok *core.OneTimeTokens) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
@@ -97,7 +125,7 @@ func setNewPassword(a *core.App, mail *core.Mail, tok *core.OneTimeTokens) func(
 				return
 			}
 		}
-		_ = json.Unmarshal(body, &in)
+		in.Email, in.Password, in.PasswordResetToken = parseSetBody(body)
 		if in.PasswordResetToken == "" || in.Password == "" {
 			res.W.Header().Set("Content-Type", "application/json; charset=utf-8")
 			res.W.WriteHeader(400)

@@ -143,6 +143,10 @@ services:
       # P2 contract: the "Request edit access" toolbar flow (readOnly members)
       SHARING_UPDATES_ENABLED: 'true'
       MONGO_CONNECTION_STRING: mongodb://mongo:27017/sharelatex?replicaSet=overleaf
+      # check-mongodb/redis.mjs scripts (my_init gate) read the toolkit-style names —
+      # point them at the e2e services (2026-10-04; env-chain fix in the scripts follows)
+      MONGO_URL: mongodb://mongo:27017/sharelatex?replicaSet=overleaf
+      REDIS_URL: redis://redis:6379/0
       # ---- DB / infra ----
       OVERLEAF_MONGO_URL: mongodb://mongo:27017/sharelatex?replicaSet=overleaf
       REDIS_HOST: redis

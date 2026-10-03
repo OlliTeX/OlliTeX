@@ -33,3 +33,22 @@ func TestValidatePasswordParity(t *testing.T) {
 		}
 	}
 }
+
+// TestParseSetBodyFormAndJSON — regression (2026-10-04): the e2e
+// global-setup posts /user/password/set as a URL-ENCODED form (Node req.body
+// parity); a JSON-only parse dropped every field → spurious
+// invalid-password 400. Both encodings must decode.
+func TestParseSetBodyFormAndJSON(t *testing.T) {
+	e, p, tk := parseSetBody([]byte("email=e2e-admin%40e2e.test&password=Ol-Fixture-9x7K&passwordResetToken=TKN123"))
+	if e != "e2e-admin@e2e.test" || p != "Ol-Fixture-9x7K" || tk != "TKN123" {
+		t.Fatalf("form path: got %q %q %q", e, p, tk)
+	}
+	e, p, tk = parseSetBody([]byte(`{"email":"e2e-admin@e2e.test","password":"Ol-Fixture-9x7K","passwordResetToken":"TKN123"}`))
+	if e != "e2e-admin@e2e.test" || p != "Ol-Fixture-9x7K" || tk != "TKN123" {
+		t.Fatalf("json path: got %q %q %q", e, p, tk)
+	}
+	_, p, _ = parseSetBody([]byte("email=x@y.test&passwordResetToken=TKN"))
+	if p != "" {
+		t.Fatalf("missing password must stay empty, got %q", p)
+	}
+}
