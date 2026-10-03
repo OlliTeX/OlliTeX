@@ -161,7 +161,7 @@ func samlFromSiteSettings(a *core.App, c context.Context) *SAMLProvider {
 	if err := db.Collection("site_settings").FindOne(c, bson.D{{Key: "_id", Value: "global"}}).Decode(&doc); err != nil {
 		return nil
 	}
-	sec, ok := doc["sso-saml"].(bson.M)
+	sec, ok := doc["sso-saml"].(map[string]any)
 	if !ok {
 		return nil
 	}
