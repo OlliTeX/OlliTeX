@@ -61,8 +61,20 @@ import (
 )
 
 func crTypstTemplateDir() string {
-	return crEnvOr("WEB_TYPST_PROJECTS_DIR",
-		"/overleaf/services/web/modules/typst/app/templates/project_files")
+	if v := os.Getenv("WEB_TYPST_PROJECTS_DIR"); v != "" {
+		return v
+	}
+	// P7 image: the typst module tree (when shipped) lives under the junk
+	// oracle tree; legacy images had it under services/web. First existing wins.
+	for _, p := range []string{
+		"/overleaf/junk/services-web/modules/typst/app/templates/project_files",
+		"/overleaf/services/web/modules/typst/app/templates/project_files",
+	} {
+		if st, err := os.Stat(p); err == nil && st.IsDir() {
+			return p
+		}
+	}
+	return "templates"
 }
 
 // crTypstDocLines reads a template, applies lodash's plain `<%= project_name %>`

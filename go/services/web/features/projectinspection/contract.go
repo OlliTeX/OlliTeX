@@ -78,11 +78,29 @@ func envInt64(key string, dflt int64) int64 {
 	return dflt
 }
 
+// piWorkerPath honors PROJECT_INSPECTION_WORKER, else the first existing
+// analyzer worker: the P7 image dropped the Node web tier, so the module tree
+// now ships under /overleaf/junk/services-web/... (legacy images under
+// /overleaf/services/web/...). First existing wins per deployment.
+func piWorkerPath() string {
+	if v := os.Getenv("PROJECT_INSPECTION_WORKER"); v != "" {
+		return v
+	}
+	for _, p := range []string{
+		"/overleaf/junk/services-web/modules/project-inspection/dist/analyze-worker.cjs",
+		"/overleaf/services/web/modules/project-inspection/dist/analyze-worker.cjs",
+	} {
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			return p
+		}
+	}
+	return "/overleaf/services/web/modules/project-inspection/dist/analyze-worker.cjs"
+}
+
 func cfgFromEnv() cfg {
 	return cfg{
 		NodeBin:       getenv("PROJECT_INSPECTION_NODE_BIN", "node"),
-		Worker: getenv("PROJECT_INSPECTION_WORKER",
-			"/overleaf/services/web/modules/project-inspection/dist/analyze-worker.cjs"),
+		Worker: piWorkerPath(),
 		Timeout:     time.Duration(envInt64("PROJECT_INSPECTION_TIMEOUT_MS", 30_000)) * time.Millisecond,
 		MaxSource:   envInt64("PROJECT_INSPECTION_MAX_SOURCE_BYTES", 25<<20),
 		MaxBib:      envInt64("PROJECT_INSPECTION_MAX_BIB_BYTES", 6<<20),

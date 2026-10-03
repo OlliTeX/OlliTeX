@@ -60,10 +60,38 @@ func crEnvOr(k, def string) string {
 	return def
 }
 
+// firstExistingFile returns the first candidate that exists as a regular file
+// (or dflt if none — keeps callers working, and loggable, when no fixture is
+// present). The P7 image dropped the Node web tier, so the historical
+// /overleaf/services/web/... fixture tree moved under /overleaf/junk/...;
+// both generations are shipped in the image (Dockerfile COPY junk/services-web),
+// so the first existing wins per deployment.
+func firstExistingFile(dflt string, candidates ...string) string {
+	for _, p := range candidates {
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			return p
+		}
+	}
+	return dflt
+}
+
+func firstExistingDir(dflt string, candidates ...string) string {
+	for _, p := range candidates {
+		if st, err := os.Stat(p); err == nil && st.IsDir() {
+			return p
+		}
+	}
+	return dflt
+}
+
 func crDocstoreBase() string { return crEnvOr("WEB_DOCSTORE_URL", "http://127.0.0.1:3016") }
 func crHistoryBase() string  { return crEnvOr("WEB_PROJECT_HISTORY_URL", "http://127.0.0.1:3054") }
 func crBasicTemplate() string {
-	return crEnvOr("WEB_BASIC_PROJECT_TEMPLATE",
+	if v := os.Getenv("WEB_BASIC_PROJECT_TEMPLATE"); v != "" {
+		return v
+	}
+	return firstExistingFile("mainbasic.tex",
+		"/overleaf/junk/services-web/app/templates/project_files/mainbasic.tex",
 		"/overleaf/services/web/app/templates/project_files/mainbasic.tex")
 }
 
@@ -75,7 +103,11 @@ func crV1HistoryBase() string { return crEnvOr("WEB_V1_HISTORY_URL", "http://127
 func crV1HistoryUser() string { return crEnvOr("V1_HISTORY_USER", "staging") }
 func crV1HistoryPass() string { return crEnvOr("V1_HISTORY_PASSWORD", "") }
 func crExampleProjectDir() string {
-	return crEnvOr("WEB_EXAMPLE_PROJECT_DIR",
+	if v := os.Getenv("WEB_EXAMPLE_PROJECT_DIR"); v != "" {
+		return v
+	}
+	return firstExistingDir("templates",
+		"/overleaf/junk/services-web/app/templates/project_files/example-project-sp",
 		"/overleaf/services/web/app/templates/project_files/example-project-sp")
 }
 
