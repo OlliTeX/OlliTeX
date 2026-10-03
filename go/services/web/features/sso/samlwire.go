@@ -157,32 +157,36 @@ func samlFromSiteSettings(a *core.App, c context.Context) *SAMLProvider {
 	if err != nil {
 		return nil
 	}
-	var doc map[string]any
-	if err := db.Collection("site_settings").FindOne(c, bson.D{{Key: "_id", Value: "global"}}).Decode(&doc); err != nil {
+	var global struct {
+		SsoSaml *struct {
+			Enabled      bool   `bson:"enabled"`
+			Identity     string `bson:"identityServiceName"`
+			Issuer       string `bson:"issuer"`
+			EntryPoint   string `bson:"entryPoint"`
+			Audience     string `bson:"audience"`
+			IdpCert      string `bson:"idpCert"`
+			PrivateKey   string `bson:"privateKey"`
+			DecryptionPv string `bson:"decryptionPvk"`
+		} `bson:"sso-saml"`
+	}
+	if err := db.Collection("site_settings").FindOne(c, bson.D{{Key: "_id", Value: "global"}}).Decode(&global); err != nil {
 		return nil
 	}
-	sec, ok := doc["sso-saml"].(map[string]any)
-	if !ok {
-		return nil
-	}
-	if e, _ := sec["enabled"].(bool); !e {
-		return nil
-	}
-	str := func(k string) string { v, _ := sec[k].(string); return v }
-	if str("entryPoint") == "" {
+	sec := global.SsoSaml
+	if sec == nil || !sec.Enabled || sec.EntryPoint == "" {
 		return nil
 	}
 	return &SAMLProvider{
 		ID:                  "saml",
 		Type:                "saml",
 		Enabled:             true,
-		IdentityServiceName: str("identityServiceName"),
-		Issuer:              str("issuer"),
-		EntryPoint:          str("entryPoint"),
-		Audience:            str("audience"),
-		IdpCert:             str("idpCert"),
-		PrivateKey:          str("privateKey"),
-		DecryptionPvk:       str("decryptionPvk"),
+		IdentityServiceName: sec.Identity,
+		Issuer:              sec.Issuer,
+		EntryPoint:          sec.EntryPoint,
+		Audience:            sec.Audience,
+		IdpCert:             sec.IdpCert,
+		PrivateKey:          sec.PrivateKey,
+		DecryptionPvk:       sec.DecryptionPv,
 	}
 }
 
