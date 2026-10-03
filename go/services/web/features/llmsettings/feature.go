@@ -41,8 +41,8 @@ import (
 )
 
 var (
-	reProviderPat = regexp.MustCompile(`^/user/llm-providers/([^/]+)$`)
-	reProviderDel = regexp.MustCompile(`^/user/llm-providers/([^/]+)/delete$`)
+	reProviderPat = regexp.MustCompile(`^/user/llm-providers/(?P<id>[^/]+)$`)
+	reProviderDel = regexp.MustCompile(`^/user/llm-providers/(?P<id>[^/]+)/delete$`)
 
 	// P6.4b — project-scoped llm routes (LLMRouter.mjs, ensureUserCanReadProject
 	// chain). First capture = Project_id; second (status/cancel) = jobId.
