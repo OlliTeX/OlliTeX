@@ -17,8 +17,11 @@ package federation
 //
 // All require a logged-in A-side user (except the RP callback — the
 // mirror is anonymous to the A session; the callback carries the
-// HMAC state + PKCE). The deep logic (CodeExchange, State, mirror mint)
-// is the S9–S11 slice; the routes answer the pinned envelopes now.
+// HMAC state + PKCE). S10 landed: the authorize starter + RP callback
+// are live (rp_state.go / rp_exchange.go / rp_mint.go / rp_routes.go);
+// the deep B-side consent mint stays the OP engine (S4b) and the export
+// transfer the fedgap-5 slice (2b) — those routes keep the honest
+// pending envelopes.
 
 import (
 	"regexp"
@@ -37,10 +40,14 @@ var (
 func sUserFedRoutes(a *core.App) []core.Route {
 	return []core.Route{
 		{Method: "GET", Pattern: patInvitePreview, Handler: s2sPending(a, "preview-pending")},
-		{Method: "POST", Pattern: patInviteAuthorize, NoCSRF: true, Handler: s2sPending(a, "authorize-pending")},
+		// S10 (S9 starter leg): the wizard entry now mints the signed
+		// state + PKCE and 302s to B's authorization endpoint (rp_routes.go).
+		{Method: "POST", Pattern: patInviteAuthorize, NoCSRF: true, Handler: rpAuthorizeStarter(a)},
 		{Method: "GET", Pattern: patExportGet, Handler: s2sPending(a, "export-form-pending")},
 		{Method: "POST", Pattern: patExportPost, NoCSRF: true, Handler: s2sPending(a, "export-pending")},
-		{Method: "GET", Pattern: patRpCallback, NoLogin: true, NoCSRF: true, Handler: s2sPending(a, "rp-callback-pending")},
+		// S10: the A-side grant callback — state verify + code exchange
+		// (PKCE) + mirror + grant + 302 (rp_routes.go).
+		{Method: "GET", Pattern: patRpCallback, NoLogin: true, NoCSRF: true, Handler: rpCallback(a)},
 	}
 }
 
