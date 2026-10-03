@@ -21,7 +21,7 @@ var defaultBlockedNetworks = []any{
 // then DEFAULT. storedCat is always {} here (Node indexes a stored ARRAY by
 // string key → undefined), so enabled/publishable=true and name/description
 // from env/defaults. (The authoritative per-key merge is done in getSection.)
-func seedTemplateCategories() Obj {
+func seedTemplateCategories() []any {
 	pushKey := func(keys []string, seen map[string]bool, k string) []string {
 		if k != "" && !seen[k] {
 			seen[k] = true
@@ -41,7 +41,7 @@ func seedTemplateCategories() Obj {
 	}
 	keys = pushKey(keys, seen, "all")
 
-	out := Obj{}
+	out := make([]any, 0, len(keys))
 	for _, key := range keys {
 		defName, defDesc := "", ""
 		for _, d := range defaultTemplateCategories {
@@ -66,13 +66,13 @@ func seedTemplateCategories() Obj {
 		if desc == "" {
 			desc = defDesc
 		}
-		out = append(out,
+		out = append(out, Obj{
 			KV{"key", key},
 			KV{"enabled", true}, // storedCat.enabled !== false ({} → true)
 			KV{"name", name},
 			KV{"description", desc},
 			KV{"publishable", true}, // storedCat.publishable !== false
-		)
+		})
 	}
 	return out
 }
