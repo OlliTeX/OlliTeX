@@ -14,8 +14,8 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/zlib"
-	"io"
 	"encoding/base64"
+	"io"
 	"net/url"
 	"strings"
 	"time"
@@ -59,7 +59,6 @@ func newFlateReaderRaw(b []byte) (io.Reader, error) {
 	return flate.NewReader(bytes.NewReader(b)), nil
 }
 
-
 // samlNowISO — SAML 2.0 instant (2006-01-02T15:04:05.000Z).
 func samlNowISO() string {
 	return time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
@@ -84,6 +83,14 @@ func lookupSamlProviderForSLO(a *core.App, cxt *core.Cxt, providerID string) (*S
 	p, ok := resolveSAMLProvider(cfg, providerID)
 	if !ok && providerID != "" {
 		p, ok = resolveSAMLProvider(cfg, "")
+	}
+	if !ok {
+		// CE legacy: the Manage-Site "sso-saml" section (default id only).
+		if providerID == "" || providerID == "saml" {
+			if p2 := samlFromSiteSettings(a, cxt.Req.Context()); p2 != nil {
+				p, ok = p2, true
+			}
+		}
 	}
 	return p, ok
 }

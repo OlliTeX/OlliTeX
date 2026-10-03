@@ -24,6 +24,7 @@ package sso
 import (
 	"bytes"
 	"compress/zlib"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -38,6 +39,8 @@ import (
 
 	saml "github.com/crewjam/saml"
 	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"ollitex/go/services/web/core"
 )
 
 // newZlibReader — zlib (0x78 header) inflate (Node compress heuristic).
@@ -141,6 +144,48 @@ func strconvI64(s string) (int64, bool) {
 
 // resolveSAMLProvider — bare / "saml" ⇒ first enabled DB row, else env
 // synthetic; DB id ⇒ that row.
+// samlFromSiteSettings — CE legacy (Node samlLogin reads the Manage-Site
+// "sso-saml" siteSettings section when the SSO-framework provider list has
+// no match). The e2e SAML seed + operator /hub SSO section write THAT store;
+// without this fallback the SAML login/ACS/meta surface 404s
+// ("provider not found or disabled") right after a successful section PUT.
+func samlFromSiteSettings(a *core.App, c context.Context) *SAMLProvider {
+	if a == nil || a.Mongo == nil {
+		return nil
+	}
+	db, err := a.Mongo.DB(c)
+	if err != nil {
+		return nil
+	}
+	var doc map[string]any
+	if err := db.Collection("site_settings").FindOne(c, bson.D{{Key: "_id", Value: "global"}}).Decode(&doc); err != nil {
+		return nil
+	}
+	sec, ok := doc["sso-saml"].(bson.M)
+	if !ok {
+		return nil
+	}
+	if e, _ := sec["enabled"].(bool); !e {
+		return nil
+	}
+	str := func(k string) string { v, _ := sec[k].(string); return v }
+	if str("entryPoint") == "" {
+		return nil
+	}
+	return &SAMLProvider{
+		ID:                  "saml",
+		Type:                "saml",
+		Enabled:             true,
+		IdentityServiceName: str("identityServiceName"),
+		Issuer:              str("issuer"),
+		EntryPoint:          str("entryPoint"),
+		Audience:            str("audience"),
+		IdpCert:             str("idpCert"),
+		PrivateKey:          str("privateKey"),
+		DecryptionPvk:       str("decryptionPvk"),
+	}
+}
+
 func resolveSAMLProvider(cfg *SSOConfig, pathID string) (*SAMLProvider, bool) {
 	if pathID != "" && pathID != "saml" {
 		if p := samlProviderByID(cfg, pathID); p != nil {

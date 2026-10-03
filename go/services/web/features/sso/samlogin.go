@@ -61,6 +61,14 @@ func samlLogin(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		p, ok := resolveSAMLProvider(cfg, pathID)
 		if !ok {
+			// CE legacy: the Manage-Site "sso-saml" section (default id only).
+			if pathID == "" || pathID == "saml" {
+				if p2 := samlFromSiteSettings(a, cxt.Req.Context()); p2 != nil {
+					p, ok = p2, true
+				}
+			}
+		}
+		if !ok {
 			id := pathID
 			if id == "" {
 				id = "saml"
@@ -127,6 +135,14 @@ func samlACS(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		cfg = loadSSOConfig(db, cxt)
 		p, ok := resolveSAMLProvider(cfg, providerID)
+		if !ok {
+			// CE legacy: the Manage-Site "sso-saml" section (default id only).
+			if providerID == "" || providerID == "saml" {
+				if p2 := samlFromSiteSettings(a, cxt.Req.Context()); p2 != nil {
+					p, ok = p2, true
+				}
+			}
+		}
 		if !ok {
 			res.JSON(401, []byte(`{"message":{"text":"SAML provider from session not found","type":"error","status":401}}`))
 			return
@@ -243,6 +259,13 @@ func samlSPMetadata(a *core.App) func(*core.Cxt, *core.Res) {
 			cfg = loadSSOConfig(db, cxt)
 		}
 		p, ok := resolveSAMLProvider(cfg, "")
+		if !ok {
+			// CE legacy: the default SAML provider from the Manage-Site
+			// "sso-saml" section (e2e seed + /hub SSO section storage).
+			if p2 := samlFromSiteSettings(a, cxt.Req.Context()); p2 != nil {
+				p, ok = p2, true
+			}
+		}
 		if !ok {
 			res.PlainText(404, "SAML provider 'saml' not found or disabled")
 			return
