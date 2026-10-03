@@ -160,6 +160,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: fproxyPat, Handler: fileProxyHandler(a)},
 			// P4.12b document download (web-p412 flip)
 			{Method: "GET", Pattern: docdlPat, Handler: docDownloadHandler(a)},
+			{Method: "GET", Path: "/project/download/zip", Handler: multiZipDownloadHandler(a)},
 			// P4.13a file upload (POST /Project/:id/upload — capital P, pinned;
 			// session+csrf applied by core — matches Node's csrf'd route)
 			{Method: "POST", Pattern: upPat, Handler: uploadHandler(a)},
