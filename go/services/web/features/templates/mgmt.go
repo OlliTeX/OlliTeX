@@ -1266,16 +1266,24 @@ func tplValidateBundle(ctx context.Context, a *core.App, entries map[string][]by
 		issues = append(issues, "\"source.zip\" is not a valid ZIP archive.")
 	} else if doc.mainFile != "" {
 		// Node TemplatesManager._setMainFile: mainFile == null ⇒ skip the
-		// main-file check entirely (optional field). An empty string used to
-		// panic here (slice [(-1):]) instead — 500 where Node proceeds.
-
-		base := doc.mainFile[strings.LastIndex(doc.mainFile, "/"):]
+		// main-file check (optional field). The first port sliced with
+		// x[strings.LastIndex(x, "/"):] — LastIndex returns -1 when the value
+		// has NO slash (e.g. "main.tex", the common case), so [(-1):]
+		// panicked and nginx answered 502 where Node proceeds.
+		base := doc.mainFile
+		if i := strings.LastIndex(doc.mainFile, "/"); i >= 0 {
+			base = doc.mainFile[i+1:]
+		}
 		foundMain := false
 		for _, n := range names {
 			if n == "" {
-				continue // empty entry name used to panic in n[(-1):]
+				continue
 			}
-			if n == doc.mainFile || n[strings.LastIndex(n, "/"):] == base {
+			okBase := false
+			if j := strings.LastIndex(n, "/"); j >= 0 {
+				okBase = n[j+1:] == base
+			}
+			if n == doc.mainFile || okBase {
 				foundMain = true
 				break
 			}
