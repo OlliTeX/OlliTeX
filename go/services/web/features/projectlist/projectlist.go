@@ -161,11 +161,15 @@ func Feature(a *core.App) core.Feature {
 			// P4.12b document download (web-p412 flip)
 			{Method: "GET", Pattern: docdlPat, Handler: docDownloadHandler(a)},
 			{Method: "GET", Path: "/project/download/zip", Handler: multiZipDownloadHandler(a)},
+			// P4.13b new-project zip upload (POST /project/new/upload — session+csrf).
+			// ORDER MATTERS: the exact /project/new/upload route must precede the
+			// upPat /project/:id/upload pattern — Go dispatch is first-match (unlike
+			// Express's more-specific-first), and upPat swallows id='new' (live
+			// 404 'Invalid Mongo ObjectId at params.Project_id' on a good upload).
+			{Method: "POST", Pattern: nzipPat, Handler: newzipHandler(a)},
 			// P4.13a file upload (POST /Project/:id/upload — capital P, pinned;
 			// session+csrf applied by core — matches Node's csrf'd route)
 			{Method: "POST", Pattern: upPat, Handler: uploadHandler(a)},
-			// P4.13b new-project zip upload (POST /project/new/upload — session+csrf)
-			{Method: "POST", Pattern: nzipPat, Handler: newzipHandler(a)},
 			// P4.12c private API doc trio (web-p413 flip; basic auth in handler).
 			// U10.3r (pinned live 2026-09-23, web :4000): these are NoSession
 			// (the private-API gate issues its own fresh sid). The GET gate
