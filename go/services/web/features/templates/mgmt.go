@@ -1264,10 +1264,17 @@ func tplValidateBundle(ctx context.Context, a *core.App, entries map[string][]by
 	names, zerr := tplZipEntryNames(sourceRaw)
 	if zerr != nil {
 		issues = append(issues, "\"source.zip\" is not a valid ZIP archive.")
-	} else {
+	} else if doc.mainFile != "" {
+		// Node TemplatesManager._setMainFile: mainFile == null ⇒ skip the
+		// main-file check entirely (optional field). An empty string used to
+		// panic here (slice [(-1):]) instead — 500 where Node proceeds.
+
 		base := doc.mainFile[strings.LastIndex(doc.mainFile, "/"):]
 		foundMain := false
 		for _, n := range names {
+			if n == "" {
+				continue // empty entry name used to panic in n[(-1):]
+			}
 			if n == doc.mainFile || n[strings.LastIndex(n, "/"):] == base {
 				foundMain = true
 				break
