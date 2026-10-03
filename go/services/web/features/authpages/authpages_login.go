@@ -8,6 +8,7 @@ import (
 	"log"
 	"ollitex/go/services/web/core"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -309,44 +310,25 @@ func jstr(s string) string {
 	return string(b)
 }
 
-// validEmail is the EmailHelper.parseEmail bar (P1 pin: junk → the nested
-// 401; anything Node would parse → normal 401 flow).
+// validEmail is the Node EmailHelper.parseEmail bar (P1 pin: junk -> the
+// nested "SSO login option" 401 body), ported LITERALLY from the Node oracle's
+// EMAIL_REGEXP (junk/services-web/app/src/Features/Helpers/EmailHelper.mjs).
+//
+// 2026-10-03 (deck D39 live-verify): the earlier hand-rolled check diverged
+// from the oracle — its local-part letter test used
+// strings.ContainsAny(s, "a-zA-Z"), where the second arg is a MEMBER SET of
+// exactly {a,-,z,Z}, not a range. Result: live password logins with dot-less
+// locals lacking those chars (testjoe@rotermund.at, u@x.com, \u2026) 401'd on
+// the Go stack while the Node oracle accepted them — caught by the deck's
+// live-login step. The regex below IS the oracle (RE2-compatible), so Go and
+// Node validate identically.
+var emailOracleRe = regexp.MustCompile(`^([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$`)
 
-// validEmail is the EmailHelper.parseEmail bar (P1 pin: junk → the nested
-// 401; anything Node would parse → normal 401 flow).
 func validEmail(s string) bool {
-	if len(s) < 6 || len(s) > 254 {
+	if s == "" || len(s) > 254 {
 		return false
 	}
-	i := strings.LastIndex(s, "@")
-	if i < 1 || i == len(s)-1 {
-		return false
-	}
-	if !strings.Contains(s[:i], ".") && !strings.ContainsAny(s[:i], "a-zA-Z") {
-		return false
-	}
-	dom := s[i+1:]
-	if dot := strings.LastIndex(dom, "."); dot < 2 || dot == len(dom)-1 {
-		return false
-	}
-	local := s[:i]
-	for _, c := range local {
-		switch {
-		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
-		case strings.ContainsRune(".+-_%", c):
-		default:
-			return false
-		}
-	}
-	for _, c := range dom {
-		switch {
-		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
-		case strings.ContainsRune(".-", c):
-		default:
-			return false
-		}
-	}
-	return true
+	return emailOracleRe.MatchString(s)
 }
 
 // ---- body decoding (JSON preferred; urlencoded tolerated) ----
