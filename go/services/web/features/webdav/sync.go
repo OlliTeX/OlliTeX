@@ -91,29 +91,28 @@ func wdProjectTree(a *core.App, ctx context.Context, projectID string) ([]wdProj
 		}
 		for _, key := range []string{"docs", "fileRefs"} {
 			if arr, ok := wdDocVal(dm, key); ok {
-				if items, ok := arr.([]interface{}); ok {
-					for _, it := range items {
-						im, ok := it.(bson.D)
-						if !ok {
-							continue
-						}
-						iname, _ := wdDocStr(im, "name")
-						if iname == "" {
-							continue
-						}
-						e := wdProjectTreeEntry{path: here + "/" + iname}
-						e.isDoc = key == "docs"
-						if idv, ok := wdDocVal(im, "_id"); ok {
-							if h, ok := oidHex(idv); ok {
-								if e.isDoc {
-									e.docID = h
-								} else {
-									e.fileID = h
-								}
+				items := wdAsSlice(arr)
+				for _, it := range items {
+					im, ok := it.(bson.D)
+					if !ok {
+						continue
+					}
+					iname, _ := wdDocStr(im, "name")
+					if iname == "" {
+						continue
+					}
+					e := wdProjectTreeEntry{path: here + "/" + iname}
+					e.isDoc = key == "docs"
+					if idv, ok := wdDocVal(im, "_id"); ok {
+						if h, ok := oidHex(idv); ok {
+							if e.isDoc {
+								e.docID = h
+							} else {
+								e.fileID = h
 							}
 						}
-						entries = append(entries, e)
 					}
+					entries = append(entries, e)
 				}
 			}
 		}
@@ -141,37 +140,32 @@ func wdProjectTree(a *core.App, ctx context.Context, projectID string) ([]wdProj
 		dup[e.path] = true
 	}
 	for _, key := range []string{"docs", "fileRefs", "files"} {
-		arr, ok := wdDocVal(*doc, key)
-		if !ok {
-			continue
-		}
-		items, ok := arr.([]interface{})
-		if !ok {
-			continue
-		}
-		isDoc := key == "docs"
-		for _, it := range items {
-			im, ok := it.(bson.D)
-			if !ok {
-				continue
-			}
-			iname, _ := wdDocStr(im, "name")
-			if iname == "" || dup[iname] {
-				continue
-			}
-			dup[iname] = true
-			e := wdProjectTreeEntry{path: iname}
-			e.isDoc = isDoc
-			if idv, ok := wdDocVal(im, "_id"); ok {
-				if h, ok2 := oidHex(idv); ok2 {
-					if isDoc {
-						e.docID = h
-					} else {
-						e.fileID = h
+		if arr, ok := wdDocVal(*doc, key); ok {
+			items := wdAsSlice(arr)
+			isDoc := key == "docs"
+			for _, it := range items {
+				im, ok := it.(bson.D)
+				if !ok {
+					continue
+				}
+				iname, _ := wdDocStr(im, "name")
+				if iname == "" || dup[iname] {
+					continue
+				}
+				dup[iname] = true
+				e := wdProjectTreeEntry{path: iname}
+				e.isDoc = isDoc
+				if idv, ok := wdDocVal(im, "_id"); ok {
+					if h, ok2 := oidHex(idv); ok2 {
+						if isDoc {
+							e.docID = h
+						} else {
+							e.fileID = h
+						}
 					}
 				}
+				entries = append(entries, e)
 			}
-			entries = append(entries, e)
 		}
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].path < entries[j].path })
@@ -316,6 +310,19 @@ func wdWriteEntity(ctx context.Context, a *core.App, uid, projectID, relPath str
 // ---- flow entry points (called from the handlers) --------------------------
 
 // wdSyncProject — push: full local→remote export (Node syncProject best-effort).
+// wdAsSlice - mongo driver v2 unmarshals BSON arrays as bson.A (a
+// defined type; the []interface{} assertion silently fails), so tree
+// walkers must accept both shapes.
+func wdAsSlice(v interface{}) []interface{} {
+	if s, ok := v.([]interface{}); ok {
+		return s
+	}
+	if a, ok := v.(bson.A); ok {
+		return a
+	}
+	return nil
+}
+
 func wdSyncProject(ctx context.Context, a *core.App, uid, projectID string) error {
 	entries, _, err := wdProjectTree(a, ctx, projectID)
 	if err != nil {
