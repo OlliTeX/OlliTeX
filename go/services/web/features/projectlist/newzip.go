@@ -931,7 +931,7 @@ func newzipHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(422, []byte(`{"success":false,"error":"Zip contents too large"}`))
 			return
 		case 3:
-			res.JSON(422, []byte(`{"success":false,"error":"Zip doesn\u2019t contain any file"}`))
+			res.JSON(422, []byte(`{"success":false,"error":"Zip doesn’t contain any file"}`))
 			return
 		}
 

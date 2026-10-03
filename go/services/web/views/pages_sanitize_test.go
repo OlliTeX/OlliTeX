@@ -1,6 +1,7 @@
 package views
 
 import (
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -30,13 +31,40 @@ func TestSanitizeCaptureArtifacts_CsrfRawForm(t *testing.T) {
 	}
 }
 
+// Audit H2 (problems_30092026): baked e2e capture artifacts must never be
+// served. The literals below are byte-copied from the captured skeletons.
+//
+// 2026-10-03 parity fix: the e2e-email scrub runs at the FRONT of finalize
+// (pre-slot) — the terminal blanket used to erase the LEGITIMATE session
+// email re-inserted by the user slots (Node renders sessionUser.email into
+// these same slots; the restricted-403 account pill for a user whose address
+// is one of the captured artifacts lost its parity byte).
 func TestSanitizeCaptureArtifacts_E2eEmails(t *testing.T) {
 	in := `&quot;email&quot;:&quot;e2e-user@e2e.test&quot;` +
 		` admin@e2e.test ` +
 		`someone@e2e.test`
-	out := sanitizeCaptureArtifacts(in, "T", "")
+	out := (PageData{Nonce: "N", Path: "/x"}).finalize(in)
 	if strings.Contains(out, "@e2e.test") {
-		t.Fatalf("e2e email survived: %q", out)
+		t.Fatalf("e2e email survived (anon render): %q", out)
+	}
+}
+
+// Node parity: the restricted-403 page renders the SIGNED-IN user's email
+// into the account slots (restricted.pug getSessionUser().email) — even
+// when that address is one of the audit H2 capture artifacts.
+func TestRestricted403_SessionEmailSurvivesAuditScrub(t *testing.T) {
+	d := PageData{
+		Nonce:     "N0NCE",
+		Path:      "/project/x/doc/y/download",
+		CSRFToken: "CSRF123",
+		UserEmail: "e2e-user@e2e.test",
+		UserID:    "6ac10cd5f4600767b51ae7a2",
+	}
+	rec := httptest.NewRecorder()
+	Restricted403(rec, d)
+	body := rec.Body.String()
+	if !strings.Contains(body, "e2e-user@e2e.test") {
+		t.Fatalf("session email missing from restricted-403 (audit scrub over-erased)")
 	}
 }
 

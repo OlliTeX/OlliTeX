@@ -223,6 +223,18 @@ type PageData struct {
 
 func (p PageData) finalize(html string) string {
 	out := resolveAssetSlots(html)
+	// Audit H2 e2e-email scrub — moved HERE (from the terminal
+	// sanitizeCaptureArtifacts pass) so it strips the BAKED capture
+	// artifacts before the slot pass inserts the live session email.
+	// The terminal blanket was erasing the legitimate session email on
+	// every render — e.g. the restricted-403 account pill for a user
+	// whose address is one of the captured artifacts (Node parity breaks:
+	// Node renders the session email into these same slots).
+	for _, em := range e2eEmails {
+		if strings.Contains(out, em) {
+			out = strings.ReplaceAll(out, em, "")
+		}
+	}
 	out = strings.ReplaceAll(out, slotCSRF, p.CSRFToken)
 	out = strings.ReplaceAll(out, slotNonce, p.Nonce)
 	// tag-style nonce tokens (`__NONCE__`, editor/admin family) resolve
@@ -390,11 +402,8 @@ func sanitizeCaptureArtifacts(in, csrfToken, origin string) string {
 		// (named) group reference and silently expands to "".
 		in = csrfLiteralRe.ReplaceAllString(in, "${1}"+csrfToken+"${3}")
 	}
-	for _, em := range e2eEmails {
-		if strings.Contains(in, em) {
-			in = strings.ReplaceAll(in, em, "")
-		}
-	}
+	// NB: the e2eEmails scrub moved to finalize's front (pre-slot) so it
+	// no longer erases the legitimate session email re-inserted by slots.
 	for _, id := range e2eProjectIDs {
 		if strings.Contains(in, id) {
 			in = strings.ReplaceAll(in, id, "")
