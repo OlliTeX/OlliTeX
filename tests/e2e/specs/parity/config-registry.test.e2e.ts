@@ -37,7 +37,7 @@ test.describe('config registry (shared Postgres store round-trip)', () => {
       expect(r0.status(), 'GET /api/hub/config must be 200').toBe(200)
       const b0 = await r0.json()
       expect(b0, 'registry payload must be an object').toBeTruthy()
-      expect(Object.values(b0 as Record<string, unknown>), `key ${KEY} must be in the registry`).toContain(KEY)
+      expect(Object.keys(b0 as Record<string, unknown>), `key ${KEY} must be in the registry`).toContain(KEY)
 
       // 2) write (persisted to the shared store)
       const pw = await api(p, 'PUT', '/api/hub/config', { [KEY]: 'true' })
@@ -65,7 +65,15 @@ test.describe('config registry (shared Postgres store round-trip)', () => {
     const q = await c.newPage()
     await loginRobust(q, USER.email, USER.password)
     await q.goto('http://127.0.0.1:7420/projects', { waitUntil: 'domcontentloaded' }).catch(() => {})
-    const res = await api(q, 'PUT', '/api/hub/config', { [KEY]: 'true' })
+    // maxRedirects: 0 — the denial is a 302 /restricted bounce (Node parity);
+    // following it replays the PUT against /restricted and the harness reports
+    // the redirect target's 404 instead of the denial itself.
+    const tok = await q.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)
+    const res = await q.request.put('http://127.0.0.1:7420/api/hub/config', {
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': tok ?? '' },
+      data: JSON.stringify({ [KEY]: 'true' }),
+      maxRedirects: 0,
+    } as any)
     expect([302, 401, 403].includes(res.status()),
       `non-admin denial must be 302/401/403, got ${res.status()}`).toBeTruthy()
     await c.close().catch(() => {})
