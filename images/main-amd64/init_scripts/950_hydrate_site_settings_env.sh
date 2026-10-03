@@ -24,7 +24,7 @@ fi
   # NOTE: the hydrate node process prints library log lines (Settings,
   # mongoose) to stdout — keep ONLY export/comment lines in env.sh, or
   # `sh . /etc/overleaf/env.sh` fails at service start (2026-08-30 fix).
-  if ! /sbin/setuser www-data node /overleaf/services/web/modules/server-ce-scripts/scripts/hydrate-site-settings-env.mjs 2>/tmp/overleaf-hydrate-err.log | grep -E '^(export |#)' >> "$FILE"; then
+  if ! /sbin/setuser www-data node /overleaf/junk/services-web/modules/server-ce-scripts/scripts/hydrate-site-settings-env.mjs 2>/tmp/overleaf-hydrate-err.log | grep -E '^(export |#)' >> "$FILE"; then
     echo "# hydration failed (compose env stands); log: /tmp/overleaf-hydrate-err.log" >> "$FILE"
   fi
   echo "$END"
