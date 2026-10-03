@@ -132,6 +132,48 @@ func wdProjectTree(a *core.App, ctx context.Context, projectID string) ([]wdProj
 			walk(v, "")
 		}
 	}
+	// Go build shape: projects keep flat top-level docs[] / files[] arrays
+	// (no folder nesting — see wdWriteEntity). Walk those for push export
+	// (legacy rootFolder shapes are handled above; dedupe by path so mixed
+	// docs cannot double-emit).
+	dup := map[string]bool{}
+	for _, e := range entries {
+		dup[e.path] = true
+	}
+	for _, key := range []string{"docs", "fileRefs", "files"} {
+		arr, ok := wdDocVal(*doc, key)
+		if !ok {
+			continue
+		}
+		items, ok := arr.([]interface{})
+		if !ok {
+			continue
+		}
+		isDoc := key == "docs"
+		for _, it := range items {
+			im, ok := it.(bson.D)
+			if !ok {
+				continue
+			}
+			iname, _ := wdDocStr(im, "name")
+			if iname == "" || dup[iname] {
+				continue
+			}
+			dup[iname] = true
+			e := wdProjectTreeEntry{path: iname}
+			e.isDoc = isDoc
+			if idv, ok := wdDocVal(im, "_id"); ok {
+				if h, ok2 := oidHex(idv); ok2 {
+					if isDoc {
+						e.docID = h
+					} else {
+						e.fileID = h
+					}
+				}
+			}
+			entries = append(entries, e)
+		}
+	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].path < entries[j].path })
 	return entries, doc, nil
 }
@@ -309,6 +351,13 @@ func wdSyncProject(ctx context.Context, a *core.App, uid, projectID string) erro
 			body = b
 		} else {
 			body = wdFileContent(ctx, projectID, e.fileID)
+			if body == nil {
+				// best-effort (Node syncProject parity): no local filestore
+				// content (e.g. imported non-tex — wdWriteEntity writes the
+				// tree entry only). SKIP the remote instead of truncating it
+				// with an empty PUT.
+				continue
+			}
 		}
 		if perr := cl.put(ctx, root+"/"+strings.TrimPrefix(e.path, "/"), body, nil); perr != nil {
 			return perr
