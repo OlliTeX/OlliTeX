@@ -294,13 +294,17 @@ def part_b():
     seed_files = {
         f"{ROOT_PATH}/{proj}/hello.txt": b"seed hello for import\n",
         f"{ROOT_PATH}/{proj}/sub/notes.txt": b"seed notes (nested)\n",
+        # .tex exercises the docstore-backed path (import ingests into docs[]
+        # + docstore body; push exports it back from docstore) — WDV-C gate.
+        f"{ROOT_PATH}/{proj}/chapter.tex":
+            b"\\documentclass{article}\\n\\begin{document}\\nwdv harness tex seed\\n\\end{document}\\n",
     }
     for p, content in seed_files.items():
         st, _, _ = dav("PUT", urllib.parse.quote(p), content, authed())
         if st not in (200, 201):
             report("B3 seed remote tree", False, f"PUT {p} -> {st}")
             return
-    report("B3 seed remote tree", True, f"MKCOL+2x PUT under {ROOT_PATH}/{proj}/")
+    report("B3 seed remote tree", True, f"MKCOL+3x PUT under {ROOT_PATH}/{proj}/")
 
     # B4 — import CREATES the project (owner option (a), 2026-10-02; Node
     # parity WebdavHandler.importRemoteProject): response 200 success +
@@ -328,7 +332,8 @@ def part_b():
         'const p=db.projects.findOne({name: "' + proj + '"}); '
         'var out=[]; [p&&p.docs,p&&p.files,p&&p.folders].flat().forEach(function(e){e&&e.name&&out.push(e.name)}); '
         'print(out.join(","))')
-    ingested = ("hello.txt" in names.split(",")) and ("notes.txt" in names.split(","))
+    ingested = ("hello.txt" in names.split(",")) and ("notes.txt" in names.split(",")) \
+        and ("chapter.tex" in names.split(","))
     state = mongo_state(imp_pid) if imp_pid else None
     state_owner = _mongo_eval(
         'const d=db.webdavsyncprojectstates.findOne({projectId: "' + str(imp_pid) + '"}); '
@@ -363,6 +368,13 @@ def part_b():
         report("B5 push → 200 + file intact on server (conformant family)",
                st == 200 and st2 == 200 and b2 == b"seed hello for import\n",
                f"-> {st} {b[:100]!r}; server hello.txt={st2} {b2[:40]!r}")
+        # B5b — .tex parity (WDV-C): push exports docs[] from docstore; the
+        # imported chapter.tex body must come back byte-identical.
+        stx, hx, bx = dav("GET", urllib.parse.quote(f"{ROOT_PATH}/{proj}/chapter.tex"), None, authed())
+        tex_seed = seed_files[f"{ROOT_PATH}/{proj}/chapter.tex"]
+        report("B5b push .tex → remote body == docstore seed (docstore-backed parity)",
+               stx == 200 and bx == tex_seed,
+               f"-> {stx} {bx[:60]!r} (seed={tex_seed[:40]!r})")
     else:
         report("B5 push → 500 (MKCOL 409, nginx-dav family) — counterexample family",
                st >= 400,
