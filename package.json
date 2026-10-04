@@ -201,28 +201,10 @@
     "lint:fix": "eslint --cache --cache-location ./.cache/eslint/ --fix"
   },
   "workspaces": [
-    "jobs/mirror-documentation",
-    "jobs/quay-logging",
-    "jobs/wiki-algolia",
     "libraries/*",
     "server-ce/test",
-    "services/analytics",
-    "services/clsi-cache",
-    "services/clsi-lb",
-    "services/clsi-perf",
-    "services/freegeoip",
-    "services/github-sync",
-    "services/idp",
-    "services/latexqc",
-    "services/templates",
-    "services/third-party-datastore",
-    "services/third-party-references",
-    "tools/dependency-management",
-    "tools/npm-overrides-helper",
-    "tools/saas-e2e",
     "tools/migrations",
-    "frontend",
-    "junk/services-web"
+    "frontend"
   ],
   "dependenciesMeta": {
     "@babel/helper-string-parser@7.27.1": {

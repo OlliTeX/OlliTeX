@@ -63,9 +63,9 @@ func crEnvOr(k, def string) string {
 // firstExistingFile returns the first candidate that exists as a regular file
 // (or dflt if none — keeps callers working, and loggable, when no fixture is
 // present). The P7 image dropped the Node web tier, so the historical
-// /overleaf/services/web/... fixture tree moved under /overleaf/junk/...;
-// both generations are shipped in the image (Dockerfile COPY junk/services-web),
-// so the first existing wins per deployment.
+// /overleaf/services/web/... fixture tree was consolidated into the
+// frontend/ tree that ships in the image (2026-10-05: junk/ no longer ships);
+// first existing wins per deployment.
 func firstExistingFile(dflt string, candidates ...string) string {
 	for _, p := range candidates {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
@@ -91,7 +91,7 @@ func crBasicTemplate() string {
 		return v
 	}
 	return firstExistingFile("mainbasic.tex",
-		"/overleaf/junk/services-web/app/templates/project_files/mainbasic.tex",
+		"/overleaf/frontend/app/templates/project_files/mainbasic.tex",
 		"/overleaf/services/web/app/templates/project_files/mainbasic.tex")
 }
 
@@ -107,7 +107,7 @@ func crExampleProjectDir() string {
 		return v
 	}
 	return firstExistingDir("templates",
-		"/overleaf/junk/services-web/app/templates/project_files/example-project-sp",
+		"/overleaf/frontend/app/templates/project_files/example-project-sp",
 		"/overleaf/services/web/app/templates/project_files/example-project-sp")
 }
 

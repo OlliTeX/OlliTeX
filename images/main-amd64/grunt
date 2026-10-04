@@ -1,32 +1,57 @@
 #!/bin/bash
 # Thin wrapper on old grunt tasks to ease migrating.
+#
+# 2026-10-05 (owner directive: no junk/ in the image): the oracle node
+# scripts this wrapper delegated to no longer ship. check:* tasks now run
+# dependency-free probes directly; user:* tasks are removed (the Node user
+# manager had no Go CLI equivalent in this deployment — use the admin web
+# UI / `docker exec ... mongosh` for operator-level account work).
 
 set -e
-set -x
-TASK="$1"
-shift 1
+TASK="${1:-}"
+shift || true
 
-cd /overleaf/junk/services-web
+probe() { # host port name cmd regex
+  local host="$1" port="$2" name="$3" cmd="$4" rx="$5"
+  node -e '
+const net = require("node:net");
+const [host, port, name, cmd, rx] = [process.argv[1], +process.argv[2], process.argv[3], process.argv[4], new RegExp(process.argv[5], "i")];
+const s = net.connect({ host, port });
+const fail = e => { clearTimeout(t); try { s.destroy(); } catch (_) {} console.error(name + " FAIL: " + e.message); process.exit(1); };
+const t = setTimeout(() => fail(new Error(name + " timeout")), 8000);
+s.once("connect", () => {
+  if (!cmd) { clearTimeout(t); s.destroy(); return process.exit(0); }
+  s.once("data", d => { clearTimeout(t); try { s.destroy(); } catch (_) {} rx.test(d.toString()) ? process.exit(0) : fail(new Error("bad response: " + d.toString().trim())); });
+  s.once("error", fail);
+  s.write(cmd);
+});
+s.once("error", fail);
+' "$host" "$port" "$name" "$cmd" "$rx"
+}
 
 case "$TASK" in
-  user:create-admin)
-    echo "The grunt command is deprecated, run the create-user script using node instead"
-    exec /sbin/setuser www-data node modules/server-ce-scripts/scripts/create-user.mjs --admin "$@"
-    ;;
-
-  user:delete)
-    echo "The grunt command is deprecated, run the delete-user script using node instead"
-    exec /sbin/setuser www-data node modules/server-ce-scripts/scripts/delete-user.mjs "$@"
-    ;;
-
   check:mongo)
-    echo "The grunt command is deprecated, run the check-mongodb script using node instead"
-    exec /sbin/setuser www-data node modules/server-ce-scripts/scripts/check-mongodb.mjs
+    echo "Checking mongo at ${MONGO_HOST:-mongo}:${MONGO_PORT:-27017}"
+    probe "${MONGO_HOST:-mongo}" "${MONGO_PORT:-27017}" "mongo" "" ""
+    echo "mongo OK"
     ;;
 
   check:redis)
-    echo "The grunt command is deprecated, run the check-redis script using node instead"
-    exec /sbin/setuser www-data node modules/server-ce-scripts/scripts/check-redis.mjs
+    echo "Checking redis at ${REDIS_HOST:-redis}:${REDIS_PORT:-6379}"
+    probe "${REDIS_HOST:-redis}" "${REDIS_PORT:-6379}" "redis" "PING" "PONG"
+    echo "redis OK"
+    ;;
+
+  user:create-admin|user:delete)
+    echo "ERROR: grunt $TASK is no longer available (2026-10-05: the oracle node user scripts retired with junk/; there is no Go CLI equivalent in this deployment)."
+    echo "Use the admin web UI for user management, or operate the store directly:"
+    echo "  docker exec -it <overleaf> mongosh --quiet \"mongodb://${MONGO_HOST:-mongo}:${MONGO_PORT:-27017}/${MONGO_DB:-sharelatex}\""
+    exit 1
+    ;;
+
+  "")
+    echo "usage: grunt <check:mongo|check:redis|user:create-admin|user:delete> [args]" >&2
+    exit 1
     ;;
 
   *)

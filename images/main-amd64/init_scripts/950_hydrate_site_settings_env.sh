@@ -4,6 +4,10 @@
 # start — stored admin values override compose env for ALL services
 # (web, clsi, …). Idempotent: the managed block is replaced each boot.
 # On failure the block is empty and the compose env stands.
+#
+# 2026-10-05 (owner directive: no junk/ in the image): the hydrate script
+# was consolidated into the frontend workspace (self-contained; same
+# @overleaf/access-token-encryptor cipher family/label as before).
 set -u
 
 FILE=/etc/overleaf/env.sh
@@ -21,10 +25,9 @@ fi
 
 {
   echo "$BEGIN"
-  # NOTE: the hydrate node process prints library log lines (Settings,
-  # mongoose) to stdout — keep ONLY export/comment lines in env.sh, or
-  # `sh . /etc/overleaf/env.sh` fails at service start (2026-08-30 fix).
-  if ! /sbin/setuser www-data node /overleaf/junk/services-web/modules/server-ce-scripts/scripts/hydrate-site-settings-env.mjs 2>/tmp/overleaf-hydrate-err.log | grep -E '^(export |#)' >> "$FILE"; then
+  # NOTE: keep ONLY export/comment lines in env.sh, or `sh .
+  # /etc/overleaf/env.sh` fails at service start (2026-08-30 fix).
+  if ! (cd /overleaf/frontend && /sbin/setuser www-data node scripts/hydrate-site-settings-env.mjs) 2>/tmp/overleaf-hydrate-err.log | grep -E '^(export |#)' >> "$FILE"; then
     echo "# hydration failed (compose env stands); log: /tmp/overleaf-hydrate-err.log" >> "$FILE"
   fi
   echo "$END"

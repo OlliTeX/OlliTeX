@@ -662,3 +662,25 @@ way).
 - Push: owner background (owner feed).
 - Untracked probe files (u10-probe.cjs, u101-oracle.cjs,
   legacy-project.test.e2e.ts.bak): owner call pending.
+
+## RUN — 2026-10-04/05 — junk de-shipping + services/ + libraries/ + package.json size wave (owner directive: NO junk/ in the image)
+
+### Owner directives this round
+1. Retire `services/clsi_typst`, then remove `services/` (Go clsitypst is live — done previously; executed the deletion + staged 72 D).
+2. Audit `libraries/` — retire unused (result: all 13 have live dependents; `overleaf-editor-core` was initially retired then RESTORED — `frontend/config/settings.defaults.js` requires `overleaf-editor-core/lib/text_file_defaults` at build time).
+3. `frontend` last-major-Node check (result: YES for shipped product — only compiled JS assets + boot hydration script; build now runs from frontend/; runtime Node otherwise gone besides `tools/migrations` at boot).
+4. package.json removals to cut image size (below).
+5. **Hard directive: do NOT copy junk/ into the image** (owner deleted overleaf/junk on disk; donor at /data_1/image_mining/junk was extracted, then owner deleted it too).
+
+### Work
+- **Webpack build host consolidated**: `webpack.config.{js,prod,dev,dev-env}.js`, `webpack-plugins/`, `app/src/infrastructure/{Views.mjs,PackageVersions.js}`, `config/settings.defaults.js` moved from the junk oracle tree to `frontend/` (git shows them as renames). Re-anchored 60 path calcs (`../../../frontend/modules/`→`../modules/`, output `../../public`→`../public`, `precompile-pug` path). `services.js` dir → `frontend`. Dockerfile no longer copies any junk path.
+- **Init-script de-junk**: `500_check_db_access.sh` rewritten as dependency-free node net probes (mongo TCP + redis PING; verified live as www-data); `910_check_texlive_images` → advisory no-op (sandbox verified at compile time); `950_hydrate_site_settings_env.sh` repointed to NEW self-contained `frontend/scripts/hydrate-site-settings-env.mjs` (env-based mongo URL + same @overleaf/access-token-encryptor cipher family/label; verified end-to-end: planted siteSettings doc → correct export lines → cleaned); `00_close_site` pre-shutdown no longer runs the oracle `disconnect_all_users.mjs` (real-time service stop = the active kick; maintenance file + grace sleeps kept); `grunt` wrapper: check:* tasks now run inline probes, user:* tasks deprecated with operator guidance.
+- **Template assets rescued from git into canonical tree** (owner purge swept them on disk): TeX `mainbasic.tex` + `example-project-sp/` → `frontend/app/templates/project_files/`; Typst `mainbasic.typ` + article/ + example/ → `frontend/modules/typst/app/templates/project_files/`; Go candidates in `create.go`/`create_typst.go` re-targeted (junk→frontend, legacy second).
+- **package.json/yarn**: removed `onnxruntime-web` (134MB, feature-dead — no .ort models, no modules/symbol-recognition, only a stale feature flag) from frontend + build-host; removed 19 dead workspaces (18 nonexistent services/jobs/tools + junk/services-web); removed dead `@overleaf/migrations` cross-dep from frontend; lockfile pruned; orphan cache zips swept (caution: first sweep had a scoped-name dash bug — fixed logic shows 0 true orphans; missing zips re-fetched).
+- **Bake**: image rebuilt from the de-junked tree. `webpack 5.106.2 compiled successfully` in-image; container healthy; **gate green: typst-t2 4/4, u103r 2/2, config-registry + hub-owner-batch2 + p51a/p51b 11 passed / 4 skipped (retired Node legs) / 0 failed**.
+- **Image size**: 5.28GB → ~5.0GB (docker rounded) with onnxruntime-web, 4 cypress-free? kept (dev/test tooling retained), .yarn/cache 1.7→1.5GB, and the entire junk/ oracle tree (≈2.2k files incl. its node test assets) out of the copied sources.
+- **services/**: deleted (owner); a "comeback" folder on disk was only stale runtime scratch (Sep 10 main.typ + vitest cache) — cleared; 72 tracked D intact.
+
+### Standing
+- Other-session in-flight files in the tree (collab: cmd/collab, go/services/collab, collabhistory, history, sso live tests, ide-react collab, go.mod/go.sum; web-go-flip runit; p69 spec): **excluded from this commit** per shared-tree rule.
+- TODO-0a710094 registry push + hub-a11y contrast still owner-gated/deferred.

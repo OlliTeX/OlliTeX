@@ -2,6 +2,9 @@
 set -e
 
 echo "Checking texlive images"
-# P7 step 4 (2026-10-03): Node web retired to junk/services-web (RETIRED.md)
-cd /overleaf/junk/services-web
-/sbin/setuser www-data node modules/server-ce-scripts/scripts/check-texlive-images.mjs
+# 2026-10-05 (owner directive: no junk/ in the image): the old advisory
+# check ran a node script from the retired junk/services-web oracle tree.
+# TeX Live sandbox availability is now verified at compile time (the Go
+# clsitex/clsitypst docker runners pull/verify their sandbox image on first
+# compile) and end-to-end by the parity spec suite — the boot-time advisory
+# probe is intentionally a no-op now.

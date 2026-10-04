@@ -1,0 +1,1670 @@
+const Path = require('node:path')
+const { merge } = require('@overleaf/settings/merge')
+const {
+  DEFAULT_TEXT_EXTENSIONS,
+  DEFAULT_EDITABLE_FILENAMES,
+} = require('overleaf-editor-core/lib/text_file_defaults')
+
+let defaultFeatures, siteUrl
+
+// Make time interval config easier.
+const seconds = 1000
+const minutes = 60 * seconds
+
+// These credentials are used for authenticating api requests
+// between services that may need to go over public channels
+const httpAuthUser = process.env.WEB_API_USER
+const httpAuthPass = process.env.WEB_API_PASSWORD
+const httpAuthUsers = {}
+if (httpAuthUser && httpAuthPass) {
+  httpAuthUsers[httpAuthUser] = httpAuthPass
+}
+
+const intFromEnv = function (name, defaultValue) {
+  if (
+    [null, undefined].includes(defaultValue) ||
+    typeof defaultValue !== 'number'
+  ) {
+    throw new Error(
+      `Bad default integer value for setting: ${name}, ${defaultValue}`
+    )
+  }
+  return parseInt(process.env[name], 10) || defaultValue
+}
+
+const parseTextExtensions = function (extensions) {
+  if (extensions) {
+    return extensions.split(',').map(ext => ext.trim())
+  } else {
+    return []
+  }
+}
+
+const httpPermissionsPolicy = {
+  blocked: [
+    'accelerometer',
+    // 2026-08-31 (R12-17): 'attribution-reporting' removed — it is no
+    // longer a valid Permissions-Policy directive (replaced by the
+    // Attribution Reporting API). Modern Chrome logs
+    // "Error with Permissions-Policy header: Unrecognized feature:
+    // 'attribution-reporting'" on every page, polluting the console.
+    'browsing-topics',
+    'camera',
+    'display-capture',
+    'encrypted-media',
+    'gamepad',
+    'geolocation',
+    'gyroscope',
+    'hid',
+    'identity-credentials-get',
+    'idle-detection',
+    'local-fonts',
+    'magnetometer',
+    'midi',
+    'otp-credentials',
+    'picture-in-picture',
+    'screen-wake-lock',
+    'serial',
+    'storage-access',
+    'usb',
+    'window-management',
+    'xr-spatial-tracking',
+  ],
+  allowed: {
+    autoplay: 'self "https://videos.ctfassets.net"',
+    fullscreen: 'self',
+    'on-device-speech-recognition': 'self',
+    // required for Apple Pay / Google Pay
+    payment: 'self "https://js.stripe.com"',
+  },
+}
+
+const safeCompilers = ['xelatex', 'pdflatex', 'latex', 'lualatex', 'typst']
+
+// 2026-09-09 (owner R11 #9, live root-cause): the object below reads
+// process.env at BUILD time, and web boot order does not guarantee who
+// wins: the site-settings env hydration (EnvHydrator) or the first
+// @overleaf/settings consumer. If the snapshot freezes before hydration,
+// every admin-managed value (pandoc, LLM, webdav, …) silently stays OFF
+// while /admin/site shows it ON.
+//
+// Fix: export a lazy, stamp-based proxy. The object is built on first
+// access and rebuilt when EnvHydrator bumps the stamp after stored
+// values land in env. libraries/settings/Settings.js registers an
+// override re-apply hook (globalThis.__OL_SETTINGS_REAPPLY_OVERRIDES)
+// so every rebuild re-merges the /etc/overleaf/settings.js overrides
+// (sessionSecret & friends) — boot-critical values survive rebuilds.
+function buildSettings() {
+  return {
+  env: 'server-ce',
+
+  limits: {
+    httpGlobalAgentMaxSockets: 300,
+    httpsGlobalAgentMaxSockets: 300,
+  },
+
+  allowAnonymousReadAndWriteSharing:
+    process.env.OVERLEAF_ALLOW_ANONYMOUS_READ_AND_WRITE_SHARING === 'true',
+
+  // Databases
+  // ---------
+  mongo: {
+    options: {
+      appname: 'web',
+      maxPoolSize: parseInt(process.env.MONGO_POOL_SIZE, 10) || 100,
+      serverSelectionTimeoutMS:
+        parseInt(process.env.MONGO_SERVER_SELECTION_TIMEOUT, 10) || 60000,
+      // Setting socketTimeoutMS to 0 means no timeout
+      socketTimeoutMS: parseInt(
+        process.env.MONGO_SOCKET_TIMEOUT ?? '60000',
+        10
+      ),
+      monitorCommands: true,
+    },
+    url:
+      process.env.MONGO_CONNECTION_STRING ||
+      process.env.MONGO_URL ||
+      `mongodb://${process.env.MONGO_HOST || '127.0.0.1'}/sharelatex`,
+    hasSecondaries: process.env.MONGO_HAS_SECONDARIES === 'true',
+    auxUrl: process.env.MONGO_AUX_CONNECTION_STRING,
+  },
+
+  redis: {
+    web: {
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: process.env.REDIS_PORT || '6379',
+      password: process.env.REDIS_PASSWORD || '',
+      db: process.env.REDIS_DB,
+      maxRetriesPerRequest: parseInt(
+        process.env.REDIS_MAX_RETRIES_PER_REQUEST || '20'
+      ),
+    },
+
+    // websessions:
+    // 	cluster: [
+    // 		{host: '127.0.0.1', port: 7000}
+    // 		{host: '127.0.0.1', port: 7001}
+    // 		{host: '127.0.0.1', port: 7002}
+    // 		{host: '127.0.0.1', port: 7003}
+    // 		{host: '127.0.0.1', port: 7004}
+    // 		{host: '127.0.0.1', port: 7005}
+    // 	]
+
+    // ratelimiter:
+    // 	cluster: [
+    // 		{host: '127.0.0.1', port: 7000}
+    // 		{host: '127.0.0.1', port: 7001}
+    // 		{host: '127.0.0.1', port: 7002}
+    // 		{host: '127.0.0.1', port: 7003}
+    // 		{host: '127.0.0.1', port: 7004}
+    // 		{host: '127.0.0.1', port: 7005}
+    // 	]
+
+    // cooldown:
+    // 	cluster: [
+    // 		{host: '127.0.0.1', port: 7000}
+    // 		{host: '127.0.0.1', port: 7001}
+    // 		{host: '127.0.0.1', port: 7002}
+    // 		{host: '127.0.0.1', port: 7003}
+    // 		{host: '127.0.0.1', port: 7004}
+    // 		{host: '127.0.0.1', port: 7005}
+    // 	]
+
+    api: {
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: process.env.REDIS_PORT || '6379',
+      password: process.env.REDIS_PASSWORD || '',
+      maxRetriesPerRequest: parseInt(
+        process.env.REDIS_MAX_RETRIES_PER_REQUEST || '20'
+      ),
+    },
+  },
+
+  // [III] Services configuration (for microservices)
+  // H.5 NOTE: these blocks are NOT merged with the duplicate `datamanipulator`/
+  // `webdavinterface` entries inside `apis` below (different namespaces).
+  // No code reads Settings.datamanipulator / Settings.apis.datamanipulator
+  // today — the web process reads process.env.DATAMANIPULATOR_API_URL /
+  // WEBDAVINTERFACE_API_URL directly (WebDAVServiceClient). Kept for future
+  // consumers; both resolve from the same env vars.
+  datamanipulator: {
+    api_url: process.env.DATAMANIPULATOR_API_URL || 'http://localhost:4001',
+  },
+  webdavinterface: {
+    api_url: process.env.WEBDAVINTERFACE_API_URL || 'http://localhost:4002',
+  },
+
+  // Service locations
+  // -----------------
+
+  // Configure which ports to run each service on. Generally you
+  // can leave these as they are unless you have some other services
+  // running which conflict, or want to run the web process on port 80.
+  internal: {
+    web: {
+      port: process.env.WEB_PORT || 3000,
+      host: process.env.LISTEN_ADDRESS || '127.0.0.1',
+    },
+  },
+
+  // Tell each service where to find the other services. If everything
+  // is running locally then this is easy, but they exist as separate config
+  // options incase you want to run some services on remote hosts.
+  apis: {
+    // [III] datamanipulator + webdavinterface service endpoints (env-configurable)
+    datamanipulator: {
+      api_url: process.env.DATAMANIPULATOR_API_URL || 'http://localhost:4001',
+    },
+    webdavinterface: {
+      api_url: process.env.WEBDAVINTERFACE_API_URL || 'http://localhost:4002',
+    },
+    web: {
+      url: `http://${
+        process.env.WEB_API_HOST || process.env.WEB_HOST || '127.0.0.1'
+      }:${process.env.WEB_API_PORT || process.env.WEB_PORT || 3000}`,
+      user: httpAuthUser,
+      pass: httpAuthPass,
+    },
+    documentupdater: {
+      url: `http://${
+        process.env.DOCUPDATER_HOST ||
+        process.env.DOCUMENT_UPDATER_HOST ||
+        '127.0.0.1'
+      }:3003`,
+    },
+    geoIpLookup: {
+      cacheSize: intFromEnv('GEO_IP_LOOKUP_CACHE_SIZE', 10_000),
+    },
+    docstore: {
+      url: `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016`,
+      pubUrl: `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016`,
+    },
+    chat: {
+      internal_url: `http://${process.env.CHAT_HOST || '127.0.0.1'}:3010`,
+    },
+    filestore: {
+      url: `http://${process.env.FILESTORE_HOST || '127.0.0.1'}:3009`,
+    },
+    clsi: {
+      url: `http://${process.env.CLSI_HOST || '127.0.0.1'}:3013`,
+      // typst compiles go to a dedicated clsi_typst service; ClsiManager
+      // picks this URL per-compiler. COMPILE_TYPEST_ENABLED defaults ON
+      // (owner 2026-09-10); set it to 'false' to disable.
+      typst: {
+        url:
+          process.env.CLSI_TYPEST_URL ||
+          `http://${process.env.CLSI_TYPEST_HOST || '127.0.0.1'}:3014`,
+      },
+      downloadHost:
+        process.env.CLSI_LB_IP || process.env.CLSI_LB_HOST
+          ? `http://${process.env.CLSI_LB_IP || process.env.CLSI_LB_HOST}:80`
+          : `http://${process.env.DOWNLOAD_HOST || '127.0.0.1'}:8080`,
+      backendGroupName: undefined,
+      submissionCompileBackendClass:
+        process.env.CLSI_SUBMISSION_COMPILE_BACKEND_CLASS || 'free',
+      standardCompileBackendClass:
+        process.env.CLSI_STANDARD_COMPILE_BACKEND_CLASS || 'free',
+      priorityCompileBackendClass:
+        process.env.CLSI_PRIORITY_COMPILE_BACKEND_CLASS || 'premium',
+    },
+    clsiCache: {
+      instances: JSON.parse(process.env.CLSI_CACHE_INSTANCES || '[]'),
+    },
+    project_history: {
+      sendProjectStructureOps: true,
+      url: `http://${process.env.PROJECT_HISTORY_HOST || '127.0.0.1'}:3054`,
+    },
+    historyBackupDeletion: {
+      enabled: false,
+      url: `http://${process.env.HISTORY_BACKUP_DELETION_HOST || '127.0.0.1'}:3101`,
+      user: process.env.HISTORY_BACKUP_DELETION_USER || 'staging',
+      pass: process.env.HISTORY_BACKUP_DELETION_PASS,
+    },
+    realTime: {
+      url: `http://${process.env.REALTIME_HOST || '127.0.0.1'}:3026`,
+    },
+    linkedUrlProxy: {
+      url: `http://${process.env.LINKED_URL_PROXY_HOST || '127.0.0.1'}:3066`,
+    },
+    notifications: {
+      url: `http://${process.env.NOTIFICATIONS_HOST || '127.0.0.1'}:3042`,
+    },
+    webpack: {
+      url: `http://${process.env.WEBPACK_HOST || '127.0.0.1'}:3808`,
+    },
+    wiki: {
+      url: process.env.WIKI_URL || 'https://learnwiki.overleaf.com',
+      maxCacheAge: parseInt(process.env.WIKI_MAX_CACHE_AGE || 5 * minutes, 10),
+    },
+
+    haveIBeenPwned: {
+      enabled: process.env.HAVE_I_BEEN_PWNED_ENABLED === 'true',
+      url:
+        process.env.HAVE_I_BEEN_PWNED_URL || 'https://api.pwnedpasswords.com',
+      timeout: parseInt(process.env.HAVE_I_BEEN_PWNED_TIMEOUT, 10) || 5 * 1000,
+    },
+    v1_history: {
+      url:
+        process.env.V1_HISTORY_URL ||
+        `http://${process.env.V1_HISTORY_HOST || '127.0.0.1'}:${
+          process.env.V1_HISTORY_PORT || '3100'
+        }/api`,
+      urlForGitBridge: process.env.V1_HISTORY_URL_FOR_GIT_BRIDGE,
+      user: process.env.V1_HISTORY_USER || 'staging',
+      pass:
+        process.env.V1_HISTORY_PASS ||
+        process.env.V1_HISTORY_PASSWORD ||
+        'password',
+
+      buckets: {
+        globalBlobs: process.env.OVERLEAF_EDITOR_BLOBS_BUCKET,
+        projectBlobs: process.env.OVERLEAF_EDITOR_PROJECT_BLOBS_BUCKET,
+      },
+    },
+
+    // For legacy reasons, we need to populate the below objects.
+    v1: {},
+    recurly: {},
+  },
+
+  // Defines which features are allowed in the
+  // Permissions-Policy HTTP header
+  httpPermissions: httpPermissionsPolicy,
+  useHttpPermissionsPolicy: true,
+
+  jwt: {
+    key: process.env.OT_JWT_AUTH_KEY,
+    algorithm: process.env.OT_JWT_AUTH_ALG || 'HS256',
+  },
+
+  devToolbar: {
+    enabled: false,
+  },
+
+  splitTests: [],
+  splitTest: {
+    enableSplitTestCalculator:
+      process.env.ENABLE_SPLIT_TEST_CALCULATOR === 'true',
+  },
+
+  // Where your instance of Overleaf Community Edition/Server Pro can be found publicly. Used in emails
+  // that are sent out, generated links, etc.
+  siteUrl: (siteUrl = process.env.PUBLIC_URL || 'http://127.0.0.1:3000'),
+
+  isCodeSpace: process.env.IS_CODE_SPACE === 'true',
+  isDevEnv: process.env.NODE_ENV === 'development',
+  isCI: process.env.NODE_ENV === 'test',
+
+  lockManager: {
+    lockTestInterval: intFromEnv('LOCK_MANAGER_LOCK_TEST_INTERVAL', 50),
+    maxTestInterval: intFromEnv('LOCK_MANAGER_MAX_TEST_INTERVAL', 1000),
+    maxLockWaitTime: intFromEnv('LOCK_MANAGER_MAX_LOCK_WAIT_TIME', 10000),
+    redisLockExpiry: intFromEnv('LOCK_MANAGER_REDIS_LOCK_EXPIRY', 30),
+    slowExecutionThreshold: intFromEnv(
+      'LOCK_MANAGER_SLOW_EXECUTION_THRESHOLD',
+      5000
+    ),
+  },
+
+  // Optional separate location for websocket connections, if unset defaults to siteUrl.
+  wsUrl: process.env.WEBSOCKET_URL,
+  wsUrlV2: process.env.WEBSOCKET_URL_V2,
+  wsUrlBeta: process.env.WEBSOCKET_URL_BETA,
+
+  wsUrlV2Percentage: parseInt(
+    process.env.WEBSOCKET_URL_V2_PERCENTAGE || '0',
+    10
+  ),
+  wsRetryHandshake: parseInt(process.env.WEBSOCKET_RETRY_HANDSHAKE || '5', 10),
+
+  // cookie domain
+  // use full domain for cookies to only be accessible from that domain,
+  // replace subdomain with dot to have them accessible on all subdomains
+  cookieDomain: process.env.COOKIE_DOMAIN,
+  cookieName: process.env.COOKIE_NAME || 'overleaf.sid',
+  cookieRollingSession: true,
+
+  // this is only used if cookies are used for clsi backend
+  // clsiCookieKey: "clsiserver"
+
+  robotsNoindex: process.env.ROBOTS_NOINDEX === 'true' || false,
+
+  maxEntitiesPerProject: parseInt(
+    process.env.MAX_ENTITIES_PER_PROJECT || '2000',
+    10
+  ),
+
+  projectUploadTimeout: parseInt(
+    process.env.PROJECT_UPLOAD_TIMEOUT || '120000',
+    10
+  ),
+  maxUploadSize: process.env.MAX_UPLOAD_SIZE
+    ? parseInt(process.env.MAX_UPLOAD_SIZE, 10) * 1024 * 1024
+    : 50 * 1024 * 1024, // 50 MB
+  multerOptions: {
+    preservePath: process.env.MULTER_PRESERVE_PATH,
+  },
+
+  notifyOnSystemMessageChanges:
+    process.env.NOTIFY_ON_SYSTEM_MESSAGE_CHANGES === 'true',
+
+  // start failing the health check if active handles exceeds this limit
+  maxActiveHandles: process.env.MAX_ACTIVE_HANDLES
+    ? parseInt(process.env.MAX_ACTIVE_HANDLES, 10)
+    : undefined,
+
+  // Security
+  // --------
+  security: {
+    sessionSecret: process.env.SESSION_SECRET,
+    sessionSecretUpcoming: process.env.SESSION_SECRET_UPCOMING,
+    sessionSecretFallback: process.env.SESSION_SECRET_FALLBACK,
+    bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS, 10) || 12,
+  }, // number of rounds used to hash user passwords (raised to power 2)
+
+  adminUrl: process.env.ADMIN_URL,
+  adminOnlyLogin: process.env.ADMIN_ONLY_LOGIN === 'true',
+  adminPrivilegeAvailable: process.env.ADMIN_PRIVILEGE_AVAILABLE === 'true',
+  adminRolesEnabled: false,
+  blockCrossOriginRequests: process.env.BLOCK_CROSS_ORIGIN_REQUESTS === 'true',
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || siteUrl).split(','),
+
+  httpAuthUsers,
+
+  // Default features
+  // ----------------
+  //
+  // You can select the features that are enabled by default for new
+  // new users.
+  defaultFeatures: (defaultFeatures = {
+    collaborators: -1,
+    dropbox: true,
+    github: true,
+    gitBridge: true,
+    versioning: true,
+    compileTimeout: 180,
+    compileGroup: 'standard',
+    references: true,
+    trackChanges: true,
+    offlineMode: false,
+  }),
+
+  // featuresEpoch: 'YYYY-MM-DD',
+
+  personalAccessTokens: {
+    expiry: {
+      warningWindowDays: intFromEnv(
+        'PERSONAL_ACCESS_TOKEN_WARNING_WINDOW_DAYS',
+        2
+      ),
+    },
+  },
+
+  features: {
+    personal: defaultFeatures,
+  },
+
+  aiFeatures: {
+    freeQuota: 'free',
+    standardQuota: 'standard',
+    basicQuota: 'basic',
+    unlimitedQuota: 'unlimited',
+  },
+
+  quotaGrants: {
+    ai: {
+      free: 0,
+      basic: 0,
+      standard: 0,
+      unlimited: 0,
+    },
+  },
+
+  groupPlanModalOptions: {
+    plan_codes: [],
+    currencies: [],
+    sizes: [],
+    usages: [],
+  },
+  plans: [
+    {
+      planCode: 'personal',
+      name: 'Personal',
+      price_in_cents: 0,
+      features: defaultFeatures,
+    },
+  ],
+
+  disableChat: process.env.OVERLEAF_DISABLE_CHAT === 'true',
+  disableLinkSharing: process.env.OVERLEAF_DISABLE_LINK_SHARING === 'true',
+  safeCompilers,
+  defaultLatexCompiler: safeCompilers.includes(
+    process.env.DEFAULT_LATEX_COMPILER
+  )
+    ? process.env.DEFAULT_LATEX_COMPILER
+    : 'pdflatex',
+  restrictedCountries: [],
+  enableOnboardingEmails: process.env.ENABLE_ONBOARDING_EMAILS === 'true',
+
+  enabledLinkedFileTypes: (process.env.ENABLED_LINKED_FILE_TYPES || '').split(
+    ','
+  ),
+
+  // i18n
+  // ------
+  //
+  i18n: {
+    checkForHTMLInVars: process.env.I18N_CHECK_FOR_HTML_IN_VARS === 'true',
+    escapeHTMLInVars: process.env.I18N_ESCAPE_HTML_IN_VARS === 'true',
+    subdomainLang: {
+      www: { lngCode: 'en', url: siteUrl },
+    },
+    defaultLng: 'en',
+  },
+
+  // Spelling languages
+  // dic = available in client
+  // server: false = not available on server
+  // ------------------
+  languages: [
+    { code: 'en', name: 'English' },
+    { code: 'en_US', dic: 'en_US', name: 'English (American)' },
+    { code: 'en_GB', dic: 'en_GB', name: 'English (British)' },
+    { code: 'en_CA', dic: 'en_CA', name: 'English (Canadian)' },
+    {
+      code: 'en_AU',
+      dic: 'en_AU',
+      name: 'English (Australian)',
+      server: false,
+    },
+    {
+      code: 'en_ZA',
+      dic: 'en_ZA',
+      name: 'English (South African)',
+      server: false,
+    },
+    { code: 'af', dic: 'af_ZA', name: 'Afrikaans' },
+    { code: 'an', dic: 'an_ES', name: 'Aragonese', server: false },
+    { code: 'ar', dic: 'ar', name: 'Arabic' },
+    { code: 'be_BY', dic: 'be_BY', name: 'Belarusian', server: false },
+    { code: 'eu', dic: 'eu', name: 'Basque' },
+    { code: 'bn_BD', dic: 'bn_BD', name: 'Bengali', server: false },
+    { code: 'bs_BA', dic: 'bs_BA', name: 'Bosnian', server: false },
+    { code: 'br', dic: 'br_FR', name: 'Breton' },
+    { code: 'bg', dic: 'bg_BG', name: 'Bulgarian' },
+    { code: 'ca', dic: 'ca', name: 'Catalan' },
+    { code: 'hr', dic: 'hr_HR', name: 'Croatian' },
+    { code: 'cs', dic: 'cs_CZ', name: 'Czech' },
+    { code: 'da', dic: 'da_DK', name: 'Danish' },
+    { code: 'nl', dic: 'nl', name: 'Dutch' },
+    { code: 'dz', dic: 'dz', name: 'Dzongkha', server: false },
+    { code: 'eo', dic: 'eo', name: 'Esperanto' },
+    { code: 'et', dic: 'et_EE', name: 'Estonian' },
+    { code: 'fo', dic: 'fo', name: 'Faroese' },
+    { code: 'fr', dic: 'fr', name: 'French' },
+    { code: 'gl', dic: 'gl_ES', name: 'Galician' },
+    { code: 'de', dic: 'de_DE', name: 'German' },
+    { code: 'de_AT', dic: 'de_AT', name: 'German (Austria)', server: false },
+    {
+      code: 'de_CH',
+      dic: 'de_CH',
+      name: 'German (Switzerland)',
+      server: false,
+    },
+    { code: 'el', dic: 'el_GR', name: 'Greek' },
+    { code: 'gug_PY', dic: 'gug_PY', name: 'Guarani', server: false },
+    { code: 'gu_IN', dic: 'gu_IN', name: 'Gujarati', server: false },
+    { code: 'he_IL', dic: 'he_IL', name: 'Hebrew', server: false },
+    { code: 'hi_IN', dic: 'hi_IN', name: 'Hindi', server: false },
+    { code: 'hu_HU', dic: 'hu_HU', name: 'Hungarian', server: false },
+    { code: 'is_IS', dic: 'is_IS', name: 'Icelandic', server: false },
+    { code: 'id', dic: 'id_ID', name: 'Indonesian' },
+    { code: 'ga', dic: 'ga_IE', name: 'Irish' },
+    { code: 'it', dic: 'it_IT', name: 'Italian' },
+    { code: 'kk', dic: 'kk_KZ', name: 'Kazakh' },
+    { code: 'ko', dic: 'ko', name: 'Korean', server: false },
+    { code: 'ku', name: 'Kurdish' },
+    { code: 'kmr', dic: 'kmr_Latn', name: 'Kurmanji', server: false },
+    { code: 'lv', dic: 'lv_LV', name: 'Latvian' },
+    { code: 'lt', dic: 'lt_LT', name: 'Lithuanian' },
+    { code: 'lo_LA', dic: 'lo_LA', name: 'Laotian', server: false },
+    { code: 'ml_IN', dic: 'ml_IN', name: 'Malayalam', server: false },
+    { code: 'mn_MN', dic: 'mn_MN', name: 'Mongolian', server: false },
+    { code: 'nr', name: 'Ndebele' },
+    { code: 'ne_NP', dic: 'ne_NP', name: 'Nepali', server: false },
+    { code: 'ns', name: 'Northern Sotho' },
+    { code: 'no', name: 'Norwegian' },
+    { code: 'nb_NO', dic: 'nb_NO', name: 'Norwegian (Bokmål)', server: false },
+    { code: 'nn_NO', dic: 'nn_NO', name: 'Norwegian (Nynorsk)', server: false },
+    { code: 'oc_FR', dic: 'oc_FR', name: 'Occitan', server: false },
+    { code: 'fa', dic: 'fa_IR', name: 'Persian' },
+    { code: 'pl', dic: 'pl_PL', name: 'Polish' },
+    { code: 'pt_BR', dic: 'pt_BR', name: 'Portuguese (Brazilian)' },
+    {
+      code: 'pt_PT',
+      dic: 'pt_PT',
+      name: 'Portuguese (European)',
+    },
+    { code: 'pa', name: 'Punjabi' },
+    { code: 'ro', dic: 'ro_RO', name: 'Romanian' },
+    { code: 'ru', dic: 'ru_RU', name: 'Russian' },
+    { code: 'gd_GB', dic: 'gd_GB', name: 'Scottish Gaelic', server: false },
+    { code: 'sr_RS', dic: 'sr_RS', name: 'Serbian', server: false },
+    { code: 'si_LK', dic: 'si_LK', name: 'Sinhala', server: false },
+    { code: 'sk', dic: 'sk_SK', name: 'Slovak' },
+    { code: 'sl', dic: 'sl_SI', name: 'Slovenian' },
+    { code: 'st', name: 'Southern Sotho' },
+    { code: 'es', dic: 'es_ES', name: 'Spanish' },
+    { code: 'sw_TZ', dic: 'sw_TZ', name: 'Swahili', server: false },
+    { code: 'sv', dic: 'sv_SE', name: 'Swedish' },
+    { code: 'tl', dic: 'tl', name: 'Tagalog' },
+    { code: 'te_IN', dic: 'te_IN', name: 'Telugu', server: false },
+    { code: 'th_TH', dic: 'th_TH', name: 'Thai', server: false },
+    { code: 'bo', dic: 'bo', name: 'Tibetan', server: false },
+    { code: 'ts', name: 'Tsonga' },
+    { code: 'tn', name: 'Tswana' },
+    { code: 'tr_TR', dic: 'tr_TR', name: 'Turkish', server: false },
+    { code: 'uk_UA', dic: 'uk_UA', name: 'Ukrainian', server: false },
+    { code: 'hsb', name: 'Upper Sorbian' },
+    { code: 'uz_UZ', dic: 'uz_UZ', name: 'Uzbek', server: false },
+    { code: 'vi_VN', dic: 'vi_VN', name: 'Vietnamese', server: false },
+    { code: 'cy', name: 'Welsh' },
+    { code: 'xh', name: 'Xhosa' },
+  ],
+
+  translatedLanguages: {
+    cs: 'Čeština',
+    da: 'Dansk',
+    de: 'Deutsch',    cn: '简体中文',
+
+    en: 'English',
+    es: 'Español',
+    fi: 'Suomi',
+    fr: 'Français',
+    it: 'Italiano',
+    ja: '日本語',
+    ko: '한국어',
+    nl: 'Nederlands',
+    no: 'Norsk',
+    pl: 'Polski',
+    pt: 'Português',
+    ru: 'Русский',    ro: 'Română',
+
+    sv: 'Svenska',
+    tr: 'Türkçe',    uk: 'Українська',
+
+    'zh-CN': '简体中文',
+  },
+
+  maxDictionarySize: 1024 * 1024, // 1 MB
+
+  // Password Settings
+  // -----------
+  // These restrict the passwords users can use when registering
+  // opts are from http://antelle.github.io/passfield
+  passwordStrengthOptions: {
+    length: {
+      min: 8,
+      // Bcrypt does not support longer passwords than that.
+      max: 72,
+    },
+  },
+
+  elevateAccountSecurityAfterFailedLogin:
+    parseInt(process.env.ELEVATED_ACCOUNT_SECURITY_AFTER_FAILED_LOGIN_MS, 10) ||
+    24 * 60 * 60 * 1000,
+
+  deviceHistory: {
+    cookieName: process.env.DEVICE_HISTORY_COOKIE_NAME || 'deviceHistory',
+    entryExpiry:
+      parseInt(process.env.DEVICE_HISTORY_ENTRY_EXPIRY_MS, 10) ||
+      90 * 24 * 60 * 60 * 1000,
+    maxEntries: parseInt(process.env.DEVICE_HISTORY_MAX_ENTRIES, 10) || 10,
+    secret: process.env.DEVICE_HISTORY_SECRET,
+  },
+
+  // Email support
+  // -------------
+  //
+  //	Overleaf uses nodemailer (http://www.nodemailer.com/) to send transactional emails.
+  //	To see the range of transport and options they support, see http://www.nodemailer.com/docs/transports
+  // email:
+  //	fromAddress: ""
+  //	replyTo: ""
+  //	lifecycle: false
+  // # Example transport and parameter settings for Amazon SES
+  //	transport: "SES"
+  //	parameters:
+  //		AWSAccessKeyID: ""
+  //		AWSSecretKey: ""
+
+  // For legacy reasons, we need to populate this object.
+  sentry: {},
+
+  // Production Settings
+  // -------------------
+  debugPugTemplates: process.env.DEBUG_PUG_TEMPLATES === 'true',
+  precompilePugTemplatesAtBootTime: process.env
+    .PRECOMPILE_PUG_TEMPLATES_AT_BOOT_TIME
+    ? process.env.PRECOMPILE_PUG_TEMPLATES_AT_BOOT_TIME === 'true'
+    : process.env.NODE_ENV === 'production',
+
+  // Should javascript assets be served minified or not.
+  useMinifiedJs: process.env.MINIFIED_JS === 'true' || false,
+
+  // Should static assets be sent with a header to tell the browser to cache
+  // them.
+  cacheStaticAssets: false,
+
+  // If you are running Overleaf over https, set this to true to send the
+  // cookie with a secure flag (recommended).
+  secureCookie: false,
+
+  // 'SameSite' cookie setting. Can be set to 'lax', 'none' or 'strict'
+  // 'lax' is recommended, as 'strict' will prevent people linking to projects
+  // https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-03#section-4.1.2.7
+  sameSiteCookie: 'lax',
+
+  // If you are running Overleaf behind a proxy (like Apache, Nginx, etc)
+  // then set this to true to allow it to correctly detect the forwarded IP
+  // address and http/https protocol information.
+  behindProxy: true,
+  trustedProxyIps: process.env.TRUSTED_PROXY_IPS || 'loopback',
+
+  // Delay before closing the http server upon receiving a SIGTERM process signal.
+  gracefulShutdownDelayInMs:
+    parseInt(process.env.GRACEFUL_SHUTDOWN_DELAY_SECONDS ?? '5', 10) * seconds,
+
+  maxReconnectGracefullyIntervalMs: parseInt(
+    process.env.MAX_RECONNECT_GRACEFULLY_INTERVAL_MS ?? '30000',
+    10
+  ),
+
+  // Expose the hostname in the `X-Served-By` response header
+  exposeHostname: process.env.EXPOSE_HOSTNAME === 'true',
+
+  // Cookie max age (in milliseconds). Set to false for a browser session.
+  cookieSessionLength: 5 * 24 * 60 * 60 * 1000, // 5 days
+
+  // When true, only allow invites to be sent to email addresses that
+  // already have user accounts
+  restrictInvitesToExistingAccounts: false,
+
+  // Should we allow access to any page without logging in? This includes
+  // public projects, /learn, /templates, about pages, etc.
+  allowPublicAccess: process.env.OVERLEAF_ALLOW_PUBLIC_ACCESS === 'true',
+
+  // editor should be open by default
+  editorIsOpen: process.env.EDITOR_OPEN !== 'false',
+
+  // site should be open by default
+  siteIsOpen: process.env.SITE_OPEN !== 'false',
+  // status file for closing/opening the site at run-time, polled every 5s
+  siteMaintenanceFile: process.env.SITE_MAINTENANCE_FILE,
+
+  // Use a single compile directory for all users in a project
+  // (otherwise each user has their own directory)
+  // disablePerUserCompiles: true
+
+  // Domain the client (pdfjs) should download the compiled pdf from
+  pdfDownloadDomain: process.env.COMPILES_USER_CONTENT_DOMAIN, // "http://clsi-lb:3014"
+
+  // By default turn on feature flag, can be overridden per request.
+  enablePdfCaching: process.env.ENABLE_PDF_CACHING === 'true',
+
+  // Maximum size of text documents in the real-time editing system.
+  max_doc_length: 2 * 1024 * 1024, // 2mb
+
+  primary_email_check_expiration: 1000 * 60 * 60 * 24 * 90, // 90 days
+
+  userHardDeletionDelay:
+    parseInt(process.env.OVERLEAF_USER_HARD_DELETION_DELAY, 10) ||
+    1000 * 60 * 60 * 24 * 90, // 90 days
+  projectHardDeletionDelay:
+    parseInt(process.env.OVERLEAF_PROJECT_HARD_DELETION_DELAY, 10) ||
+    1000 * 60 * 60 * 24 * 90, // 90 days
+
+  // Maximum Delay before sending comment mention notifications
+  notificationMaxDelay:
+    parseInt(process.env.COMMENT_MENTION_DELAY_MS) || 30 * 60 * 1000, // 30 minutes
+
+  // Comment mention notifications will wait at least this long before being sent
+  notificationMinDelay:
+    parseInt(process.env.COMMENT_MENTION_DELAY_MS) || 10 * 60 * 1000, // 10 minutes
+
+  // Maximum JSON size in HTTP requests
+  // We should be able to process twice the max doc length, to allow for
+  //   - the doc content
+  //   - text ranges spanning the whole doc
+  //
+  // There's also overhead required for the JSON encoding and the UTF-8
+  // encoding, theoretically up to 6 times the max doc length (e.g. a document
+  // entirely filled with "\u0011" characters). On the other hand, we don't want
+  // to block the event loop with JSON parsing, so we try to find a practical
+  // compromise.
+  max_json_request_size:
+    parseInt(process.env.MAX_JSON_REQUEST_SIZE) || 12 * 1024 * 1024, // 12 MB
+
+  // Internal configs
+  // ----------------
+  path: {
+    // If we ever need to write something to disk (e.g. incoming requests
+    // that need processing but may be too big for memory, then write
+    // them to disk here).
+    dumpFolder: Path.resolve(__dirname, '../data/dumpFolder'),
+    uploadFolder: Path.resolve(__dirname, '../data/uploads'),
+  },
+
+  // Automatic Snapshots
+  // -------------------
+  automaticSnapshots: {
+    // How long should we wait after the user last edited to
+    // take a snapshot?
+    waitTimeAfterLastEdit: 5 * minutes,
+    // Even if edits are still taking place, this is maximum
+    // time to wait before taking another snapshot.
+    maxTimeBetweenSnapshots: 30 * minutes,
+  },
+
+  // Smoke test
+  // ----------
+  // Provide log in credentials and a project to be able to run
+  // some basic smoke tests to check the core functionality.
+  //
+  smokeTest: {
+    userId: process.env.SMOKE_TEST_USER_ID,
+  },
+
+  appName: process.env.APP_NAME || 'OlliTeX',
+
+  adminEmail: process.env.ADMIN_EMAIL || 'placeholder@example.com',
+  adminDomains: process.env.ADMIN_DOMAINS
+    ? JSON.parse(process.env.ADMIN_DOMAINS)
+    : undefined,
+
+  nav: {
+    title: process.env.APP_NAME || 'Overleaf Community Edition',
+
+    hide_powered_by: process.env.NAV_HIDE_POWERED_BY === 'true',
+    left_footer: [],
+
+    right_footer: [
+      {
+        text: '<a href="https://github.com/overleaf/overleaf">Fork on GitHub!</a>',
+      },
+    ],
+
+    showSubscriptionLink: false,
+
+    header_extras: [
+      process.env.OVERLEAF_BIB_LIBRARY !== 'false' && {
+        text: 'Library',
+        url: '/library',
+        class: 'subdued',
+      },
+      {
+        text: 'Templates',
+        url: '/templates',
+        class: 'subdued',
+        only_when_logged_in: true,
+      },
+    ].filter(Boolean),
+  },
+  // Example:
+  //   header_extras: [{text: "Some Page", url: "http://example.com/some/page", class: "subdued"}]
+
+  recaptcha: {
+    endpoint:
+      process.env.RECAPTCHA_ENDPOINT ||
+      'https://www.google.com/recaptcha/api/siteverify',
+    trustedUsers: (process.env.CAPTCHA_TRUSTED_USERS || '')
+      .split(',')
+      .map(x => x.trim())
+      .filter(x => x !== ''),
+    trustedUsersRegex: process.env.CAPTCHA_TRUSTED_USERS_REGEX
+      ? // Enforce matching of the entire input.
+        new RegExp(`^${process.env.CAPTCHA_TRUSTED_USERS_REGEX}$`)
+      : null,
+    disabled: {
+      invite: true,
+      login: true,
+      passwordReset: true,
+      register: true,
+      addEmail: true,
+    },
+  },
+
+  customisation: {},
+
+  redirects: {
+    '/templates/index': '/templates/',
+  },
+
+  enablePugCache: process.env.ENABLE_PUG_CACHE === 'true',
+  reloadModuleViewsOnEachRequest:
+    process.env.ENABLE_PUG_CACHE !== 'true' &&
+    process.env.NODE_ENV === 'development',
+
+  rateLimit: {
+    subnetRateLimiterDisabled:
+      process.env.SUBNET_RATE_LIMITER_DISABLED === 'true',
+    autoCompile: {
+      everyone: process.env.RATE_LIMIT_AUTO_COMPILE_EVERYONE || 100,
+      standard: process.env.RATE_LIMIT_AUTO_COMPILE_STANDARD || 25,
+    },
+    login: {
+      ip: { points: 20, subnetPoints: 200, duration: 60 },
+      email: { points: 10, duration: 120 },
+    },
+  },
+
+  analytics: {
+    enabled: false,
+  },
+
+  compileBodySizeLimitMb: process.env.COMPILE_BODY_SIZE_LIMIT_MB || 7,
+
+  // The defaults come from overleaf-editor-core so that every service that
+  // classifies a file as a doc or as a binary file works from the same list.
+  textExtensions: DEFAULT_TEXT_EXTENSIONS.concat(
+    // [IVd] diagram/image editor plugins: SVG diagrams are editable text-ish
+    // files for the diagram (maxGraph) visual editor.
+    'svg',
+    // Typst: .typ documents are editable (created/uploaded files are docs,
+    // not binaries).
+    'typ',
+    'drawio',
+    parseTextExtensions(process.env.ADDITIONAL_TEXT_EXTENSIONS)
+  ),
+
+  // case-insensitive file names that is editable (doc) in the editor
+  editableFilenames: DEFAULT_EDITABLE_FILENAMES.slice(),
+
+  fileIgnorePattern:
+    process.env.FILE_IGNORE_PATTERN ||
+    '**/{{__MACOSX,.git,.texpadtmp,.R,.venv,venv}{,/**},.!(latexmkrc),*.{dvi,aux,log,toc,out,pdfsync,synctex,synctex(busy),fdb_latexmk,fls,nlo,ind,glo,gls,glg,bbl,blg,doc,docx,gz,swp}}',
+
+  validRootDocExtensions: ['tex', 'Rtex', 'ltx', 'Rnw', 'typ'],
+
+  emailConfirmationDisabled:
+    process.env.EMAIL_CONFIRMATION_DISABLED === 'true' || false,
+
+  emailAddressLimit: intFromEnv('EMAIL_ADDRESS_LIMIT', 10),
+
+  enabledServices: (process.env.ENABLED_SERVICES || 'web,api')
+    .split(',')
+    .map(s => s.trim()),
+
+  // module options
+  // ----------
+  modules: {
+    sanitize: {
+      options: {
+        allowedTags: [
+          'h1',
+          'h2',
+          'h3',
+          'h4',
+          'h5',
+          'h6',
+          'blockquote',
+          'p',
+          'a',
+          'ul',
+          'ol',
+          'nl',
+          'li',
+          'b',
+          'i',
+          'strong',
+          'em',
+          'strike',
+          'code',
+          'hr',
+          'br',
+          'div',
+          'table',
+          'thead',
+          'col',
+          'caption',
+          'tbody',
+          'tr',
+          'th',
+          'td',
+          'tfoot',
+          'pre',
+          'iframe',
+          'img',
+          'figure',
+          'figcaption',
+          'span',
+          'source',
+          'track',
+          'video',
+          'del',
+        ],
+        allowedAttributes: {
+          a: [
+            'href',
+            'name',
+            'target',
+            'class',
+            'event-tracking',
+            'event-tracking-ga',
+            'event-tracking-label',
+            'event-tracking-trigger',
+          ],
+          div: ['class', 'id', 'style'],
+          h1: ['class', 'id'],
+          h2: ['class', 'id'],
+          h3: ['class', 'id'],
+          h4: ['class', 'id'],
+          h5: ['class', 'id'],
+          h6: ['class', 'id'],
+          p: ['class'],
+          col: ['width'],
+          figure: ['class', 'id', 'style'],
+          figcaption: ['class', 'id', 'style'],
+          i: ['aria-hidden', 'aria-label', 'class', 'id', 'translate'],
+          iframe: [
+            'allowfullscreen',
+            'frameborder',
+            'height',
+            'src',
+            'style',
+            'width',
+          ],
+          img: ['alt', 'class', 'src', 'style'],
+          source: ['src', 'type'],
+          span: ['class', 'id', 'style'],
+          strong: ['style'],
+          table: ['border', 'class', 'id', 'style'],
+          td: ['colspan', 'rowspan', 'headers', 'style'],
+          th: [
+            'abbr',
+            'headers',
+            'colspan',
+            'rowspan',
+            'scope',
+            'sorted',
+            'style',
+          ],
+          tr: ['class'],
+          track: ['src', 'kind', 'srcLang', 'label'],
+          video: ['alt', 'class', 'controls', 'height', 'width'],
+        },
+      },
+    },
+  },
+
+  overleafModuleImports: {
+    // modules to import (an empty array for each set of modules)
+    //
+    // Restart webpack after making changes.
+    //
+    createFileModes: [
+    Path.resolve(
+      __dirname,
+      '../modules/zotero/frontend/js/components/zotero-create-file'
+    ),
+    // Mendeley reference connector (2026-09-07): "New file > Mendeley" import
+    Path.resolve(
+      __dirname,
+      '../modules/mendeley/frontend/js/components/mendeley-create-file'
+    ),
+      // [IVd] diagram module: "New file > Diagram (SVG)" entry
+    Path.resolve(
+      __dirname,
+      '../modules/diagram/frontend/js/components/create-diagram-file'
+    ),
+      // Candidate B (2026-09-29): "New file > TikZ diagram" (.tikz)
+      Path.resolve(
+        __dirname,
+        '../modules/tikz/frontend/js/components/create-tikz-file'
+      ),
+
+    ],
+    // [IVd] Buttons rendered next to the download button in the file view header
+    // (e.g. the "Edit Image" action from the toast-image module).
+    fileViewButtons: [
+      Path.resolve(
+        __dirname,
+        '../modules/toast-image/frontend/js/components/toast-image-editor'
+      ),
+    ],
+    devToolbar: [],
+    dsNavLibraryLink: [],
+    trashPageTabs: [],
+    adminUserLibrary: [],
+    gitBridge: [],
+    publishModalDropdownButton: [],
+    publishModalToolbarButton: [],
+    tprFileViewInfo: [
+    Path.resolve(
+      __dirname,
+      '../modules/zotero/frontend/js/components/tpr-file-view-info'
+    ),
+    ],
+    tprFileViewRefreshError: [
+    Path.resolve(
+      __dirname,
+      '../modules/zotero/frontend/js/components/tpr-file-view-refresh-error'
+    ),
+    ],
+    tprFileViewRefreshButton: [
+    Path.resolve(
+      __dirname,
+      '../modules/zotero/frontend/js/components/tpr-file-view-refresh-button'
+    ),
+    ],
+    tprFileViewNotOriginalImporter: [
+    Path.resolve(
+      __dirname,
+      '../modules/zotero/frontend/js/components/tpr-file-view-not-original-importer'
+    ),
+    ],
+    contactUsModal: [],
+    sourceEditorExtensions: [
+      // [I] bib-editor: in-project .bib visual editor — the extension PARSES the
+      // document and emits entries to the React context. 6.3.0 port (live-06 item 1):
+      // missing from this list, so the Visual panel opened but detected NO bib items
+      // (nothing ever emitted the entries event).
+      Path.resolve(
+        __dirname,
+        '../modules/bib-editor/frontend/js/extensions/bib-editor-extension'
+      ),
+      // Candidate F (owner-adopted 2026-09-29): WakaTime/Wakapi edit
+      // tracking — throttled heartbeats via the Go web relay; no-op unless
+      // the instance flag is on and the user linked an account.
+      Path.resolve(
+        __dirname,
+        '../modules/wakatime/frontend/js/wakatime-extension'
+      ),
+      // overleaf-lab (LLM port): inline LaTeX completion.
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/extensions/llm-inline-completion'
+      ),
+      // overleaf-lab (grammar port): CM6 grammar-checking extension (LanguageTool
+      // + optional LLM suggestions, per-user mode from /user/llm-settings/grammar).
+      Path.resolve(
+        __dirname,
+        '../modules/languagetool/frontend/js/grammar-extension'
+      ),
+    ],
+    sourceEditorVisualExtensions: [],
+    sourceEditorComponents: [
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/components/llm-source-editor-component'
+      ),
+    ],
+    pdfLogEntryHeaderActionComponents: [
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/components/pdf-log-entry-ask-ai-button'
+      ),
+    ],
+    pdfLogEntryComponents: [
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/components/pdf-llm-compile-fix-card'
+      ),
+    ],
+    pdfLogEntriesComponents: [],
+    pdfPreviewPromotions: [],
+    diagnosticActions: [],
+    sourceEditorCompletionSources: [],
+    sourceEditorSymbolPalette: [
+      // [IVb]: v2 palette panel (self-contained: config provider + header + content).
+      // 6.3.0 mounts module components from this key via symbol-palette-pane.tsx.
+      Path.resolve(
+        __dirname,
+        '../modules/symbol-palette/frontend/components/symbol-palette-panel'
+      ),
+    ],
+    sourceEditorToolbarStartButtons: [
+      // overleaf-lab (2026-08, reference-synced): the editor toolbar "Ask AI"
+      // (smart_toy) button — opens the LLM context menu.
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/extensions/llm-editor-toolbar-ask-ai'
+      ),
+    ],
+    sourceEditorToolbarButtonGroups: [
+      // typst module: bold/italic/format group for `.typ` documents (the
+      // component self-gates on the active language + the typst feature
+      // flag); registered unconditionally so one release image serves both
+      // flag states.
+      Path.resolve(
+        __dirname,
+        '../modules/typst/frontend/js/components/typst-toolbar-buttons'
+      ),
+    ],
+    sourceEditorToolbarComponents: [],
+    sourceEditorToolbarEndButtons: [
+      // tex-autoformatter module (ported 2026-08-31 from CE+ autoformat,
+      // commit e5edadaa): toolbar end button that formats the current
+      // document via POST /api/format-tex (tex-fmt for TeX, bibtex-tidy
+      // for .bib).
+      Path.resolve(
+        __dirname,
+        '../modules/tex-autoformatter/frontend/components/autoformat-button'
+      ),
+    
+      // [IVc] latex-editor module: open the floating equation-editor (MathLive).
+      Path.resolve(
+        __dirname,
+        '../modules/latex-editor/frontend/js/components/latex-editor-toolbar-button'
+      ),
+
+],
+    rootContextProviders: [
+      Path.resolve(
+        __dirname,
+        '../modules/bib-editor/frontend/js/context/bib-editor-provider.tsx'
+      ),
+    ],
+    mainEditorLayoutModals: [
+    Path.resolve(
+      __dirname,
+      '../modules/reference-picker/frontend/components/reference-picker-controller.tsx'
+    ),
+    ],
+    mainEditorLayoutPanels: [
+      // audit 019 (2026-09-30): project inspection moved into the rail tab
+      // bar (rail.tsx 'project-inspection' tab) per owner directive — no
+      // longer a separate layout pane.
+    ],
+    pythonRunner: [
+      // python-runner module (ported from ayakaleaf-pro, owner-provided 2026-09-06):
+      // browser-side Python (Pyodide) execution for .py files; split editor +
+      // output pane with Run/Stop; active for users of the 'overleaf-code'
+      // split test (gated in core editor.tsx).
+      Path.resolve(
+        __dirname,
+        '../modules/python-runner/frontend/js/components/layout/python-editor-split'
+      ),
+    ],
+    langFeedbackLinkingWidgets: [],
+    labsExperiments: [],
+    integrationLinkingWidgets: [
+    Path.resolve(
+      __dirname,
+      '../modules/github-sync/frontend/js/components/github-sync-widget.tsx'
+    ),
+    // Candidate F: WakaTime account card for the project settings page.
+    Path.resolve(
+      __dirname,
+      '../modules/wakatime/frontend/js/components/wakatime-card.tsx'
+    ),
+      // [III]: WebDAV (Nextcloud) + Dropbox project mirroring widgets
+    Path.resolve(
+      __dirname,
+      '../modules/webdav/frontend/js/components/webdav-widget.tsx'
+    ),
+    Path.resolve(
+      __dirname,
+      '../modules/dropbox/frontend/js/components/dropbox-widget.tsx'
+    ),
+    ],
+    referenceLinkingWidgets: [
+    Path.resolve(
+      __dirname,
+      '../modules/zotero/frontend/js/components/zotero-widget'
+    ),
+    Path.resolve(
+      __dirname,
+      '../modules/mendeley/frontend/js/components/mendeley-widget'
+    ),
+    ],
+    importProjectFromGithubModalWrapper: [
+    Path.resolve(
+      __dirname,
+      '../modules/github-sync/frontend/js/components/import-from-github-modal-wrapper.tsx'
+    ),
+    ],
+    importProjectFromGithubMenu: [
+    Path.resolve(
+      __dirname,
+      '../modules/github-sync/frontend/js/components/import-from-github-menu.tsx'
+    ),
+    ],
+    // Typst: "Typst project" new-project entry + modal. Runtime visibility
+    // is ExposedSettings.typst.enabled (COMPILE_TYPEST_ENABLED).
+    typstNewProjectMenu: [
+      Path.resolve(
+        __dirname,
+        '../modules/typst/frontend/js/components/typst-new-project-menu.tsx'
+      ),
+    ],
+    typstNewProjectModalWrapper: [
+      Path.resolve(
+        __dirname,
+        '../modules/typst/frontend/js/components/typst-new-project-modal-wrapper.tsx'
+      ),
+    ],
+    // [III]: import-project-from-Nextcloud/WebDAV modal + navbar menu entry
+    importProjectFromWebdavModalWrapper: [
+    Path.resolve(
+      __dirname,
+      '../modules/webdav/frontend/js/components/import-from-webdav-modal-wrapper.tsx'
+    ),
+    ],
+    importProjectFromWebdavMenu: [
+    Path.resolve(
+      __dirname,
+      '../modules/webdav/frontend/js/components/import-from-webdav-menu.tsx'
+    ),
+    ],
+    editorLeftMenuSync: [],
+    editorLeftMenuManageTemplate: [],
+    menubarExtraComponents: [
+    Path.resolve(
+      __dirname,
+      '../modules/template-gallery/frontend/js/features/template/components/menubar-manage-template'
+    ),
+      // overleaf-lab: LLM whole-document generators (title/abstract/keywords) registered
+      // for the Generate group (see insertMenuSections below).
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/extensions/llm-file-menu-commands'
+      ),
+    ],
+    insertMenuSections: [
+      // overleaf-lab (owner request 2026-08): the "AI Generate" group
+      // (smart_toy icon + Title/Abstract/Keywords) moved from the File menu
+      // to the INSERT menu — upstream-style placement for AI tools.
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/extensions/llm-insert-menu-section'
+      ),
+    ],
+    // overleaf-lab: BYO LLM provider management embedded in Account Settings (reviewer #2);
+    // the core section renders it when present, else falls back to a link card.
+    llmUserSettingsSection: [
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/components/llm-settings-section'
+      ),
+    ],
+    oauth2Server: [
+    Path.resolve(
+      __dirname,
+      '../modules/git-bridge/frontend/js/widget/components/git-integration-widget.tsx'
+    ),
+    ],
+    managedGroupSubscriptionEnrollmentNotification: [],
+    managedGroupEnrollmentInvite: [],
+    ssoCertificateInfo: [],
+    domainVerificationLabel: [],
+    domainVerificationToken: [],
+    v1ImportDataScreen: [],
+    snapshotUtils: [],
+    visualEditorProviders: [
+      Path.resolve(
+        __dirname,
+        '../modules/bib-editor/frontend/js/bib-editor-visual-provider.ts'
+      ),
+      // [IVd] SVG diagram editor (maxGraph canvas) claims *.svg files
+      Path.resolve(
+        __dirname,
+        '../modules/diagram/frontend/js/visual-editor-provider'
+      ),
+      // Candidate B (2026-09-29): WYSIWYG TikZ editor claims *.tikz/*.pgf
+      Path.resolve(
+        __dirname,
+        '../modules/tikz/frontend/js/visual-editor-provider'
+      ),
+    ],
+    usGovBanner: [],
+    rollingBuildsUpdatedAlert: [],
+    offlineModeToolbarButtons: [],
+    settingsEntries: [],
+    autoCompleteExtensions: [
+    Path.resolve(
+      __dirname,
+      '../modules/reference-picker/frontend/extensions/reference-picker-keybinding.ts'
+    ),
+    ],
+    sectionTitleGenerators: [],
+    toastGenerators: [
+      Path.resolve(
+        __dirname,
+        '../js/features/pdf-preview/components/synctex-toasts'
+      ),
+      // python-runner module (ported from ayakaleaf-pro): "files saved" /
+      // error toasts for browser-side Python execution output files.
+      // NOTE: this is a toast GENERATOR list (export default =
+      // GlobalToastGeneratorEntry[]), which the IDE consumes via the
+      // `toastGenerators` key in global-toasts.tsx. It must NOT be in
+      // sourceEditorToolbarEndButtons: that list is rendered as React
+      // COMPONENTS, and an array-as-type throws React error #130 and
+      // destroys the whole editor tree (regression fixed 2026-09-06).
+      Path.resolve(
+        __dirname,
+        '../modules/python-runner/frontend/js/components/editor/python/python-output-toasts'
+      ),
+    ],
+    editorSidebarComponents: [
+      Path.resolve(
+        __dirname,
+        '../modules/full-project-search/frontend/js/components/full-project-search.tsx'
+      ),
+    ],
+    fileTreeToolbarComponents: [
+      Path.resolve(
+        __dirname,
+        '../modules/full-project-search/frontend/js/components/full-project-search-button.tsx'
+      ),
+    ],
+    fullProjectSearchPanel: [
+      Path.resolve(
+        __dirname,
+        '../modules/full-project-search/frontend/js/components/full-project-search.tsx'
+      ),
+    ],
+    integrationPanelComponents: [
+    Path.resolve(
+      __dirname,
+      '../modules/github-sync/frontend/js/components/github-integration-card.tsx'
+    ),
+    Path.resolve(
+      __dirname,
+      '../modules/git-bridge/frontend/js/card/components/git-integration-card.tsx'
+    ),
+    Path.resolve(
+      __dirname,
+      '../modules/zotero/frontend/js/components/zotero-integration-card.tsx'
+    ),
+    Path.resolve(
+      __dirname,
+      '../modules/mendeley/frontend/js/components/mendeley-integration-card'
+    ),
+    // [III]: WebDAV (Nextcloud) + Dropbox integration cards in the Integrations panel
+    Path.resolve(
+      __dirname,
+      '../modules/webdav/frontend/js/components/webdav-integration-card.tsx'
+    ),
+    Path.resolve(
+      __dirname,
+      '../modules/dropbox/frontend/js/components/dropbox-integration-card.tsx'
+    ),
+    ],
+    referenceSearchSetting: [],
+    settingsModalEditorTabSections: [],
+    settingsModalSpellcheckSections: [],
+    editorFloatingMenuActions: [
+      // overleaf-lab: floating-menu "Ask AI" action (LLM context menu).
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/extensions/llm-fm-ask-ai.tsx'
+      ),
+    ],
+    errorLogsComponents: [],
+    referenceIndices: [
+    Path.resolve(
+      __dirname,
+      '../modules/reference-picker/frontend/reference-index/advanced-reference-index.ts'
+    ),
+    ],
+    railEntries: [
+      // overleaf-lab: LLM chat/compliance side rails.
+      Path.resolve(
+        __dirname,
+        '../modules/llm/frontend/js/components/llm-rail-pane'
+      ),
+      // Symbol palette: the classic palette module only (2026-09-03 owner X:
+      // the redesigned "new" palette tab was a duplicate — removed).
+      Path.resolve(
+        __dirname,
+        '../modules/symbol-palette/frontend/components/symbol-palette-rail-entry'
+      ),
+    ],
+    railPopovers: [],
+    railActions: [],
+    railModals: [],
+  },
+
+  // P6.20 COMPLETE (2026-09-21): every route-owning module under
+  // services/web/modules/ has a Go-web representation (go/services/web/features/*),
+  // and the live :4000 web IS the Go binary (server-ce/runit/web-overleaf/run).
+  // The Node-web module boot is therefore defanged: this list is intentionally
+  // EMPTY. The module Node backends (app/ + index.*) are retired junk — kept only
+  // where live code depends on them:
+  //  - modules/server-ce-scripts: LIVE ops (server-ce/bin/grunt, init_scripts)
+  //  - modules/authentication: saml/oidc/ldap handshakes (P2 family; retired
+  //    together with the Node web core — D1)
+  // (2026-09-25: modules/notifications fully retired — the dispatch cron is the
+  //  Go cronmail service (ARC-8), its 5 tests + app tree deleted; the one live
+  //  consumer now imports frontend/types/api/notifications.d.ts.)
+  // Frontends under modules/*/frontend stay live (webpack entries, CI vitest,
+  // @modules imports) and are NOT affected by this list.
+  moduleImportSequence: [],
+  viewIncludes: {},
+
+  csp: {
+    enabled: process.env.CSP_ENABLED === 'true',
+    reportOnly: process.env.CSP_REPORT_ONLY === 'true',
+    reportPercentage: parseFloat(process.env.CSP_REPORT_PERCENTAGE) || 0,
+    reportUri: process.env.CSP_REPORT_URI,
+    exclude: [],
+    viewDirectives: {
+      'app/views/project/ide-react': [`img-src 'self' data: blob:`],
+    },
+  },
+
+  unsupportedBrowsers: {
+    ie: '<=11',
+    safari: '<15',
+    firefox: '<=78',
+  },
+
+  // ID of the IEEE brand in the rails app
+  ieeeBrandId: intFromEnv('IEEE_BRAND_ID', 15),
+
+  managedUsers: {
+    enabled: false,
+  },
+
+  // Feature gate for the typst module. Top-level section, NOT
+  // Settings.features.typst (Settings.features is a plan->features map;
+  // an `{enabled}` key there would corrupt plan matching). WHEN OFF:
+  // modules/typst router is not mounted (no "Typst project" creation) and
+  // clsi_typst (separate service, same env) answers 501 on any compile.
+  // OWNER DECISION 2026-09-10: default ON; set COMPILE_TYPEST_ENABLED=false
+  // in env to disable (rollback path).
+  typst: {
+    enabled: process.env.COMPILE_TYPEST_ENABLED !== 'false',
+  },
+
+  // N-D (2026-09-01): admin instance-statistics dashboards
+  // (/admin/instance-stats). The module router self-disables when
+  // `enabled` is false; retention prunes InstanceStat docs older than
+  // `retentionDays` on every collector run (see modules/instance-stats).
+  instanceStats: {
+    enabled: process.env.INSTANCE_STATS_ENABLED !== 'false',
+    retentionDays: intFromEnv('INSTANCE_STATS_RETENTION_DAYS', 365),
+  },
+
+  enablePandocConversions: process.env.ENABLE_PANDOC_CONVERSIONS === 'true',
+
+  // 6.3.0 port (live-06 item 3): CE feature FLAGS live in splitTestOverrides — the
+  // non-SaaS path in SplitTestHandler._getNonSaasAssignment() reads exactly this.
+  // The File → Download menu's "Export as Word / Markdown / HTML" items are gated
+  // behind the three export-* flags, so without these overrides the items never
+  // render even though the pandoc pipeline is enabled. Wire them to the same env.
+  // 6.3.0 port (live-06 item 3 + live-07 item 2): CE feature FLAGS live in
+  // splitTestOverrides — the non-SaaS path in SplitTestHandler._getNonSaasAssignment()
+  // reads exactly this. The File → Download menu's "Export as Word / Markdown /
+  // HTML" items are gated behind the three export-* flags, and the New Project
+  // dropdown's "Import Word document" / "Import Markdown file" items are gated
+  // behind the two import-* flags — without these overrides the items never
+  // render even though the pandoc pipeline is enabled. Wire them to the same env.
+  splitTestOverrides: {
+    'export-docx':
+      process.env.ENABLE_PANDOC_CONVERSIONS === 'true' ? 'enabled' : 'default',
+    'export-markdown':
+      process.env.ENABLE_PANDOC_CONVERSIONS === 'true' ? 'enabled' : 'default',
+    'export-html':
+      process.env.ENABLE_PANDOC_CONVERSIONS === 'true' ? 'enabled' : 'default',
+    'import-docx':
+      process.env.ENABLE_PANDOC_CONVERSIONS === 'true' ? 'enabled' : 'default',
+    'import-markdown':
+      process.env.ENABLE_PANDOC_CONVERSIONS === 'true' ? 'enabled' : 'default',
+    // python-runner module (ported from ayakaleaf-pro, owner-provided
+    // 2026-09-06): CE feature flag for the browser-side Python (Pyodide)
+    // split editor. 'enabled' => the overleaf-code split test resolves to
+    // the 'enabled' variant for every user (see the CE path in
+    // SplitTestHandler._getNonSaasAssignment); 'default' => hidden.
+    'overleaf-code':
+      process.env.ENABLE_PYTHON_RUNNER === 'true' ? 'enabled' : 'default',
+    // "Request edit access" toolbar flow (readOnly/review members asking the
+    // owner for editor access). Instance-level opt-in, same pattern as the
+    // flags above: enabled when SHARING_UPDATES_ENABLED=true, else default.
+    'sharing-updates':
+      process.env.SHARING_UPDATES_ENABLED === 'true' ? 'enabled' : 'default',
+  },
+
+  oauthProviders: {
+    ...(process.env.EXTERNAL_AUTH &&
+      process.env.EXTERNAL_AUTH.includes('oidc') && {
+        [process.env.OVERLEAF_OIDC_PROVIDER_ID || 'oidc']: {
+          name:
+            process.env.OVERLEAF_OIDC_PROVIDER_NAME || 'OIDC Provider',
+          descriptionKey: process.env.OVERLEAF_OIDC_PROVIDER_DESCRIPTION,
+          descriptionOptions: {
+            link: process.env.OVERLEAF_OIDC_PROVIDER_INFO_LINK,
+          },
+          hideWhenNotLinked: process.env
+            .OVERLEAF_OIDC_PROVIDER_HIDE_NOT_LINKED
+            ? process.env.OVERLEAF_OIDC_PROVIDER_HIDE_NOT_LINKED.toLowerCase() ===
+                'true'
+            : undefined,
+          linkPath: '/oidc/login',
+        },
+      }),
+  },}
+}
+
+// ── 2026-09-09 R11: stamp-based lazy export (see header comment) ──────
+const OL_SETTINGS_STAMP =
+  globalThis.OL_SETTINGS_STAMP || (globalThis.OL_SETTINGS_STAMP = { n: 0 })
+globalThis.OL_SETTINGS_REBUILD =
+  globalThis.OL_SETTINGS_REBUILD ||
+  function () {
+    OL_SETTINGS_STAMP.n += 1
+  }
+// Re-apply registry: every extension applied to the settings object —
+// the /etc/overleaf/settings.js overrides (via mergeWith), and whole
+// module sections set top-level (Settings.llm = {...}, Settings.webdav =
+// {...}, …) — is re-applied on each rebuild, so nothing is lost when
+// hydration bumps the stamp.
+const OL_SETTINGS_REAPPLIES = []
+const OL_SETTINGS_ASSIGNED = new Map()
+let _settingsCache = null
+let _settingsCacheStamp = -1
+function _settings() {
+  if (_settingsCache === null || _settingsCacheStamp !== OL_SETTINGS_STAMP.n) {
+    _settingsCache = buildSettings()
+    OL_SETTINGS_REAPPLIES.slice().forEach(fn => fn(_settingsCache))
+    for (const [k, v] of OL_SETTINGS_ASSIGNED) _settingsCache[k] = v
+    _settingsCacheStamp = OL_SETTINGS_STAMP.n
+  }
+  return _settingsCache
+}
+module.exports = new Proxy({}, {
+  get(_t, k) {
+    if (k === 'mergeWith') {
+      // 2026-09-11 (R11): merge into the cache, register for re-apply, and
+      // return the PROXY itself (not the frozen built object) — callers
+      // keep rebuild semantics on later access.
+      return function (overrides) {
+        OL_SETTINGS_REAPPLIES.push(target => merge(overrides, target))
+        merge(overrides, _settings())
+        return module.exports
+      }
+    }
+    return _settings()[k]
+  },
+  set(_t, k, v) {
+    // 2026-09-11 (R11): remember whole-section assignments (Settings.llm =
+    // {...} etc.) so a post-hydration rebuild does not drop module sections.
+    if (typeof k === 'string' && k !== 'mergeWith') OL_SETTINGS_ASSIGNED.set(k, v)
+    _settings()[k] = v
+    return true
+  },
+  has(_t, k) {
+    return k in _settings()
+  },
+  ownKeys() {
+    return Reflect.ownKeys(_settings())
+  },
+  getOwnPropertyDescriptor(_t, k) {
+    return Object.getOwnPropertyDescriptor(_settings(), k)
+  },
+})
+
+module.exports.mergeWith = function (overrides) {
+  return merge(overrides, module.exports)
+}

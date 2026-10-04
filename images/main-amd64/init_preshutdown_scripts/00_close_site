@@ -11,25 +11,33 @@ echo "closed" > "${SITE_MAINTENANCE_FILE}"
 # status file is polled every 5 seconds
 sleep 5
 
-# giving a grace period of 5 seconds for users before disconnecting them and start shutting down
-# P7 step 4 (2026-10-03): Node web retired to junk/services-web (RETIRED.md)
-cd /overleaf/junk/services-web && /sbin/setuser www-data node scripts/disconnect_all_users.mjs --delay-in-seconds=5 >> /var/log/overleaf/web.log 2>&1
+# 2026-10-05 (owner directive: no junk/ in the image): the old node
+# disconnect-all-users script lived in the retired junk/services-web oracle
+# tree. The equivalent active kick in the Go deployment is stopping the
+# real-time service below — every open editor WebSocket is torn down, and
+# the maintenance status ("closed") written above makes editors surface the
+# shutdown on reconnect.
 
-EXIT_CODE="$?"
-if [ $EXIT_CODE -ne 0 ]
-then
-  echo "scripts/disconnect_all_users.mjs failed with exit code $EXIT_CODE"
-  exit 1
-fi
+EXIT_CODE=0
 
 sleep 10 &
 GIVE_EDITOR_10_SECONDS_TO_RELOAD=$!
+sleep 5 &
+GRACE_USERS_BEFORE_KILL=$!
 
-# wait for disconnection
+# wait for disconnection (stopping the service kills all user sockets)
 while ! sv stop real-time-overleaf; do
   sleep 1
 done
+EXIT_CODE=$?
 
+wait $GRACE_USERS_BEFORE_KILL
 wait $GIVE_EDITOR_10_SECONDS_TO_RELOAD
+
+if [ $EXIT_CODE -ne 0 ]
+then
+  echo "real-time-overleaf stop failed with exit code $EXIT_CODE"
+  exit $EXIT_CODE
+fi
 
 exit 0
