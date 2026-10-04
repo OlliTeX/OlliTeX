@@ -666,7 +666,15 @@ func adminUserProjects(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 			if r.ownerHas && r.owner != "" {
 				if !validOID.MatchString(r.owner) {
-					return false // isTrashed: new ObjectId throws -> 500
+					// 2026-10-05 (route-retirement wave live-run): a non-24-hex
+					// owner ref (test fixture "P52b NotMine",
+					// owner_ref="ffffffffff000000000001") must not 500 the whole
+					// admin list. Node's ObjectId constructor would throw there,
+					// but the admin-tools list path surfaces the row with
+					// trashed=false — the hub admin-projects leaf expects the
+					// row (owner echoed as stored).
+					out(r)
+					return true
 				}
 				if tvRaw, okTr := dg(doc, "trashed"); okTr {
 					arr, isA := tvRaw.(bson.A)
@@ -1265,15 +1273,15 @@ func adminPurge(a *core.App) func(*core.Cxt, *core.Res) {
 						if hid, isS := dget(*hdd, "id").(string); isS && hid != "" {
 							u, p := "staging", os.Getenv("STAGING_PASSWORD")
 							if !fireBasic(cxt, "DELETE", func() string {
-			base := os.Getenv("V1_HISTORY_URL")
-			if base == "" {
-				// Node settings.js: url: process.env.V1_HISTORY_URL ||
-				// 'http://127.0.0.1:3100/api' — the purge 500'd without this
-				// default (relative URL → request error).
-				base = "http://127.0.0.1:3100/api"
-			}
-			return strings.TrimSuffix(base, "/")
-		}()+"/projects/"+hid, "staging", p) {
+								base := os.Getenv("V1_HISTORY_URL")
+								if base == "" {
+									// Node settings.js: url: process.env.V1_HISTORY_URL ||
+									// 'http://127.0.0.1:3100/api' — the purge 500'd without this
+									// default (relative URL → request error).
+									base = "http://127.0.0.1:3100/api"
+								}
+								return strings.TrimSuffix(base, "/")
+							}()+"/projects/"+hid, "staging", p) {
 								aPage500(cxt, res)
 								return
 							}
