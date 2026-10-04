@@ -173,12 +173,10 @@ test('4: ldap — Timeout is an editable field and round-trips', async () => {
   await p.waitForTimeout(1200)
 })
 
-test('5: /admin/site no longer serves the legacy page — 302 into the hub', async () => {
+test('5: /admin/site retired — legacy admin page 404 now (retirement wave 2026-10-05; hub admin-site leaf is the surface)', async () => {
   const r = await p.request.get(BASE + '/admin/site', { maxRedirects: 0 }).catch(() => null)
-  expect(r, 'route still exists (redirect)').toBeTruthy()
-  expect([301, 302, 307, 308].includes(r!.status()), 'redirect status (' + r!.status() + ')').toBeTruthy()
-  const loc = r!.headers()['location'] || ''
-  expect(loc, 'redirect target is the hub').toContain('/hub')
+  expect(r, 'route answered').toBeTruthy()
+  expect([404, 302].includes(r!.status()), 'retired page 404 (or anon bounce; here admin) (' + r!.status() + ')').toBeTruthy()
 })
 
 test('7: sandboxed compiles — section is mandatory (no enable toggle)', async () => {
