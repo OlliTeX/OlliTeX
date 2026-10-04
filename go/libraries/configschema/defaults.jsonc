@@ -200,4 +200,33 @@
     // ── test ──
     "SMOKE_TEST_USER_ID": null, // Smoke-test user id (dev)
     "WEB_GO_DEBUG_AUTH": null, // Go web debug auth override (dev)
+
+    // ── stack (boot plane — the settings that START the main container plane;
+    //     historically toolkit/lib/default.rc + overleaf.rc. Owner 2026-10-06:
+    //     managed through this registry + the config store — one key space, one
+    //     source of truth; no docker-env fallbacks.) ──
+    "TOOLKIT_PROJECT_NAME": "ollitex", // Stack/instance identity (project name, container prefix)
+    "OVERLEAF_LISTEN_IP": "127.0.0.1", // Bind address of the main ollitex container
+    "OVERLEAF_PORT": 80, // Published port of the main ollitex container
+    "MONGO_ENABLED": true, // Start the MongoDB container (content DB)
+    "MONGO_DATA_PATH": null, // Host folder for MongoDB data (inside the mounted data dir)
+    "MONGO_URL": "mongodb://mongo/sharelatex", // Mongo connection string  [secret: masked in listings; field-encrypted in the store]
+    "REDIS_ENABLED": true, // Start the Redis container (sessions/cache)
+    "REDIS_DATA_PATH": null, // Host folder for Redis persistence
+    "REDIS_HOST": "redis", // Redis host as seen by the app containers
+    "REDIS_PORT": 6379, // Redis port
+    "POSTGRES_ENABLED": true, // Start the Postgres container (config DB + historyv1 planes)
+    "POSTGRES_DATA_PATH": null, // Host folder for Postgres data (postgres:18+ layout)
+    "POSTGRES_USER": "overleaf", // Postgres superuser name
+    "POSTGRES_DB": "overleaf-history-v1", // Primary Postgres database (shared DSN plane)
+    "SEAWEEDFS_ENABLED": true, // Start the SeaweedFS S3 containers (durable storage)
+    "NGINX_ENABLED": false, // Start the TLS proxy (nginx) container
+    "NGINX_CONFIG_PATH": null, // nginx.conf path (host) for the TLS proxy
+    "NGINX_HTTP_PORT": 80, // nginx HTTP (pre-TLS) port
+    "TLS_PORT": 443, // Published TLS port when the proxy is enabled
+    "LANGUAGE_TOOL_ENABLED": false, // Start the LanguageTool grammar-checking container
+    "LANGUAGE_TOOL_DATA_PATH": null, // Host folder for LanguageTool data/n-grams
+    "LANGUAGE_TOOL_NGRAM_LANGUAGES": "en,de,es,fr", // Comma-separated n-gram languages
+    "SIBLING_CONTAINERS_ENABLED": false, // Sandboxed compiles in sibling containers (needs socket)
+    "SIBLING_CONTAINERS_PULL": true // Pull sibling compile images on start
 }

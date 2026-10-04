@@ -247,6 +247,36 @@ var Registry = []Param{
 	// ---------- test ----------
 	{Key: "SMOKE_TEST_USER_ID", Kind: KString, Group: "test", Description: "Smoke-test user id (dev)."},
 	{Key: "WEB_GO_DEBUG_AUTH", Kind: KString, Group: "test", Description: "Go web debug auth override (dev)."},
+
+	// ---------- stack (boot plane — the settings that START the main container
+	 // plane; historically toolkit/lib/default.rc + overleaf.rc, which the /hub
+	 // admin site-settings registry did not cover. Owner 2026-10-06: the
+	 // toolkit TUI manages them THROUGH THIS registry + the config store —
+	 // one key space, one source of truth.) ----------
+	{Key: "TOOLKIT_PROJECT_NAME", Kind: KString, Group: "stack", Default: "ollitex", Description: "Stack/instance identity (project name, container prefix)."},
+	{Key: "OVERLEAF_LISTEN_IP", Kind: KString, Group: "stack", Default: "127.0.0.1", Description: "Bind address of the main ollitex container."},
+	{Key: "OVERLEAF_PORT", Kind: KInt, Group: "stack", Default: "80", Description: "Published port of the main ollitex container."},
+	{Key: "MONGO_ENABLED", Kind: KBool, Group: "stack", Default: "true", Description: "Start the MongoDB container (content DB)."},
+	{Key: "MONGO_DATA_PATH", Kind: KString, Group: "stack", Description: "Host folder for MongoDB data (inside the mounted data dir)."},
+	{Key: "MONGO_URL", Kind: KString, Secret: true, Group: "stack", Default: "mongodb://mongo/sharelatex", Description: "MongoDB connection string the main container uses (may embed credentials)."},
+	{Key: "REDIS_ENABLED", Kind: KBool, Group: "stack", Default: "true", Description: "Start the Redis container (sessions/cache)."},
+	{Key: "REDIS_DATA_PATH", Kind: KString, Group: "stack", Description: "Host folder for Redis persistence."},
+	{Key: "REDIS_HOST", Kind: KString, Group: "stack", Default: "redis", Description: "Redis host as seen by the app containers."},
+	{Key: "REDIS_PORT", Kind: KInt, Group: "stack", Default: "6379", Description: "Redis port."},
+	{Key: "POSTGRES_ENABLED", Kind: KBool, Group: "stack", Default: "true", Description: "Start the Postgres container (config DB + historyv1 planes)."},
+	{Key: "POSTGRES_DATA_PATH", Kind: KString, Group: "stack", Description: "Host folder for Postgres data (postgres:18+: /var/lib/postgresql layout)."},
+	{Key: "POSTGRES_USER", Kind: KString, Group: "stack", Default: "overleaf", Description: "Postgres superuser name."},
+	{Key: "POSTGRES_DB", Kind: KString, Group: "stack", Default: "overleaf-history-v1", Description: "Primary Postgres database name (shared DSN plane)."},
+	{Key: "SEAWEEDFS_ENABLED", Kind: KBool, Group: "stack", Default: "true", Description: "Start the SeaweedFS S3 containers (durable storage backend for filestore/docstore)."},
+	{Key: "NGINX_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "Start the TLS proxy (nginx) container."},
+	{Key: "NGINX_CONFIG_PATH", Kind: KString, Group: "stack", Description: "nginx.conf path (host) for the TLS proxy."},
+	{Key: "NGINX_HTTP_PORT", Kind: KInt, Group: "stack", Default: "80", Description: "nginx HTTP (pre-TLS) port."},
+	{Key: "TLS_PORT", Kind: KInt, Group: "stack", Default: "443", Description: "Published TLS port when the proxy is enabled."},
+	{Key: "LANGUAGE_TOOL_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "Start the LanguageTool grammar-checking container."},
+	{Key: "LANGUAGE_TOOL_DATA_PATH", Kind: KString, Group: "stack", Description: "Host folder for LanguageTool data/n-grams."},
+	{Key: "LANGUAGE_TOOL_NGRAM_LANGUAGES", Kind: KString, Group: "stack", Default: "en,de,es,fr", Description: "Comma-separated n-gram languages to download for grammar checking."},
+	{Key: "SIBLING_CONTAINERS_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "Sandboxed compiles in dedicated sibling containers (requires docker socket mount)."},
+	{Key: "SIBLING_CONTAINERS_PULL", Kind: KBool, Group: "stack", Default: "true", Description: "Pull sibling compile images on start."},
 }
 
 // Find returns the param for key (case-sensitive exact match).
