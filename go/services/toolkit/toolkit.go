@@ -30,14 +30,14 @@ import (
 // Defaults (env-overridable; the TUI surfaces these in About/Doctor so an
 // operator always knows which plane it is talking to).
 const (
-	EnvSSHListen      = "OLLITEX_TOOLKIT_SSH_LISTEN" // default 0.0.0.0:2222
-	EnvSSHUser        = "OLLITEX_TOOLKIT_USER"       // default ollitex
-	EnvSSHPassword    = "OLLITEX_TOOLKIT_PASSWORD"
-	EnvSSHPasswordFl  = "OLLITEX_TOOLKIT_PASSWORD_FILE"
-	EnvDataDir        = "OLLITEX_TOOLKIT_DATA_DIR" // the one mounted folder
-	EnvComposeFile    = "OLLITEX_TOOLKIT_COMPOSE_FILE"
-	EnvProjectName    = "OLLITEX_TOOLKIT_PROJECT" // default ollitex
-	EnvDSN            = "CONFIG_DB_DSN"           // configstore single source of truth
+	EnvSSHListen     = "OLLITEX_TOOLKIT_SSH_LISTEN" // default 0.0.0.0:2222
+	EnvSSHUser       = "OLLITEX_TOOLKIT_USER"       // default ollitex
+	EnvSSHPassword   = "OLLITEX_TOOLKIT_PASSWORD"
+	EnvSSHPasswordFl = "OLLITEX_TOOLKIT_PASSWORD_FILE"
+	EnvDataDir       = "OLLITEX_TOOLKIT_DATA_DIR" // the one mounted folder
+	EnvComposeFile   = "OLLITEX_TOOLKIT_COMPOSE_FILE"
+	EnvProjectName   = "OLLITEX_TOOLKIT_PROJECT" // default ollitex
+	EnvDSN           = "CONFIG_DB_DSN"           // configstore single source of truth
 )
 
 // Toolkit is the shared application handle for a TUI session (or the local

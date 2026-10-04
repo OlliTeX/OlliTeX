@@ -21,9 +21,9 @@ func newSettings(t *Toolkit) *Settings { return &Settings{tk: t} }
 
 // Group is one rendered section (registry group + its keys in order).
 type Group struct {
-	Name  string
-	Keys  []Entry
-	Sort  int
+	Name string
+	Keys []Entry
+	Sort int
 }
 
 // Entry is one setting row.

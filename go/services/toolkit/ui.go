@@ -465,6 +465,7 @@ func (a *app) viewStack() string {
 	b.WriteString("\n")
 	b.WriteString(titleBar("Stack — " + a.tk.Project))
 	b.WriteString("\n")
+	a.renderPlan(&b)
 	lst := a.containerList()
 	if a.dock == nil {
 		b.WriteString("\n  " + styleErr.Render("docker socket unavailable — check the mount"))
@@ -492,6 +493,27 @@ func (a *app) viewStack() string {
 		styleKey.Render("r") + " restart   " +
 		styleKey.Render("p") + " pull images" + a.footer())
 	return b.String()
+}
+
+// renderPlan shows the store-rendered overlay/env plan (the exact thing the
+// stack actions will run).
+func (a *app) renderPlan(b *strings.Builder) {
+	plan, err := a.tk.Plan()
+	if err != nil {
+		b.WriteString("\n  " + styleErr.Render("plan: ") + err.Error())
+		return
+	}
+	names := []string{}
+	for _, f := range plan.Files {
+		names = append(names, shortName(f))
+	}
+	b.WriteString("\n  " + styleHeader.Render("plan") + "  " +
+		fit(strings.Join(names, " + "), a.width-10))
+	b.WriteString("\n  " + styleKvK.Render("image") + " " + styleDim.Render(fit(plan.Env["IMAGE"], a.width-40)))
+	b.WriteString("\n  " + styleKvK.Render("env file") + " " + styleDim.Render(plan.EnvFile))
+	for _, n := range plan.Notes {
+		b.WriteString("\n  " + styleWarn.Render("note") + "  " + fit(n, a.width-12))
+	}
 }
 
 func healthWord(h string) string {

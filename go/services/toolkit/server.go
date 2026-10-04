@@ -14,11 +14,11 @@ import (
 	"path/filepath"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	teaMiddleware "github.com/charmbracelet/wish/bubbletea"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ServerOpts configures the wish SSH endpoint.

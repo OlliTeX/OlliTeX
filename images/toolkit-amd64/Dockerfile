@@ -26,7 +26,10 @@ COPY cmd/ cmd/
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
     go build -trimpath \
       -ldflags "-s -w -X main.ver=${MONOREPO_REVISION}" \
-      -o /out/toolkit ./cmd/toolkit
+      -o /out/toolkit ./cmd/toolkit \
+ && go build -trimpath \
+      -ldflags "-s -w -X main.ver=${MONOREPO_REVISION}" \
+      -o /out/configdb ./cmd/configdb
 
 # ---- runtime: alpine 3.24 ---------------------------------------------------
 FROM alpine:3.24
@@ -34,8 +37,10 @@ FROM alpine:3.24
 ARG MONOREPO_REVISION=dev
 LABEL com.overleaf.ce.revision="${MONOREPO_REVISION}"
 
-# TUI binary.
+# TUI binary + the config CLI (same config store — the emergency/offline
+# path stays one `docker exec` away).
 COPY --from=go /out/toolkit /usr/local/bin/toolkit
+COPY --from=go /out/configdb /usr/local/bin/configdb
 
 # The official docker CLI + compose plugin: orchestration of the stack
 # talks to the MOUNTED docker socket (the host provides it).

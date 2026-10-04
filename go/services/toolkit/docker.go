@@ -44,10 +44,10 @@ func (d *Docker) Ping(ctx context.Context) error {
 type Status struct {
 	Name   string
 	Image  string
-	State  string            // created | running | paused | restarting | exiting | dead
-	Status string            // daemon status string
-	Health string            // "" | starting | healthy | unhealthy
-	Ports  string            // compact published port list
+	State  string // created | running | paused | restarting | exiting | dead
+	Status string // daemon status string
+	Health string // "" | starting | healthy | unhealthy
+	Ports  string // compact published port list
 	Labels map[string]string
 	Up     bool
 }
@@ -213,7 +213,14 @@ func compactPorts(ps []container.PortSummary) string {
 // ---------- compose lifecycle (bundled CLI) ---------------------------------
 
 func (t *Toolkit) composeExec(ctx context.Context, args ...string) (string, error) {
-	full := append([]string{"compose", "-f", t.ComposeFile, "--project-name", t.Project}, args...)
+	plan, perr := t.Plan()
+	if perr != nil {
+		return "", perr
+	}
+	if rerr := t.RenderEnvFile(plan); rerr != nil {
+		return "", fmt.Errorf("render env file: %w", rerr)
+	}
+	full := t.composeArgs(plan, args...)
 	cmd := exec.CommandContext(ctx, "docker", full...)
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out
@@ -223,6 +230,13 @@ func (t *Toolkit) composeExec(ctx context.Context, args ...string) (string, erro
 		return strings.TrimSpace(out.String() + "\n" + errb.String()), err
 	}
 	return strings.TrimSpace(out.String()), nil
+}
+
+// PlanValidate renders the plan (env file included) and validates it against
+// the daemon with a read-only `compose config` — no containers touched.
+func (t *Toolkit) PlanValidate(ctx context.Context) (string, error) {
+	out, err := t.composeExec(ctx, "config", "--quiet")
+	return out, err
 }
 
 // StackUp starts the whole stack.

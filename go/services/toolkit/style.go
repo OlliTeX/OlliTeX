@@ -21,28 +21,28 @@ var (
 
 var (
 	styleTitle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(colFg).
-		Background(colAccent).
-		Padding(0, 1)
+			Bold(true).
+			Foreground(colFg).
+			Background(colAccent).
+			Padding(0, 1)
 
 	styleHeader = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("51")).
-		PaddingBottom(1)
+			Bold(true).
+			Foreground(lipgloss.Color("51")).
+			PaddingBottom(1)
 
 	styleHint = lipgloss.NewStyle().
-		Foreground(colDim).
-		PaddingTop(1)
+			Foreground(colDim).
+			PaddingTop(1)
 
 	styleBar = lipgloss.NewStyle().
-		Background(colKeyBG).
-		Foreground(colKey)
+			Background(colKeyBG).
+			Foreground(colKey)
 
 	styleSelected = lipgloss.NewStyle().
-		Background(colAccent).
-		Foreground(lipgloss.Color("16")).
-		Bold(true)
+			Background(colAccent).
+			Foreground(lipgloss.Color("16")).
+			Bold(true)
 
 	styleDim = lipgloss.NewStyle().Foreground(colDim)
 
@@ -51,19 +51,19 @@ var (
 	styleErr  = lipgloss.NewStyle().Bold(true).Foreground(colErr)
 
 	styleKey = lipgloss.NewStyle().
-		Foreground(colAccent).
-		Background(colKeyBG).
-		Padding(0, 1)
+			Foreground(colAccent).
+			Background(colKeyBG).
+			Padding(0, 1)
 
 	stylePanel = lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("238")).
-		Padding(0, 1)
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("238")).
+			Padding(0, 1)
 
 	stylePanelSel = lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(colAccent).
-		Padding(0, 1)
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(colAccent).
+			Padding(0, 1)
 
 	styleValue = lipgloss.NewStyle().Foreground(colText)
 	styleKvK   = lipgloss.NewStyle().Foreground(colDim).Width(24)
@@ -103,7 +103,7 @@ func hintBar(pairs ...string) string {
 }
 
 func titleBar(title string) string {
-	return styleTitle.Render(" "+title+" ")
+	return styleTitle.Render(" " + title + " ")
 }
 
 // renderWidth fits content to a width by truncating (simple + predictable).

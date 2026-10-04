@@ -209,14 +209,14 @@
     "OVERLEAF_LISTEN_IP": "127.0.0.1", // Bind address of the main ollitex container
     "OVERLEAF_PORT": 80, // Published port of the main ollitex container
     "MONGO_ENABLED": true, // Start the MongoDB container (content DB)
-    "MONGO_DATA_PATH": null, // Host folder for MongoDB data (inside the mounted data dir)
+    "MONGO_DATA_PATH": "data/mongo", // Host folder for MongoDB data (inside the mounted data dir)
     "MONGO_URL": "mongodb://mongo/sharelatex", // Mongo connection string  [secret: masked in listings; field-encrypted in the store]
     "REDIS_ENABLED": true, // Start the Redis container (sessions/cache)
-    "REDIS_DATA_PATH": null, // Host folder for Redis persistence
+    "REDIS_DATA_PATH": "data/redis", // Host folder for Redis persistence
     "REDIS_HOST": "redis", // Redis host as seen by the app containers
     "REDIS_PORT": 6379, // Redis port
     "POSTGRES_ENABLED": true, // Start the Postgres container (config DB + historyv1 planes)
-    "POSTGRES_DATA_PATH": null, // Host folder for Postgres data (postgres:18+ layout)
+    "POSTGRES_DATA_PATH": "data/postgres", // Host folder for Postgres data (postgres:18+ layout)
     "POSTGRES_USER": "overleaf", // Postgres superuser name
     "POSTGRES_DB": "overleaf-history-v1", // Primary Postgres database (shared DSN plane)
     "SEAWEEDFS_ENABLED": true, // Start the SeaweedFS S3 containers (durable storage)
@@ -225,8 +225,28 @@
     "NGINX_HTTP_PORT": 80, // nginx HTTP (pre-TLS) port
     "TLS_PORT": 443, // Published TLS port when the proxy is enabled
     "LANGUAGE_TOOL_ENABLED": false, // Start the LanguageTool grammar-checking container
-    "LANGUAGE_TOOL_DATA_PATH": null, // Host folder for LanguageTool data/n-grams
+    "LANGUAGE_TOOL_DATA_PATH": "data/languagetool", // Host folder for LanguageTool data/n-grams
     "LANGUAGE_TOOL_NGRAM_LANGUAGES": "en,de,es,fr", // Comma-separated n-gram languages
     "SIBLING_CONTAINERS_ENABLED": false, // Sandboxed compiles in sibling containers (needs socket)
-    "SIBLING_CONTAINERS_PULL": true // Pull sibling compile images on start
+    "SIBLING_CONTAINERS_PULL": true, // Pull sibling compile images on start
+    // ── stack image pins (the version plane, from toolkit/lib/images.env) ──
+    "IMAGE_VERSION": "main", // OlliTeX app image version (config/version)
+    "OLLITEX_IMAGE": null, // Full OlliTeX app image (default: ollitex/ollitex:$IMAGE_VERSION)
+    "MONGO_IMAGE": "mongo:8.3", // MongoDB image pin
+    "MONGO_VERSION": 8, // Mongo major version (MONGOSH vs mongo + replSet args)
+    "REDIS_IMAGE": "redis:8.6-alpine", // Redis image pin
+    "REDIS_AOF_PERSISTENCE": true, // Redis AOF + save-on-60s persistence
+    "POSTGRES_IMAGE": "postgres:18-alpine", // Postgres image pin (owner-pinned)
+    "POSTGRES_PASSWORD": null, // Postgres DB password  [secret: masked in listings; field-encrypted in the store]
+    "NGINX_IMAGE": "nginx:1.30-alpine", // nginx (TLS proxy) image pin
+    "TEXLIVE_IMAGE": "texlive/texlive:latest-full", // TeX Live sandboxed-compile image
+    "TYPST_IMAGE": null, // Typst compile image pin (digest-pinned)
+    "LANGUAGE_TOOL_IMAGE": "erikvl87/languagetool:latest", // LanguageTool image pin
+    "LANGUAGETOOL_URL": "http://languagetool:8010", // Grammar-service URL (admin-visible)
+    "OVERLEAF_DATA_PATH": "data/ollitex", // Main app data folder (mounted data dir)
+    "OVERLEAF_LOG_PATH": null, // Optional host log folder
+    "OVERLEAF_TRUSTED_PROXY_IPS": "loopback,172.16.0.0/12", // Trusted proxy IPs (docker 172.16.0.0/12)
+    "TLS_PRIVATE_KEY_PATH": null, // Host path of the nginx TLS private key
+    "TLS_CERTIFICATE_PATH": null, // Host path of the nginx TLS certificate
+    "OVERLEAF_SKIP_RETRACTION_CHECK": null // Skip the retracted-version guard (air-gapped)
 }

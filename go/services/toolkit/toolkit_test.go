@@ -155,3 +155,94 @@ func TestPasswordGate_ConstantTimeBothInputs(t *testing.T) {
 		t.Fatal("wrong pass accepted")
 	}
 }
+
+func TestPlan_OverlaySelectionFromStore(t *testing.T) {
+	tk, dir := offlineToolkit(t)
+	// point at the real templates so the base file resolves
+	lib := filepath.Join("..", "..", "..", "toolkit", "lib")
+	fi, err := os.Stat(filepath.Join(lib, "docker-compose.base.yml"))
+	if err != nil || fi.IsDir() {
+		t.Skipf("templates not present at %s", lib)
+	}
+	tk.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
+	// store plane: the offline store is empty → registry defaults apply
+	// (mongo/redis/postgres/seaweed ON, nginx/lt/sibling OFF)
+	plan, err := tk.Plan()
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	names := []string{}
+	for _, f := range plan.Files {
+		names = append(names, filepath.Base(f))
+	}
+	for _, want := range []string{"docker-compose.base.yml", "docker-compose.redis.yml", "docker-compose.mongo.yml", "docker-compose.postgres.yml", "docker-compose.seaweedfs.yml"} {
+		found := false
+		for _, n := range names {
+			if n == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("missing overlay %s in %v", want, names)
+		}
+	}
+	for _, off := range []string{"docker-compose.nginx.yml", "docker-compose.languagetool.yml", "docker-compose.sibling-containers.yml"} {
+		for _, n := range names {
+			if n == off {
+				t.Fatalf("unexpected overlay %s in %v (flag off)", off, names)
+			}
+		}
+	}
+	// env plane essentials
+	if plan.Env["MONGOSH"] != "mongosh" {
+		t.Fatalf("MONGOSH = %q, want mongosh (MONGO_VERSION default 8)", plan.Env["MONGOSH"])
+	}
+	if plan.Env["MONGO_ARGS"] != "--replSet overleaf" {
+		t.Fatalf("MONGO_ARGS = %q", plan.Env["MONGO_ARGS"])
+	}
+	if plan.Env["REDIS_COMMAND"] == "" {
+		t.Fatal("REDIS_COMMAND missing")
+	}
+	if plan.Env["IMAGE"] == "" {
+		t.Fatal("IMAGE missing")
+	}
+	// POSTGRES_PASSWORD must have been generated AND stored (the no-constant rule)
+	if plan.Env["POSTGRES_PASSWORD"] == "" {
+		t.Fatal("generated POSTGRES_PASSWORD missing")
+	}
+	stored, err := tk.Store.Get("POSTGRES_PASSWORD")
+	if err != nil || stored != plan.Env["POSTGRES_PASSWORD"] {
+		t.Fatalf("stored POSTGRES_PASSWORD: %q err=%v (plan=%q)", stored, err, plan.Env["POSTGRES_PASSWORD"])
+	}
+	// env file renders
+	if err := tk.RenderEnvFile(plan); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	b, err := os.ReadFile(plan.EnvFile)
+	if err != nil {
+		t.Fatalf("read env file: %v", err)
+	}
+	if !strings.Contains(string(b), "MONGO_ARGS=-") && !strings.Contains(string(b), "MONGO_ARGS='--replSet'") && !strings.Contains(string(b), "MONGO_ARGS='--replSet overleaf'") {
+		t.Fatalf("env file missing MONGO_ARGS:\n%s", string(b))
+	}
+	_ = dir
+}
+
+func TestPlan_RetractionGuard(t *testing.T) {
+	tk, dir := offlineToolkit(t)
+	lib := filepath.Join("..", "..", "..", "toolkit", "lib")
+	tk.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
+	if err := tk.Store.Set("IMAGE_VERSION", "5.0.1", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tk.Plan(); err == nil {
+		t.Fatal("expected the 5.0.1 retraction guard to fail the plan")
+	}
+	if err := tk.Store.Set("OVERLEAF_SKIP_RETRACTION_CHECK", "5.0.1", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tk.Plan(); err != nil {
+		t.Fatalf("air-gap override should skip the guard, got: %v", err)
+	}
+	_ = dir
+}

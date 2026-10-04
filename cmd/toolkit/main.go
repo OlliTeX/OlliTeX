@@ -55,6 +55,10 @@ func run(args []string) error {
 		return serve(rest)
 	case "local":
 		return local(rest)
+	case "init":
+		return initcmd(rest)
+	case "plan":
+		return plancmd(rest)
 	case "doctor":
 		return doctor(rest)
 	default:
@@ -67,6 +71,7 @@ func usage() error {
 
 Usage:
   toolkit serve     run the SSH (wish) server — for ssh host:2222
+  toolkit init      first-boot seed of the config store (key + env + defaults, never clobbers)
   toolkit local     run the TUI on the local TTY (docker run -it / dev)
   toolkit doctor    one-shot health check
   toolkit version
@@ -148,6 +153,82 @@ func serve(args []string) error {
 		Password: pwd,
 		Log:      log.Default().With("svc", "toolkit"),
 	})
+}
+
+func plancmd(args []string) error {
+	f := flag.NewFlagSet("plan", flag.ExitOnError)
+	dsn := f.String("dsn", os.Getenv(toolkit.EnvDSN), "config store Postgres DSN (overrides env chain)")
+	dataDir := f.String("data-dir", envOr(toolkit.EnvDataDir, "/opt/ollitex/data"), "mounted data dir")
+	composeFile := f.String("compose", envOr(toolkit.EnvComposeFile, "/opt/ollitex/toolkit.yaml"), "compose file")
+	project := f.String("project", envOr(toolkit.EnvProjectName, "ollitex"), "stack project name")
+	_ = f.Parse(args)
+
+	t, err := toolkit.New(toolkit.Options{
+		DSN:         *dsn,
+		DataDir:     *dataDir,
+		ComposeFile: *composeFile,
+		Project:     *project,
+	})
+	if err != nil {
+		return err
+	}
+	defer t.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	plan, perr := t.Plan()
+	if perr != nil {
+		fmt.Fprintln(os.Stderr, "✗ plan: "+perr.Error())
+		return perr
+	}
+	if rerr := t.RenderEnvFile(plan); rerr != nil {
+		fmt.Fprintln(os.Stderr, "✗ env render: "+rerr.Error())
+		return rerr
+	}
+	fmt.Println("project :", plan.Project)
+	fmt.Println("overlays:")
+	for _, f := range plan.Files {
+		fmt.Println("  -", f)
+	}
+	fmt.Println("env file:", plan.EnvFile)
+	if len(plan.Notes) > 0 {
+		fmt.Println("notes:")
+		for _, n := range plan.Notes {
+			fmt.Println("  !", n)
+		}
+	}
+	fmt.Println("validating (docker compose config --quiet):")
+	out, verr := t.PlanValidate(ctx)
+	if verr != nil {
+		fmt.Println("✗ compose config FAILED")
+		if out != "" {
+			fmt.Println(out)
+		}
+		return verr
+	}
+	fmt.Println("✔ compose config OK — the plan is daemon-valid")
+	return nil
+}
+
+func initcmd(args []string) error {
+	f := flag.NewFlagSet("init", flag.ExitOnError)
+	dsn := f.String("dsn", os.Getenv(toolkit.EnvDSN), "config store Postgres DSN (overrides env chain)")
+	dataDir := f.String("data-dir", envOr(toolkit.EnvDataDir, "/opt/ollitex/data"), "mounted data dir")
+	composeFile := f.String("compose", envOr(toolkit.EnvComposeFile, "/opt/ollitex/toolkit.yaml"), "compose file")
+	project := f.String("project", envOr(toolkit.EnvProjectName, "ollitex"), "stack project name")
+	_ = f.Parse(args)
+
+	t, err := toolkit.New(toolkit.Options{
+		DSN:         *dsn,
+		DataDir:     *dataDir,
+		ComposeFile: *composeFile,
+		Project:     *project,
+	})
+	if err != nil {
+		return err
+	}
+	defer t.Close()
+	return toolkit.InitStore(t, os.Stdout)
 }
 
 func local(args []string) error {
