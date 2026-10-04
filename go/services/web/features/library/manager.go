@@ -61,12 +61,8 @@ func iso(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000Z")
 func toApiEntry(doc map[string]any, occ int) string {
 	fields := []string{}
 	for _, f := range asAnySlice(doc["fields"]) {
-		if fm, ok := f.(map[string]any); ok {
-			v := ""
-			if s, ok := fm["value"].(string); ok {
-				v = s
-			}
-			fields = append(fields, `{"name":`+jstr(jsStr(fm["name"]))+`,"value":`+jstr(v)+`}`)
+		if name, value, ok := fieldPair(f); ok {
+			fields = append(fields, `{"name":`+jstr(name)+`,"value":`+jstr(value)+`}`)
 		}
 	}
 	updateAt, created := "null", "null"
@@ -87,6 +83,34 @@ func jsStr(v any) string {
 		return s
 	}
 	return ""
+}
+
+// fieldPair — extract {name, value} from one `fields` array element whichever
+// shape the mongo driver v2 decoded it as: subdocs in arrays arrive as
+// bson.D (ordered), while the create-path (input) docs carry map[string]any.
+// 2026-10-05 (live parity catch): the map-only assertion silently dropped
+// every field from `GET /library/references` (the hub leaf rendered empty
+// Title/Year/Author columns). Both shapes are the same Node {name, value}.
+func fieldPair(f any) (string, string, bool) {
+	get := func(m any) (string, string, bool) {
+		switch mm := m.(type) {
+		case map[string]any:
+			return jsStr(mm["name"]), jsStr(mm["value"]), true
+		case bson.D:
+			n, v := "", ""
+			for _, e := range mm {
+				switch e.Key {
+				case "name":
+					n = jsStr(e.Value)
+				case "value":
+					v = jsStr(e.Value)
+				}
+			}
+			return n, v, true
+		}
+		return "", "", false
+	}
+	return get(f)
 }
 
 func jsStringOID(v any) string {

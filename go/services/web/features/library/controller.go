@@ -321,12 +321,8 @@ func (f *feature) download(c *core.Cxt, r *core.Res) {
 	for _, it := range items {
 		flds := []fieldOut{}
 		for _, f := range asAnySlice(it["fields"]) {
-			if fm, ok := f.(map[string]any); ok {
-				v := ""
-				if s, ok := fm["value"].(string); ok {
-					v = s
-				}
-				flds = append(flds, fieldOut{Name: jsStr(fm["name"]), Value: v})
+			if name, value, ok := fieldPair(f); ok {
+				flds = append(flds, fieldOut{Name: name, Value: value})
 			}
 		}
 		bibEntries = append(bibEntries, bibEntry{Key: jsStr(it["key"]), Type: jsStr(it["type"]), Fields: flds})
