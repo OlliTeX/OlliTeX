@@ -272,6 +272,17 @@ func Groups() []string {
 	return out
 }
 
+// ByGroup returns the params of one group in registration order.
+func ByGroup(group string) []Param {
+	var out []Param
+	for _, p := range Registry {
+		if p.Group == group {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // IsSecret reports whether key is registered and secret.
 func IsSecret(key string) bool {
 	p, ok := Find(key)

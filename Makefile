@@ -123,6 +123,21 @@ build-base: ## Build the ollitex/base image (alpine + TeX Live) from images/base
 	  --network=host \
 	  .
 
+TOOLKIT_TAG ?= ollitex/toolkit-tui:main
+
+.PHONY: build-toolkit
+build-toolkit: ## Build the toolkit TUI image (golang builder -> alpine 3.24, single static binary)
+	docker build \
+	  --build-arg BUILDKIT_INLINE_CACHE=1 \
+	  --progress=plain \
+	  --build-arg GO_BUILDER_TAG \
+	  --build-arg MONOREPO_REVISION=$(MONOREPO_REVISION) \
+	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
+	  --file images/toolkit-amd64/Dockerfile \
+	  --tag $(TOOLKIT_TAG) \
+	  --network=host \
+	  .
+
 .PHONY: build-community
 build-community: ## Build the ollitex/ollitex app image from images/main-amd64 (yarn + Go + webpack inside)
 	docker build \
