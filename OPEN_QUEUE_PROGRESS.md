@@ -520,4 +520,20 @@ fallbacks); make it look nice.
   errors.As bug fixed; actions_test.go green (offline httptest round-trip +
   TestNgramPlan_RealOwnerDataDir + mismatched-pair rejection); CREDITS.md:
   nschang/languagetool-101 attributed.
-
+## TUI finalize (2026-10-04, owner feeds: ngram dirs, languagetool-101, word2vec deprecation)
+- Owner's live ngrams dir (compose_cep/languagetool/ngrams, 5 official stable zips) now PINS the
+  idempotency contract: TestNgramPlan_RealOwnerDataDir asserts 5/5 already-present (no network).
+- Owner's untested tier added: he it ru zh (ngram-<lang>-<date>.zip under /untested/);
+  official tier keeps the wget -O stable name ngrams-<lang>.zip.
+- word2vec family REMOVED: owner feed (languagetool-standalone CHANGES) — LT dropped
+  --word2vecmodel/--neuralnetworkmodel (unmaintained). CREDITS: nschang/languagetool-101
+  attributed as the reviewed recipe (FastText = owner-gated candidate).
+- SSH UX: exec-with-command -> CLI (outermost wish middleware; RawCommand routing — wish runs
+  LAST-added middleware first), interactive shell -> TUI. Live-verified: ssh "toolkit languages",
+  "toolkit languages --plan", "toolkit plan" (daemon-valid in-container), "toolkit health"
+  (clean docker-socket contract error).
+- Port contract REVERTED to owner's :2222 (ssh -p 2222; EXPOSE 2222).
+- Image ollitex/toolkit-tui:main rebuilt (sha 0ce11cc6...).
+- Next owner-facing: TUI interactive screens for the actions (cert import form + languages
+  screen) — plumbing done (ImportCert/NgramPlan/NgramDownload), CLI done, UI wiring is the
+  remaining delta; then /hub navbar + route-retirement wave.
