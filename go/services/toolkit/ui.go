@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,6 +31,8 @@ const (
 	scrSettings
 	scrStack
 	scrLogs
+	scrShell
+	scrActions
 	scrDoctor
 	scrBackup
 	scrAbout
@@ -71,6 +74,19 @@ type app struct {
 
 	// doctor
 	doctorRows []doctorRow
+
+	// shell
+	shell       *ShellSession
+	shellLabel  string
+	shellBuf    []byte
+	shellExited bool
+
+	// actions (admin: TLS import + n-gram models)
+	actPrompt string // active prompt text ("" = no prompt)
+	actBuffer string // typed input for the active prompt
+	actResult string // last action result (shown on the Actions screen)
+	actCert   string // captured cert path (TLS import, 2-step)
+	actKey    string
 }
 
 func newApp(t *Toolkit) *app {
@@ -155,6 +171,59 @@ func (a *app) refreshActive() tea.Cmd {
 	return nil
 }
 
+// shellChunkMsg carries one decoded exec chunk into the model.
+type shellChunkMsg struct {
+	text string
+	eof  bool
+}
+
+// pumpShell blocks on the exec stream and delivers one decoded chunk.
+func (a *app) pumpShell() tea.Cmd {
+	sess := a.shell
+	if sess == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		buf := make([]byte, 256*1024)
+		n, err := sess.ReadOne(buf)
+		if n > 0 {
+			return shellChunkMsg{text: DecodeShellChunk(buf[:n]), eof: err != nil}
+		}
+		return shellChunkMsg{eof: err != nil}
+	}
+}
+
+func (a *app) endShell() {
+	if a.shell != nil {
+		a.shell.Close()
+		a.shell = nil
+	}
+}
+
+// shellStartMsg is delivered when a shell action completes.
+type shellStartMsg struct {
+	label string
+	err   error
+}
+
+func (a *app) startShell(label string) tea.Cmd {
+	dk, tk := a.dock, a.tk
+	a.loading = true
+	a.jobName = "shell " + label
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		sess, err := NewShell(ctx, dk, tk.Project, label)
+		if err == nil {
+			a.shell = sess
+			a.shellLabel = label
+			a.shellBuf = nil
+			a.shellExited = false
+		}
+		return shellStartMsg{label: label, err: err}
+	}
+}
+
 // ---- Update ----------------------------------------------------------------
 
 func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -163,6 +232,27 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = m.Width
 		a.height = m.Height
 		return a, nil
+
+	case shellStartMsg:
+		a.loading = false
+		if m.err != nil {
+			a.setErr("shell %s: %v", m.label, m.err)
+			return a, nil
+		}
+		a.kind = scrShell
+		return a, a.pumpShell()
+
+	case shellChunkMsg:
+		a.shellBuf = append(a.shellBuf, []byte(m.text)...)
+		if len(a.shellBuf) > 1<<20 { // 1 MiB cap: keep the tail
+			a.shellBuf = a.shellBuf[len(a.shellBuf)-(1<<20):]
+		}
+		if m.eof {
+			a.shellExited = true
+			a.endShell()
+			return a, nil
+		}
+		return a, a.pumpShell()
 
 	case jobMsg:
 		a.loading = false
@@ -197,7 +287,72 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		if a.kind == scrShell && a.shell != nil {
+			return a.shellKey(m)
+		}
 		return a.handleKey(m)
+	}
+	return a, nil
+}
+
+// shellKey forwards operator input to the exec stream.
+//
+//	ctrl-c → to the shell (SIGINT) · ctrl-z → detach & close (back to menu)
+//	q      → to the shell (type `exit` in the app shell)
+func (a *app) shellKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	w := func(s string) tea.Cmd {
+		_, err := a.shell.Write([]byte(s))
+		if err != nil {
+			a.setErr("shell write: %v", err)
+			a.shellExited = true
+			a.endShell()
+		}
+		return nil
+	}
+	code := func(c byte) string { return string(c) }
+	switch msg.String() {
+	case "ctrl+z":
+		a.endShell()
+		a.kind = scrDashboard
+		return a, a.refreshActive()
+	case "ctrl+c":
+		return a, w(code(3))
+	case "ctrl+d":
+		return a, w(code(4))
+	case "ctrl+u":
+		return a, w(code(21))
+	case "ctrl+l":
+		return a, w(code(12))
+	case "enter":
+		return a, w(code(13))
+	case "backspace", "delete":
+		return a, w(code(127))
+	case "left":
+		return a, w("\x1b[D")
+	case "right":
+		return a, w("\x1b[C")
+	case "up":
+		return a, w("\x1b[A")
+	case "down":
+		return a, w("\x1b[B")
+	case "tab":
+		return a, w(code(9))
+	case "shift+tab":
+		return a, w("\x1b[Z")
+	case "esc":
+		return a, w(code(27))
+	case "home":
+		return a, w("\x1b[H")
+	case "end":
+		return a, w("\x1b[F")
+	case "pgup":
+		return a, w("\x1b[5~")
+	case "pgdown":
+		return a, w("\x1b[6~")
+	default:
+		if len(msg.Runes) > 0 {
+			return a, w(string(msg.Runes))
+		}
 	}
 	return a, nil
 }
@@ -250,6 +405,8 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a.stackKey(msg)
 	case scrLogs:
 		return a.logsKey(msg)
+	case scrActions:
+		return a.actionsKey(msg)
 	case scrDoctor:
 		if msg.String() == "r" {
 			return a, a.runDoctor()
@@ -334,6 +491,15 @@ func (a *app) dashItems() []dashItem {
 			a.kind = scrStack
 			return a, a.refreshStatus()
 		}},
+		{"Shells", "mongo / postgres / app exec", func(a *app) (tea.Model, tea.Cmd) {
+			return a, a.startShell(Shells[0].Label)
+		}},
+		{"Actions", "TLS import · n-gram models", func(a *app) (tea.Model, tea.Cmd) {
+			a.kind = scrActions
+			a.actResult = ""
+			a.actPrompt = ""
+			return a, nil
+		}},
 		{"Logs", "tail container logs", func(a *app) (tea.Model, tea.Cmd) {
 			a.kind = scrLogs
 			return a, a.refreshLogs("")
@@ -390,6 +556,28 @@ func (a *app) dashKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
+// viewShell renders the live exec feed.
+func (a *app) viewShell() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	bar := titleBar("Shell — " + a.shellLabel)
+	b.WriteString(bar)
+	if a.shellExited {
+		b.WriteString("\n")
+		b.WriteString(styleErr.Render("  session ended"))
+	}
+	tail := a.shellBuf
+	if len(tail) > 6000 {
+		tail = tail[len(tail)-6000:]
+	}
+	for _, ln := range strings.SplitAfter(string(tail), "\n") {
+		b.WriteString("  " + ln)
+	}
+	b.WriteString("\n")
+	b.WriteString(hintBar("ctrl-c", "to shell", "ctrl-z", "detach & close", "type", "exit / q"))
+	return b.String()
+}
+
 func (a *app) View() string {
 	switch a.kind {
 	case scrSettings:
@@ -398,6 +586,10 @@ func (a *app) View() string {
 		return a.viewStack()
 	case scrLogs:
 		return a.viewLogs()
+	case scrShell:
+		return a.viewShell()
+	case scrActions:
+		return a.viewActions()
 	case scrDoctor:
 		return a.viewDoctor()
 	case scrBackup:
@@ -540,6 +732,12 @@ func (a *app) stackKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a, a.runJob("restart", a.tk.StackRestart)
 	case "p":
 		return a, a.runJob("pull", a.tk.PullImages)
+	case "m":
+		return a, a.startShell(Shells[0].Label)
+	case "g":
+		return a, a.startShell(Shells[1].Label)
+	case "e":
+		return a, a.startShell(Shells[2].Label)
 	}
 	return a, nil
 }
@@ -826,6 +1024,195 @@ func (a *app) viewDoctor() string {
 }
 
 // ---- backup ----------------------------------------------------------------
+
+// ---- actions (admin): TLS import + n-gram models ---------------------------
+
+// ngramStatusText lists the current models on disk (no network).
+func (a *app) ngramStatusText() string {
+	d := a.tk.DataDir
+	var b strings.Builder
+	b.WriteString("  lang   archive                state          size\n")
+	for _, lang := range NgramCodes() {
+		arch := NgramArchives[lang]
+		z := filepath.Join(d, "ngrams", fmt.Sprintf("ngrams-%s.zip", lang))
+		dir := filepath.Join(d, "ngrams", lang)
+		_, zerr := os.Stat(z)
+		_, derr := os.Stat(dir)
+		state := "missing"
+		var size int64
+		if zerr == nil && derr == nil {
+			state = "present"
+			size = fileSize(z)
+		} else if zerr == nil {
+			state = "archive only"
+			size = fileSize(z)
+		} else if derr == nil {
+			state = "extracted only"
+		}
+		b.WriteString(fmt.Sprintf("  %-4s   %-20s   %-12s   %s\n", lang, arch, state, HumanBytes(size)))
+	}
+	b.WriteString(fmt.Sprintf("\n  dir: %s/ngrams (mounted read-only into the languagetool service)\n", d))
+	return b.String()
+}
+
+// runNgram downloads/verifies the requested languages into the DATA DIR
+// (owner layout: <data>/ngrams/<lang> + stable ngrams-<lang>.zip). Job
+// output = one line per language.
+func (a *app) runNgram(langs string) tea.Cmd {
+	t := a.tk
+	return a.runJob("ngram", func(ctx context.Context) (string, error) {
+		parts := []string{}
+		for _, p := range strings.Split(langs, ",") {
+			if s2 := strings.TrimSpace(p); s2 != "" {
+				parts = append(parts, s2)
+			}
+		}
+		if len(parts) == 0 {
+			parts = NgramCodes()
+		}
+		sts, err := NgramDownload(ctx, t.DataDir, parts)
+		var b strings.Builder
+		for _, st := range sts {
+			b.WriteString(fmt.Sprintf("  %-4s  %-16s  %s\n", st.Language, st.Action, st.Path))
+		}
+		if err != nil {
+			return b.String(), err
+		}
+		b.WriteString(fmt.Sprintf("\n  (dir: %s/ngrams — restart the languagetool service to pick up new models)\n", t.DataDir))
+		return b.String(), nil
+	})
+}
+
+// runTLS copies the owner's cert+key into <data>/nginx/tls, points the store
+// keys at them, and restarts nginx once (when the service is present).
+func (a *app) runTLS(certSrc, keySrc string) tea.Cmd {
+	t, dk := a.tk, a.dock
+	return a.runJob("tls", func(ctx context.Context) (string, error) {
+		certDst := filepath.Join(t.DataDir, "nginx", "tls", "nginx_certificate.pem")
+		keyDst := filepath.Join(t.DataDir, "nginx", "tls", "nginx_key.pem")
+		info, err := ImportCert(certDst, keyDst, certSrc, keySrc)
+		if err != nil {
+			return "", err
+		}
+		if serr := t.Store.Set("TLS_CERTIFICATE_PATH", certDst, "toolkit:tls-import"); serr != nil {
+			return "", serr
+		}
+		if serr := t.Store.Set("TLS_PRIVATE_KEY_PATH", keyDst, "toolkit:tls-import"); serr != nil {
+			return "", serr
+		}
+		_ = info
+		var b strings.Builder
+		b.WriteString(fmt.Sprintf("  cert  \u2192 %s\n  key   \u2192 %s\n  store: TLS_CERTIFICATE_PATH / TLS_PRIVATE_KEY_PATH updated\n", certDst, keyDst))
+		if dk != nil {
+			if rerr := dk.RestartOne(ctx, t.Project, "nginx"); rerr != nil {
+				b.WriteString("  nginx restart: " + rerr.Error() + " (restart it manually when up)\n")
+			} else {
+				b.WriteString("  nginx: restarted with the new pair\n")
+			}
+		}
+		return b.String(), nil
+	})
+}
+
+// actionsKey — the Actions screen flow:
+//
+//	t  → TLS import (prompt: certificate path, then key path)
+//	n  → n-gram models (prompt: "en,de" or empty = all five)
+//	l  → n-gram status (instant, no network)
+//	esc/q → back to the dashboard
+//
+// Prompt mode: type the path, enter confirms (TLS collects two prompts).
+func (a *app) actionsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if a.actPrompt == "" {
+		switch msg.String() {
+		case "t":
+			a.actCert, a.actKey = "", ""
+			a.actPrompt = "enter the HOST path of the TLS certificate (file), then enter:"
+			return a, nil
+		case "n":
+			a.actPrompt = `languages (en,de — empty = all five), then enter:`
+			return a, nil
+		case "l":
+			a.actResult = a.ngramStatusText()
+			return a, nil
+		case "esc", "q":
+			a.kind = scrDashboard
+			return a, a.refreshActive()
+		}
+		return a, nil
+	}
+	p := a.actPrompt
+	switch msg.String() {
+	case "enter":
+		v := strings.TrimSpace(a.actBuffer)
+		a.actBuffer = ""
+		if strings.HasPrefix(p, "enter the HOST path") {
+			a.actCert = v
+			a.actPrompt = "now the HOST path of the TLS private key (file), then enter:"
+			return a, nil
+		}
+		if strings.HasPrefix(p, "now the HOST path") {
+			a.actKey = v
+			a.actPrompt = ""
+			return a, a.runTLS(a.actCert, a.actKey)
+		}
+		if strings.HasPrefix(p, "languages") {
+			a.actPrompt = ""
+			return a, a.runNgram(v)
+		}
+	case "backspace":
+		if len(a.actBuffer) > 0 {
+			a.actBuffer = a.actBuffer[:len(a.actBuffer)-1]
+		}
+		return a, nil
+	case "esc":
+		a.actPrompt = ""
+		a.actBuffer = ""
+		return a, nil
+	default:
+		if len(msg.Runes) > 0 && msg.Runes[0] >= 32 && msg.Runes[0] != 127 {
+			a.actBuffer += string(msg.Runes[0])
+		}
+	}
+	return a, nil
+}
+
+// viewActions renders the Actions screen.
+func (a *app) viewActions() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(titleBar("Actions — TLS import \u00b7 n-gram models"))
+	b.WriteString("\n")
+	b.WriteString("  " + styleDim.Render("t") + "  Import TLS cert + key  (from owner files \u2192 " + a.tk.DataDir + "/nginx/tls, store keys updated, nginx restarted)")
+	b.WriteString("\n")
+	b.WriteString("  " + styleDim.Render("n") + "  Download n-gram models  (official dated archives \u2192 " + a.tk.DataDir + "/ngrams)")
+	b.WriteString("\n")
+	b.WriteString("  " + styleDim.Render("l") + "  n-gram status (local, no network)")
+	b.WriteString("\n")
+	b.WriteString("  " + styleDim.Render("esc") + "  back")
+	b.WriteString("\n")
+	if a.actPrompt != "" {
+		b.WriteString("\n")
+		b.WriteString(styleWarn.Render("  \u25ac " + a.actPrompt))
+		b.WriteString("\n")
+		b.WriteString("  " + a.actBuffer + "\u258c")
+		b.WriteString("\n")
+	}
+	if a.actResult != "" {
+		b.WriteString("\n")
+		b.WriteString(a.actResult)
+		b.WriteString("\n")
+	}
+	if a.errMsg != "" {
+		b.WriteString("\n")
+		b.WriteString(styleErr.Render("  " + a.errMsg))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	b.WriteString(hintBar("t/n/l", "actions", "esc", "back"))
+	b.WriteString("\n")
+	return b.String()
+}
 
 func (a *app) backupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {

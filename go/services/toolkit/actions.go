@@ -1,10 +1,25 @@
 package toolkit
 
+// Actions — the admin actions for the TUI/CLI (owner queue 2026-10-07):
+//
+//  1. nginx TLS import      — copy cert+key into the host data dir, point
+//      the TLS_*_PATH store keys at them, restart nginx once.
+//
+//  2. LanguageTool n-gram   — download the official dated archives
+//      (https://languagetool.org/download/ngram-data/), stable rename
+//      (ngrams-<lang>.zip), extract into <dataDir>/ngrams/<lang>.
+//
+// Both are host-side operations on the mounted data dir (the containers
+// mount it read-only) — no exec into the stack is required, which keeps
+// the host contract (docker socket + one folder) intact.
+
 import (
 	"context"
-	"crypto/tls"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/x509"
-	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,77 +30,64 @@ import (
 	"strings"
 )
 
-// ---- admin-selected language models (owner addendum A: languagetool) ----
-//
-// Port of the owner's canonical toolkit/bin/languagetool-ngrams: the OFFICIAL
-// LanguageTool n-gram data sets, exact layout the erikvl87 image + /hub
-// grammar settings expect (<data>/ngrams/<lang>/ extracted plus the stable
-// archive), idempotent (skip when present).
-
-// NgramBaseURL is injectable for tests (httptest server).
-var NgramBaseURL = "https://languagetool.org/download/ngram-data"
-
-// NgramModel is one downloadable n-gram language model (official or the
-// untested tier the owner listed under /untested/).
+// NgramModel is one downloadable n-gram set (official or untested tier).
 type NgramModel struct {
 	Lang     string
-	Archive  string // official dated archive file name
-	Untested bool   // true -> served under /untested/ (ngram-* naming)
+	Archive  string
+	Untested bool // true → served under /untested/ (ngram-<lang>-<date>.zip)
 }
 
-// NgramModels is the full model set: the OFFICIAL tier (owner script map,
-// 2026-09-13) + the UNTESTED tier (owner list 2026-10-04).
+// NgramModels — OFFICIAL tier (owner script, 2026-09-13) + the owner's listed
+// UNTESTED tier (2026-10-06 feed).
 var NgramModels = []NgramModel{
 	{Lang: "en", Archive: "ngrams-en-20150817.zip"},
 	{Lang: "de", Archive: "ngrams-de-20150819.zip"},
 	{Lang: "es", Archive: "ngrams-es-20150915.zip"},
 	{Lang: "fr", Archive: "ngrams-fr-20150913.zip"},
 	{Lang: "nl", Archive: "ngrams-nl-20181229.zip"},
-	// untested tier (ngram-<lang>-<date> under /untested/)
+	// untested tier (owner list 2026-10-06)
 	{Lang: "he", Archive: "ngram-he-20150916.zip", Untested: true},
 	{Lang: "it", Archive: "ngram-it-20150915.zip", Untested: true},
 	{Lang: "ru", Archive: "ngram-ru-20150914.zip", Untested: true},
 	{Lang: "zh", Archive: "ngram-zh-20150916.zip", Untested: true},
 }
 
-// NgramArchives (compat accessor): official tier lang -> archive.
+// NgramArchives (compat): lang -> dated archive name (both tiers).
 var NgramArchives = func() map[string]string {
 	m := map[string]string{}
 	for _, n := range NgramModels {
-		if !n.Untested {
-			m[n.Lang] = n.Archive
-		}
+		m[n.Lang] = n.Archive
 	}
 	return m
 }()
 
 func ngramModel(lang string) (NgramModel, bool) {
-	for _, n := range NgramModels {
-		if n.Lang == lang {
-			n := n
-			return n, true
+	for i := range NgramModels {
+		if NgramModels[i].Lang == lang {
+			return NgramModels[i], true
 		}
 	}
 	return NgramModel{}, false
 }
 
-func ngramURL(n NgramModel) string {
-	if n.Untested {
-		return NgramBaseURL + "/untested/" + n.Archive
+// NgramBaseURL is injectable for tests (offline httptest servers).
+var NgramBaseURL = "https://languagetool.org/download/ngram-data"
+
+// NgramCodes returns the supported languages in stable order.
+func NgramCodes() []string {
+	ks := make([]string, 0, len(NgramArchives))
+	for k := range NgramArchives {
+		ks = append(ks, k)
 	}
-	return NgramBaseURL + "/" + n.Archive
+	sort.Strings(ks)
+	return ks
 }
 
-// NOTE (owner feed, 2026-10-04): the word2vec model family (nschang/
-// languagetool-101 recipe, LT-5.4 era) is intentionally NOT implemented —
-// LanguageTool removed the --word2vecmodel/--neuralnetworkmodel options
-// (unmaintained features).
 // Ngram actions (stable strings for the TUI/CLI + tests).
 const (
-	NgramActionDownload       = "needs-download"
-	NgramActionAlreadyPresent = "already-present"
-	NgramActionSkipped        = "skipped-unsupported"
-	NgramActionDownloaded     = "downloaded"
+	NgramActionDownloaded   = "downloaded"
+	NgramActionAlreadyOwned = "already-present"
+	NgramActionSkipped      = "skipped-unsupported"
 )
 
 // NgramStatus is one language's outcome.
@@ -94,8 +96,8 @@ type NgramStatus struct {
 	Action   string // NgramAction* constants
 	Path     string
 	Size     int64
-	archive  string // internal: the official dated archive name
-	untested bool   // internal: /untested/ tier (ngram-* dated naming)
+	archive  string // internal: the dated archive name
+	untested bool   // internal: /untested/ tier
 }
 
 // NgramPlan is the pure, network-free decision for the selected languages:
@@ -104,11 +106,6 @@ type NgramStatus struct {
 // plan before anything is fetched.
 func NgramPlan(dataDir string, langs []string) ([]NgramStatus, error) {
 	nlDir := filepath.Join(dataDir, "ngrams")
-	if _, err := os.Stat(nlDir); err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-	}
 	out := []NgramStatus{}
 	seen := map[string]bool{}
 	for _, raw := range langs {
@@ -122,9 +119,8 @@ func NgramPlan(dataDir string, langs []string) ([]NgramStatus, error) {
 			out = append(out, NgramStatus{Language: lang, Action: NgramActionSkipped})
 			continue
 		}
-		// stable name ON DISK: official tier = ngrams-<lang>.zip (the owner's
-		// wget -O convention / compose_cep layout); the untested tier keeps its
-		// dated archive name.
+		// stable name ON DISK: official = ngrams-<lang>.zip (owner's wget -O
+		// convention + compose_cep layout); untested keeps its dated name.
 		stableName := model.Archive
 		if !model.Untested {
 			stableName = fmt.Sprintf("ngrams-%s.zip", lang)
@@ -134,13 +130,13 @@ func NgramPlan(dataDir string, langs []string) ([]NgramStatus, error) {
 		d1, _ := isDir(extractDir)
 		if d1 && fileExists(stablePath) {
 			out = append(out, NgramStatus{
-				Language: lang, Action: NgramActionAlreadyPresent,
+				Language: lang, Action: NgramActionAlreadyOwned,
 				Path: extractDir, Size: fileSize(stablePath),
 			})
 			continue
 		}
 		out = append(out, NgramStatus{
-			Language: lang, Action: NgramActionDownload,
+			Language: lang, Action: "needs-download",
 			Path:     extractDir,
 			archive:  model.Archive,
 			untested: model.Untested,
@@ -150,9 +146,8 @@ func NgramPlan(dataDir string, langs []string) ([]NgramStatus, error) {
 	return out, nil
 }
 
-// NgramDownload executes the download for every "needs-download" language in
-// the plan (several-GB streams, idempotent). It re-derives the plan so the
-// caller only passes dataDir+langs.
+// NgramDownload executes the plan for every "needs-download" language and
+// re-derives the outcome. Idempotent. Returns one status per language.
 func NgramDownload(ctx context.Context, dataDir string, langs []string) ([]NgramStatus, error) {
 	if _, err := exec.LookPath("unzip"); err != nil {
 		return nil, fmt.Errorf("unzip is required (apk add unzip in the toolkit image)")
@@ -166,13 +161,11 @@ func NgramDownload(ctx context.Context, dataDir string, langs []string) ([]Ngram
 	}
 	out := []NgramStatus{}
 	for _, st := range plan {
-		if st.Action != NgramActionDownload {
+		if st.Action != "needs-download" {
 			out = append(out, st)
 			continue
 		}
 		nlDir := filepath.Join(dataDir, "ngrams")
-		// stable name on disk: official tier = ngrams-<lang>.zip (the owner's
-		// wget -O convention); untested tier keeps its dated archive name.
 		stableName := st.archive
 		if !st.untested {
 			stableName = fmt.Sprintf("ngrams-%s.zip", st.Language)
@@ -191,10 +184,8 @@ func NgramDownload(ctx context.Context, dataDir string, langs []string) ([]Ngram
 			continue
 		}
 		if _, ierr := isDir(extractDir); ierr != nil {
-			cmd := exec.CommandContext(ctx, "unzip", "-q", "-o", tmp, "-d", extractDir)
-			_out, uerr := cmd.CombinedOutput()
-			if uerr != nil {
-				_ = _out
+			cmd := exec.Command("unzip", "-q", "-o", tmp, "-d", extractDir)
+			if _, uerr := cmd.CombinedOutput(); uerr != nil {
 				_ = os.Remove(tmp)
 				out = append(out, NgramStatus{Language: st.Language, Action: "unzip-failed", Path: url})
 				continue
@@ -214,39 +205,39 @@ func NgramDownload(ctx context.Context, dataDir string, langs []string) ([]Ngram
 	return out, nil
 }
 
-// downloadFile streams url to path (several-GB safe: no buffering in RAM).
-func downloadFile(ctx context.Context, url, path string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+// downloadFile streams a URL into path (no full-buffer in RAM for the
+// multi-GB archives).
+func downloadFile(ctx context.Context, rawURL, path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient().Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d", resp.StatusCode)
+		return fmt.Errorf("http %d for %s", resp.StatusCode, rawURL)
 	}
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
+	if _, err := io.Copy(f, resp.Body); err != nil {
 		return err
 	}
-	_, err = io.Copy(f, resp.Body)
-	if err == nil {
-		if fi2, err2 := os.Stat(path); err2 == nil && fi.Size() != 0 && fi2.Size() == 0 {
-			return fmt.Errorf("empty download")
-		}
-	}
-	return err
+	return f.Close()
 }
 
-func fileExists(p string) bool { fi, err := os.Stat(p); return err == nil && !fi.IsDir() }
+var defaultHTTPClient = &http.Client{}
+
+func httpClient() *http.Client { return defaultHTTPClient }
+
 func isDir(p string) (bool, error) {
 	fi, err := os.Stat(p)
 	if err != nil {
@@ -254,6 +245,12 @@ func isDir(p string) (bool, error) {
 	}
 	return fi.IsDir(), nil
 }
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
+
 func fileSize(p string) int64 {
 	fi, err := os.Stat(p)
 	if err != nil {
@@ -262,95 +259,162 @@ func fileSize(p string) int64 {
 	return fi.Size()
 }
 
-// ---- nginx cert import (owner addendum A) ---------------------------------
-//
-// Imports the operator's SSL key+cert files from host paths into the nginx
-// mount points (store: TLS_PRIVATE_KEY_PATH / TLS_CERTIFICATE_PATH), validates
-// that the pair actually matches, and restarts nginx when asked.
+// ---- TLS import ------------------------------------------------------------
 
-// ImportCert validates key+cert on the host and copies them onto the mount
-// paths. Returns the verified pair's leaf CN + notAfter for the operator log.
-func ImportCert(dstKey, dstCert string, srcKey, srcCert string, restart bool) (string, error) {
-	keyBytes, err := os.ReadFile(srcKey)
-	if err != nil {
-		return "", fmt.Errorf("read key %s: %w", srcKey, err)
+// TLSImport copies a certificate + private key (owner files on the host)
+// into the stack's data dir and returns the two host paths the nginx
+// service must mount (the caller stores them in TLS_CERTIFICATE_PATH /
+// TLS_PRIVATE_KEY_PATH and restarts nginx).
+func TLSImport(dataDir, certSrc, keySrc string) (certHost, keyHost string, err error) {
+	certSrc = strings.TrimSpace(certSrc)
+	keySrc = strings.TrimSpace(keySrc)
+	if certSrc == "" || keySrc == "" {
+		return "", "", fmt.Errorf("both the certificate and the private key path are required")
 	}
-	certBytes, err := os.ReadFile(srcCert)
-	if err != nil {
-		return "", fmt.Errorf("read cert %s: %w", srcCert, err)
-	}
-	certBlock, _ := x509.ParseCertificate(firstCertBlock(certBytes))
-	if certBlock == nil {
-		return "", fmt.Errorf("no x509 certificate found in %s", srcCert)
-	}
-	// pair match: decode the private key; TLS's x509 key pair check below
-	// catches a wrong (key,cert) combination early.
-	if _, err := tls.X509KeyPair(certBytes, keyBytes); err != nil {
-		return "", fmt.Errorf("key/cert do NOT match: %w", err)
-	}
-	// write key 0600, cert 0644
-	perm := []struct {
-		dst  string
-		src  []byte
-		perm os.FileMode
-	}{{dstKey, keyBytes, 0o600}, {dstCert, certBytes, 0o644}}
-	for _, p := range perm {
-		d := filepath.Dir(p.dst)
-		if err := os.MkdirAll(d, 0o755); err != nil {
-			return "", err
+	for _, p := range []string{certSrc, keySrc} {
+		fi, serr := os.Stat(p)
+		if serr != nil {
+			return "", "", fmt.Errorf("cannot read %s: %w", p, serr)
 		}
-		if err := os.WriteFile(p.dst, p.src, p.perm); err != nil {
-			return "", err
+		if fi.IsDir() {
+			return "", "", fmt.Errorf("%s is a directory — give the file", p)
 		}
 	}
-	subj := certBlock.Subject.CommonName
-	if dn := certBlock.Subject.String(); subj == "" {
-		subj = dn
+	dst := filepath.Join(dataDir, "nginx", "tls")
+	if merr := os.MkdirAll(dst, 0o700); merr != nil {
+		return "", "", merr
 	}
-	return fmt.Sprintf("%s (valid to %s)", subj, certBlock.NotAfter.String()), nil
+	certDst := filepath.Join(dst, "nginx_certificate.pem")
+	keyDst := filepath.Join(dst, "nginx_key.pem")
+	if cerr := copyFile(certSrc, certDst, 0o640); cerr != nil {
+		return "", "", cerr
+	}
+	if kerr := copyFile(keySrc, keyDst, 0o600); kerr != nil {
+		return "", "", kerr
+	}
+	return certDst, keyDst, nil
 }
 
-func firstCertBlock(pem []byte) []byte {
-	// x509.ParseCertificate takes one DER block; find the first CERTIFICATE block
-	start := strings.Index(string(pem), "-----BEGIN CERTIFICATE-----")
-	if start < 0 {
-		return nil
-	}
-	end := strings.Index(string(pem[start:]), "-----END CERTIFICATE-----")
-	if end < 0 {
-		return nil
-	}
-	// decode base64 of that block
-	block := string(pem[start : start+end+len("-----END CERTIFICATE-----")])
-	lines := strings.Split(block, "\n")
-	var b64 strings.Builder
-	in := false
-	for _, l := range lines {
-		l = strings.TrimSpace(l)
-		if l == "-----BEGIN CERTIFICATE-----" {
-			in = true
-			continue
-		}
-		if l == "-----END CERTIFICATE-----" {
-			break
-		}
-		if in {
-			b64.WriteString(l)
-		}
-	}
-	der, err := base64.StdEncoding.DecodeString(b64.String())
+func copyFile(src, dst string, perm os.FileMode) error {
+	in, err := os.Open(src)
 	if err != nil {
-		return nil
+		return err
 	}
-	return der
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perm)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return os.Chmod(dst, perm)
 }
 
-// NgramCodes returns the supported language codes in stable order.
-func NgramCodes() []string {
-	ks := make([]string, 0, len(NgramArchives))
-	for k := range NgramArchives {
-		ks = append(ks, k)
+// ImportCert validates the (key, cert) pair — both parse AND the key's
+// public key EQUALS the certificate's public key (cross-signing check) —
+// BEFORE writing anything. On success it copies them into
+// <dstBase-dir>/{k,c}.pem (key 0600) and returns the CN/subject snippet.
+func ImportCert(dstKey, dstCert, srcKey, srcCert string) (string, error) {
+	keyPEM, err := os.ReadFile(srcKey)
+	if err != nil {
+		return "", fmt.Errorf("key: %w", err)
 	}
-	sort.Strings(ks)
-	return ks
+	certPEM, err := os.ReadFile(srcCert)
+	if err != nil {
+		return "", fmt.Errorf("cert: %w", err)
+	}
+	if !strings.Contains(string(keyPEM), "PRIVATE KEY") {
+		return "", fmt.Errorf("key file does not look like a private key (%s)", srcKey)
+	}
+	keyDER, _ := pem.Decode(keyPEM)
+	if keyDER == nil {
+		return "", fmt.Errorf("key: no PEM block found")
+	}
+	certDER, _ := pem.Decode(certPEM)
+	if certDER == nil || certDER.Type != "CERTIFICATE" {
+		return "", fmt.Errorf("cert: no CERTIFICATE PEM block found")
+	}
+	x509cert, err := x509.ParseCertificate(certDER.Bytes)
+	if err != nil {
+		return "", fmt.Errorf("cert: %w", err)
+	}
+	pub, ok := parseKeyPub(keyDER)
+	if !ok {
+		return "", fmt.Errorf("key: unsupported private key format (%s)", srcKey)
+	}
+	if !pubsMatch(pub, x509cert.PublicKey) {
+		return "", fmt.Errorf("key/cert MISMATCH: the private key does not hold the certificate's public key (pair rejected, nothing copied)")
+	}
+	if err := os.MkdirAll(filepath.Dir(dstKey), 0o700); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(dstCert), 0o700); err != nil {
+		return "", err
+	}
+	if err := copyFile(srcKey, dstKey, 0o600); err != nil {
+		return "", err
+	}
+	if err := copyFile(srcCert, dstCert, 0o640); err != nil {
+		return "", err
+	}
+	return "subject=" + x509cert.Subject.CommonName + " not-after=" + x509cert.NotAfter.Format("2006-01-02"), nil
+}
+
+// pubsMatch compares two public keys (type-aware, constant-time-friendly).
+func pubsMatch(a, b crypto.PublicKey) bool {
+	are, okA := a.(*rsa.PublicKey)
+	bre, okB := b.(*rsa.PublicKey)
+	if okA && okB {
+		return are.Equal(bre)
+	}
+	ae, okA := a.(*ecdsa.PublicKey)
+	bee, okB := b.(*ecdsa.PublicKey)
+	if okA && okB {
+		return ae.Equal(bee)
+	}
+	return false
+}
+
+// parseKeyPub extracts the public key from the private key's PEM block.
+func parseKeyPub(b *pem.Block) (crypto.PublicKey, bool) {
+	if k, err := x509.ParsePKCS8PrivateKey(b.Bytes); err == nil {
+		switch k := k.(type) {
+		case *rsa.PrivateKey:
+			return &k.PublicKey, true
+		case *ecdsa.PrivateKey:
+			return &k.PublicKey, true
+		}
+		return nil, false
+	}
+	if k, err := x509.ParsePKCS1PrivateKey(b.Bytes); err == nil {
+		return &k.PublicKey, true
+	}
+	if k, err := x509.ParseECPrivateKey(b.Bytes); err == nil {
+		return &k.PublicKey, true
+	}
+	return nil, false
+}
+
+// NgramSizeFor is the human size of a stable archive (for the UI display).
+func NgramSizeFor(dataDir, lang string) int64 {
+	return fileSize(filepath.Join(dataDir, "ngrams", fmt.Sprintf("ngrams-%s.zip", lang)))
+}
+
+// HumanBytes renders bytes for the UI.
+func HumanBytes(n int64) string {
+	if n <= 0 {
+		return "-"
+	}
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for m := n / unit; m >= unit; m /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "kMGTPE"[exp])
 }

@@ -139,6 +139,21 @@ type LogStreamer struct {
 }
 
 // TailLog starts a follow-tail on the container.
+// RestartOne restarts a single compose service of the project (nginx after
+// the TLS import; languagetool after n-gram installs). Not found = clean
+// error (the action still reports the data/store side as done).
+func (d *Docker) RestartOne(ctx context.Context, project, service string) error {
+	cid, err := d.containerByService(ctx, project, service)
+	if err != nil {
+		return err
+	}
+	if _, err := d.cli.ContainerRestart(ctx, cid, client.ContainerRestartOptions{}); err != nil {
+		return fmt.Errorf("restart %s: %w", service, err)
+	}
+	return nil
+}
+
+// TailLog streams the tail of one container's logs.
 func (d *Docker) TailLog(ctx context.Context, name string, n int) (*LogStreamer, error) {
 	rc, err := d.cli.ContainerLogs(ctx, name, client.ContainerLogsOptions{
 		ShowStdout: true,

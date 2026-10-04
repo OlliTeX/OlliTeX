@@ -127,3 +127,48 @@ func DecodeShellChunk(b []byte) string {
 	demuxFrame(b, &sb)
 	return sb.String()
 }
+
+// ExecOnce runs a one-shot command in a project container and returns the
+// combined output (no interactivity) — the surface for the admin actions
+// (n-gram installs, pack listings). Reuses the moby exec contract (create →
+// attach, non-TTY demuxed).
+func ExecOnce(ctx context.Context, d *Docker, project, service string, cmdline []string) (string, error) {
+	cid, err := d.containerByService(ctx, project, service)
+	if err != nil {
+		return "", err
+	}
+	ex, err := d.cli.ExecCreate(ctx, cid, client.ExecCreateOptions{
+		Cmd:          cmdline,
+		AttachStdout: true,
+		AttachStderr: true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("exec create: %w", err)
+	}
+	att, err := d.cli.ExecAttach(ctx, ex.ID, client.ExecAttachOptions{TTY: false})
+	if err != nil {
+		return "", fmt.Errorf("exec attach: %w", err)
+	}
+	defer att.Conn.Close()
+	var sb strings.Builder
+	buf := make([]byte, 64*1024)
+	deadline, _ := ctx.Deadline()
+	if !deadline.IsZero() {
+		_ = att.Conn.SetReadDeadline(deadline)
+	}
+	for {
+		n, rerr := att.Conn.Read(buf)
+		if n > 0 {
+			sb.WriteString(DecodeShellChunk(buf[:n]))
+		}
+		if rerr != nil {
+			break
+		}
+	}
+	out := sb.String()
+	inf, ierr := d.cli.ExecInspect(context.Background(), ex.ID, client.ExecInspectOptions{})
+	if ierr == nil && inf.ExitCode != 0 {
+		return out, fmt.Errorf("exit %d: %s", inf.ExitCode, tail(out))
+	}
+	return out, nil
+}

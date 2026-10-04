@@ -46,7 +46,7 @@ func TestNgramPlan_PureDecisions(t *testing.T) {
 	for _, s := range plan {
 		byLang[s.Language] = s.Action
 	}
-	if byLang["en"] != NgramActionDownload || byLang["xx"] != NgramActionSkipped {
+	if byLang["en"] != "needs-download" || byLang["xx"] != NgramActionSkipped {
 		t.Fatalf("actions: %+v", byLang)
 	}
 	// idempotency: present → already-present
@@ -61,7 +61,7 @@ func TestNgramPlan_PureDecisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan[0].Action != NgramActionAlreadyPresent {
+	if plan[0].Action != NgramActionAlreadyOwned {
 		t.Fatalf("idempotency: %+v", plan[0])
 	}
 }
@@ -131,7 +131,7 @@ func TestNgramDownload_Offline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sts2[0].Action != NgramActionAlreadyPresent {
+	if sts2[0].Action != NgramActionAlreadyOwned {
 		t.Fatalf("second pass: %+v", sts2[0])
 	}
 }
@@ -173,7 +173,7 @@ func TestImportCert_ValidPair(t *testing.T) {
 		t.Fatal(err)
 	}
 	dstBase := t.TempDir()
-	info, err := ImportCert(dstBase+"/k.pem", dstBase+"/c.pem", srcKey, srcCert, false)
+	info, err := ImportCert(dstBase+"/k.pem", dstBase+"/c.pem", srcKey, srcCert)
 	if err != nil {
 		t.Fatalf("valid pair: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestImportCert_MismatchedPairRejected(t *testing.T) {
 	if err := os.WriteFile(cp, otherCert, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ImportCert(d+"/o/k", d+"/o/c", kp, cp, false); err == nil {
+	if _, err := ImportCert(d+"/o/k", d+"/o/c", kp, cp); err == nil {
 		t.Fatal("mismatched key/cert must be rejected before any copy")
 	}
 	// and nothing copied on rejection
@@ -221,7 +221,7 @@ func TestNgramPlan_RealOwnerDataDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, st := range plan {
-		if st.Action != NgramActionAlreadyPresent {
+		if st.Action != NgramActionAlreadyOwned {
 			t.Fatalf("%s: %s (expected already-present on the owner dir)", st.Language, st.Action)
 			_ = st.Size
 		}
