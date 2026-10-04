@@ -39,12 +39,12 @@ var (
 
 func sUserFedRoutes(a *core.App) []core.Route {
 	return []core.Route{
-		{Method: "GET", Pattern: patInvitePreview, Handler: s2sPending(a, "preview-pending")},
+		{Method: "GET", Pattern: patInvitePreview, Handler: invitePreviewHandler(a)},
 		// S10 (S9 starter leg): the wizard entry now mints the signed
 		// state + PKCE and 302s to B's authorization endpoint (rp_routes.go).
 		{Method: "POST", Pattern: patInviteAuthorize, NoCSRF: true, Handler: rpAuthorizeStarter(a)},
-		{Method: "GET", Pattern: patExportGet, Handler: s2sPending(a, "export-form-pending")},
-		{Method: "POST", Pattern: patExportPost, NoCSRF: true, Handler: s2sPending(a, "export-pending")},
+		{Method: "GET", Pattern: patExportGet, Handler: exportFormHandler(a)},
+		{Method: "POST", Pattern: patExportPost, NoCSRF: true, Handler: exportPostHandler(a)},
 		// S10: the A-side grant callback — state verify + code exchange
 		// (PKCE) + mirror + grant + 302 (rp_routes.go).
 		{Method: "GET", Pattern: patRpCallback, NoLogin: true, NoCSRF: true, Handler: rpCallback(a)},

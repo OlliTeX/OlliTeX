@@ -714,3 +714,16 @@ way).
 - **Status: all work DONE and baked; the owner's live verification window on psintern is
   the only remaining step (owner: "I will verify when I can").**
 - Lesson saved (failure memory): bson.A vs []any Go type-switch trap.
+
+## RUN — 2026-10-05 — federation S11 content bridge v2 (goal de3c28d3, wave 1)
+
+**S11 CORE DELIVERED (hermetic dual-instance GREEN)** — `features/federation` (oracle-pinned against overleaf-fed):
+- **F0** `s2scall.go` — A-side S2S outbound: LOCKED callPeer wire (federation-key ES256 assertion, aud = peer S2S endpoint, `{action,from,to,ts,payload}` body) + status wire (3xx refused never chased — 06 §8; 429 `rate-limited`; non-OK → B's code/detail) + `PeerGate` (Oracle 400/404/403 messages) + `S2SUROverride` hermetic loopback seam.
+- **F1** B-side `invited` = SOFT PREVIEW (was honest `s11-pending`; S5 pin updated — not-found is a VALID preview result) + A-side `GET /api/federation/invite/preview`: anchor gate → 60 s `federation:invite-cache` (salted-HMAC localNameHash) → S2S → cache-approved → degrade on refusal (200 `degraded:true`, 05 §4.1).
+- **F2** B-side `export-project` = FULL 09 §2: gate → projectId → owner B-native (mirror = populated `federation.origin`) → LIVE consent grant (findByAccountAndClient) → TTL = min(request, grant PTTL, cap) → fresh `olp_`+36 PAT (scope `federation:git_bridge`, sha256-only) → `federationExportGrants` upsert. Response LOCKED `{ok, payload:{git_url, pat, expires_at}}`. Audit granted/denied (PAT never in it).
+- **F2** A-side 2b wizard `export_wizard.go`: GET form (approved outbound|both peers) + POST (local 403/400 → S2S; PeerRefusal → 502 + denied audit; business refusal → 403; success → PAT rendered ONCE into result HTML + `{origin,scope,gitUrl,expiresAt}` audit). A persists nothing.
+- **PROOF**: `TestF2_DualInstance_RoundTrip` — A signs the real client assertion, B verifies against A's pinned anchor via the real pipeline (kid+ES256+iss+aud+exp), consent+mint legs, A consumes the envelope over HTTP.
+- Gates: `go build ./go/...` 0; vet clean; federation pkg FULL suite green (incl. F1/F2 batteries, updated pins).
+- Pitfalls caught this session: aud/entity-id PORT rule (entity id strips the port — a host:port peer origin FAILS the aud check; use FQDN origins + loopback override); 25-char ObjectID test literals silently diverge (one debug cycle burned).
+- `gitbridge/swap` + `core` configdb-override test failures = PRE-EXISTING (verified against clean HEAD worktree) — other-session in-flight work; NOT this arc.
+- REMAINING (tracked in TODO-5f48f0cb): f2 LIVE smoke on the psintern fed-b fixture (owner window), institutional TOFU (scoped residual).

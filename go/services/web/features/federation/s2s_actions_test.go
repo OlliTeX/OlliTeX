@@ -103,13 +103,20 @@ func TestS2SPipeline_VerifyDispatchReplay(t *testing.T) {
 	rec := &auditRec{}
 	d := bDeps(bStore, newFakeRedis(), rec)
 
-	// First call: verified + replay-claimed + dispatch (honest pending).
+	// First call (F1, oracle s2s/actions/invited.mjs): verified +
+	// replay-claimed + the SOFT PREVIEW — always the ok envelope;
+	// payload.approved:false here (no local account seam wired in the
+	// unit scope; not-found is a VALID preview result, not a refusal).
 	out := d.pipeline("invited", from, assertion, data)
 	if out.status != 200 {
 		t.Fatalf("first call: want 200, got %d body=%v", out.status, out.body)
 	}
-	if out.body["ok"] != false || out.body["code"] != "s11-pending" {
-		t.Errorf("first call: want honest s11-pending, got %v", out.body)
+	if out.body["ok"] != true {
+		t.Errorf("first call: want soft ok:true preview envelope, got %v", out.body)
+	}
+	payload, _ := out.body["payload"].(map[string]any)
+	if payload == nil || payload["approved"] != false {
+		t.Errorf("first call: want payload.approved=false (soft deny), got %v", out.body)
 	}
 	// Same assertion (same jti) again → LOCKED 401 replay-jti.
 	out2 := d.pipeline("invited", from, assertion, data)
@@ -305,16 +312,25 @@ func TestS2SPipeline_ExportLegs(t *testing.T) {
 	d.audit("export-project", ok, code, from, "", pid, map[string]any{})
 	rec.find(t, "federation_export_denied")
 
-	// gate ON → honest s11-pending + ExportRequested row.
+	// gate ON (F2, oracle ordering): the dispatch now runs the export
+	// legs — in the unit scope (no Export* seams) the FIRST leg after the
+	// gate is the project lookup: honest `project-not-owned` + ExportDenied
+	// row (the LOCKED 04 §8 granted/denied audit names).
 	t.Setenv("FEDERATION_EXPORT_ENABLED", "true")
 	rec2 := &auditRec{}
 	d2 := bDeps(bStore, newFakeRedis(), rec2)
 	ok2, code2, _, _ := d2.dispatch("export-project", from, map[string]any{"projectId": pid})
-	if ok2 || code2 != "s11-pending" {
-		t.Fatalf("gate on: want s11-pending, got %v %q", ok2, code2)
+	if ok2 || code2 != "project-not-owned" {
+		t.Fatalf("gate on: want project-not-owned (no seams in unit scope), got %v %q", ok2, code2)
 	}
 	d2.audit("export-project", ok2, code2, from, "", pid, map[string]any{})
-	rec2.find(t, "federation_export_requested")
+	row2 := rec2.find(t, "federation_export_denied")
+	if row2.info["reason"] != "project-not-owned" {
+		t.Errorf("denial reason: %v", row2.info)
+	}
+
+	// FULL legs (seams wired) — the happy + refusal matrix lives in the
+	// F2 battery (f2_export_test.go).
 }
 
 // TestS2SHandler_DispatchWired — the mounted handler now 401s on a known

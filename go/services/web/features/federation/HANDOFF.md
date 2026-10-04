@@ -745,3 +745,76 @@ overleaf-fed's own `node_modules/oidc-provider` = 9.12.2 (lib only, no
 3. Gates: build + vet + gofmt + `go test -race -count=1`; HANDOFF S5 -> DONE; commit.
 
 **(carried, completed in session 16) session-15 NEXT block:** (1) `oidcengine_token.go` DONE (2) `oidcengine_bridge.go` DONE (3) 6 routes in `s4Routes` DONE (4) `s4b2_test.go` battery (a)-(h) DONE (5) gates + HANDOFF S4 DONE + commit (this step, stage engine + bridge + token + routes + test + HANDOFF).
+
+## SESSION 12 (2026-10-05) — S11 CONTENT BRIDGE v2 (09 §2/§4.1) — HERMETIC GREEN
+
+**Scope: A↔B invited preview + export wizard are now REAL (oracle-pinned), no more hedges.**
+
+### F0 — A-side S2S outbound (the peer caller)
+- `s2scall.go`: `S2SCall.Call` = the Node `callPeer` + `buildS2sRequest` oracle:
+  wire LOCKED (assertion signed by the federation key, aud = `https://<peerOrigin>/federation/s2s`,
+  `client_assertion_type` = the OAuth JWT type, body `{action, from, to, ts (epoch ms), payload}`);
+  status wire LOCKED (**3xx → refused, NEVER chased** (06 §8 — Go default redirects overridden),
+  429 → `rate-limited`, non-OK → B's `code`/`detail` pass-through (e.g. `peer-expired`),
+  OK → business envelope); `S2SUROverride` seam for the hermetic loopback (the aud stays the
+  production endpoint — the entity-id strips the port, 03 §8); `PeerGate` = the A-side anchor gate
+  (400 invalid anchor / 404 peer not approved / 403 not outbound — exact Node messages).
+- Tests: `f1_invite_preview_test.go` (wire + refusals matrix).
+
+### F1 — B-side `invited` (soft preview) + A-side preview route
+- `s2s_actions.go`: the `invited` dispatch is now the **SOFT PREVIEW** (oracle `s2s/actions/invited.mjs`):
+  always the ok envelope; `payload: { approved, displayName }`; not-found is a VALID result,
+  not a refusal. `PreviewLocalUser` seam + `prodPreviewLocalUser` (users: email == localName;
+  suspended ⇒ not usable; displayName = first last → email).
+- `invite_preview.go`: `GET /api/federation/invite/preview?anchor=…` = the Node oracle order:
+  anchor gate → **60 s invitation cache** (`federation:invite-cache:<peerOrigin>:<localNameHash>` —
+  salted HMAC, `SaltedLocalNameHash`) → S2S `invited` → cache the approved answer → degrade on
+  refusal (200 `{approved:false, displayName:null, degraded:true}` — 05 §4.1: a preview failure is
+  NOT a refusal). The feature-off envelope stays `federation-off` (the locked fedgap-4 pin).
+- Tests: B-side matrix (missing / origin-mismatch / found / suspended) + A-side flow (happy,
+  cache-hit saves the 2nd wire round trip, soft-deny, gate failures, degrade) in `f1_invite_preview_test.go`.
+- Updated the stale S5 pin (`TestS2SPipeline_VerifyDispatchReplay`): `invited` now answers the soft
+  envelope (the honest-pending pin is retired — the slice is shipped).
+
+### F2 — B-side `export-project` (09 §2) + A-side 2b wizard
+- `s2s_actions.go`: the LOCKED handler ordering per `s2s/actions/exportProject.mjs`:
+  settings gate (`export-disabled`) → projectId sanity (`project-not-owned`) → project lookup
+  (owner_ref) → **owner B-native** (mirror = populated `federation.origin`, NOT subdoc presence —
+  the live 2d smoke bug the oracle calls out; suspended ⇒ refused) → **LIVE consent grant to the
+  caller's client** (`FindByAccountAndClient`, `export-no-consent`) → **TTL = min(request
+  `expiresAt`, grant PTTL, maxExportTtlSeconds)**, clamp ≥ 1 → fresh **`olp_` + 36 alnum** PAT
+  (scope `federation:git_bridge`, sha256 persisted only) → `federationExportGrants` ledger upsert
+  (best-effort). Response LOCKED (SESSION 11): `{ ok:true, payload: { git_url, pat, expires_at } }`
+  snake_case; `git_url = https://<B site host INCLUDING port>/git/<pid>`.
+  Production seams: `prodExportProjectDoc/Owner/Mint/Ledger` (mongo-backed; the mint reuses the
+  git-bridge PAT doc shape — the git-bridge `/\bgit_bridge\b/` matcher passes, the 2c
+  `federation:`-prefix guard makes it read-only).
+- Audit: granted/denied (LOCKED 04 §8 names) with the reason code; the PAT NEVER appears.
+- `export_wizard.go`: `GET /federation/export` (approved outbound|both peers, B project id,
+  optional TTL) + `POST /federation/export` (oracle `FederatedExportController.mjs`): local
+  validation (403 peer / 400 projectId, form re-render, no wire) → S2S `export-project`
+  (PeerRefusal → **502** + denied audit; business ok:false → **403** + denied audit) → result view
+  (the PAT rendered **once**, into the HTML only — Q2) + success audit `{ origin, scope, gitUrl,
+  expiresAt }` (04 §8: redacted — never the pat). A persists NOTHING (re-run = fresh S2S).
+- Tests: the full B-side matrix (malformed / not-found / mirror / suspended / missing owner /
+  cross-client consent / TTL clamp legs), the wizard gates, and the **HERMETIC DUAL-INSTANCE ROUND
+  TRIP** (`TestF2_DualInstance_RoundTrip`): A signs the real client assertion (federation key,
+  aud = B's S2S endpoint) → B verifies it against A's pinned anchor (kid + ES256 + iss + aud +
+  exp) → runs the consent + mint legs → A consumes the `{git_url, pat, expires_at}` envelope
+  over HTTP. This is the wire proof without live instances.
+- **Dual-instance LIVE smoke** (real instances + git clone with the minted PAT) = the remaining
+  owner verification window (like the 024 window) — the hermetic round trip covers the wire.
+
+### Institution TOFU
+- Still tracked (02 §3): requires the trust-anchor chain resolution against the anchor store —
+  scoped residual with the oracle (`plan/02-trust-model-oidf.md` + `TrustAnchorByEntityId` seam).
+  Not faked.
+
+### Pitfalls this session (keep)
+- **aud/entity-id port rule**: `getEntityIdGo` STRIPS the port (`https://<host>`); A signs aud
+  against the bare origin — a `host:port` peer origin would FAIL the aud check on B. Peer origins
+  are FQDNs (no ports), the transport may dial a local target via `S2SUROverride`.
+- **25-char ObjectID literals in tests** silently diverge from the 24-char wire values — the
+  happy-path export test burned one cycle on a mistyped pid in the expected `git_url`.
+- The `S2SCall` aud is minted by `KeyProvider.BuildS2sRequest` (tested) — don't re-implement the
+  assertion builder per caller.

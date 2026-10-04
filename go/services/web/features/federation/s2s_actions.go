@@ -20,17 +20,21 @@
 //	authorize-invite  FULL resolve (LOCKED resolveAnchorUser: mirror →
 //	  local email → unknown; suspended ⇒ invitee-disabled) + cached-invite
 //	  marker for the A-side polling (04 §6) + audit rows.
-//	invited           honest `s11-pending` — the consent mint engine is
-//	  the S10–S11 slice (do NOT fake 200 here: the handoff is explicit).
-//	export-project    gate + audit request leg; the transfer is fedgap-5
-//	  (S11) — honest `s11-pending` until that slice lands.
+//	invited           SOFT PREVIEW (03 §4.2 oracle) — always the ok
+//	  envelope; payload.approved is the business answer.
+//	export-project    FULL 09 §2: project → owner B-native → live consent
+//	  grant → TTL → fresh `federation:git_bridge` PAT + ledger upsert.
 
 package federation
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -38,6 +42,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"ollitex/go/services/web/core"
 )
@@ -75,6 +80,27 @@ type s2sDeps struct {
 	// where code is "" on success or one of invitee-unknown /
 	// invitee-disabled (03 §6). Production: mongo users (mirror → email).
 	ResolveUser func(origin, localName string) (userHex, via string, code string)
+	// PreviewLocalUser — the `invited` soft preview seam (Node oracle
+	// s2s/actions/invited.mjs): local account keyed by the home login name
+	// (email convention), existence + suspension only. Never a refusal
+	// channel — not-found is a VALID preview result.
+	PreviewLocalUser func(localName string) (found bool, suspended bool, displayName string)
+
+	// --- export-project seams (Node oracle s2s/actions/exportProject.mjs,
+	// plan 09 §2 — the LOCKED handler ordering) ---
+	// ExportProjectDoc — project lookup by id → ownerRef hex ('' =
+	// not found / no owner_ref → project-not-owned).
+	ExportProjectDoc func(projectId string) (ownerHex string)
+	// ExportOwner — B-native owner check: (exists, suspended, mirror).
+	// Mirror mark = the `federation.origin` string is populated (an empty
+	// {} subdoc is the mongoose materialization — NOT a mirror).
+	ExportOwner func(ownerHex string) (exists bool, suspended bool, mirror bool)
+	// ExportMint — fresh raw PAT (scope `federation:git_bridge`), sha256
+	// persisted only; returns the stored PAT id.
+	ExportMint func(ownerHex, rawToken string, createdAt, expiresAt time.Time) (patID string, err error)
+	// ExportLedger — the `federationExportGrants` upsert (best-effort; a
+	// ledger failure must not break a legitimate export).
+	ExportLedger func(ownerHex, projectId, callerOrigin, patHashPrefix, patID, scope string, expiresAt time.Time) error
 	// DeleteFederationPAT — revoke sweep leg: best-effort deleteOne with
 	// the LOCKED scope guard `federation:git_bridge`.
 	DeleteFederationPAT func(patID string) bool
@@ -122,7 +148,12 @@ func prodS2sDeps(a *core.App, cxt *core.Cxt) *s2sDeps {
 	}
 	if db != nil {
 		d.ResolveUser = prodResolveUser(db)
+		d.PreviewLocalUser = prodPreviewLocalUser(db)
 		d.DeleteFederationPAT = prodDeleteFederationPAT(db)
+		d.ExportProjectDoc = prodExportProjectDoc(db)
+		d.ExportOwner = prodExportOwner(db)
+		d.ExportMint = prodExportMint(db)
+		d.ExportLedger = prodExportLedger(db)
 		d.AuditW = mongoAuditWriter{db: db}
 	}
 	return d
@@ -276,20 +307,21 @@ func (d *s2sDeps) dispatch(action, from string, payload map[string]any) (bool, s
 		}
 		return d.authorizeInvite(from, localName)
 	case "invited":
-		// Honest pending: the consent-mint engine (code issue + mirror)
-		// is the S10–S11 slice (05 §8; 09 §7 "S10–S11 mint code+mirror,
-		// session, sweep, E2E round trip").
-		return false, "s11-pending", "consent mint lands in the S10–S11 slice", nil
+		// Soft PREVIEW (Node oracle s2s/actions/invited.mjs, 03 §4.2):
+		// A asks "does invitee.localName live on B, usable for a federated
+		// invite?" The answer is ALWAYS the ok envelope (a preview, not a
+		// decision); payload.approved distinguishes. Not-found is a valid
+		// preview result, NOT a refusal.
+		return d.invitedPreview(payload)
 	case "export-project":
-		if !hasPayloadStr(payload, "projectId") {
-			return false, "projectId-missing", "payload.projectId is required", nil
-		}
+		// plan 09 §2 oracle ordering: settings gate FIRST (envelope code
+		// `export-disabled`, 'export disabled'), then the project/owner/
+		// consent/mint legs (all 200 + in-band business envelopes — the
+		// LOCKED SESSION 11 shape).
 		if !d.Setting.ExportEnabled {
-			return false, "export-disabled", "FEDERATION_EXPORT_ENABLED is off", nil
+			return false, "export-disabled", "export disabled", nil
 		}
-		// Request leg now (audited 04 §8 ExportRequested); the transfer
-		// leg is fedgap-5 (S11). Do not fake success.
-		return false, "s11-pending", "export transfer lands in the S10–S11 slice", nil
+		return d.exportProject(from, payload)
 	}
 	// s2s.go gates unknown actions before this point; keep the 200 shape
 	// honest anyway.
@@ -337,6 +369,194 @@ func (d *s2sDeps) revoke(from, projectID string, payload map[string]any) (bool, 
 		}
 	}
 	return true, "revoked", "revoke sweep complete", out
+}
+
+// invitedPreview — B-side read-only preview (Node oracle
+// s2s/actions/invited.mjs, 03 §4.2): the invite-UX blur check (05 §8.1).
+// ALWAYS the ok envelope (soft); payload.approved distinguishes. The
+// invitee's declared origin MUST be B's own origin (B is the home
+// oracle — it can only preview users that live HERE); anything else
+// soft-denies (no local account here, not a refusal code).
+func (d *s2sDeps) invitedPreview(payload map[string]any) (bool, string, string, map[string]any) {
+	soft := func(approved bool, displayName string) (bool, string, string, map[string]any) {
+		out := map[string]any{"approved": approved}
+		if !approved {
+			out["displayName"] = nil
+		} else {
+			out["displayName"] = displayName
+		}
+		return true, "", "", out
+	}
+	invitee, _ := payload["invitee"].(map[string]any)
+	localName, _ := invitee["localName"].(string)
+	inviteeOrigin, _ := invitee["origin"].(string)
+	if localName == "" || inviteeOrigin == "" || d.PreviewLocalUser == nil {
+		return soft(false, "")
+	}
+	own, err := getOriginGo(d.Site)
+	if err != nil || inviteeOrigin != own {
+		return soft(false, "")
+	}
+	found, suspended, displayName := d.PreviewLocalUser(localName)
+	if !found || suspended {
+		return soft(false, "")
+	}
+	return soft(true, displayName)
+}
+
+// --- B-side export-project (plan 09 §2, oracle s2s/actions/exportProject.mjs) ---
+
+const exportScope = "federation:git_bridge" // 09 §3 (git-bridge matcher /\\bgit_bridge\\b/ passes; 2c guard keys off `federation:`)
+
+// genFederationToken — `olp_` + 36 alphanumerics (Node `_generateToken`
+// byte-pinned: PAT_CHARS A-Z a-z 0-9, crypto.randomInt).
+func genFederationToken() (string, error) {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	out := make([]byte, 36)
+	buf := make([]byte, 36)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	for i, b := range buf {
+		out[i] = chars[int(b)%len(chars)]
+	}
+	return "olp_" + string(out), nil
+}
+
+// exportGitURL — `https://<B-host>/git/<projectId>` (09 §2: the host is
+// the full site URL host INCLUDING port — the git-bridge mount is a real
+// URL, not the origin FQDN).
+func (d *s2sDeps) exportGitURL(projectId string) string {
+	if u, err := url.Parse(d.Site); err == nil && u.Host != "" {
+		return "https://" + u.Host + "/git/" + projectId
+	}
+	return "https://" + d.Site + "/git/" + projectId
+}
+
+// exportProject — the LOCKED handler ordering (settings gate sits in the
+// dispatch): projectId sanity → project lookup (owner_ref) → owner
+// B-native (not mirror / not suspended) → LIVE consent grant to the
+// caller's client → TTL = min(request, grant remaining, cap) → fresh
+// PAT mint → ledger upsert (best-effort). Business refusions are 200 +
+// in-band envelopes (LOCKED SESSION 11).
+func (d *s2sDeps) exportProject(callerOrigin string, payload map[string]any) (bool, string, string, map[string]any) {
+	projectId, _ := payload["projectId"].(string)
+	if projectId == "" {
+		return false, "project-not-owned", "malformed projectId", nil
+	}
+	// 3 project lookup (owner_ref).
+	if d.ExportProjectDoc == nil {
+		return false, "project-not-owned", "project not found", nil
+	}
+	ownerHex := d.ExportProjectDoc(projectId)
+	if ownerHex == "" {
+		return false, "project-not-owned", "project not found", nil
+	}
+	// 4 owner B-native (mirror rows are home-side; suspended cannot export).
+	if d.ExportOwner != nil {
+		exists, suspended, mirror := d.ExportOwner(ownerHex)
+		if !exists || suspended || mirror {
+			return false, "project-not-owned", "owner missing/mirror/suspended", nil
+		}
+	}
+	// 5 consent-grant binding (09 §2.1): the grant is (owner, client of
+	// home A's origin) — the S2S assertion is server identity only.
+	if d.Adapter == nil || d.Adapter.Redis == nil {
+		return false, "export-no-consent", "no live consent grant", nil
+	}
+	clientId := "urn:overleaf-federation:client:" + callerOrigin
+	grantJti, _ := FindByAccountAndClient(d.Adapter.Redis, ownerHex, clientId)
+	if grantJti == "" {
+		return false, "export-no-consent", "no live consent grant", nil
+	}
+
+	// 6 TTL = min(request, grant remaining, maxExportTtlSeconds). The
+	// A-side sends `expiresAt` as epoch SECONDS (2b wizard); the request
+	// ttl defaults to the cap when absent (Node: requestedExp null → maxTtl).
+	now := time.Now()
+	if d.Now != nil {
+		now = d.Now()
+	}
+	nowSec := now.Unix()
+	maxTtl := d.Setting.ExportMaxTTLSeconds
+	if maxTtl <= 0 {
+		maxTtl = 86400
+	}
+	ttl := maxTtl
+	if exp, ok := payload["expiresAt"].(float64); ok {
+		ttl = int(exp) - int(nowSec)
+	}
+	grantTtlMs, _ := d.Adapter.Redis.PTTL(OIDCDocKey("Grant", grantJti))
+	if grantTtlMs > 0 {
+		if g := int(grantTtlMs / 1000); g < ttl {
+			ttl = g
+		}
+	}
+	if ttl > maxTtl {
+		ttl = maxTtl
+	}
+	if ttl < 1 {
+		ttl = 1
+	}
+
+	// 7 PAT mint (fresh raw token per request — the raw value is NEVER
+	// persisted: sha256 in oauthAccessTokens; re-export = fresh raw +
+	// ledger upsert, so idempotency is on the grant row, not the token).
+	raw, err := genFederationToken()
+	if err != nil {
+		return false, "export-denied", "pat mint failed", nil
+	}
+	createdAt := time.Unix(nowSec, 0).UTC()
+	expiresAt := createdAt.Add(time.Duration(ttl) * time.Second)
+	patID := ""
+	if d.ExportMint != nil {
+		patID, err = d.ExportMint(ownerHex, raw, createdAt, expiresAt)
+		if err != nil {
+			return false, "export-denied", "pat mint failed", nil
+		}
+	}
+	// 8 ledger upsert (best-effort — a ledger failure must not break a
+	// legitimate export; 2c's revoke sweep is best-effort on top).
+	if d.ExportLedger != nil {
+		_ = d.ExportLedger(ownerHex, projectId, callerOrigin, raw[:8], patID, exportScope, expiresAt)
+	}
+
+	// LOCKED response (SESSION 11): snake_case keys — the 2b wizard
+	// reads these.
+	return true, "", "", map[string]any{
+		"git_url":    d.exportGitURL(projectId),
+		"pat":        raw,
+		"expires_at": nowSec + int64(ttl),
+	}
+}
+
+// prodPreviewLocalUser — the `invited` preview against mongo `users`
+// (Node oracle: User.findOne({email: localName}) — the home login name
+// is the email convention; displayName = "first last" trimmed, falling
+// back to the email; a suspended account is not usable for invites).
+func prodPreviewLocalUser(db *mongo.Database) func(localName string) (bool, bool, string) {
+	return func(localName string) (bool, bool, string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var doc bson.M
+		if db.Collection("users").FindOne(ctx, bson.D{{Key: "email", Value: localName}}).Decode(&doc) != nil {
+			return false, false, ""
+		}
+		suspended := false
+		switch s := doc["suspended"].(type) {
+		case bool:
+			suspended = s
+		case string:
+			suspended = s == "true" || s != ""
+		}
+		first, _ := doc["first_name"].(string)
+		last, _ := doc["last_name"].(string)
+		displayName := strings.TrimSpace(first + " " + last)
+		if displayName == "" {
+			displayName, _ = doc["email"].(string)
+		}
+		return true, suspended, displayName
+	}
 }
 
 // authorizeInvite — LOCKED resolve (mirror → local email → unknown;
@@ -498,18 +718,145 @@ func (d *s2sDeps) audit(action string, ok bool, code, from, localName, projectID
 		}
 		Audit(nil, d.AuditW, op, m, "", "")
 	case "export-project":
-		op := AuditTypes.ExportRequested
-		if code == "export-disabled" {
-			op = AuditTypes.ExportDenied
-		}
+		// 04 §8 + plan 09 §3.2: granted/denied (LOCKED names); the denial
+		// reason is the B-side code string (an allow-list field, never a
+		// secret; the PAT value NEVER appears).
 		m := mkmeta(map[string]any{"scope": "export"})
-		if projectID != "" {
-			pid := projectID
-			AuditProject(nil, d.AuditW, op, m, &pid, "", "")
-		} else {
-			Audit(nil, d.AuditW, op, m, "", "")
+		if ok {
+			AuditProject(nil, d.AuditW, AuditTypes.ExportGranted, m, projectIDOrNil(projectID), "", "")
+			return
 		}
+		m["reason"] = code
+		AuditProject(nil, d.AuditW, AuditTypes.ExportDenied, m, projectIDOrNil(projectID), "", "")
 	}
 }
 
+func projectIDOrNil(pid string) *string {
+	if pid == "" {
+		return nil
+	}
+	return &pid
+}
+
 var _ = context.Background // keep context referenced on build-trim paths
+
+// ---------- export-project production seams (mongo-backed) ----------
+
+// prodExportProjectDoc — project lookup by id (LOCKED oracle 09 §2 step 3:
+// Project.findOne({_id}) .select('owner_ref'); a missing project or a
+// missing owner_ref is the SAME refusal — `project-not-owned`).
+func prodExportProjectDoc(db *mongo.Database) func(projectId string) string {
+	return func(projectId string) string {
+		oid, err := bson.ObjectIDFromHex(projectId)
+		if err != nil {
+			return ""
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var doc bson.M
+		if db.Collection("projects").FindOne(ctx, bson.M{"_id": oid}).Decode(&doc) != nil {
+			return ""
+		}
+		switch v := doc["owner_ref"].(type) {
+		case bson.ObjectID:
+			return v.Hex()
+		case string:
+			if oid, oerr := bson.ObjectIDFromHex(v); oerr == nil {
+				return oid.Hex()
+			}
+		}
+		return ""
+	}
+}
+
+// prodExportOwner — B-native owner check (09 §2 step 4). The mirror mark
+// is a POPULATED `federation.origin` string (an empty {} subdoc is the
+// mongoose materialization present on every native account — keying on
+// bare `federation` presence is the live 2d smoke bug the oracle call
+// out).
+func prodExportOwner(db *mongo.Database) func(ownerHex string) (exists, suspended, mirror bool) {
+	return func(ownerHex string) (exists, suspended, mirror bool) {
+		oid, err := bson.ObjectIDFromHex(ownerHex)
+		if err != nil {
+			return false, false, false
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var doc bson.M
+		if db.Collection("users").FindOne(ctx, bson.M{"_id": oid}).Decode(&doc) != nil {
+			return false, false, false
+		}
+		if b, ok := doc["suspended"].(bool); ok && b {
+			return true, true, false
+		}
+		if fed, ok := doc["federation"].(bson.M); ok {
+			if origin, _ := fed["origin"].(string); origin != "" {
+				return true, !suspended, true
+			}
+		}
+		return true, false, false
+	}
+}
+
+// prodExportMint — the fresh raw federation PAT (scope
+// `federation:git_bridge`; sha256 persisted, raw value only returned —
+// 09 §2 step 6 / Node `oauthAccessTokens.insertOne` shape).
+func prodExportMint(db *mongo.Database) func(ownerHex, rawToken string, createdAt, expiresAt time.Time) (string, error) {
+	return func(ownerHex, rawToken string, createdAt, expiresAt time.Time) (string, error) {
+		oid, err := bson.ObjectIDFromHex(ownerHex)
+		if err != nil {
+			return "", err
+		}
+		sum := sha256.Sum256([]byte(rawToken))
+		doc := bson.M{
+			"accessToken":        hex.EncodeToString(sum[:]),
+			"accessTokenPartial": rawToken[:8],
+			"user_id":            oid,
+			"type":               "personal_access_token",
+			"scope":              exportScope,
+			"createdAt":          createdAt,
+			"expiresAt":          expiresAt,
+		}
+		res, err := db.Collection("oauthAccessTokens").InsertOne(context.Background(), doc)
+		if err != nil {
+			return "", err
+		}
+		id, ok := res.InsertedID.(bson.ObjectID)
+		if !ok {
+			return "", nil
+		}
+		return id.Hex(), nil
+	}
+}
+
+// prodExportLedger — `federationExportGrants` upsert on (owner, project,
+// home) (09 §2 step 7 — the idempotent re-export refresh).
+func prodExportLedger(db *mongo.Database) func(ownerHex, projectId, callerOrigin, patHashPrefix, patID, scope string, expiresAt time.Time) error {
+	return func(ownerHex, projectId, callerOrigin, patHashPrefix, patID, scope string, expiresAt time.Time) error {
+		ownerOid, err := bson.ObjectIDFromHex(ownerHex)
+		if err != nil {
+			return err
+		}
+		set := bson.M{
+			"patHashPrefix": patHashPrefix,
+			"scope":         scope,
+			"expiresAt":     expiresAt,
+			"status":        "exported",
+		}
+		if patID != "" {
+			if id, e := bson.ObjectIDFromHex(patID); e == nil {
+				set["patId"] = id
+			}
+		}
+		_, err = db.Collection("federationExportGrants").UpdateOne(
+			context.Background(),
+			bson.M{"owner": ownerOid, "projectId": projectId, "homeOrigin": callerOrigin},
+			bson.M{
+				"$set":         set,
+				"$setOnInsert": bson.M{"createdAt": time.Now().UTC()},
+			},
+			options.UpdateOne().SetUpsert(true),
+		)
+		return err
+	}
+}
