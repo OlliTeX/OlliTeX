@@ -27,3 +27,11 @@ something from their code we put them into CREDITS.md").
 
 - **LanguageTool** — `erikvl87/languagetool` image plus the owner-maintained
   ngram/languagemodel packs mounted read-only at `/ngrams`.
+
+## n-gram / word2vec model plumbing & offline-server extension recipe
+
+- `nschang/languagetool-101` (https://github.com/nschang/languagetool-101) —
+  the step-by-step recipe we mirror in `go/services/toolkit/actions.go` (n-gram
+  official + untested tiers under the owner's stable `ngrams-<lang>.zip` naming,
+  word2vec en/de/pt, SSD caution). Borrowed: the recipe/structure. Re-implemented:
+  the Go action code (not a copy of any script).

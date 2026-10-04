@@ -28,7 +28,6 @@ import (
 
 	"github.com/charmbracelet/log"
 
-	"errors"
 	"ollitex/go/services/toolkit"
 )
 
@@ -37,8 +36,7 @@ var ver = "dev"
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		code := 1
-		var ec toolkit.ExitCode
-		if errors.As(&ec, &err) {
+		if ec, ok := err.(toolkit.ExitCode); ok {
 			code = int(ec)
 		} else {
 			fmt.Fprintln(os.Stderr, "toolkit: "+err.Error())
@@ -72,6 +70,8 @@ func run(args []string) error {
 		return healthcmd(rest)
 	case "autofix":
 		return autofixcmd(rest)
+	case "languages":
+		return languagescmd(rest)
 	case "doctor":
 		return doctor(rest)
 	default:
@@ -89,6 +89,7 @@ Usage:
   toolkit doctor    one-shot health check
   toolkit health    cron-friendly container health (exit codes)
   toolkit autofix   autoheal pass (--once | --interval loop)
+  toolkit languages download grammar models (--ngrams en,he / --word2vec en / --plan)
   toolkit version
 
 Environment:
@@ -408,6 +409,82 @@ func autofixcmd(args []string) error {
 	ctx.Done()
 	fmt.Println("autofixer stopped")
 	return nil
+}
+
+// languagescmd: admin-selected grammar models (owner addendum A + the
+// languagetool-101 extensions: ngram official+untested tiers, word2vec).
+func languagescmd(args []string) error {
+	f := flag.NewFlagSet("languages", flag.ExitOnError)
+	dataDir := f.String("data-dir", envOr(toolkit.EnvDataDir, "/opt/ollitex/data"), "languagetool data dir (mounted)")
+	ngrams := f.String("ngrams", "", "n-gram languages (official: en de es fr nl; untested: he it ru zh)")
+	w2v := f.String("word2vec", "", "word2vec languages (en de pt)")
+	plan := f.Bool("plan", false, "show the plan only (no download)")
+	_ = f.Parse(args)
+
+	langsNG, langsW2 := splitCSV(*ngrams), splitCSV(*w2v)
+	if len(langsNG) == 0 && len(langsW2) == 0 {
+		fmt.Println("official ngrams :", strings.Join(toolkit.NgramCodes(), " "))
+		fmt.Println("untested ngrams  : (pass e.g. --ngrams he,ru — /untested/ tier)")
+		fmt.Println("word2vec models  :", strings.Join(toolkit.Word2VecCodes(), " "))
+		fmt.Println()
+		fmt.Println("usage: toolkit languages --ngrams en,he --word2vec en --plan")
+		return nil
+	}
+	if *plan {
+		p, err := toolkit.NgramPlan(*dataDir, langsNG)
+		if err != nil {
+			return err
+		}
+		printNgramPlan(p, langsW2)
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 7*24*time.Hour)
+	defer cancel() // multi-GB streams: generous ceiling; cancellable via SIGINT
+	if len(langsNG) > 0 {
+		sts, err := toolkit.NgramDownload(ctx, *dataDir, langsNG)
+		for _, st := range sts {
+			fmt.Printf("ngram %-4s : %s %s\n", st.Language, st.Action, st.Path)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if len(langsW2) > 0 {
+		sts, err := toolkit.Word2VecDownload(ctx, *dataDir, langsW2)
+		for _, st := range sts {
+			fmt.Printf("w2v   %-4s : %s %s\n", st.Language, st.Action, st.Path)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Println("(after adding models: restart languagetool + /hub → Site → Grammar)")
+	return nil
+}
+
+func printNgramPlan(p []toolkit.NgramStatus, w2 []string) {
+	for _, st := range p {
+		fmt.Printf("PLAN ngram %-4s : %s\n", st.Language, st.Action)
+	}
+	if len(toolkit.Word2VecCodes()) > 0 && len(w2) > 0 {
+		for _, l := range w2 {
+			fmt.Printf("PLAN w2v   %-4s : (see %s)\n", l, toolkit.Word2VecModels[l])
+		}
+	}
+}
+
+func splitCSV(v string) []string {
+	if v == "" {
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	out := []string{}
+	for _, p := range parts {
+		if s := strings.TrimSpace(p); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 var errNoProject = fmt.Errorf("project not found")
