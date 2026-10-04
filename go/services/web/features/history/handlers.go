@@ -14,6 +14,8 @@ import (
 	"ollitex/go/services/collab"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // ---------- shared http client ----------
@@ -970,7 +972,7 @@ func jsType(v any) string {
 		return "boolean"
 	case map[string]any:
 		return "object"
-	case []any:
+	case []any, bson.A:
 		return "array"
 	case nil:
 		return "undefined"

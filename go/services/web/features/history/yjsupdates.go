@@ -225,8 +225,8 @@ func mapOf(v any) map[string]any {
 func yjsStrList(v any) []string {
 	out := []string{}
 	switch l := v.(type) {
-	case []any:
-		for _, e := range l {
+	case []any, bson.A:
+		for _, e := range toAnySlice(l) {
 			if s, ok := e.(string); ok {
 				out = append(out, s)
 			}
@@ -240,8 +240,8 @@ func yjsStrList(v any) []string {
 func yjsMapList(v any) []map[string]any {
 	out := []map[string]any{}
 	switch l := v.(type) {
-	case []any:
-		for _, e := range l {
+	case []any, bson.A:
+		for _, e := range toAnySlice(l) {
 			if m, ok := e.(map[string]any); ok {
 				out = append(out, m)
 			}
@@ -525,6 +525,20 @@ func entField(d bson.D, key string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// toAnySlice — normalize an array value decoded from mongo ([]any in the
+// JSON-decode world, bson.A in the bson.D-decode world) to []any. Walkers
+// that only match []any silently miss every real mongo array (the 024 room
+// resolver 404 class): both encodings carry the same elements.
+func toAnySlice(v any) []any {
+	switch s := v.(type) {
+	case []any:
+		return s
+	case bson.A:
+		return []any(s)
+	}
+	return nil
 }
 
 func entArrAny(d bson.D, key string) []any {

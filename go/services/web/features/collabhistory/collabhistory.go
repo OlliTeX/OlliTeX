@@ -440,6 +440,20 @@ func (h *Handlers) fetchProjectDoc(cxt *core.Cxt, pid string) (bson.D, error) {
 // docInRootFolder — docID anywhere in the rootFolder tree (docs[] at any
 // depth; live shape = array-of-folder wrappers). Mirrors the collab seed's
 // tree check so client-visible rooms and service-seeded rooms agree.
+// toAnySlice — normalize an array value decoded from mongo ([]any in the
+// JSON-decode world, bson.A in the bson.D-decode world) to []any. Walkers
+// that only match []any silently miss every real mongo array (the 024 room
+// resolver 404 class): both encodings carry the same elements.
+func toAnySlice(v any) []any {
+	switch s := v.(type) {
+	case []any:
+		return s
+	case bson.A:
+		return []any(s)
+	}
+	return nil
+}
+
 func docInRootFolder(doc bson.D, docID string) bool {
 	rf, ok := fld(doc, "rootFolder")
 	if !ok || rf == nil {
@@ -450,8 +464,8 @@ func docInRootFolder(doc bson.D, docID string) bool {
 
 func docInValues(v any, docID string) bool {
 	switch t := v.(type) {
-	case []any:
-		for _, e := range t {
+	case []any, bson.A:
+		for _, e := range toAnySlice(t) {
 			if docInValues(e, docID) {
 				return true
 			}
