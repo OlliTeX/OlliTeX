@@ -684,3 +684,33 @@ way).
 ### Standing
 - Other-session in-flight files in the tree (collab: cmd/collab, go/services/collab, collabhistory, history, sso live tests, ide-react collab, go.mod/go.sum; web-go-flip runit; p69 spec): **excluded from this commit** per shared-tree rule.
 - TODO-0a710094 registry push + hub-a11y contrast still owner-gated/deferred.
+
+## Segment: 024 Option B handoff — completed + REAL BUG FOUND (2026-10-04 night)
+- `69ac5a0553` — Option B multi-file collab slice committed from the other session's green
+  in-flight state (19 files; go.mod/go.sum EXCLUDED — they carry other workstream deps:
+  bubbletea/ssh/wish, go-oidfed, crewjam/saml, go-ldap, coreos/go-oidc).
+- `77943eb78d` — junk-wave residue (500_check_db_access.sh).
+- `7ba6f833d5` — **the acceptance battery caught a real product bug**: every per-(project,doc)
+  room 404'd because 9 Go tree walkers type-switched `case []any:` only, but a real mongo
+  decode yields `bson.A` (a distinct Go type). The room resolver's doc-in-tree check, the
+  collab seed tree check, and history/yjsupdates walkers all missed real mongo arrays;
+  the editor client fail-open'd users back to the single root room — 024's exact symptom
+  surviving with Option B deployed. Fixed with a `toAnySlice` normalizer in
+  collabhistory.go / seedsource.go / yjsupdates.go / handlers.go (docroom.go already had
+  both cases — net zero). Hermetic regression: roomdoc_shape_test.go (decodes the exact
+  live doc shape). All 3 Go suites green.
+- **tests/e2e/specs/multifile-collab.test.e2e.ts — GREEN (1.0m) against the baked image
+  (3b438a86cdbc, bake12 from the fix)**: sample.bib shows the greenwade93 bib (not
+  main.tex); no cross-file contamination either direction; a second browser tab converges
+  inside the per-doc room (CRDT) while main.tex stays clean; write-through survives a full
+  editor reload; root room + history contract intact (room={pid} root:true, foreign 404);
+  no console errors.
+- Gate slice on the same baked image: typst-t2 4/4, u103r 2/2, config-registry +
+  hub-owner-batch2 + p51a/p51b — 15/15 green.
+- Regression note: collab-yjs (ADMIN) now fails at project CREATION — the admin /hub
+  landing moved to "Overview & activity" and the New-project trigger is not on it
+  (same wall hit as ADMIN in the battery; USER flow works). Pre-existing hub-UX issue,
+  unrelated to the collab changes (root-room CRDT covered by the battery's main flow).
+- **Status: all work DONE and baked; the owner's live verification window on psintern is
+  the only remaining step (owner: "I will verify when I can").**
+- Lesson saved (failure memory): bson.A vs []any Go type-switch trap.
