@@ -596,3 +596,69 @@ second actor mid-run (image re-pull under the same tag; a dangling
 editor pages 502'd until stripped). If this recurs, re-check
 `/etc/nginx/sites-enabled/overleaf.conf` for `overleaf-flips` includes and
 the web service binary hash before blaming the parity layer.
+
+## RUN — 2026-10-05 — typst conversion finalize (adopt the P7 kill residue; typst-t2 green)
+
+Owner feed (2026-10-05): "finish the Go conversion of services/clsi_typst
+into go/services/clsitypst — likely the work of the session killed in P7."
+The target tree was ~95% present; adoption + live parity closed 2026-10-05.
+
+### What the killed session left vs missing
+- Present: go/services/clsitypst (apps/compilecontroller/compilemanager/
+  dockerrunner/typstrunner/sourcemap...), go build + go test green,
+  web synctex handlers (synctex.go) + compile.go route registration
+  present in the WORKING TREE only (uncommitted +3 lines), the patched
+  typst fork image ollitex/typst:main (0.15.1+clsi, sourcemap sidecar).
+- Missing (closed this pass): service file-serving routes, web absorbed
+  output-file routes, nginx output.* dispatch (:8080 was the dead shared
+  clsi nginx), e2e sandbox dir env gaps, typst template files.
+
+### Live catches fixed (typst-t2 was RED: "PDF artifact not ready")
+1. **Compile 500 on container restart** — shared engine (ApiVersion 1.54)
+   emits inspect `State` as an object; Go struct was `bool`.
+   dockerrunner/engine.go now decodes both shapes (unit-pinned).
+2. **Editor PDF link 404** — three-layer gap: service had no
+   `/build/{bid}/output/{file}` route (Node shared the tex clsi for that);
+   web had no absorbed output-file routes (Node oracle router.mjs L716/724);
+   web Route A (`/download/...` PDF button) proxied to the dead :8080
+   downloadHost. All three closed: clsitypst now serves its own build
+   files (containment-checked, Range-capable), web got the absorbed
+   routes (dispatch by project compiler), Route A dispatches typst →
+   :3014.
+3. **nginx output.* + /content ranges** — proxy_pass :8080 (dead) → :4000
+   (web = the only layer that knows the project compiler; dispatches to
+   clsitypst/clsitex). Template + live vhost updated; nginx -t clean.
+4. **E2E sandbox EACCES** — runit run script reads TYPSF_*_DIR; compose
+   pinned all four (compiles/output/cache/uploads) + TYPST_IMAGE.
+5. **Templates gone** — typst project_files (basic/article/example)
+   restored to the junk/ canonical location the Go create path reads.
+
+### Operational gotcha (bake)
+Host-built Go binaries are DYNAMICALLY linked against the host glibc
+layout; the container image lacks /lib64/ld-linux-x86-64.so.2 →
+`setpriv: ... No such file or directory` on exec. Inject/rebuild with
+`CGO_ENABLED=0` (static) — both clsitypst + web now injected static.
+
+### Green
+- typst-t2: **4/4** (blank menu + basic + article cits + example compile
+  to a PDF the pane fetches as %PDF).
+- synctex crown jewel LIVE: /project/{pid}/sync/code → real pdf coords
+  from output.sourcemap.json (the d101c2f5 fork sidecar); /sync/pdf →
+  real code positions; wordcount 200.
+- Regression slice: 18 passed / 4 skipped (retired dual-stack legs) —
+  config-registry, hub-owner-batch2, u103r, p51a/p51b, u101-history.
+- Unit: all clsitypst suites + web compile feature green.
+
+### Commit
+`ce7eed0df8` — typst conversion finalize (route registration + output
+file serving + dispatch + engine State dual-shape + nginx + e2e pins +
+templates). Image rebuild of ollitex/ollitex:main kicked off after the
+injection-only deploy so the fixes are baked (rebuild-overleaf-docker
+pattern; the live container keeps the injected static binaries either
+way).
+
+### Standing
+- Owner hub-a11y contrast failures: deferred per owner (low prior).
+- Push: owner background (owner feed).
+- Untracked probe files (u10-probe.cjs, u101-oracle.cjs,
+  legacy-project.test.e2e.ts.bak): owner call pending.
