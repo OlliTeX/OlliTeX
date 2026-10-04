@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	i18nlib "ollitex/go/libraries/i18n"
 	"os"
 	"time"
 
@@ -17,295 +16,31 @@ import (
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/emailtemplates"
 	"ollitex/go/services/web/features/templates"
-	"ollitex/go/services/web/views"
 )
 
 // nowUTC / timeNowMillis — the two timestamp shapes Node writes:
-// new Date() (stored BSONDate) and Date.now() (epoch ms int).
-func nowUTC() time.Time    { return time.Now().UTC() }
-func timeNowMillis() int64 { return time.Now().UnixMilli() }
+func nowUTC() time.Time     { return time.Now().UTC() }
+func timeNowMillis() int64  { return time.Now().UnixMilli() }
 
-// Feature wires the launchpad routes (all pinned — see package doc).
+// Feature wires the launchpad routes (owner decision 2026-10-05: the
+// /launchpad PAGE and its register_* bootstrap endpoints are RETIRED — the
+// first-admin function moved to the toolkit CLI `toolkit bootstrap`; the
+// Node-parity creation code below stays in this package as that toolkit's
+// engine + the p620 parity pin). Only the session test-email route remains
+// registered; /launchpad* now falls through to the generic 404.
 func Feature(a *core.App) core.Feature {
 	mail := core.NewMail()
 	return core.Feature{
 		Name: "launchpad",
 		Routes: []core.Route{
-			{Method: "GET", Path: "/launchpad", NoLogin: true, Handler: hPage(a)},
-			// Node login whitelist: anonymous reaches the controller
-			// (it renders or redirects by itself).
-			{Method: "POST", Path: "/launchpad/register_admin", NoLogin: true, Handler: hRegisterAdmin(a)},
-			{Method: "POST", Path: "/launchpad/register_ldap_admin", NoLogin: true, Handler: hRegisterExternal(a, "ldap")},
-			{Method: "POST", Path: "/launchpad/register_saml_admin", NoLogin: true, Handler: hRegisterExternal(a, "saml")},
+			// (retired rows: GET /launchpad, POST /launchpad/register_admin,
+			// register_ldap_admin, register_saml_admin → 404 now.)
 			// NOT on the whitelist: anonymous bounces via the global
 			// requireGlobalLogin gate (401 XHR / 302 /login) — same as Node.
 			{Method: "POST", Path: "/launchpad/send_test_email", Handler: hSendTestEmail(a, mail)},
 		},
 	}
 }
-
-// ---- view plumbing ---------------------------------------------------------
-
-func pageData(a *core.App, cxt *core.Cxt) views.PageData {
-	d := views.PageData{Nonce: views.NewNonce()}
-	if cxt.Sess != nil {
-		d.CSRFToken = cxt.Sess.CsrfToken()
-	}
-	origin := cxt.SiteURL
-	if origin == "" {
-		origin = "http://" + cxt.Req.Host
-	}
-	d.Origin = origin
-	d.UserEmail, d.UserID = core.PageUserSlots(cxt.Sess)
-	// i18n wave A (docs/go-i18n-evaluation.md §3.1-2): the locale resolves via
-	// App.PageLocale (user.language best-effort → Accept-Language); bundle nil
-	// or locale en/"" → EXACT English bytes (e2e pins).
-	var tf i18nlib.TFunc
-	if a != nil && a.I18n != nil {
-		tf = a.I18n.T
-	}
-	d.I18n = views.I18nPage{Locale: a.PageLocale(cxt), T: tf, Strings: views.WaveALaunchpadAll()}
-	return d
-}
-
-func render500(a *core.App, cxt *core.Cxt, res *core.Res) {
-	views.Error500Page(res.W, pageData(a, cxt))
-}
-
-// ---- GET /launchpad ---------------------------------------------------------
-
-// hPage — LaunchpadController.launchpadPage:
-//
-//	session user:  admin  → 200 admin page | else → 302 /restricted
-//	anon:         adminExists → stash postLoginRedirect + 302 /login
-//	              none        → 200 fresh (first-admin) page.
-func hPage(a *core.App) func(*core.Cxt, *core.Res) {
-	return func(cxt *core.Cxt, res *core.Res) {
-		if cxt.Sess != nil && cxt.Sess.IsLoggedIn() {
-			if templates.SessionIsAdmin(cxt.Sess) {
-				views.LaunchpadAdminPage(res.W, pageData(a, cxt))
-				return
-			}
-			res.Redirect(cxt.Req, 302, "/restricted")
-			return
-		}
-		ctx, cancel := context.WithTimeout(cxt.Req.Context(), 8*time.Second)
-		defer cancel()
-		if a.Mongo == nil {
-			res.SendStatus(500)
-			return
-		}
-		db, err := a.Mongo.DB(ctx)
-		if err != nil {
-			res.SendStatus(500)
-			return
-		}
-		exists, err := adminExists(ctx, db)
-		if err != nil {
-			res.SendStatus(500)
-			return
-		}
-		if !exists {
-			views.LaunchpadFreshPage(res.W, pageData(a, cxt))
-			return
-		}
-		// Node: AuthenticationController.setRedirectInSession(req) then
-		// redirect('/login').
-		if cxt.Sess != nil {
-			cxt.Sess.Set("postLoginRedirect", "/launchpad")
-		}
-		res.Redirect(cxt.Req, 302, "/login")
-	}
-}
-
-// ---- JSON body decode --------------------------------------------------------
-
-// decodePair — JSON {email?, password?} (the async-form helper submits
-// application/json — pinned on the launchpad page bundle).
-func decodePair(cxt *core.Cxt) (email, password string, ok bool) {
-	raw, err := io.ReadAll(io.LimitReader(cxt.Req.Body, 1<<20))
-	if err != nil {
-		return "", "", false
-	}
-	var in struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	if json.Unmarshal(raw, &in) != nil {
-		return "", "", false
-	}
-	return in.Email, in.Password, true
-}
-
-func jsonBody(res *core.Res, code int, obj string) {
-	res.JSON(code, []byte(obj))
-}
-
-func objID(doc bson.M) (bson.ObjectID, bool) {
-	oid, ok := doc["_id"].(bson.ObjectID)
-	return oid, ok
-}
-
-// ---- POST /launchpad/register_admin ----------------------------------------
-
-// hRegisterAdmin — Node registerAdmin (exact gate order, pinned):
-//
-//	1 email+password both present    → else 400 "Bad Request"
-//	2 no admin exists                → else 403 {"message":{"type":"error",
-//	                                               "text":"admin user already exists"}}
-//	3 valid email                    → else 400 {"message":{"type":"error",
-//	                                               "text":"email not valid"}}
-//	4 valid password                 → else 400 {"message":{"type":"error","text":<rule>}}
-//	5 no existing non-holding user   → else 500 view (EmailAlreadyRegistered
-//	                                               — Node throws → error middleware)
-//	6 create (+promote)              → 200 {"redir":"/launchpad"}
-func hRegisterAdmin(a *core.App) func(*core.Cxt, *core.Res) {
-	return func(cxt *core.Cxt, res *core.Res) {
-		email, password, ok := decodePair(cxt)
-		if !ok || email == "" || password == "" {
-			res.SendStatus(400)
-			return
-		}
-		ctx, cancel := context.WithTimeout(cxt.Req.Context(), 12*time.Second)
-		defer cancel()
-		if a.Mongo == nil {
-			res.SendStatus(500)
-			return
-		}
-		db, err := a.Mongo.DB(ctx)
-		if err != nil {
-			res.SendStatus(500)
-			return
-		}
-		if exists, _ := adminExists(ctx, db); exists {
-			jsonBody(res, 403, `{"message":{"type":"error","text":"admin user already exists"}}`)
-			return
-		}
-		if msg := validateEmail(email); msg != "" {
-			jsonBody(res, 400, `{"message":{"type":"error","text":"`+msg+`"}}`)
-			return
-		}
-		if msg := validatePassword(password, email); msg != "" {
-			jsonBody(res, 400, `{"message":{"type":"error","text":"`+msg+`"}}`)
-			return
-		}
-		email = parseEmail(email) // Node: registerNewUser re-parses (trim+lower)
-		if cerr := createLocalAdminOrReuse(ctx, db, email, password, randomUUID()); cerr != nil {
-			if errors.Is(cerr, errEmailAlreadyRegistered) {
-				render500(a, cxt, res)
-				return
-			}
-			res.SendStatus(500)
-			return
-		}
-		jsonBody(res, 200, `{"redir":"/launchpad"}`)
-	}
-}
-
-// ---- POST /launchpad/register_ldap_admin + register_saml_admin --------------
-
-// hRegisterExternal — Node registerExternalAuthAdmin(authMethod) (pinned):
-//
-//	1 authMethod == current method   → else 403 "Forbidden"
-//	2 email present                  → else 400 "Bad Request"
-//	3 no admin exists                → else 403 "Forbidden"
-//	4 valid email (registerNewUser)  → else 500 view ('request is not valid')
-//	5 create external admin (no hashedPassword, confirmedAt=Date.now() ms,
-//	  first_name=full email, last_name="" — the controller's userDetails)
-//	6 stash postLoginRedirect='/launchpad'
-//	7 → 200 {"redir":"/launchpad","email":<email>}
-func hRegisterExternal(a *core.App, method string) func(*core.Cxt, *core.Res) {
-	return func(cxt *core.Cxt, res *core.Res) {
-		if authMethod() != method {
-			res.SendStatus(403)
-			return
-		}
-		raw, rerr := io.ReadAll(io.LimitReader(cxt.Req.Body, 1<<20))
-		if rerr != nil {
-			res.SendStatus(400)
-			return
-		}
-		var in struct {
-			Email string `json:"email"`
-		}
-		if json.Unmarshal(raw, &in) != nil {
-			res.SendStatus(400)
-			return
-		}
-		if in.Email == "" {
-			res.SendStatus(400)
-			return
-		}
-		ctx, cancel := context.WithTimeout(cxt.Req.Context(), 12*time.Second)
-		defer cancel()
-		if a.Mongo == nil {
-			res.SendStatus(500)
-			return
-		}
-		db, err := a.Mongo.DB(ctx)
-		if err != nil {
-			res.SendStatus(500)
-			return
-		}
-		if exists, _ := adminExists(ctx, db); exists {
-			res.SendStatus(403)
-			return
-		}
-		email := parseEmail(in.Email)
-		if email == "" {
-			// Node: registerNewUser fails _registrationRequestIsValid
-			// (validateEmail) → throws 'request is not valid' → 500 view.
-			render500(a, cxt, res)
-			return
-		}
-		existing, _ := userByEmail(ctx, db, email)
-		if existing != nil {
-			if holdingAccountFalse(existing) {
-				render500(a, cxt, res)
-				return
-			}
-			// Node reuse path: the existing user is reused; the controller's
-			// updateOne applies {isAdmin, emails} (+ $unset hashedPassword),
-			// registerNewUser sets holdingAccount:false + a random password
-			// which is again $unsetting — final shape: NO hashedPassword,
-			// first_name/last_name UNCHANGED (node does not rewrite them on
-			// reuse — only fresh creation stores the controller's values).
-			oid, okO := objID(existing)
-			if !okO {
-				res.SendStatus(500)
-				return
-			}
-			set := bson.M{
-				"holdingAccount": false,
-				"isAdmin":        true,
-				"emails": bson.A{bson.M{
-					"email":            email,
-					"reversedHostname": reversedHostname(email),
-					"confirmedAt":      timeNowMillis(),
-					"_id":              bson.NewObjectID(),
-				}},
-			}
-			filt := bson.M{"_id": oid}
-			if _, uerr := db.Collection("users").UpdateOne(ctx, filt, bson.M{
-				"$set":   set,
-				"$unset": bson.M{"hashedPassword": ""},
-			}); uerr != nil {
-				res.SendStatus(500)
-				return
-			}
-		} else {
-			if cerr := createExternalAdminUser(ctx, db, email, randomUUID()); cerr != nil {
-				res.SendStatus(500)
-				return
-			}
-		}
-		if cxt.Sess != nil {
-			cxt.Sess.Set("postLoginRedirect", "/launchpad")
-		}
-		jsonBody(res, 200, `{"redir":"/launchpad","email":`+jsonQuote(email)+`}`)
-	}
-}
-
 // ---- POST /launchpad/send_test_email ----------------------------------------
 
 // hSendTestEmail — Node: ensureUserIsSiteAdmin middleware then sendTestEmail
@@ -315,6 +50,19 @@ func hRegisterExternal(a *core.App, method string) func(*core.Cxt, *core.Res) {
 //	no email       → 400 {"message":"no email address supplied"}
 //	sent           → 200 {"message":"Email Sent"}  (translate('email_sent'))
 //	mail error     → 500 view (Node: throw → error middleware)
+
+// render500 — Node: express error middleware → the generic 500 VIEW (the
+// launchpad page is gone, but a send_test_email failure still renders the
+// plain 500 page — the core 500 renderer with the page nonce/origin the
+// other leaves use; fallback to a bare 500 when the renderer is absent).
+func render500(a *core.App, cxt *core.Cxt, res *core.Res) {
+	if a != nil && a.Render500 != nil {
+		a.Render500(cxt, res)
+		return
+	}
+	res.SendStatus(500)
+}
+
 func hSendTestEmail(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 	return func(cxt *core.Cxt, res *core.Res) {
 		if cxt.Sess == nil || !templates.SessionIsAdmin(cxt.Sess) {
@@ -362,14 +110,13 @@ func hSendTestEmail(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 		jsonBody(res, 200, `{"message":"Email Sent"}`)
 	}
 }
-
-// ---- local-admin creation with Node reuse semantics --------------------------
-
-func holdingAccountFalse(doc bson.M) bool {
-	h, ok := doc["holdingAccount"].(bool)
-	return ok && !h
+func jsonBody(res *core.Res, code int, obj string) {
+	res.JSON(code, []byte(obj))
 }
-
+func objID(doc bson.M) (bson.ObjectID, bool) {
+	oid, ok := doc["_id"].(bson.ObjectID)
+	return oid, ok
+}
 // createLocalAdminOrReuse — Node registerNewUser + the launchpad promote,
 // in one of two shapes:
 //
@@ -410,7 +157,30 @@ func createLocalAdminOrReuse(ctx context.Context, db *mongo.Database, email, pas
 	}
 	return createLocalAdminUser(ctx, db, email, password, analyticsID)
 }
+// ---- local-admin creation with Node reuse semantics --------------------------
 
+func holdingAccountFalse(doc bson.M) bool {
+	h, ok := doc["holdingAccount"].(bool)
+	return ok && !h
+}
+// ---- JSON body decode --------------------------------------------------------
+
+// decodePair — JSON {email?, password?} (the async-form helper submits
+// application/json — pinned on the launchpad page bundle).
+func decodePair(cxt *core.Cxt) (email, password string, ok bool) {
+	raw, err := io.ReadAll(io.LimitReader(cxt.Req.Body, 1<<20))
+	if err != nil {
+		return "", "", false
+	}
+	var in struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if json.Unmarshal(raw, &in) != nil {
+		return "", "", false
+	}
+	return in.Email, in.Password, true
+}
 // jsonQuote — minimal JSON string quoting for the registered email echo.
 func jsonQuote(s string) string {
 	b, _ := json.Marshal(s)

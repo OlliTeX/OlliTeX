@@ -26,10 +26,10 @@ test.afterAll(async () => {
 const prefs = async () => (await (await api(p, 'GET', '/notifications/preferences')).json())
 const setPrefs = async (body: unknown) => api(p, 'POST', '/notifications/preferences', body)
 
-test('redirects: /user/notification-preferences 301 → /hub#/mysettings.email (page removed 2026-09-10)', async () => {
+test('retired: /user/notification-preferences is a Go 404 now (redirect removed 2026-10-05)', async () => {
   const res = await p.request.get(PAGE, { maxRedirects: 0 })
-  expect(res.status(), '301 expected').toBe(301)
-  expect(res.headers()['location']).toBe('/hub#/mysettings.email')
+  expect(res.status(), '404 expected for the retired page').toBe(404)
+  expect((res.headers()['location'] || '').toLowerCase(), 'no hub redirect anymore').not.toContain('/hub')
 })
 
 test('hub surface: the redirect target renders the email preferences section', async () => {
@@ -39,13 +39,10 @@ test('hub surface: the redirect target renders the email preferences section', a
   expect(/email preferences/i.test(body), 'email preferences surface visible').toBeTruthy()
 })
 
-test('deny: guests cannot open the preference surface (redirect → login)', async ({ browser }) => {
+test('deny: guests cannot open the retired preference page (404)', async ({ browser }) => {
   const ctx = await browser.newContext(); const q = await ctx.newPage()
-  await q.goto(PAGE, { waitUntil: 'domcontentloaded' }).catch(() => {})
-  const url = q.url()
-  const body = (await q.locator('body').innerText().catch(() => '')) || ''
-  const denied = /login|sign in/i.test(url) || /mute all/i.test(body) === false
-  expect(denied, 'guest must be redirected/denied (at ' + url + ')').toBeTruthy()
+  const r = await q.request.get(PAGE, { maxRedirects: 0 })
+  expect([404, 403, 302].includes(r.status()), 'guest stopped (got ' + r.status() + ')').toBeTruthy()
   await ctx.close()
 })
 

@@ -57,7 +57,6 @@ var patchPat = regexp.MustCompile(`^/library/references/([^/]+)$`)
 // page 60/60, api 120/60, writes 60/60 (identifier = client ip, Node
 // `identifier: req.ip`).
 func Feature(a *core.App) core.Feature {
-	pageLim := core.NewRateLimiter(a.Redis, "bib-library-page", 60, 60)
 	apiLim := core.NewRateLimiter(a.Redis, "bib-library-api", 120, 60)
 	writesLim := core.NewRateLimiter(a.Redis, "bib-library-writes", 60, 60)
 
@@ -75,8 +74,8 @@ func Feature(a *core.App) core.Feature {
 	return core.Feature{
 		Name: "library",
 		Routes: []core.Route{
-			{Method: "GET", Path: "/library", Handler: limit(pageLim, f.page(false))},
-			{Method: "GET", Path: "/library/trashed", Handler: limit(pageLim, f.page(true))},
+			// (RETIRED 2026-10-05: the /library + /library/trashed PAGE routes are gone —
+			// 404 now; the hub absorbs the surface. All /library/* APIs below stay.)
 			{Method: "GET", Path: "/library/references", Handler: limit(apiLim, f.list)},
 			{Method: "POST", Path: "/library/references", Handler: limit(writesLim, f.create)},
 			{Method: "POST", Path: "/library/references/match", Handler: limit(apiLim, f.match)},

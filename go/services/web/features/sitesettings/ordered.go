@@ -1,7 +1,8 @@
 // Package sitesettings ports the admin "Manage Site" SiteSettings leaf
 // (P3.6 flip unit) — the five admin-tools routes:
 //
-//	GET  /admin/site                     → 302 /hub#/site
+// (RETIRED 2026-10-05: /admin/site 302 → 404 now; /admin/site-settings +
+//  /admin/site/template-admins remain.)
 //	GET  /admin/site-settings            → all sections (secrets masked) + counts
 //	PUT  /admin/site-settings/:section   → replace one section (validated)
 //	POST /admin/site-settings/email/test → one test mail via the stored E-mail section

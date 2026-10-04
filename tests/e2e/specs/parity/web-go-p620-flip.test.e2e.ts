@@ -1,5 +1,14 @@
 /**
- * P6.20 flip gate — launchpad module (first-admin bootstrap), the LAST P6 flip
+ * P6.20 flip gate — RETIRED (owner decision 2026-10-05): the /launchpad page
+ * and the register_* bootstrap endpoints are gone — the toolkit CLI
+ * (`toolkit bootstrap --email <e> --password <p>`) is the first-admin
+ * replacement, and only /launchpad/send_test_email remains in Go. This
+ * Node-vs-Go flip-era gate (its dual stack no longer exists post-P7) is
+ * retired with the surface; the live replacement is the toolkit bootstrap
+ * smoke (`make / tests/e2e/specs/parity/toolkit-bootstrap` if needed).
+ *
+ * (Original header: P6.20 flip gate — launchpad module, the LAST P6 flip)
+/**
  * (WEB_GO_PLAN.md P6.20). 4-leg contract-parity gate, same harness family as
  * P6.5…P6.9:
  *   leg 0: flips stripped (clean slate)
@@ -452,8 +461,7 @@ async function runLeg(): Promise<Leg> {
 
 // ---- the 4-leg gate ---------------------------------------------------------
 
-test(
-  'P6.20 launchpad flip parity',
+test.skip('RETIRED 2026-10-05 (routes gone → toolkit bootstrap): P6.20 launchpad flip parity',
   async () => {
 
   // leg 0 — clean slate

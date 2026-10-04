@@ -27,32 +27,23 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 
-test('redirects: /project 301 → /hub#/projects.all (dashboard removed 2026-09-10)', async () => {
+test('retired: /project is a Go 404 now (redirect removed 2026-10-05)', async () => {
   const res = await p.request.get(PAGE, { maxRedirects: 0 })
-  expect(res.status(), '301 expected').toBe(301)
-  expect(res.headers()['location']).toBe('/hub#/projects.all')
+  expect([404, 302].includes(res.status()), '404 (or the anonymous login bounce) expected').toBeTruthy()
+  if (res.status() === 404) {
+    const loc = (res.headers()['location'] || '').toLowerCase()
+    expect(loc, 'must not be a hub redirect anymore').not.toContain('/hub')
+  }
 })
 
-test('deny: guests get the login wall (redirect → hub → login)', async ({ browser }) => {
+test('deny: guests get the login wall (404 now — no redirect to wall)', async ({ browser }) => {
   const ctx = await browser.newContext(); const q = await ctx.newPage()
   await q.goto(PAGE, { waitUntil: 'domcontentloaded' }).catch(() => {})
   const url = q.url()
   const body = (await q.locator('body').innerText().catch(() => '')) || ''
-  const denied = /login/i.test(url) || /log ?in|sign in/i.test(body)
-  expect(denied, 'guest walled (at ' + url + ')').toBeTruthy()
+  const wall = /login/i.test(url) || /4\?0\?4|not found|error/i.test(body) || /log ?in|sign in/i.test(body)
+  expect(wall, 'guest stopped (at ' + url + ')').toBeTruthy()
   await ctx.close()
-})
-
-test('list: created project appears on the hub projects surface (via the redirect)', async () => {
-  const name = 'PtyListProbe' + Date.now().toString(36)
-  const { _id: pid } = await mkProject(p, name)
-  try {
-    await p.goto(PAGE, { waitUntil: 'domcontentloaded' })
-    expect(p.url(), 'lands on the hub').toContain('/hub')
-    await expect(p.locator('body').getByText(name).first()).toBeVisible({ timeout: 15000 })
-  } finally {
-    await delProject(p, pid)
-  }
 })
 
 test('create: hub "New project" menu → Blank → name → POST /project/new', async () => {
@@ -129,15 +120,15 @@ test('tags: POST /tag creates a tag retrievable via GET /tag', async () => {
   }
 })
 
-test('role: tpladmin reaches the hub projects surface through the redirect', async ({ browser }) => {
+test('role: tpladmin still reaches the HUB projects surface (legacy /project is 404)', async ({ browser }) => {
   const ctx = await browser.newContext(); const q = await ctx.newPage()
   await loginRobust(q, TPLADMIN.email, TPLADMIN.password)
-  await q.goto(PAGE, { waitUntil: 'domcontentloaded' })
+  await q.goto(HUB_PROJECTS, { waitUntil: 'domcontentloaded' })
   expect(q.url(), 'lands on the hub').toContain('/hub')
   const body = (await q.locator('body').innerText().catch(() => '')) || ''
   const ok = !/log ?in|sign in/i.test(q.url()) && !/restricted|don.t have permission/i.test(body)
   expect(ok, 'tpladmin sees the project surface (url ' + q.url() + ')').toBeTruthy()
   const r = await q.request.get(BASE + '/project', { maxRedirects: 0 })
-  expect(r.status(), 'project redirect endpoint').toBeLessThan(500)
+  expect(r.status(), 'retired /project → 404 (or <500 in transition)').toBeLessThan(500)
   await ctx.close()
 })

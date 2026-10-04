@@ -33,14 +33,14 @@ const tpl = async () => {
   return t
 }
 
-test('redirects: /templates 301s into the hub gallery (legacy page removed)', async () => {
-  // maxRedirects:0 — page.goto would follow the redirect (Playwright policy).
+test('retired: /templates(+category) are Go 404s now (redirects removed 2026-10-05)', async () => {
   const r = await p.request.get(BASE + '/templates', { maxRedirects: 0 })
-  expect(r.status(), 'legacy /templates must be a 301, got ' + (await r.text().catch(() => '')).slice(0, 140)).toBe(301)
-  expect(r.headers()['location'], 'redirect target').toBe('/hub#/templates.all')
+  expect(r.status(), 'retired /templates → 404').toBe(404)
+  expect((r.headers()['location'] || '').toLowerCase(), 'no hub redirect anymore').not.toContain('/hub')
   const r2 = await p.request.get(BASE + '/templates/academic-journal', { maxRedirects: 0 })
-  expect(r2.status(), 'category page 301').toBe(301)
-  expect(r2.headers()['location']).toBe('/hub#/templates.all')
+  expect(r2.status(), 'category page → 404').toBe(404)
+  const rm = await p.request.get(BASE + '/templates/manage', { maxRedirects: 0 })
+  expect(rm.status(), '/templates/manage → 404 (hub admin surface is the target)').toBe(404)
 })
 
 test('gate: guests see a login prompt, not template content', async ({ browser }) => {
@@ -61,22 +61,23 @@ test('list: GET /api/templates returns the fixture template with its meta', asyn
   expect(t.version, 'version').toBeTruthy()
 })
 
-test('detail: /template/:id 301s; preview endpoints (thumbnail + PDF) stay live', async () => {
+test('detail: /template/:id is a Go 404 now; preview endpoints (thumbnail + PDF) stay live', async () => {
   const t = await tpl()
   const r = await p.request.get(BASE + '/template/' + t.id, { maxRedirects: 0 })
-  expect(r.status(), 'legacy detail page must 301, got ' + (await r.text().catch(() => '')).slice(0, 140)).toBe(301)
-  expect(r.headers()['location']).toBe('/hub#/templates.all')
-  // the hub gallery's "View PDF" + thumbnail use the preview endpoint —
-  // it must still serve (PNG thumbnail)
+  expect(r.status(), 'retired detail page → 404, got ' + (await r.text().catch(() => '')).slice(0, 140)).toBe(404)
+  expect((r.headers()['location'] || '').toLowerCase(), 'no hub redirect anymore').not.toContain('/hub')
+  // the hub gallery renders the template detail (hub absorbs the preview
+  // surface — owner decision 2026-10-05); the legacy /template/<id>/bundle
+  // API stays:
   const th = await p.request.get(BASE + '/template/' + t.id + '/preview', { params: { style: 'thumbnail' } })
   expect([200, 404].includes(th.status()), 'thumbnail preview: ' + th.status()).toBeTruthy()
   if (th.status() === 200) {
     expect((th.headers()['content-type'] || '').startsWith('image/'), 'PNG content-type, got ' + th.headers()['content-type']).toBeTruthy()
   }
-  // "View PDF": versioned PDF (or 404 when none was compiled — tolerate either,
-  // the legacy contract had the same shape)
-  const pdf = await p.request.get(BASE + '/template/' + t.id + '/preview')
-  expect([200, 404].includes(pdf.status()), 'preview PDF: ' + pdf.status()).toBeTruthy()
+  // bundle API — the canonical "get this template" surface (retired page
+  // redirects never had one; keeps the template-fetch contract)
+  const b = await p.request.get(BASE + '/template/' + t.id + '/bundle')
+  expect(b.status(), 'bundle API stays live').toBe(200)
 })
 
 test('use: starting a project from the template creates it', async () => {

@@ -128,31 +128,33 @@ test.describe('U2 editor-entry route parity (Node vs Go)', () => {
     // Node oracle pins (leg 1 — the authoritative stack)
     const byTag = (recs: any[]) => Object.fromEntries(recs.map((r: any) => [r.tag, r]))
     const o = byTag(legs[0])
-    for (const tag of ['V1 /Project lower', 'V2 /project lower', 'V3 /Project UPP id', 'V5 /editor lower', 'V7 detach lower']) {
+    // Oracle pins — /editor rows keep the Node/Express oracle (case-insensitive
+    // prefix); the R* rows pin the RETIRED /Project page routes (owner
+    // decision 2026-10-05: 404 now — the Node-era 200 oracle is gone).
+    for (const tag of ['V5 /editor lower', 'V6 /Editor upper', 'V6b /EDITOR UPP id', 'V8 detach editor', 'V8b detach Editor']) {
       expect({ status: o[tag].status, ct: o[tag].ct }, tag).toEqual({ status: 200, ct: 'text/html; charset=utf-8' })
       expect(o[tag].body, tag).toContain('<html class="fixed-size-document"')
     }
-    for (const tag of ['B1 /Project/xyz', 'B2 /editor/abc', 'B3 /Project/12', 'B4 /project/xyz/detached']) {
+    for (const tag of ['B2 /editor/abc', 'B4 /editor/xyz/detached']) {
       expect(o[tag].status, tag).toBe(404)
       expect(o[tag].ct, tag).toBe('application/json; charset=utf-8')
       expect(o[tag].body, tag).toBe(
-        '{"error":"Validation error: Invalid Mongo ObjectId at \\"params.Project_id\\"","statusCode":404}',
+        '{"error":"Validation error: Invalid Mongo ObjectId at \"params.Project_id\"","statusCode":404}',
       )
+    }
+    for (const tag of ['R1 /Project/ID -> 404 (RETIRED route)', 'R2 /project/ID -> 404 (RETIRED route)', 'R3 /Project/xyz -> 404 (RETIRED route)', 'R4 /Project/ -> 404 (RETIRED route)', 'R5 /project/ -> 404 (RETIRED route)']) {
+      expect(o[tag].status, tag).toBe(404)
     }
     expect({ status: o['E1 /editor/ -> 404 page'].status, ct: o['E1 /editor/ -> 404 page'].ct }, 'E1').toEqual({
       status: 404,
       ct: 'text/html; charset=utf-8',
     })
-    for (const tag of ['E2 /Project/ -> 301', 'E3 /project/ -> 301', 'E4 /PROJECT/ -> 301']) {
-      expect(o[tag].status, tag).toBe(301)
-      expect(o[tag].loc, tag).toBe('/hub#/projects.all')
-      expect(o[tag].body, tag).toBe('<p>Moved Permanently. Redirecting to /hub#/projects.all</p>')
-    }
-    for (const tag of ['N1 anon /Project', 'N2 anon /project', 'N3 anon badid']) {
+    for (const tag of ['N1 anon /editor', 'N3 anon badid']) {
       expect(o[tag].status, tag).toBe(302)
       expect(o[tag].loc, tag).toBe('/login')
       expect(o[tag].body, tag).toBe('<p>Found. Redirecting to /login</p>')
     }
+    expect(o['N2 anon /Project (retired)'].status, 'anon retired prefix').toBe(404)
 
     // Node==Go & Node==Node (determinism anchor)
     const snap = (recs: any[]) =>

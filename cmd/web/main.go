@@ -50,7 +50,6 @@ import (
 	"ollitex/go/services/web/features/mendeley"
 	"ollitex/go/services/web/features/notifications"
 	"ollitex/go/services/web/features/orcidpicker"
-	"ollitex/go/services/web/features/pageshells"
 	"ollitex/go/services/web/features/passwordreset"
 	"ollitex/go/services/web/features/projectinspection"
 	"ollitex/go/services/web/features/projectlist"
@@ -293,7 +292,8 @@ func main() {
 	// removed (hubs are the settings surfaces): GET /user/mysettings →
 	// 301 /hub#/mysettings.account; GET /admin/panel → 301 /hub#/overview
 	// (site admin — non-admin bounces to /restricted?from=…).
-	app.RegisterFeature(pageshells.Feature(app))
+	// (pageshells feature RETIRED 2026-10-05: /user/mysettings + /admin/panel
+	// redirects are gone — both paths now 404.)
 
 	// P6.19 surface: git-bridge web module — PAT endpoints
 	// (/git-bridge/personal-access-tokens*), /oauth/token/info, and the

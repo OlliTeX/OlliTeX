@@ -36,7 +36,6 @@ func Feature(a *core.App) core.Feature {
 	return core.Feature{
 		Name: "sitesettings",
 		Routes: []core.Route{
-			{Method: "GET", Path: "/admin/site", Handler: siteIndex(a)},
 			{Method: "GET", Path: "/admin/site-settings", Handler: getSiteSettings(a)},
 			{
 				Method:  "PUT",
@@ -71,17 +70,6 @@ func jsEscapeQuote(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)
 	return s
-}
-
-// ---------- GET /admin/site → 302 /hub#/site ----------
-
-func siteIndex(a *core.App) func(*core.Cxt, *core.Res) {
-	return func(cxt *core.Cxt, res *core.Res) {
-		if !a.RequireSiteAdmin(cxt, res) {
-			return
-		}
-		res.Redirect(cxt.Req, 302, "/hub#/site")
-	}
 }
 
 // ---------- GET /admin/site-settings → all sections ----------

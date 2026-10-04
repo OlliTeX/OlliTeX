@@ -119,8 +119,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "POST", Path: "/notifications/preferences", Handler: hSaveGlobal(a)},
 			{Method: "GET", Pattern: projectP, Handler: hGetProject(a)},
 			{Method: "POST", Pattern: projectP, Handler: hSaveProject(a)},
-			{Method: "GET", Path: "/user/notification-preferences", Handler: hRedirectHub()},
-			{Method: "POST", Path: "/user/notification-preferences", Handler: hRedirectHub()},
+			// (RETIRED 2026-10-05: /user/notification-preferences redirects gone — 404 now; the prefs APIs above stay.)
 			{Method: "POST", Path: "/user/send-test-email", Handler: hTestEmail(a, mail)},
 		},
 	}
@@ -618,18 +617,6 @@ func hSaveProject(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		// Node res.json(null) — the literal body is "null".
 		res.JSON(200, []byte(`null`))
-	}
-}
-
-// ---------- /user routes ------------------------------------------------------
-
-func hRedirectHub() func(*core.Cxt, *core.Res) {
-	return func(cxt *core.Cxt, res *core.Res) {
-		// Node res.redirect(301, '/hub#/mysettings.email') — express renders
-		// the Accept matrix (html → "<p>Moved Permanently. …</p>"; json →
-		// empty body; text/*|*/* → plain; Vary: Accept). core.Redirect
-		// mirrors it (P6.5 instance-stats precedent).
-		res.Redirect(cxt.Req, 301, "/hub#/mysettings.email")
 	}
 }
 

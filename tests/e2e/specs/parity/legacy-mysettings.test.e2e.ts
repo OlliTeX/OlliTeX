@@ -23,30 +23,20 @@ const userId = () => mongoEval('db.users.findOne({ email: "e2e-user@e2e.test" })
 const doc = (field: string) => mongoEval(`db.users.findOne({ _id: ObjectId("${userId()}") }).${field}`)
 const ok = (code: number) => [200, 204].includes(code)
 
-test('redirect: /user/mysettings 301s into the hub (legacy page removed, owner 2026-09-12)', async () => {
+test('retired: /user/mysettings is a Go 404 now (redirect removed 2026-10-05)', async () => {
   const page = u()
-  // No redirect following: the route itself must be a 301 into the hub;
-  // the hub #/mysettings.account surface (not this legacy page) is the
-  // settings contract from here on.
-  const _redirectHop = await page.goto(BASE + '/user/mysettings', { waitUntil: 'domcontentloaded', waitUntilRedirect: undefined as never }).catch(() => null)
-  void _redirectHop
   const r = await page.request.get(BASE + '/user/mysettings', { maxRedirects: 0 }).catch(() => null)
-  const loc = r?.headers()['location'] || ''
   const status = r?.status() || 0
-  expect(
-    (status === 301 || status === 302) && /hub.*mysettings/i.test(loc),
-    'expected 301 → /hub#/mysettings.*, got ' + status + ' ' + loc.slice(0, 90)
-  ).toBeTruthy()
+  const loc = r?.headers()['location'] || ''
+  expect(status === 404, 'expected 404 for the retired page, got ' + status + ' ' + loc.slice(0, 90)).toBeTruthy()
   // and the hub target actually renders the settings surface
   await page.goto(BASE + '/hub#/mysettings.account', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('body')).toContainText(/account|settings/i, { timeout: 15000 })
 })
 
-test('denied: unauthenticated guests do not reach settings', async ({ page }) => {
+test('denied: unauthenticated guests do not reach the retired settings page', async ({ page }) => {
   const r = await page.request.get(BASE + '/user/mysettings')
-  const followed = await page.goto(BASE + '/user/mysettings', { waitUntil: 'domcontentloaded' }).catch(() => null)
-  const denied = r?.status() === 403 || r?.status() === 302 || /login/i.test(page.url() || '') || /login/i.test(followed?.url() || '')
-  expect(denied, 'guest must not get settings (got: ' + (r?.status()) + ' at ' + (page.url()).slice(0, 80) + ')').toBeTruthy()
+  expect([404, 403, 302].includes(r?.status() || 0), 'guest stopped (got ' + (r?.status() || 0) + ')').toBeTruthy()
 })
 
 test('account: PUT /user/settings {first_name,last_name} persists', async () => {

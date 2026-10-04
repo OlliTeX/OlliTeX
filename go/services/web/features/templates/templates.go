@@ -59,18 +59,12 @@ func Feature(a *core.App) core.Feature {
 	anchor := func(s string) *regexp.Regexp { return regexp.MustCompile(`^` + s + `$`) }
 	return core.Feature{Name: "template-gallery", Routes: []core.Route{
 		{Method: "POST", Pattern: anchor(`/template/new/([^/]+)`), Handler: hCreateNew(a)},
-		{Method: "GET", Pattern: anchor(`/template/([^/]+)`), Handler: hRedirect(`/hub#/templates.all`)}, {Method: "GET", Path: "/api/templates/admin-list", Handler: hAdminList(a)},
+		{Method: "GET", Path: "/api/templates/admin-list", Handler: hAdminList(a)},
 		{Method: "GET", Pattern: anchor(`/template/([^/]+)/bundle`), Handler: hBundle(a)},
 		{Method: "POST", Path: "/template/bundle/import", Handler: hImport(a)},
 		{Method: "POST", Path: "/template/bundle/import-url", Handler: hImportUrl(a)},
-		{Method: "GET", Path: "/templates/manage", Handler: hRedirect(`/hub#/site.general.managetpl`)},
 		{Method: "POST", Pattern: anchor(`/template/([^/]+)/edit`), Handler: hEdit(a)},
 		{Method: "DELETE", Pattern: anchor(`/template/([^/]+)/delete`), Handler: hDelete(a)},
-		// Node: webRouter.get('/templates/:category?') — matches /templates,
-		// /templates/ and /templates/<one-segment>; /templates//x and
-		// /templates/a/b do NOT match (pinned 404 page); /templates/manage
-		// (registered above) wins first (pinned 301 hub admin leaf).
-		{Method: "GET", Pattern: anchor(`/templates(?:/[^/]*)?`), Handler: hRedirect(`/hub#/templates.all`)},
 		{Method: "GET", Path: "/api/template", Handler: hGetTemplate(a)},
 		{Method: "GET", Path: "/api/template/categories", Handler: hCategories(a)},
 		{Method: "GET", Path: "/api/templates", Handler: hList(a)},

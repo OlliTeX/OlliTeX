@@ -80,13 +80,10 @@ async function main() {
   push('GET', `/editingSession/${P}`, {}, 'es3 GET /editingSession P1')
   push('PUT', '/editingSession', {}, 'es4 PUT /editingSession (no seg)')
   push('PUT', '/editingSession/test', { anon: true }, 'es5 PUT /editingSession anon')
-  // --- university redirects ---
-  push('GET', '/university', {}, 'uni1 GET /university')
-  push('GET', '/university', { acc: 'application/json' }, 'uni2 GET /university (json)')
-  push('GET', '/university/Foo', {}, 'uni3 GET /university/Foo')
-  push('GET', '/university/a.html', {}, 'uni4 GET /university/a.html')
-  push('GET', '/university/A.HTML', {}, 'uni5 GET /university/A.HTML')
-  push('GET', '/university', { anon: true }, 'uni6 GET /university anon')
+  // --- university (RETIRED 2026-10-05: the pages are gone — 404 now) ---
+  push('GET', '/university', {}, 'uni1 GET /university (RETIRED)')
+  push('GET', '/university/Foo', {}, 'uni3 GET /university/Foo (RETIRED)')
+  push('GET', '/university', { anon: true }, 'uni6 GET /university anon (RETIRED)')
   // --- project tokens ---
   push('GET', `/project/${P}/tokens`, { acc: 'application/json' }, 'tk1 GET tokens (tokens:{})')
   if (NO_TOKENS) push('GET', `/project/${NO_TOKENS}/tokens`, { acc: 'application/json' }, 'tk2 GET tokens (tokens ABSENT)')

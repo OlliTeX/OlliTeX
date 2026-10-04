@@ -2,12 +2,12 @@
  * against base (http://127.0.0.1:4000 Node or :4010 Go). Emits:
  *   BATTERY-JSON:[{tag,status,ct,loc,body,etag}, ...]
  *
- * Matrix (Node oracle, captured 2026-09-22): Express routing is
- * case-INsensitive, so /editor|/project in ANY case + hex id in EITHER
- * case all render the editor (200); a non-empty invalid id is 404 JSON
- * (exact body); the empty-id forms split: /editor/ → 404 HTML page,
- * /Project/ (any case) → 301 hub#/projects.all; anonymous → 302 /login
- * (auth first).
+ * Matrix (POST-retraction 2026-10-05, owner decision): /editor is the ONLY
+ * editor page prefix (case-INsensitive Node truth is kept); the legacy
+ * /Project/:id + /project/:id PAGE routes are RETIRED (404 now). A
+ * non-empty invalid id is 404 JSON (exact body); /editor/ (empty id) →
+ * 404 HTML page; anonymous → 302 /login (auth first). /Project/:id/<action>
+ * APIs stay (registered elsewhere).
  *
  * args: <base> <pid>
  */
@@ -63,35 +63,37 @@ async function main() {
     }
   }
 
+  // RETIRED 2026-10-05 (owner decision): the /Project|/project PAGE routes
+  // are gone — they now 404 like any unknown path (V1-V4, B1, B3, B4, E2-E4
+  // were the retired rows; the /editor family keeps its full matrix).
   const cases = [
-    // 200 editor (any prefix case × id case, main + detach)
-    ['V1 /Project lower', `/Project/${PID}`],
-    ['V2 /project lower', `/project/${PID}`],
-    ['V3 /Project UPP id', `/Project/${UPP}`],
-    ['V4 /project UPP id', `/project/${UPP}`],
+    // 200 editor (/editor case-INsensitive — Node/Express truth, kept)
     ['V5 /editor lower', `/editor/${PID}`],
     ['V6 /Editor upper', `/Editor/${PID}`],
-    ['V7 detach lower', `/project/${PID}/detached`],
+    ['V6b /EDITOR UPP id', `/EDITOR/${UPP}`],
     ['V8 detach editor', `/editor/${PID}/detacher`],
-    // 404 JSON (invalid id, any case)
-    ['B1 /Project/xyz', '/Project/xyz'],
+    ['V8b detach Editor', `/Editor/${PID}/detached`],
+    // 404 JSON (invalid id)
     ['B2 /editor/abc', '/editor/abc'],
-    ['B3 /Project/12', '/Project/12'],
-    ['B4 /project/xyz/detached', `/project/xyz/detached`],
-    // empty-id splits
+    ['B4 /editor/xyz/detached', `/editor/xyz/detached`],
+    // empty-id split
     ['E1 /editor/ -> 404 page', '/editor/'],
-    ['E2 /Project/ -> 301', '/Project/'],
-    ['E3 /project/ -> 301', '/project/'],
-    ['E4 /PROJECT/ -> 301', '/PROJECT/'],
+    // retired prefix -> generic 404 (was 200 / 301 in the Node-era rows)
+    ['R1 /Project/ID -> 404 (RETIRED route)', `/Project/${PID}`],
+    ['R2 /project/ID -> 404 (RETIRED route)', `/project/${PID}`],
+    ['R3 /Project/xyz -> 404 (RETIRED route)', '/Project/xyz'],
+    ['R4 /Project/ -> 404 (RETIRED route)', '/Project/'],
+    ['R5 /project/ -> 404 (RETIRED route)', '/project/'],
   ]
   for (const [tag, path] of cases) {
     out.push(await req('GET', path, { tag }))
   }
 
-  // anonymous (auth bounces first — incl. the bad-id form)
-  out.push(await req('GET', `/Project/${PID}`, { tag: 'N1 anon /Project', anon: true }))
-  out.push(await req('GET', `/project/${PID}`, { tag: 'N2 anon /project', anon: true }))
-  out.push(await req('GET', '/Project/xyz', { tag: 'N3 anon badid', anon: true }))
+  // anonymous (auth bounces first — incl. the bad-id form; retired prefix
+  // now 404s regardless of auth)
+  out.push(await req('GET', `/editor/${PID}`, { tag: 'N1 anon /editor', anon: true }))
+  out.push(await req('GET', `/Project/${PID}`, { tag: 'N2 anon /Project (retired)', anon: true }))
+  out.push(await req('GET', '/editor/xyz', { tag: 'N3 anon badid', anon: true }))
 
   console.log('BATTERY-JSON:' + JSON.stringify(out))
 }

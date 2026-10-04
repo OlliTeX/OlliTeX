@@ -53,19 +53,20 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-// editorPagePattern — both main-shell prefixes (Node/Express routing is
-// case-INsensitive: /editor|/project in ANY case) + a 24-hex project id in
-// either hex case; optional detach suffix (P5.1b).
-var editorPagePattern = regexp.MustCompile(`^/(?i:editor|project)/(?P<id>[0-9a-fA-F]{24})(?P<role>/detacher|/detached)?$`)
+// editorPagePattern — /editor is the ONLY editor page prefix (owner
+// decision 2026-10-05: the legacy /Project/:id page route is RETIRED — it
+// now 404s; every /Project/:id/<action> API stays, registered separately).
+// Case stays-INsensitive Node/Express truth (/Editor, /EDITOR valid) + a
+// 24-hex project id in either hex case; optional detach suffix (P5.1b).
+var editorPagePattern = regexp.MustCompile(`^/(?i:editor)/(?P<id>[0-9a-fA-F]{24})(?P<role>/detacher|/detached)?$`)
 
 // editorBadIdPattern — the same route family with a NON-empty, non-valid
 // ObjectId (Node: loadEditorSchema logs the fallback, the objectId param
 // validator 404s: {"error":"Validation error: Invalid Mongo ObjectId at
 // \"params.Project_id\"","statusCode":404}, application/json — pinned
-// live 2026-09-22 U2). Empty id (/editor/ or /Project/) does NOT hit this:
-// /editor/ falls through to the generic 404 page (Node truth), /Project/
-// matches the dashboard 301 (projectlist) — both pinned in the U2 gate.
-var editorBadIdPattern = regexp.MustCompile(`^/(?i:editor|project)/(?P<id>[^/]+)(?P<role>/detacher|/detached)?$`)
+// live 2026-09-22 U2). Empty id (/editor/) does NOT hit this: it falls
+// through to the generic 404 page (Node truth — still pinned).
+var editorBadIdPattern = regexp.MustCompile(`^/(?i:editor)/(?P<id>[^/]+)(?P<role>/detacher|/detached)?$`)
 
 // Feature registers the editor page routes.
 func Feature(a *core.App) core.Feature {

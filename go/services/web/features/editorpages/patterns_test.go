@@ -7,21 +7,18 @@ import (
 	"ollitex/go/services/web/core"
 )
 
-// TestEditorRoutePatternsCase — U2 pin: Node/Express matches the editor
-// route family case-INsensitively (prefix + hex id), pinned live on the
-// e2e stack 2026-09-22 (200 on /Project|/project|/Editor in any case; the
-// gate asserts the full matrix against Node).
+// TestEditorRoutePatternsCase — editor prefix pins. Owner decision
+// 2026-10-05: the legacy /Project/:id + /project/:id PAGE routes are
+// RETIRED (they must NOT match the editor patterns anymore — they 404 now);
+// /editor stays case-INsensitive (Node/Express truth: /Editor, /EDITOR
+// valid — pinned live 2026-09-22). /Project/:id/<action> APIs stay but
+// are registered elsewhere and are deliberately excluded here.
 func TestEditorRoutePatternsCase(t *testing.T) {
 	valid := []string{
-		"/Project/6aaa7f570accd346715942b5",
-		"/project/6aaa7f570accd346715942b5",
-		"/Project/6AAA7F570ACCD346715942B5",
-		"/project/6AAA7F570ACCD346715942B5",
 		"/editor/6aaa7f570accd346715942b5",
 		"/Editor/6aaa7f570accd346715942b5",
-		"/EDITOR/6aaa7f570accd346715942b5",
-		"/Project/6aaa7f570accd346715942b5/detacher",
-		"/project/6aaa7f570accd346715942b5/detached",
+		"/EDITOR/6AAA7F570ACCD346715942B5",
+		"/editor/6aaa7f570accd346715942b5/detacher",
 		"/editor/6aaa7f570accd346715942b5/detached",
 	}
 	for _, p := range valid {
@@ -42,8 +39,20 @@ func TestEditorRoutePatternsCase(t *testing.T) {
 		if id != "6aaa7f570accd346715942b5" && id != "6AAA7F570ACCD346715942B5" {
 			t.Fatalf("%q: id param = %q", p, id)
 		}
-		if (p == "/Project/6aaa7f570accd346715942b5/detacher") && role != "/detacher" {
+		if (p == "/editor/6aaa7f570accd346715942b5/detacher") && role != "/detacher" {
 			t.Fatalf("%q: role = %q", p, role)
+		}
+	}
+
+	// RETIRED prefix: /Project|/project page routes must not match any
+	// editor pattern (owner decision 2026-10-05 — they 404 now).
+	for _, p := range []string{
+		"/Project/6aaa7f570accd346715942b5",
+		"/project/6aaa7f570accd346715942b5",
+		"/Project/6aaa7f570accd346715942b5/detacher",
+	} {
+		if editorPagePattern.MatchString(p) || editorBadIdPattern.MatchString(p) {
+			t.Fatalf("retired %q must not match the editor patterns (route removed 2026-10-05)", p)
 		}
 	}
 
@@ -52,15 +61,13 @@ func TestEditorRoutePatternsCase(t *testing.T) {
 	// valid registered first; core/app.go walks routes in slice order) —
 	// pinned at the end of this test.
 	bad := []string{
-		"/Project/xyz",
-		"/project/xyz",
-		"/editor/x",
-		"/Project/12345",
-		"/Project/zzzzzzzzzzzzzzzzzzzzzzzz",
-		"/Project/6aaa7f570accd346715942b57", // 25 chars
-		"/Project/6aaa7f570accd346715942b",   // 23 chars
-		"/Project/xyz/detached",
-		"/Project/xyz/detacher",
+		"/editor/xyz",
+		"/editor/12345",
+		"/editor/zzzzzzzzzzzzzzzzzzzzzzzz",
+		"/editor/6aaa7f570accd346715942b57", // 25 chars
+		"/editor/6aaa7f570accd346715942b",   // 23 chars
+		"/editor/xyz/detached",
+		"/editor/xyz/detacher",
 	}
 	for _, p := range bad {
 		if !editorBadIdPattern.MatchString(p) {
@@ -79,7 +86,8 @@ func TestEditorRoutePatternsCase(t *testing.T) {
 	}
 
 	// empty id: NEITHER editor pattern matches (Node: /editor/ → generic 404
-	// page; /Project/ → dashboard 301 handled by projectlist)
+	// page). /Project + /project (any form) are retired page routes — they
+	// must not match either pattern (404 / generic fallthrough now).
 	for _, p := range []string{"/editor/", "/Editor/", "/Project/", "/project/"} {
 		if editorPagePattern.MatchString(p) || editorBadIdPattern.MatchString(p) {
 			t.Fatalf("empty-id %q must not match the editor patterns", p)

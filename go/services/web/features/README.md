@@ -24,7 +24,7 @@ locked by parity gates under `tests/e2e/specs/parity/`. The phase letter
 | `mendeley` | Mendeley sync surface | P6.8 |
 | `notifications` | `/notifications/preferences` + notification-preferences + test-email | P6.14 |
 | `orcidpicker` | ORCID picker/OAuth surface | P6.7 |
-| `pageshells` | page-shell (PSH) redirect surface | P6.18 |
+| `pageshells` | (RETIRED 2026-10-05: /user/mysettings + /admin/panel 301s removed → 404; the hub is the only settings surface) | P6.18 |
 | `passwordreset` | CE password-reset flow | P2 |
 | `projectlist` | `GET /user/projects` (project list) | P4.1 |
 | `registrationpage` | CE registration-page flow | P3.4 |

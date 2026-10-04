@@ -369,14 +369,6 @@ func tplRestricted(cxt *core.Cxt, res *core.Res) {
 	views.Restricted403(res.W, tplPageData(cxt))
 }
 
-// ---- simple routes ---------------------------------------------------------
-
-func hRedirect(target string) func(*core.Cxt, *core.Res) {
-	return func(cxt *core.Cxt, res *core.Res) {
-		res.Redirect(cxt.Req, 301, target)
-	}
-}
-
 // ---- /api/template ---------------------------------------------------------
 
 // singleQuery — Node req.query: a single value; duplicates → array → the

@@ -31,20 +31,18 @@ test.afterAll(async () => {
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const KEY = 'paritylib' + Date.now().toString(36)
 
-test('renders: /library loads with h1 + Add control', async () => {
-  const r = await p.goto(PAGE, { waitUntil: 'domcontentloaded' })
-  expect(r?.status()).toBe(200)
-  await expect(p.locator('h1', { hasText: /library/i })).toBeVisible({ timeout: 15000 })
-  await expect(p.locator('button', { hasText: /add reference|add/i }).first()).toBeVisible()
+test('retired: /library PAGE is a Go 404 now (the hub #/library surface replaces it)', async () => {
+  const r = await p.request.get(PAGE, { maxRedirects: 0 })
+  expect(r.status(), '404 expected for the retired page').toBe(404)
+  // the API surface the page used is untouched:
+  const refs = await a('GET', '/library/references')
+  expect(refs.status(), 'API stays live').toBe(200)
 })
 
-test('deny: guests get the login wall', async ({ browser }) => {
+test('deny: guests hitting the retired /library page get 404 (no page, no wall needed)', async ({ browser }) => {
   const ctx = await browser.newContext(); const q = await ctx.newPage()
-  await q.goto(PAGE, { waitUntil: 'domcontentloaded' }).catch(() => {})
-  const url = q.url()
-  const body = (await q.locator('body').innerText().catch(() => '')) || ''
-  const denied = /login/i.test(url) || /log ?in|sign in/i.test(body)
-  expect(denied, 'guest walled (at ' + url + ')').toBeTruthy()
+  const r = await q.request.get(PAGE, { maxRedirects: 0 })
+  expect([404, 302].includes(r.status()), 'guest stopped from the retired page').toBeTruthy()
   await ctx.close()
 })
 

@@ -34,20 +34,18 @@ const postRedirect = async (path: string, body?: unknown) => {
   return res.status() < 400
 }
 
-test('redirects: /admin/panel 301 → /hub#/overview (page removed 2026-09-10)', async () => {
+test('retired: /admin/panel is a Go 404 now (redirect removed 2026-10-05)', async () => {
   const res = await p.request.get(PAGE, { maxRedirects: 0 })
-  expect(res.status(), '301 expected').toBe(301)
-  expect(res.headers()['location']).toBe('/hub#/overview')
+  expect(res.status(), '404 expected for the retired page').toBe(404)
+  expect((res.headers()['location'] || '').toLowerCase(), 'no hub redirect anymore').not.toContain('/hub')
 })
 
-test('deny: non-site-admins are denied the admin panel (gate enforced on the hub)', async ({ browser }) => {
+test('deny: non-site-admins hit 404/restricted on the retired panel page', async ({ browser }) => {
   for (const who of [TPLADMIN, USER]) {
     const ctx = await browser.newContext(); const q = await ctx.newPage()
     await loginRobust(q, who.email, who.password)
-    await q.goto(PAGE, { waitUntil: 'domcontentloaded' })
-    await q.waitForTimeout(1200)
-    const body = (await q.locator('body').innerText().catch(() => '')) || ''
-    expect(/post message/i.test(body), who.email + ' must NOT see the panel controls').toBeFalsy()
+    const r = await q.request.get(PAGE, { maxRedirects: 0 })
+    expect([404, 302, 403].includes(r.status()), who.email + ' stopped (got ' + r.status() + ')').toBeTruthy()
     await ctx.close()
   }
 })

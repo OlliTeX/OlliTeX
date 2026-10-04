@@ -18,21 +18,19 @@ test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const all = async () => (await a('GET', '/admin/site-settings')).json().catch(() => null)
 
-test('redirect: /admin/site forwards admins to the hub Site settings (owner 2026-09-11 item 5)', async () => {
-  // The legacy /admin/site page was retired — the URL now 302s to the hub's
-  // Site section; every former page section lives there (parity is asserted
-  // in hub-admin-site.test.e2e.ts). Non-admins still get a hard deny (below).
-  expect(p.url(), 'redirected into the hub').toContain('/hub')
-  const body = (await p.locator('body').innerText()) || ''
-  expect(/site|settings|hub/i.test(body), 'hub site surface rendered').toBeTruthy()
+test('retired: /admin/site is a Go 404 now (redirect removed 2026-10-05)', async () => {
+  // The legacy /admin/site page is fully retired; the hub's Site section is
+  // the surface (parity asserted in hub-admin-site.test.e2e.ts).
+  const r = await p.request.get(BASE + '/admin/site', { maxRedirects: 0 })
+  expect([404, 302].includes(r.status()), 'retired page: 404 (or the non-admin bounce), got ' + r.status()).toBeTruthy()
+  expect((r.headers()['location'] || '').toLowerCase(), 'no hub redirect anymore').not.toContain('/hub')
 })
 
-test('deny: non-site-admins are denied /admin/site', async ({ browser }) => {
+test('retired: non-site-admins get 404 / restricted at /admin/site', async ({ browser }) => {
   for (const who of [TPLADMIN, USER]) {
     const ctx = await browser.newContext(); const q = await ctx.newPage()
-    await q.goto(PAGE, { waitUntil: 'domcontentloaded' }).catch(() => {})
-    const ok = /login|signin|denied|forbidden/i.test(q.url()) || !/site settings/i.test((await q.locator('body').innerText().catch(() => '')) || '')
-    expect(ok, who.email + ' denied').toBeTruthy()
+    const r = await q.request.get(BASE + '/admin/site', { maxRedirects: 0 })
+    expect([404, 302, 403].includes(r.status()), who.email + ' stopped (got ' + r.status() + ')').toBeTruthy()
     await ctx.close()
   }
 })

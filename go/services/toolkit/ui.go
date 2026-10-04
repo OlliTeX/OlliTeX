@@ -1083,6 +1083,20 @@ func (a *app) runNgram(langs string) tea.Cmd {
 	})
 }
 
+// runBootstrap — the launchpad absorption as a TUI job: first-admin
+// creation through the toolkit (owner: the /launchpad page goes; this is
+// the replacement).
+func (a *app) runBootstrap(email, password string) tea.Cmd {
+	t := a.tk
+	var b strings.Builder
+	if err := t.BootstrapFreshInstance(email, password, &b); err != nil {
+		a.actResult = "bootstrap FAILED: " + err.Error()
+		return a.refreshActive()
+	}
+	a.actResult = b.String() + "\n  first admin created: " + email + " — sign in with email + password; the instance is bootable."
+	return a.refreshActive()
+}
+
 // runTLS copies the owner's cert+key into <data>/nginx/tls, points the store
 // keys at them, and restarts nginx once (when the service is present).
 func (a *app) runTLS(certSrc, keySrc string) tea.Cmd {
@@ -1119,6 +1133,7 @@ func (a *app) runTLS(certSrc, keySrc string) tea.Cmd {
 //	t  → TLS import (prompt: certificate path, then key path)
 //	n  → n-gram models (prompt: "en,de" or empty = all five)
 //	l  → n-gram status (instant, no network)
+//	b  → first-admin bootstrap (launchpad absorption: email, password)
 //	esc/q → back to the dashboard
 //
 // Prompt mode: type the path, enter confirms (TLS collects two prompts).
@@ -1134,6 +1149,10 @@ func (a *app) actionsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return a, nil
 		case "l":
 			a.actResult = a.ngramStatusText()
+			return a, nil
+		case "b":
+			a.actCert, a.actKey = "", ""
+			a.actPrompt = "first admin EMAIL, then enter:"
 			return a, nil
 		case "esc", "q":
 			a.kind = scrDashboard
@@ -1155,6 +1174,16 @@ func (a *app) actionsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			a.actKey = v
 			a.actPrompt = ""
 			return a, a.runTLS(a.actCert, a.actKey)
+		}
+		if strings.HasPrefix(p, "first admin EMAIL") {
+			a.actCert = v
+			a.actPrompt = "first admin PASSWORD, then enter:"
+			return a, nil
+		}
+		if strings.HasPrefix(p, "first admin PASSWORD") {
+			a.actKey = v
+			a.actPrompt = ""
+			return a, a.runBootstrap(a.actCert, a.actKey)
 		}
 		if strings.HasPrefix(p, "languages") {
 			a.actPrompt = ""

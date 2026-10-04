@@ -64,6 +64,8 @@ func run(args []string) error {
 		return local(rest)
 	case "init":
 		return initcmd(rest)
+	case "bootstrap":
+		return bootstrapcmd(rest)
 	case "plan":
 		return plancmd(rest)
 	case "health":
@@ -483,4 +485,36 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// bootstrapcmd — the launchpad absorption (owner decision 2026-10-05,
+// TODO-f3b6d88d): "that functionality in the toolkit instead, then get rid
+// of the /launchpad page". First-boot story: config store (key +
+// env/defaults seed, never clobbers) + the first admin user (the exact
+// Node-parity document the launchpad page created).
+func bootstrapcmd(args []string) error {
+	f := flag.NewFlagSet("bootstrap", flag.ExitOnError)
+	dsn := f.String("dsn", os.Getenv(toolkit.EnvDSN), "config store Postgres DSN (overrides env chain)")
+	dataDir := f.String("data-dir", envOr(toolkit.EnvDataDir, "/opt/ollitex/data"), "mounted data dir")
+	composeFile := f.String("compose", envOr(toolkit.EnvComposeFile, "/opt/ollitex/toolkit.yaml"), "compose file")
+	project := f.String("project", envOr(toolkit.EnvProjectName, "ollitex"), "stack project name")
+	email := f.String("email", "", "first admin email (required)")
+	password := f.String("password", "", "first admin password (required)")
+	_ = f.Parse(args)
+
+	if *email == "" || *password == "" {
+		return fmt.Errorf("usage: toolkit bootstrap --email <a@b.c> --password <pw>   (first-admin bootstrap; the /launchpad page is retired and this is its replacement)")
+	}
+
+	t, err := toolkit.New(toolkit.Options{
+		DSN:         *dsn,
+		DataDir:     *dataDir,
+		ComposeFile: *composeFile,
+		Project:     *project,
+	})
+	if err != nil {
+		return err
+	}
+	defer t.Close()
+	return t.BootstrapFreshInstance(*email, *password, os.Stdout)
 }
