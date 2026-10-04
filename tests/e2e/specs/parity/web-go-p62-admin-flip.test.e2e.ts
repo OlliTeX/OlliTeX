@@ -34,6 +34,11 @@
  *
  *   Node oracle pins (live 2026-09-16, /tmp/p62_oracle.json).
  */
+
+ // 2026-10-05 (route-retirement wave): Node-dependent legs RETIRED — the Node-
+ // baseline/flip-off legs need the P6 Node web service, absent from the single-Go
+ // P7 e2e image. Pure-Go legs (leg 0 / leg 2 "Go parity") stay live as the
+ // contract pins; the Node-comparison premise matches web-go-u2-editor/u102a/p620.
 import { execFileSync } from 'node:child_process'
 import { test, expect } from '@playwright/test'
 
@@ -300,7 +305,7 @@ test.describe('@local web-go P6.2 (admin-tools project surface) parity', () => {
     prepSacrifice()
   })
 
-  test('leg 1: Node baseline', async () => {
+  test.skip('leg 1: Node baseline', async () => {
     flip('strip')
     await sleep(300)
     Object.assign(LEG1, await battery(U, A))
@@ -317,7 +322,7 @@ test.describe('@local web-go P6.2 (admin-tools project surface) parity', () => {
     expect(ds, ds.join('\n')).toHaveLength(0)
   })
 
-  test('leg 3: Node re-baseline', async () => {
+  test.skip('leg 3: Node re-baseline', async () => {
     flip('strip')
     await sleep(300)
     const leg3 = await battery(U, A)

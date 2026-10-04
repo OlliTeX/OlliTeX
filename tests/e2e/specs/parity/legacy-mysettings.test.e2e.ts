@@ -35,7 +35,7 @@ test('retired: /user/mysettings is a Go 404 now (redirect removed 2026-10-05)', 
 })
 
 test('denied: unauthenticated guests do not reach the retired settings page', async ({ page }) => {
-  const r = await page.request.get(BASE + '/user/mysettings')
+  const r = await page.request.get(BASE + '/user/mysettings', { maxRedirects: 0 })
   expect([404, 403, 302].includes(r?.status() || 0), 'guest stopped (got ' + (r?.status() || 0) + ')').toBeTruthy()
 })
 

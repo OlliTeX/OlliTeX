@@ -25,6 +25,11 @@
  *
  * Run: npx playwright test -g "web-go P2 flip gate"
  */
+
+ // 2026-10-05 (route-retirement wave): dual-stack legs RETIRED — the Node-
+ // baseline leg needs the P6 Node web service, absent from the single-Go P7 e2e
+ // image (same premise as web-go-u2-editor/u102a/p3d/p3e/p620-flip). The single-Go
+ // contract stays pinned by the standalone legacy-*/hub-* families.
 import { execFileSync } from 'child_process'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -383,14 +388,14 @@ test.describe.serial('web-go P2 flip gate (WEB_GO_PLAN P2)', () => {
     restoreFixture()
   })
 
-  test('leg 1: Node baseline battery', async () => {
+  test.skip('leg 1: Node baseline battery', async () => {
     test.setTimeout(1800_000)
     dexe(overleafC, FLIP_STRIP, true)
     leg1 = await battery()
     expect(Object.keys(leg1.out).length).toBeGreaterThan(20)
   }, 1800_000)
 
-  test('leg 2: FLIP ON — Go matches the Node baseline', async () => {
+  test.skip('leg 2: FLIP ON — Go matches the Node baseline', async () => {
     test.setTimeout(1800_000)
     dexe(overleafC, FLIP_APPLY)
     const leg2 = await battery()
@@ -398,7 +403,7 @@ test.describe.serial('web-go P2 flip gate (WEB_GO_PLAN P2)', () => {
     expect(problems, problems.join('\n---\n')).toHaveLength(0)
   }, 1800_000)
 
-  test('leg 3: FLIP OFF — Node matches the baseline again', async () => {
+  test.skip('leg 3: FLIP OFF — Node matches the baseline again', async () => {
     test.setTimeout(1800_000)
     dexe(overleafC, FLIP_STRIP)
     const leg3 = await battery()

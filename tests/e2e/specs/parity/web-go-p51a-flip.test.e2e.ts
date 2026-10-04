@@ -52,8 +52,9 @@ function dexeQ(c: string, cmd: string): string {
 
 async function waitGo(): Promise<void> {
   for (let i = 0; i < 60; i++) {
-    const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim()
-    if (code === '200') return
+    // 2026-10-05: the single-Go P7 stack has no :4010 shadow — probe :4000 (the live Go web).
+    const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4000/login`, true).trim()
+    if (code === '200' || code === '302') return
     await sleep(500)
   }
   throw new Error('Go shadow /status not 200')
@@ -192,29 +193,33 @@ test.describe('@local web-go P5.1a (editor page) parity', () => {
   test.beforeAll(async () => {
     test.setTimeout(600_000)
     const here = path.dirname(fileURLToPath(import.meta.url))
-    const cp = path.resolve(here, '..', '..', '..', '..', 'server-ce', 'nginx', 'flips', FLIPCONF)
+    const cp = path.resolve(here, '..', '..', '..', '..', 'images', 'main-amd64', 'nginx', 'flips', FLIPCONF)
     execFileSync('docker', ['cp', cp, `${overleafC}:/tmp/${FLIPCONF}`])
     dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips && cp -f /tmp/${FLIPCONF} /usr/local/share/overleaf-flips/${FLIPCONF}`)
-    flip('strip')
+    // 2026-10-05 (route-retirement wave) single-stack rework: the P7 e2e stack
+    // serves the Go web service directly, so the gate runs against the live
+    // stack (the flip confs are a no-op legacy from the dual-stack era). Leave
+    // the nginx upstream on the live Go service.
+    flip('apply')
     await waitGo()
     U = await login(USER)
     PID = await ensureFixtureProject(U)
-    // Pin the Node oracle BEFORE any flip: it must be a 200 text/html owner
-    // page with the ol-* bootstrap metas.
+    // Pin the Go oracle: a 200 text/html owner page with the ol-* bootstrap metas.
     const probe = await call('/editor/' + PID, { headers: { cookie: U.ck, accept: 'text/html' } })
-    if (probe.status !== 200) throw new Error('Node oracle /editor/:id not 200: ' + probe.status)
-    if (!probe.ct.includes('text/html')) throw new Error('Node oracle CT not html: ' + probe.ct)
-    if (!probe.body.includes('name="ol-project_id"')) throw new Error('Node oracle missing ol-project_id meta')
+    if (probe.status !== 200) throw new Error('Go /editor/:id not 200: ' + probe.status)
+    if (!probe.ct.includes('text/html')) throw new Error('Go CT not html: ' + probe.ct)
+    if (!probe.body.includes('name="ol-project_id"')) throw new Error('Go missing ol-project_id meta')
   }, 600_000)
 
   test.afterAll(async () => {
     try {
-      flip('strip')
+      // 2026-10-05: leave the single-Go stack on its live upstream.
+      flip('apply')
       await waitGo()
     } catch {}
   })
 
-  test('leg 1: Node baseline', async () => {
+  test.skip('leg 1: Node baseline', async () => {
     test.setTimeout(300_000)
     flip('strip')
     const leg1 = await battery(PID, U)
@@ -239,17 +244,29 @@ test.describe('@local web-go P5.1a (editor page) parity', () => {
     expect(leg1.legacy.body).toContain(`/Project/`)
   })
 
-  test('leg 2: Go parity', async () => {
+  test('leg 2: Go (single-stack; /Project retired 2026-10-05)', async () => {
     test.setTimeout(300_000)
     flip('apply')
-    const leg2 = await battery(PID, U)
-    flip('strip')
-    const ds = diffLegs('p51a', LEG1, leg2)
-    if (ds.length) console.log(ds.join('\n'))
-    expect(ds, ds.join('\n')).toHaveLength(0)
+    try {
+      const leg2 = await battery(PID, U)
+      // /editor/:id — the live editor page (owner route decision: /editor stays)
+      expect(leg2.editor.status, 'editor status').toBe(200)
+      expect(leg2.editor.ct, 'editor CT').toBe('text/html')
+      expect(leg2.editor.body).toContain('<!DOCTYPE html')
+      expect(leg2.editor.body).toMatch(/<meta name="ol-csrfToken" content="[A-Za-z0-9_-]+"/)
+      expect(leg2.editor.body).toMatch(/<meta name="ol-project_id" content="[0-9a-f]{24}"/)
+      expect(leg2.editor.body).toContain('name="ol-navbar" data-type="json"')
+      expect(leg2.editor.body).toContain('name="ol-capabilities" data-type="json"')
+      // /Project/:id — RETIRED by the 2026-10-05 route-retirement wave (owner
+      // decision: /Project/:id editor page went, /editor/:id stays)
+      expect(leg2.legacy.status, 'legacy /Project/:id retired \u2192 404').toBe(404)
+    } finally {
+      // leave the stack on the live Go upstream (P7 single-Go baseline)
+      flip('apply')
+    }
   })
 
-  test('leg 3: Node re-baseline', async () => {
+  test.skip('leg 3: Node re-baseline', async () => {
     test.setTimeout(300_000)
     flip('strip')
     const leg3 = await battery(PID, U)

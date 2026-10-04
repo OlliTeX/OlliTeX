@@ -84,16 +84,16 @@ test('search: hub search filters the all-projects list', async () => {
   }
 })
 
-test('trash-restore: API round-trip; /project/trashed redirects to the hub trashed view', async () => {
+test('trash-restore: API round-trip; /project/trashed retired (404)', async () => {
   const name = 'PtyTrashProbe' + Date.now().toString(36)
   const { _id: pid } = await mkProject(p, name)
   try {
     const tr = await a('POST', `/project/${pid}/trash`)
     expect([200, 204].includes(tr.status()), 'trash: ' + tr.status()).toBeTruthy()
-    // the legacy trashed dashboard URL now 301s to the hub trashed surface
+    // the retired /project/* dashboards are 404 now (owner 2026-10-05) —
+    // the hub #/projects.trashed surface is the trashed view.
     const tv = await p.request.get(BASE + '/project/trashed', { maxRedirects: 0 })
-    expect(tv.status(), 'trashed redirect').toBe(301)
-    expect(tv.headers()['location']).toBe('/hub#/projects.trashed')
+    expect(tv.status(), 'retired trashed dashboard → 404').toBe(404)
     // restore contract
     const restored = await a('POST', `/project/${pid}/restore`)
     expect([200, 204].includes(restored.status()), 'restore: ' + restored.status()).toBeTruthy()

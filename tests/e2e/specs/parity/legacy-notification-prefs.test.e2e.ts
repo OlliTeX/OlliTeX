@@ -81,13 +81,15 @@ test('default-hint: the hub email section shows the server default delay hint', 
   expect(/default \(2 minutes\)|2 minutes/i.test(body), 'server default delay hint visible').toBeTruthy()
 })
 
-// role coverage: template admin and admin reach the same surface via the redirect
-test('role: tpladmin and admin reach the hub email surface through the redirect', async ({ browser }) => {
+// role coverage: the RETIRED page is 404 for everyone (page gone 2026-10-05);
+// the hub email surface is the role contract (admin/template-admin alike).
+test('role: retired page 404 for all roles; the hub email surface stays live', async ({ browser }) => {
   for (const u of [TPLADMIN, ADMIN]) {
     const ctx = await browser.newContext(); const q = await ctx.newPage()
     await loginRobust(q, u.email, u.password)
-    await q.goto(PAGE, { waitUntil: 'domcontentloaded' })
-    expect(q.url(), u.email + ' lands on the hub').toContain('/hub')
+    const r = await q.request.get(PAGE, { maxRedirects: 0 })
+    expect([404, 403, 302].includes(r.status()), u.email + ' stopped at retired page (got ' + r.status() + ')').toBeTruthy()
+    await q.goto(HUB_EMAIL, { waitUntil: 'domcontentloaded' })
     await expect(q.locator('input:visible, select:visible, textarea:visible, button:visible').first()).toBeVisible({ timeout: 15000 })
     await ctx.close()
   }

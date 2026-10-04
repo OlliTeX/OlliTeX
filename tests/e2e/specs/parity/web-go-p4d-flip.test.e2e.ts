@@ -95,10 +95,23 @@ async function login(who: { email: string; password: string }): Promise<string> 
   const page = await call('/login')
   const csrf = (page.body.match(/name=["']ol-csrfToken["']\s+content=["']([^"']+)"/) || [])[1] || ''
   let ck = (page.setcookie.match(/overleaf\.sid=[^;\n]+/) || [])[0] || ''
-  const r = await call('/login', {
+  // 2026-10-05: the login limiter (10/60s per IP) trips under the parity
+  // battery's repeated admin/user/guest logins — wait out the window on 429
+  // (parity-neutral: the limiter is pinned separately by the p1-auth battery).
+  let r = await call('/login', {
     method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': csrf, accept: 'application/json' },
     cookie: ck, body: JSON.stringify(who),
   })
+  for (let i = 0; r.status === 429 && i < 14; i++) {
+    await sleep(5000)
+    const page2 = await call('/login')
+    ck = (page2.setcookie.match(/overleaf\.sid=[^;\n]+/) || [])[0] || ck
+    const csrf2 = (page2.body.match(/name=["']ol-csrfToken["']\s+content=["']([^"']+)"/) || [])[1] || csrf
+    r = await call('/login', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': csrf2, accept: 'application/json' },
+      cookie: ck, body: JSON.stringify(who),
+    })
+  }
   expect(r.status, `login ${who.email}`).toBe(200)
   const lines = r.setcookie.split('\n').filter((l) => l.includes('overleaf.sid'))
   return lines[lines.length - 1] || ck

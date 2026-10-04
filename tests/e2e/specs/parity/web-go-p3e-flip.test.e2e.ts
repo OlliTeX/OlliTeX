@@ -53,6 +53,12 @@
  *
  * Run: npx playwright test -g "web-go P3.6 flip gate"
  */
+
+ // 2026-10-05 (route-retirement wave): RETIRED as a dual-stack gate — its Node-
+ // baseline leg needs the P6 Node web service, which is absent from the single-Go
+ // P7 e2e image (web-overleaf runit service down; the nginx flip has no Node side).
+ // Same premise as web-go-u2-editor/u102a/p620-flip. The single-Go contract stays
+ // pinned by the standalone families against the live stack (legacy-* + hub-*).
 import { execFileSync } from 'child_process'
 import { test, expect } from '@playwright/test'
 import path from 'path'
@@ -348,7 +354,7 @@ test.describe.serial('web-go P3.6 flip gate (WEB_GO_PLAN P3.6 SiteSettings)', ()
     return { me, guest }
   }
 
-  test('leg 1: Node baseline battery', async () => {
+  test.skip('leg 1: Node baseline battery', async () => {
     test.setTimeout(300_000)
     dexe(overleafC, FLIP('strip'), true)
     await nginxSettled()
@@ -381,7 +387,7 @@ test.describe.serial('web-go P3.6 flip gate (WEB_GO_PLAN P3.6 SiteSettings)', ()
     expect(leg1.mailSubject).toBe('[Overleaf] E-mail configuration test')
   }, 300_000)
 
-  test('leg 2: FLIP ON — Go matches the Node baseline', async () => {
+  test.skip('leg 2: FLIP ON — Go matches the Node baseline', async () => {
     test.setTimeout(300_000)
     dexe(overleafC, FLIP('apply'))
     await nginxSettled()
@@ -393,7 +399,7 @@ test.describe.serial('web-go P3.6 flip gate (WEB_GO_PLAN P3.6 SiteSettings)', ()
     expect(problems, problems.join('\n---\n')).toHaveLength(0)
   }, 300_000)
 
-  test('leg 3: FLIP OFF — Node matches the baseline again', async () => {
+  test.skip('leg 3: FLIP OFF — Node matches the baseline again', async () => {
     test.setTimeout(300_000)
     dexe(overleafC, FLIP('strip'))
     await nginxSettled()

@@ -22,6 +22,11 @@
  * Determinism: the e2e user is unlinked → no zotero.org traffic on pinned
  * paths; no collection is written (unlink is a no-op when unlinked).
  */
+
+ // 2026-10-05 (route-retirement wave): Node-dependent legs RETIRED — the Node-
+ // baseline/flip-off legs need the P6 Node web service, absent from the single-Go
+ // P7 e2e image. Pure-Go legs (leg 0 / leg 2 "Go parity") stay live as the
+ // contract pins; the Node-comparison premise matches web-go-u2-editor/u102a/p620.
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 
@@ -298,7 +303,7 @@ test('leg 0: flip off before start', async () => {
   for (const conf of FLIPCONFS) expect(flipCount(conf)).toBe(0)
 }, 60_000)
 
-test('leg 1: Node baseline (A disabled → B enabled)', async () => {
+test.skip('leg 1: Node baseline (A disabled → B enabled)', async () => {
   leg1 = await runLeg()
   expect(Object.keys(leg1).length).toBeGreaterThanOrEqual(26)
   expect(zoteroState()).toBe('null')
@@ -315,7 +320,7 @@ test('leg 2: Go parity (flip on)', async () => {
   expect(userLinked()).toBe('not-linked')
 }, 300_000)
 
-test('leg 3: Node re-baseline', async () => {
+test.skip('leg 3: Node re-baseline', async () => {
   await flip('strip')
   leg3 = await runLeg()
   const ds = diffLegs('node-determinism', leg1!, leg3!)
@@ -324,7 +329,7 @@ test('leg 3: Node re-baseline', async () => {
   expect(userLinked()).toBe('not-linked')
 }, 300_000)
 
-test('pin sanity: anchors hold (Node baseline)', async () => {
+test.skip('RETIRED (dual-stack, 2026-10-05) — pin sanity: anchors hold (Node baseline)', async () => {
   const L = leg1!
   // disabled phase
   expect(L.A_zstate.body).toBe('null')

@@ -60,6 +60,11 @@
  * disconnect): dropboxusercredentials count 0 before/after;
  * dropboxsyncprojectstates count 0 throughout.
  */
+
+ // 2026-10-05 (route-retirement wave): dual-stack legs RETIRED — the Node-
+ // baseline leg needs the P6 Node web service, absent from the single-Go P7 e2e
+ // image (same premise as web-go-u2-editor/u102a/p620-flip). The single-Go
+ // contract stays pinned by the standalone legacy-*/hub-* families.
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 
@@ -398,7 +403,7 @@ async function login(email: string, pw: string): Promise<{ ck: string; tok: stri
 
 let leg1: Leg | null = null
 
-test('leg 0: flip off before start (force-strip any leftovers)', async () => {
+test.skip('leg 0: flip off before start (force-strip any leftovers)', async () => {
   try {
     await flip('strip')
   } catch {
@@ -407,7 +412,7 @@ test('leg 0: flip off before start (force-strip any leftovers)', async () => {
   for (const conf of FLIPCONFS) expect(flipCount(conf)).toBe(0)
 }, 60_000)
 
-test('leg 1: Node baseline battery', async () => {
+test.skip('leg 1: Node baseline battery', async () => {
   dexeStrict(
     'ol-e2e-redis-1',
     'sh -c "redis-cli --scan --pattern \"rate-limit:*\" | xargs -r redis-cli del >/dev/null 2>&1 || true"',
@@ -416,7 +421,7 @@ test('leg 1: Node baseline battery', async () => {
   expect(Object.keys(leg1!).length).toBe(40)
 }, 300_000)
 
-test('leg 2: Go parity (flip on)', async () => {
+test.skip('leg 2: Go parity (flip on)', async () => {
   await flip('apply')
   await waitGo()
   dexeStrict(
@@ -428,7 +433,7 @@ test('leg 2: Go parity (flip on)', async () => {
   if (ds.length) throw new Error(ds.join('\n').slice(0, 4000))
 }, 300_000)
 
-test('leg 3: Node re-baseline', async () => {
+test.skip('leg 3: Node re-baseline', async () => {
   await flip('strip')
   dexeStrict(
     'ol-e2e-redis-1',
@@ -439,7 +444,7 @@ test('leg 3: Node re-baseline', async () => {
   if (ds.length) throw new Error(ds.join('\n').slice(0, 4000))
 }, 300_000)
 
-test('pin sanity: anchors hold (Node baseline)', async () => {
+test.skip('RETIRED (dual-stack, 2026-10-05) — pin sanity: anchors hold (Node baseline)', async () => {
   const L = leg1!
   // DB state anchors
   expect(L.creds_before.body).toBe('0')

@@ -70,8 +70,9 @@ function flushOpenProjectRateLimits(): void {
 
 async function waitGo(): Promise<void> {
   for (let i = 0; i < 60; i++) {
-    const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim()
-    if (code === '200') return
+    // 2026-10-05: the single-Go P7 stack has no :4010 shadow — probe :4000 (the live Go web).
+    const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4000/login`, true).trim()
+    if (code === '200' || code === '302') return
     await sleep(500)
   }
   throw new Error('Go shadow /status not 200')
@@ -205,32 +206,40 @@ test.describe('@local web-go P5.1b (editor detach shell) parity', () => {
   test.beforeAll(async () => {
     test.setTimeout(600_000)
     const here = path.dirname(fileURLToPath(import.meta.url))
-    const cp = path.resolve(here, '..', '..', '..', '..', 'server-ce', 'nginx', 'flips', FLIPCONF)
+    const cp = path.resolve(here, '..', '..', '..', '..', 'images', 'main-amd64', 'nginx', 'flips', FLIPCONF)
     execFileSync('docker', ['cp', cp, `${overleafC}:/tmp/${FLIPCONF}`])
     dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips && cp -f /tmp/${FLIPCONF} /usr/local/share/overleaf-flips/${FLIPCONF}`)
-    flip('strip')
+    // 2026-10-05 (route-retirement wave) single-stack rework: run against the
+    // live Go stack; the /Project/:id*/detacher|detached routes are RETIRED
+    // (/editor/:id* stays per the owner route decision).
+    flip('apply')
     await waitGo()
     U = await login(USER)
     PID = await ensureFixtureProject(U)
     flushOpenProjectRateLimits()
-    // Pin the Node oracle BEFORE any flip: all four detach routes must 200.
+    // Pin the Go oracle: /editor detach routes 200 with metas; /Project 404.
     for (const route of ROUTES) {
       const p = route.replace('<PID>', PID)
       const probe = await call(p, { headers: { cookie: U.ck, accept: 'text/html' } })
-      if (probe.status !== 200) throw new Error(`Node oracle ${p} not 200: ${probe.status} ${probe.body.slice(0, 120)}`)
-      if (!probe.ct.includes('text/html')) throw new Error(`Node oracle ${p} CT not html: ${probe.ct}`)
-      if (!probe.body.includes('name="ol-project_id"')) throw new Error(`Node oracle ${p} missing ol-project_id meta`)
+      if (route.startsWith('/editor')) {
+        if (probe.status !== 200) throw new Error(`Go ${p} not 200: ${probe.status} ${probe.body.slice(0, 120)}`)
+        if (!probe.ct.includes('text/html')) throw new Error(`Go ${p} CT not html: ${probe.ct}`)
+        if (!probe.body.includes('name="ol-project_id"')) throw new Error(`Go ${p} missing ol-project_id meta`)
+      } else {
+        if (probe.status !== 404) throw new Error(`Go ${p} retired \u2192 404: ${probe.status}`)
+      }
     }
   }, 600_000)
 
   test.afterAll(async () => {
     try {
-      flip('strip')
+      // 2026-10-05: leave the single-Go stack on its live upstream.
+      flip('apply')
       await waitGo()
     } catch {}
   })
 
-  test('leg 1: Node baseline', async () => {
+  test.skip('leg 1: Node baseline', async () => {
     test.setTimeout(300_000)
     flip('strip')
     const leg1 = await battery(PID, U)
@@ -266,17 +275,41 @@ test.describe('@local web-go P5.1b (editor detach shell) parity', () => {
     }
   })
 
-  test('leg 2: Go parity', async () => {
+  test('leg 2: Go detach shells (single-stack; /Project retired 2026-10-05)', async () => {
     test.setTimeout(300_000)
     flip('apply')
-    const leg2 = await battery(PID, U)
-    flip('strip')
-    const ds = diffLegs('p51b', LEG1, leg2)
-    if (ds.length) console.log(ds.join('\n'))
-    expect(ds, ds.join('\n')).toHaveLength(0)
+    try {
+      const leg2 = await battery(PID, U)
+      // /editor/:id/detacher|detached — the live detach shells (owner route
+      // decision: /editor stays)
+      for (const route of ROUTES) {
+        const c = leg2[route]
+        if (route.startsWith('/editor')) {
+          const rel = route.replace('<PID>', PID)
+          expect(c.status, route + ' status').toBe(200)
+          expect(c.ct, route + ' CT').toBe('text/html')
+          expect(c.body).toMatch(/<meta name="ol-detachRole" data-type="string" content="(detached|detacher)"/)
+          if (route.endsWith('/detached')) {
+            expect(c.body).toContain('content="detached"')
+            expect(c.body).toContain('/stylesheets/ide-detached-')
+            expect(c.body).toContain('id="pdf-preview-detached-root"')
+          } else {
+            expect(c.body).toContain('content="detacher"')
+            expect(c.body).toContain('/stylesheets/pages/ide-')
+          }
+          expect(c.body).toContain('currentUrl')
+          expect(c.body).toContain(rel)
+        } else {
+          // /Project/:id/detacher|detached — RETIRED by the 2026-10-05 wave
+          expect(c.status, route + ' retired \u2192 404').toBe(404)
+        }
+      }
+    } finally {
+      flip('apply') // leave the single-Go stack on its live upstream
+    }
   })
 
-  test('leg 3: Node re-baseline', async () => {
+  test.skip('leg 3: Node re-baseline', async () => {
     test.setTimeout(300_000)
     flip('strip')
     const leg3 = await battery(PID, U)

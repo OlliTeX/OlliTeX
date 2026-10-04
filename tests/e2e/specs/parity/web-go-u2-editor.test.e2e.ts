@@ -111,7 +111,13 @@ const normEtag = (e: string): string => {
 }
 
 test.describe('U2 editor-entry route parity (Node vs Go)', () => {
-  test('3-leg matrix: Node == Go == Node', async () => {
+  // RETIRED 2026-10-05 (dual-stack premise dead post-P7): the 3-leg Node/Go
+  // flip infrastructure no longer exists in the single-Go image (only :4000
+  // listens). The route surface this gate covered — /editor 200/302 rows,
+  // retired /Project 404 rows, bad-id 404s — is now pinned by the
+  // legacy-project standalone spec against the live stack (owner decision:
+  // /Project page prefix retired, /editor kept).
+  test.skip('3-leg matrix: Node == Go == Node (dual-stack retired)', async () => {
     test.setTimeout(600_000)
     await waitUp()
     execFileSync('docker', ['cp', BATTERY, `${overleafC}:/tmp/u2-matrix.cjs`], { timeout: 30000 })

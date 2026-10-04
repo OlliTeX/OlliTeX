@@ -13,6 +13,11 @@
  * creates and deletes its own docs; the collection is asserted empty at
  * the end of every leg).
  */
+
+ // 2026-10-05 (route-retirement wave): dual-stack legs RETIRED — the Node-
+ // baseline leg needs the P6 Node web service, absent from the single-Go P7 e2e
+ // image (same premise as web-go-u2-editor/u102a/p620-flip). The single-Go
+ // contract stays pinned by the standalone legacy-*/hub-* families.
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 
@@ -329,17 +334,17 @@ let leg1: Leg | null = null
 let leg2: Leg | null = null
 let leg3: Leg | null = null
 
-test('leg 0: flip off before start', async () => {
+test.skip('leg 0: flip off before start', async () => {
   for (const conf of FLIPCONFS) expect(flipCount(conf)).toBe(0)
 }, 60_000)
 
-test('leg 1: Node baseline', async () => {
+test.skip('leg 1: Node baseline', async () => {
   leg1 = await runLeg()
   expect(Object.keys(leg1).length).toBeGreaterThanOrEqual(57)
   expect(libraryCount()).toBe(0)
 }, 300_000)
 
-test('leg 2: Go parity (flip on)', async () => {
+test.skip('leg 2: Go parity (flip on)', async () => {
   await flip('apply')
   await waitGo()
   leg2 = await runLeg()
@@ -348,7 +353,7 @@ test('leg 2: Go parity (flip on)', async () => {
   expect(libraryCount()).toBe(0)
 }, 300_000)
 
-test('leg 3: Node re-baseline', async () => {
+test.skip('leg 3: Node re-baseline', async () => {
   await flip('strip')
   leg3 = await runLeg()
   const ds = diffLegs('node-determinism', leg1!, leg3!)
@@ -356,7 +361,7 @@ test('leg 3: Node re-baseline', async () => {
   expect(libraryCount()).toBe(0)
 }, 300_000)
 
-test('pin sanity: anchors hold (Node baseline)', async () => {
+test.skip('RETIRED (dual-stack, 2026-10-05) — pin sanity: anchors hold (Node baseline)', async () => {
   const L = leg1!
   expect(L.a_anon_page.loc).toBe('/login')
   expect(L.a_anon_create.status).toBe(403)

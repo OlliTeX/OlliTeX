@@ -122,7 +122,7 @@ function runBattery(base: string, leg: string): any[] {
 
 test.describe.configure({ timeout: 900_000 })
 
-test('10.2a: analytics/university/tokens/404-pins Node==Go==Node (3 legs)', async () => {
+test.skip('RETIRED 2026-10-05 (dual-stack premise dead post-P7): 10.2a Node-vs-Go battery — its route surface (analytics/tokens/university) is pinned standalone against the live single-Go stack; university 404 pin lives in legacy-university.test.e2e.ts', async () => {
   await waitUp()
   flushRateLimiters()
   const leg1 = runBattery(NODE, '1')
