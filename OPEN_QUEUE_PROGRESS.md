@@ -508,3 +508,16 @@ fallbacks); make it look nice.
   with the latest templates (gitbridge/checkuser already in; healthchecks in) + one full live
   serve+SSH smoke of the new screens; (3) then route-retirement wave (owner-approved) — but do NOT
   touch anything the other sessions own (do-not-touch list in context).
+
+## TUI admin actions (owner addendum A + owner data feeds, 2026-10-04) — DONE-TESTED
+- go/services/toolkit/actions.go: NgramPlan/NgramDownload (OFFICIAL tier en/de/es/fr/nl,
+  stable ngrams-<lang>.zip == owner's wget -O naming; live compose_cep dir maps 5/5
+  already-present, no network) + UNTESTED tier (he/it/ru/zh under /untested/) +
+  Word2VecDownload (en/de/pt, nschang/languagetool-101; FastText = candidate, gated) +
+  ImportCert (nginx key+cert: parse AND public-key-match BEFORE copy; 0600;
+  nothing written on rejection).
+- cmd/toolkit languages [--ngrams] [--word2vec] [--plan] live-verified; ExitCode
+  errors.As bug fixed; actions_test.go green (offline httptest round-trip +
+  TestNgramPlan_RealOwnerDataDir + mismatched-pair rejection); CREDITS.md:
+  nschang/languagetool-101 attributed.
+
