@@ -76,75 +76,10 @@ func ngramURL(n NgramModel) string {
 	return NgramBaseURL + "/" + n.Archive
 }
 
-// ---- word2vec neural rules (languagetool-101: confusion-pair disambiguation) ----
-
-// Word2VecModels are the official word2vec model archives (en/de/pt).
-var Word2VecModels = map[string]string{
-	"en": "en.zip",
-	"de": "de.zip",
-	"pt": "pt.zip",
-}
-
-var Word2VecBaseURL = "https://languagetool.org/download/word2vec"
-
-// Word2VecCodes returns the supported word2vec languages in stable order.
-func Word2VecCodes() []string {
-	ks := make([]string, 0, len(Word2VecModels))
-	for k := range Word2VecModels {
-		ks = append(ks, k)
-	}
-	sort.Strings(ks)
-	return ks
-}
-
-// Word2VecDownload fetches + extracts the selected word2vec models into
-// <dataDir>/word2vec/<lang> (languagetool-101 layout), idempotent.
-func Word2VecDownload(ctx context.Context, dataDir string, langs []string) ([]NgramStatus, error) {
-	if _, err := exec.LookPath("unzip"); err != nil {
-		return nil, fmt.Errorf("unzip is required (apk add unzip in the toolkit image)")
-	}
-	base := filepath.Join(dataDir, "word2vec")
-	if err := os.MkdirAll(base, 0o755); err != nil {
-		return nil, err
-	}
-	out := []NgramStatus{}
-	seen := map[string]bool{}
-	for _, raw := range langs {
-		lang := strings.TrimSpace(strings.ToLower(raw))
-		if lang == "" || seen[lang] {
-			continue
-		}
-		seen[lang] = true
-		archive, ok := Word2VecModels[lang]
-		if !ok {
-			out = append(out, NgramStatus{Language: lang, Action: NgramActionSkipped})
-			continue
-		}
-		extractDir := filepath.Join(base, lang)
-		if d, _ := isDir(extractDir); d {
-			out = append(out, NgramStatus{Language: lang, Action: NgramActionAlreadyPresent, Path: extractDir})
-			continue
-		}
-		url := Word2VecBaseURL + "/" + archive
-		tmp := base + "/" + archive + ".part"
-		if derr := downloadFile(ctx, url, tmp); derr != nil {
-			_ = os.Remove(tmp)
-			out = append(out, NgramStatus{Language: lang, Action: "download-failed", Path: url})
-			continue
-		}
-		cmd := exec.CommandContext(ctx, "unzip", "-q", "-o", tmp, "-d", extractDir)
-		if _, uerr := cmd.CombinedOutput(); uerr != nil {
-			_ = os.Remove(tmp)
-			out = append(out, NgramStatus{Language: lang, Action: "unzip-failed", Path: url})
-			continue
-		}
-		_ = os.Remove(tmp)
-		out = append(out, NgramStatus{Language: lang, Action: NgramActionDownloaded, Path: extractDir})
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Language < out[j].Language })
-	return out, nil
-}
-
+// NOTE (owner feed, 2026-10-04): the word2vec model family (nschang/
+// languagetool-101 recipe, LT-5.4 era) is intentionally NOT implemented —
+// LanguageTool removed the --word2vecmodel/--neuralnetworkmodel options
+// (unmaintained features).
 // Ngram actions (stable strings for the TUI/CLI + tests).
 const (
 	NgramActionDownload       = "needs-download"

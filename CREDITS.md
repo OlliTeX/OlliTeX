@@ -28,10 +28,15 @@ something from their code we put them into CREDITS.md").
 - **LanguageTool** — `erikvl87/languagetool` image plus the owner-maintained
   ngram/languagemodel packs mounted read-only at `/ngrams`.
 
-## n-gram / word2vec model plumbing & offline-server extension recipe
+## n-gram model plumbing & offline-server extension review
 
 - `nschang/languagetool-101` (https://github.com/nschang/languagetool-101) —
-  the step-by-step recipe we mirror in `go/services/toolkit/actions.go` (n-gram
-  official + untested tiers under the owner's stable `ngrams-<lang>.zip` naming,
-  word2vec en/de/pt, SSD caution). Borrowed: the recipe/structure. Re-implemented:
-  the Go action code (not a copy of any script).
+  the step-by-step recipe reviewed for the grammar-model action set
+  (`go/services/toolkit/actions.go`): n-gram official tier + the owner's listed
+  untested tier, under the owner's stable `ngrams-<lang>.zip` naming, with the
+  SSD caution. Its word2vec recipe was reviewed and deliberately NOT adopted:
+  LanguageTool removed the `--word2vecmodel`/`--neuralnetworkmodel` options
+  (unmaintained features, per languagetool-standalone CHANGES). FastText
+  language-detection logged as an owner-gated candidate (needs the LT binary +
+  lid.176.bin). Re-implemented: all Go action code (no copy of the recipe's
+  shell steps).

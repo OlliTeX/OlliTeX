@@ -89,7 +89,7 @@ Usage:
   toolkit doctor    one-shot health check
   toolkit health    cron-friendly container health (exit codes)
   toolkit autofix   autoheal pass (--once | --interval loop)
-  toolkit languages download grammar models (--ngrams en,he / --word2vec en / --plan)
+  toolkit languages download n-gram models (--ngrams en,he / --plan)
   toolkit version
 
 Environment:
@@ -136,7 +136,7 @@ func passwordFrom(o *flag.FlagSet) (string, error) {
 
 func serve(args []string) error {
 	f := flag.NewFlagSet("serve", flag.ExitOnError)
-	listen := f.String("listen", envOr(toolkit.EnvSSHListen, ":2222"), "SSH listen address")
+	listen := f.String("listen", envOr(toolkit.EnvSSHListen, ":2222"), "SSH listen address (default :2222; OLLITEX_TOOLKIT_SSH_LISTEN)")
 	user := f.String("user", envOr(toolkit.EnvSSHUser, "ollitex"), "SSH user")
 	f.String("password", "", "SSH password (preferred: env/file)")
 	f.String("password-file", "", "file containing the SSH password")
@@ -412,22 +412,24 @@ func autofixcmd(args []string) error {
 }
 
 // languagescmd: admin-selected grammar models (owner addendum A + the
-// languagetool-101 extensions: ngram official+untested tiers, word2vec).
+// languagetool-101 review: ngram official+untested tiers adopted; word2vec
+// dropped upstream-deprecated).
 func languagescmd(args []string) error {
 	f := flag.NewFlagSet("languages", flag.ExitOnError)
 	dataDir := f.String("data-dir", envOr(toolkit.EnvDataDir, "/opt/ollitex/data"), "languagetool data dir (mounted)")
 	ngrams := f.String("ngrams", "", "n-gram languages (official: en de es fr nl; untested: he it ru zh)")
-	w2v := f.String("word2vec", "", "word2vec languages (en de pt)")
 	plan := f.Bool("plan", false, "show the plan only (no download)")
 	_ = f.Parse(args)
 
-	langsNG, langsW2 := splitCSV(*ngrams), splitCSV(*w2v)
-	if len(langsNG) == 0 && len(langsW2) == 0 {
+	langsNG := splitCSV(*ngrams)
+	if len(langsNG) == 0 {
 		fmt.Println("official ngrams :", strings.Join(toolkit.NgramCodes(), " "))
-		fmt.Println("untested ngrams  : (pass e.g. --ngrams he,ru — /untested/ tier)")
-		fmt.Println("word2vec models  :", strings.Join(toolkit.Word2VecCodes(), " "))
+		fmt.Println("untested ngrams : he it ru zh (pass --ngrams he,ru for the /untested/ tier)")
 		fmt.Println()
-		fmt.Println("usage: toolkit languages --ngrams en,he --word2vec en --plan")
+		fmt.Println("NOTE: word2vec models are NOT offered — LanguageTool removed the")
+		fmt.Println("      --word2vecmodel/--neuralnetworkmodel options (unmaintained).")
+		fmt.Println()
+		fmt.Println("usage: toolkit languages --ngrams en,he --plan")
 		return nil
 	}
 	if *plan {
@@ -435,7 +437,7 @@ func languagescmd(args []string) error {
 		if err != nil {
 			return err
 		}
-		printNgramPlan(p, langsW2)
+		printNgramPlan(p)
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 7*24*time.Hour)
@@ -449,27 +451,14 @@ func languagescmd(args []string) error {
 			return err
 		}
 	}
-	if len(langsW2) > 0 {
-		sts, err := toolkit.Word2VecDownload(ctx, *dataDir, langsW2)
-		for _, st := range sts {
-			fmt.Printf("w2v   %-4s : %s %s\n", st.Language, st.Action, st.Path)
-		}
-		if err != nil {
-			return err
-		}
-	}
+
 	fmt.Println("(after adding models: restart languagetool + /hub → Site → Grammar)")
 	return nil
 }
 
-func printNgramPlan(p []toolkit.NgramStatus, w2 []string) {
+func printNgramPlan(p []toolkit.NgramStatus) {
 	for _, st := range p {
 		fmt.Printf("PLAN ngram %-4s : %s\n", st.Language, st.Action)
-	}
-	if len(toolkit.Word2VecCodes()) > 0 && len(w2) > 0 {
-		for _, l := range w2 {
-			fmt.Printf("PLAN w2v   %-4s : (see %s)\n", l, toolkit.Word2VecModels[l])
-		}
 	}
 }
 

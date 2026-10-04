@@ -1,6 +1,7 @@
 package toolkit
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -11,7 +12,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -69,18 +72,25 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 			o.Log.Info("ssh auth", "user", user, "ok", ok)
 			return ok
 		}),
+		wish.WithMiddleware(teaMiddleware.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
+			return newApp(t), []tea.ProgramOption{tea.WithInput(sess), tea.WithOutput(sess), tea.WithAltScreen()}
+		})),
+		// Outermost (wish runs the LAST-added middleware first): gate + routing.
+		// exec with a command string (e.g. `ssh host "toolkit health"`) runs the
+		// CLI and exits; an interactive shell lands in the TUI below.
 		wish.WithMiddleware(func(next ssh.Handler) ssh.Handler {
 			return func(sess ssh.Session) {
 				if !userGate(sess.User()) {
 					fmt.Fprintln(sess, "toolkit: access denied for user "+sess.User())
 					return
 				}
+				if cmd := strings.TrimSpace(sess.RawCommand()); cmd != "" {
+					runCLI(sess, cmd)
+					return
+				}
 				next(sess)
 			}
 		}),
-		wish.WithMiddleware(teaMiddleware.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
-			return newApp(t), []tea.ProgramOption{tea.WithInput(sess), tea.WithOutput(sess), tea.WithAltScreen()}
-		})),
 	)
 	if err != nil {
 		return fmt.Errorf("wish server: %w", err)
@@ -110,6 +120,27 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 	case err := <-serveErr:
 		return err
 	}
+}
+
+// to the session (the multi-command owner usage: `ssh host "toolkit ..."`).
+func runCLI(sess ssh.Session, cmd string) {
+	c := exec.CommandContext(sess.Context(), "/bin/sh", "-c", cmd)
+	c.Env = append(os.Environ(), "PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+	var out bytes.Buffer
+	c.Stdout = &out
+	c.Stderr = &out
+	err := c.Run()
+	sess.Write(out.Bytes())
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			sess.Exit(ee.ExitCode())
+			return
+		}
+		fmt.Fprintf(sess, "\ntoolkit: %v\n", err)
+		sess.Exit(1)
+		return
+	}
+	sess.Exit(0)
 }
 
 // writeHostKey generates a persistent ECDSA P-256 host key (0600).
