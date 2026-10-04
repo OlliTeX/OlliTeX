@@ -15,6 +15,8 @@ export type HubNode = {
   icon: string
   /** admin-only node (subtree hides for members) */
   admin?: boolean
+  /** section = non-interactive heading row (functional grouping, owner UX 2026-10-06) */
+  section?: boolean
   /** leaf nodes map to a shared "render kind" */
   render?: 'projects' | 'projects-tags' | 'template-cat' | 'site-sec' | 'overview' | 'library'
   /** site-settings section id for render:'site-sec' (legacy NAV ids) */
@@ -29,14 +31,9 @@ export type HubNode = {
 }
 
 export const HUB_NAV: HubNode[] = [
-  {
-    id: 'overview',
-    label: 'Overview & activity',
-    icon: 'insights',
-    admin: true,
-    render: 'overview',
-    tone: 'admin',
-  },
+  // ---- Workspace (owner UX 2026-10-06: functional grouping replaced the
+  //      flat scrolling rail) ----------------------------------------------
+  { id: 'sec.workspace', label: 'Workspace', icon: 'apps', section: true },
   {
     id: 'projects',
     label: 'Projects',
@@ -71,6 +68,9 @@ export const HUB_NAV: HubNode[] = [
     ],
   },
   { id: 'library', label: 'Reference library', icon: 'menu_book', render: 'library' },
+
+  // ---- Personal -----------------------------------------------------------
+  { id: 'sec.personal', label: 'Personal', icon: 'person', section: true },
   {
     id: 'mysettings',
     label: 'My settings',
@@ -100,6 +100,18 @@ export const HUB_NAV: HubNode[] = [
       },
     ],
   },
+
+  // ---- Administration (owner UX 2026-10-06: admin surface grouped under
+  //      its own heading; Overview & activity rejoins Site settings) --------
+  { id: 'sec.admin', label: 'Administration', icon: 'shield', section: true, admin: true },
+  {
+    id: 'overview',
+    label: 'Overview & activity',
+    icon: 'insights',
+    admin: true,
+    render: 'overview',
+    tone: 'admin',
+  },
   {
     id: 'site',
     label: 'Site settings',
@@ -120,7 +132,18 @@ export const HUB_NAV: HubNode[] = [
           { id: 'site.general.appearance', label: 'Appearance', icon: 'palette' },
           { id: 'site.general.emailtemplates', label: 'Email templates', icon: 'mail' },
           { id: 'site.general.signup', label: 'Sign-up', icon: 'person_add', render: 'site-sec', siteId: 'signup' },
-          { id: 'site.general.managetpl', label: 'Manage templates', icon: 'tag' },
+          {
+            // Functional grouping (owner UX 2026-10-06): the formerly flat
+            // 12-row General list is now domain folders. IDs/labels unchanged.
+            id: 'site.general.content',
+            label: 'Content & community',
+            icon: 'menu_book',
+            children: [
+              { id: 'site.general.managetpl', label: 'Manage templates', icon: 'tag' },
+              { id: 'site.general.messages', label: 'System messages', icon: 'campaign' },
+              { id: 'site.general.activeprojects', label: 'Active projects', icon: 'track_changes' },
+            ],
+          },
           {
             id: 'site.general.projects',
             label: 'Projects',
@@ -144,10 +167,15 @@ export const HUB_NAV: HubNode[] = [
               { id: 'site.general.users.deleted', label: 'Deleted users', icon: 'delete_forever' },
             ],
           },
-          { id: 'site.general.activeprojects', label: 'Active projects', icon: 'track_changes' },
-          { id: 'site.general.messages', label: 'System messages', icon: 'campaign' },
-          { id: 'site.general.stats', label: 'Instance statistics', icon: 'monitoring' },
-          { id: 'site.general.editor', label: 'Editor controls', icon: 'build' },
+          {
+            id: 'site.general.diagnostics',
+            label: 'Diagnostics',
+            icon: 'monitoring',
+            children: [
+              { id: 'site.general.stats', label: 'Instance statistics', icon: 'monitoring' },
+              { id: 'site.general.editor', label: 'Editor controls', icon: 'build' },
+            ],
+          },
         ],
       },
       {

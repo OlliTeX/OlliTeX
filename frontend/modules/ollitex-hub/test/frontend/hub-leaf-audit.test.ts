@@ -41,7 +41,7 @@ describe('hub leaf completeness (#2: no silent stubs)', () => {
   const allLeaves: NavLeaf[] = []
   for (const n of HUB_NAV) {
     const walk = (x: any) => {
-      if (!x.children || x.children.length === 0) allLeaves.push({ id: x.id, kind: x.render })
+      if (!x.children || x.children.length === 0) allLeaves.push({ id: x.id, kind: x.render, section: !!(x as any).section })
       for (const c of x.children || []) walk(c)
     }
     walk(n)
@@ -66,6 +66,7 @@ describe('hub leaf completeness (#2: no silent stubs)', () => {
 
   it('every leaf is handled by a real renderer or intentionally stubbed (KNOWN_STUBS)', () => {
     const unhandled = allLeaves.filter(l => {
+      if ((l as any).section) return false
       if (l.kind && handledByKind.has(l.kind)) return false
       if (caseIds.has(l.id)) return false
       if (mysettingsFallback && l.id.startsWith('mysettings.')) return false

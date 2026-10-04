@@ -186,13 +186,34 @@ export default function Rail({ nav, active, onSelect }: RailProps) {
   const open = useOpenSet()
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {nav.map(n =>
-        n.children && n.children.length > 0 ? (
+      {nav.map(n => {
+        // Functional grouping (owner UX 2026-10-06): section rows are
+        // non-interactive headings that group the rail by function.
+        if (n.section) {
+          return (
+            <div
+              key={n.id}
+              role="presentation"
+              aria-hidden="true"
+              style={{
+                margin: '8px 2px 2px',
+                fontSize: 10.5,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase' as const,
+                color: 'var(--mantine-color-text-dimmed)',
+              }}
+            >
+              {n.label}
+            </div>
+          )
+        }
+        return n.children && n.children.length > 0 ? (
           <Folder key={n.id} node={n} active={active} onSelect={onSelect} open={open} />
         ) : (
           <Leaf key={n.id} node={n} active={active} onSelect={onSelect} />
         )
-      )}
+      })}
     </div>
   )
 }

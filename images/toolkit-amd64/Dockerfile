@@ -48,7 +48,9 @@ RUN apk add --no-cache \
       ca-certificates \
       docker-cli \
       docker-cli-compose \
-      tzdata
+      tzdata \
+      unzip \
+      wget
 
 # The stack compose templates live next to the binary (absorbed from
 # toolkit/lib; the TUI reads + renders them — no env file fallbacks).

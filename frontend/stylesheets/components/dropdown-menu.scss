@@ -327,6 +327,31 @@ $dropdown-item-min-height: 36px;
   }
 }
 
+// Functional section labels for the account menu (owner UX 2026-10-06:
+// Workspace / Personal / Manage instance — the flat 14-row list used to
+// scroll; groups are non-interactive headings, role=presentation).
+.nav-section {
+  list-style: none;
+  margin: 0.45rem 0 0.1rem;
+
+  &:first-child {
+    margin-top: 0;
+  }
+
+  .nav-section-label {
+    display: block;
+    padding: 0 1rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--dropdown-text-dimmed, var(--text-dimmed));
+    opacity: 0.85;
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
 // "Manage" sub-folder accordion (account menu; user design 2026-08-28,
 // round 4 — inline unfold, replacing the non-functional flyout).
 .manage-submenu-toggle {

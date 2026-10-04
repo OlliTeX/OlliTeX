@@ -9,49 +9,63 @@ import type {
 import DropdownListItem from '@/shared/components/dropdown/dropdown-list-item'
 import NavDropdownDivider from './nav-dropdown-divider'
 import NavDropdownLinkItem from './nav-dropdown-link-item'
+import NavSectionLabel from './nav-section-label'
 import { useDsNavStyle } from '@/features/project-list/components/use-is-ds-nav'
 import { CaretRight, SignOut } from '@phosphor-icons/react'
 import ThemeToggle from '@/features/project-list/components/sidebar/theme-toggle'
 import { ConnectionOutageTracker } from '@/features/ide-react/editor/connection-outage-tracker'
 
 /**
- * "Manage" sub-folder (user design 2026-08-28, round 4): an INLINE
- * accordion — click "Manage" and the site-management links unfold directly
- * below it (the flyout version did not unfold in the reported browser
- * sessions; inline cannot be clipped/positioning-sensitive).
- * Chevron: ">" (CaretRight), rotates down when open.
+ * "Manage instance" accordion (owner UX 2026-10-06 redesign): the inline
+ * accordion pattern from the 2026-08-28 rounds (flyout did not unfold),
+ * now with a functional item order — overview first, then site, users,
+ * content, and the flag-gated diagnostics last:
  *
- * Naming (user round 3): the historical Admin Panel keeps the name
- * "Manage Site"; the settings console (/admin/site) is
- * "Manage Extensions".
+ *   Dashboard (opt) → Manage Site → Manage Extensions → Site LLM
+ *   → Manage Users → Manage Projects (opt) → Manage template gallery (opt)
+ *   → Manage Feature Flags / Surveys / Script Logs (flag-gated)
  *
- * W8 (UI-R10, 2026-08-30): the menu now points at this fork's SAME-ORIGIN
- * shells — /admin/panel (the upstream admin tabset) and /user/mysettings
- * (the upstream account-settings app, themed) — from the page-shells
- * module. The original upstream URLs keep working.
+ * (The historical names are kept — parity + muscle memory — only the
+ * GROUPING and ORDER changed, per the owner's "functional menu grouping"
+ * ask. All hrefs/flags are unchanged.)
  */
-function ManageMenu({
+function ManageInstanceMenu({
   canManageProjects,
   canDisplayInstanceStats = false,
-}: { canManageProjects: boolean; canDisplayInstanceStats?: boolean }) {
+  showGallery,
+  canDisplaySplitTestMenu,
+  canDisplaySurveyMenu,
+  canDisplayScriptLogMenu,
+}: {
+  canManageProjects: boolean
+  canDisplayInstanceStats?: boolean
+  showGallery: boolean
+  canDisplaySplitTestMenu?: boolean
+  canDisplaySurveyMenu?: boolean
+  canDisplayScriptLogMenu?: boolean
+}) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const items = [
-    { href: '/admin/panel', label: 'Manage Site' },
-    // overleaf-lab: explicit Admin dropdown entry for the site LLM settings
-    // (reviewer follow-up: users expected the menu item; the /admin "LLM
-    // Configuration" tab remains as well).
-    { href: '/admin/llm/settings', label: 'Manage Site LLM' },
+  const items = [{ href: '/admin/panel', label: 'Manage Site' }]
+  // overleaf-lab: explicit entry for the site LLM settings (the /admin
+  // "LLM Configuration" tab remains as well).
+  items.push(
+    { href: '/admin/llm/settings', label: 'Site LLM' },
     { href: '/admin/site', label: 'Manage Extensions' },
     { href: '/admin/user', label: 'Manage Users' },
-  ]
-  // N-D (2026-09-01): instance-statistics dashboards — first item of the
-  // Manage submenu (requirement: above "Manage Site").
-  if (canDisplayInstanceStats) {
-    items.unshift({ href: '/admin/instance-stats', label: 'Dashboard' })
-  }
+  )
   if (canManageProjects) items.push({ href: '/admin/project', label: 'Manage Projects' })
+  if (showGallery) items.push({ href: '/templates/manage', label: t('Manage template gallery') })
+  if (canDisplaySplitTestMenu) items.push({ href: '/admin/split-test', label: 'Manage Feature Flags' })
+  if (canDisplaySurveyMenu) items.push({ href: '/admin/survey', label: 'Manage Surveys' })
+  if (canDisplayScriptLogMenu) items.push({ href: '/admin/script-logs', label: 'View Script Logs' })
+  if (canDisplayInstanceStats) items.unshift({ href: '/admin/instance-stats', label: 'Dashboard' })
+
   return (
     <>
+      <li role="none" className="nav-section" aria-hidden="true">
+        <span className="nav-section-label">Manage instance</span>
+      </li>
       <li role="none">
         <button
           type="button"
@@ -61,7 +75,7 @@ function ManageMenu({
           aria-expanded={open}
           onClick={() => setOpen(o => !o)}
         >
-          <span>Manage</span>
+          <span>Admin</span>
           <CaretRight
             size={14}
             weight="bold"
@@ -80,12 +94,6 @@ function ManageMenu({
   )
 }
 
-/**
- * Nav-extra links (SaaS layout: Library, Templates — see
- * settings.defaults.js nav.header_extras → ol-navbar meta `items`).
- * The account menu (sidebar lower section) shows the same items the top
- * navbar shows, using the same visibility rules as default-navbar.tsx.
- */
 function useNavExtraItems(sessionUser: NavbarSessionUser | undefined) {
   const items = getMeta('ol-navbar')?.items ?? []
   const suppressNavContentLinks =
@@ -100,6 +108,17 @@ function useNavExtraItems(sessionUser: NavbarSessionUser | undefined) {
   })
 }
 
+/**
+ * Account menu — functional grouping (owner UX 2026-10-06):
+ *
+ *   Workspace      Projects · Library · Templates
+ *   Personal       Account settings (+ AI settings flag) · (theme flag)
+ *   Manage inst.   accordion (all admin links, functional order)
+ *   (divider)      Sign out
+ *
+ * The top navbar keeps its two content links + Admin dropdown unchanged;
+ * only this menu (the one that scrolled) was re-grouped.
+ */
 export function AccountMenuItems({
   sessionUser,
   showThemeToggle = false,
@@ -112,8 +131,6 @@ export function AccountMenuItems({
   const dsNavStyle = useDsNavStyle()
   const hasOverallThemes = Boolean(getMeta('ol-overallThemes'))
   const navExtraItems = useNavExtraItems(sessionUser)
-  // Admin section parity with the top navbar's Admin dropdown
-  // (admin-menu.tsx): same items, same flag-based visibility rules.
   const nav = (getMeta('ol-navbar') ?? {}) as {
     canDisplayAdminMenu?: boolean
     canDisplayProjectUrlLookup?: boolean
@@ -124,19 +141,33 @@ export function AccountMenuItems({
     adminUrl?: string
     canDisplayInstanceStats?: boolean
   }
+  const isAdmin =
+    Boolean(nav.canDisplayAdminMenu) ||
+    Boolean(nav.canDisplayProjectUrlLookup) ||
+    Boolean(nav.canDisplayAdminRedirect)
+  const showGallery = Boolean(getMeta('ol-ExposedSettings')?.canManageTemplatesMenu)
+  const showFlags =
+    Boolean(nav.canDisplaySplitTestMenu) ||
+    Boolean(nav.canDisplaySurveyMenu) ||
+    Boolean(nav.canDisplayScriptLogMenu)
 
   return (
     <>
       <OLDropdownItem as="li" disabled role="menuitem">
         {sessionUser.email}
       </OLDropdownItem>
-      <NavDropdownDivider />
+      <li role="none" className="nav-section" aria-hidden="true">
+        <span className="nav-section-label">Workspace</span>
+      </li>
       <NavDropdownLinkItem href="/hub#/projects.all">{t('projects')}</NavDropdownLinkItem>
       {navExtraItems.map((item, index) => (
         <NavDropdownLinkItem key={index} href={item.url}>
           {item.translatedText || item.text}
         </NavDropdownLinkItem>
       ))}
+      <li role="none" className="nav-section" aria-hidden="true">
+        <span className="nav-section-label">Personal</span>
+      </li>
       <NavDropdownLinkItem href="/user/mysettings">
         {t('account_settings')}
       </NavDropdownLinkItem>
@@ -145,58 +176,36 @@ export function AccountMenuItems({
           {t('ai_settings', 'AI Settings')}
         </NavDropdownLinkItem>
       ) : null}
-      {/* R9 item 5 (2026-08-29): template gallery management lives in the
-          account menu (site admins + template gallery admins only), directly
-          above the Manage submenu. */}
-      {getMeta('ol-ExposedSettings')?.canManageTemplatesMenu ? (
-        <NavDropdownLinkItem href="/templates/manage">
-          {t('Manage template gallery')}
-        </NavDropdownLinkItem>
-      ) : null}
-      {(nav.canDisplayAdminMenu || nav.canDisplayProjectUrlLookup || nav.canDisplayAdminRedirect || nav.canDisplaySplitTestMenu || nav.canDisplaySurveyMenu || nav.canDisplayScriptLogMenu) && (
-        <>
-          <NavDropdownDivider />
-          {(nav.canDisplayAdminMenu || nav.canDisplayProjectUrlLookup) ? (
-            <ManageMenu
-              canManageProjects={Boolean(nav.canDisplayProjectUrlLookup)}
-              canDisplayInstanceStats={Boolean(nav.canDisplayInstanceStats)}
-            />
-          ) : null}
-          {nav.canDisplayAdminRedirect && nav.adminUrl ? (
-            <NavDropdownLinkItem href={nav.adminUrl}>
-              Switch to Admin
-            </NavDropdownLinkItem>
-          ) : null}
-          {nav.canDisplaySplitTestMenu ? (
-            <NavDropdownLinkItem href="/admin/split-test">
-              Manage Feature Flags
-            </NavDropdownLinkItem>
-          ) : null}
-          {nav.canDisplaySurveyMenu ? (
-            <NavDropdownLinkItem href="/admin/survey">
-              Manage Surveys
-            </NavDropdownLinkItem>
-          ) : null}
-          {nav.canDisplayScriptLogMenu ? (
-            <NavDropdownLinkItem href="/admin/script-logs">
-              View Script Logs
-            </NavDropdownLinkItem>
-          ) : null}
-        </>
-      )}
       {showThemeToggle && hasOverallThemes && (
         <DropdownListItem>
           <ThemeToggle />
         </DropdownListItem>
       )}
-
+      {(isAdmin || showGallery || showFlags) && (
+        <>
+          <NavDropdownDivider />
+          <ManageInstanceMenu
+            canManageProjects={Boolean(nav.canDisplayProjectUrlLookup)}
+            canDisplayInstanceStats={Boolean(nav.canDisplayInstanceStats)}
+            showGallery={showGallery}
+            canDisplaySplitTestMenu={nav.canDisplaySplitTestMenu}
+            canDisplaySurveyMenu={nav.canDisplaySurveyMenu}
+            canDisplayScriptLogMenu={nav.canDisplayScriptLogMenu}
+          />
+          {nav.canDisplayAdminRedirect && nav.adminUrl ? (
+            <NavDropdownLinkItem href={nav.adminUrl}>
+              Switch to Admin
+            </NavDropdownLinkItem>
+          ) : null}
+        </>
+      )}
       <NavDropdownDivider />
       <DropdownListItem>
         {
           // The button is outside the form but still belongs to it via the
-          // form attribute. The reason to do this is that if the button is
-          // inside the form, screen readers will not count it in the total
-          // number of menu items
+          // form attribute. The reason is that if the button is inside the
+          // form, screen readers will not count it in the total number of
+          // menu items
         }
         <OLDropdownItem
           as="button"

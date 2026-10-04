@@ -34,7 +34,7 @@ const path = require('node:path')
 // This package directory (frontend/): hub + renovation tests live under it.
 const rootId = __dirname
 // Node-app env setup (shared UV_THREADPOOL / worker env) at its canonical home.
-const SW_TEST_UNIT = path.join(__dirname, '..', 'services', 'web', 'test', 'unit')
+const SW_TEST_UNIT = path.join(__dirname, '..', 'junk', 'services-web', 'test', 'unit')
 
 // Babel macro stub for the vitest runner (esbuild does not run babel macros):
 // legacy components call importOverleafModules('x') at module scope; resolve
