@@ -543,3 +543,56 @@ fallbacks); make it look nice.
 - **Toolkit (commit 46e6210a23)**: TUI Actions screen (t/ngram, l/status, c/cert) over SSH; `ExecOnce` one-shot docker exec (moby v1 Create→Start→Inspect); `unzip` in image; `toolkit languages` catalog: official de/en/es/fr/nl (stable `ngrams-<lang>.zip`) + untested he/it/ru/zh (`/untested/`, dated names); build+vet+tests green; image `ollitex/toolkit-tui:main` c027a3c11927; live SSH smoke: `toolkit languages` over :2222 ✓.
 - **Owner UX item (commit f7ad00ac22)**: /hub rail is the "admin navbar" — regrouped with Workspace/Personal/Administration section headings (stable leaf ids unchanged); Site settings→General split into Content & community / Diagnostics domain folders (Projects & Users already grouped); account dropdown (project list) grouped the same way. Gates: 601/601 vitest (incl. hub-leaf-audit updated for section nodes), TSC clean for touched files, Playwright pin `specs/_probe4/hub-nav-groups.test.e2e.ts` green, 97 hub parity specs green. hub-a11y color-contrast failures = pre-existing BLOCKED ticket (contrast values on cards), not from this change — owner decision still pending.
 - **vitest harness repair**: `frontend/vitest.config.js` SW_TEST_UNIT repointed `services/web/test/unit` → `junk/services-web/test/unit` (P7 move left the config dangling → all 46 HubFrontend files failed before the fix).
+
+## RUN — 2026-10-05 — route-retirement wave finalize (goal 691c4571)
+Owner decision 2026-10-05 (binding): retire the legacy UI pages/redirects;
+keep ALL APIs + capital-P + /admin* + settings + auth.
+
+### Landed (this pass, on top of df82bb02b8/d8c249db31)
+- **4 more real Go parity bugs found live and fixed** (each with a failing
+  gate as evidence before the fix):
+  1. `hub-admin-projects` 500 "Couldn't load projects": a p52b fixture row
+     (owner_ref `ffffffffff000000000001`, 22-char non-OID string) made
+     `mkRow` fail the owner-validity guard and 500 the WHOLE all-users list.
+     Admin list contract = surface the row (trashed=false, owner echoed).
+     Commit 738e9edcdd.
+  2. `hub-library` create: `GET /library/references` returned `fields:[]`
+     for every entry — mongo driver v2 decodes subdocs INSIDE arrays as
+     bson.D, and `toApiEntry` + the download/bib serializer asserted
+     map[string]any and silently dropped every element (create echo was
+     immune — it builds from the request body). New `fieldPair()` helper
+     accepts both shapes. Commit 15893deab5.
+  3. `POST /user/password/update` Go parity gap (route + contract CSV live
+     in Node; Go never implemented) — full port with limiter, CE
+     validatePassword order, token/session invalidation semantics.
+     Commit d8c249db31.
+  4. Toolkit launchpad first-admin bootstrap: `toolkit bootstrap --email
+     --password` CLI + TUI row (admin-exists guard, auth-pages local user
+     over configstore). Part of the df82bb02b8 route wave.
+- **Spec wave 2/3 (356f640b5b, fe228fb6cc)**: post-P7 single-stack
+  settlement of the parity suite — ~24 dual-stack flip/3-leg gates retired
+  with evidence notes (Node web service absent from the single-Go image;
+  same premise as u2/u102a/p620); p51a/p51b REWORKED to live single-stack
+  (editor 200 pins + /Project 404 retirement pins); p4d login 429 backoff;
+  p51a/p51b flip-conf path fixed for the images/ reorg; helpers/auth.ts
+  createBlankProject → /hub (the /project dashboard is 404 now);
+  u101-history editor goto → /editor/:id (kept route); p69 conversion is a
+  prior session's uncommitted work and was intentionally NOT committed.
+- **New standalone pin**: legacy-university (2/2) — /university + /university/*
+  404 contract on the live stack (the u102a gate was the only pin and is
+  dual-stack dead).
+- **Green state (this stack, this pass)**: legacy family 57/57 (incl.
+  university/u103r/registry), hub family incl. admin-projects 8/8 and
+  library 6/6 (14/14 combined), p0/p1-auth/p4x/p51a/p51b/u101-history/u103r
+  all green; the interrupted-battery 502/429 artifacts root-caused (stale
+  container + dangling flip include + login limiter window) and the
+  failure modes baked into the specs (pre-checks, strip-on-exit, 429
+  backoff).
+
+### Operational note (owner)
+The shared `ol-e2e` overleaf container on 127.0.0.1:7420 was cycled by a
+second actor mid-run (image re-pull under the same tag; a dangling
+`include /etc/nginx/overleaf-flips/web-p51b.conf` was left in the vhost →
+editor pages 502'd until stripped). If this recurs, re-check
+`/etc/nginx/sites-enabled/overleaf.conf` for `overleaf-flips` includes and
+the web service binary hash before blaming the parity layer.
