@@ -118,9 +118,15 @@ func Feature(a *core.App) core.Feature {
 		}
 	}
 
+	pwUpdate := registerPasswordUpdate(a)
+
 	return core.Feature{
 		Name: "passwordreset",
 		Routes: []core.Route{
+			// logged-in change-password (Node UserController.changePassword,
+			// router.mjs:350) — 2026-10-05: added with the route-retirement
+			// wave (missing Go parity gap caught by the live parity run).
+			{Method: "POST", Path: "/user/password/update", Handler: pwUpdate},
 			{Method: "GET", Path: "/user/password/reset", NoLogin: true, Handler: func(cxt *core.Cxt, res *core.Res) {
 				d := pageData(cxt)
 				if cxt.Req.URL.Query().Get("error") == "token_expired" {
