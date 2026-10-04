@@ -1,74 +1,66 @@
-// U10.3r — private-API (basic-auth) document trio parity: Node == Go.
+// u103r: private-API basic-auth wire contract — WEB profile, standalone.
 //
-// Routes (Node web profile = the drop-in Go replaces; the same path on the
-// 'api' profile :3000 differs — 401 everywhere — and is NOT this gate's
-// oracle; see WEB_GO_PLAN.md cutover section):
-//   GET  /project/:Project_id/doc/:doc_id          → 401/302 (no auth)
-//   POST /project/:Project_id/doc/:doc_id          → 403 (no-csrf POST)
-//   POST /project/:Project_id/doc/:doc_id/changes/reject → 403 (no-csrf POST)
+// CONVERTED 2026-10-05 (owner): the 3-leg shadow comparison (Node web :4000
+// vs Go shadow :4010 vs Node api :3000) is retired — in the P7 image the
+// canonical stack IS Go, so :4000/:3000 are both Go profiles and the shadow
+// :4010 no longer exists. The wire is now pinned DIRECTLY on canonical Go
+// (web profile here; the api profile is pinned by web-go-uapi-doc) + 2-run
+// byte-parity stability. Transcription, not rewrite (u101-history pattern).
 //
-// Three-leg gate inside ol-e2e-overleaf-1:
-//   Node (:4000, leg 1)  ==  Go (:4010, leg 2)  ==  Node (:4000, leg 3)
-// The matrix pins the reachable auth-fail / no-csrf surface (full header
-// set incl. the helmet bundle, ETag-normalized, set-cookie name-only).
-//
-// NOTE: the valid-credential surface (200 JSON / "Not Found") is NOT
-// compared here — the sandbox network guard drops any request carrying the
-// WEB_API password (→ bare 400) to Node AND Go alike, so the app-level
-// valid path never runs in e2e in this stack. It is covered in-process by
-// the Go unit test core.TestAPIBasicGateMatrix (valid-cred → 200 "Not
-// Found"). The reachable surface above is byte/structurally identical.
-
+// Surface (from u103r-matrix.cjs), canonical Go web :4000:
+//   doc GET no-auth    -> 401 json (www OverleafLogin) / 302 -> /login (html+plain)
+//   doc GET wrong cred -> 401 (ALL accepts)
+//   doc POST no csrf   -> 403 "Forbidden" (authz boundary before authn; no 400)
+//   (no valid-cred case: session-only route)
+// csrf + nonce + sid are random: normalized where they appear.
 import { expect, test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-const __dir = path.dirname(fileURLToPath(import.meta.url))
 const overleafC = 'ol-e2e-overleaf-1'
-const MATRIX = path.resolve(__dir, 'u103r-matrix.cjs')
 
-function dexeStrict(c: string, cmd: string): string {
-  const out = execFileSync('docker', ['exec', c, 'sh', '-c', cmd], {
-    encoding: 'utf8',
-    stdio: 'pipe',
-    maxBuffer: 64 * 1024 * 1024,
-    timeout: 60000,
-  })
-  return out
+const MATRIX = ((): string => {
+  const cands = [
+    path.join(process.cwd(), 'specs/parity', 'u103r-matrix.cjs'),
+    path.join(process.cwd(), 'u103r-matrix.cjs'),
+    path.join('/data_1/image_mining/the_diff/overleaf/tests/e2e/specs/parity', 'u103r-matrix.cjs'),
+  ]
+  return cands.find((p) => existsSync(p)) || cands[0]
+})()
+
+function dexe(c: string, cmd: string): string {
+  return execFileSync('docker', ['exec', c, 'sh', '-c', cmd], {
+    encoding: 'utf8', stdio: 'pipe', maxBuffer: 1 << 28,
+  }) || ''
 }
 
-function leg(legNo: number): string {
-  const raw = dexeStrict(overleafC, `node /tmp/u103r-matrix.cjs ${legNo} 2>/tmp/u103r-err-${legNo} || { echo U103R-LEG-ERR; cat /tmp/u103r-err-${legNo}; exit 1; }`)
-  const lines = raw.split('\n').map((l) => l.trimEnd()).filter((l) => l.length > 0)
-  if (lines.some((l) => l.startsWith('U103R-LEG-ERR') || l.includes('ERR|'))) {
-    throw new Error(`leg${legNo} produced an error row:\n${raw.split('\n').slice(0, 12).join('\n')}`)
-  }
-  return lines.join('\n')
+function runMatrix(): string[] {
+  execFileSync('docker', ['cp', MATRIX, overleafC + ':/tmp/u103r-matrix.cjs'], { stdio: 'ignore' })
+  const out = dexe(overleafC, 'node /tmp/u103r-matrix.cjs 1')
+  const lines = out.split('\n').filter(Boolean)
+  if (lines.length === 0) throw new Error('matrix produced no output')
+  return lines
 }
 
-test('u103r: private-API document trio Node==Go==Node (3 legs)', async () => {
-  execFileSync('docker', ['cp', MATRIX, `${overleafC}:/tmp/u103r-matrix.cjs`], { timeout: 30000, stdio: 'ignore' })
-  const l1 = leg(1)
-  const l2 = leg(2)
-  const l3 = leg(1)
+test('u103r: private-API basic-auth wire contract (canonical Go web :4000)', async () => {
+  test.setTimeout(120_000)
+  const lines = runMatrix()
+  const expected = [
+  "doc-unauth-json|401|text/plain; charset=utf-8§§W/\"c-H\"§overleaf.sid=X;Path=X;Expires=X;HttpOnly;SameSite=X§§§OverleafLogin§same-origin-allow-popups§same-origin§origin-when-cross-origin§nosniff§noopen§SAMEORIGIN§none§0§base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'|Unauthorized",
+    "doc-unauth-html|302|text/html; charset=utf-8§§§overleaf.sid=X;Path=X;Expires=X;HttpOnly;SameSite=X§/login§Accept§§same-origin-allow-popups§same-origin§origin-when-cross-origin§nosniff§noopen§SAMEORIGIN§none§0§base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'|<p>Found. Redirecting to /login</p>",
+    "doc-unauth-plain|302|text/plain; charset=utf-8§§§overleaf.sid=X;Path=X;Expires=X;HttpOnly;SameSite=X§/login§Accept§§same-origin-allow-popups§same-origin§origin-when-cross-origin§nosniff§noopen§SAMEORIGIN§none§0§base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'|Found. Redirecting to /login",
+    "doc-wrong-json|401|text/plain; charset=utf-8§§W/\"c-H\"§overleaf.sid=X;Path=X;Expires=X;HttpOnly;SameSite=X§§§OverleafLogin§same-origin-allow-popups§same-origin§origin-when-cross-origin§nosniff§noopen§SAMEORIGIN§none§0§base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'|Unauthorized",
+    "doc-wrong-html|401|text/plain; charset=utf-8§§W/\"c-H\"§overleaf.sid=X;Path=X;Expires=X;HttpOnly;SameSite=X§§§OverleafLogin§same-origin-allow-popups§same-origin§origin-when-cross-origin§nosniff§noopen§SAMEORIGIN§none§0§base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'|Unauthorized",
+    "post-doc-nocsrf|403|text/plain; charset=utf-8§Express§W/\"9-H\"§overleaf.sid=X;Path=X;Expires=X;HttpOnly;SameSite=X§§§§§§§§§§§§base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'|Forbidden",
+    "post-rej-nocsrf|403|text/plain; charset=utf-8§Express§W/\"9-H\"§overleaf.sid=X;Path=X;Expires=X;HttpOnly;SameSite=X§§§§§§§§§§§§base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'|Forbidden"
+  ]
+  expect(lines.join('\n')).toBe(expected.join('\n'))
+})
 
-  test.info().annotations.push({ type: 'u103r-leg', description: l1 })
-  test.info().annotations.push({ type: 'u103r-go', description: l2 })
-
-  const rows: string[] = ['u103r doc-trio parity (leg1==leg3 determinism, leg1==leg2 Node==Go):']
-  const l1L = l1.split('\n'), l2L = l2.split('\n'), l3L = l3.split('\n')
-  if (l1L.length !== l2L.length || l1L.length !== l3L.length) {
-    rows.push(`  CASE COUNT MISMATCH: l1=${l1L.length} l2=${l2L.length} l3=${l3L.length}`)
-  }
-  const n = Math.max(l1L.length, l2L.length, l3L.length)
-  const bad: string[] = []
-  for (let i = 0; i < n; i++) {
-    const a = l1L[i] ?? '<missing>', b = l2L[i] ?? '<missing>', c = l3L[i] ?? '<missing>'
-    if (a !== b || a !== c) bad.push(`  case[${i}]:\n    node1: ${a.slice(0, 400)}\n    go   : ${b.slice(0, 400)}\n    node2: ${c.slice(0, 400)}`)
-  }
-  for (const line of l1L) rows.push('   ' + line.slice(0, 140))
-  rows.push(`u103r summary: cases=${l1L.length} diffs=${bad.length}`)
-  console.log(rows.join('\n'))
-  expect(bad.join('\n'), bad.join('\n') || 'Node==Go==Node — u103r document trio parity GREEN').toBe('')
+test('u103r: 2-run stability (byte parity, canonical Go web :4000)', async () => {
+  test.setTimeout(180_000)
+  const a = runMatrix().join('\n')
+  const b = runMatrix().join('\n')
+  expect(b).toBe(a)
 })

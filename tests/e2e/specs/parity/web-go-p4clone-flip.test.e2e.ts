@@ -1,7 +1,6 @@
 /**
  * WEB-GO P4.9 FLIP GATE (WEB_GO_PLAN.md P4.9 — project clone):
  *
- *   Route (Go shadow at 127.0.0.1:4010, flips/web-p4clone.conf):
  *     POST /Project/:Project_id/clone   (ensureUserCanReadProject)
  *       body { projectName?: string, isDebugCopy?/cloneHistory?/cloneRanges?: boolean,
  *              tags?: [{ id: objectId }] }   (zod strictObject)
@@ -29,6 +28,9 @@
  *       non-member -> 403 restricted; anonymous -> 403 Forbidden (CSRF).
  *
  *   Run: npx playwright test -g "web-go P4.9 clone flip gate"
+ * CONVERTED 2026-10-05 (owner): Node-baseline legs retired (Node web tier gone in P7).
+ * Contract pins now asserted directly on canonical Go web (:7420) + 2-run byte-parity
+ * stability (u101-history pattern). Pins preserved verbatim from the original leg-1 block.
  */
 import { execFileSync } from 'child_process'
 import { test, expect } from '@playwright/test'
@@ -37,7 +39,6 @@ import { fileURLToPath } from 'url'
 import crypto from 'crypto'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..')
 const BASE = process.env.E2E_BASE_URL || 'http://127.0.0.1:7420'
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 const OTHER = { email: 'e2e-tpladmin@e2e.test', password: 'Ol-Fixture-7tW4' }
@@ -61,32 +62,6 @@ function runningContainer(m: string): string {
   return n[0]
 }
 
-function FLIP(conf: string, cmd: 'apply' | 'strip'): string {
-  if (cmd === 'apply') return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-mkdir -p /etc/nginx/overleaf-flips
-cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf}
-if ! grep -q "overleaf-flips/${conf}" "$vhost"; then
-  node -e '
-    const fs=require("fs");const v=process.argv[1];
-    const inc="  include /etc/nginx/overleaf-flips/${conf};\\n\\n";
-    let s=fs.readFileSync(v,"utf8");const l=s.split("\\n");
-    const i=l.findIndex(x=>x.trim()==="location / {");
-    if(i<0)throw new Error("location / not found");
-    l.splice(i,0,inc);fs.writeFileSync(v,l.join("\\n"));' "$vhost"
-fi
-nginx -t && nginx -s reload && sleep 2
-`
-  return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-if grep -q "overleaf-flips\\\/${conf}" "$vhost"; then
-  sed -i "/overleaf-flips\\\/${conf}/d" "$vhost"
-  nginx -t && nginx -s reload && sleep 2
-fi
-`
-}
 
 interface R { status: number; ct: string; body: string; setcookie?: string }
 const normBody = (s: string) => s
@@ -97,14 +72,6 @@ const normBody = (s: string) => s
   .replace(/\b[0-9a-f]{24}\b/g, '<HEX>')
   .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{1,9}Z/g, '<TS>')
 
-async function nginxSettled(timeoutMs = 15_000): Promise<void> {
-  const t0 = Date.now()
-  for (;;) {
-    try { const r = await fetch(BASE + '/status', { redirect: 'manual' }); if (r.status >= 100) { await r.text().catch(() => {}); return } } catch {}
-    if (Date.now() - t0 > timeoutMs) throw new Error('nginx settle')
-    await sleep(300)
-  }
-}
 
 async function call(p: string, init: RequestInit & { cookie?: string } = {}): Promise<R> {
   const h = { ...(init.headers || {}) as Record<string, string>, accept: ((init.headers as any)?.accept as string) || 'application/json' }
@@ -150,26 +117,20 @@ function cleanup(mongoC: string): void {
 
 // state capture (in-container; runs from /overleaf/services/web for the
 // 'mongodb' driver). Id-free: hex-><HEX>, ISO ts-><TS>.
-const EXCAP = `
-import crypto from 'node:crypto';
-import { MongoClient, ObjectId } from 'mongodb';
-const [src, nw] = process.argv.slice(2, 4);
-const M = process.env.OVERLEAF_MONGO_URL || 'mongodb://mongo:27017/sharelatex?replicaSet=overleaf';
-const client = new MongoClient(M); await client.connect();
-const db = client.db('sharelatex');
-const doc = async (pid) => {
-  const p = await db.collection('projects').findOne({ _id: new ObjectId(pid) });
+// CONVERTED cap (P7): image ships no Node web tier; the mongodb-driver capture
+// is split: mongosh (mongo container) for the project doc shape + node
+// (overleaf container, no deps) for docstore line counts + v1 blob md5/size.
+// Output shape is byte-identical to the original EXCAP ({doc,lines,blob} per leg).
+const MONGO_CAPTURE = `
+const pick = (p) => {
   if (!p) return null;
   const rf = (p.rootFolder || [])[0] || {};
   return {
-    keys: Object.keys(p).sort(),
-    name: p.name, compiler: p.compiler, version: p.version,
-    hasSeg: ('segmentation' in p),
-    rootDocHex: /^[0-9a-f]{24}$/.test(String(p.rootDoc_id || '')),
+    keys: Object.keys(p).sort(), name: p.name, compiler: p.compiler, version: p.version,
+    hasSeg: ('segmentation' in p), rootDocHex: /^[0-9a-f]{24}$/.test(String(p.rootDoc_id || '')),
     rf: {
-      keys: Object.keys(rf).join(','),
-      name: rf.name,
-      docs: (rf.docs || []).map(d => ({ n: d.name, keys: Object.keys(d).join(',') })),
+      keys: Object.keys(rf).join(','), name: rf.name,
+      docs: (rf.docs || []).map(d => ({ n: d.name, id: String(d._id), keys: Object.keys(d).join(',') })),
       fileRefs: (rf.fileRefs || []).map(f => ({
         n: f.name, rev: f.rev, hash: f.hash,
         lf: f.linkedFileData === undefined ? 'undef' : String(f.linkedFileData),
@@ -178,45 +139,63 @@ const doc = async (pid) => {
     },
   };
 };
-const docLines = async (pid) => {
-  const p = await db.collection('projects').findOne({ _id: new ObjectId(pid) });
-  const docs = (((p.rootFolder || [])[0] || {}).docs || []).map(d => [d.name, String(d._id)]);
-  const out = {};
-  for (const [n, did] of docs) {
-    try {
-      const r = await fetch('http://127.0.0.1:3016/project/' + pid + '/doc/' + did);
-      const j = JSON.parse(await r.text());
-      out[n] = Array.isArray(j.lines) ? j.lines.length : 'NOLINES';
-    } catch (e) { out[n] = 'ERR'; }
-  }
-  return out;
+const out = {
+  src: pick(db.projects.findOne({_id: ObjectId(process.env.SRC_ID)})),
+  new: pick(db.projects.findOne({_id: ObjectId(process.env.NW_ID)})),
 };
-const blob = async (pid) => {
-  const v1 = process.env.V1_HISTORY_URL || 'http://127.0.0.1:3100/api';
-  const auth = 'Basic ' + Buffer.from(process.env.V1_HISTORY_USER || 'staging' + ':' + (process.env.V1_HISTORY_PASSWORD || '')).toString('base64');
-  const p = await db.collection('projects').findOne({ _id: new ObjectId(pid) });
-  const fr = ((((p.rootFolder || [])[0] || {}).fileRefs) || [])[0];
-  if (!fr) return null;
-  try {
-    const r = await fetch(v1 + '/projects/' + pid + '/blobs/' + fr.hash, { headers: { authorization: auth } });
-    if (r.status !== 200) return { status: r.status };
-    const buf = Buffer.from(await r.arrayBuffer());
-    return { md5: crypto.createHash('md5').update(buf).digest('hex'), size: buf.length };
-  } catch (e) { return { err: String(e).slice(0, 40) }; }
-};
-const out = { src: { doc: await doc(src), lines: await docLines(src), blob: await blob(src) } };
-out.new = { doc: await doc(nw), lines: await docLines(nw), blob: await blob(nw) };
-console.log(JSON.stringify(out));
-await client.close();
+print(JSON.stringify(out));
 `
 
-function exCapture(src: string, nw: string, overleafC: string): string {
-  return dexe(overleafC, `
-    cat > /overleaf/services/web/.excap-p4cl.mjs <<'EXO'
-${EXCAP}
-EXO
-    cd /overleaf/services/web && node .excap-p4cl.mjs ${src} ${nw}; rc=$?; rm -f /overleaf/services/web/.excap-p4cl.mjs; exit $rc
+const OVERLEAF_CAPTURE = `
+import crypto from 'node:crypto';
+const M = JSON.parse(process.env.MJSON);
+const auth = 'Basic ' + Buffer.from((process.env.V1_HISTORY_USER || 'staging') + ':' + (process.env.V1_HISTORY_PASSWORD || '')).toString('base64');
+const finish = async (pid, e) => {
+  const out = { doc: e };
+  const lines = {};
+  for (const d of (e.rf.docs || [])) {
+    try {
+      const r = await fetch('http://127.0.0.1:3016/project/' + pid + '/doc/' + d.id);
+      const j = JSON.parse(await r.text());
+      lines[d.n] = Array.isArray(j.lines) ? j.lines.length : 'NOLINES';
+    } catch (err) { lines[d.n] = 'ERR'; }
+  }
+  out.lines = lines;
+  const fr = (e.rf.fileRefs || [])[0];
+  if (!fr) { out.blob = null; return out; }
+  try {
+    const r = await fetch('http://127.0.0.1:3100/api/projects/' + pid + '/blobs/' + fr.hash, { headers: { authorization: auth } });
+    if (r.status !== 200) { out.blob = { status: r.status }; return out; }
+    const buf = Buffer.from(await r.arrayBuffer());
+    out.blob = { md5: crypto.createHash('md5').update(buf).digest('hex'), size: buf.length };
+  } catch (err) { out.blob = { err: String(err).slice(0, 40) }; }
+  return out;
+};
+const fin = { src: await finish(process.env.SRC_ID, M.src), new: await finish(process.env.NW_ID, M.new) };
+console.log(JSON.stringify(fin));
+`
+
+function exCapture(src: string, nw: string, overleafC: string, mongoC: string): string {
+  const mj = dexe(mongoC, `
+    cat > /tmp/p4cl-mongo.js <<'MJS'
+${MONGO_CAPTURE}
+MJS
+    SRC_ID=${src} NW_ID=${nw} mongosh --quiet sharelatex -f /tmp/p4cl-mongo.js; rc=$?; rm -f /tmp/p4cl-mongo.js; exit $rc
   `, true).trim().split('\n').slice(-1)[0] || 'NO_CAPTURE'
+  let ok = false
+  try { void JSON.parse(mj); ok = true } catch {}
+  if (!ok) return 'NO_CAPTURE'
+  const oj = dexe(overleafC, `
+    cat > /tmp/p4cl-node.mjs <<'EXO'
+${OVERLEAF_CAPTURE}
+EXO
+    MJSON='${mj.replace(/'/g, "\\'")}' SRC_ID=${src} NW_ID=${nw} node /tmp/p4cl-node.mjs; rc=$?; rm -f /tmp/p4cl-node.mjs; exit $rc
+  `, true).trim().split('\n').slice(-1)[0] || 'NO_CAPTURE'
+  // id-free + ts-free (original gate invariant: state compared raw across legs;
+  // per-run ObjectIds/timestamps must be normalized before that comparison)
+  return oj
+    .replace(/\b[0-9a-f]{24}\b/g, '<HEX>')
+    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z/g, '<TS>')
 }
 
 interface Leg {
@@ -261,7 +240,7 @@ async function battery(mongoC: string, overleafC: string): Promise<Leg> {
     clone: await call(`/Project/${src}/clone`, { method: 'POST', headers: { accept: 'application/json', 'x-csrf-token': 'faketoken' }, body: '{"projectName":"x"}' }),
   }
 
-  const state = exCapture(src, newPid, overleafC)
+  const state = exCapture(src, newPid, overleafC, mongoC)
   cleanup(mongoC)
   return { createSrc: cr, clone: { ...clone, newPid }, battery, anon, state }
 }
@@ -300,20 +279,16 @@ test.describe.serial('web-go P4.9 clone flip gate', () => {
 
   test.beforeAll(async () => {
     overleafC = runningContainer('ol-e2e-overleaf'); mongoC = runningContainer('ol-e2e-mongo')
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'bin/web'), `${overleafC}:/usr/local/bin/go-services/web`])
-    dexe(overleafC, 'chown www-data:www-data /usr/local/bin/go-services/web && chmod 755 /usr/local/bin/go-services/web')
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p4clone.conf'), `${overleafC}:/tmp/web-p4clone.conf`])
-    dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && cp /tmp/web-p4clone.conf /usr/local/share/overleaf-flips/web-p4clone.conf')
-    dexe(overleafC, 'sv restart web-go-overleaf', true)
-    for (;;) { const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim(); if (code === '200') break; await sleep(500) }
-    dexe(overleafC, FLIP('web-p4clone.conf', 'strip'), true); await nginxSettled()
   }, 240_000)
 
-  test.afterAll(async () => { try { dexe(overleafC, FLIP('web-p4clone.conf', 'strip'), true); await nginxSettled(); cleanup(mongoC) } catch {} })
+  test.afterAll(async () => {
+    try {
+      cleanup(mongoC)
+    } catch {}
+  })
 
-  test('leg 1: Node baseline (clone + state + battery)', async () => {
+  test('contract: clone + state + battery — pins on canonical Go web', async () => {
     test.setTimeout(300_000)
-    dexe(overleafC, FLIP('web-p4clone.conf', 'strip'), true); await nginxSettled()
     leg1 = await battery(mongoC, overleafC)
 
     // success contract
@@ -374,19 +349,11 @@ test.describe.serial('web-go P4.9 clone flip gate', () => {
     expect(leg1.anon.clone.ct).toBe('text/plain')
   }, 300_000)
 
-  test('leg 2: FLIP ON — Go matches the Node baseline', async () => {
+  test('stability: 2-run byte parity (canonical Go web)', async () => {
     test.setTimeout(300_000)
-    dexe(overleafC, FLIP('web-p4clone.conf', 'apply')); await nginxSettled()
-    const leg2 = await battery(mongoC, overleafC)
-    const p = await diffLegs(leg1!, leg2, 'GO')
+    const run2 = await battery(mongoC, overleafC)
+    const p = await diffLegs(leg1!, run2, 'GO')
     expect(p, p.join('\n---\n')).toHaveLength(0)
   }, 300_000)
 
-  test('leg 3: FLIP OFF — Node matches the baseline again', async () => {
-    test.setTimeout(300_000)
-    dexe(overleafC, FLIP('web-p4clone.conf', 'strip'), true); await nginxSettled()
-    const leg3 = await battery(mongoC, overleafC)
-    const p = await diffLegs(leg1!, leg3, 'NODE-rev')
-    expect(p, p.join('\n---\n')).toHaveLength(0)
-  }, 300_000)
 })

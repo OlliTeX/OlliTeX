@@ -1,7 +1,6 @@
 /**
  * WEB-GO P5.2b FLIP GATE (WEB_GO_PLAN.md P5.2b — COMPILE OUTPUT READ):
  *
- *   Routes (Go shadow at 127.0.0.1:4010, flips/web-p52b.conf):
  *     GET /download/project/:pid/build/:build_id/output/output.pdf
  *     GET /download/project/:pid/build/:editorBuildId/output/cached/:file
  *     GET /project/:pid/output/cached/output.overleaf.json
@@ -31,6 +30,9 @@
  *     anon_json      ⇒ 401 "Unauthorized" (Accept: application/json)
  *
  *   Node oracle pins (live 2026-09-16, /tmp/p52b/oracle.json + probes).
+ * CONVERTED 2026-10-05 (owner): Node-baseline legs retired (Node web tier gone in P7).
+ * Contract pins now asserted directly on canonical Go web (:7420) + 2-run byte-parity
+ * stability (u101-history pattern). Pins preserved verbatim from the original leg-1 block.
  */
 import { execFileSync } from 'node:child_process'
 import { test, expect } from '@playwright/test'
@@ -39,7 +41,6 @@ import crypto from 'node:crypto'
 const overleafC = 'ol-e2e-overleaf-1'
 const mongoC = 'ol-e2e-mongo-1'
 const redisC = 'ol-e2e-redis-1'
-const FLIPCONF = 'web-p52b.conf'
 const BASE = 'http://127.0.0.1:7420'
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 const FIX_NAME = 'P52b Oracle'
@@ -75,14 +76,6 @@ function flushLimiter(): void {
   }
 }
 
-async function waitGo(): Promise<void> {
-  for (let i = 0; i < 60; i++) {
-    const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim()
-    if (code === '200') return
-    await sleep(500)
-  }
-  throw new Error('Go shadow /status not 200')
-}
 
 async function call(p: string, init: { method?: string; headers?: Record<string, string>; cookie?: string; body?: any } = {}): Promise<any> {
   const h: Record<string, string> = { ...(init.headers || {}) }
@@ -125,22 +118,10 @@ function stripFlips(): void {
   const vhost = '/etc/nginx/sites-enabled/overleaf.conf'
   dexe(
     overleafC,
-    `node -e "const fs=require('fs');const p='${vhost}';const s=fs.readFileSync(p,'utf8');const L=s.split(String.fromCharCode(10)).filter(x=>!x.includes('overleaf-flips/'));fs.writeFileSync(p,L.join(String.fromCharCode(10)))"`
   )
   dexe(overleafC, 'nginx -t && nginx -s reload')
 }
 
-function flip(mode: 'apply' | 'strip'): void {
-  stripFlips()
-  if (mode === 'strip') return
-  const vhost = '/etc/nginx/sites-enabled/overleaf.conf'
-  dexe(overleafC, `
-mkdir -p /etc/nginx/overleaf-flips
-cp -f /usr/local/share/overleaf-flips/${FLIPCONF} /etc/nginx/overleaf-flips/${FLIPCONF}
-node -e "const fs=require('fs');const p='${vhost}';let s=fs.readFileSync(p,'utf8');const inc='  include /etc/nginx/overleaf-flips/${FLIPCONF};'+String.fromCharCode(10);if(s.includes('location / {')){s=s.replace('location / {',inc+'location / {',1)};else{throw new Error('anchor not found')};fs.writeFileSync(p,s)"
-nginx -t && nginx -s reload
-`)
-}
 
 async function battery(mePid: string, othPid: string, U: { ck: string; csrf: string }): Promise<Leg> {
   const out: Leg = {}
@@ -251,7 +232,6 @@ test.describe('@local web-go P5.2b (output read) parity', () => {
   const LEG1: Leg = {}
 
   test.beforeAll(async () => {
-    await waitGo()
     U = await login(USER)
     ME_PID = mongoProjectByName(FIX_NAME)
     if (!ME_PID) {
@@ -272,29 +252,18 @@ test.describe('@local web-go P5.2b (output read) parity', () => {
     expect(OTH_PID, 'non-member fixture project').toHaveLength(24)
   })
 
-  test('leg 1: Node baseline', async () => {
-    flip('strip')
+  test('contract: web-go-p52b-flip — pins on canonical Go web', async () => {
     await sleep(300)
     Object.assign(LEG1, await battery(ME_PID, OTH_PID, U))
   })
 
-  test('leg 2: Go parity', async () => {
-    flip('apply')
+  test('stability: 2-run byte parity (canonical Go web)', async () => {
     await sleep(800)
-    const leg2 = await battery(ME_PID, OTH_PID, U)
-    flip('strip')
+    const run2 = await battery(ME_PID, OTH_PID, U)
     await sleep(300)
-    const ds = diffLegs('p52b', LEG1, leg2)
+    const ds = diffLegs('p52b', LEG1, run2)
     if (ds.length) console.log(ds.join('\n'))
     expect(ds, ds.join('\n')).toHaveLength(0)
   })
 
-  test('leg 3: Node re-baseline', async () => {
-    flip('strip')
-    await sleep(300)
-    const leg3 = await battery(ME_PID, OTH_PID, U)
-    const ds = diffLegs('p52b', LEG1, leg3)
-    if (ds.length) console.log(ds.join('\n'))
-    expect(ds, ds.join('\n')).toHaveLength(0)
-  })
 })

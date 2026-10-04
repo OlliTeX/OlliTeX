@@ -1,7 +1,6 @@
 /**
  * WEB-GO P4.10a FLIP GATE (WEB_GO_PLAN.md P4.10a — collaborator writes):
  *
- *   Routes (Go shadow at 127.0.0.1:4010, flips/web-p4col.conf):
  *     POST   /project/:id/leave                              (requireLogin)
  *     PUT    /project/:id/users/:user_id   (admin; {privilegeLevel})
  *     DELETE /project/:id/users/:user_id   (admin)
@@ -20,6 +19,9 @@
  *   404 "project or collaborator not found", CSRF 403 Forbidden anon).
  *
  *   Run: npx playwright test -g "web-go P4.10a collab-writes flip gate"
+ * CONVERTED 2026-10-05 (owner): Node-baseline legs retired (Node web tier gone in P7).
+ * Contract pins now asserted directly on canonical Go web (:7420) + 2-run byte-parity
+ * stability (u101-history pattern). Pins preserved verbatim from the original leg-1 block.
  */
 import { execFileSync } from 'child_process'
 import { test, expect } from '@playwright/test'
@@ -28,7 +30,6 @@ import { fileURLToPath } from 'url'
 import crypto from 'crypto'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..')
 const BASE = process.env.E2E_BASE_URL || 'http://127.0.0.1:7420'
 const SINK = process.env.E2E_MAIL_SINK || 'http://127.0.0.1:18025'
 const OWNER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
@@ -49,32 +50,6 @@ function runningContainer(m: string): string {
   return n[0]
 }
 
-function FLIP(conf: string, cmd: 'apply' | 'strip'): string {
-  if (cmd === 'apply') return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-mkdir -p /etc/nginx/overleaf-flips
-cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf}
-if ! grep -q "overleaf-flips/${conf}" "$vhost"; then
-  node -e '
-    const fs=require("fs");const v=process.argv[1];
-    const inc="  include /etc/nginx/overleaf-flips/${conf};\\n\\n";
-    let s=fs.readFileSync(v,"utf8");const l=s.split("\\n");
-    const i=l.findIndex(x=>x.trim()==="location / {");
-    if(i<0)throw new Error("location / not found");
-    l.splice(i,0,inc);fs.writeFileSync(v,l.join("\\n"));' "$vhost"
-fi
-nginx -t && nginx -s reload && sleep 2
-`
-  return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-if grep -q "overleaf-flips\\\/${conf}" "$vhost"; then
-  sed -i "/overleaf-flips\\\/${conf}/d" "$vhost"
-  nginx -t && nginx -s reload && sleep 2
-fi
-`
-}
 
 interface R { status: number; ct: string; body: string; setcookie?: string }
 const normBody = (s: string) => s
@@ -90,14 +65,6 @@ const normBody = (s: string) => s
   .replace(/\b[0-9a-f]{24}\b/g, '<HEX>')
   .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{1,9}Z/g, '<TS>')
 
-async function nginxSettled(timeoutMs = 15_000): Promise<void> {
-  const t0 = Date.now()
-  for (;;) {
-    try { const r = await fetch(BASE + '/status', { redirect: 'manual' }); if (r.status >= 100) { await r.text().catch(() => {}); return } } catch {}
-    if (Date.now() - t0 > timeoutMs) throw new Error('nginx settle')
-    await sleep(300)
-  }
-}
 
 async function call(p: string, init: RequestInit & { cookie?: string } = {}): Promise<R> {
   const h = { ...(init.headers || {}) as Record<string, string>, accept: ((init.headers as any)?.accept as string) || 'application/json' }
@@ -409,20 +376,15 @@ test.describe.serial('web-go P4.10a collab-writes flip gate', () => {
 
   test.beforeAll(async () => {
     overleafC = runningContainer('ol-e2e-overleaf'); mongoC = runningContainer('ol-e2e-mongo')
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'bin/web'), `${overleafC}:/usr/local/bin/go-services/web`])
-    dexe(overleafC, 'chown www-data:www-data /usr/local/bin/go-services/web && chmod 755 /usr/local/bin/go-services/web')
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p4col.conf'), `${overleafC}:/tmp/web-p4col.conf`])
-    dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && cp /tmp/web-p4col.conf /usr/local/share/overleaf-flips/web-p4col.conf')
-    dexe(overleafC, 'sv restart web-go-overleaf', true)
-    for (;;) { const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim(); if (code === '200') break; await sleep(500) }
-    dexe(overleafC, FLIP('web-p4col.conf', 'strip'), true); await nginxSettled()
   }, 240_000)
 
-  test.afterAll(async () => { try { dexe(overleafC, FLIP('web-p4col.conf', 'strip'), true); await nginxSettled() } catch {} })
+  test.afterAll(async () => {
+    try {
+    } catch {}
+  })
 
-  test('leg 1: Node baseline', async () => {
+  test('contract: web-go-p4col-flip — pins on canonical Go web', async () => {
     test.setTimeout(300_000)
-    dexe(overleafC, FLIP('web-p4col.conf', 'strip'), true); await nginxSettled()
     leg1 = await battery(mongoC)
 
     try {
@@ -495,19 +457,11 @@ test.describe.serial('web-go P4.10a collab-writes flip gate', () => {
     expect(c('transferUnknownKey').status).toBe(400)
   }, 300_000)
 
-  test('leg 2: FLIP ON — Go matches the Node baseline', async () => {
+  test('stability: 2-run byte parity (canonical Go web)', async () => {
     test.setTimeout(300_000)
-    dexe(overleafC, FLIP('web-p4col.conf', 'apply')); await nginxSettled()
-    const leg2 = await battery(mongoC)
-    const p = diffLegs(leg1!, leg2, 'GO')
+    const run2 = await battery(mongoC)
+    const p = diffLegs(leg1!, run2, 'GO')
     expect(p, p.join('\n---\n')).toHaveLength(0)
   }, 300_000)
 
-  test('leg 3: FLIP OFF — Node matches the baseline again', async () => {
-    test.setTimeout(300_000)
-    dexe(overleafC, FLIP('web-p4col.conf', 'strip'), true); await nginxSettled()
-    const leg3 = await battery(mongoC)
-    const p = diffLegs(leg1!, leg3, 'NODE-rev')
-    expect(p, p.join('\n---\n')).toHaveLength(0)
-  }, 300_000)
 })

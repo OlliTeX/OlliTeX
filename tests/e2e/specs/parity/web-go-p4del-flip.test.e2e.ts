@@ -1,7 +1,6 @@
 /**
  * WEB-GO P4.8 FLIP GATE (WEB_GO_PLAN.md P4.8 — project delete/restore):
  *
- *   Routes (Go shadow at 127.0.0.1:4010, flips/web-p4del.conf):
  *     DELETE /Project/:Project_id            -> hard delete
  *         = document-updater flush+delete (204) [Node fallback chain replicated]
  *         + docstore POST /project/:id/archive (best-effort; no-op persistor here)
@@ -28,6 +27,9 @@
  *       (archive is a no-op with the mongo/memory persistor backend).
  *
  *   Run: npx playwright test -g "web-go P4.8 delete/restore flip gate"
+ * CONVERTED 2026-10-05 (owner): Node-baseline legs retired (Node web tier gone in P7).
+ * Contract pins now asserted directly on canonical Go web (:7420) + 2-run byte-parity
+ * stability (u101-history pattern). Pins preserved verbatim from the original leg-1 block.
  */
 import { execFileSync } from 'child_process'
 import fs from 'node:fs'
@@ -37,7 +39,6 @@ import { fileURLToPath } from 'url'
 import crypto from 'crypto'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..')
 const BASE = process.env.E2E_BASE_URL || 'http://127.0.0.1:7420'
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 const OTHER = { email: 'e2e-tpladmin@e2e.test', password: 'Ol-Fixture-7tW4' }
@@ -55,32 +56,6 @@ function runningContainer(m: string): string {
   return n[0]
 }
 
-function FLIP(conf: string, cmd: 'apply' | 'strip'): string {
-  if (cmd === 'apply') return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-mkdir -p /etc/nginx/overleaf-flips
-cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf}
-if ! grep -q "overleaf-flips/${conf}" "$vhost"; then
-  node -e '
-    const fs=require("fs");const v=process.argv[1];
-    const inc="  include /etc/nginx/overleaf-flips/${conf};\\n\\n";
-    let s=fs.readFileSync(v,"utf8");const l=s.split("\\n");
-    const i=l.findIndex(x=>x.trim()==="location / {");
-    if(i<0)throw new Error("location / not found");
-    l.splice(i,0,inc);fs.writeFileSync(v,l.join("\\n"));' "$vhost"
-fi
-nginx -t && nginx -s reload && sleep 2
-`
-  return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-if grep -q "overleaf-flips\\\/${conf}" "$vhost"; then
-  sed -i "/overleaf-flips\\\/${conf}/d" "$vhost"
-  nginx -t && nginx -s reload && sleep 2
-fi
-`
-}
 
 interface R { status: number; ct: string; body: string; setcookie?: string }
 // normalize: id-free, nonce-free, csrf-free — comparable across legs/services
@@ -91,14 +66,6 @@ const normBody = (s: string) => s
   .replace(/name="_csrf" type="hidden" value="[^"]*"/g, 'name="_csrf" type="hidden" value="CSRF"')
   .replace(/\b[0-9a-f]{24}\b/g, '<HEX>')
 
-async function nginxSettled(timeoutMs = 15_000): Promise<void> {
-  const t0 = Date.now()
-  for (;;) {
-    try { const r = await fetch(BASE + '/status', { redirect: 'manual' }); if (r.status >= 100) { await r.text().catch(() => {}); return } } catch {}
-    if (Date.now() - t0 > timeoutMs) throw new Error('nginx settle')
-    await sleep(300)
-  }
-}
 
 async function call(p: string, init: RequestInit & { cookie?: string } = {}): Promise<R> {
   const h = { ...(init.headers || {}) as Record<string, string>, accept: ((init.headers as any)?.accept as string) || 'application/json' }
@@ -140,88 +107,107 @@ function clearRateLimits(): void {
   } catch {}
 }
 
-// state capture (in-container ESM; runs from /overleaf/services/web for the
-// 'mongodb' driver resolution). Output: id-free + timestamp-free + presence-
-// based, directly comparable across legs.
-function exCapture(args: string, which: 'pre' | 'post', overleafC: string): string {
-  return dexe(overleafC, `
-    cat > /overleaf/services/web/.excap-p4del.mjs <<'EXO'
-import { MongoClient, ObjectId } from 'mongodb';
-const [A, B, C] = process.argv.slice(2, 5);
-const which = process.argv[5];
-const M = process.env.OVERLEAF_MONGO_URL || 'mongodb://mongo:27017/sharelatex?replicaSet=overleaf';
-const client = new MongoClient(M); await client.connect();
-const db = client.db('sharelatex');
-const proj = async (pid) => {
-  const p = await db.collection('projects').findOne({ _id: new ObjectId(pid) });
-  if (!p) return { present: false };
-  return {
-    present: true, name: p.name,
-    archivedAbsent: !('archived' in p),
-    archivedHasOwner: !!(p.archived && p.archived.some(x => String(x) === String(p.owner_ref))),
-    collabEmpty: ((p.collablator_refs) || []).length === 0,
-    rootDocs: (((( p.rootFolder || [])[0]) || {}).docs || []).map(d => d.name).sort(),
-  };
-};
-const out = { A: await proj(A), B: await proj(B) };
-if (which === 'post') {
-  const c = await proj(C);
-  out.C_present = !!c.present;
-  const rec = await db.collection('deletedProjects').findOne({ 'deleterData.deletedProjectId': new ObjectId(C) });
-  if (rec) {
-    const dd = rec.deleterData || {};
-    const arr = (v) => (Array.isArray(v) ? v.length : -1);
-    const p = rec.project || {};
-    out.C_rec = {
-      found: true,
-      topKeys: Object.keys(rec).sort(),
-      __v: (rec.__v === undefined ? null : rec.__v),
-      dd: {
-        fieldKeys: Object.keys(dd).sort(),
-        deletedReason: dd.deletedReason,
-        has_deleterId: !!dd.deleterId,
-        has_deleterIpAddress: typeof dd.deleterIpAddress === 'string' && dd.deleterIpAddress.length > 0,
-        has_deletedAt: !!dd.deletedAt,
-        has_deletedProjectId: !!dd.deletedProjectId,
-        ownerSet: !!dd.deletedProjectOwnerId,
-        arrCols: arr(dd.deletedProjectCollaboratorIds),
-        arrRO: arr(dd.deletedProjectReadOnlyIds),
-        arrRev: arr(dd.deletedProjectReviewerIds),
-        arrRWTokAcc: arr(dd.deletedProjectReadWriteTokenAccessIds),
-        arrROTokAcc: arr(dd.deletedProjectReadOnlyTokenAccessIds),
-        overleafHistSet: !!dd.deletedProjectOverleafHistoryId,
-        hasOverleafId: 'deletedProjectOverleafId' in dd,
-        hasRWTok: 'deletedProjectReadWriteToken' in dd,
-        hasROTok: 'deletedProjectReadOnlyToken' in dd,
-        lastUpdSet: !!dd.deletedProjectLastUpdatedAt,
-        subHasId: !!dd._id,
-      },
-      project: {
-        keyCount: Object.keys(p).length,
-        name: p.name,
-        ownerSet: !!p.owner_ref,
-        rootDocHex: /^[0-9a-f]{24}$/.test(String(p.rootDoc_id || '')),
-        collabEmpty: ((p.collablator_refs) || []).length === 0,
-        tokensReadAndWriteAbsent: !(p.tokens && 'readAndWrite' in (p.tokens || {})),
-        overleafHistorySet: !!(p.overleaf && p.overleaf.history && p.overleaf.history.id),
-        rootDocs: (((( p.rootFolder || [])[0]) || {}).docs || []).map(d => d.name).sort(),
-      },
+// state capture — two stages (P7 image ships no Node web tier / mongodb driver):
+//   (a) mongo shapes via mongosh in the mongo container (host-side docker exec)
+//   (b) docstore doc-visible probe via curl in the overleaf container at :3016
+// Output: id-free + timestamp-free + presence-based, directly comparable.
+// CONVERTED 2026-10-05: the original single-stage excap (in-container ESM with the
+// 'mongodb' driver, cwd /overleaf/services/web) cannot run in P7 images — same
+// semantics, split across the two stages.
+function exCapture(a: string, b: string, c: string, which: 'pre' | 'post', overleafC: string, mongoC: string): string {
+  const seedJs = `
+    // mongosh FILE mode treats positional args as extra input files, and arg
+    // layout is prefix-dependent in --eval mode — env vars are mode-stable.
+    const A = process.env.P4DEL_A, B = process.env.P4DEL_B, C = process.env.P4DEL_C, which = process.env.P4DEL_W;
+    const proj = (pid) => {
+      const p = db.projects.findOne({ _id: new ObjectId(pid) });
+      if (!p) return { present: false };
+      return {
+        present: true, name: p.name,
+        archivedAbsent: !('archived' in p),
+        archivedHasOwner: !!(p.archived && p.archived.some(x => String(x) === String(p.owner_ref))),
+        collabEmpty: ((p.collaberator_refs) || []).length === 0,
+        rootDocs: ((((p.rootFolder || [])[0]) || {}).docs || []).map(d => d.name).sort(),
+      };
     };
-    const doc = (((( rec.project || {}).rootFolder || [])[0] || {}).docs || [])[0];
-    if (doc && doc._id) {
-      try {
-        const r = await fetch('http://127.0.0.1:3016/project/' + C + '/doc/' + String(doc._id));
-        out.docvisible = { status: r.status };
-        await r.text();
-      } catch (e) { out.docvisible = { err: String(e).slice(0, 40) }; }
-    } else { out.docvisible = { nodoc: true }; }
-  } else { out.C_rec = { found: false }; }
+    const out = { A: proj(A), B: proj(B), cFirstDoc: null };
+    if (which === 'post') {
+      out.C_present = !!db.projects.findOne({ _id: new ObjectId(C) });
+      const rec = db.deletedProjects.findOne({ 'deleterData.deletedProjectId': new ObjectId(C) });
+      if (rec) {
+        const dd = rec.deleterData || {};
+        const pp = rec.project || {};
+        const arr = (v) => (Array.isArray(v) ? v.length : -1);
+        out.C_rec = {
+          found: true,
+          topKeys: Object.keys(rec).sort(),
+          __v: (rec.__v === undefined ? null : rec.__v),
+          dd: {
+            fieldKeys: Object.keys(dd).sort(),
+            deletedReason: dd.deletedReason,
+            has_deleterId: !!dd.deleterId,
+            has_deleterIpAddress: typeof dd.deleterIpAddress === 'string' && dd.deleterIpAddress.length > 0,
+            has_deletedAt: !!dd.deletedAt,
+            has_deletedProjectId: !!dd.deletedProjectId,
+            ownerSet: !!dd.deletedProjectOwnerId,
+            arrCols: arr(dd.deletedProjectCollaboratorIds),
+            arrRO: arr(dd.deletedProjectReadOnlyIds),
+            arrRev: arr(dd.deletedProjectReviewerIds),
+            arrRWTokAcc: arr(dd.deletedProjectReadWriteTokenAccessIds),
+            arrROTokAcc: arr(dd.deletedProjectReadOnlyTokenAccessIds),
+            overleafHistSet: !!dd.deletedProjectOverleafHistoryId,
+            hasOverleafId: 'deletedProjectOverleafId' in dd,
+            hasRWTok: 'deletedProjectReadWriteToken' in dd,
+            hasROTok: 'deletedProjectReadOnlyToken' in dd,
+            lastUpdSet: !!dd.deletedProjectLastUpdatedAt,
+            subHasId: !!dd._id,
+          },
+          project: {
+            keyCount: Object.keys(pp).length,
+            name: pp.name,
+            ownerSet: !!pp.owner_ref,
+            rootDocHex: /^[0-9a-f]{24}$/.test(String(pp.rootDoc_id || '')),
+            collabEmpty: ((pp.collaberator_refs) || []).length === 0,
+            tokensReadAndWriteAbsent: !(pp.tokens && 'readAndWrite' in (pp.tokens || {})),
+            overleafHistorySet: !!(pp.overleaf && pp.overleaf.history && pp.overleaf.history.id),
+            rootDocs: ((((pp.rootFolder || [])[0]) || {}).docs || []).map(d => d.name).sort(),
+          },
+        };
+        const d0 = ((((pp.rootFolder || [])[0]) || {}).docs || []);
+        if (d0[0] && d0[0]._id) out.cFirstDoc = String(d0[0]._id) + ' ' + C;
+      } else { out.C_rec = { found: false }; }
+    }
+    print(JSON.stringify(out));
+  `
+  fs.writeFileSync('/tmp/p4del-shape.js', seedJs)
+  execFileSync('docker', ['cp', '/tmp/p4del-shape.js', `${mongoC}:/tmp/p4del-shape.js`], { stdio: 'ignore' })
+  let raw = ''
+  for (let att = 1; att <= 4 && !(raw.includes('"present"') || raw.includes('"found"')); att++) {
+    raw = dexe(mongoC, `P4DEL_A="${a}" P4DEL_B="${b}" P4DEL_C="${c}" P4DEL_W=${which} mongosh --quiet sharelatex /tmp/p4del-shape.js`)
+      .trim().split('\n').filter(Boolean).pop() || ''
+    if (att < 4) dexe(mongoC, 'sleep 1')
+  }
+  let out: any
+  try {
+    out = JSON.parse(raw)
+  } catch {
+    throw new Error('p4del shape capture failed: ' + raw.slice(0, 200))
+  }
+  const cDoc = out.cFirstDoc || null
+  delete out.cFirstDoc
+  if (cDoc) out.docvisible = docVisibleProbe(cDoc, overleafC)
+  return JSON.stringify(out)
 }
-console.log(JSON.stringify(out));
-await client.close();
-EXO
-    cd /overleaf/services/web && node .excap-p4del.mjs ${args} ${which}; rc=$?; rm -f /overleaf/services/web/.excap-p4del.mjs; exit $rc
-  `, true).trim().split('\n').slice(-1)[0] || 'NO_CAPTURE'
+
+function docVisibleProbe(cd: string, overleafC: string): { status: number } | { err: string } {
+  const [doc, pid] = cd.split(' ')
+  try {
+    const code = Number(dexe(overleafC, `curl -s -m 5 -o /dev/null -w "%{http_code}" http://127.0.0.1:3016/project/${pid}/doc/${doc}`))
+    if (!Number.isNaN(code)) return { status: code }
+  } catch (e) {
+    return { err: String(e).slice(0, 40) }
+  }
+  return { err: 'probe-failed' }
 }
 
 const randomHex24 = () => crypto.randomBytes(12).toString('hex')
@@ -253,7 +239,7 @@ async function battery(mongoC: string, overleafC: string): Promise<Leg> {
   await sleep(200)
 
   const arch = await call(`/Project/${pidB}/archive`, { method: 'POST', headers: H(owner.csrf), cookie: owner.ck })
-  const pre = exCapture(`${pidA} ${pidB} ${pidC}`, 'pre', overleafC)
+  const pre = exCapture(pidA, pidB, pidC, 'pre', overleafC, mongoC)
   const restore = await call(`/Project/${pidB}/restore`, { method: 'POST', headers: H(owner.csrf), cookie: owner.ck })
   const miss = randomHex24()
 
@@ -272,7 +258,7 @@ async function battery(mongoC: string, overleafC: string): Promise<Leg> {
 
   const del = await call(`/Project/${pidC}`, { method: 'DELETE', headers: H(owner.csrf), cookie: owner.ck })
   await sleep(400)
-  const post = exCapture(`${pidA} ${pidB} ${pidC}`, 'post', overleafC)
+  const post = exCapture(pidA, pidB, pidC, 'post', overleafC, mongoC)
   return { creates: [crA, crB, crC], archive: arch, restore, del, battery, anon, pre, post }
 }
 
@@ -329,21 +315,16 @@ test.describe.serial('web-go P4.8 delete/restore flip gate', () => {
 
   test.beforeAll(async () => {
     overleafC = runningContainer('ol-e2e-overleaf'); mongoC = runningContainer('ol-e2e-mongo')
-    const repoBin = path.resolve(REPO_ROOT, 'bin/web')
-    execFileSync('docker', ['cp', repoBin, `${overleafC}:/usr/local/bin/go-services/web`])
-    dexe(overleafC, 'chown www-data:www-data /usr/local/bin/go-services/web && chmod 755 /usr/local/bin/go-services/web')
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p4del.conf'), `${overleafC}:/tmp/web-p4del.conf`])
-    dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && cp /tmp/web-p4del.conf /usr/local/share/overleaf-flips/web-p4del.conf')
-    dexe(overleafC, 'sv restart web-go-overleaf', true)
-    for (;;) { const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim(); if (code === '200') break; await sleep(500) }
-    dexe(overleafC, FLIP('web-p4del.conf', 'strip'), true); await nginxSettled()
   }, 240_000)
 
-  test.afterAll(async () => { try { dexe(overleafC, FLIP('web-p4del.conf', 'strip'), true); await nginxSettled(); cleanup(mongoC) } catch {} })
+  test.afterAll(async () => {
+    try {
+      cleanup(mongoC)
+    } catch {}
+  })
 
-  test('leg 1: Node baseline (delete/restore + state + battery)', async () => {
+  test('contract: delete/restore + state + battery — pins on canonical Go web', async () => {
     test.setTimeout(240_000)
-    dexe(overleafC, FLIP('web-p4del.conf', 'strip'), true); await nginxSettled()
     leg1 = await battery(mongoC, overleafC)
 
     // success contract
@@ -410,19 +391,11 @@ test.describe.serial('web-go P4.8 delete/restore flip gate', () => {
     expect(leg1.anon.restore.body).toBe('Forbidden')
   }, 240_000)
 
-  test('leg 2: FLIP ON — Go matches the Node baseline', async () => {
+  test('stability: 2-run byte parity (canonical Go web)', async () => {
     test.setTimeout(240_000)
-    dexe(overleafC, FLIP('web-p4del.conf', 'apply')); await nginxSettled()
-    const leg2 = await battery(mongoC, overleafC)
-    const p = diffLegs(leg1!, leg2, 'GO')
+    const run2 = await battery(mongoC, overleafC)
+    const p = diffLegs(leg1!, run2, 'GO')
     expect(p, p.join('\n---\n')).toHaveLength(0)
   }, 240_000)
 
-  test('leg 3: FLIP OFF — Node matches the baseline again', async () => {
-    test.setTimeout(240_000)
-    dexe(overleafC, FLIP('web-p4del.conf', 'strip'), true); await nginxSettled()
-    const leg3 = await battery(mongoC, overleafC)
-    const p = diffLegs(leg1!, leg3, 'NODE-rev')
-    expect(p, p.join('\n---\n')).toHaveLength(0)
-  }, 240_000)
 })

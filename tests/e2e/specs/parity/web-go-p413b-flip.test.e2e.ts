@@ -43,7 +43,6 @@ import zlib from 'node:zlib'
 const overleafC = 'ol-e2e-overleaf-1'
 const mongoC = 'ol-e2e-mongo-1'
 const redisC = 'ol-e2e-redis-1'
-const FLIPCONF = 'web-p413b.conf'
 const BASE = 'http://127.0.0.1:7420'
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 
@@ -71,44 +70,7 @@ function flushLimits(): void {
   } catch {}
 }
 
-async function waitGo(): Promise<void> {
-  for (let i = 0; i < 60; i++) {
-    const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim()
-    if (code === '200') return
-    await sleep(500)
-  }
-  throw new Error('Go shadow /status not 200')
-}
 
-function flip(mode: 'apply' | 'strip'): void {
-  const vhost = '/etc/nginx/sites-enabled/overleaf.conf'
-  if (mode === 'apply') {
-    dexe(overleafC, `
-mkdir -p /etc/nginx/overleaf-flips
-cp -f /usr/local/share/overleaf-flips/${FLIPCONF} /etc/nginx/overleaf-flips/${FLIPCONF}
-node -e "const fs=require('fs');const p='${vhost}';const s=fs.readFileSync(p,'utf8');const L=s.split(String.fromCharCode(10)).filter(x=>!x.includes('overleaf-flips/'));fs.writeFileSync(p,L.join(String.fromCharCode(10)))"
-if ! grep -q "overleaf-flips/${FLIPCONF}" ${vhost}; then
-  python3 - ${vhost} <<'PYEOF'
-import sys
-p = sys.argv[1]
-s = open(p).read()
-inc = "  include /etc/nginx/overleaf-flips/${FLIPCONF};\n"
-if "location / {" in s:
-    s = s.replace("location / {", inc + "location / {", 1)
-else:
-    raise SystemExit("anchor 'location / {' not found")
-open(p, 'w').write(s)
-PYEOF
-fi
-nginx -t 2>&1 | tail -1 && nginx -s reload
-`)
-  } else {
-    dexe(overleafC, `sed -i "/overleaf-flips\\/${FLIPCONF}/d" ${vhost} && nginx -t 2>&1 | tail -1 && nginx -s reload`)
-  }
-  void sleep(2000)
-}
-
-// ---------- zip writer (store method) -------------------------------------------
 function zipStore(entries: Array<{ name: string; data: Buffer }>): Buffer {
   const d = new Date(2026, 8, 15, 12, 0, 0)
   const t = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)
@@ -489,25 +451,16 @@ test.describe('@local web-go P4.13b (new-upload) parity', () => {
 
   test.beforeAll(async () => {
     test.setTimeout(600_000)
-    const here = path.dirname(fileURLToPath(import.meta.url))
-    const cp = path.resolve(here, '..', '..', '..', '..', 'server-ce', 'nginx', 'flips', FLIPCONF)
-    execFileSync('docker', ['cp', cp, `${overleafC}:/tmp/${FLIPCONF}`])
-    dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips && cp -f /tmp/${FLIPCONF} /usr/local/share/overleaf-flips/${FLIPCONF}`)
-    flip('strip')
-    await waitGo()
     U = await login(USER)
   }, 600_000)
 
   test.afterAll(async () => {
     try {
-      flip('strip')
-      await waitGo()
     } catch {}
   })
 
-  test('leg 1: Node baseline', async () => {
+  test('contract: web-go-p413b-flip — pins on canonical Go web', async () => {
     test.setTimeout(300_000)
-    flip('strip')
     await reseedAwait(U)
     const leg1 = await battery(U)
     LEG1 = leg1
@@ -565,24 +518,13 @@ test.describe('@local web-go P4.13b (new-upload) parity', () => {
     expect(st[`${RUN} U16 Zip`].flat).toEqual(['doc:main.tex'])
   })
 
-  test('leg 2: Go parity', async () => {
+  test('stability: 2-run byte parity (canonical Go web)', async () => {
     test.setTimeout(300_000)
-    flip('apply')
     await reseedAwait(U)
-    const leg2 = await battery(U)
-    flip('strip')
-    const ds = diffLegs('p413b', LEG1, leg2)
+    const run2 = await battery(U)
+    const ds = diffLegs('p413b', LEG1, run2)
     if (ds.length) console.log(ds.join('\n'))
     expect(ds, ds.join('\n')).toHaveLength(0)
   })
 
-  test('leg 3: Node re-baseline', async () => {
-    test.setTimeout(300_000)
-    flip('strip')
-    await reseedAwait(U)
-    const leg3 = await battery(U)
-    const d1 = diffLegs('p413b-leg3', LEG1, leg3)
-    if (d1.length) console.log(d1.join('\n'))
-    expect(d1, d1.join('\n')).toHaveLength(0)
-  })
 })

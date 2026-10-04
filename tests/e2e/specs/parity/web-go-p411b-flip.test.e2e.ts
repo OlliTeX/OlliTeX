@@ -8,7 +8,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dir = path.dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = path.resolve(__dir, '..', '..', '..', '..')
 const BASE = 'http://127.0.0.1:7420'
 const overleafC = 'ol-e2e-overleaf-1'
 const mongoC = 'ol-e2e-mongo-1'
@@ -27,32 +26,6 @@ function dexeQ(c: string, cmd: string): string {
   return execFileSync('docker', ['exec', c, 'mongosh', '--quiet', 'sharelatex', '--eval', cmd], { encoding: 'utf8' }).trim()
 }
 
-function FLIP(conf: string, mode: 'apply' | 'strip'): string {
-  if (mode === 'apply') return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-mkdir -p /etc/nginx/overleaf-flips
-cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf}
-if ! grep -q "overleaf-flips/${conf}" "$vhost"; then
-  node -e '
-    const fs=require("fs");const v=process.argv[1];
-    const inc="  include /etc/nginx/overleaf-flips/${conf};\\n\\n";
-    let s=fs.readFileSync(v,"utf8");const l=s.split("\\n");
-    const i=l.findIndex(x=>x.trim()==="location / {");
-    if(i<0)throw new Error("location / not found");
-    l.splice(i,0,inc);fs.writeFileSync(v,l.join("\\n"));' "$vhost"
-fi
-nginx -t && nginx -s reload && sleep 2
-`
-  return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-if grep -q "overleaf-flips\\/${conf}" "$vhost"; then
-  sed -i "/overleaf-flips\\/${conf}/d" "$vhost"
-  nginx -t && nginx -s reload && sleep 2
-fi
-`
-}
 
 interface R { status: number; ct: string; body: string; setcookie?: string }
 const normVolatile = (s: string) =>
@@ -67,14 +40,6 @@ const normBody = (s: string) => normVolatile(s)
   .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z/g, '<TS>')
   .replace(/\b1[5-9]\d{5,7}\b|\b2[0-9]{9}\b/g, '<EPOCH>')
 
-async function nginxSettled(timeoutMs = 15_000): Promise<void> {
-  const t0 = Date.now()
-  for (;;) {
-    try { const r = await fetch(BASE + '/status', { redirect: 'manual' }); if (r.status >= 100) { await r.text().catch(() => {}); return } } catch {}
-    if (Date.now() - t0 > timeoutMs) throw new Error('nginx settle')
-    await sleep(300)
-  }
-}
 
 async function call(p: string, init: RequestInit & { cookie?: string } = {}): Promise<R> {
   const h = { ...(init.headers || {}) as Record<string, string>, accept: ((init.headers as any)?.accept as string) || 'application/json' }
@@ -112,8 +77,12 @@ function seed(): Ids {
   const out = dexeQ(mongoC, `
     db.projects.deleteMany({name:{$in:["pf11b-mine","pf11b-x"]}});
     db.docstore_docs.deleteMany({project_name:{$in:["pf11b-mine","pf11b-x"]}});
-    const uid = ObjectId("6aa4b8b573ef0e5094f4cbc0");
-    const oidd = ObjectId("6aa4b8c0ee67ff98732d4947");
+    const uid = (db.users.findOne({email:"e2e-user@e2e.test"}) || {})._id || ObjectId("6ac10cd5f4600767b51ae7a2");
+    // O (the delXOwner actor) must OWN project x — the flip-era fixture
+    // relied on e2e-tpladmin having isAdmin:true; the current fixture has
+    // isAdmin:false, so ownership is the access path (pin intent: the
+    // X-owner delete succeeds; non-members are still 403).
+    const oidd = (db.users.findOne({email:"e2e-tpladmin@e2e.test"}) || {})._id || ObjectId("6ac10ce12432e1e439d1816c");
     const main = new ObjectId(), notes = new ObjectId(), deep = new ObjectId(), img = new ObjectId(), xm = new ObjectId();
     const sub = new ObjectId(), sub2 = new ObjectId();
     const a = db.projects.insertOne({_id:new ObjectId(), name:"pf11b-mine", owner_ref:uid, publicAccesLevel:"private",
@@ -239,27 +208,16 @@ test.describe('@local web-go P4.11b (entities delete) parity', () => {
 
   test.beforeAll(async () => {
     test.setTimeout(240_000)
-    dexe(overleafC, FLIP('web-p411b.conf', 'strip'), true); await nginxSettled()
-    if (process.env.P411B_BUILD) {
-      execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'bin/web'), `${overleafC}:/usr/local/bin/go-services/web`])
-      dexe(overleafC, 'chown www-data:www-data /usr/local/bin/go-services/web && chmod 755 /usr/local/bin/go-services/web')
-      dexe(overleafC, 'sv restart web-go-overleaf', true)
-    }
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p411b.conf'), `${overleafC}:/tmp/web-p411b.conf`])
-    dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && cp /tmp/web-p411b.conf /usr/local/share/overleaf-flips/web-p411b.conf')
-    for (;;) { const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim(); if (code === '200') break; await sleep(500) }
     U = await login(USER)
     O = await login(OTHER)
     ids = seed()
   }, 240_000)
 
   test.afterAll(async () => {
-    try { dexe(overleafC, FLIP('web-p411b.conf', 'strip'), true); await nginxSettled() } catch {}
   })
 
-  test('leg 1: Node baseline', async () => {
+  test('contract: web-go-p411b-flip — pins on canonical Go web', async () => {
     test.setTimeout(180_000)
-    dexe(overleafC, FLIP('web-p411b.conf', 'strip'), true); await nginxSettled()
     clearRateLimits()
     ids = seed()
     leg1 = await battery(ids, U, O)
@@ -297,26 +255,14 @@ test.describe('@local web-go P4.11b (entities delete) parity', () => {
     expect(c('delAnonCsrf').body).toBe('Unauthorized')
   })
 
-  test('leg 2: Go parity', async () => {
+  test('stability: 2-run byte parity (canonical Go web)', async () => {
     test.setTimeout(180_000)
-    dexe(overleafC, FLIP('web-p411b.conf', 'apply'), true); await nginxSettled()
     clearRateLimits()
     ids = seed()
-    const leg2 = await battery(ids, U, O)
-    dexe(overleafC, FLIP('web-p411b.conf', 'strip'), true); await nginxSettled()
-    const ds = diffLegs('p411b', leg1, leg2)
+    const run2 = await battery(ids, U, O)
+    const ds = diffLegs('p411b', leg1, run2)
     if (ds.length) console.log(ds.join('\n'))
     expect(ds, ds.join('\n')).toHaveLength(0)
   })
 
-  test('leg 3: Node re-baseline', async () => {
-    test.setTimeout(180_000)
-    dexe(overleafC, FLIP('web-p411b.conf', 'strip'), true); await nginxSettled()
-    clearRateLimits()
-    ids = seed()
-    const leg3 = await battery(ids, U, O)
-    const d1 = diffLegs('p411b-leg3', leg1, leg3)
-    if (d1.length) console.log(d1.join('\n'))
-    expect(d1, d1.join('\n')).toHaveLength(0)
-  })
 })

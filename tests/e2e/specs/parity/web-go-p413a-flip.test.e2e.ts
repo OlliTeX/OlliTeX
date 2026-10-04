@@ -35,11 +35,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dir = path.dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = path.resolve(__dir, '..', '..', '..', '..')
 const BASE = 'http://127.0.0.1:7420'
 const overleafC = 'ol-e2e-overleaf-1'
 const mongoC = 'ol-e2e-mongo-1'
-const FLIPCONF = 'web-p413a.conf'
 
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 const OTHER = { email: 'e2e-tpladmin@e2e.test', password: 'Ol-Fixture-7tW4' }
@@ -61,33 +59,6 @@ function dexeQ(c: string, cmd: string): string {
   return execFileSync('docker', ['exec', c, 'mongosh', '--quiet', 'sharelatex', '--eval', cmd], { encoding: 'utf8' }).trim()
 }
 
-function FLIP(conf: string, mode: 'apply' | 'strip'): string {
-  const inc = `  include /etc/nginx/overleaf-flips/${conf};\n`
-  if (mode === 'apply') return `
-set -e
-mkdir -p /etc/nginx/overleaf-flips
-cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf}
-# Defensive: drop stale flip includes from previously failed runs (orphaned
-# includes break nginx -t and cascade-fail later gates in the batch).
-node -e "const fs=require('fs');const p='/etc/nginx/sites-enabled/overleaf.conf';const s=fs.readFileSync(p,'utf8');const L=s.split(String.fromCharCode(10)).filter(x=>!x.includes('overleaf-flips/'));fs.writeFileSync(p,L.join(String.fromCharCode(10)))"
-grep -q "overleaf-flips/${conf}" "/etc/nginx/sites-enabled/overleaf.conf" && exit 0
-node -e '
-    const fs=require("fs");const v="/etc/nginx/sites-enabled/overleaf.conf";
-    const inc="  include /etc/nginx/overleaf-flips/${conf};\\n\\n";
-    let s=fs.readFileSync(v,"utf8");const l=s.split("\\n");
-    const i=l.findIndex(x=>x.trim()==="location / {");
-    if(i<0)throw new Error("location / not found");
-    l.splice(i,0,inc);fs.writeFileSync(v,l.join("\\n"));'
-nginx -t && nginx -s reload && sleep 2
-`
-  return `
-set -e
-if grep -q "overleaf-flips\\/${conf}" "/etc/nginx/sites-enabled/overleaf.conf"; then
-  sed -i "/overleaf-flips\\/${conf}/d" "/etc/nginx/sites-enabled/overleaf.conf"
-  nginx -t && nginx -s reload && sleep 2
-fi
-`
-}
 
 interface R { status: number; ct: string; body: string; setcookie?: string }
 const normBody = (s: string) => s
@@ -98,14 +69,6 @@ const normBody = (s: string) => s
   .replace(/name="_csrf"\s+type="hidden"\s+value="[^"]*"/g, 'name="_csrf" type="hidden" value="CSRF"')
   .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z/g, '<TS>')
 
-async function nginxSettled(timeoutMs = 15_000): Promise<void> {
-  const t0 = Date.now()
-  for (;;) {
-    try { const r = await fetch(BASE + '/status', { redirect: 'manual' }); if (r.status >= 100) { await r.text().catch(() => {}); return } } catch {}
-    if (Date.now() - t0 > timeoutMs) throw new Error('nginx settle')
-    await sleep(300)
-  }
-}
 
 async function call(p: string, init: RequestInit & { cookie?: string } = {}): Promise<R> {
   const h = { ...(init.headers || {}) as Record<string, string> }
@@ -253,22 +216,16 @@ test.describe('@local web-go P4.13a (upload) parity', () => {
 
   test.beforeAll(async () => {
     test.setTimeout(300_000)
-    dexe(overleafC, FLIP(FLIPCONF, 'strip'), true); await nginxSettled()
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/' + FLIPCONF), `${overleafC}:/tmp/${FLIPCONF}`])
-    dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips && cp /tmp/${FLIPCONF} /usr/local/share/overleaf-flips/${FLIPCONF}`)
-    for (;;) { const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim(); if (code === '200') break; await sleep(500) }
     U = await login(USER)
     O = await login(OTHER)
     ids = seed()
   }, 300_000)
 
   test.afterAll(async () => {
-    try { dexe(overleafC, FLIP(FLIPCONF, 'strip'), true); await nginxSettled() } catch {}
   })
 
-  test('leg 1: Node baseline', async () => {
+  test('contract: web-go-p413a-flip — pins on canonical Go web', async () => {
     test.setTimeout(180_000)
-    dexe(overleafC, FLIP(FLIPCONF, 'strip'), true); await nginxSettled()
     ids = seed()
     leg1 = await battery(ids, U, O)
     const c = (k: string) => leg1.cases[k]
@@ -306,24 +263,13 @@ test.describe('@local web-go P4.13a (upload) parity', () => {
     expect(c('anon').body).toBe('Forbidden')
   })
 
-  test('leg 2: Go parity', async () => {
+  test('stability: 2-run byte parity (canonical Go web)', async () => {
     test.setTimeout(180_000)
-    dexe(overleafC, FLIP(FLIPCONF, 'apply'), true); await nginxSettled()
     ids = seed()
-    const leg2 = await battery(ids, U, O)
-    dexe(overleafC, FLIP(FLIPCONF, 'strip'), true); await nginxSettled()
-    const ds = diffLegs('p413a', leg1, leg2)
+    const run2 = await battery(ids, U, O)
+    const ds = diffLegs('p413a', leg1, run2)
     if (ds.length) console.log(ds.join('\n'))
     expect(ds, ds.join('\n')).toHaveLength(0)
   })
 
-  test('leg 3: Node re-baseline', async () => {
-    test.setTimeout(180_000)
-    dexe(overleafC, FLIP(FLIPCONF, 'strip'), true); await nginxSettled()
-    ids = seed()
-    const leg3 = await battery(ids, U, O)
-    const d1 = diffLegs('p413a-leg3', leg1, leg3)
-    if (d1.length) console.log(d1.join('\n'))
-    expect(d1, d1.join('\n')).toHaveLength(0)
-  })
 })

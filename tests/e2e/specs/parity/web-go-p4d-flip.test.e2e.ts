@@ -1,7 +1,6 @@
 /**
  * WEB-GO P4.4 FLIP GATE (WEB_GO_PLAN.md P4.4 — project access-requests route):
  *
- *   Routes (Go shadow at 127.0.0.1:4010, flips/web-p4d.conf — regex location
  *   matching one dynamic segment + the literal "access-requests"):
  *     GET /project/:Project_id/access-requests
  *       → requireLogin → (ensureUserCanAdminProject: OWNER or site-admin w/
@@ -37,6 +36,9 @@
  * JSON bodies and ETags are byte-compared.
  *
  * Run: npx playwright test -g "web-go P4.4 flip gate"
+ * CONVERTED 2026-10-05 (owner): Node-baseline legs retired (Node web tier gone in P7).
+ * Contract pins now asserted directly on canonical Go web (:7420) + 2-run byte-parity
+ * stability (u101-history pattern). Pins preserved verbatim from the original leg-1 block.
  */
 import { execFileSync } from 'child_process'
 import { test, expect } from '@playwright/test'
@@ -44,7 +46,6 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..')
 const BASE = process.env.E2E_BASE_URL || 'http://127.0.0.1:7420'
 
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
@@ -66,54 +67,10 @@ function runningContainer(match: string): string {
   return names[0]
 }
 
-function FLIP(cmd: 'apply' | 'strip'): string {
-  const conf = 'web-p4d.conf'
-  if (cmd === 'apply') {
-    return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-mkdir -p /etc/nginx/overleaf-flips
-cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf}
-if ! grep -q "overleaf-flips/${conf}" "$vhost"; then
-  node -e '
-    const fs = require("fs");
-    const v = process.argv[1];
-    const inc = "  include /etc/nginx/overleaf-flips/${conf};\\n\\n";
-    let s = fs.readFileSync(v, "utf8");
-    const lines = s.split("\\n");
-    const idx = lines.findIndex((l) => l.trim() === "location / {");
-    if (idx < 0) throw new Error("location / open line not found in vhost");
-    lines.splice(idx, 0, inc);
-    fs.writeFileSync(v, lines.join("\\n"));
-  ' "$vhost"
-fi
-nginx -t && nginx -s reload && sleep 2
-`
-  }
-  return `
-set -e
-vhost=/etc/nginx/sites-enabled/overleaf.conf
-if grep -q "overleaf-flips/${conf}" "$vhost"; then
-  sed -i "/overleaf-flips\\\/${conf}/d" "$vhost"
-  nginx -t && nginx -s reload && sleep 2
-fi
-`
-}
 
 const HDRS = ['content-type', 'location', 'etag', 'content-length', 'x-powered-by', 'www-authenticate'] as const
 interface R { status: number; h: Record<string, string>; body: string; setcookie: string }
 
-async function nginxSettled(timeoutMs = 15_000): Promise<void> {
-  const t0 = Date.now()
-  for (;;) {
-    try {
-      const r = await fetch(BASE + '/status', { redirect: 'manual' })
-      if (r.status >= 100) { await r.text().catch(() => {}); return }
-    } catch { /* retry */ }
-    if (Date.now() - t0 > timeoutMs) throw new Error('nginx never settled after reload')
-    await sleep(300)
-  }
-}
 
 async function call(p: string, init: RequestInit & { cookie?: string } = {}, attempt = 0): Promise<R> {
   try {
@@ -204,8 +161,8 @@ function diffLegs(a: Leg, b: Leg, tag: string): string[] {
   return problems.map((p) => `${tag}: ${p}`)
 }
 
-const USER_OID = '6aa4b8b573ef0e5094f4cbc0'
-const ADMIN_OID = '6aa4b8a873ef0e5094f4cba3'
+const USER_OID = '6ac10cd5f4600767b51ae7a2' // e2e-user@e2e.test (live users collection 2026-10-03)
+const ADMIN_OID = '6ac10cc9f4600767b51ae79e' // e2e-admin@e2e.test (isAdmin:true in e2e users, 2026-10-03)
 function createFixtures(mongoC: string): { req: string; empty: string } {
   const script = `
 const user=new ObjectId("${USER_OID}"), admin=new ObjectId("${ADMIN_OID}");
@@ -235,31 +192,15 @@ test.describe.serial('web-go P4.4 flip gate (WEB_GO_PLAN P4.4 access-requests)',
   test.beforeAll(async () => {
     overleafC = runningContainer('ol-e2e-overleaf')
     mongoC = runningContainer('ol-e2e-mongo')
-    const repoBin = path.resolve(REPO_ROOT, 'bin/web')
-    execFileSync('docker', ['cp', repoBin, `${overleafC}:/usr/local/bin/go-services/web`])
-    dexe(overleafC, 'chown www-data:www-data /usr/local/bin/go-services/web && chmod 755 /usr/local/bin/go-services/web')
-    execFileSync('docker', ['cp', path.resolve(REPO_ROOT, 'images/main-amd64/nginx/flips/web-p4d.conf'), `${overleafC}:/tmp/web-p4d.conf`])
-    dexe(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && cp /tmp/web-p4d.conf /usr/local/share/overleaf-flips/web-p4d.conf')
-    dexe(overleafC, 'sv restart web-go-overleaf', true)
-    for (;;) {
-      const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim()
-      if (code === '200') break
-      await sleep(500)
-    }
     const fx = createFixtures(mongoC)
     req = fx.req; empty = fx.empty
-    dexe(overleafC, FLIP('strip'), true)
-    await nginxSettled()
   })
 
   test.afterAll(async () => {
-    try { dexe(overleafC, FLIP('strip'), true); await nginxSettled() } catch { /* best effort */ }
   })
 
-  test('leg 1: Node baseline battery', async () => {
+  test('contract: battery — pins on canonical Go web', async () => {
     test.setTimeout(180_000)
-    dexe(overleafC, FLIP('strip'), true)
-    await nginxSettled()
     leg1 = await battery(req, empty)
     // pins (Node is the authoritative oracle)
     expect(leg1.withReq.status).toBe(200)
@@ -287,21 +228,11 @@ test.describe.serial('web-go P4.4 flip gate (WEB_GO_PLAN P4.4 access-requests)',
     expect(leg1.anonHtml.h.location).toBe('/login')
   }, 180_000)
 
-  test('leg 2: FLIP ON — Go matches the Node baseline', async () => {
+  test('stability: 2-run byte parity (canonical Go web)', async () => {
     test.setTimeout(180_000)
-    dexe(overleafC, FLIP('apply'))
-    await nginxSettled()
-    const leg2 = await battery(req, empty)
-    const problems = diffLegs(leg1!, leg2, 'GO')
+    const run2 = await battery(req, empty)
+    const problems = diffLegs(leg1!, run2, 'GO')
     expect(problems, problems.join('\n---\n')).toHaveLength(0)
   }, 180_000)
 
-  test('leg 3: FLIP OFF — Node matches the baseline again', async () => {
-    test.setTimeout(180_000)
-    dexe(overleafC, FLIP('strip'))
-    await nginxSettled()
-    const leg3 = await battery(req, empty)
-    const problems = diffLegs(leg1!, leg3, 'NODE-rev')
-    expect(problems, problems.join('\n---\n')).toHaveLength(0)
-  }, 180_000)
 })

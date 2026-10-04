@@ -1,7 +1,6 @@
 /**
  * WEB-GO P5.2a FLIP GATE (WEB_GO_PLAN.md P5.2a — COMPILE CONTROL PLANE):
  *
- *   Routes (Go shadow at 127.0.0.1:4010, flips/web-p52a.conf):
  *     POST /project/:Project_id/compile        (CompileController.compile)
  *     POST /project/:Project_id/compile/stop   (CompileController.stopCompile)
  *
@@ -48,6 +47,9 @@
  *       clsi backend class "free"
  *
  * Run: npx playwright test -g "web-go P5.2a flip gate"
+ * CONVERTED 2026-10-05 (owner): Node-baseline legs retired (Node web tier gone in P7).
+ * Contract pins now asserted directly on canonical Go web (:7420) + 2-run byte-parity
+ * stability (u101-history pattern). Pins preserved verbatim from the original leg-1 block.
  */
 import { execFileSync } from 'node:child_process'
 import { test, expect } from '@playwright/test'
@@ -57,7 +59,6 @@ import { fileURLToPath } from 'node:url'
 const overleafC = 'ol-e2e-overleaf-1'
 const mongoC = 'ol-e2e-mongo-1'
 const redisC = 'ol-e2e-redis-1'
-const FLIPCONF = 'web-p52a.conf'
 const BASE = 'http://127.0.0.1:7420'
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 const FIX_NAME = 'P52a Compile Fixture'
@@ -92,44 +93,7 @@ function flushCompileLimiter(): void {
   }
 }
 
-async function waitGo(): Promise<void> {
-  for (let i = 0; i < 60; i++) {
-    const code = dexe(overleafC, `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4010/status`, true).trim()
-    if (code === '200') return
-    await sleep(500)
-  }
-  throw new Error('Go shadow /status not 200')
-}
 
-function flip(mode: 'apply' | 'strip'): void {
-  const vhost = '/etc/nginx/sites-enabled/overleaf.conf'
-  if (mode === 'apply') {
-    dexe(overleafC, `
-mkdir -p /etc/nginx/overleaf-flips
-cp -f /usr/local/share/overleaf-flips/${FLIPCONF} /etc/nginx/overleaf-flips/${FLIPCONF}
-node -e "const fs=require('fs');const p='${vhost}';const s=fs.readFileSync(p,'utf8');const L=s.split(String.fromCharCode(10)).filter(x=>!x.includes('overleaf-flips/'));fs.writeFileSync(p,L.join(String.fromCharCode(10)))"
-if ! grep -q "overleaf-flips/${FLIPCONF}" ${vhost}; then
-  python3 - ${vhost} <<'PYEOF'
-import sys
-p = sys.argv[1]
-s = open(p).read()
-inc = "  include /etc/nginx/overleaf-flips/${FLIPCONF};\\n"
-if "location / {" in s:
-    s = s.replace("location / {", inc + "location / {", 1)
-else:
-    raise SystemExit("anchor 'location / {' not found")
-open(p, 'w').write(s)
-PYEOF
-fi
-nginx -t 2>&1 | tail -1 && nginx -s reload
-`)
-  } else {
-    dexe(overleafC, `sed -i "/overleaf-flips\\/${FLIPCONF}/d" ${vhost} && nginx -t 2>&1 | tail -1 && nginx -s reload`)
-  }
-  dexe(overleafC, 'sleep 1.5')
-}
-
-// ---------- http ---------------------------------------------------------------
 type R = { status: number; ct: string; body: string; setcookie: string }
 async function call(p: string, init: { method?: string; headers?: Record<string, string>; cookie?: string; body?: any } = {}): Promise<R> {
   const h: Record<string, string> = { ...(init.headers || {}) }
@@ -178,15 +142,34 @@ const normHTML = (s: string): string =>
 
 // JSON compile-response norm: buildId (ts-hex + '-' + 8hex) + build field,
 // createdAt, pdf size, stats/timings objects. Kept EXACT otherwise.
-const normJSON = (s: string): string =>
-  s
+const normJSON = (s: string): string => {
+  let r = s
     .replace(/(\\?\/build\/)[0-9a-f]+-[0-9a-f]+/g, '$1BID')
     .replace(/"build":"[0-9a-f]+-[0-9a-f]+"/g, '"build":"BID"')
     .replace(/"createdAt":"[^"]*"/g, '"createdAt":"TS"')
     .replace(/"size":\d+/g, '"size":0')
-    .replace(/"stats":\{[^{}]*\}/g, '"stats":{}')
-    .replace(/"timings":\{[^{}]*\}/g, '"timings":{}')
     .replace(/\b[0-9a-f]{24}\b/g, '<H24>')
+  // stats/timings: nested objects with legitimately-varying compile latency
+  // numbers — remove the whole (possibly nested) object; rest stays byte-exact.
+  r = stripObject(r, 'stats')
+  r = stripObject(r, 'timings')
+  return r
+}
+
+const stripObject = (s: string, key: string): string => {
+  const m = s.match(new RegExp('"' + key + '":'))
+  if (!m || m.index === undefined) return s
+  const at = m.index
+  const start = at + m[0].length
+  if (s[start] !== '{') return s
+  let depth = 0
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i]
+    if (ch === '{') depth++
+    else if (ch === '}') { depth--; if (depth === 0) return s.slice(0, at) + '"' + key + '":{}' + s.slice(i + 1) }
+  }
+  return s
+}
 
 function parseJSON(t: string): any {
   try {
@@ -308,12 +291,6 @@ test.describe('@local web-go P5.2a (compile control plane) parity', () => {
 
   test.beforeAll(async () => {
     test.setTimeout(900_000)
-    const here = path.dirname(fileURLToPath(import.meta.url))
-    const cp = path.resolve(here, '..', '..', '..', '..', 'server-ce', 'nginx', 'flips', FLIPCONF)
-    execFileSync('docker', ['cp', cp, `${overleafC}:/tmp/${FLIPCONF}`])
-    dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips && cp -f /tmp/${FLIPCONF} /usr/local/share/overleaf-flips/${FLIPCONF}`)
-    flip('strip')
-    await waitGo()
     U = await login(USER)
     PID = await ensureFixtureProject(U)
 
@@ -350,14 +327,11 @@ test.describe('@local web-go P5.2a (compile control plane) parity', () => {
 
   test.afterAll(async () => {
     try {
-      flip('strip')
-      await waitGo()
     } catch {}
   })
 
-  test('leg 1: Node baseline', async () => {
+  test('contract: web-go-p52a-flip — pins on canonical Go web', async () => {
     test.setTimeout(300_000)
-    flip('strip')
     const leg1 = await battery(PID, U)
     LEG1 = leg1
     // pair = exactly one success + one too-recently-compiled
@@ -380,24 +354,13 @@ test.describe('@local web-go P5.2a (compile control plane) parity', () => {
     expect(leg1.absent.body).toContain('Page Not Found')
   })
 
-  test('leg 2: Go parity', async () => {
+  test('stability: 2-run byte parity (canonical Go web)', async () => {
     test.setTimeout(300_000)
-    flip('apply')
-    const leg2 = await battery(PID, U)
-    flip('strip')
+    const run2 = await battery(PID, U)
     if (!LEG1) throw new Error('leg1 missing')
-    const ds = diffLegs('p52a', LEG1, leg2)
+    const ds = diffLegs('p52a', LEG1, run2)
     if (ds.length) console.log(ds.join('\n'))
     expect(ds, ds.join('\n')).toHaveLength(0)
   })
 
-  test('leg 3: Node re-baseline', async () => {
-    test.setTimeout(300_000)
-    flip('strip')
-    const leg3 = await battery(PID, U)
-    if (!LEG1) throw new Error('leg1 missing')
-    const d1 = diffLegs('p52a-leg3', LEG1, leg3)
-    if (d1.length) console.log(d1.join('\n'))
-    expect(d1, d1.join('\n')).toHaveLength(0)
-  })
 })
