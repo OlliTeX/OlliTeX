@@ -537,3 +537,9 @@ fallbacks); make it look nice.
 - Next owner-facing: TUI interactive screens for the actions (cert import form + languages
   screen) — plumbing done (ImportCert/NgramPlan/NgramDownload), CLI done, UI wiring is the
   remaining delta; then /hub navbar + route-retirement wave.
+
+## TUI finalize + /hub UX (this pass)
+- **Owner feed #2 — word2vec DROPPED from the toolkit** (LanguageTool removed `--word2vecmodel`/`--neuralnetworkmodel`, unmaintained). nschang/languagetool-101 reviewed per owner instruction → declined; CREDITS records the review. FastText stays owner-gated (needs lid.176.bin + fasttext binary).
+- **Toolkit (commit 46e6210a23)**: TUI Actions screen (t/ngram, l/status, c/cert) over SSH; `ExecOnce` one-shot docker exec (moby v1 Create→Start→Inspect); `unzip` in image; `toolkit languages` catalog: official de/en/es/fr/nl (stable `ngrams-<lang>.zip`) + untested he/it/ru/zh (`/untested/`, dated names); build+vet+tests green; image `ollitex/toolkit-tui:main` c027a3c11927; live SSH smoke: `toolkit languages` over :2222 ✓.
+- **Owner UX item (commit f7ad00ac22)**: /hub rail is the "admin navbar" — regrouped with Workspace/Personal/Administration section headings (stable leaf ids unchanged); Site settings→General split into Content & community / Diagnostics domain folders (Projects & Users already grouped); account dropdown (project list) grouped the same way. Gates: 601/601 vitest (incl. hub-leaf-audit updated for section nodes), TSC clean for touched files, Playwright pin `specs/_probe4/hub-nav-groups.test.e2e.ts` green, 97 hub parity specs green. hub-a11y color-contrast failures = pre-existing BLOCKED ticket (contrast values on cards), not from this change — owner decision still pending.
+- **vitest harness repair**: `frontend/vitest.config.js` SW_TEST_UNIT repointed `services/web/test/unit` → `junk/services-web/test/unit` (P7 move left the config dangling → all 46 HubFrontend files failed before the fix).
