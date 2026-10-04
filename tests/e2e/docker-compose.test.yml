@@ -12,12 +12,12 @@ name: ol-e2e
 
 services:
   mongo:
-    # 2026-09-16 (owner task T9): same DB as prod (mongo 8.3). Fresh 8.x used
+    # 2026-09-16 (owner task T9): same DB as prod (mongo). Fresh line used
     # to segfault on this host's kernel (SERVER-121912 / SHSTK) — the fix is
     # the GLIBC hwcaps workaround the toolkit already uses for the prod
     # mongo (toolkit/lib/docker-compose.mongo.yml). Data volume is
     # disposable: stack-reset + reseed after the bump.
-    image: mongo:8.3
+    image: mongo:9.0
     environment:
       GLIBC_TUNABLES: glibc.cpu.hwcaps=-SHSTK
     command: --replSet overleaf
@@ -37,7 +37,7 @@ services:
     networks: [e2e]
 
   redis:
-    image: redis:8.6-alpine
+    image: redis:8.10-alpine3.23
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s

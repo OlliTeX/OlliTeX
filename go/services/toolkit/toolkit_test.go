@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"crypto/subtle"
+	"time"
 )
 
 // fakeToolkits builds a Toolkit with an explicit offline (SQLite) store —
@@ -195,7 +196,14 @@ func TestPlan_OverlaySelectionFromStore(t *testing.T) {
 	}
 	// env plane essentials
 	if plan.Env["MONGOSH"] != "mongosh" {
-		t.Fatalf("MONGOSH = %q, want mongosh (MONGO_VERSION default 8)", plan.Env["MONGOSH"])
+		t.Fatalf("MONGOSH = %q, want mongosh (MONGO_VERSION default 9)", plan.Env["MONGOSH"])
+	}
+	// owner safety directive 2026-10-04: the rendered plan must carry the owner pins
+	if plan.Env["MONGO_DOCKER_IMAGE"] != "mongo:9.0" {
+		t.Fatalf("plan MONGO_DOCKER_IMAGE = %q, want mongo:9.0", plan.Env["MONGO_DOCKER_IMAGE"])
+	}
+	if plan.Env["REDIS_IMAGE"] != "redis:8.10-alpine3.23" {
+		t.Fatalf("plan REDIS_IMAGE = %q, want redis:8.10-alpine3.23", plan.Env["REDIS_IMAGE"])
 	}
 	if plan.Env["MONGO_ARGS"] != "--replSet overleaf" {
 		t.Fatalf("MONGO_ARGS = %q", plan.Env["MONGO_ARGS"])
@@ -246,3 +254,37 @@ func TestPlan_RetractionGuard(t *testing.T) {
 	}
 	_ = dir
 }
+
+func TestShell_LiveMongo(t *testing.T) {
+	skipIfNoDocker(t)
+	sock := os.Getenv("DOCKER_SOCKET_PATH")
+	if sock == "" {
+		sock = "/var/run/docker.sock"
+	}
+	if _, err := os.Stat(sock); err != nil {
+		t.Skipf("no docker socket: %v", err)
+	}
+	d, err := NewDocker(sock)
+	if err != nil {
+		t.Skipf("docker: %v", err)
+	}
+	sess, err := NewShell(context.Background(), d, "ol-e2e", Shells[0].Label)
+	if err != nil {
+		t.Skipf("no ol-e2e mongo up: %v", err)
+	}
+	defer sess.Close()
+	// read until we get the mongosh banner/log id line (first chunk is enough for parity)
+	buf := make([]byte, 64*1024)
+	sess.Conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	n, rerr := sess.ReadOne(buf)
+	if rerr != nil && n == 0 {
+		t.Fatalf("read: %v", rerr)
+	}
+	text := DecodeShellChunk(buf[:n])
+	if !strings.Contains(text, "Mongosh Log ID") && !strings.Contains(text, "mongosh") {
+		t.Fatalf("unexpected first chunk: %q", text)
+	}
+	t.Logf("shell feed OK: %q", text)
+}
+
+func skipIfNoDocker(t *testing.T) {}

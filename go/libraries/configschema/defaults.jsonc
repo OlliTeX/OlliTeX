@@ -232,9 +232,9 @@
     // ── stack image pins (the version plane, from toolkit/lib/images.env) ──
     "IMAGE_VERSION": "main", // OlliTeX app image version (config/version)
     "OLLITEX_IMAGE": null, // Full OlliTeX app image (default: ollitex/ollitex:$IMAGE_VERSION)
-    "MONGO_IMAGE": "mongo:8.3", // MongoDB image pin
-    "MONGO_VERSION": 8, // Mongo major version (MONGOSH vs mongo + replSet args)
-    "REDIS_IMAGE": "redis:8.6-alpine", // Redis image pin
+    "MONGO_IMAGE": "mongo:9.0", // MongoDB image pin (owner safety directive 2026-10-04)
+    "MONGO_VERSION": 9, // Mongo major version (MONGOSH vs mongo + replSet args)
+    "REDIS_IMAGE": "redis:8.10-alpine3.23", // Redis image pin (owner safety directive 2026-10-04)
     "REDIS_AOF_PERSISTENCE": true, // Redis AOF + save-on-60s persistence
     "POSTGRES_IMAGE": "postgres:18-alpine", // Postgres image pin (owner-pinned)
     "POSTGRES_PASSWORD": null, // Postgres DB password  [secret: masked in listings; field-encrypted in the store]
