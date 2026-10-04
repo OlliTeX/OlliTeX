@@ -33,6 +33,11 @@
  * :4010), Node==Go==Node 3 legs — the U1/U2 gate idiom. Read-only
  * battery: no rate limiter / no writes → no resets needed.
  */
+
+ // 2026-10-05 (route-retirement wave): RETIRED — the Node==Go==Node flip legs
+ // need the P6 Node web service, absent from the single-Go P7 e2e image (same
+ // premise as web-go-u2-editor/u102a/p620-flip). The single-Go route contract
+ // stays pinned by the standalone legacy-*/hub-* families.
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 
@@ -89,7 +94,7 @@ const norm = (s: string): string =>
     .replace(/ol-csrfToken" content="[^"]*"/g, 'ol-csrfToken" content="CSRF"')
 
 test.describe('U8 user-family JSON read parity (Node vs Go)', () => {
-  test('3-leg matrix: Node == Go == Node', async () => {
+  test.skip('3-leg matrix: Node == Go == Node', async () => {
     test.setTimeout(600_000)
     await waitUp()
     execFileSync('docker', ['cp', BATTERY, `${overleafC}:/tmp/u8-matrix.cjs`], { timeout: 30000 })

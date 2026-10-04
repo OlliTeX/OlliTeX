@@ -59,6 +59,11 @@
  * e2e-tpladmin not-admin + canManageTemplates, e2e-user not-admin, gate users
  * (p620-local/p620-ldap) absent.
  */
+
+ // 2026-10-05 (route-retirement wave): dual-stack legs RETIRED — the Node-
+ // baseline leg needs the P6 Node web service, absent from the single-Go P7 e2e
+ // image (same premise as web-go-u2-editor/u102a/p620-flip). The single-Go
+ // contract stays pinned by the standalone legacy-*/hub-* families.
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 

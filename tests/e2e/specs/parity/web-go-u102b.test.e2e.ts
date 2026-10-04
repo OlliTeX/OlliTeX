@@ -39,6 +39,11 @@
  * (first-seen hex24 → H<n>, ISO ts → TS, nonce/csrf, ETag hash, event
  * counter id).
  */
+
+ // 2026-10-05 (route-retirement wave): RETIRED — the Node==Go==Node flip legs
+ // need the P6 Node web service, absent from the single-Go P7 e2e image (same
+ // premise as web-go-u2-editor/u102a/p620-flip). The single-Go route contract
+ // stays pinned by the standalone legacy-*/hub-* families.
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 
@@ -462,7 +467,7 @@ function runLeg(base: string, leg: string): LegData {
 
 test.describe.configure({ timeout: 1200_000 })
 
-test('u102b: entity rename/move/duplicate Node==Go==Node (3 legs)', async () => {
+test.skip('u102b: entity rename/move/duplicate Node==Go==Node (3 legs)', async () => {
   await waitUp()
   flushLimits()
   const leg1 = runLeg(NODE, 'L1')

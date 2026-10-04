@@ -25,6 +25,11 @@
  * Dual-port in-container battery (Node 127.0.0.1:4000 vs Go shadow :4010),
  * Node==Go==Node 3 legs — the U1/U2/U8 gate idiom. Read-only battery.
  */
+
+ // 2026-10-05 (route-retirement wave): RETIRED — the Node==Go==Node flip legs
+ // need the P6 Node web service, absent from the single-Go P7 e2e image (same
+ // premise as web-go-u2-editor/u102a/p620-flip). The single-Go route contract
+ // stays pinned by the standalone legacy-*/hub-* families.
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 
@@ -92,7 +97,7 @@ const norm = (s: string): string =>
     .replace(/(&quot;currentUrl&quot;:&quot;)[^&]*(&quot;)/g, '$1P$2')
 
 test.describe('U9 hub/admin/home shell parity (Node vs Go)', () => {
-  test('3-leg matrix: Node == Go == Node', async () => {
+  test.skip('3-leg matrix: Node == Go == Node', async () => {
     test.setTimeout(600_000)
     await waitUp()
     execFileSync('docker', ['cp', BATTERY, `${overleafC}:/tmp/u9-matrix.cjs`], { timeout: 30000 })

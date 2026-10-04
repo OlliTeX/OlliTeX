@@ -198,9 +198,10 @@ test.describe('@local web-go P5.1a (editor page) parity', () => {
     dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips && cp -f /tmp/${FLIPCONF} /usr/local/share/overleaf-flips/${FLIPCONF}`)
     // 2026-10-05 (route-retirement wave) single-stack rework: the P7 e2e stack
     // serves the Go web service directly, so the gate runs against the live
-    // stack (the flip confs are a no-op legacy from the dual-stack era). Leave
-    // the nginx upstream on the live Go service.
-    flip('apply')
+    // stack. Baseline = the clean default vhost (no flip confs); any stale
+    // flip includes are stripped first (they routed the editor pages to the
+    // P6 Node targets and 502'd the surface).
+    flip('strip')
     await waitGo()
     U = await login(USER)
     PID = await ensureFixtureProject(U)
@@ -213,8 +214,8 @@ test.describe('@local web-go P5.1a (editor page) parity', () => {
 
   test.afterAll(async () => {
     try {
-      // 2026-10-05: leave the single-Go stack on its live upstream.
-      flip('apply')
+      // restore the clean baseline (no flip confs) best-effort.
+      flip('strip')
       await waitGo()
     } catch {}
   })
@@ -246,7 +247,7 @@ test.describe('@local web-go P5.1a (editor page) parity', () => {
 
   test('leg 2: Go (single-stack; /Project retired 2026-10-05)', async () => {
     test.setTimeout(300_000)
-    flip('apply')
+    flip('strip')
     try {
       const leg2 = await battery(PID, U)
       // /editor/:id — the live editor page (owner route decision: /editor stays)
@@ -261,8 +262,8 @@ test.describe('@local web-go P5.1a (editor page) parity', () => {
       // decision: /Project/:id editor page went, /editor/:id stays)
       expect(leg2.legacy.status, 'legacy /Project/:id retired \u2192 404').toBe(404)
     } finally {
-      // leave the stack on the live Go upstream (P7 single-Go baseline)
-      flip('apply')
+      // restore the clean baseline (no flip confs = the live Go default vhost)
+      flip('strip')
     }
   })
 

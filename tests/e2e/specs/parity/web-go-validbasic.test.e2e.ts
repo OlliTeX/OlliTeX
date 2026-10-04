@@ -42,7 +42,7 @@ function leg(legNo: number): string {
   return lines.join('\n')
 }
 
-test('web valid-basic wire: Node web :4000 == Go web :4010 == Node web :4000', async () => {
+test.skip('RETIRED 2026-10-05 (dual-stack: the :4010 Go shadow is absent from the single-Go P7 image) — web valid-basic wire: Node web :4000 == Go web :4010 == Node web :4000', async () => {
   ensureGoWeb()
   fs.copyFileSync(MATRIX, '/tmp/validbasic-matrix.local')
   execFileSync('docker', ['cp', '/tmp/validbasic-matrix.local', `${overleafC}:/tmp/validbasic-matrix.cjs`], { timeout: 30000, stdio: 'ignore' })

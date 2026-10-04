@@ -131,7 +131,9 @@ export async function loginRobust(
 export async function createBlankProject(
   page: import('@playwright/test').Page
 ): Promise<string> {
-  await page.goto('/project')
+  // 2026-10-05 (route-retirement wave): /project is a 404 now (retired
+  // dashboard) — the new-project surface is the hub, so go there directly.
+  await page.goto('/hub')
   const trigger = page
     .locator(
       'button:has-text("New project"), button:has-text("Create a new project"), [aria-label="New project"]'

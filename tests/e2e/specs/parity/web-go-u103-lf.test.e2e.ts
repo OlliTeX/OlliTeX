@@ -38,6 +38,11 @@
  * pins, error block) after nonce/csrf normalization — the honest byte
  * surface of the view contract.
  */
+
+ // 2026-10-05 (route-retirement wave): RETIRED — the Node==Go==Node flip legs
+ // need the P6 Node web service, absent from the single-Go P7 e2e image (same
+ // premise as web-go-u2-editor/u102a/p620-flip). The single-Go route contract
+ // stays pinned by the standalone legacy-*/hub-* families.
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 
@@ -196,7 +201,7 @@ function runLeg(base: string): LegData {
 
 test.describe.configure({ timeout: 900_000 })
 
-test('u103: linked files create/refresh Node==Go==Node (3 legs)', async () => {
+test.skip('u103: linked files create/refresh Node==Go==Node (3 legs)', async () => {
   await waitUp()
   seed()
   const before = projectJSON()

@@ -405,7 +405,7 @@ test.describe(`@local web-go P6.3b (admin-tools user surface mutations) parity`,
   test.afterAll(() => {
     if (FLIPPED) {
       try {
-        flip('apply') // 2026-10-05 (route-retirement wave): single-Go P7 stack — keep the live Go upstream (the P6 Node side is absent)
+        flip('strip')
       } catch {
         // best-effort restore
       }

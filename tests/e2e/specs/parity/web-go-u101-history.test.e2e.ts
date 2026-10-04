@@ -111,7 +111,9 @@ test('10.1: history contract + 2-run stability (canonical web)', async ({ page }
   // the 'nonmember' cases then use e2e-admin (L95). Owning the fixture as admin would flip both.
   await loginRobust(page, USER.email, USER.password)
   const pid = await createBlankProject(page)
-  await page.goto(`/project/${pid}`, { waitUntil: 'load' })
+  // 2026-10-05 (route-retirement wave): the legacy /Project/:id|/project/:id
+// editor PAGE route is retired — open the editor via the kept /editor/:id.
+await page.goto(`/editor/${pid}`, { waitUntil: 'load' })
   await page.waitForSelector('.cm-content', { timeout: 60_000 })
   for (let i = 1; i <= 3; i++) {
     await page.click('.cm-content')

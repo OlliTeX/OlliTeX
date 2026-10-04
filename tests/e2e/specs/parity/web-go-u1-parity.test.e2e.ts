@@ -34,6 +34,11 @@
  * renders at the leg's own request time with sub-ms jitter on Node —
  * compared as a set) + ETag (body-derived). Everything else byte-strict.
  */
+
+ // 2026-10-05 (route-retirement wave): RETIRED — the Node==Go==Node flip legs
+ // need the P6 Node web service, absent from the single-Go P7 e2e image (same
+ // premise as web-go-u2-editor/u102a/p620-flip). The single-Go route contract
+ // stays pinned by the standalone legacy-*/hub-* families.
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 
@@ -194,7 +199,7 @@ function canonBody(body: string, now: number): string {
 // ---------- test ----------
 
 test.describe('U1 tag + api-project parity (Node vs Go)', () => {
-  test('3-leg battery: Node == Go == Node', async () => {
+  test.skip('3-leg battery: Node == Go == Node', async () => {
     await waitUp()
     execFileSync('docker', ['cp', BASE64_BATTERY, `${overleafC}:/tmp/u1-battery.cjs`], { timeout: 30000 })
     const pid = setupProject()

@@ -211,8 +211,9 @@ test.describe('@local web-go P5.1b (editor detach shell) parity', () => {
     dexe(overleafC, `mkdir -p /usr/local/share/overleaf-flips && cp -f /tmp/${FLIPCONF} /usr/local/share/overleaf-flips/${FLIPCONF}`)
     // 2026-10-05 (route-retirement wave) single-stack rework: run against the
     // live Go stack; the /Project/:id*/detacher|detached routes are RETIRED
-    // (/editor/:id* stays per the owner route decision).
-    flip('apply')
+    // (/editor/:id* stays per the owner route decision). Keep the baseline
+    // vhost clean (the P6 flip confs point at the absent :4010 shadow).
+    flip('strip')
     await waitGo()
     U = await login(USER)
     PID = await ensureFixtureProject(U)
@@ -233,8 +234,8 @@ test.describe('@local web-go P5.1b (editor detach shell) parity', () => {
 
   test.afterAll(async () => {
     try {
-      // 2026-10-05: leave the single-Go stack on its live upstream.
-      flip('apply')
+      // restore the clean baseline (no flip confs) best-effort.
+      flip('strip')
       await waitGo()
     } catch {}
   })
@@ -277,7 +278,7 @@ test.describe('@local web-go P5.1b (editor detach shell) parity', () => {
 
   test('leg 2: Go detach shells (single-stack; /Project retired 2026-10-05)', async () => {
     test.setTimeout(300_000)
-    flip('apply')
+    flip('strip')
     try {
       const leg2 = await battery(PID, U)
       // /editor/:id/detacher|detached — the live detach shells (owner route
@@ -305,7 +306,7 @@ test.describe('@local web-go P5.1b (editor detach shell) parity', () => {
         }
       }
     } finally {
-      flip('apply') // leave the single-Go stack on its live upstream
+      flip('strip') // restore the clean baseline (no flip confs = live Go default)
     }
   })
 
