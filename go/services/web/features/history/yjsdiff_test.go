@@ -168,7 +168,7 @@ func TestFiletreeDiffS3Added(t *testing.T) {
 		mergedFeedItem{UnifiedV: 2, Source: 1, Kind: YopAdd, Pathname: "img/pic.png"},
 		mergedFeedItem{UnifiedV: 3, Source: 1, Kind: YopAdd, Pathname: "notes/todo.md"},
 	)
-	out := yjsFiletreeDiffS3([]string{"main.tex"}, feed, 1, 4, false)
+	out := yjsFiletreeDiffS3([]string{"main.tex"}, feed, 1, 4, nil)
 	diffs := out["diff"].([]map[string]any)
 	if len(diffs) != 3 {
 		t.Fatalf("want 3 entries: %+v", diffs)
@@ -193,7 +193,7 @@ func TestFiletreeDiffS3Removed(t *testing.T) {
 		mergedFeedItem{UnifiedV: 1, Source: 0, Meta: map[string]any{}},
 		mergedFeedItem{UnifiedV: 2, Source: 1, Kind: YopRemove, Pathname: "old/draft.tex"},
 	)
-	out := yjsFiletreeDiffS3([]string{"main.tex", "old/draft.tex"}, feed, 1, 3, false)
+	out := yjsFiletreeDiffS3([]string{"main.tex", "old/draft.tex"}, feed, 1, 3, nil)
 	diffs := out["diff"].([]map[string]any)
 	byName := map[string]map[string]any{}
 	for _, d := range diffs {
@@ -210,7 +210,7 @@ func TestFiletreeDiffS3Removed(t *testing.T) {
 
 func TestFiletreeDiffS3Renamed(t *testing.T) {
 	feed := ftFeed(mergedFeedItem{UnifiedV: 2, Source: 1, Kind: YopRename, Pathname: "a.md", NewPath: "b.md"})
-	out := yjsFiletreeDiffS3([]string{"a.md", "main.tex"}, feed, 1, 3, false)
+	out := yjsFiletreeDiffS3([]string{"a.md", "main.tex"}, feed, 1, 3, nil)
 	diffs := out["diff"].([]map[string]any)
 	byName := map[string]map[string]any{}
 	for _, d := range diffs {
@@ -228,7 +228,7 @@ func TestFiletreeDiffS3Renamed(t *testing.T) {
 func TestFiletreeDiffS3RootEdited(t *testing.T) {
 	// no ops, text changed → legacy single-doc shape stays byte-identical
 	feed := ftFeed(mergedFeedItem{UnifiedV: 1, Source: 0, Meta: map[string]any{}})
-	out := yjsFiletreeDiffS3([]string{"main.tex"}, feed, 1, 2, true)
+	out := yjsFiletreeDiffS3([]string{"main.tex"}, feed, 1, 2, map[string]bool{"main.tex": true})
 	diffs := out["diff"].([]map[string]any)
 	if len(diffs) != 1 || diffs[0]["operation"] != "edited" || diffs[0]["pathname"] != "main.tex" {
 		t.Fatalf("edited shape: %+v", diffs)

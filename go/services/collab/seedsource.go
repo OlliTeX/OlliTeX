@@ -80,25 +80,57 @@ func NewSeedSource(p SeedProjects, base, user, pass string, c *http.Client) *See
 	return &SeedSource{P: p, Base: base, User: user, Pass: pass, HTTP: c}
 }
 
-// SeedText implements Options.SeedFn for the room named <projectId>: the
-// project's root-document content ("" + nil error when there is none).
+// SeedText implements Options.SeedFn: the room's content, per the 024
+// Option B room-identity contract (roomkey.go):
+//
+//	root room  {pid}          → the project's root document (rootDoc_id)
+//	per-doc room  {pid}-{did} → that document itself
+//
+// Both read through the SAME docstore document API the editor renders
+// from: GET {WEB_DOCSTORE_URL}/project/{pidHex}/doc/{docID}.
+//
+// Failure semantics (fail-closed where content is expected):
+//   - invalid room name            → error
+//   - no project doc               → error (the auth gate already proved the
+//     caller is a member, so this is anomalous — surfacing it is correct)
+//   - room's doc not in the tree   → "" (nil error): the doc is not part of
+//     this project (degenerate room name) — an empty room is honest
+//   - root room with no rootDoc_id → "" (nil error): nothing to seed is a
+//     state, not a failure (the editor itself has no doc to render)
+//   - docstore 404                 → "" (nil error): doc absent — same
+//     observable as empty for seeding
+//   - other HTTP / transport       → error (never open a room from a failed
+//     content read — an empty room would silently diverge from reality)
 func (s *SeedSource) SeedText(ctx context.Context, room string) (string, error) {
-	if !seedHex24.MatchString(room) {
+	rid := RoomProject(room)
+	did := RoomDoc(room)
+	if rid == "" {
 		return "", fmt.Errorf("%w: %q", ErrSeedProject, room)
 	}
-	doc, err := s.P.ProjectByID(ctx, room)
+	doc, err := s.P.ProjectByID(ctx, rid)
 	if err != nil {
 		return "", err
 	}
 	if doc == nil {
-		return "", fmt.Errorf("%w: %s", ErrSeedProject, room)
+		return "", fmt.Errorf("%w: %s", ErrSeedProject, rid)
 	}
-	did := rootDocID(doc)
 	if did == "" {
-		// No root document in this project model → nothing to seed.
-		return "", nil
+		// Root room: the project's root document (the D19 contract).
+		did = rootDocID(doc)
+		if did == "" {
+			return "", nil
+		}
+	} else {
+		// Per-doc room (024 Option B): the document must belong to this
+		// project's file tree — a room name carrying a foreign doc id seeds
+		// nothing rather than leaking another project's bytes (docstore is
+		// scoped by (pid, did) anyway, but the tree check is the explicit
+		// contract surface).
+		if !seedRoomDocInTree(doc, did) {
+			return "", nil
+		}
 	}
-	body, status, err := fetchSeedDoc(ctx, s, room, did)
+	body, status, err := fetchSeedDoc(ctx, s, rid, did)
 	if err != nil {
 		return "", err
 	}
@@ -180,4 +212,55 @@ func docGet(d bson.D, key string) any {
 		}
 	}
 	return nil
+}
+
+// RootDocIDOf — the project doc's rootDoc_id as a 24-hex string (ObjectID
+// or stored string both occur in this lineage) — the write-through's root
+// room → document resolver (and the seed source's root-doc lookup).
+func RootDocIDOf(doc bson.D) string { return rootDocID(doc) }
+
+// seedRoomDocInTree — true when did occurs in the project's rootFolder tree
+// (docs[] at any depth; the live lineage shape is an array-of-folder
+// wrappers each carrying docs/folders sub-arrays).
+func seedRoomDocInTree(doc bson.D, did string) bool {
+	rf := docGet(doc, "rootFolder")
+	if rf == nil {
+		return false
+	}
+	return seedDocInValues(rf, did)
+}
+
+func seedDocInValues(v any, did string) bool {
+	switch t := v.(type) {
+	case []any:
+		for _, e := range t {
+			if seedDocInValues(e, did) {
+				return true
+			}
+		}
+		return false
+	case bson.D:
+		if id := seedDocIDHex(docGet(t, "_id")); id == did {
+			return true
+		}
+		for _, k := range []string{"docs", "folders", "rootFolder", "children"} {
+			if sub := docGet(t, k); sub != nil && seedDocInValues(sub, did) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
+// seedDocIDHex — an id value (ObjectID or hex string) as 24-hex ("" when
+// not an id).
+func seedDocIDHex(v any) string {
+	if s, ok := v.(string); ok && seedHex24.MatchString(s) {
+		return s
+	}
+	if o, ok := v.(bson.ObjectID); ok {
+		return o.Hex()
+	}
+	return ""
 }

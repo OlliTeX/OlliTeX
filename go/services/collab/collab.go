@@ -104,6 +104,11 @@ type Options struct {
 	OnFirstPeer      func(room string)
 	OnLastPeer       func(room string)
 	OnUnloadDocument func(room string)
+	// WriteBack — 024 Option B: room→docstore write-through (the
+	// persistence-of-record bridge; see writeback.go). Wrap with
+	// WrapWriteBack to hook the store, and call FlushRoom from
+	// OnUnloadDocument / Shutdown. Nil = disabled (pure CRDT plane).
+	WriteBack *WriteBack
 }
 
 // Service — the collab service. ServeHTTP implements http.Handler for the
@@ -189,7 +194,17 @@ func New(opts Options) (*Service, error) {
 			return ws.ConnectionConfig{}, false
 		}
 		room := path.Base(r.URL.Path)
-		role, err := opts.Auth.ProjectRole(uid, room)
+		// 024 Option B: the room may be a per-doc room ({pid}-{docID}); the
+		// role always resolves against the room's PROJECT (roomkey.go).
+		pid := RoomProject(room)
+		if pid == "" {
+			// Legacy tolerance (D19-era and test room names that are not the
+			// 024 hex24/hex24-hex24 shapes): fall back to the D19 contract
+			// (room name == project id). The SEED stays strict (roomkey.go)
+			// — only the role check is tolerant.
+			pid = room
+		}
+		role, err := opts.Auth.ProjectRole(uid, pid)
 		if err != nil || role == Deny {
 			return ws.ConnectionConfig{}, false
 		}
@@ -208,7 +223,17 @@ func New(opts Options) (*Service, error) {
 		srv.OnLastPeer = func(ctx context.Context, room string) { opts.OnLastPeer(room) }
 	}
 	if opts.OnUnloadDocument != nil {
-		srv.OnUnloadDocument = func(ctx context.Context, room string) { opts.OnUnloadDocument(room) }
+		srv.OnUnloadDocument = func(ctx context.Context, room string) {
+		// 024 Option B: the last peer left (or the room is being recycled) —
+		// flush the write-through so the docstore carries the converged head
+		// even when the session ends without more edits (fail-soft inside).
+		if opts.WriteBack != nil {
+			opts.WriteBack.FlushRoom(ctx, room)
+		}
+		if opts.OnUnloadDocument != nil {
+			opts.OnUnloadDocument(room)
+		}
+	}
 	}
 	return &Service{Server: srv, store: store}, nil
 }

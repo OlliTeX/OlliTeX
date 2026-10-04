@@ -147,6 +147,48 @@ func roomCovers(ctx context.Context, st persistence.VersionedPersistence, room s
 
 // vlogMetaFor — the authored row wire meta for room version v (nil when the
 // version log has no entry — unattributed), same shape as S1.2 rows.
+// diffTextRange — the {diff:[u|i|d,meta?]} wire diffing two EXPLICIT room
+// versions (024 Option B per-file diff: the room versions are the
+// timeline-mapped versions of one file's own room; yjsDocDiff's
+// from/to-minus-one convention is the special case).
+func diffTextRange(ctx context.Context, st persistence.VersionedPersistence, room string, beforeV, afterV int, meta map[string]any) (map[string]any, error) {
+	before, err := textAt(ctx, st, room, beforeV)
+	if err != nil {
+		return nil, err
+	}
+	after, err := textAt(ctx, st, room, afterV)
+	if err != nil {
+		return nil, err
+	}
+	d := dmp.New()
+	d.DiffTimeout = dmpTimeoutNode
+	diffs := d.DiffMain(before, after)
+	d.CleanupSemantic(&diffs)
+	parts := make([]map[string]any, 0, len(diffs))
+	for _, df := range diffs {
+		switch df.Op {
+		case dmp.Equal:
+			parts = append(parts, map[string]any{"u": df.Text})
+		case dmp.Insert:
+			p := map[string]any{"i": df.Text}
+			if meta != nil {
+				p["meta"] = meta
+			}
+			parts = append(parts, p)
+		case dmp.Delete:
+			p := map[string]any{"d": df.Text}
+			if meta != nil {
+				p["meta"] = meta
+			}
+			parts = append(parts, p)
+		}
+	}
+	if len(parts) == 0 {
+		parts = append(parts, map[string]any{"u": after})
+	}
+	return map[string]any{"diff": parts}, nil
+}
+
 func vlogMetaFor(ctx context.Context, vlog collab.Log, room, rootPath string, v int) map[string]any {
 	if vlog == nil || v < 1 {
 		return nil
@@ -170,7 +212,9 @@ func vlogMetaFor(ctx context.Context, vlog collab.Log, room, rootPath string, v 
 // ---------- S3b: full tree-op replay (Node FileTreeDiffGenerator shapes) ----------
 
 // yjsFiletreeDiffS3 — the {diff: [FileDiff]} wire for [from,to) over the
-// UNIFIED stream (room text versions + tree ops), Node-oracle shapes:
+// UNIFIED stream (room text versions + tree ops), Node-oracle shapes
+// (024 Option B: text edits per FILE — editedPaths marks the files with a
+// content change in the range):
 //
 //	added     {pathname, operation:"added", editable}
 //	removed   {pathname, operation:"removed", editable, deletedAtV:<unified v>}
@@ -180,7 +224,7 @@ func vlogMetaFor(ctx context.Context, vlog collab.Log, room, rootPath string, v 
 //
 // Entry order: the initial pathnames (sorted), then ops in unified order —
 // matching the generator's "initial tree, then appended ops" entry order.
-func yjsFiletreeDiffS3(initial []string, feed mergedFeed, from, to int, rootEdited bool) map[string]any {
+func yjsFiletreeDiffS3(initial []string, feed mergedFeed, from, to int, editedPaths map[string]bool) map[string]any {
 	type acc struct {
 		entry map[string]any
 		pos   int // order rank: initial = sorted idx; ops = 1000+v
@@ -225,20 +269,18 @@ func yjsFiletreeDiffS3(initial []string, feed mergedFeed, from, to int, rootEdit
 			}
 		}
 	}
-	// the root doc's text edit (only if not already represented by a
-	// stronger op on it)
-	if rootEdited {
-		// locate the edited doc = the room's seeded text file; the entry
-		// wins only when it has no operation yet (unchanged) — vendor
-		// precedence: removed > added > renamed > edited > unchanged
-		for _, p := range initial {
-			if p == "" {
-				continue
-			}
-			if a, ok := byPath[p]; ok && a.entry["operation"] == nil {
+	// text edits (024 Option B: ANY file; the file's pathname may come
+	// from a per-doc room). Vendor precedence: removed > added > renamed
+	// > edited > unchanged — the entry wins only when it has no
+	// operation yet.
+	for _, p := range initial {
+		if p == "" {
+			continue
+		}
+		if a, ok := byPath[p]; ok && a.entry["operation"] == nil {
+			if editedPaths != nil && editedPaths[p] {
 				a.entry = map[string]any{"pathname": p, "operation": "edited"}
 			}
-			break // single-doc room text (S3 scope)
 		}
 	}
 	diffs := []map[string]any{}

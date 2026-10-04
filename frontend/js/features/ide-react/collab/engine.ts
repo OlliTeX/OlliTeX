@@ -40,7 +40,7 @@ export interface CreateEngineOptions {
 }
 
 export function createEngine(
-  projectId: string,
+  roomName: string,
   sink: TextSink,
   opts: CreateEngineOptions = {},
 ): YjsEngine {
@@ -49,7 +49,10 @@ export function createEngine(
 
   let providers: Providers = { ws: null, idb: null };
   if (!opts.offline) {
-    providers = attachProviders(content.doc, projectId, opts.wsBase);
+    // 024 Option B: roomName = the DOCUMENT's room ("{pid}" root or
+    // "{pid}-{docId}") — the client never derives the room itself; the
+    // server resolver is the single source of truth.
+    providers = attachProviders(content.doc, roomName, opts.wsBase);
   }
 
   const cmBridge = syncExtension(sync);

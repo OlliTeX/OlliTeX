@@ -213,8 +213,11 @@ export class DocumentContainer extends EventEmitter {
   // Join / leave
   // --------------------------------------------------------------------
 
-  join(callback?: JoinCallback): void {
-    this.ensureEngine()
+  async join(callback?: JoinCallback): Promise<void> {
+    // 024 Option B: resolve THIS document's room first (server resolver =
+    // single source of truth: "{pid}" for the project's root document,
+    // "{pid}-{docId}" for every other file), then create the engine on it.
+    const room = await this.ensureEngine()
 
     const settled = this.waitFirstSync().then(
       () => callback?.(),
@@ -251,11 +254,11 @@ export class DocumentContainer extends EventEmitter {
   }
 
   // Create the engine lazily (browser: attachProviders connects to
-  // /collab/<projectId> with the session cookie; Node: offline engine for
-  // tests).
-  private ensureEngine(): void {
+  // /collab/<room> with the session cookie; Node: offline engine for
+  // tests). Returns the ROOM the engine was created on.
+  private async ensureEngine(): Promise<string> {
     if (this.engine) {
-      return
+      return this.roomName ?? getMeta('ol-project_id')
     }
     const projectId = getMeta('ol-project_id')
     if (!projectId) {
@@ -279,9 +282,50 @@ export class DocumentContainer extends EventEmitter {
         })
       },
     }
-    this.engine = createEngine(projectId, sink)
+    // 024 Option B: the ROOM is resolved server-side (GET
+    // /project/:id/collab/room?doc={doc_id}). Fail-open: a resolver
+    // outage keeps the D19 behavior (root room) rather than breaking the
+    // editor — the collab service's own seed stays the single source of
+    // truth for content either way.
+    const room = await this.resolveCollabRoom(projectId, this.doc_id)
+    this.roomName = room
+    this.engine = createEngine(room, sink)
     this.emit('op:sent') // parity hook: transport is now the WS provider
+    return room
   }
+
+  // The room this container is attached to (024 Option B: per-document).
+  // resolveCollabRoom — the document's collab room from the server
+  // resolver (single source of truth for the room identity contract).
+  // `failOpen = projectId` keeps the D19 root room on any error (resolver
+  // 404/5xx/offline) — never better to break the editor than to lose the
+  // collaboration channel (the server seed is still authoritative).
+  private async resolveCollabRoom(
+    projectId: string,
+    docId: string,
+  ): Promise<string> {
+    try {
+      const q = docId ? `?doc=${encodeURIComponent(docId)}` : ''
+      const res = await fetch(`/project/${projectId}/collab/room${q}`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      })
+      if (!res.ok) {
+        return projectId
+      }
+      const json = (await res.json()) as { room?: string }
+      if (typeof json.room === 'string' && json.room.length > 0) {
+        return json.room
+      }
+      return projectId
+    } catch (e) {
+      debugConsole.warn('collab room resolver failed; using root room', e)
+      return projectId
+    }
+  }
+
+  private roomName?: string
+
 
   /**
    * Waits until the provider reports connected (and the initial sync has

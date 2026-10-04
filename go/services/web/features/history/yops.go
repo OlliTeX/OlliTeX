@@ -99,6 +99,7 @@ func projectOpsWire(m YopMeta) map[string]any {
 type mergedFeedItem struct {
 	UnifiedV int // unified index (1-based), assigned after sort
 	V        int
+	Room     string // 024 Option B: the source room ("" in legacy single-room feeds)
 	Meta     map[string]any
 	Path     []string
 	Ops      []map[string]any

@@ -17,15 +17,23 @@ export interface CollabEndpoint {
   room: string;
 }
 
+// roomName — the collab ROOM (024 Option B): the project's root document
+// keeps room "{projectId}"; every other document owns "{projectId}-{docId}"
+// (server contract: go/services/collab roomkey.go + the web resolver
+// GET /project/:id/collab/room). The name carries its own identity — both
+// y-websocket (which opens `wsBase + '/' + room`) and this client index
+// their offline store per room.
 export function collabEndpoint(
-  projectId: string,
+  roomName: string,
   base?: string,
 ): CollabEndpoint {
   const b =
     base ?? (typeof window !== "undefined" ? window.location.href : undefined);
   return {
     wsBaseUrl: wsBaseUrl(b),
-    room: `collab/${encodeURIComponent(projectId)}`,
+    // the room name is a single path segment ({pid} or {pid}-{docId});
+    // encode each piece so neither hex char set changes
+    room: `collab/${encodeURIComponent(roomName)}`,
   };
 }
 
@@ -54,16 +62,18 @@ export interface Providers {
 // immediately, then the WS provider syncs the delta (yjs merges both).
 export function attachProviders(
   doc: Y.Doc,
-  projectId: string,
+  roomName: string,
   base?: string,
 ): Providers {
   let idb: unknown = null;
   if (typeof window !== "undefined" && typeof indexedDB !== "undefined") {
-    idb = new IndexeddbPersistence(`ollitex-collab-${projectId}`, doc);
+    // per-ROOM offline store (024 Option B): each file caches its own
+    // room document, so opening sample.bib never carries main.tex state.
+    idb = new IndexeddbPersistence(`ollitex-collab-${roomName}`, doc);
   }
   let ws: unknown = null;
   if (typeof window !== "undefined") {
-    const ep = collabEndpoint(projectId, base);
+    const ep = collabEndpoint(roomName, base);
     // `params: {}` — the server does not read query params; the session
     // cookie is the credential (SameSite; same-origin).
     ws = new WebsocketProvider(ep.wsBaseUrl, ep.room, doc, {

@@ -54,6 +54,7 @@ type Handlers struct {
 	App     *core.App
 	Store   persistence.VersionedPersistence // optional; wins over App.Mongo
 	RoleFor RoleFor
+	DocReader DocReader // optional; room-resolver project-doc access (tests)
 	// VLog — d5dd23dd S1: version-metadata side log (nil = today's behavior).
 	// Test injection point; the App.Mongo path resolves a lazily-cached
 	// Mongo-backed log (versionLog).
@@ -93,6 +94,7 @@ var (
 	histVPattern   = regexp.MustCompile(`^/project/([a-fA-F0-9]{24})/collab/history/([1-9][0-9]{0,9})$`)
 	restorePattern = regexp.MustCompile(`^/project/([a-fA-F0-9]{24})/collab/history/([1-9][0-9]{0,9})/restore$`)
 	docPattern     = regexp.MustCompile(`^/project/([a-fA-F0-9]{24})/collab/doc$`)
+	roomPattern    = regexp.MustCompile(`^/project/([a-fA-F0-9]{24})/collab/room$`)
 )
 
 // Feature — production wiring over the app's Mongo (lazy client).
@@ -114,6 +116,7 @@ func Feature(a *core.App) core.Feature {
 		{Method: "GET", Pattern: histVPattern, Handler: h.at},
 		{Method: "POST", Pattern: restorePattern, Handler: h.restore},
 		{Method: "GET", Pattern: docPattern, Handler: h.doc},
+		{Method: "GET", Pattern: roomPattern, Handler: h.room}, // 024 Option B: doc → room resolver
 	}}
 }
 
@@ -339,6 +342,156 @@ func (h *Handlers) doc(cxt *core.Cxt, res *core.Res) {
 		Content string              `json:"content"`
 	}{head, content})
 	res.JSON(200, b)
+}
+
+// room — 024 Option B: the authoritative (project, document) → room name
+// resolver for the editor client:
+//
+//	GET /project/:id/collab/room?doc={docID}  → {"room":"…"}
+//	GET /project/:id/collab/room              → {"room":"{id}"}  (root room)
+//
+// The room identity contract (go/services/collab roomkey.go): the project's
+// ROOT document keeps the D19 room "{projectID}" (existing live history,
+// review records, IndexedDB "ollitex-collab-{pid}" all stay valid); every
+// other document gets its own room "{projectID}-{docID}". The client gets
+// EXACTLY the room the collab service will serve (seed + role both resolve
+// the same way server-side) — no client-side policy, no meta change.
+func (h *Handlers) room(cxt *core.Cxt, res *core.Res) {
+	pid := pidParam(cxt)
+	if !h.gate(cxt, res, pid, collab.ReadOnly) {
+		return
+	}
+	doc := strings.ToLower(cxt.Req.URL.Query().Get("doc"))
+	rootDoc := h.projectRootDoc(cxt, pid)
+	// Root room (D19 contract — unchanged identity: history, review records
+	// and IndexedDB "ollitex-collab-{pid}" all belong to this room):
+	//  - no doc param, or
+	//  - the doc IS the project's root document.
+	if doc == "" || (rootDoc != "" && doc == rootDoc) {
+		b, _ := json.Marshal(struct {
+			Room string `json:"room"`
+			Root bool   `json:"root"`
+		}{pid, true})
+		res.JSON(200, b)
+		return
+	}
+	if !regexp.MustCompile(`^[0-9a-f]{24}$`).MatchString(doc) {
+		res.JSON(400, []byte(bodyInvalidID))
+		return
+	}
+	// The per-doc room is legitimate only for a doc INSIDE this project's
+	// tree — refuse unknown/foreign doc ids (same contract as the seed's
+	// tree check; the 404 hides existence, per the panel convention).
+	if !h.rootOfContains(cxt, pid, doc) {
+		res.JSON(404, []byte(bodyNotFound))
+		return
+	}
+	b, _ := json.Marshal(struct {
+		Room string `json:"room"`
+		Root bool   `json:"root"`
+	}{pid + "-" + doc, false})
+	res.JSON(200, b)
+}
+
+// rootOfContains — true when docID occurs in the project's rootFolder tree.
+func (h *Handlers) projectRootDoc(cxt *core.Cxt, pid string) string {
+	doc, err := h.fetchProjectDoc(cxt, pid)
+	if err != nil || doc == nil {
+		return ""
+	}
+	return docIDHexOf(fldOrZero(doc, "rootDoc_id"))
+}
+
+func (h *Handlers) rootOfContains(cxt *core.Cxt, pid, docID string) bool {
+	doc, err := h.fetchProjectDoc(cxt, pid)
+	if err != nil || doc == nil {
+		return false
+	}
+	return docInRootFolder(doc, docID)
+}
+
+// DocReader — injectable (project, doc) access for the room resolver
+// (hermetic tests); nil → the App.Mongo path.
+type DocReader func(cxt *core.Cxt, projectID string) (bson.D, error)
+
+func (h *Handlers) fetchProjectDoc(cxt *core.Cxt, pid string) (bson.D, error) {
+	if h.DocReader != nil {
+		return h.DocReader(cxt, pid)
+	}
+	if h.App == nil || h.App.Mongo == nil {
+		return nil, nil
+	}
+	ctx := cxt.Req.Context()
+	db, err := h.App.Mongo.DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var d bson.D
+	err = db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid(pid)}}).Decode(&d)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return d, nil
+}
+
+// docInRootFolder — docID anywhere in the rootFolder tree (docs[] at any
+// depth; live shape = array-of-folder wrappers). Mirrors the collab seed's
+// tree check so client-visible rooms and service-seeded rooms agree.
+func docInRootFolder(doc bson.D, docID string) bool {
+	rf, ok := fld(doc, "rootFolder")
+	if !ok || rf == nil {
+		return false
+	}
+	return docInValues(rf, docID)
+}
+
+func docInValues(v any, docID string) bool {
+	switch t := v.(type) {
+	case []any:
+		for _, e := range t {
+			if docInValues(e, docID) {
+				return true
+			}
+		}
+		return false
+	case bson.D:
+		id := docIDHexOf(fldOrZero(t, "_id"))
+		if id == docID {
+			return true
+		}
+		for _, k := range []string{"docs", "folders", "rootFolder", "children"} {
+			if sub, ok := fld(t, k); ok && sub != nil && docInValues(sub, docID) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
+// fld — first value for key (found, zeroValue) in a bson.D.
+func fld(d bson.D, key string) (any, bool) {
+	for i := 0; i < len(d); i++ {
+		if d[i].Key == key {
+			return d[i].Value, true
+		}
+	}
+	return nil, false
+}
+
+func fldOrZero(d bson.D, key string) any { v, _ := fld(d, key); return v }
+
+func docIDHexOf(v any) string {
+	if s, ok := v.(string); ok {
+		return strings.ToLower(s)
+	}
+	if o, ok := v.(bson.ObjectID); ok {
+		return o.Hex()
+	}
+	return ""
 }
 
 // gate — session user + role check (fail closed: no session/role → 404).

@@ -160,6 +160,26 @@ func main() {
 		env("V1_HISTORY_PASSWORD", ""),
 		&http.Client{Timeout: 15 * time.Second})
 
+	// 024 Option B: room→docstore write-through (the durable content of
+	// record — downloads / git-provider export / doc GET all read the
+	// docstore, so the room head must reach it). Docstore base = the same
+	// WEB_DOCSTORE_URL the seed source uses (one docstore on both sides).
+	docstoreBase := env("WEB_DOCSTORE_URL", "http://127.0.0.1:3016")
+	writeBack := collab.NewWriteBack(
+		collab.NewHTTPDocFetcher(docstoreBase, env("V1_HISTORY_USER", ""), env("V1_HISTORY_PASSWORD", ""), &http.Client{Timeout: 10 * time.Second}),
+		store,
+		func(ctx context.Context, projectID string) (string, error) { // root room → root doc
+			doc, err := m.ProjectByID(ctx, projectID)
+			if err != nil || doc == nil {
+				return "", err
+			}
+			return collab.RootDocIDOf(doc), nil
+		},
+	)
+	writeBack.ErrSink = func(err error) {
+		log.Printf("collab: write-back (fail-soft): %v", err)
+	}
+
 	var sl *slog.Logger
 	if os.Getenv("COLLAB_LOG_LEVEL") == "debug" {
 		sl = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -169,7 +189,8 @@ func main() {
 	}
 	svc, err := collab.New(collab.Options{
 		Auth:             auth,
-		Store:            store,
+		Store:            collab.WrapWriteBack(store, writeBack), // 024 Option B: write-through
+		WriteBack:        writeBack,
 		VersionLog:       vlog,
 		Logger:           sl,
 		OnFirstPeer:      lifecycle("first-peer"),
@@ -189,6 +210,11 @@ func main() {
 		// (ranges) + the Node TC chat service (thread messages) — same env
 		// bases as the web's trackchanges proxy (downstream.go).
 		LegacyBackfill: func(ctx context.Context, room string, st persistence.VersionedPersistence) error {
+			// 024 Option B: the legacy (OT-era) corpus is the ROOT document's
+			// review state (single-doc era) — per-doc rooms get no backfill.
+			if !collab.IsRootRoom(room) {
+				return nil
+			}
 			src := collab.NewLegacySource(seed)
 			data, lerr := src.Load(ctx, room)
 			if lerr != nil {

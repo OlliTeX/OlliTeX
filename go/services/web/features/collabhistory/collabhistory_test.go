@@ -74,8 +74,8 @@ func TestRoutesRegistered(t *testing.T) {
 	if f.Name != "collabhistory" {
 		t.Fatalf("name = %q", f.Name)
 	}
-	if len(f.Routes) != 4 {
-		t.Fatalf("routes = %d, want 4", len(f.Routes))
+	if len(f.Routes) != 5 {
+		t.Fatalf("routes = %d, want 5", len(f.Routes))
 	}
 	want := []struct {
 		m string
@@ -85,6 +85,7 @@ func TestRoutesRegistered(t *testing.T) {
 		{"GET", histVPattern},
 		{"POST", restorePattern},
 		{"GET", docPattern},
+		{"GET", roomPattern}, // 024 Option B resolver
 	}
 	for i, w := range want {
 		if f.Routes[i].Method != w.m || f.Routes[i].Pattern != w.p {

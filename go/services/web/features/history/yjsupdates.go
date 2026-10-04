@@ -566,6 +566,68 @@ func MongoDocSeeker(db *mongo.Database) func(ctx context.Context, coll string, i
 // buildUnifiedFeed — S3a core: sort room versions + tree ops by ts (ties:
 // room before yops), assign the unified 1-based index. Shared by the
 // /updates composition and the S3b filetree range selection.
+// buildUnifiedFeedMulti — the 024 Option B union feed: text versions from
+// MULTIPLE rooms (the project's root room + per-doc rooms, with each row's
+// pathname) merged with the root room's tree ops, sorted by timestamp and
+// given a unified 1..N index. Same row shapes as buildUnifiedFeed so the
+// vendor summarizer and S3 replay consume both identically.
+func buildUnifiedFeedMulti(rooms []projectRoom, rootPath string, yops []YopMeta) mergedFeed {
+	feed := mergedFeed{}
+	for _, r := range rooms {
+		path := r.Pathname
+		if r.IsRoot {
+			path = rootPath
+		} else if path == "" {
+			path = r.Room
+		}
+		for _, lv := range r.Lversions {
+			metaInfo, _ := r.Vmetas[uint64(lv.Version)]
+			ts := lv.UpdatedAt.UTC().UnixMilli()
+			users := []any{}
+			if metaInfo.UID != "" {
+				users = []any{metaInfo.UID}
+			}
+			m := map[string]any{"users": users, "start_ts": ts, "end_ts": ts}
+			if o, has := originObject(metaInfo.Origin, path, ts); has {
+				m["origin"] = o
+			}
+			pathnames := []string{}
+			if path != "" {
+				pathnames = []string{path}
+			}
+			feed = append(feed, mergedFeedItem{Room: r.Room, V: int(lv.Version), Meta: m, Path: pathnames, Ts: ts, Source: 0})
+		}
+	}
+	for _, yo := range yops {
+		ts := yo.At.UTC().UnixMilli()
+		users := []any{}
+		if yo.UID != "" {
+			users = []any{yo.UID}
+		}
+		m := map[string]any{"users": users, "start_ts": ts, "end_ts": ts}
+		feed = append(feed, mergedFeedItem{V: int(yo.V), Meta: m, Ops: []map[string]any{projectOpsWire(yo)}, Ts: ts, Source: 1, Kind: yo.Kind, Pathname: yo.Pathname, NewPath: yo.NewPath})
+	}
+	sort.Slice(feed, func(i, j int) bool {
+		if feed[i].Ts != feed[j].Ts {
+			return feed[i].Ts < feed[j].Ts
+		}
+		if feed[i].Source != feed[j].Source {
+			return feed[i].Source < feed[j].Source
+		}
+		return feed[i].V < feed[j].V
+	})
+	for i := range feed {
+		feed[i].UnifiedV = i + 1
+	}
+	return feed
+}
+
+// projectCovers — true when the UNION feed has at least to-1 timeline
+// points (the panel's from/to are unified indices under Option B).
+func projectCovers(feed mergedFeed, from, to int) bool {
+	return len(feed) >= to-1 && from >= 1
+}
+
 func buildUnifiedFeed(lvs []persistence.VersionMeta, vmetas map[uint64]collab.VersionMeta, yops []YopMeta, rootPath string) mergedFeed {
 	feed := mergedFeed{}
 	for _, lv := range lvs {

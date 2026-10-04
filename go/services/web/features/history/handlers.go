@@ -176,7 +176,61 @@ func (h *svc) yjsUpdates(cxt *core.Cxt) (body []byte, ok bool, err error) {
 		before = &b
 	}
 	seek := MongoDocSeeker(db)
-	return composeYjsUpdates(ctx, st, vlog, pid, rootDocPathname(ctx, seek, pid), before)
+	rootPath := rootDocPathname(ctx, seek, pid)
+	// 024 Option B: the panel version list is the UNION across the
+	// project's rooms (root room + per-doc rooms, each row tagged with its
+	// file pathname). The legacy single-room path stays the fallback when
+	// no per-doc rooms exist (identical feed for single-room projects).
+	if rooms, rerr := projectDocRooms(ctx, st, vlog, seek, pid); rerr == nil && len(rooms) > 1 {
+		var yops []YopMeta
+		if ylog, yerr := NewMongoYopLog(ctx, db); yerr == nil {
+			if ops, oerr := ylog.List(ctx, pid); oerr == nil {
+				yops = ops
+			}
+		}
+		feed := buildUnifiedFeedMulti(rooms, rootPath, yops)
+		if len(feed) > 0 {
+			body, ok, err := feedUpdatesBody(ctx, feed, before)
+			if ok || err == nil {
+				if ok {
+					return body, true, nil
+				}
+				return nil, false, nil
+			}
+		}
+	}
+	return composeYjsUpdates(ctx, st, vlog, pid, rootPath, before)
+}
+
+// feedUpdatesBody — the S1.2-shaped /updates body from a prebuilt unified
+// feed (024 Option B union; the vendor summarizer + newest-first rule
+// stay byte-identical with composeMerged).
+func feedUpdatesBody(ctx context.Context, feed mergedFeed, before *int) (body []byte, ok bool, err error) {
+	updates := []map[string]any{}
+	for _, item := range feed {
+		v := item.UnifiedV
+		if before != nil && v >= *before {
+			continue
+		}
+		opswire := []map[string]any{}
+		opswire = append(opswire, item.Ops...)
+		updates = append(updates, map[string]any{
+			"v":           v,
+			"meta":        item.Meta,
+			"pathnames":   item.Path,
+			"project_ops": opswire,
+		})
+	}
+	for i, j := 0, len(updates)-1; i < j; i, j = i+1, j-1 {
+		updates[i], updates[j] = updates[j], updates[i]
+	}
+	rows := summarizeYjs(updates, map[int][]map[string]any{}, []map[string]any{})
+	out := map[string]any{"nextBeforeTimestamp": 0, "updates": rows}
+	b, merr := json.Marshal(out)
+	if merr != nil {
+		return nil, false, merr
+	}
+	return b, true, nil
 }
 
 // docDiff — S2 Yjs-first (D41-b1): Node docDiffSchema adds the doc_id
@@ -268,6 +322,92 @@ func (h *svc) yjsDiffBody(cxt *core.Cxt, from, to int, doc bool) (body []byte, s
 		vlog = vl
 	}
 	root := rootDocPathname(ctx, MongoDocSeeker(db), room)
+
+	// ---- 024 Option B: union timeline across the project's rooms ----
+	// When the project has per-doc rooms, the panel's version range is a
+	// UNIFIED index over (root room + per-doc room versions + tree ops);
+	// a /diff renders ONE file (pathname param) at its OWN room's mapped
+	// versions, and the filetree diff marks every file that changed.
+	// Uncovered union range → served=false → the legacy passthrough below
+	// (OT-era) applies.
+	if rooms, rerr := projectDocRooms(ctx, st, vlog, MongoDocSeeker(db), room); rerr == nil && len(rooms) > 1 {
+		yops := []YopMeta{}
+		if ylog, yerr := NewMongoYopLog(ctx, db); yerr == nil {
+			if ops, oerr := ylog.List(ctx, room); oerr == nil {
+				yops = ops
+			}
+		}
+		feed := buildUnifiedFeedMulti(rooms, root, yops)
+		if from >= 1 && len(feed) >= to-1 {
+			if doc {
+				path := cxt.Req.URL.Query().Get("pathname")
+				if path == "" {
+					path = root
+				}
+				did, rootDoc := docIDForPathname(ctx, MongoDocSeeker(db), room, path)
+				froom := room
+				if did != "" && did != rootDoc {
+					froom = room + "-" + did
+				}
+				beforeV, _ := fileAtTimeline(feed, from-1, froom)
+				afterV, _ := fileAtTimeline(feed, to-1, froom)
+				if beforeV == 0 && afterV == 0 {
+					// The file was never edited in the Yjs plane (its own
+					// room has no versions) — honest content = the docstore
+					// record (the store of record for file content), so the
+					// pane shows the FILE's text, not the root file's.
+					lines := docstoreDocLines(ctx, room, did)
+					fallbackOut := map[string]any{"diff": []map[string]any{{"u": lines}}}
+					b, merr := json.Marshal(fallbackOut)
+					if merr == nil {
+						return b, true
+					}
+				}
+				if _, berr := textAt(ctx, st, froom, int(beforeV)); berr == nil {
+					if _, aerr := textAt(ctx, st, froom, int(afterV)); aerr == nil {
+						meta := vlogMetaFor(ctx, vlog, froom, path, int(afterV))
+						if out, terr := diffTextRange(ctx, st, froom, int(beforeV), int(afterV), meta); terr == nil {
+							b, merr := json.Marshal(out)
+							if merr == nil {
+								return b, true
+							}
+						}
+					}
+				}
+			} else {
+				edited := map[string]bool{}
+				for _, r := range rooms {
+					path := r.Pathname
+					if r.IsRoot {
+						path = root
+					}
+					if path == "" {
+						continue
+					}
+					bv, _ := fileAtTimeline(feed, from-1, r.Room)
+					av, _ := fileAtTimeline(feed, to-1, r.Room)
+					bc, berr := textAt(ctx, st, r.Room, int(bv))
+					ac, aerr := textAt(ctx, st, r.Room, int(av))
+					if berr == nil && aerr == nil && bc != ac {
+						edited[path] = true
+					}
+				}
+				initial := rootFolderPaths(ctx, MongoDocSeeker(db), room)
+				if len(initial) == 0 {
+					initial = []string{}
+				}
+				if root != "" {
+					initial = append(initial, root)
+				}
+				fileOut := yjsFiletreeDiffS3(initial, feed, from, to, edited)
+				b, merr := json.Marshal(fileOut)
+				if merr == nil {
+					return b, true
+				}
+			}
+		}
+	}
+
 	var out map[string]any
 	if doc {
 		out, err = yjsDocDiff(ctx, st, room, from, to, func(ctx context.Context, v int) map[string]any {
@@ -305,7 +445,11 @@ func (h *svc) yjsDiffBody(cxt *core.Cxt, from, to int, doc bool) (body []byte, s
 						if root != "" {
 							initial = append(initial, root)
 						}
-						servedOut = yjsFiletreeDiffS3(initial, feed, from, to, before != after)
+						edited := map[string]bool{}
+if before != after {
+	edited[root] = true
+}
+servedOut = yjsFiletreeDiffS3(initial, feed, from, to, edited)
 					}
 				}
 			}
