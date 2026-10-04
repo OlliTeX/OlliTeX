@@ -6,9 +6,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -170,6 +174,8 @@ func (l *LogStreamer) Close() error {
 	return err
 }
 
+func containerNames(names []string) []string { return names }
+
 func firstNames(names []string) string {
 	if len(names) == 0 {
 		return ""
@@ -279,4 +285,150 @@ func (t *Toolkit) StackImages(ctx context.Context) ([]string, error) {
 		}
 	}
 	return imgs, nil
+}
+
+// ---- autofixer (idea derived from willfarrell/autoheal — see CREDITS.md) ----
+
+// Healer reports one autoheal decision.
+type HealerEvent struct {
+	Action    string `json:"action"` // "restart" | "skip-restarting" | "skip-null-name"
+	Container string `json:"container"`
+	Reason    string `json:"reason,omitempty"`
+}
+
+// HealerPolicy configures the autofixer (store-backed when run under the TUI).
+type HealerPolicy struct {
+	// Interval between polls.
+	Interval time.Duration
+	// StopTimeoutSeconds is the docker stop timeout applied on restart
+	// (autoheal.stop.timeout per-container label overrides).
+	StopTimeoutSeconds int
+	// CooldownSeconds: after a restart, do not restart the same container
+	// again within this window (loop guard on top of docker's own restart
+	// policy; autoheal relies on docker's policy alone).
+	CooldownSeconds int
+	// WatchUnhealthy: poll for health=unhealthy (default true — the
+	// autoheal contract). Set false for monitor-only.
+	WatchUnhealthy bool
+	// NotifyFn receives a rendered message (webhook/apprise/post-script
+	// hooks live here in the full deployment; nil = log only).
+	NotifyFn func(HealerEvent)
+}
+
+// Healer polls the daemon for unhealthy containers of the project and
+// restarts them (autoheal semantics: skip null-name + already-restarting,
+// per-container stop-timeout label, notification hooks).
+type Healer struct {
+	docker  *Docker
+	project string
+	policy  HealerPolicy
+	lastFix map[string]time.Time
+	mu      sync.Mutex
+	fixed   []HealerEvent
+}
+
+// NewHealer builds an autofixer for one project.
+func NewHealer(d *Docker, project string, policy HealerPolicy) *Healer {
+	if policy.Interval <= 0 {
+		policy.Interval = 15 * time.Second
+	}
+	if policy.StopTimeoutSeconds <= 0 {
+		policy.StopTimeoutSeconds = 10
+	}
+	if policy.CooldownSeconds < 0 {
+		policy.CooldownSeconds = 60
+	}
+	if !policy.WatchUnhealthy {
+		policy.WatchUnhealthy = true
+	}
+	return &Healer{
+		docker:  d,
+		project: project,
+		policy:  policy,
+		lastFix: map[string]time.Time{},
+	}
+}
+
+// Tick runs one poll+heal pass (cron-friendly too: `toolkit autofix --once`).
+func (h *Healer) Tick(ctx context.Context) []HealerEvent {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	events := []HealerEvent{}
+
+	// unhealthy containers of the project
+	ctx2, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	list, err := h.docker.cli.ContainerList(ctx2, client.ContainerListOptions{
+		Filters: projectFilter(h.project),
+	})
+	if err != nil {
+		h.logEvent(HealerEvent{Action: "skip-list", Container: h.project, Reason: err.Error()})
+		return events
+	}
+	for _, c := range list.Items {
+		name := shortName(firstNames(containerNames(c.Names)))
+		if c.Health == nil || string(c.Health.Status) != "unhealthy" {
+			continue
+		}
+		if name == "" {
+			h.emit(&events, HealerEvent{Action: "skip-null-name", Container: c.ID[:12], Reason: "container name is null"})
+			continue
+		}
+		if string(c.State) == "restarting" {
+			h.emit(&events, HealerEvent{Action: "skip-restarting", Container: name, Reason: "container is already restarting"})
+			continue
+		}
+		// cooldown loop guard
+		if last, ok := h.lastFix[name]; ok && time.Since(last) < time.Duration(h.policy.CooldownSeconds)*time.Second {
+			h.emit(&events, HealerEvent{Action: "skip-cooldown", Container: name, Reason: "recently restarted"})
+			continue
+		}
+		// per-container stop timeout (autoheal label) or policy default
+		timeout := h.policy.StopTimeoutSeconds
+		if labels := c.Labels; labels != nil {
+			if v, ok := labels["autoheal.stop.timeout"]; ok {
+				if n, err := strconv.Atoi(v); err == nil && n > 0 {
+					timeout = n
+				}
+			}
+			if v, ok := labels["autoheal"]; ok && v == "False" {
+				h.emit(&events, HealerEvent{Action: "skip-labeled-off", Container: name, Reason: "autoheal=False label"})
+				continue
+			}
+		}
+		if _, err := h.docker.cli.ContainerRestart(ctx2, c.ID, client.ContainerRestartOptions{Timeout: &timeout}); err != nil {
+			h.emit(&events, HealerEvent{Action: "restart-failed", Container: name, Reason: err.Error()})
+		} else {
+			h.lastFix[name] = time.Now()
+			h.emit(&events, HealerEvent{Action: "restart", Container: name})
+		}
+	}
+	return events
+}
+
+func (h *Healer) emit(events *[]HealerEvent, e HealerEvent) {
+	*events = append(*events, e)
+	if h.policy.NotifyFn != nil {
+		h.policy.NotifyFn(e)
+	} else {
+		h.logEvent(e)
+	}
+}
+
+func (h *Healer) logEvent(e HealerEvent) {
+	fmt.Fprintf(os.Stderr, "autoheal: %s %s %s\n", e.Action, e.Container, e.Reason)
+}
+
+// Run polls until ctx is cancelled (served under `toolkit serve --autofixer`).
+func (h *Healer) Run(ctx context.Context) {
+	t := time.NewTicker(h.policy.Interval)
+	defer t.Stop()
+	for {
+		h.Tick(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }

@@ -19,4 +19,11 @@ services:
           REDIS_HOST: "${REDIS_HOST}"
           REDIS_PORT: "${REDIS_PORT}"
           V1_HISTORY_URL: "http://ollitex:3100/api"
+        healthcheck:
+          # ollitex image ships busybox curl; /login 200 = app layer alive
+          test: ["CMD-SHELL", "curl -fsS --connect-timeout 5 http://localhost/login >/dev/null || exit 1"]
+          interval: 30s
+          timeout: 10s
+          retries: 5
+          start_period: 120s
         stop_grace_period: 60s

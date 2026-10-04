@@ -153,3 +153,20 @@ func (t *Toolkit) BackupPath() string { return filepath.Join(t.DataDir, "config-
 
 // Context is the ctx used by background work.
 func (t *Toolkit) Context(ctx context.Context) context.Context { return ctx }
+
+// ExitCode is a sentinel error carrying a process exit code (0 = OK).
+type ExitCode int
+
+func (e ExitCode) Error() string { return "exit " + itoa(int(e)) }
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	d := ""
+	for n > 0 {
+		d = string(rune('0'+n%10)) + d
+		n /= 10
+	}
+	return d
+}

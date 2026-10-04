@@ -221,6 +221,29 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 		}
 	}
 
+	// ---- cep-service-set overlays (owner addendum A) --------------------
+	if t.boolVal("GITBRIDGE_SERVICE_ENABLED") {
+		addOverlay("docker-compose.gitbridge.yml")
+		if v := t.val("GIT_BRIDGE_IMAGE"); v != "" {
+			plan.Env["GIT_BRIDGE_IMAGE"] = v
+		}
+		if v := t.val("GIT_BRIDGE_DATA_PATH"); v != "" {
+			plan.Env["GIT_BRIDGE_DATA_PATH"] = absData(t.DataDir, v)
+		}
+		if v := t.val("GIT_BRIDGE_RUNTIME_JSON"); v != "" {
+			plan.Env["GIT_BRIDGE_RUNTIME_JSON"] = absData(t.DataDir, v)
+		}
+	}
+	if t.boolVal("CHECKUSER_ENABLED") {
+		addOverlay("docker-compose.checkuser.yml")
+		if v := t.val("CHECKUSER_IMAGE"); v != "" {
+			plan.Env["CHECKUSER_IMAGE"] = v
+		}
+		if v := t.val("CHECKUSER_DATA_PATH"); v != "" {
+			plan.Env["CHECKUSER_DATA_PATH"] = absData(t.DataDir, v)
+		}
+	}
+
 	if t.boolVal("NGINX_ENABLED") {
 		addOverlay("docker-compose.nginx.yml")
 		plan.Env["NGINX_IMAGE"] = t.val("NGINX_IMAGE")

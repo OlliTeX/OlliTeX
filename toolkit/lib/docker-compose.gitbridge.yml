@@ -1,0 +1,26 @@
+# git-bridge — the Go GitBridge (go/services/gitbridge) between the app and
+# GitHub (P7 cutover: 1:1 replacement of the Java sharelatex/git-bridge).
+#
+# Data plane: ${GIT_BRIDGE_DATA_PATH} (bind mount — owner policy B: real
+# folder names for backups, never named-volume UUIDs).
+#
+# Config: GIT_BRIDGE_RUNTIME_JSON (host path; mounted read-only at
+# /conf/runtime.json — same schema as the Java runtime.json).
+services:
+  git-bridge:
+    image: "${GIT_BRIDGE_IMAGE:-gitbridge-go:latest}"
+    container_name: git-bridge
+    restart: always
+    command: ["git_bridge", "serve", "/conf/runtime.json"]
+    volumes:
+      - "${GIT_BRIDGE_DATA_PATH:-data/gitbridge}:/data/git-bridge"
+      - "${GIT_BRIDGE_RUNTIME_JSON:-config/runtime.json}:/conf/runtime.json:ro"
+    expose:
+      - "8000"
+    healthcheck:
+      # Go server: GET /health_check (Java-parity endpoint)
+      test: ["CMD-SHELL", "wget -q --timeout=5 -O /dev/null http://localhost:8000/health_check || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s

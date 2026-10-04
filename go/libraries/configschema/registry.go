@@ -277,6 +277,14 @@ var Registry = []Param{
 	{Key: "LANGUAGE_TOOL_NGRAM_LANGUAGES", Kind: KString, Group: "stack", Default: "en,de,es,fr", Description: "Comma-separated n-gram languages to download for grammar checking."},
 	{Key: "SIBLING_CONTAINERS_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "Sandboxed compiles in dedicated sibling containers (requires docker socket mount)."},
 	{Key: "SIBLING_CONTAINERS_PULL", Kind: KBool, Group: "stack", Default: "true", Description: "Pull sibling compile images on start."},
+	{Key: "GITBRIDGE_SERVICE_ENABLED", Kind: KBool, Group: "stack", Default: "true", Description: "Run the git-bridge container (cep stack overlay). App-level Git integration toggle is GIT_BRIDGE_ENABLED."},
+	{Key: "GIT_BRIDGE_IMAGE", Kind: KString, Group: "stack", Default: "gitbridge-go:latest", Description: "GitBridge image pin."},
+	{Key: "GIT_BRIDGE_DATA_PATH", Kind: KString, Group: "stack", Default: "data/gitbridge", Description: "GitBridge data bind mount (owner policy: real folder names)."},
+	{Key: "GIT_BRIDGE_RUNTIME_JSON", Kind: KString, Group: "stack", Default: "config/runtime.json", Description: "Host path of the git-bridge runtime.json."},
+	{Key: "CHECKUSER_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "checkuser audit checker (cep plane)."},
+	{Key: "CHECKUSER_IMAGE", Kind: KString, Group: "stack", Default: "check_user_image", Description: "checkuser image pin."},
+	{Key: "CHECKUSER_DATA_PATH", Kind: KString, Group: "stack", Default: "data/checkuser", Description: "checkuser data bind mount."},
+
 
 	// ---------- stack image pins (from toolkit/lib/images.env — the version
 	 // plane; now in the one key space / one source of truth) ----------

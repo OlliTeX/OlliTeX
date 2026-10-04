@@ -1,130 +1,29 @@
 # CREDITS
 
-This project includes ideas and adapted code from several open-source projects.\
-In most cases the original code has been modified, optimized, or extended.
+Third-party work the OlliTeX monorepo borrows, per owner policy ("if we take
+something from their code we put them into CREDITS.md").
 
-## Symbol palette
+- **Docker Autoheal** — `github.com/willfarrell/autoheal` (Nikos via willfarrell;
+  Apache-2.0 lineage). We borrowed the *operating model* (not a copy): poll the
+  daemon for `health=unhealthy` containers → restart with a per-container stop
+  timeout (`autoheal.stop.timeout` label), skip null-named + already-restarting
+  containers, and fire a post-restart notification hook. Implemented natively in
+  Go in `go/services/toolkit/docker.go` (`Healer`), with one added safety layer
+  autoheal does not have: a per-container cooldown window to break tight
+  restart loops on top of docker's own restart policy.
 
-The symbol palette feature is based on the
-[original Overleaf implementation](https://github.com/overleaf/web/tree/master/frontend/js/features/symbol-palette)
+- **charmbracelet** — `wish` (SSH server), `bubbletea` (TUI event loop),
+  `bubbles`, `lipgloss` (styling). Used by the operator TUI in
+  `go/services/toolkit`.
 
-The original code was slightly improved, particularly in the parts related to keyboard input.
+- **Moby (Docker)** — `github.com/moby/moby/client` (official Go client) for all
+  daemon operations (container list/logs/images, exec attach for interactive
+  shells, restart). The `stdcopy` stream demultiplexing in
+  `go/services/toolkit/shell.go` transcribes moby's documented frame format
+  (8-byte header: stream + 3 pad + BE32 size).
 
-## LDAP authentication
+- **SeaweedFS** — `chrislusf/seaweedfs` image, used as the local S3 object
+  storage backend for filestore + docstore.
 
-LDAP authentication was inspired by [this project](https://github.com/smhaller/ldap-overleaf-sl).
-
-The project provided the idea and part of the implementation for adding LDAP users to the user's contacts.
-
-## Real-time track changes and comments
-
-The Track Changes and Comments feature exists largely in the original Overleaf codebase.\
-The missing parts were implemented based on [this code](https://github.com/ertuil/overleaf).
-
-The referenced code was fixed, optimized, and extended.
-
-## Sandboxed compiles
-
-The Sandboxed Compiles feature was until recently largely present in the original Overleaf codebase.\
-The missing parts were implemented in this project.
-
-## Import file from external URL
-
-The "From External URL" feature exists in the original Overleaf code.\
-The missing proxy component was implemented in this project.
-
-## Git integration
-
-The Git integration feature includes parts of the frontend code
-from [here](https://github.com/ayaka-notes/overleaf-pro/tree/feat-git-bridge)
-
-## GitHub synchronization
-
-The GitHub synchronization feature includes parts of the frontend code and the OAuth2 backend implementation
-from [here](https://github.com/ayaka-notes/overleaf-pro/commit/06a30fe9a0ed75e5ab40b50a8a4e94f43161cf71).
-
-## Sign Up page
-
-The Sign Up page is based on [this code](https://github.com/ayaka-notes/overleaf-pro/tree/feat-public-registeration).
-
-## Instance statistics
-
-The instance statistics feature is based on work from [Isaac Alonso](https://github.com/isaac-aa) (isaac-aa).
-
-## LLM features
-
-The LLM features (AI assistant, compliance review, LLM grammar checking, BYO provider
-management) were developed with AI coding assistants: mainly the **pi coding agent**
-(using the **qwen3.8-27b** model), and VS Code **Copilot** with Claude, OpenAI and
-Raptor Mini models.
-
-[Alessandro Lotti](https://github.com/alelotti96) (alelotti96) worked on part of the LLM work.
-
-## Python runner
-
-The Python runner module (browser-side Python execution for `.py` files via
-[Pyodide](https://pyodide.org)) is the python-runner module from the
-[ayakaleaf-pro](https://ayakaleaf-pro.ayaka.space) CE fork (commit
-`0370307dc1`), provided by its maintainer and adapted to this fork on
-2026-09-06 (settings + toast wiring, the run-button safety caveat, and
-in-repo unit/E2E test coverage).
-
-## Selected-text word count (File → Word count)
-
-The selection-aware word counting shown in the editor's File → Word count
-menu (the "Selection" section — words, headings, inline/display math for the
-currently selected LaTeX text) is ported from the community contribution
-`feature/selected_text_word_count` in
-[hnd0hng/overleaf-cep](https://github.com/hnd0hng/overleaf-cep)
-(`services/web/modules/selected-word-count`), by
-[hnd0hng](https://github.com/hnd0hng), integrated per the upstream reviewer
-guidance: the action stays in File → Word count (not the floating menu), the
-dialog always shows the whole-document count and adds the selection count
-when text is selected (2026-09-14). Typst selections use a documented
-approximate word count.
-
-## OIDC admin promotion (non-standard claims)
-
-The OpenID Connect admin check — promoting users to admin based on a claim
-value, now supporting NON-STANDARD claims read from the raw userinfo payload
-with UserInfo taking priority over the ID token — follows the community fix
-"OIDC: enable non standard claims in admin check" (PR #230) and "give priority
-to UserInfo" by [Juan Antonio Zuloaga
-Mellino](https://github.com/xvan) (@xvan), ported to this tree on 2026-09-12
-(owner item) together with the matching /hub → Site settings → SSO · OIDC
-"Claim mapping" fields.
-
-## Go service internals (shutdown choreography, scheduling, config hardening)
-
-The Go backend service mains and shared Go library helpers take inspiration from
-[J. Ackermann\'s Golang port of Overleaf](https://github.com/das7pad/overleaf-go) (Jakob
-Ackermann / das7pad, AGPL-3.0): ordered graceful-shutdown choreography (stop accepting →
-drain in-flight → deadline-bound flush → force close) with pending-operation tracking, a
-jittered periodic scheduler with adaptive backoff, fail-fast configuration validation at
-boot, and the create-if-missing / wait-for-marker integration-test bootstrap pattern.
-Idea-level inspiration only — all implementations in this repository are independent,
-no code from that project is included.
-
-## Inspiration
-
-The local-first, self-hosted approach to LaTeX editing was inspired by
-[texlyre](https://github.com/texlyre/texlyre) — a local-first LaTeX & Typst web editor
-with real-time collaboration and offline support, by
-[Fares Abawi](https://github.com/fabawi) (fabawi).
-
-The end-to-end test suite in [`tests/e2e`](tests/e2e) (dedicated disposable test
-stack, self-seeding fixture journeys, composable test infrastructure) was
-inspired by the testing practices of
-[Forgejo](https://codeberg.org/forgejo/forgejo).
-
-The Mendeley reference connector in
-[`services/web/modules/mendeley`](services/web/modules/mendeley) is ported
-from the Third-Party-References module (`tpr-webmodule`) of the `ayakaleaf`
-fork (owner's pro line, 2025/2026); the OAuth client, token storage and
-linked-file agent logic were carried over 1:1 and adapted to the 6.3.0
-linked-files API and this fork's house style.
-
-# Acknowledgments
-
-Thanks to the users of the project for valuable feedback, suggestions,
-and help in identifying and fixing bugs.
+- **LanguageTool** — `erikvl87/languagetool` image plus the owner-maintained
+  ngram/languagemodel packs mounted read-only at `/ngrams`.

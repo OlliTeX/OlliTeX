@@ -228,7 +228,14 @@
     "LANGUAGE_TOOL_DATA_PATH": "data/languagetool", // Host folder for LanguageTool data/n-grams
     "LANGUAGE_TOOL_NGRAM_LANGUAGES": "en,de,es,fr", // Comma-separated n-gram languages
     "SIBLING_CONTAINERS_ENABLED": false, // Sandboxed compiles in sibling containers (needs socket)
-    "SIBLING_CONTAINERS_PULL": true, // Pull sibling compile images on start
+    "SIBLING_CONTAINERS_PULL": true,
+    "GITBRIDGE_SERVICE_ENABLED": true, // run git-bridge container (app toggle is GIT_BRIDGE_ENABLED)
+    "GIT_BRIDGE_IMAGE": "gitbridge-go:latest", // GitBridge image pin
+    "GIT_BRIDGE_DATA_PATH": "data/gitbridge", // GitBridge data bind mount
+    "GIT_BRIDGE_RUNTIME_JSON": "config/runtime.json", // git-bridge runtime.json host path
+    "CHECKUSER_ENABLED": false, // checkuser audit checker
+    "CHECKUSER_IMAGE": "check_user_image", // checkuser image pin
+    "CHECKUSER_DATA_PATH": "data/checkuser", // checkuser data bind mount
     // ── stack image pins (the version plane, from toolkit/lib/images.env) ──
     "IMAGE_VERSION": "main", // OlliTeX app image version (config/version)
     "OLLITEX_IMAGE": null, // Full OlliTeX app image (default: ollitex/ollitex:$IMAGE_VERSION)

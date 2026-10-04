@@ -176,7 +176,7 @@ func TestPlan_OverlaySelectionFromStore(t *testing.T) {
 	for _, f := range plan.Files {
 		names = append(names, filepath.Base(f))
 	}
-	for _, want := range []string{"docker-compose.base.yml", "docker-compose.redis.yml", "docker-compose.mongo.yml", "docker-compose.postgres.yml", "docker-compose.seaweedfs.yml"} {
+	for _, want := range []string{"docker-compose.base.yml", "docker-compose.redis.yml", "docker-compose.mongo.yml", "docker-compose.postgres.yml", "docker-compose.seaweedfs.yml", "docker-compose.gitbridge.yml"} {
 		found := false
 		for _, n := range names {
 			if n == want {

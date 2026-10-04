@@ -28,6 +28,7 @@ import (
 
 	"github.com/charmbracelet/log"
 
+	"errors"
 	"ollitex/go/services/toolkit"
 )
 
@@ -35,8 +36,16 @@ var ver = "dev"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "toolkit: "+err.Error())
-		os.Exit(1)
+		code := 1
+		var ec toolkit.ExitCode
+		if errors.As(&ec, &err) {
+			code = int(ec)
+		} else {
+			fmt.Fprintln(os.Stderr, "toolkit: "+err.Error())
+		}
+		if code != 0 {
+			os.Exit(code)
+		}
 	}
 }
 
@@ -59,6 +68,10 @@ func run(args []string) error {
 		return initcmd(rest)
 	case "plan":
 		return plancmd(rest)
+	case "health":
+		return healthcmd(rest)
+	case "autofix":
+		return autofixcmd(rest)
 	case "doctor":
 		return doctor(rest)
 	default:
@@ -74,6 +87,8 @@ Usage:
   toolkit init      first-boot seed of the config store (key + env + defaults, never clobbers)
   toolkit local     run the TUI on the local TTY (docker run -it / dev)
   toolkit doctor    one-shot health check
+  toolkit health    cron-friendly container health (exit codes)
+  toolkit autofix   autoheal pass (--once | --interval loop)
   toolkit version
 
 Environment:
@@ -306,4 +321,100 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// healthcmd: cron-friendly container health report (owner addendum C).
+// Exit codes: 0 all up, 1 some unhealthy, 2 daemon/error, 3 project missing.
+func healthcmd(args []string) error {
+	f := flag.NewFlagSet("health", flag.ExitOnError)
+	project := f.String("project", "ollitex", "stack project name")
+	sock := f.String("sock", "/var/run/docker.sock", "docker socket")
+	failOn := f.String("fail-on", "unhealthy", "exit 1 when a container is in this state")
+	_ = f.Parse(args)
+
+	d, err := toolkit.NewDocker(*sock)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "docker: "+err.Error())
+		return fmt.Errorf("%w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	defer cancel()
+	rows, err := d.ListProject(ctx, *project)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "list: "+err.Error())
+		return err
+	}
+	if len(rows) == 0 {
+		fmt.Println("no containers in project " + *project)
+		return errNoProject
+	}
+	rc := 0
+	for _, c := range rows {
+		health := strings.TrimSpace(c.Health)
+		state := c.State
+		line := fmt.Sprintf("%-28s state=%-10s health=%s", c.Name, state, health)
+		if health == "" {
+			line += "  (no healthcheck)"
+		}
+		fmt.Println(line)
+		if *failOn != "" && health == *failOn {
+			rc = 1
+		}
+		if state != "running" && state != "exited" {
+			rc = max(rc, 1)
+		}
+	}
+	if rc == 0 {
+		fmt.Println("OK: all containers of " + *project + " up")
+	}
+	return toolkit.ExitCode(rc)
+}
+
+// autofixcmd: one autoheal pass (owner addendum D).
+func autofixcmd(args []string) error {
+	f := flag.NewFlagSet("autofix", flag.ExitOnError)
+	sock := f.String("sock", "/var/run/docker.sock", "docker socket")
+	project := f.String("project", "ollitex", "stack project name")
+	interval := f.Duration("interval", 15*time.Second, "poll interval (loop mode)")
+	cooldown := f.Int("cooldown", 300, "per-container restart cooldown seconds (loop guard)")
+	once := f.Bool("once", false, "run exactly one pass and exit")
+	_ = f.Parse(args)
+
+	d, err := toolkit.NewDocker(*sock)
+	if err != nil {
+		return err
+	}
+	h := toolkit.NewHealer(d, *project, toolkit.HealerPolicy{
+		Interval:           *interval,
+		StopTimeoutSeconds: 10,
+		CooldownSeconds:    *cooldown,
+	})
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	if *once {
+		evs := h.Tick(ctx)
+		if len(evs) == 0 {
+			fmt.Println("no unhealthy containers — nothing to do")
+		}
+		for _, e := range evs {
+			fmt.Printf("autoheal: %s %s %s\n", e.Action, e.Container, e.Reason)
+		}
+		return nil
+	}
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	go h.Run(ctx)
+	<-sig
+	ctx.Done()
+	fmt.Println("autofixer stopped")
+	return nil
+}
+
+var errNoProject = fmt.Errorf("project not found")
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

@@ -31,6 +31,12 @@
 services:
   seaweedfs-master:
     image: chrislusf/seaweedfs:latest
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:9333/status >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     container_name: seaweedfs-master
     hostname: seaweedfs-master
     command: "master -ip=seaweedfs-master -ip.bind=0.0.0.0 -metricsPort=9327"
@@ -42,6 +48,13 @@ services:
     restart: unless-stopped
 
   seaweedfs-volume:
+    healthcheck:
+      # volume speaks gRPC only; liveness = the swoc volume process is up
+      test: ["CMD-SHELL", "pgrep -f 'swoc volume' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     image: chrislusf/seaweedfs:latest
     container_name: seaweedfs-volume
     hostname: seaweedfs-volume
@@ -56,6 +69,12 @@ services:
 
   seaweedfs-filer:
     image: chrislusf/seaweedfs:latest
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:8888/about >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     container_name: seaweedfs-filer
     hostname: seaweedfs-filer
     depends_on:
@@ -70,6 +89,12 @@ services:
 
   seaweedfs-s3:
     image: chrislusf/seaweedfs:latest
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:8333 >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     container_name: seaweedfs-s3
     hostname: seaweedfs-s3
     depends_on:
