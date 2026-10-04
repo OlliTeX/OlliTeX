@@ -151,6 +151,13 @@ func (a *App) routeMux() http.Handler {
 	mux.HandleFunc("GET /project/{project_id}/user/{user_id}/sync/code", a.syncCode)
 	mux.HandleFunc("GET /project/{project_id}/user/{user_id}/sync/pdf", a.syncPdf)
 
+	// Output file serving (M1 parity 2026-10-05): the absorbed output URLs
+	// advertised by the compile response. In the Node deployment the shared
+	// clsi (tex) served them from the common volume; the single Go deploy
+	// must serve them here (see compilemanager/outputfile.go).
+	mux.HandleFunc("GET /project/{project_id}/build/{build_id}/output/{filepath...}", a.buildFile)
+	mux.HandleFunc("GET /project/{project_id}/user/{user_id}/build/{build_id}/output/{filepath...}", a.buildFile)
+
 	// Live status.
 	mux.HandleFunc("GET /status", a.aliveStatus)
 	mux.HandleFunc("GET /health_check", a.healthCheck)
@@ -257,6 +264,15 @@ func (a *App) smokeTestForce(w http.ResponseWriter, r *http.Request) {
 func (a *App) syncCode(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func(w http.ResponseWriter) (int, error) {
 		return a.CompileCtrl.SyncFromCode(w, a.projectUser(r), parseSyncQuery(r.URL.Query()))
+	})
+}
+
+// buildFile is GET .../build/{bid}/output/{filename} (both mounts) — the
+// shared-cls file-serving surface (see compilemanager/outputfile.go).
+func (a *App) buildFile(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func(w http.ResponseWriter) (int, error) {
+		return a.CompileCtrl.BuildFile(w, r, a.projectUser(r),
+			r.PathValue("build_id"), r.PathValue("filepath"))
 	})
 }
 

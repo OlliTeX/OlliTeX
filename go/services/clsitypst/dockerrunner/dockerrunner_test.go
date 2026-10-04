@@ -12,6 +12,7 @@ package dockerrunner
 
 import (
 	"context"
+	"encoding/json"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -1153,6 +1154,36 @@ func TestReasonTable(t *testing.T) {
 	} {
 		if got := reason(code); got != want {
 			t.Fatalf("reason(%d) = %q want %q", code, got, want)
+		}
+	}
+}
+
+// TestContainerInfoStateShapes pins the dual engine wire contract caught
+// live 2026-10-05: the current shared engine (ApiVersion 1.54) emits
+// State as an OBJECT ({"Status":"running",...}) while older engines (and
+// the fake in the wire tests above) emit a bare bool. Both must decode.
+func TestContainerInfoStateShapes(t *testing.T) {
+	cases := []struct {
+		name    string
+		body    string
+		running bool
+	}{
+		{"old-bool-true", `{"Id":"a","Name":"/a","State":true}`, true},
+		{"old-bool-false", `{"Id":"a","Name":"/a","State":false}`, false},
+		{"new-object-running", `{"Id":"a","Name":"/a","State":{"Status":"running","Running":true,"Pid":42}}`, true},
+		{"new-object-exited", `{"Id":"a","Name":"/a","State":{"Status":"exited","Running":false,"ExitCode":0}}`, false},
+		{"no-state", `{"Id":"a","Name":"/a"}`, false},
+	}
+	for _, tc := range cases {
+		var ci ContainerInfo
+		if err := json.Unmarshal([]byte(tc.body), &ci); err != nil {
+			t.Fatalf("%s: unmarshal: %v", tc.name, err)
+		}
+		if ci.ID != "a" || ci.Name != "/a" {
+			t.Fatalf("%s: id/name = %q %q", tc.name, ci.ID, ci.Name)
+		}
+		if ci.Running != tc.running {
+			t.Fatalf("%s: Running = %v want %v", tc.name, ci.Running, tc.running)
 		}
 	}
 }

@@ -111,6 +111,14 @@ func (c *Controller) SyncFromCode(res http.ResponseWriter, params ProjectUser, q
 	})
 }
 
+// BuildFile (M1 parity 2026-10-05) streams one output artifact of a build
+// (the shared-cls file-serving surface that had no Go counterpart until
+// now — typst-t2 "PDF artifact not ready"); see compilemanager/outputfile.
+func (c *Controller) BuildFile(res http.ResponseWriter, r *http.Request,
+	params ProjectUser, buildID, filename string) (int, error) {
+	return c.Manager.ServeBuildFile(res, r, params.ProjectID, params.UserID, buildID, filename)
+}
+
 // SyncFromPdf (D21) ports the clsi syncFromPdf wire: (page, h, v) -> edit
 // record {file, line, column}.
 func (c *Controller) SyncFromPdf(res http.ResponseWriter, params ProjectUser, q SyncQuery) (int, error) {

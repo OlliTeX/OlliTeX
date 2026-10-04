@@ -25,7 +25,9 @@ async function newTypstProject(
   page: import('@playwright/test').Page,
   opts: { name: string; article?: boolean; example?: boolean }
 ): Promise<void> {
-  await page.goto('/project')
+  // 2026-10-05 (route-retirement wave): the /project dashboard is 404 now —
+  // the new-project menu is served only from the /hub surface.
+  await page.goto('/hub')
   await expect(
     page
       .locator(
@@ -118,7 +120,7 @@ test.describe('typst T2 live matrix', () => {
   test('flag ON: blank typst project appears in the new-project menu', async ({ page, context }) => {
     await login(page, USER)
 
-    await page.goto('/project')
+    await page.goto('/hub')
     const trigger = page
       .locator(
         'button:has-text("New project"), button:has-text("Create a new project"), [aria-label="New project"]'

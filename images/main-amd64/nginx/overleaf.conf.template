@@ -132,23 +132,29 @@ server {
 	}
 
   # handle output files for specific users
+  # 2026-10-05 (clsitypst Go conversion / typst-t2 live): the classic :8080
+  # clsi-nginx endpoint is gone in the P7 single-container world (nothing
+  # listens there anymore -> nginx 404 on the editor's PDF link). The WEB
+  # service (:4000) is the only layer that knows the project's compiler and
+  # dispatches to the right Go service (typst -> clsitypst :3014, which now
+  # serves these shapes; tex -> clsitex :3013).
   location ~ ^/project/([0-9a-f]+)/user/([0-9a-f]+)/build/([0-9a-f-]+)/output/output\.([a-z.]+)$ {
-		proxy_pass http://127.0.0.1:8080; # clsi-nginx.conf
+		proxy_pass http://127.0.0.1:4000; # web dispatch (was clsi-nginx :8080)
 		proxy_http_version 1.1;
   }
   # handle output files for anonymous users
   location ~ ^/project/([0-9a-f]+)/build/([0-9a-f-]+)/output/output\.([a-z.]+)$ {
-		proxy_pass http://127.0.0.1:8080; # clsi-nginx.conf
+		proxy_pass http://127.0.0.1:4000; # web dispatch (was clsi-nginx :8080)
 		proxy_http_version 1.1;
   }
   # PDF range for specific users
   location ~ ^/project/([0-9a-f]+)/user/([0-9a-f]+)/content/([0-9a-f-]+/[0-9a-f]+)$ {
-		proxy_pass http://127.0.0.1:8080; # clsi-nginx.conf
+		proxy_pass http://127.0.0.1:4000; # web dispatch (was clsi-nginx :8080)
 		proxy_http_version 1.1;
   }
   # PDF range for anonymous users
   location ~ ^/project/([0-9a-f]+)/content/([0-9a-f-]+/[0-9a-f]+)$ {
-		proxy_pass http://127.0.0.1:8080; # clsi-nginx.conf
+		proxy_pass http://127.0.0.1:4000; # web dispatch (was clsi-nginx :8080)
 		proxy_http_version 1.1;
   }
 

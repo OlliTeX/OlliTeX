@@ -190,6 +190,14 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: pdfDownloadPattern, Handler: pdfDownloadHandler(a)},
 			{Method: "GET", Pattern: cachedJSONPattern, Handler: cachedBuildJSONHandler(a)},
 			{Method: "GET", Pattern: cachedFilePattern, Handler: cachedFileHandler(a)},
+			// Absorbed output file routes (Node router.mjs L716/L724
+			// getFileFromClsi): the URLs the compile response advertises —
+			// typst-t2 live catch 2026-10-05 (missing -> PDF pane never loads).
+			{Method: "GET", Pattern: outputFileProjectPat, Handler: outputFileHandler(a)},
+			{Method: "GET", Pattern: outputFileUserPat, Handler: outputFileHandler(a)},
+			// c08 — synctex proxy (CROWN JEWEL): click-to-pdf / click-to-source.
+			{Method: "GET", Pattern: syncCodePat, Handler: syncProxy(a, "code")},
+			{Method: "GET", Pattern: syncPdfPat, Handler: syncProxy(a, "pdf")},
 		},
 	}
 }

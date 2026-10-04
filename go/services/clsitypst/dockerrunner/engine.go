@@ -52,6 +52,7 @@
 package dockerrunner
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"regexp"
@@ -151,10 +152,46 @@ type Engine interface {
 }
 
 // ContainerInfo: inspect result (used for existence check only).
+//
+// State tolerates BOTH engine wire shapes: bare bool (old API) and object
+// {"Status":"running",...} (new API). LIVE CAUGHT 2026-10-05: the shared
+// engine (ApiVersion 1.54) emits the object shape, and strict bool decoding
+// 500'd the compile's restart path for an existing sandbox container
+// ("cannot unmarshal object into Go struct field ContainerInfo.State of
+// type bool") while the fresh-create path stayed green.
 type ContainerInfo struct {
 	ID      string `json:"Id"`
 	Name    string `json:"Name"`
-	Running bool   `json:"State"`
+	Running bool
+}
+
+func (c *ContainerInfo) UnmarshalJSON(b []byte) error {
+	var raw struct {
+		ID    string          `json:"Id"`
+		Name  string          `json:"Name"`
+		State json.RawMessage `json:"State"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	c.ID = raw.ID
+	c.Name = raw.Name
+	if len(raw.State) > 0 {
+		switch raw.State[0] {
+		case 't': // true (old API)
+			c.Running = string(raw.State) == "true"
+		case 'f': // false (old API)
+			c.Running = false
+		case '{': // {"Status":"running",...} (new API)
+			var so struct {
+				Status string `json:"Status"`
+			}
+			if json.Unmarshal(raw.State, &so) == nil {
+				c.Running = so.Status == "running"
+			}
+		}
+	}
+	return nil
 }
 
 // CreateOpts: container creation document (dockerode wire keys).

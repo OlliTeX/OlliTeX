@@ -89,6 +89,19 @@ services:
       # reads these; the tex clsi is untouched)
       TYPST_COMPILES_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
       TYPST_OUTPUT_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
+      # 2026-10-05 (clsitypst conversion finalize / M1 parity): the runit run
+      # script reads the TYPSF_* names (-> CLSI_TYPST_*_PATH). Pin ALL FOUR
+      # dirs to the SAME-PATH bind dirs or the service writes cache/uploads
+      # into root-owned /var/lib and compiles fail with EACCES (live catch:
+      # "mkdir /var/lib/overleaf/typst/cache/<pid>: permission denied").
+      TYPSF_COMPILES_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
+      TYPSF_OUTPUT_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
+      TYPSF_CACHE_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/cache
+      TYPSF_UPLOAD_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/uploads
+      # Synctex crown jewel (M1): the patched fork (typst 0.15.1+clsi,
+      # buildable via `make build-typst` from images/typst-amd64) emits the
+      # output.sourcemap.json sidecar the Go resolver consumes.
+      TYPST_IMAGE: ollitex/typst:main
       # 2026-09-16 (owner #10): tex compiles are SANDBOX-MANDATORY (clsi
       # DockerRunner; LocalCommandRunner removed). SAME-PATH contract: the
       # texlive/texlive:latest-full image (uid 33) bind-mounts these host
@@ -228,6 +241,8 @@ services:
       # the same files (see images/main-amd64/runit/clsi_typst-overleaf/run)
       - ./local-data/typst/compiles:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
       - ./local-data/typst/output:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
+      - ./local-data/typst/cache:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/cache
+      - ./local-data/typst/uploads:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/uploads
       # 2026-09-16 (owner #10): tex sandbox compile dirs (texlive/texlive:latest-full, uid 33)
       # host dirs created+owned by scripts/stack-reset.sh (uid 33, the texlive image user)
       - /var/lib/overleaf/data/compiles:/var/lib/overleaf/data/compiles

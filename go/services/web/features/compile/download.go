@@ -177,8 +177,20 @@ func pdfDownloadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		// clsi URL (ClsiURLHelpers.getFilePath): /project/<pid>[/user/<uid>]
 		// /build/<bid>/output/output.pdf  — userId = session user (per-user
 		// compiles ON in this stack).
+		//
+		// 2026-10-05 (typst-t2 live catch): the Node default downloadHost
+		// (127.0.0.1:8080, the shared clsi nginx) is DEAD in the P7
+		// single-container world (nothing listens there). Dispatch like the
+		// synctex proxy does: typst project -> clsitypst, else clsitex.
+		compiler, _ := dget(*p, "compiler").(string)
+		dlBase := clsiDownloadHost()
+		if compiler == "typst" {
+			dlBase = clsiTypstBase()
+		} else if compiler != "" {
+			dlBase = clsiBase()
+		}
 		uid := cxt.Sess.UserIDHex()
-		up := clsiDownloadHost() + "/project/" + pid
+		up := dlBase + "/project/" + pid
 		if uid != "" {
 			up += "/user/" + uid
 		}
