@@ -72,25 +72,35 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 			o.Log.Info("ssh auth", "user", user, "ok", ok)
 			return ok
 		}),
-		wish.WithMiddleware(teaMiddleware.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
-			return newApp(t), []tea.ProgramOption{tea.WithInput(sess), tea.WithOutput(sess), tea.WithAltScreen()}
-		})),
-		// Outermost (wish runs the LAST-added middleware first): gate + routing.
-		// exec with a command string (e.g. `ssh host "toolkit health"`) runs the
-		// CLI and exits; an interactive shell lands in the TUI below.
-		wish.WithMiddleware(func(next ssh.Handler) ssh.Handler {
-			return func(sess ssh.Session) {
-				if !userGate(sess.User()) {
-					fmt.Fprintln(sess, "toolkit: access denied for user "+sess.User())
-					return
+		wish.WithMiddleware(
+			teaMiddleware.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
+				return newApp(t), []tea.ProgramOption{tea.WithInput(sess), tea.WithOutput(sess), tea.WithAltScreen()}
+			}),
+			// Both middlewares go in ONE WithMiddleware call: wish.WithMiddleware
+			// does `s.Handler = h` per option, so two separate options REPLACE
+			// each other (last wins) — which silently drops the TUI middleware
+			// and makes every interactive session close right after auth
+			// ("Connection to ... closed", zero bytes out; the CLI path kept
+			// working because the surviving gate implements it itself). Order in
+			// the call: last-added runs first → gate/route runs first and its
+			// next() lands in the TUI.
+			// Gate + routing (outermost). exec with a command string
+			// (e.g. `ssh host "toolkit health"`) runs the CLI and exits; an
+			// interactive shell lands in the TUI below.
+			func(next ssh.Handler) ssh.Handler {
+				return func(sess ssh.Session) {
+					if !userGate(sess.User()) {
+						fmt.Fprintln(sess, "toolkit: access denied for user "+sess.User())
+						return
+					}
+					if cmd := strings.TrimSpace(sess.RawCommand()); cmd != "" {
+						runCLI(sess, cmd)
+						return
+					}
+					next(sess)
 				}
-				if cmd := strings.TrimSpace(sess.RawCommand()); cmd != "" {
-					runCLI(sess, cmd)
-					return
-				}
-				next(sess)
-			}
-		}),
+			},
+		),
 	)
 	if err != nil {
 		return fmt.Errorf("wish server: %w", err)
