@@ -97,9 +97,9 @@ export default function InstanceStatsSection() {
       alive = false
     }
   }, [])
-  const grafanaDash = grafana
-    ? grafana.dashboards.find(d => d.id === grafanaSel) || grafana.dashboards[0]
-    : null
+	const grafanaDash = Array.isArray(grafana?.dashboards)
+		? grafana.dashboards.find(d => d.id === grafanaSel) || grafana.dashboards[0]
+		: null
 
   const load = useCallback(async (w: WindowKey) => {
     setLoading(true)

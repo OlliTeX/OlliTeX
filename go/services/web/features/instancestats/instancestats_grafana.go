@@ -35,15 +35,18 @@ func grafanaDashboards(base string) []struct {
 	Kiosk string `json:"kiosk"`
 	Full  string `json:"full"`
 } {
-	if base == "" {
-		return nil
-	}
+	// Contract (hub frontend instance-stats-section.tsx, owner break 2026-10-06):
+	// dashboards is ALWAYS a JSON array — an empty [] when the base is unset,
+	// never null — because the browser does dashboards.find(...) unguarded.
 	out := []struct {
 		ID    string `json:"id"`
 		Title string `json:"title"`
 		Kiosk string `json:"kiosk"`
 		Full  string `json:"full"`
 	}{}
+	if base == "" {
+		return out
+	}
 	for _, d := range []struct{ id, title string }{
 		{"ollitex-overview", "OlliTeX — overview"},
 		{"ollitex-toolkit-mongo-redis", "MongoDB + Redis overview"},

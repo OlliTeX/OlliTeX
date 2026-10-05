@@ -1,16 +1,23 @@
 package instancestats
 
 import (
+	"encoding/json"
 	"testing"
 
 	"ollitex/go/services/web/features/sitesettings"
 )
 
 func TestGrafanaEmbedDashboardURLs(t *testing.T) {
-	// off by default (the d22 kiosk is an explicit owner opt-in)
-	if ds := grafanaDashboards(""); ds != nil {
-		t.Fatalf("empty base must yield no dashboards, got %v", ds)
+	// off by default (the d22 kiosk is an explicit owner opt-in) — and the
+	// CONTRACT is "always an array": no doc ⇒ an EMPTY slice (JSON [] …)
+	// never nil (JSON null), because the hub browser does
+	// dashboards.find(...) unguarded (owner break 2026-10-06: "Cannot
+	// read properties of null (reading 'find')").
+	if ds := grafanaDashboards(""); ds == nil || len(ds) != 0 {
+		t.Fatalf("empty base must yield an empty (non-nil) dashboard list, got %#v", ds)
 	}
+	dsJSON, _ := json.Marshal(json.RawMessage("nil"))
+	_ = dsJSON
 	ds := grafanaDashboards("http://grafana.example.org:3180")
 	if len(ds) != 2 {
 		t.Fatalf("want 2 dashboards, got %d", len(ds))
