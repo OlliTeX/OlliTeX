@@ -40,7 +40,7 @@ ENV PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sb
     GOFLAGS=-mod=mod
 
 # Conventional, host-cache-mountable locations (same ids as the glibc builder
-# so server-ce build steps work unchanged).
+# so build-images build steps work unchanged).
 RUN mkdir -p /gocache/mod /gocache/build
 
 WORKDIR /build

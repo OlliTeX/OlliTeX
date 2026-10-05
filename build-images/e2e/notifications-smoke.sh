@@ -17,7 +17,7 @@
 #   `docker compose up mailhog` running.
 #
 # Usage (from repo root):
-#   ./server-ce/e2e/notifications-smoke.sh [docker-compose project dir hints skipped;
+#   ./build-images/e2e/notifications-smoke.sh [docker-compose project dir hints skipped;
 #   uses `docker` against the running stack]
 #
 # Requires: jq; a logged-in Overleaf account on the stack (override with env

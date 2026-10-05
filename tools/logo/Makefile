@@ -4,7 +4,7 @@
 #
 # Builds and runs the generator INSIDE the repo's Go builder container
 # (ollitex/golang-builder-amd64-alpine, Go 1.27.1 / alpine 3.24) — the same
-# image the server-ce build uses. Only docker is required; if a host Go
+# image the build-images build uses. Only docker is required; if a host Go
 # toolchain is present its module/build caches are bind-mounted so
 # `go mod download` and compilation are near-free.
 #

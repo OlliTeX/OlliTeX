@@ -39,9 +39,9 @@ So the certbot webroot on the host is now consumed by **two** containers:
 haproxy no longer mounts it; the app container does.
 
 ## Cutover (owner-applied, /data_1/docker/compose_cep)
-1. Copy `server-ce/edge/haproxy.cfg` → `compose_cep/haproxy/haproxy.cfg`
+1. Copy `build-images/edge/haproxy.cfg` → `compose_cep/haproxy/haproxy.cfg`
    (adjust the SNI domain + cert paths if this box differs).
-2. Copy `server-ce/edge/compose.yaml` into the compose file (service `edge`)
+2. Copy `build-images/edge/compose.yaml` into the compose file (service `edge`)
    **or** point the nginx include at the new service name; remove the old
    `nginx` service; **add** the `/var/www/acme:/var/www/acme:ro` volume to
    `overleafserver`.

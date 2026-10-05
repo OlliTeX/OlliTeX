@@ -190,7 +190,7 @@ points at a compiling Typst service.
 
 ## 5. Retirements (c09/c10)
 - **c09**: retire `overleaf/services/clsi_typst` (Node) — remove from
-  `server-ce`/`images/main-amd64/services.js`/Dockerfile node install, re-point
+  `build-images`/`images/main-amd64/services.js`/Dockerfile node install, re-point
   runit (done in 3.2), junk/delete the dir after live-verification (c11) proves
   the Go path is load-bearing. Do **not** retire while TeX/Typst live compile
   still depends on it.
@@ -278,7 +278,7 @@ Remaining: **RESOLVED this pass** — the service-level **local HTTP E2E was exe
 
 ## c09 — Node clsi_typst retirement (code level) — COMPLETED 2026-10-02
 - `images/main-amd64/runit/clsi_typst-overleaf/run` rewritten to exec `/usr/local/bin/go-services/clsitypst` (Go), keeping the docker.sock perms block. Sets the exact env the Go `clsitypst/config.New` reads: COMPILE_TYPEST_ENABLED, DOCKER_RUNNER+SANDBOXED_COMPILES, same-path SANDBOXED_COMPILES_HOST_DIR_{COMPILES,OUTPUT,CACHE} == CLSI_TYPST_*_PATH under /var/lib/overleaf/typst/, TYPST_IMAGE (default vanilla digest; set ollitex/typst for SYNCTEX).
-- gobuilder already builds clsitypst (main-amd64/Dockerfile line 30). server-ce/ does NOT exist here (no services.js touch point).
+- gobuilder already builds clsitypst (main-amd64/Dockerfile line 30). build-images/ does NOT exist here (no services.js touch point).
 - Node services/clsi_typst/ dir LEFT as rollback; no longer exec'd. Deletion deferred to post-bake.
 
 ## c10 — libraries audit — AUDIT DONE 2026-10-02 (deletion owner-gated)

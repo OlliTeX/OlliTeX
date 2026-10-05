@@ -36,10 +36,10 @@ $OLD_ITEMS
   Legacy docker compose setups/Horizontal scaling setups:
 
     github.com/overleaf/overleaf$ git pull
-    github.com/overleaf/overleaf$ server-ce/bin/rename-env-vars-5-0.sh
+    github.com/overleaf/overleaf$ build-images/bin/rename-env-vars-5-0.sh
 
     # When using a docker-compose.override.yml file (or other file name):
-    github.com/overleaf/overleaf$ server-ce/bin/rename-env-vars-5-0.sh docker-compose.override.yml
+    github.com/overleaf/overleaf$ build-images/bin/rename-env-vars-5-0.sh docker-compose.override.yml
 
 
   Other deployment methods:

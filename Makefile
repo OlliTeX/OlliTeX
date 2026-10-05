@@ -15,7 +15,7 @@
 #   make wiki-check    wiki docs gate (links + data-safety scan) for CI
 #   make image         rebuild the ollitex docker image set (base + app +
 #                      pandoc/pdftocairo/png2pdf — from the images/ tree;
-#                      the former server-ce/Makefile merged here 2026-10-01)
+#                      the former build-images/Makefile merged here 2026-10-01)
 #   make hooks-install install the repo git pre-push fast gate
 #
 # Notes:
@@ -36,7 +36,7 @@ TEST_STACK   ?= ol-e2e-overleaf-1
 STACK_PORT   ?= 7420
 
 # ----------------------------------------------------------------------------
-# Docker image builds (merged from server-ce/Makefile 2026-10-01, owner
+# Docker image builds (merged from build-images/Makefile 2026-10-01, owner
 # directive: one Makefile controls everything; retired to junk/).
 # All images live under images/&lt;name&gt;/Dockerfile (2026-10-01 reorg) with
 # THIS repo root as the build context.

@@ -125,7 +125,7 @@ Known old-code issues to fix during port:
 
 ### Phase B — build + live verification
 - [x] B1 pre-rebuild review (diff analysis + log audit) → `make all`
-      (server-ce of THIS checkout) → image revision == HEAD.
+      (build-images of THIS checkout) → image revision == HEAD.
 - [x] B2 cycle compose_cep overleafserver; container image == built image.
 - [x] B3 startup log: module init line, no ERRORs.
 - [x] B4 browser E2E (testuser.txt): toolbar button present; modal opens;
@@ -150,7 +150,7 @@ Known old-code issues to fix during port:
 1. Lint `--max-warnings 0` clean on touched scopes.
 2. Unit tests green (vitest, own module).
 3. Reviewer pass: no stray changes; dead-code exclusion confirmed.
-4. `make all` exit 0 from this checkout's server-ce; image revision == HEAD.
+4. `make all` exit 0 from this checkout's build-images; image revision == HEAD.
 5. Container cycled healthy; container image ID == built image ID.
 6. Startup log shows module init, no ERRORs; feature works on live port.
 7. Browser-verified E2E on deployed FQDN (psintern.neuro.uni-bremen.de).

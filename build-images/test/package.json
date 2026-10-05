@@ -1,5 +1,5 @@
 {
-  "name": "@overleaf/server-ce-test",
+  "name": "@overleaf/build-images-test",
   "description": "e2e tests for Overleaf Community Edition",
   "private": true,
   "type": "module",

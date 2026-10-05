@@ -3,7 +3,7 @@
 # Ollitex Go web service (WEB_GO_PLAN.md) — the Go replacement of
 # services/web. SHADOW phase (P0 onward): it listens on 127.0.0.1:4010 and
 # the web-go-flip runit service routes exactly the already-flipped
-# prefixes (see server-ce/nginx/flips/) to it; everything else keeps
+# prefixes (see build-images/nginx/flips/) to it; everything else keeps
 # flowing to the Node web on 127.0.0.1:4000. After the final flip (P7)
 # this service IS the web service and the Node implementation is removed.
 #

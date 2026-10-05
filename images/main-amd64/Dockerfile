@@ -58,8 +58,8 @@ ENV COREPACK_ENABLE_NETWORK=0
 # Install yarn dependencies
 # -------------------------
 RUN --mount=type=cache,target=/root/.cache \
-    --mount=type=cache,target=/root/.yarn/berry/cache,id=server-ce-yarn-cache \
-    --mount=type=cache,target=/usr/local/share/.cache/yarn,id=server-ce-yarn-fallback-cache \
+    --mount=type=cache,target=/root/.yarn/berry/cache,id=build-images-yarn-cache \
+    --mount=type=cache,target=/usr/local/share/.cache/yarn,id=build-images-yarn-fallback-cache \
     --mount=type=tmpfs,target=/tmp node genScript install | bash
 
 # Add the actual source files
@@ -98,8 +98,8 @@ RUN rm -rf /overleaf/public/js /overleaf/public/minjs /overleaf/public/styleshee
     /overleaf/public/manifest.json
 
 RUN --mount=type=cache,target=/root/.cache \
-    --mount=type=cache,target=/root/.yarn/berry/cache,id=server-ce-yarn-cache \
-    --mount=type=cache,target=/usr/local/share/.cache/yarn,id=server-ce-yarn-fallback-cache \
+    --mount=type=cache,target=/root/.yarn/berry/cache,id=build-images-yarn-cache \
+    --mount=type=cache,target=/usr/local/share/.cache/yarn,id=build-images-yarn-fallback-cache \
     --mount=type=tmpfs,target=/overleaf/frontend/node_modules/.cache \
     --mount=type=tmpfs,target=/overleaf/frontend/.cache \
     --mount=type=tmpfs,target=/tmp \

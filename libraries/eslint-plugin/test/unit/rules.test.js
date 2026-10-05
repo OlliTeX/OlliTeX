@@ -609,7 +609,7 @@ jsonRuleTester.run('french-typography-in-locales', frenchTypographyInLocales, {
 })
 
 const noMochaBeforeOptions = [
-  { helperPath: 'server-ce/test/helpers/beforeWithReRunOnTestRetry' },
+  { helperPath: 'build-images/test/helpers/beforeWithReRunOnTestRetry' },
 ]
 
 ruleTester.run('no-mocha-before', noMochaBefore, {
@@ -633,7 +633,7 @@ before(function () { setup() })`,
   invalid: [
     {
       // rename + import added after the last existing import
-      filename: 'server-ce/test/foo.spec.ts',
+      filename: 'build-images/test/foo.spec.ts',
       code: `import { login } from './helpers/login'
 before(async function () { this.timeout(1000) })`,
       options: noMochaBeforeOptions,
@@ -644,7 +644,7 @@ beforeWithReRunOnTestRetry(async function () { this.timeout(1000) })`,
     },
     {
       // no imports yet: import inserted at the top
-      filename: 'server-ce/test/foo.spec.ts',
+      filename: 'build-images/test/foo.spec.ts',
       code: `before(function () { setup() })`,
       options: noMochaBeforeOptions,
       errors: 1,
@@ -653,7 +653,7 @@ beforeWithReRunOnTestRetry(function () { setup() })`,
     },
     {
       // helper already imported: rename only
-      filename: 'server-ce/test/foo.spec.ts',
+      filename: 'build-images/test/foo.spec.ts',
       code: `import { beforeWithReRunOnTestRetry } from './helpers/beforeWithReRunOnTestRetry'
 before(function () { setup() })`,
       options: noMochaBeforeOptions,
@@ -663,7 +663,7 @@ beforeWithReRunOnTestRetry(function () { setup() })`,
     },
     {
       // file inside helpers/: relative path has no directory prefix
-      filename: 'server-ce/test/helpers/config.ts',
+      filename: 'build-images/test/helpers/config.ts',
       code: `before(function () { setup() })`,
       options: noMochaBeforeOptions,
       errors: 1,
@@ -672,14 +672,14 @@ beforeWithReRunOnTestRetry(function () { setup() })`,
     },
     {
       // two-argument mocha form: report without autofix
-      filename: 'server-ce/test/foo.spec.ts',
+      filename: 'build-images/test/foo.spec.ts',
       code: `before('named hook', function () { setup() })`,
       options: noMochaBeforeOptions,
       errors: 1,
     },
     {
       // no helperPath configured: report without autofix
-      filename: 'server-ce/test/foo.spec.ts',
+      filename: 'build-images/test/foo.spec.ts',
       code: `before(function () { setup() })`,
       errors: 1,
     },

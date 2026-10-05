@@ -4,7 +4,7 @@
 # Yjs/ygo real-time room service. Serves:
 #   WS   /collab/{projectId}   (browser y-websocket clients; nginx passes
 #                               /collab/* here WITH the Upgrade headers —
-#                               see server-ce/nginx/overleaf.conf.template)
+#                               see build-images/nginx/overleaf.conf.template)
 #   GET  /healthz              (ops; same-origin-internal)
 # Same contract as the web session store (cookie overleaf.sid, Redis key
 # sess:<sid> → passport.user) — see go/services/collab/collab.go.

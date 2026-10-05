@@ -6,7 +6,7 @@ Goal: move to a new image without losing data.
 
 1. **Build** the new image from the target tag/branch:
    ```bash
-   cd server-ce
+   cd build-images
    make all
    ```
 2. **Cycle** the server container (compose style):

@@ -16,11 +16,11 @@ export default defineConfig([
   },
   {
     // The cypress block in baseConfig has patterns rooted at the
-    // monorepo root (`server-ce/test/helpers/*.ts`). When ESLint loads
-    // this file (server-ce/eslint.config.mjs) as the closest config --
+    // monorepo root (`build-images/test/helpers/*.ts`). When ESLint loads
+    // this file (build-images/eslint.config.mjs) as the closest config --
     // which happens when running `yarn run lint` from
-    // /overleaf/server-ce/test/ -- patterns from baseConfig are
-    // resolved relative to /overleaf/server-ce/, so those cross-dir
+    // /overleaf/build-images/test/ -- patterns from baseConfig are
+    // resolved relative to /overleaf/build-images/, so those cross-dir
     // patterns don't match. Re-declare with paths relative to this
     // config file.
     files: [

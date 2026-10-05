@@ -89,7 +89,8 @@ S4/D25 OT sweep (F2, deleted via `git rm` — recoverable from git history):
 `frontend/js/vendor/libs/sharejs.js`, plus their OT unit tests.
 KEPT (not OT text sync): the app EVENT BUS connection stack —
 `connection/connection-manager.ts`, `SocketIoShim`, `use-socket-listener`,
-`socket-diagnostics`, lost-connection alerts (D28: the bus survives; moving
+lost-connection alerts (D28: the bus survives; moving
+The SaaS-era `socket-diagnostics` browser-debug page + component dir was RETIRED 2026-10-06 (no Go route, no UI link, no consumers).
 it to Go is the D28a arc). The OT half of `source-editor/extensions`
 (`history-ot.ts`, `realtime.ts` attach no-op stubs, track-changes/comments
 extensions) stays as dormant code per D25 (comments/track-changes disabled

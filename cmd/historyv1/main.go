@@ -1,7 +1,7 @@
 // Command historyv1 is the Go 1:1 runtime for the history-v1 service (see
 // ollitex/go/services/historyv1). Node: services/history-v1/app.js.
 //
-// Env (1:1 with services/history-v1/config + server-ce mappings):
+// Env (1:1 with services/history-v1/config + build-images mappings):
 //
 //	MONGO_CONNECTION_STRING || mongodb://(MONGO_HOST || 127.0.0.1)/sharelatex
 //	HISTORY_CONNECTION_STRING || DATABASE_URL (PG18 chunk/blob seam)

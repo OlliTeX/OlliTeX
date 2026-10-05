@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Config mirrors the settings the web app consumes (server-ce
+// Config mirrors the settings the web app consumes (build-images
 // settings.js + services/web defaults). Only the keys the P0/P1 surface
 // touches are read; each new feature adds its keys with a comment
 // pointing at the Node source it mirrors.
@@ -24,7 +24,7 @@ type Config struct {
 	CookieName     string   // COOKIE_NAME || "overleaf.sid"
 	CookieLength   time.Duration
 	CookieLengthMS int64
-	SecureCookie   bool   // OVERLEAF_SECURE_COOKIE set (server-ce: != null)
+	SecureCookie   bool   // OVERLEAF_SECURE_COOKIE set (build-images: != null)
 	SameSite       string // default "lax"
 	RollingSession bool   // default true
 	CookieDomain   string // COOKIE_DOMAIN (empty = absent cookie domain attr)
@@ -36,7 +36,7 @@ type Config struct {
 	ExpoHostname      bool     // EXPOSE_HOSTNAME
 	AllowPublicAccess bool     // OVERLEAF_ALLOW_PUBLIC_ACCESS === 'true' (disables the global login gate)
 
-	CacheStaticAssets bool // server-ce: true
+	CacheStaticAssets bool // build-images: true
 
 	// RealtimeURL — the real-time bus :3026 (socketIO + ops HTTP API) base
 	// for project-room event relays (D40 review events: new-comment,
@@ -84,7 +84,7 @@ func LoadConfig() (*Config, error) {
 	if strings.Contains(os.Getenv("ENABLED_SERVICES"), "api") && !strings.Contains(os.Getenv("ENABLED_SERVICES"), "web") {
 		profile = "api"
 	} else if os.Getenv("ENABLED_SERVICES") == "" {
-		// Node default is 'web'+? — server-ce run scripts always set it;
+		// Node default is 'web'+? — build-images run scripts always set it;
 		// standalone `node app.mjs` (api) uses explicit env. Default web.
 		profile = "web"
 	}
@@ -99,7 +99,7 @@ func LoadConfig() (*Config, error) {
 	}
 	listen := env("WEB_GO_LISTEN", host+":"+port)
 
-	cookieLen := int64(5 * 24 * 60 * 60 * 1000) // 5d default (server-ce)
+	cookieLen := int64(5 * 24 * 60 * 60 * 1000) // 5d default (build-images)
 	if v := os.Getenv("OVERLEAF_COOKIE_SESSION_LENGTH"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
 			cookieLen = n
@@ -124,7 +124,7 @@ func LoadConfig() (*Config, error) {
 		return nil, &ConfigError{Msg: "No SESSION_SECRET provided (OVERLEAF_SESSION_SECRET or CRYPTO_RANDOM)"}
 	}
 
-	// Image-lineage contract (server-ce/config/settings.js — what Node web
+	// Image-lineage contract (build-images/config/settings.js — what Node web
 	// actually reads in this tree): OVERLEAF_REDIS_HOST (default
 	// 'dockerhost' in the stock image; e2e sets 'redis'), OVERLEAF_REDIS_PORT,
 	// OVERLEAF_REDIS_PASS. services/web defaults accept REDIS_* too, so both
@@ -144,7 +144,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	// Node: siteUrl = process.env.OVERLEAF_SITE_URL || 'http://localhost'
-	// (server-ce/config/settings.js) — keep SITE_URL as a legacy alias.
+	// (build-images/config/settings.js) — keep SITE_URL as a legacy alias.
 	siteURL := func() string {
 		if v := os.Getenv("OVERLEAF_SITE_URL"); v != "" {
 			return v
@@ -159,7 +159,7 @@ func LoadConfig() (*Config, error) {
 		allowedOrigins = strings.Split(v, ",")
 	}
 
-	_, pb := os.LookupEnv("OVERLEAF_SECURE_COOKIE") // parity: server-ce `!= null`
+	_, pb := os.LookupEnv("OVERLEAF_SECURE_COOKIE") // parity: build-images `!= null`
 	rolling := true
 	if v := os.Getenv("COOKIE_ROLLING_SESSION"); v == "false" {
 		rolling = false

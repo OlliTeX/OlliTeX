@@ -1,5 +1,5 @@
 # SSO / identity TEST stack (OlliTeX) — for exercising the SSO + federation Go code E2E without
-# the external-registry images server-ce/test needs. Mirrors the benchmark identity servers
+# the external-registry images build-images/test needs. Mirrors the benchmark identity servers
 # (/data_1/image_mining/benchmark_overleaf_vm/compose/production): osixia LDAP, Flask OIDC,
 # boxyhq/mock-saml SAML, postfix MAILSINK (catch-all inbox).
 #

@@ -1,7 +1,7 @@
 // Command web is the Go replacement of services/web (WEB_GO_PLAN.md).
 //
 // One binary, two profiles — selected by ENABLED_SERVICES exactly like
-// the Node app (server-ce/runit/web-overleaf/run sets web,
+// the Node app (build-images/runit/web-overleaf/run sets web,
 // web-api-overleaf/run sets api). P0 runs as the SHADOW service
 // (web-go-overleaf) on a distinct port; the nginx vhost-extras flip
 // table routes individual prefixes here. See WEB_GO_PLAN.md §3.

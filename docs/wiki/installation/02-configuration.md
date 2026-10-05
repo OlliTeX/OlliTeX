@@ -4,7 +4,7 @@ Goal: know where every setting lives.
 
 ## The single env file
 
-`server-ce/config/env.sh` is the one place for instance configuration
+`build-images/config/env.sh` is the one place for instance configuration
 (site name, URL, SMTP host *name*, auth providers, compile images, LLM
 admin gate, …). The toolkit under `toolkit` (with
 `toolkit/lib/images.env` as the image-allowlist source of truth)

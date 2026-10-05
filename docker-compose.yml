@@ -140,7 +140,7 @@ services:
   # ports (D22 A2 wiring — the HAProxy edge never forwards /metrics);
   # node-exporter reports host-level signals (CPU/RAM/disk via mounted /).
   # :9090 is host-published for Grafana (phase C) / operator tooling.
-  # Docs: server-ce/prometheus/README.md
+  # Docs: build-images/prometheus/README.md
   # ---------------------------------------------------------------------------
   prometheus:
     profiles: ["d22"]
@@ -154,7 +154,7 @@ services:
       OVERLEAF_HOST: sharelatex
       GITBRIDGE_HOST: git-bridge
     volumes:
-      - ./server-ce/prometheus:/etc/prometheus:ro  # yml + rules/ (phase D)
+      - ./build-images/prometheus:/etc/prometheus:ro  # yml + rules/ (phase D)
       - ~/prometheus_data:/prometheus
     ports:
       - "9090:9090"
@@ -176,7 +176,7 @@ services:
     environment:
       OVERLEAF_HOST: sharelatex
     volumes:
-      - ./server-ce/alertmanager:/etc/alertmanager:ro
+      - ./build-images/alertmanager:/etc/alertmanager:ro
       - ~/alertmanager_data:/alertmanager
     depends_on:
       - sharelatex
@@ -246,7 +246,7 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-ollitex-observability}"
       GF_USERS_ALLOW_SIGN_UP: "false"
-      # D22 kiosk on /hub — explicit owner opt-in (server-ce/grafana
+      # D22 kiosk on /hub — explicit owner opt-in (build-images/grafana
       # README): anonymous Viewer + who may iframe. Defaults stay safe
       # (off / self-only).
       GF_AUTH_ANONYMOUS_ENABLED: "${GRAFANA_ANONYMOUS:-false}"
@@ -255,8 +255,8 @@ services:
       GF_SECURITY_CSP_FRAME_ANCESTORS: "${GRAFANA_CSP_FRAME_ANCESTORS:-self}"
     volumes:
       - ~/grafana_data:/var/lib/grafana
-      - ./server-ce/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./server-ce/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./build-images/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./build-images/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "3180:3000"
     depends_on:

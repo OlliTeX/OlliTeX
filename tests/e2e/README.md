@@ -32,7 +32,7 @@ of degrading. A seed manifest is written to `test-results/seed-manifest.json`.
   under load on 8.0/8.2). 6.0 was probed to survive the full migration
   load. The image's "Mongo ≥ 8.0" boot check is overridden via
   `OL_MIN_MONGO_VERSION=6.0` / `OL_MIN_MONGO_FCV=6.0` **test-stack only**
-  (production defaults unchanged; `server-ce-scripts/check-mongodb.mjs`).
+  (production defaults unchanged; `build-images-scripts/check-mongodb.mjs`).
 - **Registration domain gate**: CE treats an empty allowed-domain list as
   "block all" (`[] && ![].some(...)`), so the stack sets
   `OVERLEAF_ALLOWED_REGISTRATION_EMAIL_DOMAINS=e2e.test`.

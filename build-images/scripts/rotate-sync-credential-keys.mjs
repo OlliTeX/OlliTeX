@@ -16,7 +16,7 @@
  *   - Idempotent: documents already under the NEW label/key are skipped.
  *
  * Usage (from the host):
- *   docker cp server-ce/scripts/rotate-sync-credential-keys.mjs overleafserver:/tmp/
+ *   docker cp build-images/scripts/rotate-sync-credential-keys.mjs overleafserver:/tmp/
  *   docker exec \
  *     -e OLD_CYPHER_PASSWORD='generate-a-long-random-secret' \
  *     -e OLD_CYPHER_LABEL='OL_WEBDAV-v3' \

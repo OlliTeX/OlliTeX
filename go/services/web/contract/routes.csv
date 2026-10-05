@@ -83,7 +83,6 @@ GET,/project/download/zip,webRouter,core,services/web/app/src/router.mjs:848
 GET,/read-only/one-time-login,webRouter,core,services/web/app/src/router.mjs:283
 GET,/register,webRouter,core,services/web/app/src/router.mjs:299
 GET,/restricted,webRouter,core,services/web/app/src/router.mjs:296
-GET,/socket-diagnostics,webRouter,core,services/web/app/src/router.mjs:265
 GET,/status/compiler/:Project_id,webRouter,core,services/web/app/src/router.mjs:1265
 GET,/system/messages,webRouter,core,services/web/app/src/router.mjs:337
 GET,/tag,webRouter,core,services/web/app/src/router.mjs:904

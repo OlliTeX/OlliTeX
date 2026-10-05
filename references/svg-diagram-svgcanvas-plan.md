@@ -66,7 +66,7 @@ Verification gates (strict — no "fixed" claims without these):
 1. vitest (modules/drawio + modules/toast-image tests; adjust drawio-model tests for SVG)
 2. eslint (repo-local flat config)
 3. tsc --noEmit delta vs pre-change baseline
-4. Docker `cd server-ce && make all` (babel is stricter than tsc — final arbiter)
+4. Docker `cd build-images && make all` (babel is stricter than tsc — final arbiter)
 5. Deploy compose cycle → browser E2E (CDP script, testjoe@rotermund.at):
    - TUI: open frog.jpg → no console error; canvas + menus visible; save gate disabled until load; screenshot.
    - Diagram: create .svg → draw rect+line+freehand → recolor → undo/redo → Save → doc text is SVG; reopen .svg → shapes present; companions .png/.pdf exist in project; screenshot of both.

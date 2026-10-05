@@ -2,7 +2,7 @@
 steps:
   - id: build_base
     name: us-east1-docker.pkg.dev/overleaf-ops/ol-docker/cloud-builder
-    dir: server-ce
+    dir: build-images
     args:
       - "build-base"
   - id: tag_main_latest_base
@@ -28,7 +28,7 @@ steps:
       - "-"
   - id: build_community
     name: us-east1-docker.pkg.dev/overleaf-ops/ol-docker/cloud-builder
-    dir: server-ce
+    dir: build-images
     args:
       - build-community
     waitFor:

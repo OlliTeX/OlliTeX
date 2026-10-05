@@ -110,12 +110,12 @@ func (c *FSTConfig) withDefaults() {
 		c.GlobalBlobs = "/var/lib/overleaf/data/history/overleaf-global-blobs"
 	}
 	if c.UploadFolder == "" {
-		// Node (server-ce/config/settings.js): settings.path.uploadFolder =
+		// Node (build-images/config/settings.js): settings.path.uploadFolder =
 		// Path.join(TMP_DIR, 'uploads') with TMP_DIR = /var/lib/overleaf/tmp.
 		c.UploadFolder = "/var/lib/overleaf/tmp/uploads"
 	}
 	if c.Converter == "" {
-		// Node (server-ce/config/settings.js): CONVERTER || 'pdftocairo'.
+		// Node (build-images/config/settings.js): CONVERTER || 'pdftocairo'.
 		c.Converter = "pdftocairo"
 	}
 }

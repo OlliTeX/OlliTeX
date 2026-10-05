@@ -1,7 +1,7 @@
 // Command cronmail is the Go replacement for the Node email-notification
 // dispatcher cron:
 //
-//	server-ce/cron/notification-email-dispatch.sh
+//	build-images/cron/notification-email-dispatch.sh
 //	  → services/web/scripts/process_notifications.mjs
 //	    → modules/notifications/app/src/ProcessNotifications.mjs
 //

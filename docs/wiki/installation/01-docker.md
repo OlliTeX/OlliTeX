@@ -12,7 +12,7 @@ Goal: run an OlliTeX instance from the published image.
 From a checkout of this repository:
 
 ```bash
-cd server-ce
+cd build-images
 make all                 # builds sharelatex/sharelatex:<branch> (+ the TeX Live base image)
 ```
 
@@ -20,7 +20,7 @@ The [base image Dockerfile](../../../images/base-amd64/Dockerfile) builds the
 `sharelatex/sharelatex-base` image (dependencies + TeX Live); the
 [application image Dockerfile](../../../images/main-amd64/Dockerfile) builds
 the application image on top. (All image Dockerfiles live under `images/`,
-next to the golang/nodejs builder images; `make all` in `server-ce` drives
+next to the golang/nodejs builder images; `make all` in `build-images` drives
 them.)
 
 The included deployment example

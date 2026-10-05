@@ -1,7 +1,7 @@
 # D22 (8cbc1526) phase D — OlliTeX alert rules.
 #
 # Delivery chain: Prometheus → Alertmanager (d22 sidecar,
-# server-ce/alertmanager/alertmanager.yml) → HTTP webhook into the Go web
+# build-images/alertmanager/alertmanager.yml) → HTTP webhook into the Go web
 # route
 #   POST http://<OVERLEAF_HOST>:4000/internal/alerts
 # which fans one mail per firing alert out to the instance-stats alert

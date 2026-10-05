@@ -64,7 +64,7 @@ docs/wiki/
 │   ├── 08-sso-saml-oidc.md       # identity providers, group mapping
 │   └── 09-operations.md          # system messages, sessions, diagnostics
 └── installation/
-    ├── 01-docker.md              # server-ce make all + compose example
+    ├── 01-docker.md              # build-images make all + compose example
     ├── 02-configuration.md       # env.sh + toolkit seed map
     ├── 03-upgrade.md             # image swap + data notes
     ├── 04-security-sandbox.md    # sandbox compiles, trusted-user warning

@@ -167,7 +167,7 @@ services:
       OVERLEAF_FILESTORE_MIGRATION_LEVEL: '2'
       # ---- PG plane (G1, 2026-09-27 owner: tree-wide anchor postgres:18-alpine) ----
       # history-v1 (Node knex) + future Go history-v1 port connect via this;
-      # migrations run at boot (server-ce init 890).
+      # migrations run at boot (build-images init 890).
       DATABASE_URL: postgres://overleaf:overleaf@postgres:5432/overleaf-history-v1
       # ---- S3 plane (G2/STOR-1: SeaweedFS = the only durable binary backend) ----
       # Bucket names are PLAIN (Go s3x PathEscapes the bucket; a "/buckets/x"
@@ -180,7 +180,7 @@ services:
       OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME: templatefiles
       OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET: projectblobs
       OVERLEAF_HISTORY_BLOBS_BUCKET: globalblobs
-      # monolith history-v1 persistor (server-ce custom-env mapping:
+      # monolith history-v1 persistor (build-images custom-env mapping:
       # persistor.backend <- OVERLEAF_HISTORY_BACKEND etc.)
       OVERLEAF_HISTORY_BACKEND: s3
       OVERLEAF_HISTORY_S3_ENDPOINT: http://s3:8333

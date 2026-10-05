@@ -29,7 +29,7 @@ func firstNonEmpty(vals ...string) string {
 func main() {
 	cfg := filestore.FSTConfig{
 		// 1:1 with the Node config surface the CE image actually exports to the
-		// filestore process (server-ce/config/settings.js `switch
+		// filestore process (build-images/config/settings.js `switch
 		// (OVERLEAF_FILESTORE_BACKEND)` block + the s3 fallback env names
 		// from services/filestore/config/settings.defaults.cjs). In s3 mode
 		// the three bucket values are BUCKET NAMES, not directories.

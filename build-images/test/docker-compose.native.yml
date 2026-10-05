@@ -34,7 +34,7 @@ services:
       - ../../:/overleaf
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ${XAUTHORITY:-/dev/null}:/home/node/.Xauthority
-    working_dir: /overleaf/server-ce/test
+    working_dir: /overleaf/build-images/test
     entrypoint: npm
     command: run cypress:open
     environment:
