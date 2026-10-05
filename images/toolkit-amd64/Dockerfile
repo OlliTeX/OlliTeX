@@ -65,6 +65,14 @@ RUN apk add --no-cache \
 COPY toolkit/compose.yaml /opt/ollitex/compose.yaml
 COPY toolkit/lib/monitoring/ /opt/ollitex/monitoring/
 
+# The data-backup suite (owner: "for these I have no backup strategy yet" —
+# now they do): toolkit/backup is the ONE backup surface, baked where the TUI
+# can drive it (d = data backup, v = restore drill). The ${PREFIX}/data bind
+# is /opt/ollitex/data, so BACKUP_ROOT resolves to the same host directory
+# from both the container and the host.
+COPY toolkit/backup/ /opt/ollitex/backup/
+RUN chmod +x /opt/ollitex/backup/*.sh
+
 
 # The one mounted folder (default; override --data-dir / OLLITEX_TOOLKIT_DATA_DIR).
 ENV OLLITEX_TOOLKIT_DATA_DIR=/opt/ollitex/data \

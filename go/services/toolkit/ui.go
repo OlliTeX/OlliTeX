@@ -22,10 +22,13 @@ package toolkit
 // All three libraries are MIT, credited in CREDITS.md.
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -177,6 +180,43 @@ func (a *app) runJob(job string, f func(ctx context.Context) (string, error)) te
 		out, err := f(ctx)
 		return jobMsg{job: job, out: out, err: err, done: true}
 	}
+}
+
+// runJobLong is for store-heavy jobs (the data-backup round tars the full
+// SeaweedFS volume — minutes, not seconds). Same message contract.
+func (a *app) runJobLong(job string, f func(ctx context.Context) (string, error)) tea.Cmd {
+	a.loading = true
+	a.jobName = job
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Minute)
+		defer cancel()
+		out, err := f(ctx)
+		return jobMsg{job: job, out: out, err: err, done: true}
+	}
+}
+
+// runBackupScript runs one of the toolkit/backup/*.sh suites (baked into the
+// image at /opt/ollitex/backup; OLLITEX_TOOLKIT_BACKUP_DIR points at the repo
+// copy during host-side dev) and returns its tail — the [backup]/[drill]
+// status lines the TUI renders in the result pane.
+func runBackupScript(dir, script string, ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "sh", filepath.Join(dir, script))
+	if v := os.Getenv("OLLITEX_TOOLKIT_DATA_DIR"); v != "" {
+		cmd.Env = append(cmd.Env, "BACKUP_ROOT="+filepath.Join(v, "backups"))
+	}
+	var b bytes.Buffer
+	cmd.Stdout = &b
+	cmd.Stderr = &b
+	err := cmd.Run()
+	out := b.String()
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) > 40 {
+		out = "… " + strconv.Itoa(len(lines)-40) + " earlier lines…\n" + strings.Join(lines[len(lines)-40:], "\n")
+	}
+	if err != nil {
+		return out + "\n[exit " + err.Error() + "]", nil
+	}
+	return out, nil
 }
 
 func (a *app) silentJob(job string, f func(ctx context.Context) (string, error)) tea.Cmd {
@@ -635,6 +675,14 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "r":
 			a.askRestore()
 			return a, nil
+		case "d":
+			return a, a.runJobLong("data-backup", func(ctx context.Context) (string, error) {
+				return runBackupScript(a.tk.BackupDir(), "backup-data.sh", ctx)
+			})
+		case "v":
+			return a, a.runJobLong("data-drill", func(ctx context.Context) (string, error) {
+				return runBackupScript(a.tk.BackupDir(), "restore-drill.sh", ctx)
+			})
 		}
 	}
 	return a, nil
@@ -763,6 +811,16 @@ func (a *app) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					return "", err
 				}
 				return fmt.Sprintf("%d keys", len(m)), nil
+			})
+		}},
+		{"data-backup", func() tea.Cmd {
+			return a.runJobLong("data-backup", func(ctx context.Context) (string, error) {
+				return runBackupScript(a.tk.BackupDir(), "backup-data.sh", ctx)
+			})
+		}},
+		{"data-drill", func() tea.Cmd {
+			return a.runJobLong("data-drill", func(ctx context.Context) (string, error) {
+				return runBackupScript(a.tk.BackupDir(), "restore-drill.sh", ctx)
 			})
 		}},
 		{"restore", func() tea.Cmd { a.askRestore(); return nil }},

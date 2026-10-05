@@ -151,6 +151,17 @@ func (t *Toolkit) HostKeyPath() string { return filepath.Join(t.DataDir, "ssh_ho
 // BackupPath returns the canonical backup file location.
 func (t *Toolkit) BackupPath() string { return filepath.Join(t.DataDir, "config-backup.json") }
 
+// BackupDir is where the toolkit/backup shell suite lives for the running
+// TUI: baked into the image at /opt/ollitex/backup (canonical), or
+// OLLITEX_TOOLKIT_BACKUP_DIR when the repo copy should be driven instead
+// (host-side dev/testing).
+func (t *Toolkit) BackupDir() string {
+	if d := os.Getenv("OLLITEX_TOOLKIT_BACKUP_DIR"); d != "" {
+		return d
+	}
+	return "/opt/ollitex/backup"
+}
+
 // Context is the ctx used by background work.
 func (t *Toolkit) Context(ctx context.Context) context.Context { return ctx }
 

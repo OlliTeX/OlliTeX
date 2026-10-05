@@ -3,6 +3,7 @@ package toolkit
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -524,16 +525,19 @@ func (a *app) panelDoctor() string {
 
 func (a *app) panelBackup() string {
 	var b strings.Builder
-	b.WriteString(panelHead("backup — the config-store snapshot"))
-	b.WriteString("  " + styleKvK.Render("file") + " " + a.tk.BackupPath() + "\n")
-	b.WriteString("  " + styleKvK.Render("scope") + " " + styleDim.Render("every stored key (the true source of the settings plane)") + "\n")
+	b.WriteString(panelHead("backup — the config store AND the data stores"))
+	b.WriteString("  " + styleKvK.Render("store file") + " " + a.tk.BackupPath() + "\n")
 	if _, err := storeFileExists(a.tk.BackupPath()); err != nil {
-		b.WriteString("  " + styleKvK.Render("state") + " " + styleDim.Render("(not written yet)") + "\n")
+		b.WriteString("  " + styleKvK.Render("store state") + " " + styleDim.Render("(not written yet)") + "\n")
 	} else {
-		b.WriteString("  " + styleKvK.Render("state") + " " + styleOK.Render("present") + "\n")
+		b.WriteString("  " + styleKvK.Render("store state") + " " + styleOK.Render("present") + "\n")
 	}
+	b.WriteString("  " + styleKvK.Render("data root") + " " + filepath.Join(a.tk.DataDir, "backups") + styleDim.Render("  (mongo · redis · postgres · seaweedfs)") + "\n")
 	b.WriteString("\n")
-	b.WriteString(a.btnRow("backup", "b backup", "restore", "r restore"))
+	b.WriteString(a.btnRow("backup", "b backup") + "\n")
+	b.WriteString(a.btnRow("restore", "r restore") + "\n")
+	b.WriteString(a.btnRow("data-backup", "d data backup") + "\n")
+	b.WriteString(a.btnRow("data-drill", "v drill"))
 	return b.String()
 }
 
