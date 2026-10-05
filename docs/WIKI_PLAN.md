@@ -67,7 +67,9 @@ docs/wiki/
     ├── 01-docker.md              # server-ce make all + compose example
     ├── 02-configuration.md       # env.sh + toolkit seed map
     ├── 03-upgrade.md             # image swap + data notes
-    └── 04-security-sandbox.md    # sandbox compiles, trusted-user warning
+    ├── 04-security-sandbox.md    # sandbox compiles, trusted-user warning
+    └── 05-toolkit-ssh.md         # the SSH toolkit TUI/CLI (added 2026-10-05): deploy,
+                                  #   stack, settings, doctor, backup, monitoring (D22)
 ```
 
 Numbering is stable (new pages get the next number). Every page follows the

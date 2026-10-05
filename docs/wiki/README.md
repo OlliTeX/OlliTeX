@@ -17,6 +17,7 @@ Typst**, built on [Overleaf Community Edition](https://github.com/overleaf/overl
 | Managing **references** | [Reference managers & bibliography](users/06-references.md) |
 | An **admin** | [Admin overview](admins/01-admin-overview.md) → [Users](admins/02-users.md) → [Site settings](admins/04-site-settings.md) |
 | **Deploying** OlliTeX | [Docker deployment](installation/01-docker.md) → [Configuration](installation/02-configuration.md) |
+| **Operating** a host over SSH | [The Toolkit TUI & CLI (installer, console, monitoring)](installation/05-toolkit-ssh.md) |
 
 ## The hub
 
