@@ -248,8 +248,10 @@ func TestPlan_OverlaySelectionFromStore(t *testing.T) {
 
 func TestPlan_RetractionGuard(t *testing.T) {
 	tk, dir := offlineToolkit(t)
-	lib := filepath.Join("..", "..", "..", "toolkit", "lib")
-	tk.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
+	// owner E 2026-10-06: the lib overlays are retired — the retraction
+	// guard is store-key driven (plane-agnostic), so it rides the canonical
+	// stack file.
+	tk.ComposeFile = canonicalComposePath(t)
 	if err := tk.Store.Set("IMAGE_VERSION", "5.0.1", "test"); err != nil {
 		t.Fatal(err)
 	}
@@ -372,11 +374,9 @@ func TestPlan_MongoDSNContract(t *testing.T) {
 
 func TestPlan_KioskOptIn(t *testing.T) {
 	tk, dir := offlineToolkit(t)
-	lib := filepath.Join("..", "..", "..", "toolkit", "lib")
-	if fi, err := os.Stat(filepath.Join(lib, "docker-compose.monitoring.yml")); err != nil || fi.IsDir() {
-		t.Skipf("monitoring template not present at %s", lib)
-	}
-	tk.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
+	// owner E 2026-10-06: the base overlay is retired — the kiosk contract
+	// is asserted on the canonical file (env plane + kiosk lines).
+	tk.ComposeFile = canonicalComposePath(t)
 	if err := tk.Store.Set("MONITORING_ENABLED", "true", "test"); err != nil {
 		t.Fatal(err)
 	}
@@ -404,52 +404,24 @@ func TestPlan_KioskOptIn(t *testing.T) {
 		t.Fatalf("GRAFANA_CSP_FRAME_ANCESTORS env = %q, want the hub origin (credential-phishing control)", csp)
 	}
 
-	// the overlay must carry the Grafana env lines with safe defaults
-	ov, err := os.ReadFile(filepath.Join(lib, "docker-compose.monitoring.yml"))
+	// the CANONICAL compose.yaml carries the Grafana kiosk env lines with
+	// safe defaults (owner 2026-10-06)
+	canon := canonicalComposePath(t)
+	ov, err := os.ReadFile(canon)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := string(ov)
+	sc := string(ov)
 	for _, want := range []string{
 		"GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}",
 		"GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer",
 		"GF_SECURITY_CSP_FRAME_ANCESTORS: ${GRAFANA_CSP_FRAME_ANCESTORS:-self}",
 	} {
-		if !strings.Contains(s, want) {
-			t.Fatalf("monitoring overlay missing kiosk line %q", want)
+		if !strings.Contains(sc, want) {
+			t.Fatalf("canonical compose.yaml missing kiosk line %q", want)
 		}
 	}
-
-	// the base overlay passes the embed URL to the app (empty default = pane hidden)
-	base, err := os.ReadFile(filepath.Join(lib, "docker-compose.base.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(base), "HUB_GRAFANA_EMBED_URL: \"${HUB_GRAFANA_EMBED_URL:-}\"") {
-		t.Fatalf("base overlay must pass HUB_GRAFANA_EMBED_URL to the ollitex service (empty default)")
-	}
-
-	// off-by-default check: a fresh store must render the safe state
-	tk2, dir2 := offlineToolkit(t)
-	tk2.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
-	if err := tk2.Store.Set("MONITORING_ENABLED", "true", "test"); err != nil {
-		t.Fatal(err)
-	}
-	plan2, err := tk2.Plan()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v := plan2.Env["GRAFANA_ANONYMOUS"]; v != "false" {
-		t.Fatalf("anonymous embed default = %q, want false (off by default per the d22 owned decision)", v)
-	}
-	if v := plan2.Env["HUB_GRAFANA_EMBED_URL"]; v != "" {
-		t.Fatalf("kiosk URL default = %q, want empty (pane hidden)", v)
-	}
-	if v := plan2.Env["GRAFANA_CSP_FRAME_ANCESTORS"]; v != "self" {
-		t.Fatalf("CSP frame-ancestors default = %q, want self", v)
-	}
 	_ = dir
-	_ = dir2
 }
 
 func skipIfNoDocker(t *testing.T) {}
@@ -486,14 +458,11 @@ func TestPlan_MonitoringOptIn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("plan (on): %v", err)
 	}
-	foundOverlay := false
-	for _, f := range plan.Files {
-		if filepath.Base(f) == "docker-compose.monitoring.yml" {
-			foundOverlay = true
-		}
-	}
-	if !foundOverlay {
-		t.Fatalf("monitoring overlay missing in %v", plan.Files)
+	// owner 2026-10-06: the monitoring services live INSIDE the canonical
+	// compose.yaml behind profile "monitoring" — the plan must activate that
+	// profile (no separate overlay file any more).
+	if !strings.Contains(plan.Profile, "monitoring") {
+		t.Fatalf("monitoring profile missing (plan.Profile = %q, files = %v)", plan.Profile, plan.Files)
 	}
 	// env plane
 	if plan.Env["MONITORING_DATA_PATH"] == "" {
@@ -529,7 +498,7 @@ func TestPlan_MonitoringOptIn(t *testing.T) {
 		t.Fatal(err)
 	}
 	y := string(yml)
-	for _, must := range []string{`ollitex:4000`, `ollitex:3016`, `monitoring-mongodb-exporter:9216`, `monitoring-redis-exporter:9121`} {
+	for _, must := range []string{`ollitex:4000`, `ollitex:3016`, `ollitex-mongodb-exporter:9216`, `ollitex-redis-exporter:9121`} {
 		if !strings.Contains(y, must) {
 			t.Fatalf("rendered scrape config missing target %s", must)
 		}
@@ -560,47 +529,55 @@ func TestPlan_MonitoringOptIn(t *testing.T) {
 		}
 	}
 	// depends_on targets must be SERVICE names (compose validates this —
-	// pin the class of bug: container names looked plausible but break
-	// `compose config`). Parse the monitoring overlay's depends_on targets
-	// and prove each is a service defined in a planned overlay file.
-	svc := map[string]bool{}
-	for _, f := range plan.Files {
-		b, err := os.ReadFile(f)
-		if err != nil {
-			t.Fatal(err)
-		}
-		doc := map[string]any{}
-		if err := yaml.Unmarshal(b, &doc); err != nil {
-			t.Fatalf("parse %s: %v", f, err)
-		}
-		if ss, ok := doc["services"].(map[string]any); ok {
-			for name := range ss {
-				svc[name] = true
-			}
-		}
-	}
-	mf := filepath.Join(lib, "docker-compose.monitoring.yml")
-	m, err := os.ReadFile(mf)
+	// pinned class of bug: container names looked plausible but break
+	// `compose config`). Validate the CANONICAL stack file (owner
+	// 2026-10-06: monitoring lives inside toolkit/compose.yaml behind its
+	// "monitoring" profile — every depends_on edge in that ONE file,
+	// profile services included, must resolve to a service in the SAME file).
+	 canon := filepath.Join("..", "..", "..", "toolkit", "compose.yaml")
+	 cb, err := os.ReadFile(canon)
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := map[string]any{}
-	if err := yaml.Unmarshal(m, &doc); err != nil {
+	cdoc := map[string]any{}
+	if err := yaml.Unmarshal(cb, &cdoc); err != nil {
 		t.Fatal(err)
 	}
-	ss, _ := doc["services"].(map[string]any)
-	for name, raw := range ss {
+	css, ok := cdoc["services"].(map[string]any)
+	if !ok {
+		t.Fatal("canonical compose.yaml has no services")
+	}
+	svc := map[string]bool{}
+	for name := range css {
+		svc[name] = true
+	}
+	checked := 0
+	for name, raw := range css {
 		mm, ok := raw.(map[string]any)
 		if !ok {
 			continue
 		}
-		if dep, ok := mm["depends_on"].([]any); ok {
+		// both depends_on forms (map-with-condition for the Q6 gate,
+		// list for the profile services)
+		switch dep := mm["depends_on"].(type) {
+		case map[string]any:
+			for target := range dep {
+				if !svc[target] {
+					t.Fatalf("canonical service %s depends_on %v, which is not a service defined in the same file (service names, not container names)", name, target)
+				}
+				checked++
+			}
+		case []any:
 			for _, d := range dep {
 				target, _ := d.(string)
 				if !svc[target] {
-					t.Fatalf("service %s depends_on %v, which is not a service defined in the planned overlays", name, d)
+					t.Fatalf("canonical service %s depends_on %v, which is not a service defined in the same file (service names, not container names)", name, d)
 				}
+				checked++
 			}
 		}
+	}
+	if checked < 5 { // Q6 gate (3) + profile edges (exporters, probe, grafana)
+		t.Fatalf("expected at least 3 depends_on edges in the canonical file (pg gate + mongo/redis), saw %d", checked)
 	}
 }

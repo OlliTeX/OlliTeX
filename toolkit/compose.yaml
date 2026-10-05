@@ -4,6 +4,9 @@
 #                   truth). Self-signed SSL: on first start it auto-generates
 #                   a 10-year CA + server cert under ${PREFIX}/data/ssl (Q5),
 #                   then enables SSL. Password = ${PG_PASSWORD} (Q2).
+#   overleafmongo   the stack Mongo (no host port on this box — the legacy cep
+#                   stack owns 127.0.0.1:27017).
+#   overleafredis   the stack Redis (same: legacy owns 127.0.0.1:6379).
 #   ollitex-toolkit the SSH TUI plane (2222). Publickey auth, keys over
 #                   passwords (Q4): an ed25519 pair is generated under
 #                   ${PREFIX}/ssh when no public key is there yet. Connects to
@@ -11,18 +14,29 @@
 #                   (sslmode=require&sslrootcert). Starts ONLY after
 #                   ollitex-pg is healthy (Q6).
 #
+#   PROFILE "monitoring" (owner: "grafana + prometheus belong to the toolkit
+#   stack" 2026-10-06) — optional, off by default; the toolkit starts them
+#   from the config key MONITORING_ENABLED (one store: the PG config store;
+#   visible in the TUI Settings → stack). Manual: docker compose --profile
+#   monitoring up -d. Services: prometheus, grafana, mongodb-exporter,
+#   redis-exporter, mongo-probe (real client liveness), node-exporter.
+#
 # Run:        cp env.example .env && vi .env && docker compose up -d
 # SSH (TUI):  ssh -p 2222 -i ${PREFIX}/ssh/id_ed25519 ollitex@<host>
 #
-# .env provides: PREFIX, PG_PASSWORD, PG_PORT (see env.example — the workspace
-# blocks dotted env files, hence the non-dotted template name).
+# .env provides: PREFIX, PG_PASSWORD, PG_PORT + the image pins (see
+# env.example — the workspace blocks dotted env files, hence the non-dotted
+# template name).
 
 name: ollitex-toolkit
 
 services:
   # ------------------------------------------------------------------- postgres
   ollitex-pg:
-    image: postgres:16
+    # Owner-pinned 2026-10-06: postgres:18 (the earlier postgres:16 line was
+    # the stale pin the owner flagged; the registry + lib/images.env agree on
+    # postgres:18-alpine).
+    image: ${POSTGRES_IMAGE:-postgres:18-alpine}
     container_name: ollitex-pg
     restart: unless-stopped
     environment:
@@ -67,7 +81,14 @@ services:
       # Owner directive 2026-10-06: PG data + backup live under ${PREFIX} on
       # the host (the single-folder contract), not in a Docker-managed
       # volume — visible, backed up, and migratable without docker plumbing.
-      - ${PREFIX}/data/pgdata:/var/lib/postgresql/data
+      # PG data under ${PREFIX} (owner directive). 2026-10-06: the legacy
+      # 16 debug cluster was WIPTED (owner: debug data only) and the stack
+      # runs the canonical pin, postgres:18-alpine. 18 contract: ONE mount
+      # at the PG root (docker-library/postgres#37); the cluster lives at
+      #   pgdata/18/docker  (== the image's PGDATA=/var/lib/postgresql/18/docker)
+      # The 18 image ships NO child dirs under the root (verified), so the
+      # host's 2026-10-06 masking quirk (16-image `data` child) cannot apply.
+      - ${PREFIX}/data/pgdata:/var/lib/postgresql
       - ${PREFIX}/data/pgdata-backup:/backup
       # rw on purpose: the wrapper generates certs / fixes ownership in the
       # shared dir (cert/key CONTENTS are stable afterwards).
@@ -79,7 +100,7 @@ services:
       retries: 24
       start_period: 20s
     ports:
-      - "${PG_PORT:-15432}:5432"
+      - "${PG_PORT_HOST:-5432}:5432"   # NORMAL default; PG_PORT_HOST for dev
 
   # ------------------------------------------------------------------ mongodb
   # Service name = the hostname the web stack already uses (overleafmongo),
@@ -87,7 +108,8 @@ services:
   # network change alone. Container NAME stays distinct (ollitex-mongo) so
   # it never collides with the legacy cep container on this box.
   overleafmongo:
-    image: mongo:9.0
+    # Owner-pinned 2026-10-06: mongo:9.0 (env-overridable).
+    image: ${MONGO_IMAGE:-mongo:9.0}
     container_name: ollitex-mongo
     restart: unless-stopped
     environment:
@@ -103,13 +125,15 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
-    # No host port: 127.0.0.1:27017 is already published by the legacy cep
-    # Mongo on this box. Add "27017:27017" on a machine where this stack is
-    # the only one.
+    # Host binding is env-configurable (owner 2026-10-06): NORMAL default
+    # 27017; override MONGO_PORT_HOST in .env for dev / conflict boxes.
+    ports:
+      - "${MONGO_PORT_HOST:-27017}:27017"
 
   # --------------------------------------------------------------------- redis
   overleafredis:
-    image: redis:8.10-alpine3.23
+    # Owner-pinned 2026-10-06: redis:8.10-alpine3.23 (env-overridable).
+    image: ${REDIS_IMAGE:-redis:8.10-alpine3.23}
     container_name: ollitex-redis
     restart: unless-stopped
     command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
@@ -121,8 +145,10 @@ services:
       timeout: 5s
       retries: 12
       start_period: 10s
-    # No host port: 127.0.0.1:6379 is already published by the legacy cep
-    # Redis on this box. Add "6379:6379" on a standalone machine.
+    # Host binding env-configurable (owner 2026-10-06): NORMAL default 6379;
+    # override REDIS_PORT_HOST in .env for dev / conflict boxes.
+    ports:
+      - "${REDIS_PORT_HOST:-6379}:6379"
 
   # ------------------------------------------------------------------- toolkit
   ollitex-toolkit:
@@ -130,10 +156,10 @@ services:
     container_name: ollitex-toolkit
     restart: unless-stopped
     depends_on:
-      # Q6: hard gate — the toolkit only starts once ollitex-pg is healthy.
+      # Q6 three-way gate (restored — the owner rule: depends_on is ALWAYS
+      # condition: service_healthy):
       ollitex-pg:
         condition: service_healthy
-      # the TUI surfaces stack status for mongo/redis too — wait for them
       overleafmongo:
         condition: service_healthy
       overleafredis:
@@ -142,6 +168,14 @@ services:
       # Q2 + Q5: one shared password (${PG_PASSWORD} from .env) and the
       # self-signed CA pinned for the TLS connection.
       CONFIG_DB_DSN: postgres://overleaf:${PG_PASSWORD}@ollitex-pg:5432/overleaf?sslmode=require&sslrootcert=/etc/ollitex-ssl/ca.crt
+      # env passthrough so the in-container runner (TUI stack ops) can
+      # interpolate the canonical compose (owner 2026-10-06): the process
+      # env is the plan context — no secrets added (PG_PASSWORD is already
+      # the shared stack credential, resolved from .env at compose time).
+      PREFIX: ${PREFIX:-/data_1/test_x/opt/ollitex}
+      PG_PASSWORD: ${PG_PASSWORD}
+      SSH_PORT: ${SSH_PORT:-2222}
+      MONITORING_DATA_PATH: ${MONITORING_DATA_PATH:-${PREFIX:-/data_1/test_x/opt/ollitex}/data/monitoring}
       # Q4: key auth — authorized_keys from the mounted ${PREFIX}/ssh. The
       # image's entrypoint generates the pair there on first start when the
       # dir is empty (keys over passwords; the gate is fail-closed).
@@ -157,4 +191,376 @@ services:
       - ${PREFIX}/data/ssl:/etc/ollitex-ssl:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
-      - "2222:2222"
+      - "${SSH_PORT:-2222}:2222"
+    healthcheck:
+      # the SSH/TUI listener (port 2222) is the service: TCP-connectable =
+      # serving. The image is alpine with busybox nc (verified 2026-10-06).
+      test: ["CMD", "nc", "-z", "127.0.0.1", "2222"]
+      start_period: 20s
+      interval: 30s
+      timeout: 5s
+      retries: 6
+
+  # ====================================================================
+  #  MONITORING — owner: "grafana + prometheus are part of the toolkit
+  #  stack" (2026-10-06). One mechanism (owner D 2026-10-06): the
+  #  ENABLE_MONITORING flag carries restart policy AND the admin's
+  #  start/no-start decision ("no" for a temporary run; "unless-stopped"/
+  #  "always" to run). ACTIVE BY DEFAULT (owner D). The legacy cep
+  #  monitoring-* containers (owners of 9090/3180) are RETIRED — one
+  #  monitoring plane, these service/container names (ollitex-*).
+  #  Every container carries a healthcheck (policy C); depends_on is
+  #  service_healthy gated; all state under ${PREFIX}/data/monitoring
+  #  (policy B); owner-pinned images.
+
+  ollitex-prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.53.5}
+    container_name: ollitex-prometheus
+    restart: ${ENABLE_MONITORING:-unless-stopped}   # Option no / unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "sed -e 's/__OVERLEAF_HOST__/${OVERLEAF_HOST:-overleafserver}/g' -e 's/__GITBRIDGE_HOST__/${GITBRIDGE_HOST:-git-bridge}/g' /etc/prometheus/prometheus.yml > /tmp/prometheus-live.yml && exec /bin/prometheus --config.file=/tmp/prometheus-live.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d --web.enable-lifecycle"
+    environment:
+      OVERLEAF_HOST: ${OVERLEAF_HOST:-overleafserver}
+      GITBRIDGE_HOST: ${GITBRIDGE_HOST:-git-bridge}
+    volumes:
+      - ${MONITORING_DATA_PATH:-${PREFIX}/data/monitoring}:/etc/prometheus:ro
+      - ${MONITORING_DATA_PATH:-${PREFIX}/data/monitoring}/prometheus-data:/prometheus
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/-/healthy"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+
+  ollitex-mongodb-exporter:
+    image: ${MONGODB_EXPORTER_IMAGE:-percona/mongodb_exporter:0.43.0}
+    container_name: ollitex-mongodb-exporter
+    restart: ${ENABLE_MONITORING:-unless-stopped}   # Option no / unless-stopped
+    # scratch image: single binary at /mongodb_exporter, no shell —
+    # healthcheck = binary startability; DB liveness = ollitex-mongo-probe.
+    command:
+      - "--mongodb.uri=mongodb://${MONITORING_MONGO_HOST:-overleafmongo}:${MONITORING_MONGO_PORT:-27017}/sharelatex?directConnection=true"
+    environment:
+      MONITORING_MONGO_HOST: ${MONITORING_MONGO_HOST:-overleafmongo}
+      MONITORING_MONGO_PORT: ${MONITORING_MONGO_PORT:-27017}
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${MONGODB_EXPORTER_PORT:-9216}:9216"
+    healthcheck:
+      # in-image self-check: the exporter binary still runs (proven: the
+      # healthy legacy plane runs this exact test; no shell needed)
+      test: ["CMD", "/mongodb_exporter", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    depends_on:
+      overleafmongo:
+        condition: service_healthy
+
+  ollitex-redis-exporter:
+    image: ${REDIS_EXPORTER_IMAGE:-oliver006/redis_exporter:v1.58.0-alpine}
+    container_name: ollitex-redis-exporter
+    restart: ${ENABLE_MONITORING:-unless-stopped}   # Option no / unless-stopped
+    environment:
+      REDIS_ADDR: "redis://${MONITORING_REDIS_HOST:-overleafredis}:${MONITORING_REDIS_PORT:-6379}"
+      MONITORING_REDIS_HOST: ${MONITORING_REDIS_HOST:-overleafredis}
+      MONITORING_REDIS_PORT: ${MONITORING_REDIS_PORT:-6379}
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${REDIS_EXPORTER_PORT:-9121}:9121"
+    healthcheck:
+      # alpine edition has no wget/nc applets — liveness = the exporter
+      # binary itself still runs (verified: image entrypoint /redis_exporter)
+      test: ["CMD", "/redis_exporter", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    depends_on:
+      overleafredis:
+        condition: service_healthy
+
+  ollitex-mongo-probe:
+    # the owner-pinned mongo image — its mongosh is the canonical client for
+    # a real protocol-level liveness check of the stack Mongo.
+    image: ${MONGO_IMAGE:-mongo:9.0}
+    container_name: ollitex-mongo-probe
+    restart: ${ENABLE_MONITORING:-unless-stopped}   # Option no / unless-stopped
+    command: ["sh", "-c", "sleep 3600"]
+    environment:
+      MONITORING_MONGO_HOST: ${MONITORING_MONGO_HOST:-overleafmongo}
+      MONITORING_MONGO_PORT: ${MONITORING_MONGO_PORT:-27017}
+    healthcheck:
+      # the probe IS the mongo reachability test: healthy == mongo (the
+      # thing it exists to probe) answers on TCP. busybox nc applet verified.
+      test: ["CMD-SHELL", "busybox nc -z -w3 ${MONITORING_MONGO_HOST:-overleafmongo} ${MONITORING_MONGO_PORT:-27017} || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      overleafmongo:
+        condition: service_healthy
+
+  ollitex-mongodb-exporter-probe:
+    # OWNER sidecar request (2026-10-06): the exporter image has no shell —
+    # its HTTP SERVING proof lives here (busybox spider), same proven
+    # pattern as ollitex-wakapi-probe. healthy == /metrics answers.
+    image: ${PROBE_IMAGE:-busybox:1.36}
+    container_name: ollitex-mongodb-exporter-probe
+    restart: ${ENABLE_MONITORING:-unless-stopped}   # Option no / unless-stopped
+    depends_on:
+      ollitex-mongodb-exporter:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider --timeout=5 http://ollitex-mongodb-exporter:9216/metrics >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    entrypoint: ["sh", "-c", "sleep infinity"]
+
+  ollitex-redis-exporter-probe:
+    # same sidecar contract for the redis exporter (busybox spider on its
+    # in-container /metrics port 9121; the alpine exporter has no gotter)
+    image: ${PROBE_IMAGE:-busybox:1.36}
+    container_name: ollitex-redis-exporter-probe
+    restart: ${ENABLE_MONITORING:-unless-stopped}   # Option no / unless-stopped
+    depends_on:
+      ollitex-redis-exporter:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider --timeout=5 http://ollitex-redis-exporter:9121/metrics >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    entrypoint: ["sh", "-c", "sleep infinity"]
+
+  ollitex-node-exporter:
+    image: ${NODE_EXPORTER_IMAGE:-prom/node-exporter:v1.9.1}
+    container_name: ollitex-node-exporter
+    restart: ${ENABLE_MONITORING:-unless-stopped}   # Option no / unless-stopped
+    command: ["--path.procfs=/host/proc", "--path.rootfs=/host", "--path.sysfs=/host/sys"]
+    ports:
+      - "${NODE_EXPORTER_PORT:-9100}:9100"   # NORMAL default; env override for dev
+    volumes:
+      - /:/host:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9100/metrics"]
+      start_period: 15s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+
+  ollitex-grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana-oss:11.6.0}
+    container_name: ollitex-grafana
+    restart: ${ENABLE_MONITORING:-unless-stopped}   # Option no / unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-ollitex}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_USERS_SIGNUP_ENABLED: "false"
+      GF_SERVER_ROOT_URL: "http://${OVERLEAF_LISTEN_IP:-127.0.0.1}:${GRAFANA_PORT:-3000}/"
+      # Hub kiosk opt-in (server-ce/grafana README: explicit owner opt-in,
+      # NOT a default): anonymous Viewer role for kiosk embeds + which origin
+      # may iframe Grafana. Both default to the safe state (off / self-only).
+      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_ANONYMOUS_ORG_NAME: Main Org.
+      GF_SECURITY_CSP_FRAME_ANCESTORS: ${GRAFANA_CSP_FRAME_ANCESTORS:-self}
+    volumes:
+      - ${MONITORING_DATA_PATH:-${PREFIX}/data/monitoring}/grafana-provisioning:/etc/grafana/provisioning
+      - ${MONITORING_DATA_PATH:-${PREFIX}/data/monitoring}/grafana-dashboards:/var/lib/grafana/dashboards
+      - ${MONITORING_DATA_PATH:-${PREFIX}/data/monitoring}/grafana-data:/var/lib/grafana
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"
+    healthcheck:
+      # proven: the healthy legacy grafana runs this exact test and the
+      # grafana-oss image ships the gotter (verified 2026-10-06)
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    depends_on:
+      ollitex-prometheus:
+        condition: service_healthy
+
+  # ====================================================================
+  #  SEAWEEDFS (profile "seaweedfs", owner 2026-10-06: the four S3
+  #  services are part of the toolkit stack). The canonical file carries
+  #  them (supersedes lib/docker-compose.seaweedfs.yml for this stack).
+  #  Container NAMES are kept from the legacy layout on purpose: the web
+  #  plane's S3 endpoint (http://seaweedfs-s3:8333) + the Go filestore/
+  #  docstore env reference those names — one storage plane.
+  #  Activation: SEAWEEDFS_ENABLED in the config store (TUI Settings →
+  #  stack). Restart policy: ENABLE_SEAWEEDFS (owner env flag 2026-10-06).
+  #  NOTE (this box): the legacy cep seaweedfs-* containers still hold
+  #  host ports 9333/18080/8333 — retire them before flipping the flag on.
+  # ====================================================================
+
+  seaweedfs-master:
+    image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:latest}   # same tag as the running legacy plane (pin a digest on the next upgrade)
+    container_name: seaweedfs-master
+    hostname: seaweedfs-master
+    restart: ${ENABLE_SEAWEEDFS:-unless-stopped}   # Option no / unless-stopped
+    command: "master -ip=seaweedfs-master -ip.bind=0.0.0.0 -metricsPort=9327"
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_MASTER_PORT:-9333}:9333"     # master HTTP
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_MASTER_GRPC_PORT:-19333}:19333"   # master gRPC
+    volumes:
+      - ${PREFIX}/data/seaweedfs/master:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:9333/status >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  seaweedfs-volume:
+    image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:latest}
+    container_name: seaweedfs-volume
+    hostname: seaweedfs-volume
+    restart: ${ENABLE_SEAWEEDFS:-unless-stopped}
+    command: "volume -url=http://seaweedfs-master:9333"
+    healthcheck:
+      # image ships a real HTTP client (verified CLIENT-OK); volume exposes
+      # its metrics HTTP server on 10027 (default -metricsPort)
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 -o /dev/null http://localhost:10027/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      seaweedfs-master:
+        condition: service_healthy
+
+  seaweedfs-filer:
+    image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:latest}
+    container_name: seaweedfs-filer
+    hostname: seaweedfs-filer
+    restart: ${ENABLE_SEAWEEDFS:-unless-stopped}
+    command: "filer -master=seaweedfs-master:9333"
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_FILER_PORT:-8333}:8333"
+    healthcheck:
+      # filer serves /status on its HTTP port (master's /status pattern
+      # proven healthy on the legacy plane)
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:8333/status >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      seaweedfs-master:
+        condition: service_healthy
+
+  seaweedfs-s3:
+    image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:latest}
+    container_name: seaweedfs-s3
+    hostname: seaweedfs-s3
+    restart: ${ENABLE_SEAWEEDFS:-unless-stopped}
+    command: "s3 -port=8888 -ip.bind=0.0.0.0 -filer=seaweedfs-filer:8333"
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_S3_PORT:-8888}:8888"
+    healthcheck:
+      # s3 server serves /status on its bound port
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:8888/status >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      seaweedfs-filer:
+        condition: service_healthy
+
+  # ====================================================================
+  #  WAKA API (profile "wakapi", owner 2026-10-06). Supersedes the legacy
+  #  standalone "wakapi" container (same image/config family; sqlite state
+  #  moves to ${PREFIX}/data/wakapi per policy B).
+  #  Activation: WAKA_API_ENABLED in the config store. Restart policy:
+  #  ENABLE_WAKA_API (owner env flag 2026-10-06).
+  #  NOTE (this box): 127.0.0.1:3000 is held by the forgejo-test box —
+  #  set WAKA_API_PORT (e.g. 3001) in .env when enabling here.
+  # ====================================================================
+
+  ollitex-wakapi:
+    image: ${WAKA_API_IMAGE:-ghcr.io/muety/wakapi:latest}   # same family as the running legacy wakapi (pin on the next upgrade)
+    container_name: ollitex-wakapi
+    restart: ${ENABLE_WAKA_API:-unless-stopped}   # Option no / unless-stopped
+    # OWNER 2026-10-06 (C): wakapi uses the ONE Postgres store — never
+    # sqlite (the mandatory ollitex-pg is the database; "wakapi" database
+    # created idempotently there). No local data dir anymore: all state is
+    # in Postgres (backups = the pg backup plane).
+    ports:
+      - "${WAKA_API_PORT:-3000}:3000"   # HOST side env-configurable (dev boxes: 3001); container stays 3000
+    environment:
+      WAKAPI_DB_TYPE: postgres
+      WAKAPI_DB_HOST: ollitex-pg
+      WAKAPI_DB_PORT: "5432"
+      WAKAPI_DB_USER: overleaf
+      WAKAPI_DB_PASSWORD: "${PG_PASSWORD:?PG_PASSWORD required (toolkit/.env)}"
+      WAKAPI_DB_NAME: wakapi
+    healthcheck:
+      # image has no shell/wget/ls (scratch family): liveness = the binary
+      # runs; HTTP serving is proven by ollitex-wakapi-probe.
+      test: ["CMD", "/app/wakapi", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      ollitex-pg:
+        condition: service_healthy
+
+  ollitex-wakapi-probe:
+    # HTTP liveness for the shell-less wakapi (same pattern as
+    # ollitex-mongo-probe): a busybox spider against the API port.
+    # healthy == wakapi is actually serving on 3000.
+    image: ${PROBE_IMAGE:-busybox:1.36}
+    container_name: ollitex-wakapi-probe
+    restart: ${ENABLE_WAKA_API:-unless-stopped}
+    depends_on:
+      ollitex-wakapi:
+        condition: service_healthy
+    # CMD form (busybox has a shell; keep it one process)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://ollitex-wakapi:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    entrypoint: ["sh", "-c", "sleep infinity"]
+
+  # ====================================================================
+  #  LANGUAGE TOOL (profile "languagetool", owner 2026-10-06). Canonical
+  #  carrier for the grammar-checker (supersedes the lib overlay for this
+  #  stack). Container name "languagetool" is kept — the web plane's
+  #  LANGUAGETOOL_URL references that host name.
+  #  Activation: LANGUAGE_TOOL_ENABLED in the config store. Restart policy:
+  #  ENABLE_LANGUAGE_TOOL (owner env flag 2026-10-06).
+  # ====================================================================
+
+  languagetool:
+    image: ${LANGUAGE_TOOL_IMAGE:-erikvl87/languagetool:latest}   # legacy pin (pin a tag on the next upgrade)
+    container_name: languagetool
+    hostname: languagetool
+    restart: ${ENABLE_LANGUAGE_TOOL:-unless-stopped}   # Option no / unless-stopped
+    environment:
+      Java_Xms: 512m
+      Java_Xmx: 2g
+      langtool_languageModel: /ngrams
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${LANGUAGE_TOOL_PORT:-8010}:8010"
+    volumes:
+      - ${PREFIX}/data/languagetool/ngrams:/ngrams:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider --timeout=5 http://localhost:8010/v2/languages 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

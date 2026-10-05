@@ -226,6 +226,7 @@
     "NGINX_HTTP_PORT": 80, // nginx HTTP (pre-TLS) port
     "TLS_PORT": 443, // Published TLS port when the proxy is enabled
     "LANGUAGE_TOOL_ENABLED": false, // Start the LanguageTool grammar-checking container
+    "WAKA_API_ENABLED": false, // Start the Waka API (wakapi) service (profile "wakapi")
     "LANGUAGE_TOOL_DATA_PATH": "data/languagetool", // Host folder for LanguageTool data/n-grams
     "LANGUAGE_TOOL_NGRAM_LANGUAGES": "en,de,es,fr", // Comma-separated n-gram languages
     "MONITORING_ENABLED": false, // Start the Prometheus + Grafana + exporters observability stack (D22 ecosystem)

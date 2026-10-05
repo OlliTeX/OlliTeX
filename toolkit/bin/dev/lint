@@ -1,3 +1,0 @@
-#! /usr/bin/env bash
-
-exec find ./bin -type f -not -name '*.swp' -print0 | xargs -0 shellcheck

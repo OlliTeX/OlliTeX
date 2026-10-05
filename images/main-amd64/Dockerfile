@@ -43,7 +43,7 @@ WORKDIR /overleaf
 # and the Go clsitypst conversion is live; the junk/services-web webpack
 # build chain was CONSOLIDATED into frontend/ — owner directive 2026-10-05:
 # NO junk/ content in the image.)
-COPY --parents libraries/*/package.json .yarn/patches/ tools/migrations/ package.json frontend/package.json yarn.lock .yarnrc.yml .pnp.register.mjs /overleaf/
+COPY --parents libraries/*/package.json .yarn/patches/ package.json frontend/package.json yarn.lock .yarnrc.yml .pnp.register.mjs /overleaf/
 COPY images/main-amd64/genScript.js images/main-amd64/services.js /overleaf/
 
 # Pre-install yarn via corepack so it is available at runtime for all users
@@ -71,7 +71,7 @@ RUN --mount=type=cache,target=/root/.cache \
 # (2026-10-05: services/ retired — the Go clsitypst service replaced the
 # Node clsi_typst; junk/ is NO LONGER copied into the image — the webpack
 # build chain now lives in frontend/.)
-COPY --parents libraries/ tools/migrations/ docs/RELEASE_NOTES.md frontend/ locales/ public/ /overleaf/
+COPY --parents libraries/ docs/RELEASE_NOTES.md frontend/ locales/ public/ /overleaf/
 
 # Pre-stage the PnP cache zips for the three git-sourced codemirror dev deps
 # (byte-identical to the zips shipped in the official 6.3.0 image; checksums

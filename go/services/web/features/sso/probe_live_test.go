@@ -29,19 +29,19 @@ func httpGetBytes(t *testing.T, url string) []byte {
 	return b
 }
 
-// TestSsoProbeLive verifies the REAL IdPs (tools/sso-test) end-to-end: it
+// TestSsoProbeLive verifies the REAL IdPs (tests/tools/sso-test) end-to-end: it
 // parses the SAML IdP's live metadata (entityID/SSO/SLO/cert) and resolves an
 // OIDC IdP's live discovery doc — the same logic the /admin/sso/test probe
 // uses. Skipped unless LIVE_SSO_PROBE=1 is set (needs the sso-test IdPs up).
 func TestSsoProbeLive(t *testing.T) {
 	if os.Getenv("LIVE_SSO_PROBE") == "" {
-		t.Skip("set LIVE_SSO_PROBE=1 to run the live SSO probe E2E (needs tools/sso-test IdPs up)")
+		t.Skip("set LIVE_SSO_PROBE=1 to run the live SSO probe E2E (needs tests/tools/sso-test IdPs up)")
 	}
 	ctx := context.Background()
 
 	samlURL := os.Getenv("LIVE_SAML_META_URL")
 	if samlURL == "" {
-		// Default = tools/sso-test boxyhq/mock-saml IdP metadata (or point LIVE_SAML_META_URL elsewhere).
+		// Default = tests/tools/sso-test boxyhq/mock-saml IdP metadata (or point LIVE_SAML_META_URL elsewhere).
 		samlURL = "http://127.0.0.1:4100/api/saml/metadata"
 	}
 	t.Run("SAML metadata parse (live IdP)", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestSsoProbeLive(t *testing.T) {
 
 	issuer := os.Getenv("LIVE_OIDC_ISSUER")
 	if issuer == "" {
-		// Default = tools/sso-test soluto oidc-server-mock (root issuer, no realm path).
+		// Default = tests/tools/sso-test soluto oidc-server-mock (root issuer, no realm path).
 		issuer = "http://127.0.0.1:8080"
 	}
 	t.Run("OIDC discovery (live IdP)", func(t *testing.T) {

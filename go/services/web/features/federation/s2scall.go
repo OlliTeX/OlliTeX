@@ -98,6 +98,13 @@ func (c *S2SCall) Call(ctx context.Context, peerOrigin, action string, payload m
 	// signed by the federation key, aud = the peer's S2S endpoint, the
 	// LOCKED {action, from, to, ts, payload} body).
 	kp := &KeyProvider{Store: c.Store, Site: c.Site}
+	// keystore self-heal (Node `ensureBootstrapped` at boot, 07 §2): a
+	// fresh instance has no signing key yet — a signing failure here
+	// would be an opaque `wire-keystore` refusal on EVERY preview;
+	// bootstrap is idempotent (skip per purpose when an active key exists).
+	if berr := kp.Bootstrap(); berr != nil {
+		return nil, &PeerRefusal{Code: "wire-keystore", Detail: "bootstrap: " + berr.Error()}
+	}
 	built, err := kp.BuildS2sRequest(peerOrigin, action, payload)
 	if err != nil {
 		return nil, &PeerRefusal{Code: "wire-keystore", Detail: err.Error()}

@@ -124,7 +124,7 @@ func invitePreviewHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		if a != nil && a.Cfg != nil && site == "" {
 			site = a.Cfg.SiteURL
 		}
-		caller := &S2SCall{Store: store, Site: site}
+		caller := &S2SCall{Store: store, Site: site, S2SUROverride: s2sPeerURLOverride()}
 
 		status, body := previewFlow(&previewDeps{
 			Store: store,

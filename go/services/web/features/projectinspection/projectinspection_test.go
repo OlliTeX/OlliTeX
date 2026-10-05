@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"ollitex/go/services/web/core"
 
@@ -30,7 +31,7 @@ func hexOID(t *testing.T, h string) bson.ObjectID {
 	return o
 }
 
-func newTestSvc(t *testing.T, 
+func newTestSvc(t *testing.T,
 	docLines []string,
 	bibErr error,
 	bibBody []byte,
@@ -296,11 +297,11 @@ func TestRouteTable(t *testing.T) {
 		t.Fatalf("route = %+v", r)
 	}
 	for path, want := range map[string]bool{
-		"/project/" + testPID + "/project-inspection/analyze":     true,
-		"/project/" + testPID + "/PROJECT-INSPECTION/ANALYZE":     true, // (?i:)
-		"/project/" + testPID + "/project-inspection/analyze/":    true, // /?
+		"/project/" + testPID + "/project-inspection/analyze":       true,
+		"/project/" + testPID + "/PROJECT-INSPECTION/ANALYZE":       true, // (?i:)
+		"/project/" + testPID + "/project-inspection/analyze/":      true, // /?
 		"/project/" + testPID + "/project-inspection/analyze/extra": false,
-		"/project/bad-id/project-inspection/analyze":              false,
+		"/project/bad-id/project-inspection/analyze":                false,
 	} {
 		if got := r.Pattern.String() != "" && analyzePat.MatchString(path); got != want {
 			t.Errorf("%q: match=%v want %v", path, got, want)
@@ -321,6 +322,59 @@ func TestConfigDefaults(t *testing.T) {
 	}
 }
 
+// TestPiWorkerPathPrecedence — the worker bundle is the analyze endpoint's
+// ONLY dependency (the de-shipping wave removed it from the image once;
+// the endpoint then died on every request). Pin the resolution contract:
+// env override wins; otherwise the current-image path (frontend/ hosts the
+// module) is the fallback so a fresh bake always resolves.
+func TestPiWorkerPathPrecedence(t *testing.T) {
+	t.Setenv("PROJECT_INSPECTION_WORKER", "/custom/work.cjs")
+	if got := piWorkerPath(); got != "/custom/work.cjs" {
+		t.Fatalf("env override ignored: %q", got)
+	}
+	os.Unsetenv("PROJECT_INSPECTION_WORKER")
+	got := piWorkerPath()
+	for _, p := range []string{
+		"/overleaf/custom",
+		"/overleaf/junk/services-web",
+	} {
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			t.Fatalf("unexpected worker present in the test env: %q", p)
+		}
+	}
+	want := "/overleaf/frontend/modules/project-inspection/dist/analyze-worker.cjs"
+	if got != want {
+		t.Fatalf("fallback = %q; want the current-image path %q (a bake without the bundle MUST resolve to the spot the image actually ships it)", got, want)
+	}
+}
+
+// TestWorkerStderrSurfaces — a worker that fails with a stderr message must
+// put that message into the returned error (the live 500 "Project
+// inspection failed" with zero diagnostics was the discarded-stderr
+// regression; a silent failure is no longer silently passed on).
+func TestWorkerStderrSurfaces(t *testing.T) {
+	d := t.TempDir()
+	fake := d + "/fakenode"
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\necho 'lezer: panic in parse loop (test signal XYZ123)' >&2\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	a := &core.App{}
+	s := newSvc(a)
+	s.cfg.NodeBin = fake
+	s.cfg.Worker = d + "/worker.cjs"
+	s.cfg.Timeout = 10 * time.Second
+	out, werr := s.runWorkerDefault(context.Background(), []byte(`{}`))
+	if out != nil || werr == nil {
+		t.Fatalf("out=%v err=%v — want an error", out, werr)
+	}
+	if !strings.Contains(werr.Error(), "XYZ123") {
+		t.Fatalf("stderr not surfaced in the error: %v", werr)
+	}
+	if !strings.Contains(werr.Error(), "worker exited") {
+		t.Fatalf("error should name the worker failure: %v", werr)
+	}
+}
+
 // TestAnalyzeRealWorker — end-to-end against the ACTUAL bundled worker
 // (default seam = spawn `node dist/analyze-worker.cjs`). Integration test:
 // proves the Go reader → worker exec → envelope pipeline with the real JS
@@ -328,7 +382,9 @@ func TestConfigDefaults(t *testing.T) {
 func TestAnalyzeRealWorker(t *testing.T) {
 	worker := os.Getenv("PROJECT_TEST_WORKER")
 	if worker == "" {
-		worker = "../../../../../services/web/modules/project-inspection/dist/analyze-worker.cjs"
+		// the bundle ships with the UI module (frontend/ hosts the module;
+		// the image COPYs it under /overleaf/frontend/...).
+		worker = "../../../../../frontend/modules/project-inspection/dist/analyze-worker.cjs"
 	}
 	if _, err := os.Stat(worker); err != nil {
 		t.Skipf("bundle not built (run the module vitest or the webpack worker build): %v", err)

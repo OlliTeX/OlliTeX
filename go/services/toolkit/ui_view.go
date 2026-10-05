@@ -107,19 +107,17 @@ func (a *app) viewClassic() string {
 	// line 2: the menu bar (the menubar library renders it + dropdowns)
 	out.WriteString(a.menuBarLine() + "\n")
 
-	// the panes (left = master list, right = the screen detail)
-	// PANE DISCIPLINE (owner feedback: the full-height padded panes read as
-	// one broken box on tall terminals): the master pane hugs its content
-	// (the SCREENS list — a compact column, the mc left panel) and the
-	// detail pane is capped (compact console density instead of a 30-row
-	// wall of empty rows when the log is quiet).
-	rawH := a.height - 5
-	detailH := 20 // content rows for the right pane (box = +2 borders)
-	if rawH < detailH {
-		detailH = rawH
-	}
-	if detailH < 4 {
-		detailH = 4
+	// LAYOUT CONTRACT (owner: "will the footer finally stay at the bottom
+	// of the terminal?"): when the terminal is tall enough the frame is
+	// EXACTLY the terminal height — row 1 title, row 2 menu bar, the pane
+	// block filling everything down to the last two rows, and the status
+	// line + keystrip (the footer) ALWAYS on the bottom two rows (the mc /
+	// ncurses convention). Both panes take the same height (two true equal
+	// windows side by side); content taller than the pane is clamped by the
+	// rectangular fit, and the master pane is padded so the boxes match.
+	paneH := a.height - 6 // fixed: title + menu + status + keystrip + box borders
+	if paneH < 4 { // belt+braces: zero/odd sizes must never reach the slice math
+		paneH = 4
 	}
 	var left strings.Builder
 	left.WriteString(stylePaneTitle.Render("  S C R E E N S  "))
@@ -129,18 +127,21 @@ func (a *app) viewClassic() string {
 		row := a.masterRow(i, it)
 		left.WriteString(row + "\n")
 	}
-	body := left.String()
-	filled := strings.Count(body, "\n")
-	if filled < 6 { // a floor for very small master lists (short screens)
-		body += strings.Repeat("\n", 6-filled)
+	body := strings.TrimRight(left.String(), "\n")
+	lbody := strings.Split(body, "\n")
+	if len(lbody) > paneH { // top window: the master list keeps its head
+		lbody = lbody[:paneH]
+		body = strings.Join(lbody, "\n")
+	} else {
+		body += strings.Repeat("\n", paneH-len(lbody)) // fill the pane (classic equal windows)
 	}
 	leftS := stylePanel.Render(body)
 
-	rightBody := a.rightPane()
+	rightBody := fitRect(a.rightPane(), 0, paneH) // tail window: the LIVE tail wins (logs/doctor/settings)
 	rb := rightBody
-	rfilled := strings.Count(rb, "\n")
-	if rfilled < detailH {
-		rb += strings.Repeat("\n", detailH-rfilled)
+	rfilled := len(strings.Split(rb, "\n"))
+	if rfilled < paneH {
+		rb += strings.Repeat("\n", paneH-rfilled)
 	}
 	rightS := stylePanel.Render(rb)
 
@@ -165,7 +166,9 @@ func (a *app) viewClassic() string {
 	// below it — the mc look).
 	out.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftFit, rightFit)+"\n")
 
-	// status line
+	// status line + keystrip form the FOOTER — with paneH = height-6 the
+	// frame is exactly the terminal height, so these rest on the bottom two
+	// rows (the mc / ncurses convention the owner asked for).
 	out.WriteString(a.statusLine() + "\n")
 	// keystorep (the classic bracketed keys, zone-targeted)
 	out.WriteString(a.keyStrip())
@@ -410,13 +413,15 @@ func (a *app) panelLogs() string {
 }
 
 func (a *app) panelSettings() string {
-	keys := a.flatKeys()
+	// settings: two-level (owner: "organize the settings into sub-groups";
+	// the tree = core/boot/services/email/integrations/compilation/limits/
+	// security/test/stack, from the configschema registry).
 	var b strings.Builder
-	b.WriteString(panelHead("settings — configstore (the one true source)"))
 	if a.editKey != "" {
+		b.WriteString(panelHead("settings — edit"))
 		b.WriteString("  " + styleHead.Render(" EDIT ") + " " + a.editKey)
 		if isSecret(a.editKey) {
-			b.WriteString("   " + styleWarn.Render("[secret]") + "   " + styleDim.Render("the value is never re-shown") + "\n")
+			b.WriteString("   " + styleWarn.Render("[secret — the value is never re-shown]") + "\n")
 		}
 		if a.editMask {
 			b.WriteString("  " + styleEdit.Render(" > "+strings.Repeat("•", max2(6, len(a.editVal)))) + styleDim.Render("  (masked)") + "\n")
@@ -429,12 +434,43 @@ func (a *app) panelSettings() string {
 		b.WriteString("  " + styleDim.Render("enter/x save · esc cancel") + "\n")
 		return b.String()
 	}
-	groupSeen := map[string]bool{}
-	for _, e := range keys {
-		if !groupSeen[e.Group] {
-			groupSeen[e.Group] = true
-			b.WriteString("  " + styleHead.Render(" "+strings.ToUpper(e.Group)+" ") + "\n")
+	if len(a.setGroups) == 0 {
+		b.WriteString(panelHead("settings — configstore"))
+		b.WriteString("  " + styleDim.Render("settings registry empty (configstore not reachable?)") + "\n")
+		return b.String()
+	}
+	if a.setLevel == 0 {
+		// LEVEL 0 — the groups (name · key count · how many are set)
+		b.WriteString(panelHead("settings — groups (enter to open)"))
+		for i, g := range a.setGroups {
+			set := 0
+			for _, e := range g.Keys {
+				if e.Present {
+					set++
+				}
+			}
+			cur := "  "
+			if i == a.setCurGroup {
+				cur = "> "
+			}
+			mark := styleDim.Render("○")
+			if set > 0 {
+				mark = styleOK.Render("●")
+			}
+			line := cur + styleValue.Render(fit(g.Name, 16)) + styleDim.Render(fmt.Sprintf("  %2d keys · %d set", len(g.Keys), set)) + "   " + mark
+			b.WriteString(fit(line, 76)+"\n")
 		}
+		b.WriteString("  " + styleDim.Render("enter open · j/k move · tab← list") + "\n")
+		return b.String()
+	}
+	// LEVEL 1 — the keys of the selected group
+	gi := a.setCurGroup
+	if gi >= len(a.setGroups) {
+		gi = 0
+	}
+	g := a.setGroups[gi]
+	b.WriteString(panelHead(fmt.Sprintf("settings — %s   (h: groups)", g.Name)))
+	for idx, e := range g.Keys {
 		var val string
 		mark := styleDim.Render("○")
 		if e.Present {
@@ -450,12 +486,14 @@ func (a *app) panelSettings() string {
 		} else {
 			val = styleDim.Render("(unset)")
 		}
-		b.WriteString("  " + styleValue.Render(fit(e.Key, 40)) + "  " + fit(val, 40) + "  " + mark + "\n")
+		cur := "  "
+		if idx == a.setCurSel {
+			cur = "> "
+		}
+		line := cur + styleValue.Render(fit(e.Key, 38)) + "  " + mark + "  " + fit(fmt.Sprint(val), 32)
+		b.WriteString(fit(line, 76)+"\n")
 	}
-	if len(keys) == 0 {
-		b.WriteString("  " + styleDim.Render("settings registry empty (configstore not reachable?)") + "\n")
-	}
-	b.WriteString("\n  " + styleDim.Render("e/enter edits a key · j/k roams · tab? no tab here — the left list owns the other pane") + "\n")
+	b.WriteString("  " + styleDim.Render("enter edit · j/k move · b groups · tab← list") + "\n")
 	return b.String()
 }
 
@@ -547,3 +585,8 @@ func (a *app) viewShell() string {
 }
 
 // (dialog surface: ui_dialog.go · menus: ui_menu.go)
+
+// gotoScreenOr — test helper: switch screen like the menu dispatch.
+func (a *app) gotoScreenOr(id string) {
+	a.gotoScreen(id)
+}

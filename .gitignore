@@ -10,6 +10,7 @@ node_modules/
 
 # tool caches (eslint/babel/webpack)
 services/web/.cache/
+frontend/.cache/
 
 # yarn PnP cache + runtime artifacts (built locally, never committed — GH 100MB limit)
 .yarn/cache/

@@ -78,29 +78,34 @@ func envInt64(key string, dflt int64) int64 {
 	return dflt
 }
 
-// piWorkerPath honors PROJECT_INSPECTION_WORKER, else the first existing
-// analyzer worker: the P7 image dropped the Node web tier, so the module tree
-// now ships under /overleaf/junk/services-web/... (legacy images under
-// /overleaf/services/web/...). First existing wins per deployment.
+// piWorkerPath honours PROJECT_INSPECTION_WORKER, else the first existing
+// analyzer worker. The bundle (the oracle-pinned tested artifact, AGPL-3.0 —
+// license travels with it) ships at frontend/modules/project-inspection/dist/
+// in the image (the de-shipping wave moved the module tree out of
+// services/ + junk/; the bundle must live in the image next to the UI module,
+// or the analyze endpoint dies on every request — the Go endpoint's ONLY
+// dependency). Legacy image layouts are kept as fallbacks so an older baked
+// image still resolves.
 func piWorkerPath() string {
 	if v := os.Getenv("PROJECT_INSPECTION_WORKER"); v != "" {
 		return v
 	}
 	for _, p := range []string{
-		"/overleaf/junk/services-web/modules/project-inspection/dist/analyze-worker.cjs",
-		"/overleaf/services/web/modules/project-inspection/dist/analyze-worker.cjs",
+		"/overleaf/frontend/modules/project-inspection/dist/analyze-worker.cjs",          // current images (frontend/ hosts the module)
+		"/overleaf/junk/services-web/modules/project-inspection/dist/analyze-worker.cjs", // pre-de-shipping images
+		"/overleaf/services/web/modules/project-inspection/dist/analyze-worker.cjs",      // legacy images
 	} {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
 			return p
 		}
 	}
-	return "/overleaf/services/web/modules/project-inspection/dist/analyze-worker.cjs"
+	return "/overleaf/frontend/modules/project-inspection/dist/analyze-worker.cjs"
 }
 
 func cfgFromEnv() cfg {
 	return cfg{
-		NodeBin:       getenv("PROJECT_INSPECTION_NODE_BIN", "node"),
-		Worker: piWorkerPath(),
+		NodeBin:     getenv("PROJECT_INSPECTION_NODE_BIN", "node"),
+		Worker:      piWorkerPath(),
 		Timeout:     time.Duration(envInt64("PROJECT_INSPECTION_TIMEOUT_MS", 30_000)) * time.Millisecond,
 		MaxSource:   envInt64("PROJECT_INSPECTION_MAX_SOURCE_BYTES", 25<<20),
 		MaxBib:      envInt64("PROJECT_INSPECTION_MAX_BIB_BYTES", 6<<20),

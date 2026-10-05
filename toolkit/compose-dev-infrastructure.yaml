@@ -1,0 +1,218 @@
+# ==================================================================
+#  OlliTeX DEV-INFRASTRUCTURE PLANE (owner H 2026-10-06)
+#
+#  The dev/test identities and tooling the web plane's tests talk to:
+#  forgejo (github-sync/git-bridge target), llm-mock (LLM settings),
+#  mock-saml + openldap + sso-oidc (SSO), sso-mailsink (SMTP catch),
+#  oidc-conform (nginx discovery + the authelia OIDC conformance suite).
+#
+#  Owner H "did I forget any dev test server?": the running inventory
+#  (this box, 2026-10-06) is exactly the list above — plus:
+#   - the OIDC conformance TARGET idp IS the sso-oidc service (reused),
+#   - the e2e app stack keeps tests/e2e/docker-compose.test.yml (separate
+#     plane by design — full app, not identity infra),
+#   - the WebDAV test tool keeps tests/tools/webdav/docker-compose.yml
+#     (an on-demand RFC6854 server fixture, not a standing dev service).
+#
+#  Pins/health = the PROVEN ones of the healthy running dev family
+#  (forgejo-test, ollitex-llm-mock, sso-test-*: all Up + healthy).
+#  Ports: normal defaults in this file; this box has dev overrides in
+#  .env while the legacy containers of the same family still run.
+# ==================================================================
+
+services:
+  forgejo:
+    # the git host for git-bridge / github-sync dev + tests (proven: the
+    # running forgejo-test is this exact image, healthy; dev DB = sqlite
+    # file in a volume, same as its proven legacy layout)
+    image: ${FORGEJO_IMAGE:-codeberg.org/forgejo/forgejo:15}
+    container_name: ollitex-forgejo
+    restart: unless-stopped
+    environment:
+      USER_UID: "1000"
+      USER_GID: "100"
+    volumes:
+      - forgejo-data:/data
+    ports:
+      - "${FORGEJO_PORT:-3000}:3000"   # normal default; this box: busy until legacy retires
+    healthcheck:
+      # the image ships the gotter (the running forgejo-test runs this
+      # exact test and is healthy — verified 2026-10-06)
+      test: ["CMD-SHELL", "wget -q -O /dev/null --spider http://127.0.0.1:3000/ 2>/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  llm-mock:
+    # LLM endpoint mock for settings/dev (proven: ollitex/llm-mock:main,
+    # running healthy; curl exists in-image — the legacy runs /v1/models)
+    image: ${LLM_MOCK_IMAGE:-ollitex/llm-mock:main}
+    container_name: ollitex-llm-mock
+    restart: unless-stopped
+    ports:
+      - "${LLM_MOCK_PORT:-8000}:8000"   # normal default (free on this box)
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/v1/models"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+
+  mock-saml:
+    # SAML IdP mock (boxyhq). The running legacy carries fixture key
+    # material in env — the canonical plane lets the image GENERATE its
+    # fixture keys on first boot (the env keys below are OPTIONAL
+    # overrides for tests that need a STABLE fixture key).
+    image: ${MOCK_SAML_IMAGE:-boxyhq/mock-saml:latest}
+    container_name: ollitex-mock-saml
+    restart: unless-stopped
+    environment:
+      APP_URL: "http://localhost:${SAML_MOCK_PORT:-4000}"
+      ENTITY_ID: "https://saml.example.com/entityid"
+      # stable fixture keys for repeatable tests (optional):
+      # PUBLIC_KEY: "${SAML_MOCK_PUBLIC_KEY:-}"
+      # PRIVATE_KEY: "${SAML_MOCK_PRIVATE_KEY:-}"
+    ports:
+      - "${SAML_MOCK_PORT:-4000}:4000"   # normal default; this box: 4100 while legacy saml runs
+    healthcheck:
+      # node is the image's runtime (proven: the legacy runs this test, healthy)
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4000/api/health',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  openldap:
+    # LDAP IdP (osixia) for LDAP SSO dev/tests (proven: sso-test-ldap-1,
+    # healthy, with this exact bind-test). Dev fixture DN/password
+    # (documented test credentials only — dev plane).
+    image: ${OPENLDAP_IMAGE:-osixia/openldap:1.5.0}
+    container_name: ollitex-openldap
+    restart: unless-stopped
+    environment:
+      LDAP_ORGANISATION: "Example"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "${LDAP_ADMIN_PASSWORD:-admin_password}"   # DEV fixture credential
+      LDAP_READONLY_USER: "false"
+    ports:
+      - "${LDAP_PORT:-389}:389"     # normal defaults; this box: busy until legacy retires
+      - "${LDAP_TLS_PORT:-636}:636"
+    healthcheck:
+      # ldapsearch ships in the osixia image (the legacy runs this bind test, healthy)
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -D cn=admin,dc=example,dc=com -w ${LDAP_ADMIN_PASSWORD:-admin_password} -b dc=example,dc=com -s base >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  sso-oidc:
+    # OIDC idp (local build sso-oidc:latest — the ASP.NET IdServer the
+    # repo's SSO tests target; config is baked into the image at /config).
+    # ALSO the conformance suite's idp target (owner H) — one service.
+    image: ${SSO_OIDC_IMAGE:-sso-oidc:latest}
+    container_name: ollitex-sso-oidc
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: "http://+:80"
+    ports:
+      - "${OIDC_PORT:-8080}:80"   # normal dev default; this box: busy until legacy retires
+    healthcheck:
+      # curl exists in the image (the legacy runs this, healthy)
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  sso-mailsink:
+    # SMTP catch for SSO mail flows (the legacy is SMTP-only: port 25,
+    # nc-applet health — proven healthy).
+    image: ${MAILSINK_IMAGE:-sso-mailsink:latest}
+    container_name: ollitex-mailsink
+    restart: unless-stopped
+    environment:
+      myhostname: mailsink
+    ports:
+      - "${MAILSINK_PORT:-25}:25"   # normal default; this box: busy until legacy retires
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "25"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+
+  oidc-conform-nginx:
+    # discovery/front for the conformance suite (local build
+    # oidc-conform-nginx — the running legacy exposes 8443/8444)
+    image: ${CONFORM_NGINX_IMAGE:-oidc-conform-nginx:latest}
+    container_name: ollitex-conform-nginx
+    restart: unless-stopped
+    command: ["nginx", "-g", "daemon off;"]
+    ports:
+      - "${CONFORM_NGINX_PORT:-8443}:8443"
+      - "${CONFORM_NGINX_ALT_PORT:-8444}:8444"
+    healthcheck:
+      # nginx ships the gotter (alpine busybox — verified pattern)
+      test: ["CMD-SHELL", "wget -q --spider --timeout=3 http://127.0.0.1:8443/ 2>/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+    depends_on:
+      sso-oidc:
+        condition: service_healthy
+
+  oidc-conform-suite:
+    # the authelia OIDC OIDCOP conformance runner (owner H). Long-running
+    # here (the legacy runs Up days) — liveness = its server process is
+    # alive (ps ships in the image — verified).
+    image: ${CONFORM_SUITE_IMAGE:-authelia/openid-connect-conformance-suite:latest}
+    container_name: ollitex-conform-suite
+    # a batch/long-running test harness: keep it out of the restart
+    # churn (manual up for a run)
+    restart: "no"
+    command: ["/server/cmd.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -c '[c]md.sh' | grep -qE '[1-9]' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      sso-oidc:
+        condition: service_healthy
+      oidc-conform-nginx:
+        condition: service_healthy
+
+  webdav-fixture:
+    # RFC6854 test server — the PROVEN fixture (tests/tools/webdav; the
+    # running webdav-test IS this image, healthy): Ubuntu 26.04 apache2
+    # (dav_lock with the DBM lock store the other servers lacked), fixture
+    # identity oltest baked at build time. Server-selection record +
+    # 15/15 client contract in tests/tools/webdav/README.md.
+    image: ${WEBDAV_IMAGE:-webdav-ubuntu2604:fixture}
+    container_name: ollitex-webdav-fixture
+    restart: unless-stopped
+    environment:
+      # documented fixture identity (dev plane; identical to the proven
+      # running webdav-test and the tests/tools/webdav tooling)
+      DAV_USER: oltest
+      DAV_PASS: "Ol-Fixture-Wd7q"
+    ports:
+      - "${WEBDAV_PORT:-8095}:80"   # the proven legacy port (free on this box)
+    volumes:
+      - webdav-fixture-data:/var/www/dav
+    healthcheck:
+      # the app image ships curl (the running webdav-test runs this exact
+      # PROPFIND probe and is healthy — the auth gate is the health gate)
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null -u oltest:Ol-Fixture-Wd7q -X PROPFIND -H 'Depth: 0' http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    # dev credentials are the fixture identity (documented in tests/tools/webdav)
+
+volumes:
+  forgejo-data:
+  webdav-fixture-data:

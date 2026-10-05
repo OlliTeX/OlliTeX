@@ -369,7 +369,7 @@ Prior handoff LARGELY ACCURATE. Corrections applied this session:
 5. No bare `GET /project` route.
 6. Node `Versions.js` cmp string-only (wire). Go parity trivial.
 7. editor-core op oracle is repo-local (see §2).
-8. Acceptance MongoHelper runs tools/migrations (root yarn) + dockerized mongo.
+8. Acceptance MongoHelper runs tools/migrations (root yarn) + dockerized mongo. NOTE 2026-10-06: tools/migrations is RETIRED (owner directive — the boot-time chain is out of the image); these fixtures are dormant until restored.
 
 ## 5. WIRE SPEC (server.js + Router.js, AUTHORITATIVE — verified)
 

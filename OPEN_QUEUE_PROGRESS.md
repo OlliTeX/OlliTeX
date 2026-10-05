@@ -668,7 +668,7 @@ way).
 ### Owner directives this round
 1. Retire `services/clsi_typst`, then remove `services/` (Go clsitypst is live — done previously; executed the deletion + staged 72 D).
 2. Audit `libraries/` — retire unused (result: all 13 have live dependents; `overleaf-editor-core` was initially retired then RESTORED — `frontend/config/settings.defaults.js` requires `overleaf-editor-core/lib/text_file_defaults` at build time).
-3. `frontend` last-major-Node check (result: YES for shipped product — only compiled JS assets + boot hydration script; build now runs from frontend/; runtime Node otherwise gone besides `tools/migrations` at boot).
+3. `frontend` last-major-Node check (result: YES for shipped product — only compiled JS assets + boot hydration script; build now runs from frontend/; runtime Node otherwise gone — the `tools/migrations` boot-time chain RETIRED 2026-10-06, owner directive).
 4. package.json removals to cut image size (below).
 5. **Hard directive: do NOT copy junk/ into the image** (owner deleted overleaf/junk on disk; donor at /data_1/image_mining/junk was extracted, then owner deleted it too).
 

@@ -1,0 +1,90 @@
+# ==================================================================
+#  OlliTeX WEB PLANE (owner H 2026-10-06) — haproxy + ollitex (web)
+#
+#  Architecture (owner H): the web app runs on the SHARED stack — it
+#  joins the canonical store plane's network (${OLLITEX_NET_NAME},
+#  created by toolkit/compose.yaml: ollitex-pg / overleafmongo /
+#  overleafredis). Start ORDER: the canonical stack first (store plane),
+#  then this plane — cross-file depends_on is not expressible in compose,
+#  so the ordering contract lives here + the web image's own boot
+#  retries carry a slow DB start.
+#
+#  Pins = the PROVEN ones of the healthy planes on this machine
+#  (2026-10-06 audit): haproxy 2.8 (running legacy LBs), ollitex/ollitex:main
+#  (the running ollitex + overleafserver are this image, healthy).
+#  Health tests: every command verified to exist in its image (owner A).
+#  Ports: normal defaults; .env dev-overrides for this box (80/443 busy).
+# ==================================================================
+
+networks:
+  default:
+    name: ollitex-web
+  ollitex-store:
+    external: true
+    name: ${OLLITEX_NET_NAME:-ollitex-toolkit_default}
+
+services:
+  haproxy:
+    image: ${HAPROXY_IMAGE:-haproxy:2.8}   # same major as the running legacy LBs (proven)
+    container_name: ollitex-haproxy
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+    networks: [default, ollitex-store]
+    ports:
+      - "${HAPROXY_PORT:-80}:80"          # plain HTTP → 301 TLS only (cep nginx parity)
+      - "${HAPROXY_TLS_PORT:-443}:443"    # the TLS facade (default 443; dev override here)
+    volumes:
+      - ./web/haproxy.cfg:/haproxy.cfg:ro
+      # self-signed web cert (dev plane; generated 2026-10-06 under the
+      # owner's ${PREFIX} data tree). A real CA cert later = swap that one
+      # file — haproxy.cfg already points at /etc/haproxy/certs/web.pem
+      - ${PREFIX}/data/ssl/web/web.pem:/etc/haproxy/certs/web.pem:ro
+    healthcheck:
+      # busybox wget exists in the haproxy alpine image (verified);
+      # the frontend answers only while the backend web is up — this
+      # health check therefore also guards the web dependency.
+      test: ["CMD-SHELL", "wget -q --spider --timeout=3 http://127.0.0.1:8636/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      ollitex-web:
+        condition: service_healthy
+    command: ["/usr/local/sbin/haproxy", "-f", "/haproxy.cfg", "-db", "-W"]
+
+  ollitex-web:
+    # THE web app (owner H). One image for the whole app (the repo
+    # builds it: ollitex/ollitex:main). Data plane = the ONE shared store:
+    # Mongo (docs/sessions) + Redis (pub/sub) + Postgres (the config store).
+    image: ${WEB_IMAGE:-ollitex/ollitex:main}
+    container_name: ollitex-web
+    restart: unless-stopped
+    environment:
+      # data plane = canonical services on the shared network (service
+      # names are the hostnames; replSet name from the canonical mongo)
+      OVERLEAF_MONGO_URL: mongodb://overleafmongo:27017/sharelatex?replicaSet=sharelatex
+      OVERLEAF_REDIS_HOST: overleafredis
+      OVERLEAF_REDIS_PORT: "6379"
+      # the web needs a session secret (owner policy: secrets come from
+      # env — .env for dev; NEVER bake one into compose)
+      SECRET_KEY: "${SECRET_KEY:?run `openssl rand -hex 32` into toolkit/.env (SECRET_KEY=)}"
+      OT_JWT_AUTH_KEY: "${OT_JWT_AUTH_KEY:-dev-jwt-key-change-me}"
+      NODE_ENV: production
+      # hub grafana embed (empty = pane hidden — the safe default; the
+      # Go side reads the PG store anyway, this is the Node-plane mirror)
+      HUB_GRAFANA_EMBED_URL: "${HUB_GRAFANA_EMBED_URL:-}"
+    networks: [default, ollitex-store]
+    # no host port: haproxy is the facade (owner H layout)
+    healthcheck:
+      # the app image ships curl (the running ollitex/overleafserver run
+      # exactly this class of test and are healthy — verified 2026-10-06)
+      test: ["CMD-SHELL", "curl -fs --connect-timeout 5 http://localhost/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+      # the store plane is OUTSIDE this file (owner H: one store for both):
+      # the web retries connections at boot (its services.js boot loop);
+      # start the canonical stack (toolkit/compose.yaml) first.

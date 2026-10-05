@@ -203,7 +203,6 @@
   "workspaces": [
     "libraries/*",
     "server-ce/test",
-    "tools/migrations",
     "frontend"
   ],
   "dependenciesMeta": {

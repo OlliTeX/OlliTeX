@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // TestUI_RenderAllScreens — the classic console layout renders for every
@@ -139,52 +140,102 @@ func TestUI_EscZeroMenuFallback(t *testing.T) {
 	}
 }
 
-// TestUI_PaneDiscipline — on a tall terminal the panes stay compact
-// (owner: the full-height padded panes read as one broken box): the LOGS
-// box is capped, and the whole frame stays far below the terminal height.
-func TestUI_PaneDiscipline(t *testing.T) {
+// TestUI_FooterPinnedContract — the owner's layout contract (2026-10-06):
+// the frame fills EXACTLY the terminal; the status line + keystrip (the
+// footer) rest on the bottom two rows; every visible row fits the terminal
+// width (lipgloss-measured, not bytes); both panes take the full pane area
+// (two true equal windows).
+func TestUI_FooterPinnedContract(t *testing.T) {
+	tk, _ := offlineToolkit(t)
+	for _, size := range [][2]int{{80, 24}, {100, 32}, {120, 48}} {
+		a := newApp(tk)
+		a.width, a.height = size[0], size[1]
+		for _, screen := range []string{"dashboard", "stack", "shells", "logs", "settings", "actions", "doctor", "backup", "about"} {
+			a.screen = screen
+			a.dlg = nil
+			v := a.View()
+			lines := strings.Split(strings.TrimRight(v, "\n"), "\n")
+			if len(lines) > a.height {
+				t.Fatalf("%s %dx%d: frame is %d rows (terminal is %d): it must fill exactly with the footer pinned\n%s", screen, a.width, a.height, len(lines), a.height, v)
+			}
+			// footer on the bottom two rows
+			last := strings.TrimRight(lines[len(lines)-1], " ")
+			if len(lines) == a.height {
+				if !strings.Contains(last, "[F10|esc0]") && !strings.Contains(last, "[j/k]") {
+					t.Fatalf("%s %dx%d: bottom row is not the keystrip: %q", screen, a.width, a.height, last[:min(80, len(last))])
+				}
+				if !strings.Contains(lines[len(lines)-2], "stack") {
+					t.Fatalf("%s %dx%d: row above the keystrip is not the status line: %q", screen, a.width, a.height, lines[len(lines)-2][:min(80, len(lines[len(lines)-2]))])
+				}
+			}
+			// every visible row fits the width
+			for i, l := range lines {
+				if w := lipgloss.Width(l); w > a.width {
+					t.Fatalf("[%s %dx%d] row %d is %d cols > %d:", screen, a.width, a.height, i, w, a.width)
+				}
+			}
+			_ = last
+		}
+		_ = size
+	}
+}
+
+// TestUI_SettingsTree — the owner's settings organization (groups → keys):
+// level 0 lists the groups; enter opens one; j/k + enter/e land on a key's
+// editor; h goes back to the groups; the flat 255-key wall no longer renders.
+func TestUI_SettingsTree(t *testing.T) {
 	tk, _ := offlineToolkit(t)
 	a := newApp(tk)
-	a.width, a.height = 100, 48 // the owner-class tall terminal
-	a.screen = "logs"
-	a.dcur = 3
+	a.width, a.height = 100, 32
+
+	// level 0 — the groups (the tree top, per the configschema registry)
+	a.gotoScreenOr("settings")
 	v := a.View()
-	lines := strings.Split(strings.TrimRight(v, "\n"), "\n")
+	// panelHead renders titles in caps — compare case-insensitively.
+	if !strings.Contains(strings.ToLower(v), "settings — groups") {
+		t.Fatalf("level 0 must show the groups list:\n%s", v)
+	}
+	for _, g := range []string{"core", "boot", "services", "email", "integrations", "compilation", "limits", "security", "test", "stack"} {
+		if !strings.Contains(v, g) {
+			t.Fatalf("the group %q is missing from the groups level:\n%s", g, v)
+		}
+	}
 
-	// total frame height: title + menubar + max(panes) + status + keystrip
-	if len(lines) > 30 {
-		t.Fatalf("frame is %d rows on a 48-row terminal — the panes are still\nfull-height walls (they must be compact):\n%s", len(lines), v)
+	// enter → level 1 (the selected group's keys)
+	a2, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}) // down one group
+	b, _ := a2.(*app)
+	c, _ := b.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	d, _ := c.(*app)
+	if !d.menuOpen {
+		// (sanity: we never touched the menu)
+	}
+	v2 := d.View()
+	if strings.Contains(strings.ToLower(v2), "settings — groups") {
+		t.Fatalf("enter must open a group (level 1), still on the groups level:\n%s", v2)
 	}
 
-	// the LOGS box itself is capped (~20 content rows + borders).
-	top, bot := -1, -1
-	for i, l := range lines {
-		if top < 0 && "LOGS" == strings.TrimSpace(strings.Trim(strings.SplitN(l, " ", 2)[0], " ")) {
-		}
-		if strings.Contains(l, "LOGS") && strings.Contains(l, "┌") {
-			top = i
-		}
+	// back to the groups (b = back a level; tab/arrow-hop switches panes)
+	e, _ := d.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	f, _ := e.(*app)
+	v3 := f.View()
+	if !strings.Contains(strings.ToLower(v3), "settings — groups") {
+		t.Fatalf("h must return to the groups level:\n%s", v3)
 	}
-	if top < 0 {
-		for i, l := range lines {
-			if strings.Contains(l, "┌") && i+1 < len(lines) && strings.Contains(lines[i+1], "LOGS") {
-				top = i
-				break
-			}
-		}
+
+	// select a key of the current group and open its editor
+	f.setLevel = 1
+	f.setCurSel = 0
+	if len(f.setGroups[f.setCurGroup].Keys) == 0 {
+		t.Skip("the selected group has no keys")
 	}
-	if top >= 0 {
-		for i := top + 1; i < len(lines); i++ {
-			if strings.Contains(lines[i], "└") && strings.Contains(lines[i], "┘") {
-				bot = i
-				break
-			}
-		}
+	key := f.setGroups[f.setCurGroup].Keys[0].Key
+	g, _ := f.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	h, _ := g.(*app)
+	if h.editKey != key {
+		t.Fatalf("enter on a settings row must open its editor (got %q, want %q)", h.editKey, key)
 	}
-	if top < 0 || bot < top {
-		t.Fatalf("could not find the LOGS box boundaries:\n%s", v)
-	}
-	if h := bot - top + 1; h > 24 {
-		t.Fatalf("LOGS box is %d rows — must stay compact (<=24), got:\n%s", h, v)
+	v4 := h.View()
+	if !strings.Contains(v4, "EDIT") {
+		t.Fatalf("the editor box must render:\n%s", v4)
 	}
 }

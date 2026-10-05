@@ -109,9 +109,16 @@ func s4Routes(a *core.App) []core.Route {
 			Path:    "/federation/oidc/jwks",
 			NoLogin: true,
 			Handler: func(c *core.Cxt, res *core.Res) {
-				store, _, ok := federStore(c)
+				store, kp, ok := federStore(c)
 				if !ok {
 					res.SendStatus(http.StatusInternalServerError)
+					return
+				}
+				// keystore self-heal (Node `ensureBootstrapped` at boot,
+				// 07 §2): a fresh instance has no keys yet — bootstrap is
+				// idempotent (skip per purpose when an active key exists).
+				if berr := kp.Bootstrap(); berr != nil {
+					res.JSON(http.StatusInternalServerError, []byte(`{"error":"keystore bootstrap failed"}`))
 					return
 				}
 				handleOidcJwks(store, c, res)

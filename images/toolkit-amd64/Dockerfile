@@ -58,11 +58,17 @@ RUN apk add --no-cache \
 
 # The stack compose templates live next to the binary (absorbed from
 # toolkit/lib; the TUI reads + renders them — no env file fallbacks).
-COPY toolkit/lib/ /opt/ollitex/compose-templates/
+# owner E 2026-10-06: the canonical stack file is IN the image (the TUI
+# runner plans/operates it from /opt/ollitex); the ONE lib survivor is the
+# monitoring bundles, laid out where materializeMonitoring expects them
+# (the compose-file neighbor: /opt/ollitex/monitoring).
+COPY toolkit/compose.yaml /opt/ollitex/compose.yaml
+COPY toolkit/lib/monitoring/ /opt/ollitex/monitoring/
+
 
 # The one mounted folder (default; override --data-dir / OLLITEX_TOOLKIT_DATA_DIR).
 ENV OLLITEX_TOOLKIT_DATA_DIR=/opt/ollitex/data \
-    OLLITEX_TOOLKIT_COMPOSE_FILE=/opt/ollitex/compose-templates/docker-compose.base.yml \
+    OLLITEX_TOOLKIT_COMPOSE_FILE=/opt/ollitex/compose.yaml \
     OLLITEX_TOOLKIT_PROJECT=ollitex \
     OLLITEX_TOOLKIT_SSH_LISTEN=:2222 \
     OLLITEX_TOOLKIT_USER=ollitex

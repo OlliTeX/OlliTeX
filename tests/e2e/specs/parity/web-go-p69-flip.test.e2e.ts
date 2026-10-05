@@ -1,11 +1,11 @@
 /**
- * P6.9 flip gate — webdav module surface (Node → OlliTeX Go web).
+ * P6.9 — webdav module surface (canonical Go).
  *
- * 4-leg contract-parity gate (same harness family as P6.5…P6.8):
- *   leg 0: flips stripped before start (clean slate)
- *   leg 1: Node baseline battery
- *   leg 2: CUMULATIVE flip (P6.4a + P6.4b + P6.5 + P6.6 + P6.7 + P6.8 + P6.9) → Go
- *   leg 3: flips stripped → Node re-baseline (Node determinism anchor)
+ * CONVERTED 2026-10-05 (owner): the 4-leg flip gate (leg 0 strip / leg 1 Node baseline /
+ * leg 2 cumulative-flip Go parity / leg 3 Node re-baseline) is retired — in the P7 image
+ * the canonical stack IS Go, so :7420 is Go on every leg and the shadow flips no longer
+ * exist. The battery + full pin set now run DIRECTLY on canonical Go, plus a 2-run
+ * byte-parity stability leg. Transcription, not rewrite (u101-history pattern).
  *
  * Single phase — the e2e instance is webdav-UNLINKED (WEBDAV_ENABLED=true
  * so the module loads on both stacks, but the user has no credentials,
@@ -58,9 +58,6 @@ import { execFileSync } from 'node:child_process'
 
 const overleafC = 'ol-e2e-overleaf-1'
 const mongoC = 'ol-e2e-mongo-1'
-// Cumulative: P7 ships the union — leg 2 exercises the full flipped so far.
-const FLIPCONFS = ['web-p64a.conf', 'web-p64b.conf', 'web-p65.conf', 'web-p66.conf', 'web-p67.conf', 'web-p68.conf', 'web-p69.conf']
-const FLIPSRC = `${process.cwd()}/../../images/main-amd64/nginx/flips`
 const BASE = 'http://127.0.0.1:7420'
 const USER = { email: 'e2e-user@e2e.test', password: 'Ol-Fixture-3m2Q' }
 const OTHER = { email: 'p69-other@e2e.test', password: 'Ol-Fixture-3m2Q' }
@@ -85,53 +82,6 @@ function msh(cmd: string): string {
 
 function dexeStrict(c: string, cmd: string): string {
   return execFileSync('docker', ['exec', c, 'sh', '-c', cmd], { encoding: 'utf8', stdio: 'pipe', maxBuffer: 64 * 1024 * 1024 })
-}
-
-// curl exit≠0 (drain window) → the status rides on e.stdout.
-function probe(url: string): string {
-  let out = ''
-  try {
-    out = execFileSync('docker', ['exec', overleafC, 'sh', '-c', `curl -s -m 3 -o /dev/null -w "%{http_code}" ${url}`], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-  } catch (e: any) {
-    out = e && e.stdout ? e.stdout.toString() : ''
-  }
-  return (out || '').trim().split('\n')[0]
-}
-
-async function waitGo(): Promise<void> {
-  for (let i = 0; i < 60; i++) {
-    if (probe('http://127.0.0.1:4010/status') === '200') return
-    await sleep(500)
-  }
-  throw new Error('Go :4010 never came up')
-}
-
-function flipCount(conf: string): number {
-  return Number(dexeStrict(overleafC, `sh -c 'grep -c "overleaf-flips/${conf}" /etc/nginx/sites-enabled/overleaf.conf || true'`).trim()) || 0
-}
-
-async function flip(mode: 'apply' | 'strip'): Promise<void> {
-  if (mode === 'strip') {
-    dexeStrict(overleafC, `node -e "const fs=require('fs');const p='/etc/nginx/sites-enabled/overleaf.conf';const s=fs.readFileSync(p,'utf8');const L=s.split(String.fromCharCode(10)).filter(x=>!x.includes('overleaf-flips/'));fs.writeFileSync(p,L.join(String.fromCharCode(10)))"`)
-    dexeStrict(overleafC, 'nginx -t && nginx -s reload')
-    const r: any = await fetch(BASE + '/status', { headers: { 'user-agent': UA } })
-    if (r.status !== 200) throw new Error('strip failed (status not 200)')
-    await sleep(1200)
-    for (const conf of FLIPCONFS) expect(flipCount(conf)).toBe(0)
-    return
-  }
-  dexeStrict(overleafC, 'mkdir -p /usr/local/share/overleaf-flips && mkdir -p /etc/nginx/overleaf-flips')
-  for (const conf of FLIPCONFS) {
-    execFileSync('docker', ['cp', `${FLIPSRC}/${conf}`, `${overleafC}:/usr/local/share/overleaf-flips/${conf}`], { timeout: 30000 })
-    dexeStrict(overleafC, `cp -f /usr/local/share/overleaf-flips/${conf} /etc/nginx/overleaf-flips/${conf}`)
-    dexeStrict(overleafC, `node -e "const fs=require('fs');const p='/etc/nginx/sites-enabled/overleaf.conf';let s=fs.readFileSync(p,'utf8');const inc='  include /etc/nginx/overleaf-flips/${conf};'+String.fromCharCode(10);if(!s.includes('overleaf-flips/${conf}')){if(s.includes('location / {')){s=s.replace('location / {',inc+'location / {',1)}else{throw new Error('anchor not found')}};fs.writeFileSync(p,s)"`)
-  }
-  dexeStrict(overleafC, 'nginx -t && nginx -s reload')
-  await sleep(1200)
-  for (const conf of FLIPCONFS) expect(flipCount(conf)).toBe(1)
 }
 
 function normBody(b: string): string {
@@ -393,17 +343,8 @@ async function login(email: string, pw: string): Promise<{ ck: string; tok: stri
 
 let leg1: Leg | null = null
 
-test('leg 0: flip off before start (force-strip any leftovers)', async () => {
-  try {
-    await flip('strip')
-  } catch {
-    /* best effort */
-  }
-  for (const conf of FLIPCONFS) expect(flipCount(conf)).toBe(0)
-}, 60_000)
-
-test('leg 1: Node baseline battery', async () => {
-  // flush shared rate-limit keys before the long battery (Node+Go share Redis)
+test('battery: webdav state machine (canonical Go :7420)', async () => {
+  // flush shared rate-limit keys before the long battery
   dexeStrict(
     'ol-e2e-redis-1',
     'sh -c "redis-cli --scan --pattern \"rate-limit:*\" | xargs -r redis-cli del >/dev/null 2>&1 || true"',
@@ -412,30 +353,18 @@ test('leg 1: Node baseline battery', async () => {
   expect(Object.keys(leg1!).length).toBe(40)
 }, 300_000)
 
-test('leg 2: Go parity (flip on)', async () => {
-  await flip('apply')
-  await waitGo()
+test('stability: 2-run byte parity (canonical Go :7420)', async () => {
   dexeStrict(
     'ol-e2e-redis-1',
     'sh -c "redis-cli --scan --pattern \"rate-limit:*\" | xargs -r redis-cli del >/dev/null 2>&1 || true"',
   )
   const leg2 = await runLeg()
-  const ds = diffLegs('go', leg1!, leg2)
+  const ds = diffLegs('run2', leg1!, leg2)
   if (ds.length) throw new Error(ds.join('\n').slice(0, 4000))
 }, 300_000)
 
-test('leg 3: Node re-baseline', async () => {
-  await flip('strip')
-  dexeStrict(
-    'ol-e2e-redis-1',
-    'sh -c "redis-cli --scan --pattern \"rate-limit:*\" | xargs -r redis-cli del >/dev/null 2>&1 || true"',
-  )
-  const leg3 = await runLeg()
-  const ds = diffLegs('node-determinism', leg1!, leg3)
-  if (ds.length) throw new Error(ds.join('\n').slice(0, 4000))
-}, 300_000)
 
-test('pin sanity: anchors hold (Node baseline)', async () => {
+test('pin sanity: anchors hold (canonical Go)', async () => {
   const L = leg1!
   // DB state anchors
   expect(L.creds_before.body).toBe('0')
@@ -494,7 +423,7 @@ test('pin sanity: anchors hold (Node baseline)', async () => {
   expect(L.c_link_incomplete.status).toBe(400)
   expect(L.c_link_incomplete2.status).toBe(400)
   expect(L.c_link_incomplete2.body).toBe('{"message":"WebDAV credentials are incomplete"}')
-  // Live Node: corrupted (undecryptable) stored token → not linked WITH error key
+  // Go: corrupted (undecryptable) stored token → not linked WITH error key
   expect(L.c_status_corrupt.body).toBe('{"connected":false,"error":"stored-credentials-invalid"}')
   // disconnect restores
   expect(L.c_disconnect.body).toBe('{"success":true}')
@@ -502,11 +431,6 @@ test('pin sanity: anchors hold (Node baseline)', async () => {
   expect(L.c_disconnect_again.body).toBe('{"success":true}')
 })
 
-test.afterAll(async () => {
-  try {
-    for (const conf of FLIPCONFS) if (flipCount(conf) > 0) await flip('strip')
-  } catch {
-    /* best effort */
-  }
+test.afterAll(() => {
   cleanWebdavState()
 })

@@ -225,6 +225,13 @@ func (a *app) gotoScreen(id string) {
 		a.dcur = i
 	}
 	a.screen = id
+	a.editKey, a.editVal, a.editMask = "", "", false
+	if id == "settings" {
+		a.setLevel, a.setCurGroup, a.setCurSel = 0, 0, 0
+		a.focus = 1 // the settings tree owns the keys (two-pane focus)
+	} else {
+		a.focus = 0
+	}
 }
 
 func (a *app) findItem(id string) (int, bool) {

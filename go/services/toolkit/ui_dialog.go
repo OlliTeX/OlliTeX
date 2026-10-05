@@ -58,10 +58,13 @@ func (a *app) askRestore() {
 	a.askConfirm("restore the config store", "the backup snapshot ("+a.tk.BackupPath()+") is loaded back — current stored values are replaced.", "restore")
 }
 func (a *app) askQuit() {
-	a.askConfirm("quit the toolkit", "quitting leaves the stack running"+a.quitTail(), "quit")
+	// Owner 2026-10-06: the old wording warned "quitting leaves the stack
+	// running" — confusing noise (everybody expects the server to keep
+	// running; that is the good part, not a warning). Plain question.
+	a.askConfirm("Close ssh connection to toolkit?", "The stack on this machine is not affected.", "quit")
 }
 
-func (a *app) quitTail() string {
+func (a *app) quitTail() string { // kept for future call sites; the quit dialog no longer uses it
 	if a.stackUpNow() {
 		return " (it is UP — stop it first with d if you want it down)"
 	}

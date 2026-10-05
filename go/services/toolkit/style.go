@@ -1,7 +1,7 @@
 package toolkit
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -135,22 +135,40 @@ func titleBar(title string) string {
 	return styleTitle.Render(" " + title + " ")
 }
 
-// renderWidth fits content to a width by truncating (simple + predictable).
+// fit fits content to a width — the RECTANGULAR clip (owner: "most of the
+// options are hanging outside the terminal" / the broken pages):
+// every LINE of the string is clipped independently (rune-safe, ANSI-aware
+// via lipgloss widths), so multi-line boxes keep their shape instead of
+// the old flat rune-slice that shredded them onto one line. Also clamps
+// HEIGHT when h > 0 (tail window: the LAST h lines win — the live tail is
+// what matters in logs/doctor/settings).
 func fit(s string, w int) string {
-	if w <= 0 {
-		return s
+	return fitRect(s, w, 0)
+}
+
+func fitRect(s string, w, h int) string {
+	s = strings.TrimRight(s, "\n")
+	lines := strings.Split(s, "\n")
+	if h > 0 && len(lines) > h {
+		lines = lines[len(lines)-h:]
 	}
-	if lipgloss.Width(s) <= w {
-		return s
+	var out []string
+	for _, l := range lines {
+		if w <= 0 || lipgloss.Width(l) <= w {
+			out = append(out, l)
+			continue
+		}
+		// rune-safe per-line truncation with ellipsis (width budget 1)
+		var b strings.Builder
+		used := 0
+		for _, r := range l {
+			if used+1 > w-1 {
+				break
+			}
+			b.WriteRune(r)
+			used++
+		}
+		out = append(out, b.String()+"…")
 	}
-	// rune-safe truncation with ellipsis
-	runes := []rune(s)
-	if len(runes) <= 1 {
-		return s
-	}
-	visible := w - 1
-	if visible < 0 {
-		visible = 0
-	}
-	return fmt.Sprintf("%s…", string(runes[:visible]))
+	return strings.Join(out, "\n")
 }

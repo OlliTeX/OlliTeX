@@ -29,6 +29,10 @@ type StackPlan struct {
 	// EnvFile is where Env is written for `--env-file` (inside the mounted
 	// data dir, so it is inspectable/auditable).
 	EnvFile string
+	// Profile — a compose PROFILE to activate (owner 2026-10-06: monitoring
+	// lives INSIDE the canonical compose.yaml behind profile "monitoring",
+	// not as a separate overlay file): --profile <name> on every invocation.
+	Profile string
 	// Notes is operator-facing provenance (e.g. generated secrets).
 	Notes []string
 }
@@ -87,10 +91,10 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 		return nil, fmt.Errorf("no compose base template (point OLLITEX_TOOLKIT_COMPOSE_FILE at the base template; image default: %s)", filepath.Join(t.templateDir(), "docker-compose.base.yml"))
 	}
 	plan.Files = append(plan.Files, base)
-	addOverlay := func(name string) {
-		p := filepath.Join(td, name)
-		plan.Files = append(plan.Files, p)
-	}
+	// (the legacy lib overlay path is retired with its files — owner E
+	// 2026-10-06; the canonical compose.yaml is the single stack file)
+	_ = td
+
 
 	// ---- base plane ------------------------------------------------------
 	if v := t.val("OVERLEAF_LISTEN_IP"); v != "" {
@@ -150,7 +154,6 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 
 	// ---- overlays (selection flags live in the store) --------------------
 	if t.boolVal("REDIS_ENABLED") {
-		addOverlay("docker-compose.redis.yml")
 		plan.Env["REDIS_IMAGE"] = t.val("REDIS_IMAGE")
 		rp := t.val("REDIS_DATA_PATH")
 		if rp != "" {
@@ -164,7 +167,6 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 	}
 
 	if t.boolVal("MONGO_ENABLED") {
-		addOverlay("docker-compose.mongo.yml")
 		plan.Env["MONGO_DOCKER_IMAGE"] = t.val("MONGO_IMAGE")
 		mp := t.val("MONGO_DATA_PATH")
 		if mp != "" {
@@ -184,7 +186,6 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 	}
 
 	if t.boolVal("POSTGRES_ENABLED") {
-		addOverlay("docker-compose.postgres.yml")
 		plan.Env["POSTGRES_DOCKER_IMAGE"] = t.val("POSTGRES_IMAGE")
 		plan.Env["POSTGRES_USER"] = t.val("POSTGRES_USER")
 		plan.Env["POSTGRES_DB"] = t.val("POSTGRES_DB")
@@ -216,7 +217,6 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 	}
 
 	if t.boolVal("SIBLING_CONTAINERS_ENABLED") {
-		addOverlay("docker-compose.sibling-containers.yml")
 		if v := t.val("DOCKER_SOCKET_PATH"); v != "" {
 			plan.Env["DOCKER_SOCKET_PATH"] = v
 		}
@@ -269,7 +269,6 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 
 	// ---- cep-service-set overlays (owner addendum A) --------------------
 	if t.boolVal("GITBRIDGE_SERVICE_ENABLED") {
-		addOverlay("docker-compose.gitbridge.yml")
 		if v := t.val("GIT_BRIDGE_IMAGE"); v != "" {
 			plan.Env["GIT_BRIDGE_IMAGE"] = v
 		}
@@ -281,7 +280,6 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 		}
 	}
 	if t.boolVal("CHECKUSER_ENABLED") {
-		addOverlay("docker-compose.checkuser.yml")
 		if v := t.val("CHECKUSER_IMAGE"); v != "" {
 			plan.Env["CHECKUSER_IMAGE"] = v
 		}
@@ -291,7 +289,6 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 	}
 
 	if t.boolVal("NGINX_ENABLED") {
-		addOverlay("docker-compose.nginx.yml")
 		plan.Env["NGINX_IMAGE"] = t.val("NGINX_IMAGE")
 		plan.Env["TLS_PORT"] = t.val("TLS_PORT")
 		plan.Env["NGINX_HTTP_PORT"] = t.val("NGINX_HTTP_PORT")
@@ -307,19 +304,46 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 		plan.Env["OVERLEAF_TRUSTED_PROXY_IPS"] = t.val("OVERLEAF_TRUSTED_PROXY_IPS")
 	}
 
-	if t.boolVal("LANGUAGE_TOOL_ENABLED") {
-		addOverlay("docker-compose.languagetool.yml")
-		plan.Env["LANGUAGE_TOOL_IMAGE"] = t.val("LANGUAGE_TOOL_IMAGE")
-		plan.Env["LANGUAGE_TOOL_PORT"] = t.val("LANGUAGE_TOOL_PORT")
-		if v := t.val("LANGUAGE_TOOL_DATA_PATH"); v != "" {
-			plan.Env["LANGUAGE_TOOL_DATA_PATH"] = absData(t.DataDir, v)
+	// owner D (2026-10-06): ONE mechanism for the optional service groups —
+	// the ENABLE_* flags in the canonical compose.yaml (seaweedfs ×4,
+	// wakapi+probe, languagetool, monitoring), ACTIVE BY DEFAULT in the
+	// file; the admin's start/no-start decision + restart policy is that
+	// flag ("no" / "unless-stopped" / "always"). The runner does NOT gate
+	// the canonical file: `docker compose up` on it is the complete stack
+	// (profiles are out of this design).
+	// The legacy lib-base app plane is RETIRED (owner E 2026-10-06: its
+	// overlay files, bin/ shell CLI and doc/ went with it) — the canonical
+	// compose.yaml is the ONE stack file; the ENABLE_* flags inside it are
+	// the ONE group mechanism. No overlay files remain to add.
+	canon := filepath.Base(t.ComposeFile) == "compose.yaml"
+	_ = canon
+	// env plane shared by both planes (the canonical file interpolates these)
+	if v := t.val("LANGUAGE_TOOL_IMAGE"); v != "" {
+		plan.Env["LANGUAGE_TOOL_IMAGE"] = v
+	}
+	if v := t.val("LANGUAGE_TOOL_PORT"); v != "" {
+		plan.Env["LANGUAGE_TOOL_PORT"] = v
+	}
+	if v := t.val("LANGUAGE_TOOL_DATA_PATH"); v != "" {
+		plan.Env["LANGUAGE_TOOL_DATA_PATH"] = absData(t.DataDir, v)
+	}
+	if v := t.val("LANGUAGETOOL_URL"); v != "" {
+		plan.Env["LANGUAGETOOL_URL"] = v
+	}
+	for _, k := range []string{"PROMETHEUS_PORT", "GRAFANA_PORT", "PROMETHEUS_IMAGE", "GRAFANA_IMAGE",
+		"MONGODB_EXPORTER_IMAGE", "REDIS_EXPORTER_IMAGE", "NODE_EXPORTER_IMAGE", "MONGO_IMAGE",
+		"REDIS_IMAGE", "POSTGRES_IMAGE", "SEAWEEDFS_IMAGE", "WAKA_API_IMAGE", "BUSYBOX_IMAGE",
+		"WAKA_API_PORT", "HUB_GRAFANA_EMBED_URL", "GRAFANA_ADMIN_PASSWORD",
+		"ENABLE_SEAWEEDFS", "ENABLE_WAKA_API", "ENABLE_LANGUAGE_TOOL", "ENABLE_MONITORING"} {
+		if v := os.Getenv(k); v != "" {
+			plan.Env[k] = v
+		} else if dv := t.val(k); dv != "" {
+			plan.Env[k] = dv
 		}
-		plan.Env["LANGUAGETOOL_URL"] = t.val("LANGUAGETOOL_URL")
 	}
-
-	if t.boolVal("SEAWEEDFS_ENABLED") {
-		addOverlay("docker-compose.seaweedfs.yml")
-	}
+	if canon && plan.Env["MONITORING_DATA_PATH"] == "" {
+		plan.Env["MONITORING_DATA_PATH"] = absData(t.DataDir, "monitoring")
+	}	// (wakapi has no legacy overlay — it never had one in the app plane.)
 
 	// ---- monitoring (D22 ecosystem, opt-in) -------------------------
 	// Prometheus + the mongo/redis exporters + Grafana — the same image
@@ -327,8 +351,14 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 	// dashboards are materialized into the monitoring data dir (owner
 	// policy B: state lives in the mounted data dir) and every container
 	// carries a healthcheck (owner policy C).
-	if t.boolVal("MONITORING_ENABLED") {
-		addOverlay("docker-compose.monitoring.yml")
+	// monitoring env plane: the canonical stack is ACTIVE BY DEFAULT (owner
+	// D) — render it unconditionally there; the legacy lib plane keeps the
+	// MONITORING_ENABLED store-key gate.
+	if canon || t.boolVal("MONITORING_ENABLED") {
+		// owner 2026-10-06: the monitoring services live INSIDE the canonical
+		// compose.yaml (the legacy lib overlay is retained only for the legacy
+		// app plane; addOverlay skips absent templates).
+	
 		if v := t.val("PROMETHEUS_PORT"); v != "" {
 			plan.Env["PROMETHEUS_PORT"] = v
 		}
@@ -463,6 +493,9 @@ func (t *Toolkit) composeArgs(plan *StackPlan, args ...string) []string {
 		out = append(out, "-f", f)
 	}
 	out = append(out, "--project-name", plan.Project)
+	if plan.Profile != "" {
+		out = append(out, "--profile", plan.Profile)
+	}
 	if plan.EnvFile != "" {
 		out = append(out, "--env-file", plan.EnvFile)
 	}
@@ -484,9 +517,23 @@ func absData(base, p string) string {
 //	<monitoring>/grafana-provisioning/*    ← monitoring/grafana/provisioning/*
 //	<monitoring>/grafana-dashboards/*      ← monitoring/grafana/dashboards/*
 func (t *Toolkit) materializeMonitoring(destRoot string) error {
+	// owner E 2026-10-06: the monitoring bundles live in toolkit/lib/monitoring
+	// (the one lib survivor — bundled into the image at the compose file
+	// neighbor path /opt/ollitex/monitoring; the legacy overlay dir is gone).
 	td := filepath.Join(t.templateDir(), "monitoring")
 	if fi, err := os.Stat(td); err != nil || !fi.IsDir() {
-		return fmt.Errorf("monitoring templates missing under %s (the toolkit image bundles them — local builds need toolkit/lib/monitoring)", td)
+		// local-build fallbacks (repo layouts): toolkit/lib/monitoring
+		var rel string
+		for _, c := range []string{"toolkit/lib/monitoring", "../../../toolkit/lib/monitoring"} {
+			if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+				rel = c
+				break
+			}
+		}
+		if rel == "" {
+			return fmt.Errorf("monitoring templates missing (the toolkit image bundles them — local builds need toolkit/lib/monitoring)")
+		}
+		td = rel
 	}
 	// 1) the scrape config (rendered).
 	src := filepath.Join(td, "prometheus", "prometheus.yml")

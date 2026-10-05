@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"ollitex/go/libraries/configstore"
 	"ollitex/go/services/web/core"
 )
 
@@ -16,39 +17,31 @@ import (
 //
 // Resolves the Grafana base URL the hub stats pane (Site settings →
 // General → Instance statistics → "Live dashboards") iframes in kiosk
-// mode. Source chain (the GHSyncEnabled pattern — env conclusive first,
-// then the stored section):
+// mode. Source chain (ONE STORE — owner directive 2026-10-06: hub and
+// toolkit share the PG config store, never a second store):
 //
 //  1. env HUB_GRAFANA_EMBED_URL (set by the toolkit env plane from the
 //     configstore key of the same name — the single-source render path),
-//  2. site_settings section `monitoring` key `grafanaEmbedURL`
-//     (admin-managed at runtime),
+//  2. the PG config store key HUB_GRAFANA_EMBED_URL directly (so a TUI or
+//     admin save is visible without a re-render),
 //
 // otherwise "" — the pane stays hidden (off by default, per the owned
-// d22 decision). Returned base is normalized: absolute http(s), trimmed
-// of trailing slashes.
+// d22 decision). No Mongo fallback (the site_settings doc is retired as a
+// settings source — one store, one source of truth). Returned base is
+// normalized: absolute http(s), trimmed of trailing slashes.
 func GrafanaEmbed(a *core.App, ctx context.Context) string {
 	if v := cleanEmbedURL(os.Getenv("HUB_GRAFANA_EMBED_URL")); v != "" {
 		return v
 	}
-	if a == nil || a.Mongo == nil {
-		return ""
+	if dsn := configstore.DSNFromEnv(); dsn != "" {
+		if st, err := configstore.DialPG(dsn); err == nil {
+			defer st.Close()
+			if v, err := st.Get("HUB_GRAFANA_EMBED_URL"); err == nil {
+				return cleanEmbedURL(v)
+			}
+		}
 	}
-	db, err := a.Mongo.DB(ctx)
-	if err != nil {
-		return ""
-	}
-	sections := loadAllSections(ctx, db)
-	sec, ok := sections["monitoring"]
-	if !ok {
-		return ""
-	}
-	v, jok := ObjGet(sec, "grafanaEmbedURL")
-	if !jok {
-		return ""
-	}
-	s, _ := v.(string)
-	return cleanEmbedURL(s)
+	return ""
 }
 
 // cleanEmbedURL — only an absolute http(s) URL counts (a relative path or

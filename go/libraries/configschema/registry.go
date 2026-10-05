@@ -269,6 +269,8 @@ var Registry = []Param{
 	{Key: "POSTGRES_USER", Kind: KString, Group: "stack", Default: "overleaf", Description: "Postgres superuser name."},
 	{Key: "POSTGRES_DB", Kind: KString, Group: "stack", Default: "overleaf-history-v1", Description: "Primary Postgres database name (shared DSN plane)."},
 	{Key: "SEAWEEDFS_ENABLED", Kind: KBool, Group: "stack", Default: "true", Description: "Start the SeaweedFS S3 containers (durable storage backend for filestore/docstore)."},
+	{Key: "WAKA_API_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "Start the Waka API (wakapi) service — toolkit compose profile \"wakapi\" (owner 2026-10-06). Restart policy: the ENABLE_WAKA_API env flag (no / unless-stopped)."},
+
 	{Key: "NGINX_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "Start the TLS proxy (nginx) container."},
 	{Key: "NGINX_CONFIG_PATH", Kind: KString, Group: "stack", Description: "nginx.conf path (host) for the TLS proxy."},
 	{Key: "NGINX_HTTP_PORT", Kind: KInt, Group: "stack", Default: "80", Description: "nginx HTTP (pre-TLS) port."},

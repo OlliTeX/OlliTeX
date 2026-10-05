@@ -89,12 +89,12 @@ scrape_configs:
   # --- the database exporters (mongo + redis) -----------------------------
   - job_name: mongodb
     static_configs:
-      - targets: ["monitoring-mongodb-exporter:9216"]
+      - targets: ["ollitex-mongodb-exporter:9216"]
         labels: { service: mongodb, db: sharelatex }
 
   - job_name: redis
     static_configs:
-      - targets: ["monitoring-redis-exporter:9121"]
+      - targets: ["ollitex-redis-exporter:9121"]
         labels: { service: redis }
 
   # --- prometheus itself ---------------------------------------------------

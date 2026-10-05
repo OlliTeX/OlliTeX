@@ -12,6 +12,7 @@
 package federation
 
 import (
+	"encoding/json"
 	"os"
 	"strconv"
 	"strings"
@@ -32,6 +33,14 @@ type Settings struct {
 	ExportEnabled               bool
 	ExportMaxTTLSeconds         int
 	ExportSweepOnRevoke         bool
+	// S2SPeerURLs — peerOrigin → absolute S2S URL (the S2SUROverride
+	// local-dev path, s2scall.go: the assertion's iss/aud identity STAYS
+	// the https origin (03 §8: entityId is the host WITHOUT port); only
+	// the transport dials here). Production leaves this empty (the wire
+	// is always https://<origin>/federation/s2s — the trust anchor). Local
+	// dual-instance dev (http transport) sets a JSON object:
+	// {"peer-origin.example": "http://127.0.0.1:4481/federation/s2s"}.
+	S2SPeerURLs map[string]string
 }
 
 func envInt(k string, def int) int {
@@ -73,7 +82,24 @@ func loadSettings() Settings {
 	s.ExportEnabled = envBool("FEDERATION_EXPORT_ENABLED", false)
 	s.ExportMaxTTLSeconds = envInt("FEDERATION_EXPORT_MAX_TTL_SECONDS", 86400)
 	s.ExportSweepOnRevoke = envBool("FEDERATION_EXPORT_SWEEP_ON_REVOKE", true)
+	if raw := os.Getenv("FEDERATION_S2S_PEER_URLS"); raw != "" {
+		m := map[string]string{}
+		if json.Unmarshal([]byte(raw), &m) == nil {
+			s.S2SPeerURLs = m
+		}
+	}
 	return s
+}
+
+// s2sPeerURLOverride — the local-dev transport map (nil in production;
+// empty env = production wire — always https://<origin>/federation/s2s).
+// Identity rules (iss/aud, https entity id) are UNCHANGED by this: it
+// redirects the dial only, the S2SUROverride seam (03 §8 split).
+func s2sPeerURLOverride() map[string]string {
+	if m := loadSettings().S2SPeerURLs; len(m) > 0 {
+		return m
+	}
+	return nil
 }
 
 // SSO env knobs (overleaf-fed plan/10 R1 + Phase 4), read where the

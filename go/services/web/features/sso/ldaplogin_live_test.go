@@ -19,7 +19,7 @@ import (
 //	LIVE_LDAP_BIND_DN="cn=ldap_reader,dc=example,dc=com"
 //	LIVE_LDAP_BIND_PW="GoodNewsEveryone"
 //	(plus the LIVE_LDAP_REG* / LIVE_LDAP_ADM* seeded-user creds, default to
-//	 the ssoe2e / ssoadm fixtures in tools/sso-test)
+//	 the ssoe2e / ssoadm fixtures in tests/tools/sso-test)
 func TestLdapAuthenticateLive(t *testing.T) {
 	url := os.Getenv("LIVE_LDAP_URL")
 	if url == "" {
@@ -40,18 +40,18 @@ func TestLdapAuthenticateLive(t *testing.T) {
 
 	cfg := func(attr string) *LDAPProvider {
 		return &LDAPProvider{
-			URL: url,
-			SearchBase:                eDef("LIVE_LDAP_BASE", "ou=people,dc=example,dc=com"),
-			BindDN:                    os.Getenv("LIVE_LDAP_BIND_DN"),
-			BindCredentials:           os.Getenv("LIVE_LDAP_BIND_PW"),
-			BindProperty:              attr, // "uid" or "mail" (Overleaf usernameField=email)
-			EmailAtt:                  "mail",
-			FirstNameAtt:              "givenName",
-			LastNameAtt:               "sn",
-			IsAdminAtt:                "employeeType",
-			ValAdmin:                  "admin",
-			SearchScope:               eDef("LIVE_LDAP_SCOPE", ""),
-			Timeout:                   5000,
+			URL:             url,
+			SearchBase:      eDef("LIVE_LDAP_BASE", "ou=people,dc=example,dc=com"),
+			BindDN:          os.Getenv("LIVE_LDAP_BIND_DN"),
+			BindCredentials: os.Getenv("LIVE_LDAP_BIND_PW"),
+			BindProperty:    attr, // "uid" or "mail" (Overleaf usernameField=email)
+			EmailAtt:        "mail",
+			FirstNameAtt:    "givenName",
+			LastNameAtt:     "sn",
+			IsAdminAtt:      "employeeType",
+			ValAdmin:        "admin",
+			SearchScope:     eDef("LIVE_LDAP_SCOPE", ""),
+			Timeout:         5000,
 		}
 	}
 	ctx := context.Background()

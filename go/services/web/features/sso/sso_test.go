@@ -175,7 +175,6 @@ func newFlateReader(b []byte) io.Reader {
 	return r
 }
 
-
 // --- env providers ---
 
 func TestEnvSAMLProvider(t *testing.T) {
@@ -223,9 +222,9 @@ func TestResolveSAMLProvider_DBBeatsEnv(t *testing.T) {
 
 func TestSamlSLOURL_TShape(t *testing.T) {
 	p := &SAMLProvider{
-		ID:       "1",
-		Type:     "saml",
-		Issuer:   "https://idp.example",
+		ID:        "1",
+		Type:      "saml",
+		Issuer:    "https://idp.example",
 		LogoutURL: "https://idp.example/slo",
 	}
 	_ = p
@@ -299,11 +298,11 @@ func TestOidcEndpoints_Discovery(t *testing.T) {
 
 func TestOidcEndpoints_ExplicitWins(t *testing.T) {
 	auth, token_, userinfo, err := oidcEndpoints(context.Background(), &OIDCProvider{
-			Issuer:            "https://ignored",
-			AuthorizationURL:  "https://a/auth",
-			TokenURL:          "https://a/token",
-			UserInfoURL:       "https://a/me",
-		})
+		Issuer:           "https://ignored",
+		AuthorizationURL: "https://a/auth",
+		TokenURL:         "https://a/token",
+		UserInfoURL:      "https://a/me",
+	})
 	if err != nil || auth != "https://a/auth" || token_ != "https://a/token" || userinfo != "https://a/me" {
 		t.Errorf("explicit endpoints: %q %q %q err=%v", auth, token_, userinfo, err)
 	}

@@ -91,6 +91,13 @@ type app struct {
 	editKey   string
 	editVal   string
 	editMask  bool
+	// two-level settings navigation: level 0 = the groups, level 1 = the
+	// selected group's keys (owner: "organize the settings into sub-groups")
+	setLevel    int
+	setCurGroup int
+	// two-pane focus: 0 = the left master list, 1 = the settings tree
+	// (the right pane); starts on the settings side when settings opens
+	focus int
 
 	// doctor
 	doctorRows []doctorRow
@@ -242,6 +249,14 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width = m.Width
 		a.height = m.Height
+		// some front-end paths draw frame 0 before the size arrives — a zero
+		// size must never reach the pane math (the old [:-6] slice panic)
+		if a.width < 40 {
+			a.width = 80
+		}
+		if a.height < 12 {
+			a.height = 24
+		}
 		return a, nil
 
 	case shellStartMsg:
@@ -336,14 +351,26 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.dlg != nil {
 			return a, a.dialogKey(m)
 		}
+		// MENU-OPEN DELEGATION (owner: "It can be open but nothing can be
+		// selected") — MUST run before the global/nav/screen switches: the
+		// menubar library owns up/down/left/right/enter/esc while active, and
+		// those are exactly the keys our navigation + screen handlers used to
+		// eat first (k/j = down/up, enter = openCmd, l/h = cycle), so no menu
+		// item could ever be reached. Items fire as their Action cmd
+		// (menuActionMsg → dispatchMenu, which closes the bar itself).
+		// Explicit toggles (F10/F9) close it; anything else stays inert.
 		if a.menuOpen {
-			next, cmd := a.menu.Update(m)
-			a.menu = next
-			a.syncMenu()
-			if !a.menuOpen {
+			switch k2 := m.String(); k2 {
+			case "up", "down", "left", "right", "enter", "esc", "tab", "shift+tab":
+				next, cmd := a.menu.Update(m)
+				a.menu = next
+				a.syncMenu()
+				return a, cmd
+			case "f10", "f9", "ctrl+m":
+				a.menuActive(false)
 				return a, nil
 			}
-			return a, cmd
+			return a, nil // other keys: no hidden navigation while the menu is open
 		}
 		return a.handleKey(m)
 	}
@@ -485,8 +512,31 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	items := a.masterList()
-	// master-list navigation works from every screen (the left pane is always
-	// live — the classic two-pane behavior)
+
+	// TWO-PANE FOCUS (owner's two-pane contract): when the settings screen
+	// is open, focus starts on the RIGHT pane (the settings tree); tab or
+	// left/right hops between panes; j/k/enter act on the pane in focus.
+	rightActive := a.screen == "settings"
+	if rightActive {
+		// tab or an arrow hops between the two panes
+		if k == "tab" || k == "left" || k == "right" {
+			if k == "tab" {
+				a.focus = 1 - a.focus
+			}
+			if k == "left" {
+				a.focus = 0
+			}
+			if k == "right" {
+				a.focus = 1
+			}
+			return a, nil
+		}
+		if a.focus == 1 {
+			return a.settingsKey(msg)
+		}
+	}
+
+	// master-list navigation — the LEFT pane (live on every screen)
 	switch k {
 	case "j", "down":
 		a.dcur = (a.dcur + 1) % len(items)
@@ -642,6 +692,12 @@ func (a *app) openItem(i int) {
 	}
 	a.screen = items[i].id
 	a.editKey, a.editVal, a.editMask = "", "", false
+	if items[i].id == "settings" {
+		a.setLevel, a.setCurGroup, a.setCurSel = 0, 0, 0 // fresh navigation
+		a.focus = 1                                        // the settings tree owns j/k
+	} else {
+		a.focus = 0 // every other screen: the left list owns j/k
+	}
 	a.actResult = ""
 }
 
@@ -923,18 +979,19 @@ func isSecret(key string) bool {
 }
 
 func (a *app) settingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	k := msg.String()
+	// EDIT MODE (unchanged behavior from the flat era): the box consumes typing
 	if a.editKey != "" {
-		switch msg.String() {
+		switch k {
 		case "backspace", "delete":
 			if len(a.editVal) > 0 {
 				a.editVal = a.editVal[:len(a.editVal)-1]
 			}
 			return a, nil
-		case "enter", "x", "ctrl+s", "esc", "q":
-			if msg.String() == "esc" || msg.String() == "q" {
-				a.editKey, a.editVal, a.editMask = "", "", false
-				return a, nil
-			}
+		case "esc", "q":
+			a.editKey, a.editVal, a.editMask = "", "", false
+			return a, nil
+		case "enter", "x", "ctrl+s":
 			key := a.editKey
 			val := strings.TrimSpace(a.editVal)
 			a.editKey, a.editVal, a.editMask = "", "", false
@@ -958,22 +1015,56 @@ func (a *app) settingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return a, nil
 	}
-	keys := a.flatKeys()
-	n := max2(1, len(keys))
-	switch msg.String() {
-	case "down", "j":
-		if len(keys) > 0 {
-			a.setCurSel = (a.setCurSel + 1) % len(keys)
-		}
-	case "up", "k":
-		if len(keys) > 0 {
-			a.setCurSel = (a.setCurSel - 1 + n) % len(keys)
-		}
-	case "enter", "e":
-		if len(keys) == 0 {
+	// LEVEL 0 — navigate the groups (owner: the settings tree)
+	if a.setLevel == 0 || len(a.setGroups) == 0 {
+		n := max2(1, len(a.setGroups))
+		switch k {
+		case "down", "j":
+			if len(a.setGroups) > 0 {
+				a.setCurGroup = (a.setCurGroup + 1) % n
+			}
+			return a, nil
+		case "up", "k":
+			if len(a.setGroups) > 0 {
+				a.setCurGroup = (a.setCurGroup - 1 + n) % n
+			}
+			return a, nil
+		case "enter", "l":
+			if len(a.setGroups) == 0 {
+				return a, nil
+			}
+			a.setLevel = 1
+			a.setCurSel = 0
 			return a, nil
 		}
-		e := keys[a.setCurSel]
+		return a, nil
+	}
+	// LEVEL 1 — the keys of the selected group
+	if a.setCurGroup >= len(a.setGroups) {
+		a.setCurGroup = 0
+	}
+	gkeys := a.setGroups[a.setCurGroup].Keys
+	n := max2(1, len(gkeys))
+	switch k {
+	case "down", "j":
+		if len(gkeys) > 0 {
+			a.setCurSel = (a.setCurSel + 1) % n
+		}
+		return a, nil
+	case "up", "k":
+		if len(gkeys) > 0 {
+			a.setCurSel = (a.setCurSel - 1 + n) % n
+		}
+		return a, nil
+	case "b":
+		// back a level (to the groups); tab/arrow-left hops panes instead
+		a.setLevel = 0
+		return a, nil
+	case "enter", "e":
+		if len(gkeys) == 0 {
+			return a, nil
+		}
+		e := gkeys[a.setCurSel%len(gkeys)]
 		v := e.Value
 		if e.Secret && e.Present {
 			if real, present, _ := a.set.Reveal(e.Key); present {

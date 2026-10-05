@@ -321,7 +321,7 @@ func formString(cxt *core.Cxt, field string) string {
 // provider keystore for the assertion).
 func prodExportDeps(a *core.App, cxt *core.Cxt) *exportDeps {
 	d := &exportDeps{
-		Caller: &S2SCall{Store: fedStore(a, cxt), Site: cxt.SiteURL, Now: time.Now},
+		Caller: &S2SCall{Store: fedStore(a, cxt), Site: cxt.SiteURL, Now: time.Now, S2SUROverride: s2sPeerURLOverride()},
 		Now:    time.Now,
 	}
 	if db := dbHandle(a); db != nil {

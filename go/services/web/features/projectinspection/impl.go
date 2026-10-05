@@ -48,10 +48,10 @@ func oidHex(v any) string {
 }
 
 type ent struct {
-	id    string
-	path  string
-	typ   string
-	hash  string
+	id   string
+	path string
+	typ  string
+	hash string
 }
 
 // walkFolder mirrors _getAllFoldersFromProject + getAllEntitiesFromProject
@@ -235,7 +235,10 @@ func (s *svc) runWorkerDefault(ctx context.Context, snapshot []byte) ([]byte, er
 	defer cancel()
 	cmd := exec.CommandContext(ctx, c.NodeBin, c.Worker)
 	cmd.Stdin = bytes.NewReader(snapshot)
-	cmd.Stderr = io.Discard
+	var errb bytes.Buffer
+	cmd.Stderr = &errb // the worker's stderr is the only failure signal it has
+	// (a silent exit otherwise surfaces as an unexplained 500); keep the
+	// tail for the error below.
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	runErr := cmd.Run()
@@ -244,6 +247,12 @@ func (s *svc) runWorkerDefault(ctx context.Context, snapshot []byte) ([]byte, er
 	}
 	if ctx.Err() != nil {
 		return nil, errCancelled
+	}
+	if e := strings.TrimSpace(errb.String()); e != "" {
+		if len(e) > 4096 {
+			e = "…" + e[len(e)-4096:]
+		}
+		return nil, errInternal("worker exited: " + runErr.Error() + " | stderr: " + e)
 	}
 	if runErr != nil {
 		return nil, errInternal("worker exited: " + runErr.Error())
