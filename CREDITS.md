@@ -16,6 +16,26 @@ something from their code we put them into CREDITS.md").
   `bubbles`, `lipgloss` (styling). Used by the operator TUI in
   `go/services/toolkit`.
 
+- **bubbletea-console-classic libraries (MIT, credited per the policy)** —
+  the classic-console (midnight-commander / freebsd-installer) TUI structure
+  in `go/services/toolkit` (menu bar + two-pane layout + prompt boxes +
+  mouse click targets) borrows three small Charm-ecosystem libraries, used
+  through their public APIs (no code copied):
+  - **jejacks0n/bubbletea-menubar**
+    (https://github.com/jejacks0n/bubbletea-menubar) — the top menu bar
+    (`ui_menu.go`): the `File · Stack · Settings · Shells · Doctor · Backup ·
+    Actions · Help` strip with hotkeys + dropdowns + its own mouse handling.
+  - **rmhubbert/bubbletea-overlay**
+    (https://github.com/rmhubbert/bubbletea-overlay) — the centered prompt
+    boxes (`ui_dialog.go`): `Composite`/`Position` do the background/foreground
+    compositing + centering of the mc-style confirm and input dialogs over the
+    panes.
+  - **lrstanley/bubblezone**
+    (https://github.com/lrstanley/bubblezone) — zone click targets
+    (`ui_view.go` / `ui_dialog.go` / `ui.go`): `zone.Mark`/`zone.Scan`/
+    `zone.Get` register the master-list rows, the keystrip chips and the
+    dialog buttons as hit-testable zones (the classic clickable UI).
+
 - **Moby (Docker)** — `github.com/moby/moby/client` (official Go client) for all
   daemon operations (container list/logs/images, exec attach for interactive
   shells, restart). The `stdcopy` stream demultiplexing in

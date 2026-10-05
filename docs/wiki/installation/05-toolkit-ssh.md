@@ -88,21 +88,37 @@ OlliTeX Toolkit 0.1.0 (rev 74da2e6)
 
 ![toolkit TUI dashboard](../assets/installation/05-toolkit-1.png)
 
-**Dashboard** (arrow keys / `j` `k`, `enter` or digits `1`–`8`):
+**The layout** — the classic console structure (midnight-commander /
+freebsd-installer direction): the **menu bar** on top (`File · Stack ·
+Settings · Shells · Doctor · Backup · Actions · Help` — `F10` or a click on a
+label opens it), the **two bordered panes** below (left = the master list,
+right = the detail of the selection), the **status line** (stack/store/job
+state) and the **keystrip** (`[j/k] move [enter] open [u] start [d] stop
+…`). Destructive moves (stop · restart · restore · quit) open a **mc prompt
+box** — a bordered `yes / no` dialog centered over the panes (a stray click is
+a NO). The master list:
 
 | # | Item | What it does |
 |---|------|--------------|
-| 1 | **Stack** `N/M up` | per-container status + start (`s`) / stop (`t`) |
-| 2 | **Shells** | live `exec` into: `mongo (mongosh)` → sharelatex · `postgres (psql)` → overleaf-history-v1 · `app sh (/app)` · `app sh (/home/overleaf)` |
-| 3 | **Actions** | TLS cert/key import (2-step) · n-gram model downloads (`en,de,es,fr,…`) |
-| 4 | **Logs** | tail any container's logs |
-| 5 | **Settings** | the config store, edit-in-place (secret keys masked; `reveal` is explicit) |
-| 6 | **Doctor** | docker / store / stack health rows (green/red) |
-| 7 | **Backup** | dump / restore the config store into the data dir |
-| 8 | **About** | build revision + config plane provenance |
+| 1 | **Dashboard** `N/M up` | the overview (stack + store + host contract) |
+| 2 | **Stack** `N/M up` | the compose plan + per-container status; start (`u`) / stop (`d`) / restart (`r`) / pull (`p`) — the action row is clickable too |
+| 3 | **Logs** | tail any container's logs (`h`/`l` cycle, `f` refresh) |
+| 4 | **Settings** | the config store, edit-in-place (secret keys masked; stored values never re-shown) |
+| 5 | **Shells** | live `exec` into: `mongo (mongosh)` → sharelatex · `postgres (psql)` → overleaf-history-v1 · `app sh (/app)` · `app sh (/home/overleaf)` — `1`–`4` |
+| 6 | **Actions** | TLS cert/key import (`t`, 2-step) · n-gram downloads (`n`) · n-gram status (`l`) · first-admin bootstrap (`b`) |
+| 7 | **Doctor** | docker / store / compose / data-dir / stack health rows (green/red; `r` re-runs) |
+| 8 | **Backup** | dump (`b`) / restore (`r`, confirmed) the config store into the data dir |
+| 9 | **About** | build revision + the config-plane provenance |
 
-Global keys: `s` start stack · `t` stop stack · `ctrl-c` → shell SIGINT ·
-`ctrl-z` → detach back to the menu · in the shell, `exit` returns to the TUI.
+Global keys: `F10` menu bar · `F1`/`?` help · `s` start · `t` (or `d`) stop
+(confirmed) · `j`/`k` + `1`–`8` the master list · `enter` open · `ctrl-c` →
+shell SIGINT · `ctrl-z` → detach the shell back to the panes · in the shell,
+`exit` returns to the TUI.
+
+The menu bar, the centered prompt boxes and the click targets come from three
+small MIT-licensed Charm-ecosystem libraries (`jejacks0n/bubbletea-menubar`,
+`rmhubbert/bubbletea-overlay`, `lrstanley/bubblezone`) — credited in
+`CREDITS.md` per the project's credits policy.
 
 ## 5. First boot (the happy path)
 

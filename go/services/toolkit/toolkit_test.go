@@ -63,7 +63,7 @@ func TestNewApp_DashboardRenders(t *testing.T) {
 	tk, _ := offlineToolkit(t)
 	a := newApp(tk)
 	a.width, a.height = 100, 30
-	a.kind = scrDashboard
+	a.screen = "dashboard"
 	a.Init()
 	v := a.View()
 	if !strings.Contains(v, "OlliTeX Toolkit") {
@@ -78,13 +78,19 @@ func TestNewApp_AllScreensRender(t *testing.T) {
 	tk, _ := offlineToolkit(t)
 	a := newApp(tk)
 	a.width, a.height = 100, 30
-	for _, kind := range []screenKind{scrDashboard, scrSettings, scrStack, scrLogs, scrDoctor, scrBackup, scrAbout} {
-		a.kind = kind
+	for _, screen := range []string{"dashboard", "stack", "shells", "settings", "logs", "actions", "doctor", "backup", "about"} {
+		a.screen = screen
 		v := a.View()
 		if strings.TrimSpace(v) == "" {
-			t.Fatalf("screen %d rendered empty", kind)
+			t.Fatalf("screen %s rendered empty", screen)
 		}
 	}
+	// the mc prompt box (the overlay compositor) must render over the panes
+	a.askStop()
+	if !strings.Contains(a.View(), "STOP THE STACK") {
+		t.Fatalf("the stop-confirm box did not render over the panes")
+	}
+	a.dlg = nil
 }
 
 func TestSettings_SetGetBoolKind(t *testing.T) {

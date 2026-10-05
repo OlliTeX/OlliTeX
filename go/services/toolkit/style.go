@@ -67,6 +67,35 @@ var (
 
 	styleValue = lipgloss.NewStyle().Foreground(colText)
 	styleKvK   = lipgloss.NewStyle().Foreground(colDim).Width(24)
+
+	// ---- the classic console set (mc / freebsd-installer direction) --------
+	// pane-frame title (the mc window title: " Name " on the top border)
+	stylePaneTitle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colFg).
+			Background(colKeyBG)
+	// the right-pane section head (mc: the "(Dir)"-style header line)
+	styleHead = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("51")).
+			Background(lipgloss.Color("236")).
+			Padding(0, 1)
+	// the classic [F5] key-chip (the bottom keystrip + the action row)
+	styleChip = lipgloss.NewStyle().
+			Foreground(colAccent).
+			Background(colKeyBG).
+			Padding(0, 1)
+	// the input line inside a dialog (the freebsd-installer "text:" row)
+	styleEdit = lipgloss.NewStyle().
+			Foreground(colFg).
+			Background(lipgloss.Color("236")).
+			Padding(0, 1)
+	// dialog title bar (the mc prompt-box header)
+	styleDlgTitle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("16")).
+			Background(colAccent).
+			Padding(0, 1)
 )
 
 // width helper
