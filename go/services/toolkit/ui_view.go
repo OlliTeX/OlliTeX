@@ -108,9 +108,18 @@ func (a *app) viewClassic() string {
 	out.WriteString(a.menuBarLine() + "\n")
 
 	// the panes (left = master list, right = the screen detail)
-	paneH := a.height - 5
-	if paneH < 4 {
-		paneH = 4
+	// PANE DISCIPLINE (owner feedback: the full-height padded panes read as
+	// one broken box on tall terminals): the master pane hugs its content
+	// (the SCREENS list — a compact column, the mc left panel) and the
+	// detail pane is capped (compact console density instead of a 30-row
+	// wall of empty rows when the log is quiet).
+	rawH := a.height - 5
+	detailH := 20 // content rows for the right pane (box = +2 borders)
+	if rawH < detailH {
+		detailH = rawH
+	}
+	if detailH < 4 {
+		detailH = 4
 	}
 	var left strings.Builder
 	left.WriteString(stylePaneTitle.Render("  S C R E E N S  "))
@@ -122,16 +131,16 @@ func (a *app) viewClassic() string {
 	}
 	body := left.String()
 	filled := strings.Count(body, "\n")
-	if filled < paneH {
-		body += strings.Repeat("\n", paneH-filled)
+	if filled < 6 { // a floor for very small master lists (short screens)
+		body += strings.Repeat("\n", 6-filled)
 	}
 	leftS := stylePanel.Render(body)
 
 	rightBody := a.rightPane()
 	rb := rightBody
 	rfilled := strings.Count(rb, "\n")
-	if rfilled < paneH {
-		rb += strings.Repeat("\n", paneH-rfilled)
+	if rfilled < detailH {
+		rb += strings.Repeat("\n", detailH-rfilled)
 	}
 	rightS := stylePanel.Render(rb)
 
@@ -228,7 +237,7 @@ func (a *app) keyStrip() string {
 	case "shells":
 		seg = append(seg, zc("shell", "1-4", "shell"))
 	}
-	seg = append(seg, zc("menu", "F10", "menu"), zc("help", "?", "help"))
+	seg = append(seg, zc("menu", "F10|esc0", "menu"), zc("help", "?", "help"))
 	s := " " + strings.Join(seg, " ")
 	if lipgloss.Width(s) > a.width {
 		s = " " + strings.Join(seg[:len(seg)-2], " ")
@@ -287,7 +296,7 @@ func (a *app) panelDashboard() string {
 	b.WriteString("\n")
 	b.WriteString("  host contract: docker + one mounted folder + the docker socket.\n")
 	b.WriteString("  the left list is the master pane — enter opens a screen.\n")
-	b.WriteString("  F10 (or a click on a label) opens the menu bar.\n")
+	b.WriteString("  F10 opens the menu bar (F9 and ctrl+M too — and ESC then 0: the terminal-friendly fallback for when the F-keys do not arrive; a lone ESC keeps its back/close/quit behavior after a short window).\n")
 	return b.String()
 }
 

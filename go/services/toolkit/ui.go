@@ -81,6 +81,10 @@ type app struct {
 	logLines []string
 	logName  string
 
+	// esc fallback state (the terminal-friendly alt-0 / esc+0 menu opener:
+	// a lone ESC still gets its semantics after the 300ms window)
+	escPending bool
+
 	// settings
 	setGroups []Group
 	setCurSel int
@@ -264,6 +268,22 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case menuActionMsg:
 		return a, a.dispatchMenu(m.action)
 
+	case escTimeoutMsg:
+		// the esc+0 window closed without a 0 → the lone ESC gets its
+		// semantics now (no delayed back/close/quit surprise).
+		a.escPending = false
+		next, cmd := a.escSemantics()
+		return next, cmd
+
+	case logTickMsg:
+		// auto-refresh chain: while the logs screen is focused and idle, keep
+		// the tail live (the classic: the log window refreshes itself — no
+		// manual [f] needed to see the box fill).
+		if a.screen == "logs" && !a.loading && a.logName != "" && a.dock != nil {
+			return a, a.refreshLogs(a.logName)
+		}
+		return a, nil
+
 	case jobMsg:
 		a.loading = false
 		if m.err != nil {
@@ -272,9 +292,14 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.errMsg = ""
 		switch m.job {
-		case "ping", "logs":
+		case "ping":
 			a.statusMsg = ""
 			return a, nil
+		case "logs":
+			a.statusMsg = ""
+			// re-arm the 2s tick (the chain stops of its own accord once the
+			// user leaves the logs screen or the dock goes away).
+			return a, logTickCmd()
 		case "start", "stop", "restart":
 			a.statusMsg = m.job + " done" + tail(m.out)
 			return a, a.refreshStatus()
@@ -398,7 +423,9 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
 	// global
 	switch k {
-	case "f10", "ctrl+m":
+	case "f10", "ctrl+m", "f9":
+		// f10 is primary (the mc convention); ctrl+m is the vt100-era F10
+		// byte; f9 is a safe alias for terminals whose F10 never arrives.
 		a.menuActive(true)
 		return a, nil
 	case "f1", "?":
@@ -416,23 +443,42 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 		return a, tea.Quit
-	case "esc", "q":
-		a.dlg = nil
-		a.editKey, a.editVal, a.editMask = "", "", false
+	case "q":
+		// q is the unambiguous exit — no fallback-window ambiguity.
+		next, cmd := a.escSemantics()
+		return next, cmd
+	case "esc":
+		// ESC is special: it is also the prefix of the terminal-friendly
+		// menu fallback (ESC then 0 — the mc alt-F habit, for terminals
+		// where the F-keys do not arrive). A 300ms window (standard
+		// ESCDELAY shape) decides which meaning it was; ESC while the menu
+		// is open stays immediate (close the menu — mc behavior).
 		if a.menuOpen {
-			a.menuActive(false)
+			next, cmd := a.escSemantics()
+			return next, cmd
+		}
+		a.escPending = true
+		return a, tea.Tick(300*time.Millisecond, func(time.Time) tea.Msg { return escTimeoutMsg{} })
+	}
+
+	// pending-ESC resolution: ESC+0 → the menu; anything else → the ESC
+	// semantics run first, then this key is processed as a normal key.
+	if a.escPending {
+		a.escPending = false
+		if k == "0" {
+			a.menuActive(true)
 			return a, nil
 		}
-		if a.screen != "dashboard" {
-			a.screen = "dashboard"
-			a.dcur = 0
-			return a, nil
+		next, cmd := a.escSemantics()
+		ap, ok := next.(*app)
+		if !ok {
+			return next, cmd // the ESC quit: nothing left to do
 		}
-		if a.stackUpNow() {
-			a.askQuit()
-			return a, nil
+		a = ap
+		if k == "esc" {
+			return a, nil // a double ESC is the first ESC (no re-pending loop)
 		}
-		return a, tea.Quit
+		// fall through: process this key normally below
 	}
 
 	items := a.masterList()
@@ -552,6 +598,37 @@ func (a *app) menuActive(on bool) {
 		a.menu.SubMenuState = nil
 	}
 	a.menuOpen = on
+}
+
+// escSemantics — what a lone ESC does (mc order: close dialog → close menu →
+// back to the dashboard → quit confirm — quit only when the stack is up).
+func (a *app) escSemantics() (tea.Model, tea.Cmd) {
+	a.dlg = nil
+	a.editKey, a.editVal, a.editMask = "", "", false
+	if a.menuOpen {
+		a.menuActive(false)
+		return a, nil
+	}
+	if a.screen != "dashboard" {
+		a.screen = "dashboard"
+		a.dcur = 0
+		return a, nil
+	}
+	if a.stackUpNow() {
+		a.askQuit()
+		return a, nil
+	}
+	return a, tea.Quit
+}
+
+// escTimeoutMsg — fired when the ESC fallback window expires without a 0.
+type escTimeoutMsg struct{}
+
+// logTickMsg — the logs auto-refresh heartbeat (2s chain while focused).
+type logTickMsg struct{}
+
+func logTickCmd() tea.Cmd {
+	return tea.Tick(2*time.Second, func(time.Time) tea.Msg { return logTickMsg{} })
 }
 
 // openItem sets the screen for the master row (the right pane re-renders).
