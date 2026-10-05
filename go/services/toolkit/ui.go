@@ -421,6 +421,29 @@ func (a *app) shellKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
+
+	// pending-ESC resolution runs BEFORE the global switch (a second ESC
+	// must be consumed, not re-armed): ESC+0 → the menu; anything else →
+	// the ESC semantics run first, then this key is processed normally.
+	if a.escPending {
+		a.escPending = false
+		if k == "0" {
+			a.menuActive(true)
+			return a, nil
+		}
+		if k == "esc" {
+			next, cmd := a.escSemantics() // the double ESC is the first ESC
+			return next, cmd
+		}
+		next, cmd := a.escSemantics()
+		ap, ok := next.(*app)
+		if !ok {
+			return next, cmd // the ESC quit: nothing left to do
+		}
+		a = ap
+		// fall through: process this key normally below
+	}
+
 	// global
 	switch k {
 	case "f10", "ctrl+m", "f9":
@@ -459,26 +482,6 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		a.escPending = true
 		return a, tea.Tick(300*time.Millisecond, func(time.Time) tea.Msg { return escTimeoutMsg{} })
-	}
-
-	// pending-ESC resolution: ESC+0 → the menu; anything else → the ESC
-	// semantics run first, then this key is processed as a normal key.
-	if a.escPending {
-		a.escPending = false
-		if k == "0" {
-			a.menuActive(true)
-			return a, nil
-		}
-		next, cmd := a.escSemantics()
-		ap, ok := next.(*app)
-		if !ok {
-			return next, cmd // the ESC quit: nothing left to do
-		}
-		a = ap
-		if k == "esc" {
-			return a, nil // a double ESC is the first ESC (no re-pending loop)
-		}
-		// fall through: process this key normally below
 	}
 
 	items := a.masterList()

@@ -157,7 +157,13 @@ func (a *app) viewClassic() string {
 	}
 	leftFit := fit(leftS, leftW)
 	rightFit := fit(rightS, rightW)
-	out.WriteString(leftFit + " " + rightFit + "\n")
+	// THE JOIN (owner: "the two windows failed"): naive string concatenation
+	// of two multi-line boxes is not a layout — the right box's top border
+	// lands on the left box's bottom row (exactly the broken screen the
+	// owner saw). JoinHorizontal aligns them as two true side-by-side panes
+	// (top-anchored; the shorter pane leaves the terminal background clear
+	// below it — the mc look).
+	out.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftFit, rightFit)+"\n")
 
 	// status line
 	out.WriteString(a.statusLine() + "\n")

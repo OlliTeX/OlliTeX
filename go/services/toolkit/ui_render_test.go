@@ -71,3 +71,120 @@ func TestUI_RenderAllScreens(t *testing.T) {
 		}
 	}
 }
+
+// TestUI_EscZeroMenuFallback — the terminal-friendly menu fallbacks
+// (owner: F10 does not arrive in their terminal; mc users use esc+0):
+// ESC then 0 opens the menu, F9 is an alias, and a LONE esc still gets its
+// back/close/quit semantics once the 300ms window expires.
+func TestUI_EscZeroMenuFallback(t *testing.T) {
+	tk, _ := offlineToolkit(t)
+	a := newApp(tk)
+	a.width, a.height = 110, 32
+
+	// ESC enters the pending-fallback window (it does NOT act immediately).
+	next, cmd := a.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	b, ok := next.(*app)
+	if !ok {
+		t.Fatalf("esc returned a non-*app model")
+	}
+	if !b.escPending {
+		t.Fatalf("esc must arm the esc+0 fallback window")
+	}
+	if cmd == nil {
+		t.Fatalf("the pending esc needs its timeout cmd (lone-esc resolution)")
+	}
+
+	// ... and 0 within the window opens the menu bar.
+	next, _ = b.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'0'}})
+	c, _ := next.(*app)
+	if !c.menuOpen {
+		t.Fatalf("esc then 0 must open the menu bar (the mc fallback)")
+	}
+
+	// F9 works too (safe alias for terminals whose F10 never arrives).
+	if c.menuOpen {
+		c.menuActive(false)
+	}
+	next, _ = c.Update(tea.KeyMsg{Type: tea.KeyF9})
+	d, _ := next.(*app)
+	if !d.menuOpen {
+		t.Fatalf("F9 must open the menu bar (alias fallback)")
+	}
+	d.menuActive(false)
+
+	// LONE esc (window expired) keeps its semantics: from a screen it goes
+	// back to the dashboard; from the dashboard with a downed stack it quits.
+	d.screen = "logs"
+	next, _ = d.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	e, _ := next.(*app)
+	if !e.escPending {
+		t.Fatalf("lone esc must arm the window before acting")
+	}
+	next, _ = e.Update(escTimeoutMsg{})
+	f, _ := next.(*app)
+	if f.screen != "dashboard" {
+		t.Fatalf("lone esc from logs must land on the dashboard, got %q", f.screen)
+	}
+
+	// a double ESC must not re-pend forever (the second ESC is consumed).
+	f.screen = "stack"
+	next, _ = f.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	g, _ := next.(*app)
+	if !g.escPending {
+		t.Fatalf("esc must arm the window")
+	}
+	next, _ = g.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if h, _ := next.(*app); h.escPending {
+		t.Fatalf("a second ESC must be consumed (no re-pend loop)")
+	}
+}
+
+// TestUI_PaneDiscipline — on a tall terminal the panes stay compact
+// (owner: the full-height padded panes read as one broken box): the LOGS
+// box is capped, and the whole frame stays far below the terminal height.
+func TestUI_PaneDiscipline(t *testing.T) {
+	tk, _ := offlineToolkit(t)
+	a := newApp(tk)
+	a.width, a.height = 100, 48 // the owner-class tall terminal
+	a.screen = "logs"
+	a.dcur = 3
+	v := a.View()
+	lines := strings.Split(strings.TrimRight(v, "\n"), "\n")
+
+	// total frame height: title + menubar + max(panes) + status + keystrip
+	if len(lines) > 30 {
+		t.Fatalf("frame is %d rows on a 48-row terminal — the panes are still\nfull-height walls (they must be compact):\n%s", len(lines), v)
+	}
+
+	// the LOGS box itself is capped (~20 content rows + borders).
+	top, bot := -1, -1
+	for i, l := range lines {
+		if top < 0 && "LOGS" == strings.TrimSpace(strings.Trim(strings.SplitN(l, " ", 2)[0], " ")) {
+		}
+		if strings.Contains(l, "LOGS") && strings.Contains(l, "┌") {
+			top = i
+		}
+	}
+	if top < 0 {
+		for i, l := range lines {
+			if strings.Contains(l, "┌") && i+1 < len(lines) && strings.Contains(lines[i+1], "LOGS") {
+				top = i
+				break
+			}
+		}
+	}
+	if top >= 0 {
+		for i := top + 1; i < len(lines); i++ {
+			if strings.Contains(lines[i], "└") && strings.Contains(lines[i], "┘") {
+				bot = i
+				break
+			}
+		}
+	}
+	if top < 0 || bot < top {
+		t.Fatalf("could not find the LOGS box boundaries:\n%s", v)
+	}
+	if h := bot - top + 1; h > 24 {
+		t.Fatalf("LOGS box is %d rows — must stay compact (<=24), got:\n%s", h, v)
+	}
+}
