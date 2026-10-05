@@ -262,6 +262,23 @@ func buildSP(p *SAMLProvider, spCfg *SPConfig, siteURL string) *saml.ServiceProv
 		AuthnNameIDFormat: nameIDFormat(p.IdentifierFormat),
 		ForceAuthn:        boolPtr(p.ForceAuthn),
 	}
+	// IdP SSO binding location: crewjam resolves the SSO service through
+	// sp.IDPMetadata (nil ⇒ runtime panic in Make*AuthenticationRequest AND
+	// in GetSSOBindingLocation itself — live 500 found in the 2026-10-06 SSO
+	// positive-leg E2E). The provider entryPoint IS the SSO service location;
+	// expose it for both bindings (the boxyhq/soluto-class IdPs serve the same
+	// endpoint on both). A nil IDPMetadata is never exposed.
+	md := &saml.EntityDescriptor{EntityID: p.Issuer}
+	if p.EntryPoint != "" {
+		ep := mustURL(p.EntryPoint)
+		md.IDPSSODescriptors = []saml.IDPSSODescriptor{{
+			SingleSignOnServices: []saml.Endpoint{
+				{Binding: saml.HTTPRedirectBinding, Location: ep.String()},
+				{Binding: saml.HTTPPostBinding, Location: ep.String()},
+			},
+		}}
+	}
+	sp.IDPMetadata = md
 	if p.SignatureAlgorithm != "" {
 		sp.SignatureMethod = p.SignatureAlgorithm
 	}
