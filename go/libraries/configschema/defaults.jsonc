@@ -191,6 +191,7 @@
     "REALTIME_PASS": null, // real-time API password  [secret: masked in listings; field-encrypted in the store]
     "SECRET_TOKEN": null, // Generic secret token  [secret: masked in listings; field-encrypted in the store]
     "OVERLEAF_INVITE_TOKEN_SECRET": null, // Invite token signing secret  [secret: masked in listings; field-encrypted in the store]
+    "SHARED_SERVICE_TOKEN": null, // Shared-secret token for the Go service plane  [secret: masked in listings; field-encrypted in the store]
     "TOKEN_CIPHER_FILE": null, // Token cipher file
     "TOKEN_CIPHER_LABEL": null, // Token cipher label
     "TOKEN_CIPHER_PASSWORD": null, // Token cipher password  [secret: masked in listings; field-encrypted in the store]
@@ -210,7 +211,7 @@
     "OVERLEAF_PORT": 80, // Published port of the main ollitex container
     "MONGO_ENABLED": true, // Start the MongoDB container (content DB)
     "MONGO_DATA_PATH": "data/mongo", // Host folder for MongoDB data (inside the mounted data dir)
-    "MONGO_URL": "mongodb://mongo/sharelatex", // Mongo connection string  [secret: masked in listings; field-encrypted in the store]
+    "MONGO_URL": "mongodb://mongo:27017/sharelatex?replicaSet=overleaf", // Mongo connection string (e2e-proven; single-node RS "overleaf")  [secret: masked; field-encrypted]
     "REDIS_ENABLED": true, // Start the Redis container (sessions/cache)
     "REDIS_DATA_PATH": "data/redis", // Host folder for Redis persistence
     "REDIS_HOST": "redis", // Redis host as seen by the app containers

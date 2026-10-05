@@ -291,6 +291,79 @@ func TestShell_LiveMongo(t *testing.T) {
 	t.Logf("shell feed OK: %q", text)
 }
 
+func TestPlan_AppEnvContract(t *testing.T) {
+	tk, dir := offlineToolkit(t)
+	lib := filepath.Join("..", "..", "..", "toolkit", "lib")
+	if fi, err := os.Stat(filepath.Join(lib, "docker-compose.base.yml")); err != nil || fi.IsDir() {
+		t.Skipf("templates not present at %s", lib)
+	}
+	tk.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
+
+	required := []string{"CRYPTO_RANDOM", "WEB_API_PASSWORD", "SHARED_SERVICE_TOKEN", "OT_JWT_AUTH_KEY", "OVERLEAF_SESSION_SECRET", "OVERLEAF_INVITE_TOKEN_SECRET"}
+
+	// pre-set one value: the store value must win (plan never clobbers)
+	if err := tk.Store.Set("CRYPTO_RANDOM", "operator-chosen-value", "test"); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := tk.Plan()
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	for _, k := range required {
+		v := plan.Env[k]
+		if v == "" {
+			t.Fatalf("%s missing from the app-env plane", k)
+		}
+		if k == "CRYPTO_RANDOM" && v != "operator-chosen-value" {
+			t.Fatalf("CRYPTO_RANDOM = %q, want the pre-set store value preserved", v)
+		}
+		if k != "CRYPTO_RANDOM" && len(v) != 32 {
+			t.Fatalf("%s = len %d, want a generated 32-hex secret (never printed, store-persisted)", k, len(v))
+		}
+	}
+	// generated secrets landed in the store (auditability) but the plan
+	// notes carry provenance, not values
+	for _, k := range []string{"WEB_API_PASSWORD", "OVERLEAF_INVITE_TOKEN_SECRET"} {
+		stored, _ := tk.Store.Get(k)
+		if stored != plan.Env[k] {
+			t.Fatalf("store %s = %q, plan env = %q", k, stored, plan.Env[k])
+		}
+	}
+	_ = dir
+}
+
+func TestPlan_MongoDSNContract(t *testing.T) {
+	tk, dir := offlineToolkit(t)
+	lib := filepath.Join("..", "..", "..", "toolkit", "lib")
+	if fi, err := os.Stat(filepath.Join(lib, "docker-compose.base.yml")); err != nil || fi.IsDir() {
+		t.Skipf("templates not present at %s", lib)
+	}
+	tk.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
+
+	plan, err := tk.Plan()
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if plan.Env["MONGO_URL"] == "" || plan.Env["MONGO_URL"] == "mongodb://dockerhost/sharelatex" {
+		t.Fatalf("MONGO_URL = %q — the bootstrap/migration default points at a nonexistent host; the plane must carry a real DSN", plan.Env["MONGO_URL"])
+	}
+	if plan.Env["OVERLEAF_MONGO_URL"] != plan.Env["MONGO_URL"] {
+		t.Fatalf("app-plane alias drifted from MONGO_URL")
+	}
+	// operator-set DSN wins
+	if err := tk.Store.Set("MONGO_URL", "mongodb://mongo.internal:27018/ot?replicaSet=prod", "test"); err != nil {
+		t.Fatal(err)
+	}
+	plan2, err := tk.Plan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan2.Env["MONGO_URL"] != "mongodb://mongo.internal:27018/ot?replicaSet=prod" {
+		t.Fatalf("store MONGO_URL not honored: %q", plan2.Env["MONGO_URL"])
+	}
+	_ = dir
+}
+
 func skipIfNoDocker(t *testing.T) {}
 
 // TestPlan_MonitoringOptIn — the D22 ecosystem is OFF by default (the base

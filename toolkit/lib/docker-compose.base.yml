@@ -19,6 +19,20 @@ services:
           REDIS_HOST: "${REDIS_HOST}"
           REDIS_PORT: "${REDIS_PORT}"
           V1_HISTORY_URL: "http://ollitex:3100/api"
+          # The app + the Node migrations both default to `mongodb://dockerhost`
+          # when unset — a nonexistent host in this network — so the DSN is
+          # ALWAYS passed (store value; e2e-proven single-node RS default)
+          MONGO_URL: "${MONGO_URL}"
+          OVERLEAF_MONGO_URL: "${OVERLEAF_MONGO_URL}"
+          # App-env contract: the bootstrap-gated + Go-plane secrets, sourced
+          # from the config store (the toolkit's plan renders + validates
+          # them; generated + stored when unset — never hand-edited files).
+          CRYPTO_RANDOM: "${CRYPTO_RANDOM}"
+          WEB_API_PASSWORD: "${WEB_API_PASSWORD}"
+          SHARED_SERVICE_TOKEN: "${SHARED_SERVICE_TOKEN}"
+          OT_JWT_AUTH_KEY: "${OT_JWT_AUTH_KEY}"
+          OVERLEAF_SESSION_SECRET: "${OVERLEAF_SESSION_SECRET}"
+          OVERLEAF_INVITE_TOKEN_SECRET: "${OVERLEAF_INVITE_TOKEN_SECRET}"
         healthcheck:
           # ollitex image ships busybox curl; /login 200 = app layer alive
           test: ["CMD-SHELL", "curl -fsS --connect-timeout 5 http://localhost/login >/dev/null || exit 1"]

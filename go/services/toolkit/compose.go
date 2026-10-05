@@ -222,6 +222,51 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 		}
 	}
 
+	// ---- app-env contract (the ollitex container's required plane) ---------
+	// The image bootstrap HARD-requires OVERLEAF_INVITE_TOKEN_SECRET (the
+	// 000_check_missing_secrets gate) and the Go plane needs the session /
+	// crypto / JWT / API secrets: all six live in the config store (single
+	// source of truth — never in a compose file or an env file on disk by
+	// hand). Unset secrets are generated + stored (same provenance pattern
+	// as POSTGRES_PASSWORD / GRAFANA_ADMIN_PASSWORD) and are NEVER printed.
+	for _, key := range []string{
+		"CRYPTO_RANDOM",
+		"WEB_API_PASSWORD",
+		"SHARED_SERVICE_TOKEN",
+		"OT_JWT_AUTH_KEY",
+		"OVERLEAF_SESSION_SECRET",
+		"OVERLEAF_INVITE_TOKEN_SECRET",
+	} {
+		v := t.val(key)
+		if v == "" {
+			buf := make([]byte, 16)
+			if _, err := rand.Read(buf); err != nil {
+				return nil, err
+			}
+			v = hex.EncodeToString(buf)
+			if t.Store != nil {
+				if err := t.Store.Set(key, v, "toolkit:plan-generated"); err != nil {
+					return nil, fmt.Errorf("store generated %s: %w", key, err)
+				}
+			}
+			plan.Notes = append(plan.Notes, "generated + stored a new "+key+" (set one in the store to choose your own)")
+		}
+		plan.Env[key] = v
+	}
+	// The app's Mongo DSN (and the app-plane alias): the bootstrap + the
+	// Node migration both default to `mongodb://dockerhost/sharelatex` when
+	// unset — a host that does not exist in the compose network (live
+	// smoke-catch: 900_run_web_migrations died with MongoTopologyClosedError
+	// while the DB itself was healthy). The store value wins; the default
+	// is the e2e-proven single-node replica-set DSN (RS name "overleaf",
+	// auto-initiated by the mongo overlay's healthcheck).
+	mongoURL := t.val("MONGO_URL")
+	if mongoURL == "" {
+		mongoURL = "mongodb://mongo:27017/sharelatex?replicaSet=overleaf"
+	}
+	plan.Env["MONGO_URL"] = mongoURL
+	plan.Env["OVERLEAF_MONGO_URL"] = mongoURL
+
 	// ---- cep-service-set overlays (owner addendum A) --------------------
 	if t.boolVal("GITBRIDGE_SERVICE_ENABLED") {
 		addOverlay("docker-compose.gitbridge.yml")

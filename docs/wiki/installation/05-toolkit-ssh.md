@@ -115,16 +115,21 @@ Global keys: `s` start stack · `t` stop stack · `ctrl-c` → shell SIGINT ·
 
 2. **Check the plan** — `plan` is the read-only answer to "what would
    `up` do?": the overlay list (merge order), the rendered env file path,
-   provenance notes (e.g. "generated + stored a new POSTGRES_PASSWORD"),
-   and a **daemon-valid gate** (`docker compose config --quiet`) — you get
-   compose's own verdict before anything starts.
+   provenance notes (the generated secrets — `POSTGRES_PASSWORD`,
+   the six app-env secrets, `GRAFANA_ADMIN_PASSWORD` — are **noted but
+   never printed**), and a **daemon-valid gate** (`docker compose config
+   --quiet`) — you get compose's own verdict before anything starts.
 
    ![toolkit plan](../assets/installation/05-toolkit-2.png)
 
 3. **Start** — `s` on the dashboard (or `stack up` from the Stack screen).
-   The toolkit renders the env plane into `data/toolkit.env`, materializes
-   the optional services' files, and brings the stack up in the right
-   order. Container health turns `healthy` in the Stack view.
+   The toolkit renders the env plane into `data/toolkit.env` (the six
+   app-env secrets + DSN + generated material, masked), materializes the
+   optional services' files, and brings the stack up in the right order.
+   The app container passes its bootstrap gate (`All checks passed`), runs
+   its migrations, and turns `healthy`. Verified: 9/9 containers healthy
+   and the app answering `GET /` → 302 `/login` (the Go service's
+   anonymous bounce).
 
    ![stack healthy](../assets/installation/05-toolkit-4.png)
 
@@ -215,6 +220,13 @@ generated plan still validates the merged result with the daemon before
 - **One true source**: settings live in the config store (Postgres). There
   is no docker-env settings plane and no rc-file fallback — if the TUI and
   `configdb` disagree, the store wins.
+- **App-env contract**: the six secrets the app bootstrap hard-requires or
+  the Go plane needs (`OVERLEAF_INVITE_TOKEN_SECRET`,
+  `OVERLEAF_SESSION_SECRET`, `CRYPTO_RANDOM`, `WEB_API_PASSWORD`,
+  `SHARED_SERVICE_TOKEN`, `OT_JWT_AUTH_KEY`) plus the Mongo DSN pair
+  (`MONGO_URL` / `OVERLEAF_MONGO_URL`) live in the store. Unset secrets
+  are generated + stored at plan time (provenance noted, never printed);
+  an operator-set value always wins.
 - **Secrets** (DB passwords, tokens, TLS material, the Grafana admin
   password) are stored field-encrypted and masked in listings; the TUI
   never prints them; `plan` notes *that one was generated*, not the value.
@@ -236,8 +248,9 @@ generated plan still validates the merged result with the daemon before
 | `up` fails on a container **name** collision | another instance on the host already uses that name → rename via the §8.4 override + set the `MONITORING_*_HOST` knobs if monitoring targets the renamed DB |
 | Grafana login 401 right after a restore | a stale SQLite WAL can resurrect old user rows — wipe the (non-secret) `data/monitoring/grafana-data` and let Grafana re-seed from `GF_SECURITY_ADMIN_PASSWORD` |
 | exporter `unhealthy` but the DB is fine | check `MONITORING_MONGO_HOST` / `MONITORING_REDIS_HOST` point at the live container names |
+| `ollitex-*` scrape targets stay DOWN while mongodb/redis/node are UP | by image design the Go app services bind `127.0.0.1` inside the ollitex container (the in-container nginx fronts them) — cross-container scrapes can't reach loopback. The scrape config already lists them and lights up automatically when a deployment exposes them on the compose network; the DB/exporter path is the fully-proven path in the multi-container layout |
 | `plan` fails with `compose config FAILED` | read the daemon's message — that is the exact cause (this gate is there to fail early) |
-| app container booting slowly / stuck in migrations | the app env plane is the closeout work (see the project ledger, TODO-a2f1ec5f) — until it lands, the e2e-grade env set is the reference |
+| app container stuck before `healthy` | the app-env contract (six secrets + MONGO_URL/OVERLEAF_MONGO_URL) is rendered from the store and validated by the plan; a crash-loop with `MongoTopologyClosedError` = the DSN pointed at a dead host (the default `mongodb://dockerhost/…` was the live smoke-catch; the store now carries a real DSN — e2e-proven single-node replica set, overridable) |
 | SSH refused on :2222 | host firewall / `-p` binding; password = `OLLITEX_TOOLKIT_PASSWORD(_FILE)` |
 
 ## 11. Legacy scripts → toolkit map (retirement)
