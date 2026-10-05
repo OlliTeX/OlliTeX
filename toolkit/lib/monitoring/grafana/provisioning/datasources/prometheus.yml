@@ -6,6 +6,6 @@ datasources:
     uid: ollitex-prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    url: http://ollitex-prometheus:9090
     isDefault: true
     editable: false

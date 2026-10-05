@@ -293,9 +293,10 @@ services:
       MONITORING_MONGO_HOST: ${MONITORING_MONGO_HOST:-overleafmongo}
       MONITORING_MONGO_PORT: ${MONITORING_MONGO_PORT:-27017}
     healthcheck:
-      # the probe IS the mongo reachability test: healthy == mongo (the
-      # thing it exists to probe) answers on TCP. busybox nc applet verified.
-      test: ["CMD-SHELL", "busybox nc -z -w3 ${MONITORING_MONGO_HOST:-overleafmongo} ${MONITORING_MONGO_PORT:-27017} || exit 1"]
+      # the probe IS the mongo reachability check: healthy == the stack Mongo
+      # answers a real protocol-level ping (busybox is absent from mongo:9.0 —
+      # mongosh is the image's own canonical client).
+      test: ["CMD-SHELL", "mongosh --quiet --host ${MONITORING_MONGO_HOST:-overleafmongo} --port ${MONITORING_MONGO_PORT:-27017} --eval 'db.adminCommand({ping:1})' >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -415,7 +416,10 @@ services:
     volumes:
       - ${PREFIX}/data/seaweedfs/master:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:9333/status >/dev/null || exit 1"]
+      # seaweedfs 4.x: the master's REST /status route is volume-id scoped;
+      # the metrics HTTP port (command -metricsPort=9327) is the stable
+      # liveness surface (verified: 200 with SeaweedFS_* gauges).
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:9327/metrics >/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -426,11 +430,16 @@ services:
     container_name: seaweedfs-volume
     hostname: seaweedfs-volume
     restart: ${ENABLE_SEAWEEDFS:-unless-stopped}
-    command: "volume -url=http://seaweedfs-master:9333"
+    # Proven flag set for this image (3-week legacy plane, same 4.46 build):
+    # -mserver (not -url/-master), HTTP 8080, gRPC 18080 (http+10000 pattern).
+    command: 'volume -mserver=seaweedfs-master:9333 -ip=seaweedfs-volume -ip.bind=0.0.0.0 -port=8080 -dir=/data -max=0'
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_VOLUME_PORT:-8080}:8080"        # volume HTTP
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_VOLUME_GRPC_PORT:-18080}:18080" # volume gRPC
     healthcheck:
-      # image ships a real HTTP client (verified CLIENT-OK); volume exposes
-      # its metrics HTTP server on 10027 (default -metricsPort)
-      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 -o /dev/null http://localhost:10027/metrics || exit 1"]
+      # the volume's /status serves DiskStatuses JSON (200, verified on 4.46);
+      # /metrics there returns 400, so /status is the liveness surface.
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:8080/status >/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -444,13 +453,14 @@ services:
     container_name: seaweedfs-filer
     hostname: seaweedfs-filer
     restart: ${ENABLE_SEAWEEDFS:-unless-stopped}
-    command: "filer -master=seaweedfs-master:9333"
+    command: 'filer -master=seaweedfs-master:9333 -ip=seaweedfs-filer -ip.bind=0.0.0.0'
     ports:
-      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_FILER_PORT:-8333}:8333"
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_FILER_PORT:-8888}:8888"        # filer HTTP (4.x default, legacy-proven)
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_FILER_GRPC_PORT:-18888}:18888" # filer gRPC
     healthcheck:
-      # filer serves /status on its HTTP port (master's /status pattern
-      # proven healthy on the legacy plane)
-      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:8333/status >/dev/null || exit 1"]
+      # seaweedfs 4.x dropped the filer /status route; the filer HTTP root
+      # serves its UI page and answers 200 when up (verified on 4.46)
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:8888/ >/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -464,12 +474,16 @@ services:
     container_name: seaweedfs-s3
     hostname: seaweedfs-s3
     restart: ${ENABLE_SEAWEEDFS:-unless-stopped}
-    command: "s3 -port=8888 -ip.bind=0.0.0.0 -filer=seaweedfs-filer:8333"
+    # S3 gateway default port is 8333 — the app contract (OVERLEAF_FILESTORE_S3_ENDPOINT
+    # = http://seaweedfs-s3:8333). Points at the filer's proven 8888.
+    command: 's3 -filer=seaweedfs-filer:8888 -ip.bind=0.0.0.0'
     ports:
-      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_S3_PORT:-8888}:8888"
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${SEAWEEDFS_S3_PORT:-8333}:8333"   # S3 API
     healthcheck:
-      # s3 server serves /status on its bound port
-      test: ["CMD-SHELL", "curl -fsS --connect-timeout 3 http://localhost:8888/status >/dev/null || exit 1"]
+      # the S3 gateway has no /status; curl (without -f) exits 0 for ANY
+      # HTTP answer (200/403 XML) and non-zero on connection failure.
+      # NOTE: no $variables here — compose interpolates them host-side.
+      test: ["CMD-SHELL", "curl -s -o /dev/null --max-time 5 http://localhost:8333/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
