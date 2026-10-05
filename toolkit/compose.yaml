@@ -242,7 +242,9 @@ services:
     # scratch image: single binary at /mongodb_exporter, no shell —
     # healthcheck = binary startability; DB liveness = ollitex-mongo-probe.
     command:
-      - "--mongodb.uri=mongodb://${MONITORING_MONGO_HOST:-overleafmongo}:${MONITORING_MONGO_PORT:-27017}/sharelatex?directConnection=true"
+      # owner A 2026-10-06: the app's DB is the NEW `ollitex` DB — monitor
+      # that one (the legacy `sharelatex` DB stays untouched and unmonitored)
+      - "--mongodb.uri=mongodb://${MONITORING_MONGO_HOST:-overleafmongo}:${MONITORING_MONGO_PORT:-27017}/${OLLITEX_DB:-ollitex}?directConnection=true"
     environment:
       MONITORING_MONGO_HOST: ${MONITORING_MONGO_HOST:-overleafmongo}
       MONITORING_MONGO_PORT: ${MONITORING_MONGO_PORT:-27017}
@@ -578,3 +580,93 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+
+  # ====================================================================
+  #  WEB PLANE (owner D 2026-10-06: absorbed from compose-web.yaml into the
+  #  ONE canonical stack — compose-web.yaml is RETIRED).
+  #
+  #  ollitex-web : the app. One image for the whole app. Its ONE database is
+  #                the NEW `ollitex` DB (mongo-import target — the legacy
+  #                `sharelatex` DB stays untouched; owner A 2026-10-06).
+  #                Durable file content lives in the SeaweedFS S3 plane (the
+  #                fs filestore is retired, G2 STOR-1).
+  #  haproxy     : the TLS facade (80 → 301 → 443, cep nginx parity).
+  #                Both optional groups, ACTIVE BY DEFAULT (owner B pattern:
+  #                restart: ${ENABLE_*:-unless-stopped}; "no" = off).
+  # ====================================================================
+
+  ollitex-web:
+    image: ${WEB_IMAGE:-ollitex/ollitex:main}
+    container_name: ollitex-web
+    restart: ${ENABLE_OLLITEX_WEB:-unless-stopped}   # Option no / unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+      # data plane = the ONE canonical store (service names = hostnames on
+      # this stack's network). The app's DB is the NEW ollitex DB.
+      OVERLEAF_MONGO_URL: mongodb://overleafmongo:27017/${OLLITEX_DB:-ollitex}
+      MONGO_HOST: overleafmongo
+      MONGO_PORT: "27017"
+      OVERLEAF_REDIS_HOST: overleafredis
+      REDIS_HOST: overleafredis
+      REDIS_PORT: "6379"
+      # secrets come from .env (owner policy: never baked into compose).
+      # OVERLEAF_SESSION_SECRET is REQUIRED (openssl rand -hex 32) — an empty
+      # value here would silently disable session signing.
+      OVERLEAF_SESSION_SECRET: "${OVERLEAF_SESSION_SECRET:-}"
+      OVERLEAF_INVITE_TOKEN_SECRET: "${OVERLEAF_INVITE_TOKEN_SECRET:-}"
+      LLM_KEY_SECRET: "${LLM_KEY_SECRET:-}"
+      OT_JWT_AUTH_KEY: "${OT_JWT_AUTH_KEY:-}"
+      NODE_ENV: production
+      # git contract (the legacy git-bridge container is attached to this
+      # stack's network — verified 2026-10-06)
+      GIT_BRIDGE_HOST: ${GIT_BRIDGE_HOST:-git-bridge}
+      GIT_BRIDGE_PORT: "${GIT_BRIDGE_PORT:-8000}"
+      # hub grafana embed (empty = pane hidden — the safe default)
+      HUB_GRAFANA_EMBED_URL: "${HUB_GRAFANA_EMBED_URL:-}"
+    # no host port: haproxy is the facade
+    healthcheck:
+      # the app ships curl; anonymous `/` answers 302→/login (curl -f accepts
+      # it) — the proven live test of this exact container (2026-10-06)
+      test: ["CMD-SHELL", "curl -fs --connect-timeout 5 http://localhost/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+    depends_on:
+      overleafmongo:
+        condition: service_healthy
+      overleafredis:
+        condition: service_healthy
+
+  haproxy:
+    image: ${HAPROXY_IMAGE:-haproxy:2.8}   # same major as the running legacy LBs (proven)
+    container_name: ollitex-haproxy
+    restart: ${ENABLE_HAPROXY:-unless-stopped}   # Option no / unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+    # official image runs as non-root user `haproxy` (uid 99): low-port binds
+    # need the capability
+    cap_add: [NET_BIND_SERVICE]
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${HAPROXY_PORT:-80}:80"          # plain HTTP → 301 TLS only (cep nginx parity)
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${HAPROXY_TLS_PORT:-443}:443"    # the TLS facade (dev override in .env)
+    volumes:
+      - ./web/haproxy.cfg:/haproxy.cfg:ro
+      # self-signed web cert (dev plane; under the owner's ${PREFIX} data
+      # tree). A real CA cert later = swap that one file — haproxy.cfg
+      # already points at /etc/haproxy/certs/web.pem.
+      # NOTE: must be readable by the haproxy user (uid 99) — chown 99:99.
+      - ${PREFIX}/data/ssl/web/web.pem:/etc/haproxy/certs/web.pem:ro
+    healthcheck:
+      # image ships NO wget/curl/busybox — core perl is the probe (verified
+      # 2026-10-06). Checks the front answers 301/302 (80→TLS live).
+      test: ["CMD-SHELL", "perl -e 'use IO::Socket::INET; my $$s = IO::Socket::INET->new(PeerAddr=>\"127.0.0.1:80\", Timeout=>4) or exit 1; $$s->print(\"GET / HTTP/1.0\\r\\nHost: ollitex\\r\\n\\r\\n\"); my $$st = <$$s>; exit($$st=~/30[012]/ ? 0 : 1)' || exit 1"]
+      # NOTE: $$-escaping is REQUIRED — compose interpolates $vars host-side.
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      ollitex-web:
+        condition: service_healthy
+    command: ["/usr/local/sbin/haproxy", "-f", "/haproxy.cfg", "-db", "-W"]
