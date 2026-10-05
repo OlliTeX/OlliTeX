@@ -64,7 +64,11 @@ services:
           -c ssl_key_file=/etc/postgresql/ssl/server.key \
           -c ssl_ca_file=/etc/postgresql/ssl/ca.crt
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Owner directive 2026-10-06: PG data + backup live under ${PREFIX} on
+      # the host (the single-folder contract), not in a Docker-managed
+      # volume — visible, backed up, and migratable without docker plumbing.
+      - ${PREFIX}/data/pgdata:/var/lib/postgresql/data
+      - ${PREFIX}/data/pgdata-backup:/backup
       # rw on purpose: the wrapper generates certs / fixes ownership in the
       # shared dir (cert/key CONTENTS are stable afterwards).
       - ${PREFIX}/data/ssl:/etc/postgresql/ssl
@@ -77,6 +81,49 @@ services:
     ports:
       - "${PG_PORT:-15432}:5432"
 
+  # ------------------------------------------------------------------ mongodb
+  # Service name = the hostname the web stack already uses (overleafmongo),
+  # so dropping the web onto THIS network switches its Mongo over with a
+  # network change alone. Container NAME stays distinct (ollitex-mongo) so
+  # it never collides with the legacy cep container on this box.
+  overleafmongo:
+    image: mongo:9.0
+    container_name: ollitex-mongo
+    restart: unless-stopped
+    environment:
+      # kernel 6.19+/7.x SHSTK workaround (SAME env the running cep mongo
+      # uses — SERVER-121912 / glibc hwcaps).
+      GLIBC_TUNABLES: glibc.cpu.hwcaps=-SHSTK
+    command: ["mongod", "--logpath", "/var/log/mongodb/mongod.log", "--bind_ip_all"]
+    volumes:
+      - ${PREFIX}/data/mongo:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    # No host port: 127.0.0.1:27017 is already published by the legacy cep
+    # Mongo on this box. Add "27017:27017" on a machine where this stack is
+    # the only one.
+
+  # --------------------------------------------------------------------- redis
+  overleafredis:
+    image: redis:8.10-alpine3.23
+    container_name: ollitex-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - ${PREFIX}/data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    # No host port: 127.0.0.1:6379 is already published by the legacy cep
+    # Redis on this box. Add "6379:6379" on a standalone machine.
+
   # ------------------------------------------------------------------- toolkit
   ollitex-toolkit:
     image: ollitex/toolkit-tui:main
@@ -85,6 +132,11 @@ services:
     depends_on:
       # Q6: hard gate — the toolkit only starts once ollitex-pg is healthy.
       ollitex-pg:
+        condition: service_healthy
+      # the TUI surfaces stack status for mongo/redis too — wait for them
+      overleafmongo:
+        condition: service_healthy
+      overleafredis:
         condition: service_healthy
     environment:
       # Q2 + Q5: one shared password (${PG_PASSWORD} from .env) and the
@@ -106,6 +158,3 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "2222:2222"
-
-volumes:
-  pgdata:
