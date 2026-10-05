@@ -22,6 +22,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	teaMiddleware "github.com/charmbracelet/wish/bubbletea"
+	xssh "golang.org/x/crypto/ssh"
 )
 
 // ServerOpts configures the wish SSH endpoint.
@@ -30,8 +31,15 @@ type ServerOpts struct {
 	Listen string
 	// User is the allowed SSH user (the only authenticated user).
 	User string
-	// Password is the (non-empty) allowed SSH password.
+	// Password is the allowed SSH password. Empty disables password auth —
+	// a key-only deployment (owner directive 2026-10-06) leaves this unset.
 	Password string
+	// KeyFile is the authorized_keys file (publickeys only; one per line, ssh-keygen
+	// format). When the file is absent, key auth simply has no keys to accept.
+	// Owner flow: the host keeps ${PREFIX}/ssh mounted at /opt/ollitex/ssh —
+	// the init step generates an ed25519 pair there when authorized_keys is
+	// missing, so a fresh install is key-ready with zero manual steps.
+	KeyFile string
 	// Logger.
 	Log *log.Logger
 }
@@ -47,8 +55,32 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 	if o.Log == nil {
 		o.Log = log.Default().With("svc", "toolkit-tui")
 	}
-	if o.Password == "" {
-		return fmt.Errorf("no SSH password configured (set %s or a password file)", EnvSSHPassword)
+	if o.Password == "" && o.KeyFile == "" {
+		return fmt.Errorf("no SSH auth method configured (set %s or a key file / authorized_keys)", EnvSSHPassword)
+	}
+	if o.KeyFile == "" {
+		o.KeyFile = "/opt/ollitex/ssh/authorized_keys"
+	}
+
+	// Public-key auth (preferred path, owner directive: keys over passwords).
+	var pubKeys []ssh.PublicKey
+	if kdata, kerr := os.ReadFile(o.KeyFile); kerr == nil {
+		for ln, line := range strings.Split(string(kdata), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			if k, _, _, _, perr := xssh.ParseAuthorizedKey([]byte(line)); perr == nil {
+				pubKeys = append(pubKeys, k)
+			} else {
+				o.Log.Warn("authorized_keys: skipping line", "line", ln+1, "err", perr.Error())
+			}
+		}
+		if len(pubKeys) > 0 {
+			o.Log.Info("ssh pubkey auth enabled", "keys", len(pubKeys), "file", o.KeyFile)
+		} else {
+			o.Log.Info("ssh pubkey auth: no authorized_keys found (password-only until one is added)", "path", o.KeyFile)
+		}
 	}
 
 	hostKey := t.HostKeyPath()
@@ -63,45 +95,73 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 		return subtle.ConstantTimeCompare([]byte(user), []byte(o.User)) == 1
 	}
 
-	srv, err := wish.NewServer(
-		wish.WithHostKeyPath(hostKey),
-		wish.WithPasswordAuth(func(ctx ssh.Context, pass string) bool {
-			user := ctx.User()
-			ok := userGate(user) &&
-				subtle.ConstantTimeCompare([]byte(pass), []byte(o.Password)) == 1
-			o.Log.Info("ssh auth", "user", user, "ok", ok)
-			return ok
-		}),
-		wish.WithMiddleware(
-			teaMiddleware.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
-				return newApp(t), []tea.ProgramOption{tea.WithInput(sess), tea.WithOutput(sess), tea.WithAltScreen()}
-			}),
-			// Both middlewares go in ONE WithMiddleware call: wish.WithMiddleware
-			// does `s.Handler = h` per option, so two separate options REPLACE
-			// each other (last wins) — which silently drops the TUI middleware
-			// and makes every interactive session close right after auth
-			// ("Connection to ... closed", zero bytes out; the CLI path kept
-			// working because the surviving gate implements it itself). Order in
-			// the call: last-added runs first → gate/route runs first and its
-			// next() lands in the TUI.
-			// Gate + routing (outermost). exec with a command string
-			// (e.g. `ssh host "toolkit health"`) runs the CLI and exits; an
-			// interactive shell lands in the TUI below.
-			func(next ssh.Handler) ssh.Handler {
-				return func(sess ssh.Session) {
-					if !userGate(sess.User()) {
-						fmt.Fprintln(sess, "toolkit: access denied for user "+sess.User())
-						return
-					}
-					if cmd := strings.TrimSpace(sess.RawCommand()); cmd != "" {
-						runCLI(sess, cmd)
-						return
-					}
-					next(sess)
+	// Auth options: public keys (preferred) + optional password fallback.
+	// Both are CONDITIONAL options (a key-only deployment has no password, and
+	// a password-only bootstrap has no key file yet).
+	authOpts := []ssh.Option{}
+	if len(pubKeys) > 0 {
+		authOpts = append(authOpts, wish.WithPublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
+			if !userGate(ctx.User()) {
+				o.Log.Info("ssh pubkey auth rejected (user)", "user", ctx.User())
+				return false
+			}
+			for _, ak := range pubKeys {
+				if ssh.KeysEqual(ak, key) {
+					o.Log.Info("ssh pubkey auth ok", "user", ctx.User(), "keytype", key.Type())
+					return true
 				}
-			},
-		),
-	)
+			}
+			return false
+		}))
+	}
+	if o.Password != "" {
+		authOpts = append(authOpts, wish.WithPasswordAuth(func(ctx ssh.Context, pass string) bool {
+			user := ctx.User()
+			// Guard against the "empty password matches empty password" hole:
+			// password auth is only active for a NON-EMPTY configured password.
+			ok := userGate(user) && pass != "" &&
+				subtle.ConstantTimeCompare([]byte(pass), []byte(o.Password)) == 1
+			return ok
+		}))
+	}
+	// FAIL CLOSED: with NO active auth method, wish would fall back to
+	// permitting password logins — exactly the hole that lets an unconfigured
+	// toolkit accept any password. Refuse to serve instead.
+	if len(authOpts) == 0 {
+		return fmt.Errorf("refusing to serve SSH with no auth method active (no %s found and no password configured)", o.KeyFile)
+	}
+
+	allOpts := append([]ssh.Option{wish.WithHostKeyPath(hostKey)}, authOpts...)
+	allOpts = append(allOpts, wish.WithMiddleware(
+		teaMiddleware.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
+			return newApp(t), []tea.ProgramOption{tea.WithInput(sess), tea.WithOutput(sess), tea.WithAltScreen()}
+		}),
+		// Both middlewares go in ONE WithMiddleware call: wish.WithMiddleware
+		// does `s.Handler = h` per option, so two separate options REPLACE
+		// each other (last wins) — which silently drops the TUI middleware
+		// and makes every interactive session close right after auth
+		// ("Connection to ... closed", zero bytes out; the CLI path kept
+		// working because the surviving gate implements it itself). Order in
+		// the call: last-added runs first → gate/route runs first and its
+		// next() lands in the TUI.
+		// Gate + routing (outermost). exec with a command string
+		// (e.g. `ssh host "toolkit health"`) runs the CLI and exits; an
+		// interactive shell lands in the TUI below.
+		func(next ssh.Handler) ssh.Handler {
+			return func(sess ssh.Session) {
+				if !userGate(sess.User()) {
+					fmt.Fprintln(sess, "toolkit: access denied for user "+sess.User())
+					return
+				}
+				if cmd := strings.TrimSpace(sess.RawCommand()); cmd != "" {
+					runCLI(sess, cmd)
+					return
+				}
+				next(sess)
+			}
+		},
+	))
+	srv, err := wish.NewServer(allOpts...)
 	if err != nil {
 		return fmt.Errorf("wish server: %w", err)
 	}

@@ -44,10 +44,14 @@ COPY --from=go /out/configdb /usr/local/bin/configdb
 
 # The official docker CLI + compose plugin: orchestration of the stack
 # talks to the MOUNTED docker socket (the host provides it).
+# openssh-client: ssh-keygen for the key-pair bootstrap (owner directive:
+# keys over passwords — ${PREFIX}/ssh mounted at /opt/ollitex/ssh), and
+# the git/ssh clients for backup actions.
 RUN apk add --no-cache \
       ca-certificates \
       docker-cli \
       docker-cli-compose \
+      openssh-client \
       tzdata \
       unzip \
       wget
@@ -68,9 +72,29 @@ ENV OLLITEX_TOOLKIT_DATA_DIR=/opt/ollitex/data \
 # (auth is gated in-process — no host accounts involved).
 RUN install -d /opt/ollitex/data
 
+# Self-healing SSH key bootstrap (owner flow: key pair under ${PREFIX}/ssh):
+# if the authorized_keys file/dir is empty, generate an ed25519 pair right
+# there before serving — a fresh stack is key-ready with zero manual steps,
+# and existing keys are never touched. (In-image so it survives one-shot
+# container state and re-runs on every start.)
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'KFILE="${OLLITEX_TOOLKIT_SSH_KEYFILE:-/opt/ollitex/ssh/authorized_keys}"' \
+    'KDIR=$(dirname "$KFILE")' \
+    'if [ ! -f "$KFILE" ] && [ -z "$(ls "$KDIR" 2>/dev/null)" ]; then' \
+    '  mkdir -p "$KDIR" && umask 077' \
+    '  ssh-keygen -t ed25519 -f "$KDIR/id_ed25519" -N "" -C "ollitex-toolkit-bootstrap" >/dev/null 2>&1' \
+    '  cp "$KDIR/id_ed25519.pub" "$KFILE"' \
+    '  echo "toolkit: generated SSH key pair under $KDIR (ssh -i $KDIR/id_ed25519 ollitex@host)"' \
+    'fi' \
+    'exec /usr/local/bin/toolkit "$@"' \
+    > /usr/local/bin/toolkit-entrypoint \
+ && chmod 755 /usr/local/bin/toolkit-entrypoint
+
 EXPOSE 2222
 
-# ssh into the host with: ssh -p 2222 ollitex@<host>
-# (password: OLLITEX_TOOLKIT_PASSWORD) — then drive the TUI.
-ENTRYPOINT ["/usr/local/bin/toolkit"]
+# ssh into the host with: ssh -p 2222 -i ${PREFIX}/ssh/id_ed25519 ollitex@<host>
+# (publickey auth; a password may still be added via OLLITEX_TOOLKIT_PASSWORD
+#  — the auth gate is fail-closed: no method active ⇒ no service.)
+ENTRYPOINT ["/usr/local/bin/toolkit-entrypoint"]
 CMD ["serve"]

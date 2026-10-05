@@ -1,0 +1,111 @@
+# OlliTeX Toolkit — standalone stack (owner spec, 2026-10-06)
+#
+#   ollitex-pg      Postgres = the config store (the stack's single source of
+#                   truth). Self-signed SSL: on first start it auto-generates
+#                   a 10-year CA + server cert under ${PREFIX}/data/ssl (Q5),
+#                   then enables SSL. Password = ${PG_PASSWORD} (Q2).
+#   ollitex-toolkit the SSH TUI plane (2222). Publickey auth, keys over
+#                   passwords (Q4): an ed25519 pair is generated under
+#                   ${PREFIX}/ssh when no public key is there yet. Connects to
+#                   ollitex-pg over TLS pinned to the self-signed CA
+#                   (sslmode=require&sslrootcert). Starts ONLY after
+#                   ollitex-pg is healthy (Q6).
+#
+# Run:        cp env.example .env && vi .env && docker compose up -d
+# SSH (TUI):  ssh -p 2222 -i ${PREFIX}/ssh/id_ed25519 ollitex@<host>
+#
+# .env provides: PREFIX, PG_PASSWORD, PG_PORT (see env.example — the workspace
+# blocks dotted env files, hence the non-dotted template name).
+
+name: ollitex-toolkit
+
+services:
+  # ------------------------------------------------------------------- postgres
+  ollitex-pg:
+    image: postgres:16
+    container_name: ollitex-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: overleaf
+      POSTGRES_USER: overleaf
+      POSTGRES_PASSWORD: ${PG_PASSWORD}   # the shared secret from .env (Q2)
+    # The wrapper, in order:
+    #   1. auto-generates the self-signed CA + server cert under the shared
+    #      dir when absent (Q5: zero manual certificate ritual),
+    #   2. fixes the server key ownership for the image's postgres user
+    #      (by NAME — no hard-coded uid — postgres requires owner=postgres or
+    #      root and <=0600),
+    #   3. runs the STOCK entrypoint (which creates the POSTGRES_DB database
+    #      on first boot) with SSL on.
+    command:
+      - sh
+      - -c
+      - |
+        SSL=/etc/postgresql/ssl
+        mkdir -p "$$SSL" 2>/dev/null || true
+        if [ ! -f "$$SSL/ca.crt" ] || [ ! -f "$$SSL/server.crt" ] || [ ! -f "$$SSL/server.key" ]; then
+          echo "generating self-signed CA + server cert (10y) under ${PREFIX}/data/ssl"
+          openssl req -x509 -newkey rsa:3072 -keyout "$$SSL/ca.key" -out "$$SSL/ca.crt" \
+            -days 3650 -nodes -subj "/CN=OlliTeX Toolkit Config CA" 2>/dev/null
+          openssl req -new -newkey rsa:3072 -keyout "$$SSL/server.key" -out "$$SSL/server.csr" \
+            -nodes -subj "/CN=ollitex-pg" 2>/dev/null
+          printf "subjectAltName=DNS:ollitex-pg,DNS:localhost,IP:127.0.0.1" > "$$SSL/san.cnf"
+          openssl x509 -req -in "$$SSL/server.csr" -CA "$$SSL/ca.crt" -CAkey "$$SSL/ca.key" \
+            -CAcreateserial -out "$$SSL/server.crt" -days 3650 -extfile "$$SSL/san.cnf" 2>/dev/null
+          openssl verify -CAfile "$$SSL/ca.crt" "$$SSL/server.crt"
+          rm -f "$$SSL/san.cnf" "$$SSL/server.csr"
+        fi
+        chown postgres:postgres "$$SSL/server.key"
+        chmod 600 "$$SSL/server.key"
+        chmod 644 "$$SSL"/*.crt 2>/dev/null || true
+        exec docker-entrypoint.sh postgres \
+          -c ssl=on \
+          -c ssl_cert_file=/etc/postgresql/ssl/server.crt \
+          -c ssl_key_file=/etc/postgresql/ssl/server.key \
+          -c ssl_ca_file=/etc/postgresql/ssl/ca.crt
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # rw on purpose: the wrapper generates certs / fixes ownership in the
+      # shared dir (cert/key CONTENTS are stable afterwards).
+      - ${PREFIX}/data/ssl:/etc/postgresql/ssl
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U overleaf -d overleaf"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 20s
+    ports:
+      - "${PG_PORT:-15432}:5432"
+
+  # ------------------------------------------------------------------- toolkit
+  ollitex-toolkit:
+    image: ollitex/toolkit-tui:main
+    container_name: ollitex-toolkit
+    restart: unless-stopped
+    depends_on:
+      # Q6: hard gate — the toolkit only starts once ollitex-pg is healthy.
+      ollitex-pg:
+        condition: service_healthy
+    environment:
+      # Q2 + Q5: one shared password (${PG_PASSWORD} from .env) and the
+      # self-signed CA pinned for the TLS connection.
+      CONFIG_DB_DSN: postgres://overleaf:${PG_PASSWORD}@ollitex-pg:5432/overleaf?sslmode=require&sslrootcert=/etc/ollitex-ssl/ca.crt
+      # Q4: key auth — authorized_keys from the mounted ${PREFIX}/ssh. The
+      # image's entrypoint generates the pair there on first start when the
+      # dir is empty (keys over passwords; the gate is fail-closed).
+      OLLITEX_TOOLKIT_SSH_KEYFILE: /opt/ollitex/ssh/authorized_keys
+      OLLITEX_TOOLKIT_DATA_DIR: /opt/ollitex/data
+      OLLITEX_TOOLKIT_PROJECT: ollitex
+      # the toolkit talks TO the mounted docker socket for stack ops
+      DOCKER_HOST_UNIX: /var/run/docker.sock
+    volumes:
+      # Q3: everything the host sees lives under ${PREFIX}.
+      - ${PREFIX}/data:/opt/ollitex/data
+      - ${PREFIX}/ssh:/opt/ollitex/ssh
+      - ${PREFIX}/data/ssl:/etc/ollitex-ssl:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "2222:2222"
+
+volumes:
+  pgdata:

@@ -136,22 +136,58 @@ func passwordFrom(o *flag.FlagSet) (string, error) {
 	return "", fmt.Errorf("no SSH password: set OLLITEX_TOOLKIT_PASSWORD or %s (or -password / -password-file)", toolkit.EnvSSHPasswordFl)
 }
 
+// passwordMaybe resolves the SSH password source (flag/env/file). pwdSet
+// is true when a usable password is configured; an explicit -password
+// given but unreadable is still an error (the operator intended password
+// auth and it must not silently downgrade to keys only).
+func passwordMaybe(o *flag.FlagSet) (pwd string, set bool, err error) {
+	v := o.Lookup("password").Value.String()
+	f := o.Lookup("password-file").Value.String()
+	if v == "" {
+		v = os.Getenv(toolkit.EnvSSHPassword)
+	}
+	if f == "" {
+		f = os.Getenv(toolkit.EnvSSHPasswordFl)
+	}
+	if v != "" && f != "" {
+		return "", false, fmt.Errorf("set exactly one of -password / -password-file (or the env pair)")
+	}
+	if v != "" {
+		return v, true, nil
+	}
+	if f != "" {
+		b, rerr := os.ReadFile(f)
+		if rerr != nil {
+			return "", false, rerr
+		}
+		s := strings.TrimSpace(string(b))
+		if s == "" {
+			return "", false, fmt.Errorf("password file %s is empty", f)
+		}
+		return s, true, nil
+	}
+	return "", false, nil // no password source — key-only is a valid deployment
+}
+
 func serve(args []string) error {
 	f := flag.NewFlagSet("serve", flag.ExitOnError)
 	listen := f.String("listen", envOr(toolkit.EnvSSHListen, ":2222"), "SSH listen address (default :2222; OLLITEX_TOOLKIT_SSH_LISTEN)")
 	user := f.String("user", envOr(toolkit.EnvSSHUser, "ollitex"), "SSH user")
-	f.String("password", "", "SSH password (preferred: env/file)")
+	f.String("password", "", "SSH password (preferred: env/file); optional when an authorized_keys file is provided")
 	f.String("password-file", "", "file containing the SSH password")
+	keyFile := f.String("keyfile", os.Getenv("OLLITEX_TOOLKIT_SSH_KEYFILE"), "authorized_keys file for publickey auth (default /opt/ollitex/ssh/authorized_keys; OLLITEX_TOOLKIT_SSH_KEYFILE)")
 	dsn := f.String("dsn", os.Getenv(toolkit.EnvDSN), "config store Postgres DSN (overrides env chain)")
 	dataDir := f.String("data-dir", envOr(toolkit.EnvDataDir, "/opt/ollitex/data"), "mounted data dir")
 	composeFile := f.String("compose", envOr(toolkit.EnvComposeFile, "/opt/ollitex/toolkit.yaml"), "compose file")
 	project := f.String("project", envOr(toolkit.EnvProjectName, "ollitex"), "stack project name")
 	_ = f.Parse(args)
 
-	pwd, err := passwordFrom(f)
-	if err != nil {
-		return err
+	pwd, pwdSet, pwErr := passwordMaybe(f)
+	if !pwdSet && *keyFile == "" {
+		return fmt.Errorf("no SSH auth method: set a password (OLLITEX_TOOLKIT_PASSWORD / %s or -password-file) or an authorized_keys file (-keyfile / OLLITEX_TOOLKIT_SSH_KEYFILE)", toolkit.EnvSSHPasswordFl)
 	}
+	// pwdSet==false with a keyfile: key-only deployment (owner directive: keys over passwords).
+	_ = pwErr
 	t, err := toolkit.New(toolkit.Options{
 		DSN:         *dsn,
 		DataDir:     *dataDir,
@@ -169,6 +205,7 @@ func serve(args []string) error {
 		Listen:   *listen,
 		User:     *user,
 		Password: pwd,
+		KeyFile:  *keyFile,
 		Log:      log.Default().With("svc", "toolkit"),
 	})
 }
