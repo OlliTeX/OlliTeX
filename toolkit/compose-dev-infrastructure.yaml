@@ -27,6 +27,9 @@ services:
     # file in a volume, same as its proven legacy layout)
     image: ${FORGEJO_IMAGE:-codeberg.org/forgejo/forgejo:15}
     container_name: ollitex-forgejo
+    networks:
+      default:
+        aliases: [forgejo-test]   # drop-in: the proven legacy name the harness resolves
     restart: unless-stopped
     environment:
       USER_UID: "1000"
@@ -66,6 +69,9 @@ services:
     # overrides for tests that need a STABLE fixture key).
     image: ${MOCK_SAML_IMAGE:-boxyhq/mock-saml:latest}
     container_name: ollitex-mock-saml
+    networks:
+      default:
+        aliases: [sso-test-saml-1, saml]   # drop-in: legacy SAML IdP name
     restart: unless-stopped
     environment:
       APP_URL: "http://localhost:${SAML_MOCK_PORT:-4000}"
@@ -76,8 +82,9 @@ services:
     ports:
       - "${SAML_MOCK_PORT:-4000}:4000"   # normal default; this box: 4100 while legacy saml runs
     healthcheck:
-      # node is the image's runtime (proven: the legacy runs this test, healthy)
-      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4000/api/health',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      # Next 16 binds the container IP, not loopback (proven: 127.0.0.1 refused,
+      # hostname works) — probe the container's own name, /api/health = 200 JSON
+      test: ["CMD", "node", "-e", "require('http').get('http://'+require('os').hostname()+':4000/api/health',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 8
@@ -89,6 +96,9 @@ services:
     # (documented test credentials only — dev plane).
     image: ${OPENLDAP_IMAGE:-osixia/openldap:1.5.0}
     container_name: ollitex-openldap
+    networks:
+      default:
+        aliases: [sso-test-ldap-1, ldap]   # drop-in: legacy LDAP name
     restart: unless-stopped
     environment:
       LDAP_ORGANISATION: "Example"
@@ -112,6 +122,9 @@ services:
     # ALSO the conformance suite's idp target (owner H) — one service.
     image: ${SSO_OIDC_IMAGE:-sso-oidc:latest}
     container_name: ollitex-sso-oidc
+    networks:
+      default:
+        aliases: [sso-test-oidc-1, oidc, oidc-idp]   # drop-in: legacy IdP-under-test names (conform suite: http://oidc-idp:80)
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: "http://+:80"
@@ -130,6 +143,9 @@ services:
     # nc-applet health — proven healthy).
     image: ${MAILSINK_IMAGE:-sso-mailsink:latest}
     container_name: ollitex-mailsink
+    networks:
+      default:
+        aliases: [sso-test-mailsink-1, mailsink]   # drop-in: legacy mail sink name
     restart: unless-stopped
     environment:
       myhostname: mailsink
@@ -147,14 +163,17 @@ services:
     # oidc-conform-nginx — the running legacy exposes 8443/8444)
     image: ${CONFORM_NGINX_IMAGE:-oidc-conform-nginx:latest}
     container_name: ollitex-conform-nginx
+    networks:
+      default:
+        aliases: [oidc-conform-nginx-1]   # drop-in: legacy conform proxy name
     restart: unless-stopped
     command: ["nginx", "-g", "daemon off;"]
     ports:
       - "${CONFORM_NGINX_PORT:-8443}:8443"
       - "${CONFORM_NGINX_ALT_PORT:-8444}:8444"
     healthcheck:
-      # nginx ships the gotter (alpine busybox — verified pattern)
-      test: ["CMD-SHELL", "wget -q --spider --timeout=3 http://127.0.0.1:8443/ 2>/dev/null || exit 1"]
+      # image ships NO wget (verified: exec fails) — use the shipped nginx config test
+      test: ["CMD", "nginx", "-t"]
       interval: 15s
       timeout: 5s
       retries: 8
@@ -163,27 +182,67 @@ services:
       sso-oidc:
         condition: service_healthy
 
+  conform-mongo:
+    # the suite's state store (the legacy project supplied a same-role service;
+    # the suite re-seeds its harness state fresh — the legacy volume was orphaned)
+    image: ${MONGO_IMAGE:-mongo:9.0}   # unified 9.x store; the suite's fcV target is raised to 9.0 on the SUITE side (see its JAVA_EXTRA_ARGS)
+    container_name: ollitex-conform-mongo
+    restart: unless-stopped
+    environment:
+      GLIBC_TUNABLES: glibc.cpu.hwcaps=-SHSTK   # host kernel >=6.19 / SERVER-121912 workaround
+    volumes:
+      - conform-mongo-data:/data/db
+    networks:
+      default:
+        aliases: [mongodb, conform-mongo, suite-mongo]   # suite default MONGODB_HOST=mongodb + legacy names
+    healthcheck:
+      # no busybox in mongo:9.0 — mongosh ping (proven pattern)
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ping:1})' >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   oidc-conform-suite:
     # the authelia OIDC OIDCOP conformance runner (owner H). Long-running
     # here (the legacy runs Up days) — liveness = its server process is
     # alive (ps ships in the image — verified).
     image: ${CONFORM_SUITE_IMAGE:-authelia/openid-connect-conformance-suite:latest}
     container_name: ollitex-conform-suite
+    environment:
+      BASE_URL: https://localhost:${CONFORM_NGINX_PORT:-8443}
+      BASE_MTLS_URL: https://localhost:${CONFORM_NGINX_ALT_PORT:-8444}
+      MONGODB_HOST: mongodb
+      ENABLE_DEBUG: "true"
+      ENABLE_START_REDIR: "true"
+      # cmd.sh refuses empty registrations; local dummies (documented fixture creds,
+      # we never log in through one) — mirrors tests/tools/oidc-conform/docker-compose.yml
+      OIDC_GITLAB_CLIENTID: ${OIDC_GITLAB_CLIENTID:-ollitex-local-suite}
+      OIDC_GITLAB_SECRET: ${OIDC_GITLAB_SECRET:-ollitex-local-suite-secret}
+      OIDC_ADMIN_GROUP: ${OIDC_ADMIN_GROUP:-ollitex-admin}
+      # the suite defaults to targetFeatureCompatibilityVersion=6.0 which a 9.x server
+      # refuses at boot (proven); raise it to 9.0 (cmd.sh appends JAVA_EXTRA_ARGS to the JVM)
+      JAVA_EXTRA_ARGS: "-Dopenid.mongodb.targetFeatureCompatibilityVersion=9.0"
+    networks:
+      default:
+        aliases: [oidc-conform-server-1, oidc-conform-oidc-idp-1, server]   # drop-in: legacy names; proxy_pass upstream name is "server"
     # a batch/long-running test harness: keep it out of the restart
     # churn (manual up for a run)
     restart: "no"
     command: ["/server/cmd.sh"]
     healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep -c '[c]md.sh' | grep -qE '[1-9]' || exit 1"]
+      test: ["CMD-SHELL", "ps aux | grep -c 'suite[.]jar' | grep -qE '[1-9]' || exit 1"]   # the JVM, not the launcher (the app can die while cmd.sh lingers)
       interval: 30s
       timeout: 5s
-      retries: 3
-      start_period: 20s
+      retries: 5
+      start_period: 150s   # Spring Boot cold start is slow
     depends_on:
       sso-oidc:
         condition: service_healthy
+      conform-mongo:
+        condition: service_healthy   # Spring Boot app: hard dependency for startup
       oidc-conform-nginx:
-        condition: service_healthy
+        condition: service_started   # nginx needs the "server" alias resolvable (the suite) at config-load
 
   webdav-fixture:
     # RFC6854 test server — the PROVEN fixture (tests/tools/webdav; the
@@ -193,6 +252,9 @@ services:
     # 15/15 client contract in tests/tools/webdav/README.md.
     image: ${WEBDAV_IMAGE:-webdav-ubuntu2604:fixture}
     container_name: ollitex-webdav-fixture
+    networks:
+      default:
+        aliases: [webdav-test]   # drop-in: the proven legacy name the DAV harness resolves
     restart: unless-stopped
     environment:
       # documented fixture identity (dev plane; identical to the proven
@@ -216,3 +278,4 @@ services:
 volumes:
   forgejo-data:
   webdav-fixture-data:
+  conform-mongo-data:   # fresh store (the legacy volume dir was metadata-only; the suite re-seeds its harness state)
