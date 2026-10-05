@@ -234,6 +234,10 @@
     "GRAFANA_PORT": 3180, // Published Grafana port (avoids the internal :3000)
     // GRAFANA_ADMIN_PASSWORD: secret — stored field-encrypted when active.
     "GRAFANA_ADMIN_PASSWORD": null, // no default: the toolkit generates + stores one (secret)
+    // Grafana hub-kiosk opt-in (off by default per the d22 owned decision)
+    "HUB_GRAFANA_EMBED_URL": null, // Grafana base for the hub stats kiosk pane (empty = hidden)
+    "GRAFANA_ANONYMOUS": false, // anonymous Viewer role for kiosk embeds (off by default)
+    "GRAFANA_CSP_FRAME_ANCESTORS": "self", // Grafana CSP frame-ancestors ('self' = the default)
     "PROMETHEUS_IMAGE": "prom/prometheus:v2.53.5", // same pin as server-ce d22
     "GRAFANA_IMAGE": "grafana/grafana-oss:11.6.0", // same pin as server-ce d22
     "MONGODB_EXPORTER_IMAGE": "percona/mongodb_exporter:0.43.0",

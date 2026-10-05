@@ -41,6 +41,7 @@ var SECTION_KNOWN_KEYS = map[string][]string{
 	"dropbox":            {"enabled", "appKey", "appSecret"},
 	"misc":               {"appName", "navHidePoweredBy", "robotsNoindex", "allowPublicAccess", "allowAnonymousReadWriteSharing", "disableLinkSharing", "disableChat", "projectHardDeletionDelayDays", "userHardDeletionDelayDays", "historyRestore", "enablePdfCaching", "pythonRunner", "maxUploadSizeMiB", "maxEntitiesPerProject", "defaultLatexCompiler", "projectChangeNotificationDelayMs"},
 	"languagetool":       {"enabled", "url"},
+	"monitoring":         {"enabled", "grafanaEmbedURL"},
 	"llm":                {"enabled", "allowUserSettings", "userRatePerMinute", "adminRatePerMinute", "userDailyTokens"},
 	"branding":           {"navTitle", "leftFooter", "rightFooter"},
 	"services":           {"v1HistoryUrl", "githubInterfaceUrl", "githubInterfaceWorkdirRoot", "webdavInterfaceUrl", "dropboxInterfaceUrl", "dataManipulatorUrl"},

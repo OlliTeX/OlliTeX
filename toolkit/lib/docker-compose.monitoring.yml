@@ -152,6 +152,15 @@ services:
             GF_ANALYTICS_REPORTING_ENABLED: "false"
             GF_USERS_SIGNUP_ENABLED: "false"
             GF_SERVER_ROOT_URL: "http://${OVERLEAF_LISTEN_IP:-127.0.0.1}:${GRAFANA_PORT:-3180}/"
+            # Hub kiosk opt-in (server-ce/grafana README: explicit owner
+            # opt-in, NOT a default): anonymous Viewer role for kiosk
+            # embeds + which origin may iframe Grafana. Both default to the
+            # safe state (off / self-only) — embedding is a credential-
+            # phishing surface while admin auth is still required.
+            GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}
+            GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+            GF_AUTH_ANONYMOUS_ORG_NAME: Main Org.
+            GF_SECURITY_CSP_FRAME_ANCESTORS: ${GRAFANA_CSP_FRAME_ANCESTORS:-self}
         volumes:
             - ${MONITORING_DATA_PATH}/grafana-provisioning:/etc/grafana/provisioning
             - ${MONITORING_DATA_PATH}/grafana-dashboards:/var/lib/grafana/dashboards

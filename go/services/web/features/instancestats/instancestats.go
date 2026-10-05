@@ -14,6 +14,7 @@
 //	GET  /admin/instance-stats/api/alert-config
 //	PUT  /admin/instance-stats/api/alert-config
 //	POST /admin/instance-stats/api/send-test-alert-email
+//	GET  /admin/instance-stats/api/grafana   (D22 kiosk opt-in; admin only)
 //
 // The `privateApiRouter` route /internal/collect-instance-stats (cron
 // collector on the api profile, port 3000) stays with the Node api process
@@ -139,6 +140,10 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Path: "/admin/instance-stats/api/alert-config", Handler: getAlertConfig(a)},
 			{Method: "PUT", Path: "/admin/instance-stats/api/alert-config", Handler: saveAlertConfig(a)},
 			{Method: "POST", Path: "/admin/instance-stats/api/send-test-alert-email", Handler: sendTestAlert(a, mail)},
+			// D22 kiosk opt-in (server-ce/grafana README: the hub kiosk is an
+			// explicit owner opt-in, not a default): the hub stats pane asks
+			// for the Grafana embed base + dashboard URLs (admin only).
+			{Method: "GET", Path: "/admin/instance-stats/api/grafana", Handler: grafanaEmbedHandler(a)},
 			// D22 (8cbc1526) phase D: Prometheus (d22 sidecar) alert webhook —
 			// internal-only (docker network; the HAProxy edge never forwards
 			// /internal/*), machine caller, no CSRF/auth by design.

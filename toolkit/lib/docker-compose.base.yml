@@ -33,6 +33,8 @@ services:
           OT_JWT_AUTH_KEY: "${OT_JWT_AUTH_KEY}"
           OVERLEAF_SESSION_SECRET: "${OVERLEAF_SESSION_SECRET}"
           OVERLEAF_INVITE_TOKEN_SECRET: "${OVERLEAF_INVITE_TOKEN_SECRET}"
+          # D22 hub kiosk (opt-in): empty when unset (pane stays hidden).
+          HUB_GRAFANA_EMBED_URL: "${HUB_GRAFANA_EMBED_URL:-}"
         healthcheck:
           # ollitex image ships busybox curl; /login 200 = app layer alive
           test: ["CMD-SHELL", "curl -fsS --connect-timeout 5 http://localhost/login >/dev/null || exit 1"]

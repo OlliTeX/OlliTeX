@@ -60,6 +60,16 @@ LANGUAGE_TOOL_NGRAM_LANGUAGES=en,de,es,fr,de
 # one. See lib/docker-compose.monitoring.yml (header) for the contract.
 MONITORING_ENABLED=false
 MONITORING_DATA_PATH=data/monitoring
+
+# -- hub kiosk (opt-in, off by default — server-ce/grafana README) ----------
+# HUB_GRAFANA_EMBED_URL: the Grafana base (e.g. http://ollitex.example.org:3180)
+#   → the hub stats pane embeds the dashboards (kiosk mode). Empty = hidden.
+# GRAFANA_ANONYMOUS: anonymous Viewer role for cross-origin kiosk embeds.
+# GRAFANA_CSP_FRAME_ANCESTORS: which origin may iframe Grafana (set the hub
+#   origin when embedding; 'self' keeps the safe default).
+#HUB_GRAFANA_EMBED_URL=http://ollitex.example.org:3180
+#GRAFANA_ANONYMOUS=true
+#GRAFANA_CSP_FRAME_ANCESTORS=http://ollitex.example.org:80
 PROMETHEUS_PORT=9090
 GRAFANA_PORT=3180
 

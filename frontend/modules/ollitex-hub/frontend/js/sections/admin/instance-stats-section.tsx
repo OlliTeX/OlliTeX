@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Anchor,
   Alert,
   Badge,
   Button,
@@ -73,6 +74,32 @@ export default function InstanceStatsSection() {
   const [savingCfg, setSavingCfg] = useState(false)
   const [sendingTest, setSendingTest] = useState(false)
   const [cfgError, setCfgError] = useState<string | null>(null)
+
+  // --- Grafana live pane (D22 kiosk opt-in — off unless the instance
+  //     configured HUB_GRAFANA_EMBED_URL / monitoring.grafanaEmbedURL) ------
+  const [grafana, setGrafana] = useState<{
+    enabled: boolean
+    dashboards: { id: string; title: string; kiosk: string; full: string }[]
+  } | null>(null)
+  const [grafanaSel, setGrafanaSel] = useState('ollitex-overview')
+  useEffect(() => {
+    let alive = true
+    getJSON<{ enabled: boolean; dashboards: { id: string; title: string; kiosk: string; full: string }[] }>(
+      '/admin/instance-stats/api/grafana',
+    )
+      .then(g => {
+        if (alive) setGrafana(g)
+      })
+      .catch(() => {
+        if (alive) setGrafana(null) // non-admin section callers are the only audience; hidden = off
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+  const grafanaDash = grafana
+    ? grafana.dashboards.find(d => d.id === grafanaSel) || grafana.dashboards[0]
+    : null
 
   const load = useCallback(async (w: WindowKey) => {
     setLoading(true)
@@ -199,6 +226,40 @@ export default function InstanceStatsSection() {
 
   return (
     <Stack gap="md">
+      {grafana && grafana.enabled && grafanaDash ? (
+        <Card withBorder radius="lg" p="md">
+          <Group justify="space-between" wrap="wrap" gap="sm" align="center" mb="sm">
+            <div>
+              <Text fw={700} size="md">
+                Live dashboards
+              </Text>
+              <Text size="sm" c="dimmed" mt={2}>
+                Grafana (read-only kiosk) — the OlliTeX observability dashboards on this instance.
+              </Text>
+            </div>
+            <Group gap="xs">
+              <NativeSelect
+                aria-label="Dashboard"
+                value={grafanaDash.id}
+                onChange={e => setGrafanaSel(e.currentTarget.value)}
+                data={grafana.dashboards.map(d => ({ value: d.id, label: d.title }))}
+                size="xs"
+                style={{ width: 210 }}
+              />
+              <Anchor href={grafanaDash.full} target="_blank" rel="noreferrer noopener" size="sm">
+                Open in Grafana ↗
+              </Anchor>
+            </Group>
+          </Group>
+          <iframe
+            title={grafanaDash.title}
+            src={grafanaDash.kiosk}
+            loading="lazy"
+            sandbox="allow-scripts allow-same-origin"
+            style={{ width: '100%', height: 520, border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8 }}
+          />
+        </Card>
+      ) : null}
       <Group justify="space-between" wrap="wrap" gap="sm" align="center">
         <Group gap={10} wrap="nowrap">
           <Icon name="monitoring" size={22} style={{ color: 'var(--mantine-color-ollitex-6)' }} />

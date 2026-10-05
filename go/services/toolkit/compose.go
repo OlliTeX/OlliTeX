@@ -380,6 +380,27 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 				}
 			}
 			plan.Notes = append(plan.Notes, "generated + stored a new GRAFANA_ADMIN_PASSWORD (set one in the store to choose your own)")
+			// ---- hub kiosk opt-in (server-ce/grafana README: explicit opt-in) ---
+			// HUB_GRAFANA_EMBED_URL → the app's env (the hub pane reads it);
+			// GRAFANA_ANONYMOUS / GRAFANA_CSP_FRAME_ANCESTORS → Grafana's env
+			// (kiosk embeds without a login prompt, framed only by the allowed
+			// origin — both OFF/default by design: with Grafana still requiring
+			// admin auth, a cross-origin iframe of it is a credential-phishing
+			// surface, so the embed trio is opt-in all the way down).
+			if u := t.val("HUB_GRAFANA_EMBED_URL"); u != "" {
+				plan.Env["HUB_GRAFANA_EMBED_URL"] = u
+			}
+			anon := "false"
+			if t.boolVal("GRAFANA_ANONYMOUS") {
+				anon = "true"
+			}
+			plan.Env["GRAFANA_ANONYMOUS"] = anon
+			csp := t.val("GRAFANA_CSP_FRAME_ANCESTORS")
+			if csp == "" {
+				csp = "self"
+			}
+			plan.Env["GRAFANA_CSP_FRAME_ANCESTORS"] = csp
+
 		}
 		plan.Env["GRAFANA_ADMIN_PASSWORD"] = pw
 		if err := t.materializeMonitoring(plan.Env["MONITORING_DATA_PATH"]); err != nil {

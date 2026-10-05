@@ -370,6 +370,88 @@ func TestPlan_MongoDSNContract(t *testing.T) {
 	_ = dir
 }
 
+func TestPlan_KioskOptIn(t *testing.T) {
+	tk, dir := offlineToolkit(t)
+	lib := filepath.Join("..", "..", "..", "toolkit", "lib")
+	if fi, err := os.Stat(filepath.Join(lib, "docker-compose.monitoring.yml")); err != nil || fi.IsDir() {
+		t.Skipf("monitoring template not present at %s", lib)
+	}
+	tk.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
+	if err := tk.Store.Set("MONITORING_ENABLED", "true", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tk.Store.Set("HUB_GRAFANA_EMBED_URL", "http://ollitex.example.org:3180", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tk.Store.Set("GRAFANA_ANONYMOUS", "true", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tk.Store.Set("GRAFANA_CSP_FRAME_ANCESTORS", "http://ollitex.example.org:80", "test"); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := tk.Plan()
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if plan.Env["HUB_GRAFANA_EMBED_URL"] != "http://ollitex.example.org:3180" {
+		t.Fatalf("HUB_GRAFANA_EMBED_URL env = %q (the app's hub pane reads it)", plan.Env["HUB_GRAFANA_EMBED_URL"])
+	}
+	if plan.Env["GRAFANA_ANONYMOUS"] != "true" {
+		t.Fatalf("GRAFANA_ANONYMOUS env = %q, want true (kiosk embeds without a login prompt)", plan.Env["GRAFANA_ANONYMOUS"])
+	}
+	csp := plan.Env["GRAFANA_CSP_FRAME_ANCESTORS"]
+	if csp != "http://ollitex.example.org:80" {
+		t.Fatalf("GRAFANA_CSP_FRAME_ANCESTORS env = %q, want the hub origin (credential-phishing control)", csp)
+	}
+
+	// the overlay must carry the Grafana env lines with safe defaults
+	ov, err := os.ReadFile(filepath.Join(lib, "docker-compose.monitoring.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(ov)
+	for _, want := range []string{
+		"GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}",
+		"GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer",
+		"GF_SECURITY_CSP_FRAME_ANCESTORS: ${GRAFANA_CSP_FRAME_ANCESTORS:-self}",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("monitoring overlay missing kiosk line %q", want)
+		}
+	}
+
+	// the base overlay passes the embed URL to the app (empty default = pane hidden)
+	base, err := os.ReadFile(filepath.Join(lib, "docker-compose.base.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(base), "HUB_GRAFANA_EMBED_URL: \"${HUB_GRAFANA_EMBED_URL:-}\"") {
+		t.Fatalf("base overlay must pass HUB_GRAFANA_EMBED_URL to the ollitex service (empty default)")
+	}
+
+	// off-by-default check: a fresh store must render the safe state
+	tk2, dir2 := offlineToolkit(t)
+	tk2.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
+	if err := tk2.Store.Set("MONITORING_ENABLED", "true", "test"); err != nil {
+		t.Fatal(err)
+	}
+	plan2, err := tk2.Plan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := plan2.Env["GRAFANA_ANONYMOUS"]; v != "false" {
+		t.Fatalf("anonymous embed default = %q, want false (off by default per the d22 owned decision)", v)
+	}
+	if v := plan2.Env["HUB_GRAFANA_EMBED_URL"]; v != "" {
+		t.Fatalf("kiosk URL default = %q, want empty (pane hidden)", v)
+	}
+	if v := plan2.Env["GRAFANA_CSP_FRAME_ANCESTORS"]; v != "self" {
+		t.Fatalf("CSP frame-ancestors default = %q, want self", v)
+	}
+	_ = dir
+	_ = dir2
+}
+
 func skipIfNoDocker(t *testing.T) {}
 
 // TestPlan_MonitoringOptIn — the D22 ecosystem is OFF by default (the base

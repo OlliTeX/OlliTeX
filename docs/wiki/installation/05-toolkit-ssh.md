@@ -198,6 +198,33 @@ ecosystem, all bind-mounted under `data/monitoring/`:
   (`data/monitoring/prometheus.yml`) — inspectable, and the placeholders
   are provably gone (unit-pinned).
 
+### Live dashboards pane in /hub (opt-in, off by default)
+
+The hub's **Site settings → General → Instance statistics** section can
+embed the Grafana dashboards as a kiosk iframe ("Live dashboards"). The
+embed is an explicit opt-in **all the way down** — with Grafana still
+requiring admin auth, a cross-origin iframe of it is a credential-phishing
+surface, so the default state is: pane hidden, anonymous access disabled,
+CSP frame-ancestors `self`. To enable:
+
+1. **Point the app at Grafana** — set the store key `HUB_GRAFANA_EMBED_URL`
+   (e.g. `http://<grafana-host>:3180`); the toolkit env plane renders it
+   into the app, and the hub pane's endpoint resolves it first (an env value
+   is conclusive — it wins over the site_settings section of the same name).
+   The admin can alternatively set `Site settings → monitoring →
+   grafanaEmbedURL` at runtime (that section is the runtime-managed source).
+2. **Allow cross-origin framing** on Grafana — `GRAFANA_ANONYMOUS=true`
+   (rendered to `GF_AUTH_ANONYMOUS_ENABLED` + `Viewer` org role) and
+   `GRAFANA_CSP_FRAME_ANCESTORS=<the hub origin>` (never `*`).
+
+The pane then switches between the two shipped dashboards
+(`ollitex-overview`, `ollitex-toolkit-mongo-redis`) and offers both the
+kiosk (`{base}/kiosk-d/{uid}`) and full (`{base}/d/{uid}`) URLs. The pane
+endpoint is site-admin only and returns the dashboards with their
+kiosk/full URLs — verified live against a disposable web instance on the
+e2e stack: store path, env-conclusive override (trailing slash trimmed),
+and the off-by-default `{enabled:false}` state all behave as pinned.
+
 ## 8. Operations
 
 ### 8.1 doctor & health
@@ -263,6 +290,7 @@ generated plan still validates the merged result with the daemon before
 |---------|-------------|
 | `up` fails on a container **name** collision | another instance on the host already uses that name → rename via the §8.4 override + set the `MONITORING_*_HOST` knobs if monitoring targets the renamed DB |
 | Grafana login 401 right after a restore | a stale SQLite WAL can resurrect old user rows — wipe the (non-secret) `data/monitoring/grafana-data` and let Grafana re-seed from `GF_SECURITY_ADMIN_PASSWORD` |
+| the /hub "Live dashboards" pane is hidden | opt-in by design: set `HUB_GRAFANA_EMBED_URL` (store key → app env) or the `monitoring.grafanaEmbedURL` site-settings section — the endpoint returns `{enabled:false}` until then (the admin-gated pane is off unless explicitly enabled) |
 | exporter `unhealthy` but the DB is fine | check `MONITORING_MONGO_HOST` / `MONITORING_REDIS_HOST` point at the live container names |
 | `ollitex-*` scrape targets stay DOWN while mongodb/redis/node are UP | by image design the Go app services bind `127.0.0.1` inside the ollitex container (the in-container nginx fronts them) — cross-container scrapes can't reach loopback. The scrape config already lists them and lights up automatically when a deployment exposes them on the compose network; the DB/exporter path is the fully-proven path in the multi-container layout |
 | `plan` fails with `compose config FAILED` | read the daemon's message — that is the exact cause (this gate is there to fail early) |
