@@ -1,0 +1,110 @@
+{
+  "uid": "ollitex-toolkit-mongo-redis",
+  "title": "OlliTeX toolkit — MongoDB + Redis",
+  "tags": ["ollitex", "toolkit"],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 0,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "MongoDB (prom/mongodb-exporter)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": [
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Uptime",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "ollitex-prometheus" },
+          "targets": [{ "expr": "mongodb_uptime_seconds", "legendFormat": "uptime" }],
+          "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Connected clients",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "ollitex-prometheus" },
+          "targets": [{ "expr": "mongodb_ss_connections{conn_type=\"connected\"}", "legendFormat": "connected" }]
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "DB size (sharelatex)",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "ollitex-prometheus" },
+          "targets": [{ "expr": "mongodb_ss_dbstats_size{db=\"sharelatex\"}", "legendFormat": "size" }],
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Document count (sharelatex)",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "datasource": { "uid": "ollitex-prometheus" },
+          "targets": [{ "expr": "mongodb_ss_dbstats_objects{db=\"sharelatex\"}", "legendFormat": "docs" }]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Operations (insert / query / update / delete per second)",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 5 },
+          "datasource": { "uid": "ollitex-prometheus" },
+          "targets": [
+            { "expr": "rate(mongodb_ss_opcounters{db=\"sharelatex\"}[5m])", "legendFormat": "{{opcode}}" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Redis (oliver006/redis_exporter)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "panels": [
+        {
+          "id": 8,
+          "type": "stat",
+          "title": "Keys",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 14 },
+          "datasource": { "uid": "ollitex-prometheus" },
+          "targets": [{ "expr": "redis_keys{db=\"db0\"}", "legendFormat": "keys" }]
+        },
+        {
+          "id": 9,
+          "type": "stat",
+          "title": "Memory used",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 14 },
+          "datasource": { "uid": "ollitex-prometheus" },
+          "targets": [{ "expr": "redis_memory_used_bytes", "legendFormat": "used" }],
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+        },
+        {
+          "id": 10,
+          "type": "stat",
+          "title": "Connected clients",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 14 },
+          "datasource": { "uid": "ollitex-prometheus" },
+          "targets": [{ "expr": "redis_connected_clients", "legendFormat": "clients" }]
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "Commands per second + rejected",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+          "datasource": { "uid": "ollitex-prometheus" },
+          "targets": [
+            { "expr": "rate(redis_commands_processed_total[5m])", "legendFormat": "processed" },
+            { "expr": "rate(redis_rejected_connections_total[5m])", "legendFormat": "rejected conns" }
+          ]
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

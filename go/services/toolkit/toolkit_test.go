@@ -4,11 +4,15 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
 	"crypto/subtle"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // fakeToolkits builds a Toolkit with an explicit offline (SQLite) store —
@@ -288,3 +292,154 @@ func TestShell_LiveMongo(t *testing.T) {
 }
 
 func skipIfNoDocker(t *testing.T) {}
+
+// TestPlan_MonitoringOptIn — the D22 ecosystem is OFF by default (the base
+// stack is unchanged) and, when enabled, adds the monitoring overlay + the
+// env plane (data path + generated Grafana admin password) and materializes
+// the scrape config + provisioning + dashboards into the data dir (scrape
+// config rendered to the toolkit's container names).
+func TestPlan_MonitoringOptIn(t *testing.T) {
+	tk, dir := offlineToolkit(t)
+	lib := filepath.Join("..", "..", "..", "toolkit", "lib")
+	if fi, err := os.Stat(filepath.Join(lib, "docker-compose.base.yml")); err != nil || fi.IsDir() {
+		t.Skipf("templates not present at %s", lib)
+	}
+	tk.ComposeFile = filepath.Join(lib, "docker-compose.base.yml")
+
+	// off by default
+	plan, err := tk.Plan()
+	if err != nil {
+		t.Fatalf("plan (off): %v", err)
+	}
+	for _, f := range plan.Files {
+		if filepath.Base(f) == "docker-compose.monitoring.yml" {
+			t.Fatalf("monitoring overlay present with MONITORING_ENABLED default false")
+		}
+	}
+
+	// on
+	if err := tk.Store.Set("MONITORING_ENABLED", "true", "test"); err != nil {
+		t.Fatal(err)
+	}
+	plan, err = tk.Plan()
+	if err != nil {
+		t.Fatalf("plan (on): %v", err)
+	}
+	foundOverlay := false
+	for _, f := range plan.Files {
+		if filepath.Base(f) == "docker-compose.monitoring.yml" {
+			foundOverlay = true
+		}
+	}
+	if !foundOverlay {
+		t.Fatalf("monitoring overlay missing in %v", plan.Files)
+	}
+	// env plane
+	if plan.Env["MONITORING_DATA_PATH"] == "" {
+		t.Fatal("MONITORING_DATA_PATH not in the env plane")
+	}
+	if !strings.HasPrefix(plan.Env["MONITORING_DATA_PATH"], dir) {
+		t.Fatalf("MONITORING_DATA_PATH %q is not under the data dir %q", plan.Env["MONITORING_DATA_PATH"], dir)
+	}
+	if pw := plan.Env["GRAFANA_ADMIN_PASSWORD"]; pw == "" || len(pw) != 32 {
+		t.Fatalf("GRAFANA_ADMIN_PASSWORD = %q, want a generated 32-hex secret", pw)
+	}
+	// the generated secret landed in the store (owner auditability; the TUI
+	// does NOT print it by default)
+	if v, _ := tk.Store.Get("GRAFANA_ADMIN_PASSWORD"); v != plan.Env["GRAFANA_ADMIN_PASSWORD"] {
+		t.Fatalf("store GRAFANA_ADMIN_PASSWORD %q != plan %q", v, plan.Env["GRAFANA_ADMIN_PASSWORD"])
+	}
+	// materialized templates (owner policy B: state under the data dir)
+	root := plan.Env["MONITORING_DATA_PATH"]
+	for _, rel := range []string{
+		"prometheus.yml",
+		"grafana-provisioning/datasources/prometheus.yml",
+		"grafana-provisioning/dashboards/ollitex.yml",
+		"grafana-dashboards/ollitex-overview.json",
+		"grafana-dashboards/mongodb-redis-overview.json",
+	} {
+		if fi, err := os.Stat(filepath.Join(root, rel)); err != nil || fi.IsDir() {
+			t.Fatalf("missing materialized %s", rel)
+		}
+	}
+	// scrape config rendered to the toolkit container names (placeholders gone)
+	yml, err := os.ReadFile(filepath.Join(root, "prometheus.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	y := string(yml)
+	for _, must := range []string{`ollitex:4000`, `ollitex:3016`, `monitoring-mongodb-exporter:9216`, `monitoring-redis-exporter:9121`} {
+		if !strings.Contains(y, must) {
+			t.Fatalf("rendered scrape config missing target %s", must)
+		}
+	}
+	for _, gone := range []string{"__OVERLEAF_HOST__", "__GITBRIDGE_HOST__"} {
+		if strings.Contains(y, gone) {
+			t.Fatalf("rendered scrape config still contains placeholder %s", gone)
+		}
+	}
+	// stateful dirs pre-created with the image user's ownership (a root-owned
+	// bind mount under a non-root container user = crash loop; caught live
+	// in the 2026-10-05 smoke before the fix)
+	if runtime.GOOS == "linux" {
+		for _, dir := range []struct {
+			p   string
+			uid int
+		}{
+			{filepath.Join(root, "grafana-data"), 472},
+			{filepath.Join(root, "prometheus-data"), 65534},
+		} {
+			fi, err := os.Stat(dir.p)
+			if err != nil || !fi.IsDir() {
+				t.Fatalf("stateful dir %s missing", dir.p)
+			}
+			if fi.Sys().(*syscall.Stat_t).Uid != uint32(dir.uid) {
+				t.Fatalf("%s owner uid = %d, want %d (image user)", dir.p, fi.Sys().(*syscall.Stat_t).Uid, dir.uid)
+			}
+		}
+	}
+	// depends_on targets must be SERVICE names (compose validates this —
+	// pin the class of bug: container names looked plausible but break
+	// `compose config`). Parse the monitoring overlay's depends_on targets
+	// and prove each is a service defined in a planned overlay file.
+	svc := map[string]bool{}
+	for _, f := range plan.Files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc := map[string]any{}
+		if err := yaml.Unmarshal(b, &doc); err != nil {
+			t.Fatalf("parse %s: %v", f, err)
+		}
+		if ss, ok := doc["services"].(map[string]any); ok {
+			for name := range ss {
+				svc[name] = true
+			}
+		}
+	}
+	mf := filepath.Join(lib, "docker-compose.monitoring.yml")
+	m, err := os.ReadFile(mf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := map[string]any{}
+	if err := yaml.Unmarshal(m, &doc); err != nil {
+		t.Fatal(err)
+	}
+	ss, _ := doc["services"].(map[string]any)
+	for name, raw := range ss {
+		mm, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if dep, ok := mm["depends_on"].([]any); ok {
+			for _, d := range dep {
+				target, _ := d.(string)
+				if !svc[target] {
+					t.Fatalf("service %s depends_on %v, which is not a service defined in the planned overlays", name, d)
+				}
+			}
+		}
+	}
+}

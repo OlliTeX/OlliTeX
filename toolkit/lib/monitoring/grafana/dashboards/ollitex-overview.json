@@ -1,0 +1,156 @@
+{
+  "uid": "ollitex-overview",
+  "title": "OlliTeX — overview",
+  "tags": ["ollitex", "d22"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": { "from": "now-3h", "to": "now" },
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "row",
+      "title": "Services (Go plane)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100
+    },
+    {
+      "type": "timeseries",
+      "title": "Request rate by app",
+      "description": "Go HTTP request rate (node-faithful `requests` counter, D22 A2).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (app) (rate(requests[$__rate_interval]))",
+          "legendFormat": "{{app}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "5xx error rate by app",
+      "description": "Share of requests returning a 5xx status.",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (app) (rate(requests{code=~\"5..\"}[$__rate_interval])) / sum by (app) (rate(requests[$__rate_interval]))",
+          "legendFormat": "{{app}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "p99 request time (ms) by app",
+      "description": "99th-percentile request duration — the `request_time` summary (ms, quantile=0.99).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "id": 3,
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (app) (request_time{quantile=\"0.99\"})",
+          "legendFormat": "{{app}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Process RSS by app",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "id": 4,
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "{{app}} ({{host}})"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Host (node_exporter)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "id": 101
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU usage",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+      "id": 5,
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval])))",
+          "legendFormat": "all cores"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory usage",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
+      "id": 6,
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+          "legendFormat": "mem"
+        },
+        {
+          "refId": "B",
+          "expr": "100 * (node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes) / node_memory_SwapTotal_bytes",
+          "legendFormat": "swap"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Root filesystem usage",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
+      "id": 7,
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})",
+          "legendFormat": "/ ({{device}})"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Service uptime",
+      "description": "Process start age per Go service (process_start_time_seconds, D22 A2 defaults).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 26 },
+      "id": 8,
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - process_start_time_seconds",
+          "legendFormat": "{{app}}"
+        }
+      ]
+    }
+  ]
+}

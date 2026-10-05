@@ -1,0 +1,108 @@
+# ---------------------------------------------------------------------------
+# OlliTeX toolkit — Prometheus scrape config (monitoring overlay, D22
+# ecosystem).
+#
+# Single-host, static-scrape design (no k8s, no SD) — the same shape as
+# server-ce/prometheus/prometheus.yml, retargeted at the toolkit's
+# container names:
+#
+#   __OVERLEAF_HOST__  the app container's compose network name (rendered
+#                      by the toolkit: ollitex)
+#   __GITBRIDGE_HOST__ the git-bridge compose service name (rendered:
+#                      git-bridge; the job only scrapes when the
+#                      gitbridge overlay is also enabled — otherwise the
+#                      target is DOWN, which is the honest signal)
+#
+# Scrape set (goal: overleaf + mongo + redis covered by default):
+#   - the Go services (internal ports, D22 A2 /metrics endpoints)
+#   - mongodb-exporter :9216   (overleafmongo)
+#   - redis-exporter  :9121    (overleafredis)
+# ---------------------------------------------------------------------------
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    stack: ollitex-toolkit
+
+scrape_configs:
+  # --- the Go services (OLLITEX host) -----------------------------------
+  - job_name: ollitex-web
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:4000"]
+        labels: { service: web }
+
+  - job_name: ollitex-collab
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3450"]
+        labels: { service: collab }
+
+  - job_name: ollitex-realtime
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3026"]
+        labels: { service: realtime }
+
+  - job_name: ollitex-chat
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3010"]
+        labels: { service: chat }
+
+  - job_name: ollitex-docstore
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3016"]
+        labels: { service: docstore }
+
+  - job_name: ollitex-filestore
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3009"]
+        labels: { service: filestore }
+
+  - job_name: ollitex-notifications
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3042"]
+        labels: { service: notifications }
+
+  - job_name: ollitex-history-v1
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3100"]
+        labels: { service: history-v1 }
+
+  - job_name: ollitex-project-history
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__OVERLEAF_HOST__:3054"]
+        labels: { service: project-history }
+
+  - job_name: ollitex-git-bridge
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__GITBRIDGE_HOST__:8000"]
+        labels: { service: git-bridge }
+
+  # --- the database exporters (mongo + redis) -----------------------------
+  - job_name: mongodb
+    static_configs:
+      - targets: ["monitoring-mongodb-exporter:9216"]
+        labels: { service: mongodb, db: sharelatex }
+
+  - job_name: redis
+    static_configs:
+      - targets: ["monitoring-redis-exporter:9121"]
+        labels: { service: redis }
+
+  # --- prometheus itself ---------------------------------------------------
+  - job_name: node
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["monitoring-node-exporter:9100"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["127.0.0.1:9090"]

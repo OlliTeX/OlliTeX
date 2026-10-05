@@ -51,6 +51,18 @@ LANGUAGE_TOOL_DATA_PATH=data/languagetool
 # Comma-separated n-gram languages downloaded by bin/languagetool-ngrams
 LANGUAGE_TOOL_NGRAM_LANGUAGES=en,de,es,fr,de
 
+# Monitoring (Prometheus + Grafana + mongo/redis exporters, opt-in).
+# The same image pins as server-ce's d22 profile; scrape config +
+# provisioning + dashboards ship from toolkit/lib/monitoring (materialized
+# into ${MONITORING_DATA_PATH} on `stack up`). Ports host-side:
+# Prometheus ${PROMETHEUS_PORT:-9090}, Grafana ${GRAFANA_PORT:-3180}.
+# GRAFANA_ADMIN_PASSWORD: leave unset to let the toolkit generate + store
+# one. See lib/docker-compose.monitoring.yml (header) for the contract.
+MONITORING_ENABLED=false
+MONITORING_DATA_PATH=data/monitoring
+PROMETHEUS_PORT=9090
+GRAFANA_PORT=3180
+
 # SeaweedFS (DEFAULT local S3 storage for filestore + docstore):
 # 4 containers on the shared network, started FIRST (master ->
 # volume/filer -> s3) before the app; data under

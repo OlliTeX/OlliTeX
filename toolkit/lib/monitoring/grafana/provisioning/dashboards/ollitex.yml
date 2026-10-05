@@ -1,0 +1,11 @@
+# D22 phase C — file-based dashboard provider (shared/deterministic: no
+# in-UI editing required; dashboards ship from the repo).
+apiVersion: 1
+providers:
+  - name: ollitex
+    folder: OlliTeX
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

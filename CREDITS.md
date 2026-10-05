@@ -28,6 +28,25 @@ something from their code we put them into CREDITS.md").
 - **LanguageTool** — `erikvl87/languagetool` image plus the owner-maintained
   ngram/languagemodel packs mounted read-only at `/ngrams`.
 
+- **Prometheus ecosystem (D22 observability)** — `prom/prometheus`
+  (v2.53.5), `grafana/grafana-oss` (11.6.0), `prom/node-exporter` (v1.9.1),
+  `percona/mongodb_exporter` (0.43.0), `oliver006/redis_exporter`
+  (v1.58.0-alpine) —
+  pinned: prometheus/grafana/node-exporter match `server-ce/docker-compose.yml`
+  d22 pins; the exporters use the current upstream tags (the prom
+  mongodb-exporter mirror was retired upstream). Used by (a) the opt-in d22
+  profile of the main server compose, (b) the toolkit's opt-in monitoring
+  overlay
+  (`toolkit/lib/docker-compose.monitoring.yml`) and (c) the hub instance
+  stats collector (which consumes no third-party code — it reads local
+  metrics only).
+- **Grafana dashboard borrowing** — `toolkit/lib/monitoring/grafana/
+  dashboards/ollitex-overview.json` is a copy of
+  `server-ce/grafana/dashboards/ollitex-overview.json` (same repo, same
+  owner — listed here for provenance per the credits policy), as are the
+  provisioning files `datasources/prometheus.yml` +
+  `dashboards/ollitex.yml`.
+
 ## n-gram model plumbing & offline-server extension review
 
 - `nschang/languagetool-101` (https://github.com/nschang/languagetool-101) —

@@ -249,10 +249,10 @@ var Registry = []Param{
 	{Key: "WEB_GO_DEBUG_AUTH", Kind: KString, Group: "test", Description: "Go web debug auth override (dev)."},
 
 	// ---------- stack (boot plane — the settings that START the main container
-	 // plane; historically toolkit/lib/default.rc + overleaf.rc, which the /hub
-	 // admin site-settings registry did not cover. Owner 2026-10-06: the
-	 // toolkit TUI manages them THROUGH THIS registry + the config store —
-	 // one key space, one source of truth.) ----------
+	// plane; historically toolkit/lib/default.rc + overleaf.rc, which the /hub
+	// admin site-settings registry did not cover. Owner 2026-10-06: the
+	// toolkit TUI manages them THROUGH THIS registry + the config store —
+	// one key space, one source of truth.) ----------
 	{Key: "TOOLKIT_PROJECT_NAME", Kind: KString, Group: "stack", Default: "ollitex", Description: "Stack/instance identity (project name, container prefix)."},
 	{Key: "OVERLEAF_LISTEN_IP", Kind: KString, Group: "stack", Default: "127.0.0.1", Description: "Bind address of the main ollitex container."},
 	{Key: "OVERLEAF_PORT", Kind: KInt, Group: "stack", Default: "80", Description: "Published port of the main ollitex container."},
@@ -275,6 +275,22 @@ var Registry = []Param{
 	{Key: "LANGUAGE_TOOL_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "Start the LanguageTool grammar-checking container."},
 	{Key: "LANGUAGE_TOOL_DATA_PATH", Kind: KString, Group: "stack", Default: "data/languagetool", Description: "Host folder for LanguageTool data/n-grams."},
 	{Key: "LANGUAGE_TOOL_NGRAM_LANGUAGES", Kind: KString, Group: "stack", Default: "en,de,es,fr", Description: "Comma-separated n-gram languages to download for grammar checking."},
+	{Key: "MONITORING_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "Start the Prometheus + Grafana + mongo/redis-exporter observability stack (D22 ecosystem; opt-in)."},
+	{Key: "MONITORING_DATA_PATH", Kind: KString, Group: "stack", Default: "data/monitoring", Description: "Host folder for the observability state (prometheus tsdb + grafana data, inside the mounted data dir)."},
+	{Key: "PROMETHEUS_PORT", Kind: KInt, Group: "stack", Default: "9090", Description: "Published port for Prometheus."},
+	{Key: "GRAFANA_PORT", Kind: KInt, Group: "stack", Default: "3180", Description: "Published port for Grafana (avoids the internal :3000)."},
+	{Key: "GRAFANA_ADMIN_PASSWORD", Kind: KString, Secret: true, Group: "stack", Description: "Grafana admin password (the toolkit generates + stores one when unset)."},
+	{Key: "PROMETHEUS_IMAGE", Kind: KString, Group: "stack", Default: "prom/prometheus:v2.53.5", Description: "Prometheus image pin (same as server-ce d22)."},
+	{Key: "GRAFANA_IMAGE", Kind: KString, Group: "stack", Default: "grafana/grafana-oss:11.6.0", Description: "Grafana image pin (same as server-ce d22)."},
+	{Key: "MONGODB_EXPORTER_IMAGE", Kind: KString, Group: "stack", Default: "percona/mongodb_exporter:0.43.0", Description: "MongoDB exporter image pin."},
+	{Key: "REDIS_EXPORTER_IMAGE", Kind: KString, Group: "stack", Default: "oliver006/redis_exporter:v1.58.0-alpine", Description: "Redis exporter image pin."},
+	{Key: "NODE_EXPORTER_IMAGE", Kind: KString, Group: "stack", Default: "prom/node-exporter:v1.9.1", Description: "Node exporter image pin (same as server-ce d22)."},
+	{Key: "MONGODB_EXPORTER_PORT", Kind: KInt, Group: "stack", Default: "9216", Description: "Published port for the MongoDB exporter."},
+	{Key: "REDIS_EXPORTER_PORT", Kind: KInt, Group: "stack", Default: "9121", Description: "Published port for the Redis exporter."},
+	{Key: "MONITORING_MONGO_HOST", Kind: KString, Group: "stack", Default: "overleafmongo", Description: "Mongo container name as seen by the monitoring containers (rename only if an operator override renamed it)."},
+	{Key: "MONITORING_MONGO_PORT", Kind: KInt, Group: "stack", Default: "27017", Description: "Mongo port as seen by the monitoring containers."},
+	{Key: "MONITORING_REDIS_HOST", Kind: KString, Group: "stack", Default: "overleafredis", Description: "Redis container name as seen by the monitoring containers (rename only if an operator override renamed it)."},
+	{Key: "MONITORING_REDIS_PORT", Kind: KInt, Group: "stack", Default: "6379", Description: "Redis port as seen by the monitoring containers."},
 	{Key: "SIBLING_CONTAINERS_ENABLED", Kind: KBool, Group: "stack", Default: "false", Description: "Sandboxed compiles in dedicated sibling containers (requires docker socket mount)."},
 	{Key: "SIBLING_CONTAINERS_PULL", Kind: KBool, Group: "stack", Default: "true", Description: "Pull sibling compile images on start."},
 	{Key: "GITBRIDGE_SERVICE_ENABLED", Kind: KBool, Group: "stack", Default: "true", Description: "Run the git-bridge container (cep stack overlay). App-level Git integration toggle is GIT_BRIDGE_ENABLED."},
@@ -285,9 +301,8 @@ var Registry = []Param{
 	{Key: "CHECKUSER_IMAGE", Kind: KString, Group: "stack", Default: "check_user_image", Description: "checkuser image pin."},
 	{Key: "CHECKUSER_DATA_PATH", Kind: KString, Group: "stack", Default: "data/checkuser", Description: "checkuser data bind mount."},
 
-
 	// ---------- stack image pins (from toolkit/lib/images.env — the version
-	 // plane; now in the one key space / one source of truth) ----------
+	// plane; now in the one key space / one source of truth) ----------
 	{Key: "IMAGE_VERSION", Kind: KString, Group: "stack", Default: "main", Description: "OlliTeX app image version (from config/version; used to build OLLITEX_IMAGE)."},
 	{Key: "OLLITEX_IMAGE", Kind: KString, Group: "stack", Description: "Full OlliTeX app image (default: ollitex/ollitex:$IMAGE_VERSION)."},
 	{Key: "MONGO_IMAGE", Kind: KString, Group: "stack", Default: "mongo:9.0", Description: "MongoDB image pin (owner safety directive 2026-10-04)."},

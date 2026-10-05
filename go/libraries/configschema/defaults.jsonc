@@ -227,6 +227,23 @@
     "LANGUAGE_TOOL_ENABLED": false, // Start the LanguageTool grammar-checking container
     "LANGUAGE_TOOL_DATA_PATH": "data/languagetool", // Host folder for LanguageTool data/n-grams
     "LANGUAGE_TOOL_NGRAM_LANGUAGES": "en,de,es,fr", // Comma-separated n-gram languages
+    "MONITORING_ENABLED": false, // Start the Prometheus + Grafana + exporters observability stack (D22 ecosystem)
+    "MONITORING_DATA_PATH": "data/monitoring", // Host folder for the observability state
+    "PROMETHEUS_PORT": 9090, // Published Prometheus port
+    "GRAFANA_PORT": 3180, // Published Grafana port (avoids the internal :3000)
+    // GRAFANA_ADMIN_PASSWORD: secret — stored field-encrypted when active.
+    "GRAFANA_ADMIN_PASSWORD": null, // no default: the toolkit generates + stores one (secret)
+    "PROMETHEUS_IMAGE": "prom/prometheus:v2.53.5", // same pin as server-ce d22
+    "GRAFANA_IMAGE": "grafana/grafana-oss:11.6.0", // same pin as server-ce d22
+    "MONGODB_EXPORTER_IMAGE": "percona/mongodb_exporter:0.43.0",
+    "REDIS_EXPORTER_IMAGE": "oliver006/redis_exporter:v1.58.0-alpine",
+    "NODE_EXPORTER_IMAGE": "prom/node-exporter:v1.9.1", // same pin as server-ce d22
+    "MONGODB_EXPORTER_PORT": 9216, // Published MongoDB exporter port
+    "REDIS_EXPORTER_PORT": 9121, // Published Redis exporter port
+    "MONITORING_MONGO_HOST": "overleafmongo", // Mongo container name for the monitoring containers
+    "MONITORING_MONGO_PORT": 27017, // Mongo port for the monitoring containers
+    "MONITORING_REDIS_HOST": "overleafredis", // Redis container name for the monitoring containers
+    "MONITORING_REDIS_PORT": 6379, // Redis port for the monitoring containers
     "SIBLING_CONTAINERS_ENABLED": false, // Sandboxed compiles in sibling containers (needs socket)
     "SIBLING_CONTAINERS_PULL": true,
     "GITBRIDGE_SERVICE_ENABLED": true, // run git-bridge container (app toggle is GIT_BRIDGE_ENABLED)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -275,6 +276,72 @@ func (t *Toolkit) Plan() (*StackPlan, error) {
 		addOverlay("docker-compose.seaweedfs.yml")
 	}
 
+	// ---- monitoring (D22 ecosystem, opt-in) -------------------------
+	// Prometheus + the mongo/redis exporters + Grafana — the same image
+	// pins as server-ce's d22 profile; scrape config + provisioning +
+	// dashboards are materialized into the monitoring data dir (owner
+	// policy B: state lives in the mounted data dir) and every container
+	// carries a healthcheck (owner policy C).
+	if t.boolVal("MONITORING_ENABLED") {
+		addOverlay("docker-compose.monitoring.yml")
+		if v := t.val("PROMETHEUS_PORT"); v != "" {
+			plan.Env["PROMETHEUS_PORT"] = v
+		}
+		if v := t.val("GRAFANA_PORT"); v != "" {
+			plan.Env["GRAFANA_PORT"] = v
+		}
+		if v := t.val("PROMETHEUS_IMAGE"); v != "" {
+			plan.Env["PROMETHEUS_IMAGE"] = v
+		}
+		if v := t.val("GRAFANA_IMAGE"); v != "" {
+			plan.Env["GRAFANA_IMAGE"] = v
+		}
+		if v := t.val("MONGODB_EXPORTER_IMAGE"); v != "" {
+			plan.Env["MONGODB_EXPORTER_IMAGE"] = v
+		}
+		if v := t.val("REDIS_EXPORTER_IMAGE"); v != "" {
+			plan.Env["REDIS_EXPORTER_IMAGE"] = v
+		}
+		if v := t.val("NODE_EXPORTER_IMAGE"); v != "" {
+			plan.Env["NODE_EXPORTER_IMAGE"] = v
+		}
+		if v := t.val("MONITORING_MONGO_HOST"); v != "" {
+			plan.Env["MONITORING_MONGO_HOST"] = v
+		}
+		if v := t.val("MONITORING_MONGO_PORT"); v != "" {
+			plan.Env["MONITORING_MONGO_PORT"] = v
+		}
+		if v := t.val("MONITORING_REDIS_HOST"); v != "" {
+			plan.Env["MONITORING_REDIS_HOST"] = v
+		}
+		if v := t.val("MONITORING_REDIS_PORT"); v != "" {
+			plan.Env["MONITORING_REDIS_PORT"] = v
+		}
+		mp := t.val("MONITORING_DATA_PATH")
+		if mp == "" {
+			mp = "data/monitoring"
+		}
+		plan.Env["MONITORING_DATA_PATH"] = absData(t.DataDir, mp)
+		pw := t.val("GRAFANA_ADMIN_PASSWORD")
+		if pw == "" {
+			buf := make([]byte, 16)
+			if _, err := rand.Read(buf); err != nil {
+				return nil, err
+			}
+			pw = hex.EncodeToString(buf)
+			if t.Store != nil {
+				if err := t.Store.Set("GRAFANA_ADMIN_PASSWORD", pw, "toolkit:plan-generated"); err != nil {
+					return nil, fmt.Errorf("store generated GRAFANA_ADMIN_PASSWORD: %w", err)
+				}
+			}
+			plan.Notes = append(plan.Notes, "generated + stored a new GRAFANA_ADMIN_PASSWORD (set one in the store to choose your own)")
+		}
+		plan.Env["GRAFANA_ADMIN_PASSWORD"] = pw
+		if err := t.materializeMonitoring(plan.Env["MONITORING_DATA_PATH"]); err != nil {
+			return nil, err
+		}
+	}
+
 	// operator override file (last = highest precedence), if present
 	ovr := filepath.Join(t.DataDir, "docker-compose.override.yml")
 	if fi, err := os.Stat(ovr); err == nil && !fi.IsDir() {
@@ -341,6 +408,94 @@ func absData(base, p string) string {
 		return p
 	}
 	return filepath.Join(base, p)
+}
+
+// materializeMonitoring — copy the bundled monitoring templates into the
+// monitoring data dir (idempotent; renders the scrape-config host
+// placeholders). Layout (matching the overlay's mounts):
+//
+//	<monitoring>/prometheus.yml            ← monitoring/prometheus/prometheus.yml
+//	<monitoring>/grafana-provisioning/*    ← monitoring/grafana/provisioning/*
+//	<monitoring>/grafana-dashboards/*      ← monitoring/grafana/dashboards/*
+func (t *Toolkit) materializeMonitoring(destRoot string) error {
+	td := filepath.Join(t.templateDir(), "monitoring")
+	if fi, err := os.Stat(td); err != nil || !fi.IsDir() {
+		return fmt.Errorf("monitoring templates missing under %s (the toolkit image bundles them — local builds need toolkit/lib/monitoring)", td)
+	}
+	// 1) the scrape config (rendered).
+	src := filepath.Join(td, "prometheus", "prometheus.yml")
+	raw, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	yml := strings.ReplaceAll(string(raw), "__OVERLEAF_HOST__", "ollitex")
+	yml = strings.ReplaceAll(yml, "__GITBRIDGE_HOST__", "git-bridge")
+	if err := os.MkdirAll(destRoot, 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(destRoot, "prometheus.yml"), []byte(yml), 0o644); err != nil {
+		return err
+	}
+	// 2) grafana provisioning + dashboards (tree copies).
+	pairs := []struct{ src, dst string }{
+		{filepath.Join(td, "grafana", "provisioning"), filepath.Join(destRoot, "grafana-provisioning")},
+		{filepath.Join(td, "grafana", "dashboards"), filepath.Join(destRoot, "grafana-dashboards")},
+	}
+	for _, pair := range pairs {
+		if err := copyTree(pair.src, pair.dst); err != nil {
+			return err
+		}
+	}
+	// 3) stateful dirs pre-created with the image user's ownership — the
+	// bind mount (owner policy B) would otherwise be a root-owned dir that
+	// the container user cannot write (grafana runs as uid 472;
+	// prometheus as uid 65534 nobody) and the container crash-loops.
+	if runtime.GOOS == "linux" {
+		if err := os.MkdirAll(filepath.Join(destRoot, "grafana-data"), 0o775); err != nil {
+			return err
+		}
+		if err := os.Chown(filepath.Join(destRoot, "grafana-data"), 472, 472); err != nil {
+			return fmt.Errorf("chown grafana-data to uid 472 (grafana image user): %w", err)
+		}
+		if err := os.MkdirAll(filepath.Join(destRoot, "prometheus-data"), 0o775); err != nil {
+			return err
+		}
+		if err := os.Chown(filepath.Join(destRoot, "prometheus-data"), 65534, 65534); err != nil {
+			return fmt.Errorf("chown prometheus-data to uid 65534 (prometheus image user): %w", err)
+		}
+	}
+	return nil
+}
+
+// copyTree — best-effort recursive copy (files 0644, dirs 0755).
+func copyTree(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		b, err := os.ReadFile(src)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(dst, b, 0o644)
+	}
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if err := copyTree(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func shellQuote(v string) string {
