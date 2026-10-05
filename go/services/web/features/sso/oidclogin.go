@@ -103,6 +103,12 @@ func oidcLogin(a *core.App) func(*core.Cxt, *core.Res) {
 			RedirectURL:  strings.TrimRight(cxt.SiteURL, "/") + "/oidc/login/callback",
 		}
 		authURLF := oauthCfg.AuthCodeURL(state, oauth2.SetAuthURLParam("nonce", nonce))
+		// Provider-configured scope (parity: the authorize request needs the
+		// scope the provider requested; soluto/IS4-class IdPs REJECT authorize
+		// requests without it). Empty provider scope = unchanged behavior.
+		if sc := strings.TrimSpace(p.Scope); sc != "" {
+			authURLF += "&scope=" + url.QueryEscape(sc)
+		}
 		_ = userinfoURL
 		res.Redirect(cxt.Req, 302, authURLF)
 	}
