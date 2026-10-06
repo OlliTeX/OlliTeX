@@ -105,6 +105,14 @@ func (d *DockerRunner) buildOpts(projectID string, command []string, directory, 
 		directory = joinPosix(d.Cfg.HostDirCompiles, basenamePosix(directory))
 	}
 
+	// Ownership for the compile container (owner 2026-10-07: "Cannot write
+	// file 'output.aux'" — the container runs unprivileged (DockerUser) and
+	// the host dir may be root-owned from daemon auto-create). Best-effort;
+	// skipped when unresolvable or non-root.
+	if d.Cfg.DockerUser != "" {
+		ensureCompileDirOwnership(directory, d.Cfg.DockerUser)
+	}
+
 	// volumes map (a single entry, keyed by directory, value
 	// "/compile:rw" default, "/compile:ro" for the read-only groups).
 	// Mirrors Node: volumes = {[directory]: '/compile'} then [:ro] for

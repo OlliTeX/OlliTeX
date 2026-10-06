@@ -47,8 +47,8 @@ export LOG_LEVEL="${LOG_LEVEL:-info}"
 # failure). So credentials default to EMPTY (anonymous) here; operators with
 # a real S3 gateway that requires auth still win via explicit compose env.
 export OVERLEAF_FILESTORE_BACKEND="${OVERLEAF_FILESTORE_BACKEND:-s3}"
-export OVERLEAF_FILESTORE_S3_ENDPOINT="${OVERLEAF_FILESTORE_S3_ENDPOINT:-http://172.17.0.1:8333}"
-export AWS_S3_ENDPOINT="${AWS_S3_ENDPOINT:-http://172.17.0.1:8333}"
+export OVERLEAF_FILESTORE_S3_ENDPOINT="${OVERLEAF_FILESTORE_S3_ENDPOINT:-http://seaweedfs-s3:8333}"
+export AWS_S3_ENDPOINT="${AWS_S3_ENDPOINT:-http://seaweedfs-s3:8333}"
 export BACKEND="${BACKEND:-s3}"
 export BUCKET_NAME="${BUCKET_NAME:-archives}"
 export TEMPLATE_FILES_BUCKET_NAME="${TEMPLATE_FILES_BUCKET_NAME:-template}"

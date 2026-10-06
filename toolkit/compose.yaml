@@ -672,9 +672,15 @@ services:
       # build DSNs from user/host/password envs; owner 2026-10-06):
       PG_PASSWORD: "${PG_PASSWORD:-}"
       # history-v1 S3 persistor → the live canonical SeaweedFS (anonymous
-      # verified 2026-10-06): default endpoint (172.17.0.1:8333) is dead.
+      # verified 2026-10-06): image default (172.17.0.1:8333) is dead.
       AWS_S3_ENDPOINT: "${AWS_S3_ENDPOINT:-http://seaweedfs-s3:8333}"
       AWS_S3_PATH_STYLE: "${AWS_S3_PATH_STYLE:-true}"
+      # filestore S3 mode → SAME live endpoint (owner 2026-10-07: filestore
+      # logged `dial tcp 172.17.0.1:8333 i/o timeout` = dead image default →
+      # every filestore S3 op timed out → clsi compile copied NO files into
+      # the sandbox → `Could not find file 'main.tex'` → no output.pdf.
+      # This env is the filestore's own endpoint knob.
+      OVERLEAF_FILESTORE_S3_ENDPOINT: "${OVERLEAF_FILESTORE_S3_ENDPOINT:-http://seaweedfs-s3:8333}"
       # hub grafana embed (empty = pane hidden — the safe default)
       HUB_GRAFANA_EMBED_URL: "${HUB_GRAFANA_EMBED_URL:-}"
       # ── SANDBOXED COMPILES (docker-in-docker on the HOST daemon) ──────
