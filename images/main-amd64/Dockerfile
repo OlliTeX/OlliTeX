@@ -27,7 +27,7 @@ COPY cmd/ ./cmd/
 RUN --mount=type=cache,id=ol-go-mod,target=/gocache/mod \
     --mount=type=cache,id=ol-go-build,target=/gocache/build \
     set -e; mkdir -p /usr/local/bin/go-services; \
-    for s in filestore notifications chat docstore web seaweed-migrate configdb cronmail collab realtime historyv1 project-history clsitex clsitypst; do \
+    for s in filestore notifications chat docstore web seaweed-migrate configdb cronmail collab historyv1 project-history clsitex clsitypst; do \
       CGO_ENABLED=1 GOOS=linux go build -o /usr/local/bin/go-services/$s ./cmd/$s; \
     done; \
     echo "built go-services: $(ls /usr/local/bin/go-services | tr '\n' ' ')"
