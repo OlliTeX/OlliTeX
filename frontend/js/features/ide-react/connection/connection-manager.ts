@@ -159,6 +159,7 @@ export class ConnectionManager extends EventTarget {
   private websocketFailureCount = 0
 
   private ws: WebSocket | null = null
+  private keepAliveTimer: ReturnType<typeof setInterval> | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private autoReconnect: boolean
   private reconnectGracefullyIntervalMs: number
@@ -297,29 +298,57 @@ export class ConnectionManager extends EventTarget {
       // already failed — keep the state, onclose finalizes it.
     }
 
-    // minimal y-websocket protocol keepalive (the collab service speaks the
-    // y-websocket protocol on this room): answer 'meta' with meta, answer
-    // 'sync' step0 with an empty state vector, ignore 'update' frames (the
-    // text engine's own provider does the real sync on its connection).
-    // Without the meta handshake the server watchdog closes an idle join
-    // socket — the 1006/reconnect loop the owner saw 2026-10-07.
-    ws.onmessage = (ev: MessageEvent) => {
-      try {
-        const m = JSON.parse(String(ev.data))
-        if (m && m.type === 'meta') {
-          ws.send(JSON.stringify({ type: 'meta' }))
-        } else if (m && m.type === 'sync') {
-          ws.send(JSON.stringify({ type: 'sync', step: 0, stateVector: {} }))
-        }
-      } catch {
-        // non-JSON frame — nothing to do for the join gate.
+    // Keepalive: the collab service speaks the hocuspocus BINARY protocol
+    // (a JSON frame there is a protocol violation — sending the old JSON
+    // meta/sync answers was one driver of the 2026-10-07 1006 loop).
+    // Every 25s we emit ONE protocol-valid client frame: hocuspocus type 0
+    // (sync) with an empty state vector = a single 0x00 byte. It
+    //   1) resets the haproxy `timeout tunnel` on this pipe — the ~30s
+    //      idle close was the OTHER driver (the IDE's own socket carries
+    //      real traffic and survives; the gate socket carried none),
+    //   2) gives the server traffic both ways (it replies with its state
+    //      vector), so no proxy or server idle policy sees this socket
+    //      as dead.
+    // The text engine's ygo provider owns the room's real sync + awareness
+    // on its own connection; this only keeps the gate alive.
+    this.keepAliveTimer = setInterval(() => {
+      if (this.ws === ws && ws.readyState === WebSocket.OPEN) {
+        // outer 0 (sync) + inner 0 (SyncStep1) + VarBytes(0) empty state vector
+        ws.send(new Uint8Array([0, 0, 0]))
       }
+    }, 25_000)
+
+    // hocuspocus peer replies (decoded from the server-side dispatcher in
+    // ygo provider/websocket/peer.go + sync.go):
+    //   t0 sync : [outer 0][inner subType][payload] — an inner 0 (SyncStep1)
+    //             MUST be answered with an inner 1 (SyncStep2); inner 1/2
+    //             (step2/update) need no reply.
+    //   t9 ping: liveness probe — answer with the 1-byte pong frame (tag 10).
+    // Everything else (step2, update, awareness, stateless, auth) is
+    // irrelevant to the join gate: consume, never echo.
+    ws.onmessage = (ev: MessageEvent) => {
+      let buf: Uint8Array | null = null
+      if (ev.data instanceof ArrayBuffer) buf = new Uint8Array(ev.data)
+      else if (ev.data instanceof Uint8Array) buf = ev.data
+      if (!buf || buf.length === 0) return
+      const t = buf[0]
+      if (t === 9) {
+        ws.send(new Uint8Array([10])) // pong
+      } else if (t === 0 && buf[1] === 0) {
+        // SyncStep1 → SyncStep2 with an empty update (we hold no local state)
+        ws.send(new Uint8Array([0, 1, 1, 0]))
+      }
+      // inner 1 (step2) / 2 (update) and other tags → no reply required
     }
 
     ws.onclose = (ev: CloseEvent) => {
       this.socket.socket.connected = false
       this.socket.socket.connecting = false
       this.ws = null
+      if (this.keepAliveTimer) {
+        clearInterval(this.keepAliveTimer)
+        this.keepAliveTimer = null
+      }
       const code = typeof ev?.code === 'number' ? ev.code : 1006
       console.debug('[ollitex] join: closed code=' + code + ' reason=' + (ev?.reason || '(none)'))
 
@@ -461,6 +490,10 @@ export class ConnectionManager extends EventTarget {
   }
 
   private cleanupSocket(): void {
+    if (this.keepAliveTimer) {
+      clearInterval(this.keepAliveTimer)
+      this.keepAliveTimer = null
+    }
     if (this.ws) {
       this.ws.onopen = null
       this.ws.onerror = null
