@@ -195,6 +195,11 @@ func getSingleton() (cfg *config.Config, cm *compilemanager.Manager) {
 // cm must be non-nil (the expiry interval dereferences it, as in Node where
 // CompileManager.clearExpiredProjects is always available after init).
 func Init(cfg *config.Config, cm *compilemanager.Manager) {
+	// Bind the singletons: production paths (ClearProject, expiry chain)
+	// read them via getSingleton. ForTest performs the same bind without
+	// the intervals; omitting it here left a nil Manager in production
+	// (owner clear-cache panic/500, 2026-10-06).
+	setSingletons(cfg, cm)
 	SetExpiryFromConfig(cfg)
 	stop := make(chan struct{})
 	cleanupStop = stop

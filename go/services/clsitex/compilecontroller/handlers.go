@@ -21,6 +21,7 @@ import (
 
 	compilemanager "ollitex/go/services/clsitex/compilemanager"
 	clserrors "ollitex/go/services/clsitex/errors"
+	clsl "ollitex/go/services/clsitex/logger"
 )
 
 // StopCompile ports stopCompile: stopCompile(projectId, userId) -> 204.
@@ -44,9 +45,16 @@ func (c *Controller) ClearCache(res http.ResponseWriter, params ProjectUser) (in
 	if c.ClearProject == nil {
 		err := c.Manager.ClearProject(params.ProjectID, params.UserID)
 		if err != nil {
+			clsl.Error(map[string]any{"err": err, "projectId": params.ProjectID,
+				"userId": params.UserID}, "clear project failed")
 			return 0, tagErr(err, "clear project")
 		}
 	} else if err := c.ClearProject(params.ProjectID, params.UserID); err != nil {
+		// log the CAUSE too: OError.Tag renders Message-only, so without
+		// this the real failure stays invisible (owner clear-cache 500,
+		// 2026-10-06).
+		clsl.Error(map[string]any{"err": err, "projectId": params.ProjectID,
+			"userId": params.UserID}, "clear project failed")
 		return 0, tagErr(err, "clear project")
 	}
 	_, err := sendPlain(res, http.StatusNoContent, "")
