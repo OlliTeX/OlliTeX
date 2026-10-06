@@ -187,6 +187,87 @@ func joinHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 }
 
 // isAnon — whether accessRequestData should be omitted (anonymous caller).
+// joinSessionHandler — GET /project/:Project_id/join (WEB profile,
+// session-authenticated). The modern browser-side join view: it replaces
+// the retired socket.io bus `joinProjectResponse` handshake (the bus
+// used to call the private U-API join with basic auth and forward the view
+// to the socket client). Same project model + privilege logic, same JSON
+// shape ({project, privilegeLevel, isRestrictedUser, isTokenMember,
+// isInvitedMember}); session user instead of the body userId.
+func joinSessionHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
+	// shared core extracted from joinHandler's response path
+	func respond(pidHex, uidHex string, anon bool) {
+		req := c.Req
+		if !delHex24(pidHex) {
+			r.W.Header().Set("X-Powered-By", "Express")
+			apiText(r, 404, "Not Found")
+			return
+		}
+		oid, _ := bson.ObjectIDFromHex(pidHex)
+		ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
+		defer cancel()
+		db, err := a.Mongo.DB(ctx)
+		if err != nil {
+			details404Plain(r)
+			return
+		}
+		var pd bson.D
+		if err := db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&pd); err != nil {
+			details404Plain(r)
+			return
+		}
+		pal := asStr(dget(pd, "publicAccesLevel"))
+		var level string
+		var invited, tokenMemb bool
+		if anon {
+			level = joinPrivilegeAnon(pal)
+		} else if uidHex != "" {
+			level = joinPrivilegeForUser(uidHex, pd, pal)
+			invited = joinInvitedMember(uidHex, pd, pal)
+			tokenMemb = joinTokenMember(uidHex, pd, pal)
+		}
+		if level == "" {
+			r.W.Header().Set("X-Powered-By", "Express")
+			apiText(r, 403, "Forbidden")
+			return
+		}
+		isRestricted := joinRestricted(uidHex != "", level, tokenMemb, invited)
+		isOwner := !anon && ownerRefHex(pd) == uidHex
+
+		var ownerMember *bson.D
+		var members, invites bson.A
+		if !isRestricted {
+			ownerMember = joinLoadUser(a, ctx, db, dget(pd, "owner_ref"))
+			members = joinInvitedMembers(a, ctx, db, pd, ownerRefHex(pd))
+			invites = bson.A{}
+		}
+		projectView := joinProjectModelView(pd, ownerMember, members, invites, isRestricted, isAnon(isOwner, anon), uidHex, isOwner, a, ctx, db)
+		var outer bson.D
+		outer = append(outer,
+			bson.E{Key: "project", Value: projectView},
+			bson.E{Key: "privilegeLevel", Value: level},
+			bson.E{Key: "isRestrictedUser", Value: isRestricted},
+			bson.E{Key: "isTokenMember", Value: tokenMemb},
+			bson.E{Key: "isInvitedMember", Value: !anon && invited},
+		)
+		r.W.Header().Set("X-Powered-By", "Express")
+		r.JSON(200, core.OrderedD(outer))
+	}
+	return func(c *core.Cxt, r *core.Res) {
+		mm := joinPat.FindStringSubmatch(c.Req.URL.Path)
+		if mm == nil {
+			views.NotFoundPage(r.W, pageBase(c, strings.TrimPrefix(c.Req.URL.Path, "/")))
+			return
+		}
+		pidHex := mm[1]
+		if c.Sess == nil || !c.Sess.IsLoggedIn() {
+			respond(pidHex, "", true) // anonymous (public/token) join view
+			return
+		}
+		respond(pidHex, strings.ToLower(c.Sess.UserIDHex()), false)
+	}
+}
+
 func isAnon(isOwner, anonReq bool) bool {
 	return anonReq // for an owner caller this is always false
 }

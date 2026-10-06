@@ -188,6 +188,9 @@ func Feature(a *core.App) core.Feature {
 			// isInvitedMember} (Node EditorHttpController.joinProject +
 			// ProjectEditorHandler.buildProjectModelView, order-preserving).
 			{Method: "POST", Pattern: joinPat, NoSession: true, APIOnly: true, Handler: joinHandler(a)},
+			// Session join view (WEB profile): the modern browser-side join that
+			// replaced the retired socket.io bus joinProjectResponse handshake.
+			{Method: "GET", Pattern: joinPat, Handler: joinSessionHandler(a)},
 			// U-API — POST /project/:Project_id/history/resync (Node HistoryRouter,
 			// privateApiRouter only; HistoryController.resyncProjectHistory). APIOnly.
 			// unauth→401; bad Project_id→404 JSON VA (params.Project_id); body invalid→

@@ -256,19 +256,40 @@ export class ConnectionManager extends EventTarget {
         reconnectAt: null,
       })
       // deliver the legacy `joinProjectResponse` handshake to IDE
-      // listeners (project:joined gate) — same shape the bus used to send
-      try {
-        ;(
+      // listeners (project:joined gate). The view comes from the session
+      // join REST route (same model + privilege as the retired bus's
+      // private-API join), mapped onto the payload shape the IDE expects.
+      void (async () => {
+        if (!this.projectId) return
+        let project: unknown = null
+        let permissionsLevel: string | null = null
+        try {
+          const res = await fetch(`/project/${this.projectId}/join`, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+          })
+          if (res.ok) {
+            const view: { project?: unknown; privilegeLevel?: string } = await res.json()
+            project = view.project
+            permissionsLevel = view.privilegeLevel ?? null
+          } else {
+            console.debug('[ollitex] join view fetch:', res.status)
+          }
+        } catch (err) {
+          console.debug('[ollitex] join view fetch failed:', err)
+        }
+        const notify = (
           this.socket as Socket & {
             __notify(event: string, payload: unknown): void
           }
-        ).__notify('joinProjectResponse', {
+        ).__notify
+        notify('joinProjectResponse', {
+          project,
+          permissionsLevel,
           protocolVersion: JOIN_PROTOCOL_VERSION,
           publicId: this.socket.publicId,
         })
-      } catch (err) {
-        console.warn('[ollitex] joinProjectResponse notify failed:', err)
-      }
+      })()
     }
 
     ws.onerror = () => {
