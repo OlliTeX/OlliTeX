@@ -1,6 +1,6 @@
 import { Form } from 'react-bootstrap'
 import type { Meta, StoryObj } from '@storybook/react-webpack5'
-import { figmaDesignUrl } from '../../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../../.storybook/utils/figma-design-url'
 
 const meta: Meta<(typeof Form)['Check']> = {
   title: 'Shared / Components / Form',

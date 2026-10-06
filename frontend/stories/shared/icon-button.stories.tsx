@@ -1,7 +1,7 @@
 import OLIconButton from '@/shared/components/ol/ol-icon-button'
 import type { Meta } from '@storybook/react-webpack5'
 import { useTranslation } from 'react-i18next'
-import { figmaDesignUrl } from '../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../.storybook/utils/figma-design-url'
 
 type Args = React.ComponentProps<typeof OLIconButton>
 

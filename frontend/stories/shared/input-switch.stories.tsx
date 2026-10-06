@@ -1,5 +1,5 @@
 import OLFormSwitch from '@/shared/components/ol/ol-form-switch'
-import { figmaDesignUrl } from '../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../.storybook/utils/figma-design-url'
 
 type Args = React.ComponentProps<typeof OLFormSwitch>
 

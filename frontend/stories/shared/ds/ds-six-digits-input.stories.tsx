@@ -1,6 +1,6 @@
 import { ComponentProps, useEffect, useState } from 'react'
 import { Meta } from '@storybook/react-webpack5'
-import { figmaDesignUrl } from '../../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../../.storybook/utils/figma-design-url'
 import DSFormGroup from '@/shared/components/ds/ds-form-group'
 import DSFormLabel from '@/shared/components/ds/ds-form-label'
 import CIAMSixDigitsInput from '@/features/settings/components/emails/ciam-six-digits-input'

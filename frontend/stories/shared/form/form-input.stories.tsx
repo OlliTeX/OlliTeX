@@ -5,7 +5,7 @@ import OLFormText from '@/shared/components/ol/ol-form-text'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import MaterialIcon from '@/shared/components/material-icon'
 import OLFormFeedback from '@/shared/components/ol/ol-form-feedback'
-import { figmaDesignUrl } from '../../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../../.storybook/utils/figma-design-url'
 
 const meta: Meta<React.ComponentProps<typeof OLFormControl>> = {
   title: 'Shared / Components / Form / Input',

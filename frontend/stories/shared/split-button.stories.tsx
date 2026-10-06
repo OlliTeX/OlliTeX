@@ -10,7 +10,7 @@ import {
 } from '@/shared/components/ol/ol-dropdown-menu'
 import OLButton from '@/shared/components/ol/ol-button'
 import { ButtonGroup } from 'react-bootstrap'
-import { figmaDesignUrl } from '../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../.storybook/utils/figma-design-url'
 
 export const Sizes = () => {
   const { t } = useTranslation()

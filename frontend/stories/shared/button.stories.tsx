@@ -1,5 +1,5 @@
 import { Meta } from '@storybook/react-webpack5'
-import { figmaDesignUrl } from '../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../.storybook/utils/figma-design-url'
 import OLButton from '@/shared/components/ol/ol-button'
 
 type Args = React.ComponentProps<typeof OLButton>

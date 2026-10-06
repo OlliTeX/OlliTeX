@@ -2,7 +2,7 @@ import fetchMock from 'fetch-mock'
 import Notification from '@/shared/components/notification'
 import { postJSON } from '../../js/infrastructure/fetch-json'
 import useAsync from '../../js/shared/hooks/use-async'
-import { figmaDesignUrl } from '../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../.storybook/utils/figma-design-url'
 
 type Args = React.ComponentProps<typeof Notification>
 

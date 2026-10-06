@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-webpack5'
 import classnames from 'classnames'
-import { figmaDesignUrl } from '../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../.storybook/utils/figma-design-url'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import MaterialIcon from '@/shared/components/material-icon'
 

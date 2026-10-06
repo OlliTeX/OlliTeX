@@ -1,5 +1,5 @@
 import { Meta } from '@storybook/react-webpack5'
-import { figmaDesignUrl } from '../../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../../.storybook/utils/figma-design-url'
 import DSButton from '@/shared/components/ds/ds-button'
 
 type Args = React.ComponentProps<typeof DSButton>

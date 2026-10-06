@@ -20,7 +20,7 @@ function getAbsolutePath(value: string): any {
 
 // Make sure that babel-macros are re-evaluated after changing the modules config
 // Import this after setting process.env.OVERLEAF_CONFIG
-const invalidateBabelCacheIfNeeded = require('macros/invalidate-babel-cache-if-needed')
+const invalidateBabelCacheIfNeeded = require('../macros/invalidate-babel-cache-if-needed') // relative: bare id is not resolvable under PnP
 invalidateBabelCacheIfNeeded()
 
 export default defineMain({

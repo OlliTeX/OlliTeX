@@ -2,7 +2,7 @@ import { Form, FormSelectProps } from 'react-bootstrap'
 import type { Meta, StoryObj } from '@storybook/react-webpack5'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormText from '@/shared/components/ol/ol-form-text'
-import { figmaDesignUrl } from '../../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../../.storybook/utils/figma-design-url'
 import { themedDecorator } from '../../utils/themed-decorator'
 
 const meta: Meta<FormSelectProps> = {

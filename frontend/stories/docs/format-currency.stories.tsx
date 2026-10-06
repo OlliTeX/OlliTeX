@@ -1,6 +1,6 @@
 import React from 'react'
 import { useSplitTest } from '@/shared/context/split-test-context'
-import { withSplitTests } from '../../../services/web/.storybook/utils/with-split-tests'
+import { withSplitTests } from '../../.storybook/utils/with-split-tests'
 
 const FormatCurrency = () => {
   const { variant } = useSplitTest('local-ccy-format')

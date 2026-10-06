@@ -1,6 +1,6 @@
 import OLToggleButton from '@/shared/components/ol/ol-toggle-button'
 import OLToggleButtonGroup from '@/shared/components/ol/ol-toggle-button-group'
-import { figmaDesignUrl } from '../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../.storybook/utils/figma-design-url'
 
 export const Default = () => {
   return (

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-webpack5'
 import DSFormCheckbox from '@/shared/components/ds/ds-form-checkbox'
-import { figmaDesignUrl } from '../../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../../.storybook/utils/figma-design-url'
 
 const meta: Meta<typeof DSFormCheckbox> = {
   title: 'Shared / DS Components / Form',

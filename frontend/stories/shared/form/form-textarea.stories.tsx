@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-webpack5'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormText from '@/shared/components/ol/ol-form-text'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
-import { figmaDesignUrl } from '../../../../services/web/.storybook/utils/figma-design-url'
+import { figmaDesignUrl } from '../../../.storybook/utils/figma-design-url'
 
 const meta: Meta<React.ComponentProps<typeof OLFormControl>> = {
   title: 'Shared / Components / Form / Textarea',
