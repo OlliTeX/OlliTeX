@@ -237,12 +237,12 @@ const ssoConfigID = "sso-settings"
 
 var (
 	samlLoginPattern    = regexp.MustCompile(`^/saml/login$`)
-	samlProviderPattern = regexp.MustCompile(`^/saml/login/(?P<providerId>[A-Za-z0-9][A-Za-z0-9_-]{1,63})$`)
+	samlProviderPattern = regexp.MustCompile(`^/saml/login/(?P<providerId>[A-Za-z0-9][A-Za-z0-9_-]{0,63})$`)
 	samlCBPattern       = regexp.MustCompile(`^/saml/login/callback$`)
 	samlLogoutPattern   = regexp.MustCompile(`^/saml/logout/callback$`)
 	samlMetaPattern     = regexp.MustCompile(`^/saml/meta$`)
 	oidcLoginPattern    = regexp.MustCompile(`^/oidc/login$`)
-	oidcProviderPattern = regexp.MustCompile(`^/oidc/login/(?P<providerId>[A-Za-z0-9][A-Za-z0-9_-]{1,63})$`)
+	oidcProviderPattern = regexp.MustCompile(`^/oidc/login/(?P<providerId>[A-Za-z0-9][A-Za-z0-9_-]{0,63})$`)
 	oidcCBPattern       = regexp.MustCompile(`^/oidc/login/callback$`)
 	oidcLogoutPattern   = regexp.MustCompile(`^/oidc/logout/callback$`)
 	unlinkPattern       = regexp.MustCompile(`^/user/oauth-unlink$`)
