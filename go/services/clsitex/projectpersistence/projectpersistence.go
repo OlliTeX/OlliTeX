@@ -30,6 +30,7 @@
 package projectpersistence
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -395,6 +396,13 @@ func ClearProject(projectId, userId string) error {
 	_, cm := getSingleton()
 	logger.Debug(map[string]any{"projectId": projectId, "userId": userId},
 		"clearing project for user")
+	if cm == nil {
+		// defensive: singleton unbound (apps bootstrap skipped
+		// projectpersistence.Init). A clear error keeps the HTTP seam honest
+		// instead of a nil-Manager panic (which used to drop the connection)
+		// — owner live event 2026-10-06.
+		return fmt.Errorf("projectpersistence: clear manager not bound")
+	}
 	if err := cmClearProject(cm, projectId, userId); err != nil {
 		return err
 	}

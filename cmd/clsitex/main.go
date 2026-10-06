@@ -85,6 +85,14 @@ func main() {
 	// --- compile controller (Node: CompileController.js) ---------------------
 	latex := latexrunner.New(runner, logInfo, logInfo, logInfo)
 	manager := cm.New(runner, latex)
+
+	// Node parity: the CLSI bootstrap initialises the
+	// ProjectPersistenceManager WITH the compile manager (singleton bind +
+	// expiry/disk-stats intervals). Without this the package-level ClearProject
+	// singleton is nil and the clearCache seam (DELETE /project/… used by the
+	// editor "Clear cache" flow) dereferences a nil Manager (owner live panic
+	// 2026-10-06: compilemanager.(*Manager).ClearProject -> nil *Paths).
+	ppm.Init(cfg, manager)
 	controller := &cc.Controller{
 		Manager: manager,
 		Notify:  clsicache.Notify,
