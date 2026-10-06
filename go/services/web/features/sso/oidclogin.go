@@ -71,6 +71,13 @@ func oidcLogin(a *core.App) func(*core.Cxt, *core.Res) {
 		} else {
 			cfg = loadSSOConfig(db, cxt)
 		}
+		if pathID == "callback" {
+			// "callback" is the exact callback-route segment (oidcCBPattern).
+			// RE2 can't lookahead it out of oidcProviderPattern, so if route
+			// order ever regresses, fail loudly instead of a bogus 404.
+			res.PlainText(404, "'callback' is the OIDC callback route, not a provider id")
+			return
+		}
 		p, ok := resolveOIDCProvider(cfg, pathID)
 		if !ok {
 			id := pathID

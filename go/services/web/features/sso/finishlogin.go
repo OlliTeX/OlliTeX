@@ -25,6 +25,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -118,12 +119,17 @@ func samlJIT(ctx context.Context, db *mongo.Database, p *SAMLProvider, profile s
 			}
 			uid = ins.InsertedID.(string)
 			u = map[string]any{"_id": uid, "email": email}
-		} else {
-			return nil, err
 		}
-		uid, _ := u["_id"].(string)
-		// link (Node $set parity — positional, idempotent shape)
-		_, _ = users.UpdateOne(ctx, bson.D{{Key: "_id", Value: uid}}, bson.D{
+		// NOTE: the email-found path used to `return nil, err` INSIDE the
+		// success branch (err==nil) — a (nil user, nil error) that the ACS
+		// handler treated as success and logged into with an EMPTY passport
+		// (live 2026-10-06, both SAML and OIDC). It must fall through.
+		idVal, _ := u["_id"]
+		// link (Node $set parity — positional, idempotent shape).
+		// FILTER _id MUST CARRY THE DECODED VALUE (bson.ObjectID): the
+		// driver v2 does NOT coerce a hex-STRING filter to ObjectID, and
+		// the no-match silently no-op'd this $set (live 2026-10-06).
+		_, _ = users.UpdateOne(ctx, bson.D{{Key: "_id", Value: idVal}}, bson.D{
 			{Key: "$set", Value: bson.D{
 				{Key: "emails.0.confirmedAt", Value: time.Now().UTC()},
 				{Key: "emails.0.samlProviderId", Value: providerID},
@@ -215,13 +221,13 @@ func oidcJIT(ctx context.Context, db *mongo.Database, p *OIDCProvider, profile s
 				return nil, ierr
 			}
 			u = map[string]any{"_id": ins.InsertedID.(string), "email": email}
-		} else {
-			return nil, err
 		}
+		// (the old `else { return nil, err }` sat on the SUCCESS branch —
+		// same (nil,nil) empty-session bug as samlJIT; removed 2026-10-06)
 		created = true
 	}
 	_ = created
-	uid, _ := u["_id"].(string)
+	uid := userIDHex(u)
 	// link (Node: link user↔OIDC account, drop prior providerUserId link
 	// for same user+provider, emails.0.confirmedAt + oidcProviderId).
 	if _, derr := tpi.DeleteMany(ctx, bson.D{
@@ -237,7 +243,9 @@ func oidcJIT(ctx context.Context, db *mongo.Database, p *OIDCProvider, profile s
 	}); ierr != nil {
 		return nil, ierr
 	}
-	if _, serr := users.UpdateOne(ctx, bson.D{{Key: "_id", Value: uid}}, bson.D{
+	uidVal, _ := u["_id"] // decoded value (ObjectID) for the filter — hex
+	// strings silently no-match under driver v2 (probe-verified 2026-10-06).
+	if _, serr := users.UpdateOne(ctx, bson.D{{Key: "_id", Value: uidVal}}, bson.D{
 		{Key: "$set", Value: bson.D{
 			{Key: "emails.0.confirmedAt", Value: time.Now().UTC()},
 			{Key: "emails.0.oidcProviderId", Value: providerID},
@@ -258,20 +266,48 @@ func oidcJIT(ctx context.Context, db *mongo.Database, p *OIDCProvider, profile s
 	return loginEpochBump(ctx, users, u, true, all)
 }
 
+// userIDHex — extract a user doc's _id (from a mongo map decode) as a hex
+// string. The driver may materialize ObjectID as string or as
+// bson.ObjectID inside map[string]any; the old `.(string)` assertion
+// SILENTLY returned "" for the other shape — that left SSO sessions with
+// passport.user._id == "" (live 2026-10-06: /admin/* → /restricted and
+// hub 500 for the very SAML user who just logged in).
+func userIDHex(m map[string]any) string {
+	if m == nil {
+		return ""
+	}
+	v, ok := m["_id"]
+	if !ok || v == nil {
+		return ""
+	}
+	switch t := v.(type) {
+	case string:
+		return t
+	case bson.ObjectID:
+		return t.Hex()
+	default:
+		s := fmt.Sprint(v)
+		return s
+	}
+}
+
 // loginEpochBump — Node: updateOne({_id, loginEpoch: user.loginEpoch},
 // {$inc loginEpoch, $set details, $unset hashedPassword});
 // modifiedCount !== 1 → ParallelLoginError.
 func loginEpochBump(ctx context.Context, users *mongo.Collection, u map[string]any, withDetails bool, details bson.D) (map[string]any, error) {
-	uid, _ := u["_id"].(string)
+	uid := userIDHex(u)
+	uidVal, _ := u["_id"] // decoded value (bson.ObjectID) — REQUIRED in filters;
+	// driver v2 does NOT coerce a hex string to ObjectID (probe-verified,
+	// live 2026-10-06: string filter no-matched, broke the SSO session).
 	var old struct {
 		LoginEpoch int32 `bson:"loginEpoch"`
 	}
 	epochVal := int32(0)
-	if err := users.FindOne(ctx, bson.D{{Key: "_id", Value: uid}}).Decode(&old); err == nil {
+	if err := users.FindOne(ctx, bson.D{{Key: "_id", Value: uidVal}}).Decode(&old); err == nil {
 		epochVal = old.LoginEpoch
 	}
 	ur := users.FindOneAndUpdate(ctx,
-		bson.D{{Key: "_id", Value: uid}, {Key: "loginEpoch", Value: epochVal}},
+		bson.D{{Key: "_id", Value: uidVal}, {Key: "loginEpoch", Value: epochVal}},
 		buildEpochUpdate(withDetails, details))
 	var out map[string]any
 	if err := ur.Decode(&out); err != nil || out == nil {
@@ -366,7 +402,7 @@ func firstStringM2(profile ssoProfile, k string) string {
 // (AcceptsJSON → 200 {"redir"}; else 302). `redir` = ?redir param
 // (root-relative only) or "/project".
 func finishSSOLogin(a *core.App, cxt *core.Cxt, res *core.Res, user map[string]any, externalAuth, providerID string, sessFields map[string]any, redir string) {
-	uid, _ := user["_id"].(string)
+	uid := userIDHex(user)
 	analyticsID, _ := user["analyticsId"].(string)
 	if analyticsID == "" {
 		analyticsID = newUUID()
@@ -492,9 +528,22 @@ func clearSSOMarker(a *core.App) core.PasswordLoginHook {
 			return
 		}
 		_, _ = db.Collection("users").UpdateOne(cxt.Req.Context(),
-			bson.D{{Key: "_id", Value: uid}},
+			bson.D{{Key: "_id", Value: ssoUserIDFilter(uid)}},
 			bson.D{{Key: "$unset", Value: bson.D{{Key: "ssoLoginProviderId", Value: ""}}}})
 	}
+}
+
+// ssoUserIDFilter — turn a session hex user id into a _id FILTER VALUE.
+// Session hex + ObjectID _id docs are the norm; string-hex _id docs exist
+// (SSO-created users). driver v2 does NOT coerce a hex string to ObjectID
+// in a filter (probe-verified 2026-10-06 — a string filter silently
+// no-matches ObjectID docs), so prefer the ObjectID form and let callers
+// fall back to the raw string when nothing matched.
+func ssoUserIDFilter(hexID string) any {
+	if oid, err := bson.ObjectIDFromHex(hexID); err == nil {
+		return oid
+	}
+	return hexID
 }
 
 // ---- small helpers ----

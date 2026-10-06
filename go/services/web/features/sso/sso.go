@@ -262,8 +262,14 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: samlLogoutPattern, NoLogin: true, NoCSRF: true, Handler: samlLogoutCallbackH(a)},
 			{Method: "GET", Pattern: samlMetaPattern, NoLogin: true, Handler: samlSPMetadata(a)},
 			{Method: "GET", Pattern: oidcLoginPattern, NoLogin: true, Handler: oidcLogin(a)},
-			{Method: "GET", Pattern: oidcProviderPattern, NoLogin: true, Handler: oidcLogin(a)},
+			// ROUTE ORDER IS LOAD-BEARING: the router is first-match (core
+			// app.go ~line 540), and "callback" matches the providerId char
+			// class — the exact callback route MUST be registered before the
+			// parameterized one or /oidc/login/callback 404s as
+			// "provider 'callback'" (found live in the 2026-10-06 OIDC
+			// positive-leg E2E).
 			{Method: "GET", Pattern: oidcCBPattern, NoLogin: true, NoCSRF: true, Handler: oidcCallback(a)},
+			{Method: "GET", Pattern: oidcProviderPattern, NoLogin: true, Handler: oidcLogin(a)},
 			{Method: "GET", Pattern: oidcLogoutPattern, NoLogin: true, NoCSRF: true, Handler: oidcLogoutCallbackH(a)},
 			{Method: "POST", Pattern: mustRegexp(`^/sso/ldap/login$`), NoLogin: true, Handler: ldapLogin(a)},
 			{Method: "POST", Pattern: unlinkPattern, Handler: oauthUnlink(a)},
