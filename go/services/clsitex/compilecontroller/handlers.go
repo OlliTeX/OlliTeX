@@ -81,6 +81,15 @@ func (c *Controller) SyncFromPdf(res http.ResponseWriter,
 	})
 }
 
+// BuildFile is GET .../build/{build_id}/output/{file} (both mounts) — the
+// shared-cls file-serving surface (Node clsi: the absorbed output URLs the
+// compile response advertises; apps/server.go routes). Delegated to the
+// ported manager method (compilemanager/outputfile.go).
+func (c *Controller) BuildFile(res http.ResponseWriter, r *http.Request,
+	params ProjectUser, buildID, fn string) (int, error) {
+	return c.Manager.ServeBuildFile(res, r, params.ProjectID, params.UserID, buildID, fn)
+}
+
 func (c *Controller) syncOpts(params ProjectUser, q SyncQuery) compilemanager.SyncOpts {
 	return compilemanager.SyncOpts{
 		ImageName:            q.ImageName,

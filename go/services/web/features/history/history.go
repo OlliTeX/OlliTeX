@@ -83,11 +83,17 @@ func v1User() string {
 	return "staging"
 }
 
+// pass precedence (2026-10-06 production): the ONE web->historyv1 key is
+// the V1_HISTORY_PASSWORD env the historyv1 service itself reads; the
+// legacy node-era secret (generated as a separate random value by
+// 100_generate_secrets.sh) only takes over when that key is unset —
+// previously the legacy token won and historyv1 answered 401 (the
+// owner's /latest/history 500s).
 func v1Pass() string {
-	if p := os.Getenv("STAGING_PASSWORD"); p != "" {
+	if p := os.Getenv("V1_HISTORY_PASSWORD"); p != "" {
 		return p
 	}
-	return os.Getenv("V1_HISTORY_PASSWORD")
+	return os.Getenv("STAGING_PASSWORD")
 }
 
 func trimRightSlash(s string) string {

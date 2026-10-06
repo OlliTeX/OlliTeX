@@ -127,6 +127,17 @@ func (a *App) outputZipUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// buildFile is GET .../build/{bid}/output/{filename} (both mounts) — the
+// shared-cls file-serving surface (see compilemanager/outputfile.go):
+// the editor PDF pane's output.pdf / output.log / output.blg / ... fetches,
+// proxied here by go web (features/compile/outputfile_web.go).
+func (a *App) buildFile(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func(w http.ResponseWriter) (int, error) {
+		return a.CC.BuildFile(w, r, a.projectUser(r),
+			r.PathValue("build_id"), r.PathValue("filepath"))
+	})
+}
+
 // --- convert routes (FUM multipart; Node FileUploadMiddleware) -------------
 
 func (a *App) convertRoutes(mux *http.ServeMux) {

@@ -117,6 +117,17 @@ func (a *App) Router() http.Handler {
 	mux.HandleFunc("GET /project/{project_id}/user/{user_id}/build/{build_id}/output/output.zip",
 		a.outputZipUser)
 
+	// Output files (Node clsi: the shared-cls file-serving surface the editor
+	// PDF/error panes fetch — output.pdf / output.log / output.blg /
+	// output.synctex.gz / ...). Go mux ranks the literal /output/output.zip
+	// patterns above over the {filepath...} wildcard, so the zip mounts keep
+	// precedence. The initial port dropped these two routes and every editor
+	// output fetch 404'd (live evidence 2026-10-06 19:36-19:43).
+	mux.HandleFunc("GET /project/{project_id}/build/{build_id}/output/{filepath...}",
+		a.buildFile)
+	mux.HandleFunc("GET /project/{project_id}/user/{user_id}/build/{build_id}/output/{filepath...}",
+		a.buildFile)
+
 	// Convert (multipart upload via FUM; Node: FileUploadMiddleware).
 	a.convertRoutes(mux)
 
