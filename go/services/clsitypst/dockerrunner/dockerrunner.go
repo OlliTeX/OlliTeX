@@ -98,11 +98,24 @@ func (d *DockerRunner) buildOpts(projectID string, command []string, directory, 
 		image = d.Cfg.Override + "/" + basenamePosix(image)
 	}
 
+	// Ownership for the COMPILE container (2026-10-06): chown the sandbox
+	// dir so the unprivileged DockerUser (texlive uid 33) can write output.
+	// Target the path as visible to THIS process (pre-remap = the mounted
+	// inner path); the post-remap chown covers flat deployments where the
+	// daemon-side bind path is directly visible. See clsitex dockerrunner for
+	// the live proof.
+	if d.Cfg.DockerUser != "" {
+		ensureCompileDirOwnership(directory, d.Cfg.DockerUser)
+	}
+
 	// directory remap (see node comment blocks in run()).
 	if compileGroup == "synctex-output" {
 		directory = joinPosix(d.Cfg.HostDirOutput, last3segments(directory)...)
 	} else {
 		directory = joinPosix(d.Cfg.HostDirCompiles, basenamePosix(directory))
+	}
+	if d.Cfg.DockerUser != "" {
+		ensureCompileDirOwnership(directory, d.Cfg.DockerUser)
 	}
 
 	// volumes map (a single entry, keyed by directory, value

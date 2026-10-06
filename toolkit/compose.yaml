@@ -720,6 +720,19 @@ services:
       # clsi run scripts add www-data to the socket group when it is
       # present): 2026-10-07 (compile 500: no /var/run/docker.sock here)
       - /var/run/docker.sock:/var/run/docker.sock
+      # sandboxed-compile scratch plane (2026-10-06, live-proven regression):
+      # clsitex writes compile resources to /var/lib/overleaf/data/compiles
+      # (inner) and the docker DAEMON bind-mounts the HOST plane (SANDBOXED
+      # _COMPILES_HOST_DIR_* = /data_1/ols/*) into the compile container's
+      # /compile. Before these mounts the inner paths resolved into the
+      # legacy CEP tree (FILESTORE_DATA_DIR) so the compile container saw an
+      # EMPTY /compile -> "Could not find file 'main.tex'" (owner project
+      # 671bd3cf..., 17:44 + 19:15 repros; the written main.tex was found in
+      # the CEP tree). Mounting /data_1/ols/* over the inner paths makes write
+      # target == bind source == daemon auto-create target.
+      - ${OLLITEX_COMPILE_DIR:-/data_1/ols/compiles}:/var/lib/overleaf/data/compiles
+      - ${OLLITEX_OUTPUT_DIR:-/data_1/ols/output}:/var/lib/overleaf/data/output
+      - ${OLLITEX_CACHE_DIR:-/data_1/ols/cache}:/var/lib/overleaf/data/cache
     # no host port: haproxy is the facade
     healthcheck:
       # the app ships curl; anonymous `/` answers 302→/login (curl -f accepts

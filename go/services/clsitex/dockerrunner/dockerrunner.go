@@ -98,17 +98,29 @@ func (d *DockerRunner) buildOpts(projectID string, command []string, directory, 
 		image = d.Cfg.Override + "/" + basenamePosix(image)
 	}
 
+	// Ownership for the COMPILE container (owner 2026-10-07: "Cannot write
+	// file 'output.aux'"): the sandbox dir on disk must be writable by the
+	// unprivileged DockerUser of the compile container.
+	//
+	// 2026-10-06 live proof: chown MUST target the path as visible to THIS
+	// process. The remap below rewrites it to the daemon-side bind source
+	// (e.g. /data_1/ols/compiles), which is NOT visible inside the runner
+	// container (only /var/lib/overleaf/data/compiles is mounted there -
+	// toolkit compose) - a chown against the remapped path silently no-ops
+	// against a container-local phantom dir while the mounted (== bind
+	// source) dir stays root:root. So chown the ORIGINAL directory first; the
+	// remapped-path chown afterwards is best-effort for flat deployments
+	// where both views coincide.
+	if d.Cfg.DockerUser != "" {
+		ensureCompileDirOwnership(directory, d.Cfg.DockerUser)
+	}
+
 	// directory remap (see node comment blocks in run()).
 	if compileGroup == "synctex-output" {
 		directory = joinPosix(d.Cfg.HostDirOutput, last3segments(directory)...)
 	} else {
 		directory = joinPosix(d.Cfg.HostDirCompiles, basenamePosix(directory))
 	}
-
-	// Ownership for the compile container (owner 2026-10-07: "Cannot write
-	// file 'output.aux'" — the container runs unprivileged (DockerUser) and
-	// the host dir may be root-owned from daemon auto-create). Best-effort;
-	// skipped when unresolvable or non-root.
 	if d.Cfg.DockerUser != "" {
 		ensureCompileDirOwnership(directory, d.Cfg.DockerUser)
 	}

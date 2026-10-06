@@ -39,6 +39,15 @@ func resolveUserIDs(name string) (uid, gid int) {
 	}
 	u, err := user.Lookup(name)
 	if err != nil {
+		// 2026-10-06 (live: "Cannot write file 'output.aux'"): the RUNNER
+		// container (alpine base) has no www-data in /etc/passwd, so the
+		// lookup fails and the ownership chown is silently skipped while the
+		// COMPILE container (texlive, Debian) runs as uid 33. The texlive
+		// images ship the Debian-standard www-data=33; fall back for that
+		// well-known name instead of silently skipping the ownership fix.
+		if name == "www-data" {
+			return 33, 33
+		}
 		return -1, -1
 	}
 	uid, _ = strconv.Atoi(u.Uid)
