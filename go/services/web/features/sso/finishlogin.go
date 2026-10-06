@@ -400,7 +400,12 @@ func firstStringM2(profile ssoProfile, k string) string {
 // finishSSOLogin commits a new session (regen parity), stamps
 // externalAuth + ssoProviderId (+ idToken/samlExtce), then redirOrJSON
 // (AcceptsJSON → 200 {"redir"}; else 302). `redir` = ?redir param
-// (root-relative only) or "/project".
+// (root-relative only) or "/".
+//
+// The default landing is "/" (→ 302 /hub), not the Node-era "/project"
+// dashboard: the Go app has NO GET /project HTML route (the project list
+// lives at /hub) — SSO logins were landing on a dead page (owner report
+// 2026-10-06).
 func finishSSOLogin(a *core.App, cxt *core.Cxt, res *core.Res, user map[string]any, externalAuth, providerID string, sessFields map[string]any, redir string) {
 	uid := userIDHex(user)
 	analyticsID, _ := user["analyticsId"].(string)
@@ -445,7 +450,7 @@ func finishSSOLogin(a *core.App, cxt *core.Cxt, res *core.Res, user map[string]a
 
 	target := strings.TrimSpace(redir)
 	if !validSSORedirect(target) {
-		target = "/project"
+		target = "/"  // Go-app landing (302 → /hub); Node's /project does not exist here
 	}
 	if core.AcceptsJSON(cxt.Req) {
 		b, _ := json.Marshal(target)
