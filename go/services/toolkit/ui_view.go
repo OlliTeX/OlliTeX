@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -37,7 +38,8 @@ func (a *app) masterList() []masterItem {
 		{"shells", "Shells", "mongo · psql · app"},
 		{"actions", "Actions", "tls · n-gram · admin"},
 		{"doctor", "Doctor", a.doctorText()},
-		{"backup", "Backup", "store snapshot"},
+		{"hub", "Hub", a.hubSubtitle()},
+		{"backup", "Backup", "store snapshot + data"},
 		{"about", "About", "rev " + a.tk.Ver},
 	}
 	_ = stateOK
@@ -117,7 +119,7 @@ func (a *app) viewClassic() string {
 	// windows side by side); content taller than the pane is clamped by the
 	// rectangular fit, and the master pane is padded so the boxes match.
 	paneH := a.height - 6 // fixed: title + menu + status + keystrip + box borders
-	if paneH < 4 { // belt+braces: zero/odd sizes must never reach the slice math
+	if paneH < 4 {        // belt+braces: zero/odd sizes must never reach the slice math
 		paneH = 4
 	}
 	var left strings.Builder
@@ -165,7 +167,7 @@ func (a *app) viewClassic() string {
 	// owner saw). JoinHorizontal aligns them as two true side-by-side panes
 	// (top-anchored; the shorter pane leaves the terminal background clear
 	// below it — the mc look).
-	out.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftFit, rightFit)+"\n")
+	out.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftFit, rightFit) + "\n")
 
 	// status line + keystrip form the FOOTER — with paneH = height-6 the
 	// frame is exactly the terminal height, so these rest on the bottom two
@@ -242,8 +244,10 @@ func (a *app) keyStrip() string {
 		seg = append(seg, zc("cycle", "h/l", "cycle"), zc("refresh", "f", "refresh"))
 	case "actions":
 		seg = append(seg, zc("tls", "t", "tls"), zc("ngram", "n", "n-gram"), zc("status", "l", "status"), zc("admin", "b", "admin"))
+	case "hub":
+		seg = append(seg, zc("refresh", "r", "refresh"), zc("rows", "t", "10/20"))
 	case "backup":
-		seg = append(seg, zc("backup", "b", "backup"), zc("restore", "r", "restore"))
+		seg = append(seg, zc("backup", "b", "backup"), zc("restore", "r", "restore"), zc("data", "d", "data"), zc("drill", "v", "drill"))
 	case "shells":
 		seg = append(seg, zc("shell", "1-4", "shell"))
 	}
@@ -273,6 +277,8 @@ func (a *app) rightPane() string {
 		return a.panelActions()
 	case "doctor":
 		return a.panelDoctor()
+	case "hub":
+		return a.panelHub()
 	case "backup":
 		return a.panelBackup()
 	case "about":
@@ -459,7 +465,7 @@ func (a *app) panelSettings() string {
 				mark = styleOK.Render("●")
 			}
 			line := cur + styleValue.Render(fit(g.Name, 16)) + styleDim.Render(fmt.Sprintf("  %2d keys · %d set", len(g.Keys), set)) + "   " + mark
-			b.WriteString(fit(line, 76)+"\n")
+			b.WriteString(fit(line, 76) + "\n")
 		}
 		b.WriteString("  " + styleDim.Render("enter open · j/k move · tab← list") + "\n")
 		return b.String()
@@ -492,7 +498,7 @@ func (a *app) panelSettings() string {
 			cur = "> "
 		}
 		line := cur + styleValue.Render(fit(e.Key, 38)) + "  " + mark + "  " + fit(fmt.Sprint(val), 32)
-		b.WriteString(fit(line, 76)+"\n")
+		b.WriteString(fit(line, 76) + "\n")
 	}
 	b.WriteString("  " + styleDim.Render("enter edit · j/k move · b groups · tab← list") + "\n")
 	return b.String()
@@ -521,6 +527,136 @@ func (a *app) panelDoctor() string {
 		b.WriteString("\n  " + styleDim.Render("(press r or enter on Doctor to run the checks)") + "\n")
 	}
 	return b.String()
+}
+
+// hubSubtitle — the master-list line for Hub (live once loaded).
+func (a *app) hubSubtitle() string {
+	if a.hub == nil {
+		return "views · not loaded"
+	}
+	p, u := a.hub.Projects, a.hub.Users
+	return fmt.Sprintf("%d projects · %d users", p.All+p.Deleted, u.All+u.Deleted)
+}
+
+// panelHub — the hub admin views (site.general.projects.* + users.*) inside
+// the TUI. Counters per the hub's leaves + the sample rows (10 or 20, "t").
+// Data = direct content-DB reads with the exact /hub predicates (see
+// hubdata.go).
+func (a *app) panelHub() string {
+	var b strings.Builder
+	b.WriteString(panelHead("hub — the instance views"))
+	if a.hub == nil {
+		b.WriteString("  " + styleDim.Render("not loaded yet — press [r] refresh (or wait for the entry load)") + "\n")
+		if a.errMsg != "" {
+			b.WriteString("  " + styleErr.Render(a.errMsg) + "\n")
+		}
+		b.WriteString("\n")
+		return b.String()
+	}
+	h := a.hub
+	b.WriteString("  " + styleKvK.Render("db") + " " + h.DB + styleDim.Render("  (mongo "+h.MongoHost+" · "+h.Now.Format("15:04:05")+")") + "\n")
+	b.WriteString("\n")
+
+	b.WriteString("  " + styleHead.Render("PROJECTS") + "\n")
+	p := h.Projects
+	b.WriteString("  " + styleKvK.Render("all") + "      " + fmt.Sprintf("%d", p.All) +
+		"   " + styleKvK.Render("inactive") + " " + fmt.Sprintf("%2d", p.Inactive) +
+		"   " + styleKvK.Render("trashed") + "  " + fmt.Sprintf("%2d", p.Trashed) +
+		"   " + styleKvK.Render("deleted") + "  " + fmt.Sprintf("%d", p.Deleted) + "\n")
+	if len(p.Sample) > 0 {
+		b.WriteString("  " + styleDim.Render(fmt.Sprintf("latest %d (by lastUpdated):", len(p.Sample))) + "\n")
+		maxName := 0
+		for _, r := range p.Sample {
+			if l := len(r.Name); l > maxName {
+				maxName = l
+			}
+		}
+		nameW := maxName
+		if nameW > 22 {
+			nameW = 22
+		}
+		for _, r := range p.Sample {
+			mark := ""
+			if r.Trashed {
+				mark += "T"
+			}
+			if r.Inactive {
+				mark += "I"
+			}
+			if r.Deleted {
+				mark += "D"
+			}
+			if mark == "" {
+				mark = "·"
+			}
+			name := fit(r.Name, nameW)
+			b.WriteString("  " + leftPad(name, nameW+1) + " " + fit(r.Owner, 22) + " " + styleWarn.Render(mark) + " " + ageStr(r.LastUpdated, h.Now) + "\n")
+		}
+	}
+	b.WriteString("\n")
+
+	b.WriteString("  " + styleHead.Render("USERS") + "\n")
+	u := h.Users
+	b.WriteString("  " + styleKvK.Render("all") + "     " + fmt.Sprintf("%d", u.All) +
+		"   " + styleKvK.Render("admins") + "  " + fmt.Sprintf("%2d", u.Admins) +
+		"   " + styleKvK.Render("susp") + "   " + fmt.Sprintf("%2d", u.Suspended) +
+		"   " + styleKvK.Render("inact") + "  " + fmt.Sprintf("%d", u.Inactive) +
+		"   " + styleKvK.Render("deleted") + " " + fmt.Sprintf("%d", u.Deleted) + "\n")
+	if len(u.Sample) > 0 {
+		b.WriteString("  " + styleDim.Render(fmt.Sprintf("latest %d (by signup):", len(u.Sample))) + "\n")
+		for _, r := range u.Sample {
+			mark := ""
+			if r.IsAdmin {
+				mark += "A"
+			}
+			if r.Suspended {
+				mark += "S"
+			}
+			if r.Inactive {
+				mark += "I"
+			}
+			if r.Deleted {
+				mark += "D"
+			}
+			if mark == "" {
+				mark = "·"
+			}
+			b.WriteString("  " + fit(r.Email, 34) + " " + styleWarn.Render(mark) + " " + ageStr(r.SignUp, h.Now) + "\n")
+		}
+	}
+	b.WriteString("\n")
+	b.WriteString("  " + styleDim.Render("[t] toggles 10/20 rows · [r] refreshes · the counters are the hub leaves' own sets") + "\n")
+	return b.String()
+}
+
+// ageStr — a compact age (mc-style: "2h", "3d", "14mo").
+func ageStr(ms int64, now time.Time) string {
+	if ms == 0 {
+		return "- (no date)"
+	}
+	d := now.Sub(time.UnixMilli(ms))
+	switch {
+	case d < time.Minute:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd", int(d.Hours())/24)
+	case d < 365*24*time.Hour:
+		return fmt.Sprintf("%dmo", int(d.Hours())/(24*30))
+	default:
+		return fmt.Sprintf("%dy", int(d.Hours())/(24*365))
+	}
+}
+
+// leftPad pads to width W (for the aligned sample columns).
+func leftPad(s string, w int) string {
+	if lipgloss.Width(s) >= w {
+		return s
+	}
+	return s + strings.Repeat(" ", w-lipgloss.Width(s))
 }
 
 func (a *app) panelBackup() string {

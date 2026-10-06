@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -131,10 +132,20 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 		return fmt.Errorf("refusing to serve SSH with no auth method active (no %s found and no password configured)", o.KeyFile)
 	}
 
+	// pendingStartScreens: the gate records a screen-boot request (e.g.
+	// `ssh host hub`) keyed by the session; the TUI middleware consumes it
+	// once (both middlewares share the same ssh.Session instance).
+	var pendingStartScreens sync.Map
 	allOpts := append([]ssh.Option{wish.WithHostKeyPath(hostKey)}, authOpts...)
 	allOpts = append(allOpts, wish.WithMiddleware(
 		teaMiddleware.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
-			return newApp(t), []tea.ProgramOption{tea.WithInput(sess), tea.WithOutput(sess), tea.WithAltScreen()}
+			start := ""
+			if v, ok := pendingStartScreens.LoadAndDelete(sess); ok {
+				if ss, ok2 := v.(string); ok2 {
+					start = ss
+				}
+			}
+			return newApp(t, start), []tea.ProgramOption{tea.WithInput(sess), tea.WithOutput(sess), tea.WithAltScreen()}
 		}),
 		// Both middlewares go in ONE WithMiddleware call: wish.WithMiddleware
 		// does `s.Handler = h` per option, so two separate options REPLACE
@@ -154,6 +165,13 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 					return
 				}
 				if cmd := strings.TrimSpace(sess.RawCommand()); cmd != "" {
+					// a master-list screen id boots the TUI straight there
+					// (`ssh host hub` · `doctor` · `backup` ...)
+					if validScreen(newApp(t), cmd) {
+						pendingStartScreens.Store(sess, cmd)
+						next(sess)
+						return
+					}
 					runCLI(sess, cmd)
 					return
 				}

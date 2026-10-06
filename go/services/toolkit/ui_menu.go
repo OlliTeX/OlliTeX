@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	menubar "github.com/jejacks0n/bubbletea-menubar"
+	"time"
 )
 
 // newMenus builds the menu bar (jejacks0n/bubbletea-menubar) — the top menu
@@ -35,6 +36,7 @@ func newMenus(a *app) menubar.Model {
 				{Label: "Shells", Action: open("shells")},
 				{Label: "Actions (admin)", Action: open("actions")},
 				{Label: "Doctor", Action: open("doctor")},
+				{Label: "Hub (instance views)", Action: open("hub")},
 				{Label: "Backup", Action: open("backup")},
 				{Label: "About", Action: open("about")},
 				menubar.Separator(),
@@ -144,6 +146,12 @@ func (a *app) dispatchMenu(action string) tea.Cmd {
 	case "open:doctor":
 		a.gotoScreen("doctor")
 		return a.runDoctor()
+	case "open:hub":
+		a.gotoScreen("hub")
+		if a.hub == nil || time.Since(a.hub.Now) > 15*time.Second {
+			return a.refreshHub()
+		}
+		return nil
 	case "open:backup":
 		a.gotoScreen("backup")
 		return nil

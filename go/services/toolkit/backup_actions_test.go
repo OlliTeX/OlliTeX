@@ -54,7 +54,7 @@ func TestRunBackupScript_TailAndExit(t *testing.T) {
 		b.WriteString(fmt.Sprintf("echo '[backup] line %d'\n", i))
 	}
 	b.WriteString("echo '[backup] FINAL line 60'\n")
-	if werr := os.WriteFile(ok, []byte("#!/bin/sh\n" + b.String()), 0o755); werr != nil {
+	if werr := os.WriteFile(ok, []byte("#!/bin/sh\n"+b.String()), 0o755); werr != nil {
 		t.Fatal(werr)
 	}
 	out, err := runBackupScript(dir, "ok.sh", context.Background())

@@ -152,6 +152,9 @@ services:
 
   # ------------------------------------------------------------------- toolkit
   ollitex-toolkit:
+    networks:
+      - default
+      - overleaf-network
     image: ollitex/toolkit-tui:main
     container_name: ollitex-toolkit
     restart: unless-stopped
@@ -596,6 +599,9 @@ services:
   # ====================================================================
 
   ollitex-web:
+    networks:
+      - default
+      - overleaf-network
     image: ${WEB_IMAGE:-ollitex/ollitex:main}
     container_name: ollitex-web
     restart: ${ENABLE_OLLITEX_WEB:-unless-stopped}   # Option no / unless-stopped
@@ -670,3 +676,11 @@ services:
       ollitex-web:
         condition: service_healthy
     command: ["/usr/local/sbin/haproxy", "-f", "/haproxy.cfg", "-db", "-W"]
+
+# --------------------------------------------------------------------------
+# External network: the shared content store (overleafmongo = the legacy
+# cep store holding the imported `ollitex` DB) lives on overleaf-network.
+# The TUI (hub views) and the web app must be able to name it.
+networks:
+  overleaf-network:
+    external: true

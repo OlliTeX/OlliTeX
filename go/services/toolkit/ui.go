@@ -88,6 +88,10 @@ type app struct {
 	// a lone ESC still gets its semantics after the 300ms window)
 	escPending bool
 
+	// hub views (the site.general.projects.* + users.* inside the TUI)
+	hub       *HubStats
+	hubSample int // 10 or 20 ("t" toggles)
+
 	// settings
 	setGroups []Group
 	setCurSel int
@@ -120,12 +124,37 @@ type app struct {
 	dlg *dialog
 }
 
-func newApp(t *Toolkit) *app {
+// validScreen reports whether id is a master-list screen (the boot targets
+// for `ssh host <screen>`).
+func validScreen(a *app, id string) bool {
+	for _, it := range a.masterList() {
+		if it.id == id {
+			return true
+		}
+	}
+	return false
+}
+
+func newApp(t *Toolkit, startScreens ...string) *app {
+	start := ""
+	if len(startScreens) > 0 {
+		start = startScreens[0]
+	}
 	d, derr := NewDocker(t.DockerSocket)
+	screen := "dashboard"
+	a0 := &app{
+		tk:     t,
+		set:    newSettings(t),
+		width:  80,
+		height: 24,
+	}
+	if start != "" && validScreen(a0, start) {
+		screen = start
+	}
 	a := &app{
 		tk:     t,
 		set:    newSettings(t),
-		screen: "dashboard",
+		screen: screen,
 		width:  80,
 		height: 24,
 	}
@@ -147,6 +176,12 @@ func newApp(t *Toolkit) *app {
 
 // Init (tea.Model)
 func (a *app) Init() tea.Cmd {
+	if a.screen == "hub" {
+		if a.hubSample == 0 {
+			a.hubSample = 10
+		}
+		return tea.Sequence(a.refreshStatus(), a.refreshHub())
+	}
 	return a.refreshStatus()
 }
 
@@ -193,6 +228,20 @@ func (a *app) runJobLong(job string, f func(ctx context.Context) (string, error)
 		out, err := f(ctx)
 		return jobMsg{job: job, out: out, err: err, done: true}
 	}
+}
+
+// refreshHub — one read pass over the content DB (the exact /hub view
+// predicates; see hubdata.go). The sample width is what "t" toggles.
+func (a *app) refreshHub() tea.Cmd {
+	return a.runJob("hub-refresh", func(ctx context.Context) (string, error) {
+		s, err := a.tk.HubCollect(ctx, a.hubSample)
+		if err != nil {
+			return "", err
+		}
+		a.hub = s
+		return fmt.Sprintf("%s: %d projects (all) · %d users (all)", s.DB,
+			s.Projects.All, s.Users.All), nil
+	})
 }
 
 // runBackupScript runs one of the toolkit/backup/*.sh suites (baked into the
@@ -361,6 +410,9 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "pull":
 			a.statusMsg = "images pulled" + tail(m.out)
 			return a, a.refreshStatus()
+		case "hub-refresh":
+			a.statusMsg = "hub: " + m.out
+			return a, nil
 		case "backup":
 			a.statusMsg = "backup saved → " + a.tk.BackupPath() + tail(m.out)
 			return a, nil
@@ -659,6 +711,18 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if k == "r" {
 			return a, a.runDoctor()
 		}
+	case "hub":
+		switch k {
+		case "r", "enter":
+			return a, a.refreshHub()
+		case "t":
+			if a.hubSample == 10 {
+				a.hubSample = 20
+			} else {
+				a.hubSample = 10
+			}
+			return a, a.refreshHub()
+		}
 	case "backup":
 		switch k {
 		case "b", "enter":
@@ -742,7 +806,7 @@ func (a *app) openItem(i int) {
 	a.editKey, a.editVal, a.editMask = "", "", false
 	if items[i].id == "settings" {
 		a.setLevel, a.setCurGroup, a.setCurSel = 0, 0, 0 // fresh navigation
-		a.focus = 1                                        // the settings tree owns j/k
+		a.focus = 1                                      // the settings tree owns j/k
 	} else {
 		a.focus = 0 // every other screen: the left list owns j/k
 	}
@@ -759,6 +823,13 @@ func (a *app) openCmd(i int) tea.Cmd {
 		return a.runDoctor()
 	case "settings":
 		a.loadSettings()
+	case "hub":
+		if a.hubSample == 0 {
+			a.hubSample = 10
+		}
+		if a.hub == nil || time.Since(a.hub.Now) > 15*time.Second {
+			return a.refreshHub()
+		}
 	}
 	return nil
 }
