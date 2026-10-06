@@ -23,6 +23,7 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -61,6 +62,47 @@ func llmPageEnabled(a *core.App, ctx context.Context) bool {
 		return false
 	}
 	return doc.LLM != nil && doc.LLM.Enabled
+}
+
+// samlPageEnabled — A3 (owner 2026-10-06): the /admin SAML-Metadata tab
+// appears when a SAML provider is resolvable — the SAME two sources the
+// sso package resolves from (an enabled saml provider in ssoConfigs, or
+// the CE legacy site_settings `sso-saml` section), so the tab never offers
+// a dead page.
+func samlPageEnabled(a *core.App, ctx context.Context) bool {
+	if a == nil || a.Mongo == nil {
+		return false
+	}
+	db, err := a.Mongo.DB(ctx)
+	if err != nil {
+		return false
+	}
+	var cfg struct {
+		Providers []struct {
+			Type    string `bson:"type"`
+			Enabled bool   `bson:"enabled"`
+		} `bson:"providers"`
+	}
+	if cfgerr := db.Collection("ssoConfigs").FindOne(ctx, bson.D{}).Decode(&cfg); cfgerr == nil {
+		for _, p := range cfg.Providers {
+			if p.Type == "saml" && p.Enabled {
+				return true
+			}
+		}
+	}
+	var global struct {
+		SsoSaml *struct {
+			Enabled    bool   `bson:"enabled"`
+			EntryPoint string `bson:"entryPoint"`
+		} `bson:"sso-saml"`
+	}
+	if gerr := db.Collection("site_settings").FindOne(ctx, bson.D{{Key: "_id", Value: "global"}}).Decode(&global); gerr == nil && global.SsoSaml != nil && global.SsoSaml.Enabled && global.SsoSaml.EntryPoint != "" {
+		return true
+	}
+	if strings.Contains(os.Getenv("EXTERNAL_AUTH"), "saml") {
+		return true
+	}
+	return false
 }
 
 // adminUserFields — user.doc { email, ace.overallTheme } (Node:
@@ -147,6 +189,7 @@ func adminPage(a *core.App) func(*core.Cxt, *core.Res) {
 			CurrentURL:   cxt.Req.URL.Path,
 
 			LLMEnabled:     llmPageEnabled(a, ctx),
+			SAML:           samlPageEnabled(a, ctx),
 			SystemMessages: msgs,
 		}
 		views.AdminShellPage(res.W, p)

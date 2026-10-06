@@ -26,6 +26,11 @@ type AdminShellParams struct {
 	Exposed        string // ol-ExposedSettings JSON (editorpages.ExposedSettingsJSON)
 	LLMEnabled     bool
 	SystemMessages []string // message.content strings, DB (natural) order
+
+	// SAML — A3 (owner 2026-10-06): the SAML SP-metadata tab, present when
+	// the instance has a SAML provider (ssoConfigs or site_settings
+	// 'sso-saml'). The pane iframes /admin/saml/metadata (sso feature).
+	SAML bool
 }
 
 // llmTabHeaderON / OFF — Node: if (llmEnabled) +bookmarkable-tabset-header(
@@ -37,6 +42,11 @@ const llmTabHeaderOFF = ``
 // else → p.text-muted "LLM is disabled on this deployment (set
 // LLM_ENABLED=true to enable)."
 const llmPaneON = `<p class="text-muted">Site-wide LLM backend, model allowlist, and compliance review settings.</p><iframe src="/admin/llm/settings" title="LLM Configuration" style="width: 100%; height: calc(100vh - 280px); min-height: 480px; border: 0;"></iframe>`
+
+// samlTabHeaderON / samlPaneON — A3: the SAML SP-metadata tab (IdP admin
+// handoff: SP entityID + ACS binding + SP signing cert in one XML).
+const samlTabHeaderON = `<li role="presentation"><a class="nav-link" href="#saml-metadata" aria-controls="saml-metadata" role="tab" data-toggle="tab" data-ol-bookmarkable-tab="data-ol-bookmarkable-tab">SAML Metadata</a></li>`
+const samlPaneON = `<p class="text-muted">SAML service-provider (SP) metadata for this instance — hand it to your IdP administrator.</p><iframe src="/admin/saml/metadata" title="SAML SP Metadata" style="width: 100%; height: calc(100vh - 280px); min-height: 480px; border: 0;"></iframe>`
 const llmPaneOFF = `<p class="text-muted">LLM is disabled on this deployment (set LLM_ENABLED=true to enable).</p>`
 
 // pugEscape — Pug `#{...}` HTML escaping (Pinned: & < > " ' →
@@ -71,11 +81,17 @@ func AdminShell(p AdminShellParams) string {
 	if p.LLMEnabled {
 		hdr, pane = llmTabHeaderON, llmPaneON
 	}
+	samlHdr, samlPane := "", ""
+	if p.SAML {
+		samlHdr, samlPane = samlTabHeaderON, samlPaneON
+	}
 	// Deterministic token replacements (no placeholder overlaps).
 	rep := func(s, old, new string) string { return strings.ReplaceAll(s, old, new) }
 	t = rep(t, `__SYSMSGS__`, sysMessagesHTML(p.SystemMessages))
 	t = rep(t, "__LLMPANE__", pane)
 	t = rep(t, "__LLMHDR__", hdr)
+	t = rep(t, "__SAMLANE__", samlPane)
+	t = rep(t, "__SAMHDR__", samlHdr)
 	t = rep(t, `name="ol-csrfToken" content="__CSRF__"`, `name="ol-csrfToken" content="`+p.CSRF+`"`)
 	t = rep(t, `value="__CSRF__"`, `value="`+p.CSRF+`"`)
 	t = rep(t, `nonce="__NONCE__"`, `nonce="`+p.Nonce+`"`)

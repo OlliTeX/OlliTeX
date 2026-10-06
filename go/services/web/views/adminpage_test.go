@@ -25,7 +25,7 @@ func TestAdminShellSlotsFull(t *testing.T) {
 		},
 	}
 	out := AdminShell(p)
-	for _, slot := range []string{"__NONCE__", "__CSRF__", "__EMAIL__", "__UID__", "__OVERALLTHEME__", "__ORIGIN__", "__CURRENTURL__", "__EXPOSED__", "__LLMHDR__", "__LLMPANE__", "__SYSMSGS__"} {
+	for _, slot := range []string{"__NONCE__", "__CSRF__", "__EMAIL__", "__UID__", "__OVERALLTHEME__", "__ORIGIN__", "__CURRENTURL__", "__EXPOSED__", "__LLMHDR__", "__LLMPANE__", "__SAMHDR__", "__SAMLANE__", "__SYSMSGS__"} {
 		if strings.Contains(out, slot) {
 			t.Fatalf("residual slot %q", slot)
 		}
@@ -86,5 +86,27 @@ func TestPugEscapeOrder(t *testing.T) {
 	want := `&lt;a href=&quot;x&quot;&gt;&amp;it&#39;s&lt;/a&gt;`
 	if got != want {
 		t.Fatalf("pugEscape = %q, want %q", got, want)
+	}
+}
+
+
+// A3 (owner 2026-10-06): the SAML SP-metadata tab must be present (header +
+// pane) when SAML is on and ABSENT when off — and leave no placeholder residue.
+func TestAdminShellSamlTab(t *testing.T) {
+	base := AdminShellParams{
+		Nonce: "N-ONCE", CSRF: "C", Email: "a@e.t", UID: "u",
+		Origin: "http://127.0.0.1:7420", CurrentURL: "/admin", Exposed: `{}` ,
+	}
+	on := base
+	on.SAML = true
+	out := AdminShell(on)
+	if !strings.Contains(out, `href="#saml-metadata"` ) || !strings.Contains(out, `/admin/saml/metadata`) {
+		t.Fatal("SAML on: tab header + pane iframe missing")
+	}
+	if !strings.Contains(out, `id="saml-metadata"`) {
+		t.Fatal("SAML on: pane div missing")
+	}
+	if off := AdminShell(base); strings.Contains(off, `href="#saml-metadata"`) || strings.Contains(off, `/admin/saml/metadata`) || strings.Contains(off, "__SAMHDR__") || strings.Contains(off, "__SAMLANE__") {
+		t.Fatal("SAML off: tab header + iframe must be absent with no residue")
 	}
 }

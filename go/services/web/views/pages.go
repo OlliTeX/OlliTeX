@@ -506,7 +506,10 @@ func originOf(u string) string {
 // Page renders a shell page (HTML, no ETag — Node sets none on views).
 const cspRestrictive = "base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'"
 
-// cspReact — Node's React-layout CSP (pinned live on /login + /register).
+// ReactorCSP — exported accessor for the React-layout CSP (the admin
+// sub-pages, e.g. the SAML SP-metadata page, embed a nonce'd inline script).
+func ReactorCSP(nonce string) string { return cspReact(nonce) }
+
 func cspReact(nonce string) string {
 	return "script-src 'nonce-" + nonce + "' 'unsafe-inline' 'strict-dynamic' https: 'report-sample'; object-src 'none'; base-uri 'none'"
 }

@@ -267,6 +267,7 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: oidcLogoutPattern, NoLogin: true, NoCSRF: true, Handler: oidcLogoutCallbackH(a)},
 			{Method: "POST", Pattern: mustRegexp(`^/sso/ldap/login$`), NoLogin: true, Handler: ldapLogin(a)},
 			{Method: "POST", Pattern: unlinkPattern, Handler: oauthUnlink(a)},
+			{Method: "GET", Pattern: adminSAMLMetaPattern, Handler: samlMetaAdmin(a)}, // A3: SP-metadata admin page
 		},
 	}
 }
