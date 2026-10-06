@@ -1,0 +1,22 @@
+const { chromium } = require('playwright')
+const BASE = process.argv[2]
+;(async () => {
+  const browser = await chromium.launch()
+  const ctx = await browser.newContext({ baseURL: BASE })
+  const page = await ctx.newPage()
+  await page.goto('/login')
+  await page.fill('#email', 'e2e-user@e2e.test')
+  await page.fill('#password', 'Ol-Fixture-3m2Q')
+  await page.click('button[type=submit]')
+  await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {})
+  await page.waitForTimeout(1200)
+  console.log('URL after login:', page.url())
+  const title = await page.title()
+  console.log('title:', title)
+  const cookies = await ctx.cookies()
+  console.log('cookies:', cookies.map((c) => c.name + '=' + String(c.value).slice(0, 12) + '...').join(', '))
+  // hit /user/me or the dashboard to see auth state
+  const r = await ctx.request.fetch('/users/me', { headers: { accept: 'application/json' } }).catch(() => null)
+  if (r) console.log('/users/me', r.status(), JSON.stringify(String(await r.body()).slice(0, 100)))
+  await browser.close()
+})().catch((e) => { console.error('ERR', e.message); process.exit(1) })

@@ -59,22 +59,6 @@ server {
 		proxy_send_timeout 10m;
 	}
 
-	location /socket.io {
-		proxy_pass http://127.0.0.1:3026;
-		proxy_http_version 1.1;
-		proxy_set_header Upgrade $http_upgrade;
-		proxy_set_header Connection "upgrade";
-		# H3 (D36 pattern from /collab): forward $http_host (port kept) — the
-		# realtime same-origin check compares host-parts and tolerates the
-		# proxy-stripped case either way.
-		proxy_set_header Host $http_host;
-		proxy_set_header X-Forwarded-Host $http_host;
-		proxy_set_header X-Forwarded-Proto $scheme;
-		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-		proxy_read_timeout 10m;
-		proxy_send_timeout 10m;
-	}
-
 	# Ollitex Go collab service (D19 collaboration pivot, 2026-09-25) — the
 	# Yjs/ygo real-time rooms. Same-origin pass: browser y-websocket clients
 	# hit /collab/{projectId}; ygo's default origin policy is a same-origin

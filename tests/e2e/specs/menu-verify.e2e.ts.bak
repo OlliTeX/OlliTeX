@@ -1,0 +1,39 @@
+/* menu-verify: the grouped /hub account menu (owner UX 2026-10-06). */
+const { test, expect } = require('@playwright/test')
+const { ADMIN } = require('./fixtures/credentials')
+
+test('account menu: functional groups + all links', async ({ page }) => {
+  // login
+  await page.goto('http://127.0.0.1:7420/login', { waitUntil: 'domcontentloaded' })
+  await page.fill('input[type="text"], input[name="identifier"]', ADMIN.email).catch(() => {})
+  const pw = page.locator('input[type="password"]').first()
+  await pw.fill(ADMIN.password)
+  await Promise.all([page.waitForResponse(r => r.url().includes('/login') && r.request().method() === 'POST', { timeout: 15000 }).catch(() => null),
+    page.keyboard.press('Enter')])
+  await page.goto('http://127.0.0.1:7420/hub', { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(1500)
+
+  // open the account menu (sidebar lower, aria-label Account)
+  const toggle = page.locator('button[aria-label="Account"]').first()
+  await toggle.click()
+  const menu = page.locator('.ds-nav-sidebar-lower .dropdown-menu, .dropdown-menu:visible').first()
+  await menu.waitFor({ state: 'visible', timeout: 8000 })
+
+  // groups present, in order
+  const labels = await menu.locator('.nav-section-label').allTextContents()
+  console.log('GROUPS:', JSON.stringify(labels))
+  expect(labels).toContain('Workspace')
+  expect(labels).toContain('Personal')
+  expect(labels.some(l => /manage instance/i.test(l))).toBe(true)
+
+  // all admin links visible (workspace + personal + accordion open)
+  const btn = menu.locator('button:has-text("Admin")').first()
+  await btn.click()
+  const links = await menu.locator('a').allTextContents()
+  console.log('LINKS:', JSON.stringify(links))
+  for (const want of ['Projects', 'Account settings', 'Manage Site', 'Manage Extensions', 'Manage Users', 'Sign out']) {
+    expect(links.join('|')).toContain(want)
+  }
+  // sign-out + divider + section count sanity
+  expect(labels.length).toBeGreaterThanOrEqual(3)
+})

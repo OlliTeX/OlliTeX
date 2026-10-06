@@ -768,7 +768,7 @@ func (a *App) globalLoginBounce(cxt *Cxt, res *Res, r *http.Request) {
 // isStaticRedirectPath mirrors the static-asset guard in
 // setRedirectInSession (never stash asset paths).
 func isStaticRedirectPath(v string) bool {
-	for _, p := range []string{"/socket.io/", "/js/", "/stylesheets/", "/img/"} {
+	for _, p := range []string{"/js/", "/stylesheets/", "/img/"} {
 		if strings.HasPrefix(v, p) {
 			return true
 		}

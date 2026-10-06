@@ -1,0 +1,17 @@
+import { chromium } from 'playwright';
+const BASE='http://127.0.0.1:7420';
+const b = await chromium.launch();
+const page = await b.newPage();
+const fails=[]; const errs=[]; const reqs=[];
+page.on('response', r => { reqs.push(r.status()+' '+(r.headers()['content-type']||'').split(';')[0]+' '+r.url().replace(BASE,'').slice(0,90)); if(r.status()>=400) fails.push(r.status()+' '+r.url().slice(0,120)); });
+page.on('pageerror', e => errs.push('PAGEERR '+(e.message||'').slice(0,300)));
+page.on('console', m => { if (m.type()==='error') errs.push('CON ' + m.text().slice(0,250)); });
+await page.goto(BASE+'/login', { waitUntil: 'load' });
+await page.waitForTimeout(6000);
+console.log('BODY TEXT:', await page.evaluate(()=>document.body.innerText.slice(0,120).replace(/\n/g,' | ')));
+console.log('auth-root children:', await page.evaluate(()=>{const r=document.getElementById('auth-root'); return r? r.children.length + ' ['+[...r.children].map(c=>c.tagName).join(',')+']' : 'no auth-root';}));
+console.log('SCRIPTS LOADED:');
+for (const r of reqs.filter(x=>x.includes('.js'))) console.log('  ', r);
+console.log('ERRORS:'); for (const e of errs) console.log('  ', e);
+console.log('FAILS:'); for (const f of [...new Set(fails)]) console.log('  ', f);
+await b.close();

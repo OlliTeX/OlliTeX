@@ -1,0 +1,15 @@
+const BASE = process.env.T || 'http://127.0.0.1:4000'
+const { chromium } = await import('playwright')
+const b = await chromium.launch({ headless: true })
+const page = await (await b.newContext()).newPage()
+await page.goto(BASE + '/login', { waitUntil: 'load' })
+await page.fill('#email', 'e2e-admin@e2e.test')
+await page.fill('#password', 'Ol-Fixture-9x7K')
+const resp = page.waitForResponse((r) => r.url().includes('/login') && r.request().method() === 'POST', { timeout: 20000 }).catch(() => null)
+await page.click('button[type=submit]')
+const r = await resp
+if (r) console.log('login POST:', r.status(), (await r.text().catch(() => '')).slice(0, 120))
+await page.waitForTimeout(3000)
+console.log('URL:', page.url())
+console.log('body:', (await page.evaluate(() => document.body.innerText.slice(0, 200))).replace(/\n/g, ' | '))
+await b.close()

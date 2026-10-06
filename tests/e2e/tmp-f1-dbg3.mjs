@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const BASE='http://127.0.0.1:7420';
+const b = await chromium.launch(); const page = await b.newPage();
+page.on('response', r => { if (r.status()>=400) console.log('FAIL', r.status(), r.url().slice(0,120)); });
+await page.goto(BASE+'/login', { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(6000);
+console.log('cm on login page ok?', await page.title());
+const inputs = await page.evaluate(() => [...document.querySelectorAll('input')].map(i=>i.name||i.id||i.type).join(', '));
+console.log('INPUTS:', inputs);
+const buttons = await page.evaluate(() => [...document.querySelectorAll('button')].map(x=>(x.name||'')+'|'+(x.type||'')+'|'+x.textContent.trim().slice(0,30)).join(' , '));
+console.log('BUTTONS:', buttons);
+await b.close();

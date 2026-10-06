@@ -1,0 +1,28 @@
+import { chromium } from 'playwright';
+const BASE='http://127.0.0.1:7420';
+const pid='6ab73507941509df73b96a34';
+const b = await chromium.launch(); const page = await b.newPage();
+const res=[];
+page.on('response', r => res.push(r.status()+' '+(r.headers()['content-type']||'').split(';')[0]+' '+Math.round((r.headers()['content-length']||'0'))+' '+r.url().replace(BASE,'').slice(0,90)));
+page.on('console', m => console.log('CON', m.type().slice(0,4).toUpperCase(), m.text().slice(0,220)));
+page.on('pageerror', e => console.log('PAGEERR', (e.message||'').slice(0,400), '\n', (e.stack||'').slice(0,300)));
+await page.exposeFunction('noop', ()=>{});
+await page.addInitScript(() => {
+  window.addEventListener('unhandledrejection', e => console.error('UNHANDLED REJ', (e.reason&&e.reason.message)||e.reason));
+});
+await page.goto(BASE+'/login', { waitUntil: 'domcontentloaded' });
+await page.fill('input[name=email]', 'e2e-admin@e2e.test');
+await page.fill('input[name=password]', 'Ol-Fixture-9x7K');
+await page.click('button[type=submit]');
+await page.waitForTimeout(2500);
+await page.goto(BASE+'/editor/'+pid, { waitUntil: 'networkidle', timeout: 40000 }).catch(e=>console.log('goto wait catch:', String(e).slice(0,100)));
+await page.waitForTimeout(12000);
+console.log('---', page.url());
+console.log('cm-content?', await page.locator('.cm-content').count());
+console.log('=== RESOURCES (sample 40):');
+console.log(res.slice(0,40).join('\n'));
+const n4xx = res.filter(r=>!r.startsWith('2')).slice(0,10);
+console.log('=== NON-2xx:', n4xx.join('\n') || 'none');
+const perf = await page.evaluate(()=> performance.getEntriesByType('resource').filter(r=>r.name.endsWith('.js')||r.name.endsWith('.json')).map(r=> (r.decodedBodySize? Math.round(r.decodedBodySize/1024)+'KB':'?') + ' ' + r.name.split('/').slice(-2).join('/')).slice(0,40));
+console.log('=== PERF JS/JSON:', perf.join(' | '));
+await b.close();

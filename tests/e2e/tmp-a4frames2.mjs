@@ -1,0 +1,27 @@
+import { chromium } from 'playwright';
+const b=await chromium.launch();
+const page=await (await b.newContext()).newPage();
+const marks=[];
+page.on('websocket', ws=>{
+  if (!ws.url().includes('/collab/')) return;
+  marks.push('WS OPEN '+ws.url());
+  ws.on('framereceived', f=>{ const p=f.payload; const t=typeof p==='string'? 'TEXT:'+p.slice(0,50) : (p instanceof Buffer? 'BIN len='+p.length+' head='+p.slice(0,8).toString('hex'): 'opaque'); marks.push('  rx: '+t); });
+  ws.on('framesent', f=>{ const p=f.payload; const t=typeof p==='string'? 'TEXT:'+p.slice(0,50) : (p instanceof Buffer? 'BIN len='+p.length : 'opaque'); marks.push('  tx: '+t); });
+  ws.on('close', e=>marks.push('WS CLOSE code='+e.code+' reason='+(e.reason||'')));
+  ws.on('error', e=>marks.push('WS ERR '+String(e).slice(0,80)));
+});
+await page.goto('http://127.0.0.1:7420/login',{waitUntil:'load'});
+await page.waitForSelector('input[name=email]');
+await page.fill('input[name=email]','e2e-admin@e2e.test');
+await page.fill('input[name=password]','Ol-Fixture-9x7K');
+await Promise.all([page.waitForURL('**/hub**',{timeout:30000}), page.click('button[type=submit]')]);
+await page.goto('http://127.0.0.1:7420/project/6ab73507941509df73b96a34',{waitUntil:'load'});
+await page.waitForSelector('.cm-content',{timeout:45000});
+await page.waitForTimeout(2000);
+const { execFileSync } = await import('node:child_process');
+execFileSync('node', ['/tmp/wsprj/push.cjs', '6ab73507941509df73b96a34', '% A4M3-' + Date.now()], { cwd: '/tmp/wsprj' });
+await page.waitForTimeout(8000);
+const txt=await page.evaluate(()=>document.querySelector('.cm-content')?.innerText||'');
+console.log('has A4M3 in editor:', /A4M3-/.test(txt));
+console.log(marks.join('\n').slice(0, 1200));
+await b.close();
