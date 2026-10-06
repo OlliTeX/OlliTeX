@@ -629,6 +629,14 @@ services:
       GIT_BRIDGE_PORT: "${GIT_BRIDGE_PORT:-8000}"
       # hub grafana embed (empty = pane hidden — the safe default)
       HUB_GRAFANA_EMBED_URL: "${HUB_GRAFANA_EMBED_URL:-}"
+    # ── DATA PLANE: durable file content ──────────────────────────────
+    # The app's default filestore/docstore is fs on /var/lib/overleaf, and the
+    # imported prod settings DB has no S3 row yet (legacy overleafserver ran
+    # fs on the shared prod data dir). Bind that dir so the canonical web has
+    # the same files (owner H: web + filestore = same plane). A formal S3
+    # import (files-import.sh) can supersede this later (G2 STOR-1).
+    volumes:
+      - ${FILESTORE_DATA_DIR:-/data_1/docker/compose_cep/overleafserver/data}:/var/lib/overleaf
     # no host port: haproxy is the facade
     healthcheck:
       # the app ships curl; anonymous `/` answers 302→/login (curl -f accepts
