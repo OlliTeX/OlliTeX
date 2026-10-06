@@ -123,6 +123,13 @@ import (
 var compilePat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/compile$`)
 var stopPat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/compile/stop$`)
 var wordcountPat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/wordcount$`)
+// Node router.mjs L730: DELETE /project/:Project_id/output ->
+// CompileController.deleteAuxFiles (CLS DELETE <clsi>/project/<pid>/user/<uid>
+// + clsi-cache/state clears via allSettled), then res.sendStatus(200).
+// The editor's pdf-preview "Clear cache" flow fires this on a bad PDF state;
+// its absence (404) logged a console FetchError per recompile (owner console
+// 2026-10-06).
+var deleteOutputPat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/output$`)
 
 // wcResEntry — the word-count compile body's resource entries (same JSON
 // shape as the compile path's local resEntry).
@@ -184,6 +191,11 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: convCreatePat, Handler: exportConvCreateHandler(a)},
 			{Method: "GET", Pattern: convDownloadPat, Handler: exportConvDownloadHandler(a)},
 			{Method: "POST", Pattern: stopPat, Handler: stopHandler(a)},
+		// DELETE /project/:id/output (Node CompileController.deleteAuxFiles):
+		// the pdf-preview clear-cache flow. Proxies the CLSI clearCache
+		// (CLS DELETE /project/<pid>/user/<uid>; typst -> clsitypst) and
+		// answers 200 like Node's res.sendStatus(200).
+		{Method: "DELETE", Pattern: deleteOutputPat, Handler: deleteOutputHandler(a)},
 			// Word-count (Node CompileController.wordCount; read-auth, no limiter).
 			{Method: "GET", Pattern: wordcountPat, Handler: wordCountHandler(a)},
 			// P5.2b — output read (download-PDF button + clsi-cache shapes)
@@ -1053,6 +1065,52 @@ func stopHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		u := clsiBase() + "/project/" + pid + "/user/" + uid + "/compile/stop" +
 			"?compileBackendClass=undefined&compileGroup=undefined"
 		creq, _ := http.NewRequest("POST", u, nil)
+		creq.Header.Set("Accept", "application/json")
+		cctx, cancel := context.WithTimeout(cxt.Req.Context(), 30*time.Second)
+		defer cancel()
+		cresp, cerr := http.DefaultClient.Do(creq.WithContext(cctx))
+		if cerr != nil {
+			res.JSON(500, []byte(internal500))
+			return
+		}
+		_, _ = io.Copy(io.Discard, cresp.Body)
+		_ = cresp.Body.Close()
+		if cresp.StatusCode >= 400 {
+			res.JSON(500, []byte(internal500))
+			return
+		}
+		res.SendStatus(200)
+	}
+}
+
+// deleteOutputHandler — DELETE /project/:id/output (Node router.mjs L730,
+// CompileController.deleteAuxFiles). Node's ClsiManager.deleteAuxFiles ran
+// CLS DELETE <clsi>/project/<pid>/user/<uid> (the CLSI clearCache seam that
+// also purges clsi-cache + project state; here that whole group is inside
+// CLSI's ClearProject) in allSettled with the local state clears, then the
+// controller answered res.sendStatus(200). On CLSI failure Node's expressify
+// middleware renders the 500 page — same as stopHandler above.
+func deleteOutputHandler(a *core.App) func(*core.Cxt, *core.Res) {
+	return func(cxt *core.Cxt, res *core.Res) {
+		param := cxt.Params["1"]
+		if cxt.Sess == nil || cxt.Sess.UserIDHex() == "" {
+			denyRead(cxt, res)
+			return
+		}
+		uid := cxt.Sess.UserIDHex()
+		proj, ok := preflight(cxt, res, a, param)
+		if !ok {
+			return
+		}
+		pid := strings.ToLower(param)
+
+		// dispatch rule (synctex.go / outputFileWeb): typst -> clsitypst.
+		base := clsiBase()
+		if compiler, _ := dget(*proj, "compiler").(string); compiler == "typst" {
+			base = clsiTypstBase()
+		}
+		u := base + "/project/" + pid + "/user/" + uid
+		creq, _ := http.NewRequest("DELETE", u, nil)
 		creq.Header.Set("Accept", "application/json")
 		cctx, cancel := context.WithTimeout(cxt.Req.Context(), 30*time.Second)
 		defer cancel()

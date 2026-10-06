@@ -129,10 +129,14 @@ function makeSocketShim(mgr: {
           ? rest.pop()
           : undefined
       emitImpl(event, rest)
+      // socket.io 0.9 "ack" contract: fn(error, ...data). A retired-bus
+      // no-op must RESOLVE (empty data), not error — the legacy
+      // Error('bus-retired: no-op') surfaced as a console error + Sentry
+      // event for every clientTracking emit (owner console 2026-10-06).
       const errCb = cbLike as
         | undefined
-        | ((error: Error, ...data: unknown[]) => void)
-      if (errCb) errCb(new Error('bus-retired: no-op'))
+        | ((error: Error | null, ...data: unknown[]) => void)
+      if (errCb) errCb(null, [])
     }) as unknown as Socket['emit'],
     socket: {
       connected: false,
