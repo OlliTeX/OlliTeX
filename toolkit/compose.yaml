@@ -650,6 +650,25 @@ services:
       # stack's network — verified 2026-10-06)
       GIT_BRIDGE_HOST: ${GIT_BRIDGE_HOST:-git-bridge}
       GIT_BRIDGE_PORT: "${GIT_BRIDGE_PORT:-8000}"
+      # admin privilege (node parity: settings.defaults; prod ran with it on —
+      # owner 2026-10-06: davrot not recognized as admin):
+      ADMIN_PRIVILEGE_AVAILABLE: "${ADMIN_PRIVILEGE_AVAILABLE:-true}"
+      # ── SUB-SERVICE PLANE (owner 2026-10-06: collab 401 / history-v1 500
+      #    after the ollitex-DB migration — the Node-era sub-services default
+      #    to `sharelatex` and a dead S3 endpoint) ─────────────────────────
+      # canonical Mongo for every sub-service (DB name from the URI):
+      MONGO_CONNECTION_STRING: mongodb://overleafmongo:27017/${OLLITEX_DB:-ollitex}
+      # collab's explicit DB knob (its client overrides the URI's DB):
+      OLLITEX_DB_NAME: ${OLLITEX_DB_NAME:-ollitex}
+      # history-v1 PG plane (chunks/zip tables) — prod parity:
+      DATABASE_URL: "${DATABASE_URL:-}"
+      # the stack PG password passed through explicitly (sub-services that
+      # build DSNs from user/host/password envs; owner 2026-10-06):
+      PG_PASSWORD: "${PG_PASSWORD:-}"
+      # history-v1 S3 persistor → the live canonical SeaweedFS (anonymous
+      # verified 2026-10-06): default endpoint (172.17.0.1:8333) is dead.
+      AWS_S3_ENDPOINT: "${AWS_S3_ENDPOINT:-http://seaweedfs-s3:8333}"
+      AWS_S3_PATH_STYLE: "${AWS_S3_PATH_STYLE:-true}"
       # hub grafana embed (empty = pane hidden — the safe default)
       HUB_GRAFANA_EMBED_URL: "${HUB_GRAFANA_EMBED_URL:-}"
     # ── DATA PLANE: durable file content ──────────────────────────────
