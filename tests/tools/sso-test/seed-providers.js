@@ -4,7 +4,7 @@
 // Run:
 //   docker cp tests/tools/sso-test/seed-providers.js ol-e2e-mongo-1:/tmp/seed.js
 //   docker exec ol-e2e-mongo-1 mongosh sharelatex --quiet /tmp/seed.js
-const cert = JSON.parse("\"-----BEGIN CERTIFICATE-----\\nMIIDPTCCAiWgAwIBAgIUI50Zx2eCPqJN4aV972BPO7yvAPkwDQYJKoZIhvcNAQEL\\nBQAwLjEZMBcGA1UEAwwQc2FtbC5leGFtcGxlLmNvbTERMA8GA1UECgwIT2xsaVRl\\nc3QwHhcNMjYxMDAyMTIxMjMxWhcNMzYwOTI5MTIxMjMxWjAuMRkwFwYDVQQDDBBz\\nYW1sLmV4YW1wbGUuY29tMREwDwYDVQQKDAhPbGxpVGVzdDCCASIwDQYJKoZIhvcN\\nAQEBBQADggEPADCCAQoCggEBAMMA+opgaZFuJc2EIrHWDKknDWvO8trX4XipWKFH\\nyn/RH0MHjvnebOgN18a0BMZAHIFt6faVhU0R6CUMCx40oCTZBAdogzgI9qijXKvT\\nOPsSoqu/K0XG+88eKTAl41HZpoKcwJZ2AXT4Mge2TK+ZDpfHsPaaoqx9tZTksDHp\\n6TzsfR5B+PBg9x3HGbmG0DlI1p4VLK8tO/dnInZK6b6h2xKAwC11QwfVc+xYT3VR\\nlTyN4qVJSdt1PniRZMnrzsg68bndklCLyLXLmHFgwLDqi1nRgDk/1Wc0e5Gu3r0s\\nhLhvchGVPSuxZsLSvlQhecqVIDigQWKE9dEwBvSctTof3wcCAwEAAaNTMFEwHQYD\\nVR0OBBYEFOQtJKshVyOvwT7lwiJlENSTFeAMMB8GA1UdIwQYMBaAFOQtJKshVyOv\\nwT7lwiJlENSTFeAMMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB\\nAHqSF2JUxPtAY5FCm2tR01ReWfnT31xTMYcqZnuIwLJVGVAz8gB0Hkw1NnhCoxCp\\naFRj1lHA/tTcjSH4N4GKl3jYhPTowmLvihnHV+23aOy70OXx6ir58b3SkFlWkShp\\nOCW34h6GE2ZFmT8f22eUFMsb2UJFQI53eDhMC5+Pv0xYEHwbI96+KMAgPEk834bS\\nMJSizzmeVtV0Zj2qpeT9lTIeVrdy+DVk2CcFy1Hvl+Jx/ui0oBrqXlyFvG75vFmP\\nO42gJ9R4G/ExHaHSAgpw/W/ZoB3DIFxuhHHb5hUL6MMYcoWIs1Wd1SoaM/wRQt9r\\nhSpWwYCnosNyTC0FoLb1vJg=\\n-----END CERTIFICATE-----\"");
+const cert = "-----BEGIN CERTIFICATE-----\nMIIDPTCCAiWgAwIBAgIUI50Zx2eCPqJN4aV972BPO7yvAPkwDQYJKoZIhvcNAQEL\nBQAwLjEZMBcGA1UEAwwQc2FtbC5leGFtcGxlLmNvbTERMA8GA1UECgwIT2xsaVRl\nc3QwHhcNMjYxMDAyMTIxMjMxWhcNMzYwOTI5MTIxMjMxWjAuMRkwFwYDVQQDDBBz\nYW1sLmV4YW1wbGUuY29tMREwDwYDVQQKDAhPbGxpVGVzdDCCASIwDQYJKoZIhvcN\nAQEBBQADggEPADCCAQoCggEBAMMA+opgaZFuJc2EIrHWDKknDWvO8trX4XipWKFH\nyn/RH0MHjvnebOgN18a0BMZAHIFt6faVhU0R6CUMCx40oCTZBAdogzgI9qijXKvT\nOPsSoqu/K0XG+88eKTAl41HZpoKcwJZ2AXT4Mge2TK+ZDpfHsPaaoqx9tZTksDHp\n6TzsfR5B+PBg9x3HGbmG0DlI1p4VLK8tO/dnInZK6b6h2xKAwC11QwfVc+xYT3VR\nlTyN4qVJSdt1PniRZMnrzsg68bndklCLyLXLmHFgwLDqi1nRgDk/1Wc0e5Gu3r0s\nhLhvchGVPSuxZsLSvlQhecqVIDigQWKE9dEwBvSctTof3wcCAwEAAaNTMFEwHQYD\nVR0OBBYEFOQtJKshVyOvwT7lwiJlENSTFeAMMB8GA1UdIwQYMBaAFOQtJKshVyOv\nwT7lwiJlENSTFeAMMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB\nAHqSF2JUxPtAY5FCm2tR01ReWfnT31xTMYcqZnuIwLJVGVAz8gB0Hkw1NnhCoxCp\naFRj1lHA/tTcjSH4N4GKl3jYhPTowmLvihnHV+23aOy70OXx6ir58b3SkFlWkShp\nOCW34h6GE2ZFmT8f22eUFMsb2UJFQI53eDhMC5+Pv0xYEHwbI96+KMAgPEk834bS\nMJSizzmeVtV0Zj2qpeT9lTIeVrdy+DVk2CcFy1Hvl+Jx/ui0oBrqXlyFvG75vFmP\nO42gJ9R4G/ExHaHSAgpw/W/ZoB3DIFxuhHHb5hUL6MMYcoWIs1Wd1SoaM/wRQt9r\nhSpWwYCnosNyTC0FoLb1vJg=\n-----END CERTIFICATE-----\n";
 const doc = {
   _id: 'sso-settings',
   updatedAt: Date.now(),
@@ -22,7 +22,7 @@ const doc = {
       id: 'sso-saml-e2e', name: 'OlliTeX SAML (E2E)', type: 'saml', enabled: true, order: 2,
       identityServiceName: 'OlliTeX SAML E2E',
       issuer: 'https://saml.example.com/entityid',
-      entryPoint: 'http://172.20.0.1:4100/api/saml/sso',
+      entryPoint: 'http://172.20.0.1:4101/api/saml/sso',
       idpCert: cert,
       wantAssertionsSigned: false, wantAuthnResponseSigned: false,
     },

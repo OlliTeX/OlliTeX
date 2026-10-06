@@ -28,6 +28,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
@@ -319,13 +320,18 @@ func buildSP(p *SAMLProvider, spCfg *SPConfig, siteURL string) *saml.ServiceProv
 	if p.AcceptedClockSkewMs >= 0 {
 		saml.MaxClockSkew = time.Duration(p.AcceptedClockSkewMs) * time.Millisecond
 	}
-	// IdP signing cert.
+	// IdP signing cert. crewjam v0.5.1 IDPCertificate is RAW BASE64 (DER),
+	// not PEM: parseCert base64-decodes it after stripping whitespace — a
+	// PEM header lands at byte 0 and the decode fails ("illegal base64 data
+	// at input byte 0" ⇒ ACS 401 on every signed response, found live in the
+	// 2026-10-06 SAML positive-leg E2E). Accept both PEM and raw base64 in
+	// the provider config and normalize to base64 here.
 	certPEM := p.IdpCert
 	if certPEM == "" && spCfg != nil {
 		certPEM = spCfg.PublicCert
 	}
-	if certPEM != "" {
-		sp.IDPCertificate = &certPEM
+	if idpCert := idpCertBase64(certPEM); idpCert != "" {
+		sp.IDPCertificate = &idpCert
 	}
 	// Decryption (EncryptedAssertion): crewjam uses sp.Key for both
 	// request signing and xml-enc decryption.
@@ -333,6 +339,31 @@ func buildSP(p *SAMLProvider, spCfg *SPConfig, siteURL string) *saml.ServiceProv
 		sp.Key = pk
 	}
 	return sp
+}
+
+// idpCertBase64 — normalize a provider IdP signing cert to the form crewjam
+// v0.5.1 expects in SP.IDPCertificate: raw base64 DER (no PEM headers).
+// Input may be PEM (-----BEGIN CERTIFICATE-----) or already-raw base64.
+// Returns "" when nothing usable is found.
+func idpCertBase64(cert string) string {
+	c := strings.TrimSpace(cert)
+	if c == "" {
+		return ""
+	}
+	if block, _ := pem.Decode([]byte(c)); block != nil && block.Type == "CERTIFICATE" {
+		return base64.StdEncoding.EncodeToString(block.Bytes)
+	}
+	// assume raw base64 (strip any whitespace/headers defensively)
+	b64 := strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' || r == ' ' || r == '\t' {
+			return -1
+		}
+		return r
+	}, c)
+	if _, err := base64.StdEncoding.DecodeString(b64); err == nil {
+		return b64
+	}
+	return ""
 }
 
 func nameIDFormat(f string) saml.NameIDFormat {
