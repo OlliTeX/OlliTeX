@@ -46,6 +46,11 @@ const externalHeartbeatInit: ExternalHeartbeat = {
 
 const USER_ACTIVITY_RECONNECT_NOW_DELAY = 500
 
+// join protocol version served to the IDE's `joinProjectResponse`
+// listener (replaces the retired bus handshake). Any stable value works —
+// the IDE only reacts to the event presence and to version CHANGES.
+const JOIN_PROTOCOL_VERSION = 202610061
+
 // collab-plane close codes → the legacy error strings the IDE UI maps.
 const CLOSE_CODE_ERROR: Record<number, ConnectionError> = {
   4001: 'not-logged-in',
@@ -85,7 +90,7 @@ function makeSocketShim(mgr: {
   closeNow: (force: boolean) => void
   setForceDisconnected: (v: boolean) => void
   sessionId: () => string | null
-}): Socket {
+}): Socket & { __notify(event: string, payload: unknown): void } {
   const handlers = new Map<string, Array<(...data: unknown[]) => void>>()
 
   function emitImpl(event: string, args: unknown[]): void {
@@ -99,6 +104,13 @@ function makeSocketShim(mgr: {
   }
 
   return {
+    __notify: (event: string, payload: unknown) => {
+      const list = handlers.get(event)
+      if (!list) return
+      for (const cb of list.slice()) {
+        cb(payload)
+      }
+    },
     publicId: newPublicId(),
     on: (event, callback) => {
       const list = handlers.get(event) ?? []
@@ -237,11 +249,26 @@ export class ConnectionManager extends EventTarget {
       this.websocketFailureCount = 0
       this.socket.socket.connected = true
       this.socket.socket.connecting = false
+      console.debug('[ollitex] join: OPEN — wss /collab/' + this.projectId)
       this.setState({
         readyState: WebSocket.OPEN,
         error: '',
         reconnectAt: null,
       })
+      // deliver the legacy `joinProjectResponse` handshake to IDE
+      // listeners (project:joined gate) — same shape the bus used to send
+      try {
+        ;(
+          this.socket as Socket & {
+            __notify(event: string, payload: unknown): void
+          }
+        ).__notify('joinProjectResponse', {
+          protocolVersion: JOIN_PROTOCOL_VERSION,
+          publicId: this.socket.publicId,
+        })
+      } catch (err) {
+        console.warn('[ollitex] joinProjectResponse notify failed:', err)
+      }
     }
 
     ws.onerror = () => {
@@ -254,6 +281,7 @@ export class ConnectionManager extends EventTarget {
       this.socket.socket.connecting = false
       this.ws = null
       const code = typeof ev?.code === 'number' ? ev.code : 1006
+      console.debug('[ollitex] join: closed code=' + code + ' reason=' + (ev?.reason || '(none)'))
 
       if (CLOSE_CODE_ERROR[code]) {
         // definitive join rejection (auth / no such project)
@@ -373,8 +401,23 @@ export class ConnectionManager extends EventTarget {
   }
 
   private dispatchStateChange(previous: ConnectionState = this.state): void {
-    const ev = new StateChangeEvent(this.state, previous)
-    this.dispatchEvent(ev)
+    // DEFENSIVE: the context reads event.detail.state; deliver it via a
+    // CustomEvent when constructable and ALWAYS via a plain Event fallback.
+    // A notification failure must NEVER kill the state machine (that is
+    // what wedged the loading screen before this fix).
+    const detail = { state: this.state, previousState: previous }
+    try {
+      this.dispatchEvent(new StateChangeEvent(this.state, previous))
+    } catch (err) {
+      try {
+        const ev = new Event(STATE_CHANGED_EVENT)
+        ;(ev as Event & { detail: typeof detail }).detail = detail
+        this.dispatchEvent(ev)
+      } catch {
+        // listeners are best-effort; the state field is already current
+      }
+      console.warn('[ollitex] statechange dispatch fallback:', err)
+    }
   }
 
   private cleanupSocket(): void {
