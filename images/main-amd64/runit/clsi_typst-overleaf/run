@@ -72,4 +72,6 @@ mkdir -p "$_TYPSF_COMPILES" "$_TYPSF_OUTPUT" "$_TYPSF_CACHE" "$_TYPSF_UPLOAD" 2>
 # 0.15.1-with-extras + the clsi-sourcemap patch). Never synctex on vanilla.
 export TYPST_IMAGE="${TYPST_IMAGE:-pandoc/typst:latest-alpine@sha256:ae9dfa3c58cae72d363484442993b761ff4bc30202ec12823bc1e59fa952c892}"
 
-exec /sbin/setuser www-data /usr/local/bin/go-services/clsitypst >> /var/log/overleaf/clsi_typst.log 2>&1
+# root runner, same rationale as clsi-overleaf (empty-sandbox regression,
+# 2026-10-06): clsitypst must create/write/chown the typst sandbox dirs.
+exec /usr/local/bin/go-services/clsitypst >> /var/log/overleaf/clsi_typst.log 2>&1

@@ -29,4 +29,13 @@ export LISTEN_ADDRESS=127.0.0.1
 # images/main-amd64/Dockerfile). Node services/clsi retired 2026-09-29 (1:1 Go port,
 # oracle-verified: full unit suite + 80,782-row safe_pathname oracle green).
 export ENABLE_PANDOC_CONVERSIONS=true  # audit-013 (owner 2026-10-01): Word/Markdown/HTML export via pandoc
-exec /sbin/setuser www-data /usr/local/bin/go-services/clsitex >> /var/log/overleaf/clsi.log 2>&1
+# clsitex MUST run as root, not www-data (2026-10-06, live-proven regression):
+# the sandboxed compile dir is bind-mounted host->texlive container and the
+# docker daemon AUTO-CREATES it root:root when missing. A www-data runner
+# cannot create dirs in the parent, cannot write main.tex into a root-owned
+# dir, and cannot chown (no CAP_CHOWN) — result: empty sandbox +
+# "Could not find file 'main.tex'" (owner project 671bd3cf..., 17:44/18:07
+# repros). Root runner creates+writes the sandbox freely and chowns it to the
+# compile container's DockerUser (go dockerrunner.ensureCompileDirOwnership),
+# matching the legacy node clsi which ran as root under the same runsv.
+exec /usr/local/bin/go-services/clsitex >> /var/log/overleaf/clsi.log 2>&1
