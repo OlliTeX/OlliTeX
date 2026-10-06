@@ -107,6 +107,7 @@ func envOIDCProvider() *OIDCProvider {
 	p := &OIDCProvider{
 		ID:               "1",
 		Type:             "oidc",
+		Name:             e("OVERLEAF_OIDC_IDENTITY_SERVICE_NAME"),
 		Issuer:           e("OVERLEAF_OIDC_ISSUER"),
 		ClientID:         e("OVERLEAF_OIDC_CLIENT_ID"),
 		ClientSecret:     e("OVERLEAF_OIDC_CLIENT_SECRET"),
@@ -220,6 +221,14 @@ func resolveSAMLProvider(cfg *SSOConfig, pathID string) (*SAMLProvider, bool) {
 func resolveOIDCProvider(cfg *SSOConfig, pathID string) (*OIDCProvider, bool) {
 	if pathID != "" && pathID != "oidc" {
 		if p := oidcProviderByID(cfg, pathID); p != nil {
+			return p, true
+		}
+		// Env mode (EXTERNAL_AUTH contains 'oidc'): the login-slot button
+		// links /oidc/login/<envID> even when the ssoConfigs table is empty
+		// (Node parity: env providers carry synthetic ids). Without this
+		// fallback the env-mode button 404s and the callback (providerID
+		// from the session) would too.
+		if p := envOIDCProvider(); p != nil {
 			return p, true
 		}
 		return nil, false
