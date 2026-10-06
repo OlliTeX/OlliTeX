@@ -104,7 +104,7 @@ export default function usePresentationMode(
     if (presentationMode) {
       window.addEventListener('keydown', arrowKeyListener)
       window.addEventListener('click', clickListener)
-      window.addEventListener('wheel', mouseWheelListener)
+      window.addEventListener('wheel', mouseWheelListener, { passive: true })
 
       return () => {
         window.removeEventListener('keydown', arrowKeyListener)

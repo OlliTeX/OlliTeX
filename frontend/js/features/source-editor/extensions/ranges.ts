@@ -300,8 +300,22 @@ const buildHighlightDecorations = (className: string, op: AnyOperation) => {
   }
 
   const opFrom = op.p
-  const opLength = isInsertOperation(op) ? op.i.length : op.c.length
-  const opType = isInsertOperation(op) ? 'i' : 'c'
+  const isInsert = isInsertOperation(op)
+  // Some legacy/migrated comment ops carry only a thread id and no text
+  // payload — the unguarded `.length` read used to crash the editor's
+  // focus pass (TypeError on mouseenter; owner console 2026-10-06).
+  const text = isInsert
+    ? op.i
+    : isCommentOperation(op)
+    ? op.c
+    : undefined
+
+  if (!text) {
+    return Decoration.none
+  }
+
+  const opLength = text.length
+  const opType = isInsert ? 'i' : 'c'
 
   if (opLength === 0) {
     return Decoration.none

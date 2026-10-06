@@ -5,7 +5,7 @@ import {
 } from '@/features/ide-react/context/tabs-context'
 import { Tab } from './tab'
 import { TabsContextMenu } from './tabs-context-menu'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { throttle } from 'lodash'
 import { debugConsole } from '@/utils/debugging'
 import classNames from 'classnames'
@@ -81,11 +81,28 @@ export const TabsContainer = () => {
     setHovered(false)
   }, [throttledOnDragOver])
 
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    if (e.deltaY !== 0 && e.deltaX === 0) {
-      // if this is a purely vertical scroll, convert it to a horizontal scroll
-      // instead
-      e.currentTarget.scrollLeft += e.deltaY
+  const tabsRowRef = useRef<HTMLDivElement>(null)
+
+  // Vertical wheel over the tab row becomes horizontal tab scrolling.
+  // Attached NATIVELY with {passive: true}: the handler never
+  // preventDefaults, and the React onWheel prop (non-passive) is what
+  // triggered the scroll-blocking [Violation] warning (owner console,
+  // 2026-10-06).
+  useEffect(() => {
+    const el = tabsRowRef.current
+    if (!el) {
+      return undefined
+    }
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY !== 0 && e.deltaX === 0) {
+        // if this is a purely vertical scroll, convert it to a horizontal scroll
+        // instead
+        el.scrollLeft += e.deltaY
+      }
+    }
+    el.addEventListener('wheel', onWheel, { passive: true })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
     }
   }, [])
 
@@ -119,6 +136,7 @@ export const TabsContainer = () => {
     <div className="editor-tabs-container">
       <div className="review-panel-header-slot" ref={setHeaderSlot} />
       <div
+        ref={tabsRowRef}
         className={classNames('editor-tabs-row', {
           'editor-tabs-row-hovered': hovered,
         })}
@@ -126,7 +144,6 @@ export const TabsContainer = () => {
         onDragOver={onDragOver}
         onDrop={onDrop}
         onDragLeave={onDragLeave}
-        onWheel={onWheel}
         tabIndex={-1}
       >
         {tabs.map(tab => (

@@ -182,10 +182,11 @@ export class ConnectionManager extends EventTarget {
 
     const self = this
     this.socket = makeSocketShim({
-      emitLog: (event, args) => {
-        // the legacy bus is retired; IDE emits that targeted it are logged
-        // for observability and dropped (server-side features use REST).
-        console.debug('[ollitex] bus emit (no-op, bus retired):', event, args)
+      emitLog: () => {
+        // the legacy bus is retired; IDE emits that targeted it are a pure
+        // no-op (server-side features use REST). Previously this logged
+        // '[ollitex] bus emit (no-op...)' on every join/cursor move, dirtying
+        // the console (owner clean-console retest, 2026-10-06).
       },
       openNow: () => self.open(),
       closeNow: (force) => self.close(force ? 'unable-to-join' : null),

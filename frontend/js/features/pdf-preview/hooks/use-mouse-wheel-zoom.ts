@@ -68,37 +68,78 @@ export default function useMouseWheelZoom(
   )
 
   useEffect(() => {
-    if (pdfJsWrapper) {
-      const wheelListener = (event: WheelEvent) => {
-        if ((event.metaKey || event.ctrlKey) && !isScrollingRef.current) {
-          event.preventDefault()
+    if (!pdfJsWrapper) {
+      return
+    }
+    const container = pdfJsWrapper.container
+    const wheelListener = (event: WheelEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !isScrollingRef.current) {
+        event.preventDefault()
 
-          if (!isZoomingRef.current) {
-            isZoomingRef.current = true
+        if (!isZoomingRef.current) {
+          isZoomingRef.current = true
 
-            performZoom(event, pdfJsWrapper)
+          performZoom(event, pdfJsWrapper)
 
-            setTimeout(() => {
-              isZoomingRef.current = false
-            }, 5)
-          }
-        } else {
-          isScrollingRef.current = true
-          if (isScrollingTimeoutRef.current) {
-            clearTimeout(isScrollingTimeoutRef.current)
-          }
-
-          isScrollingTimeoutRef.current = setTimeout(() => {
-            isScrollingRef.current = false
-          }, 100)
+          setTimeout(() => {
+            isZoomingRef.current = false
+          }, 5)
         }
-      }
+      } else {
+        isScrollingRef.current = true
+        if (isScrollingTimeoutRef.current) {
+          clearTimeout(isScrollingTimeoutRef.current)
+        }
 
-      pdfJsWrapper.container.addEventListener('wheel', wheelListener)
-
-      return () => {
-        pdfJsWrapper.container.removeEventListener('wheel', wheelListener)
+        isScrollingTimeoutRef.current = setTimeout(() => {
+          isScrollingRef.current = false
+        }, 100)
       }
+    }
+
+    // Attached only while a zoom modifier is held. This handler needs
+    // preventDefault (non-passive) for ctrl/meta+wheel zoom, but a
+    // permanently non-passive wheel listener triggers the scroll-blocking
+    // [Violation] warning (owner console, 2026-10-06) and delays page
+    // scroll. Lazy attach = no wheel listener in the resting state.
+    let attached = false
+    const attach = () => {
+      if (attached) {
+        return
+      }
+      attached = true
+      container.addEventListener('wheel', wheelListener)
+    }
+    const detach = () => {
+      if (!attached) {
+        return
+      }
+      attached = false
+      container.removeEventListener('wheel', wheelListener)
+    }
+    const onModifierDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey) {
+        attach()
+      }
+    }
+    const onModifierUp = (event: KeyboardEvent) => {
+      if (!event.metaKey && !event.ctrlKey) {
+        detach()
+      }
+    }
+    // a missed keyup (window loses focus while modifier is held) detaches
+    // on blur so the non-passive listener never lingers
+    const onWindowBlur = () => detach()
+
+    window.addEventListener('keydown', onModifierDown)
+    window.addEventListener('keyup', onModifierUp)
+    window.addEventListener('blur', onWindowBlur)
+
+    return () => {
+      detach()
+      window.removeEventListener('keydown', onModifierDown)
+      window.removeEventListener('keyup', onModifierUp)
+      window.removeEventListener('blur', onWindowBlur)
     }
   }, [pdfJsWrapper, setScale, performZoom])
 }
