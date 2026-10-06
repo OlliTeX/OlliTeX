@@ -677,6 +677,33 @@ services:
         condition: service_healthy
     command: ["/usr/local/sbin/haproxy", "-f", "/haproxy.cfg", "-db", "-W"]
 
+  # ------------------------------------------------------------------------
+  # B5 (owner 2026-10-06): the private image registry — ollitex.registry:11435
+  # The ollitex/* builds (ollitex/ollitex:main, ollitex/toolkit-tui:main, the
+  # golang builder, the base stage) are pushed here so bakes on any box of
+  # the owner's fleet pull a VERIFIED local image instead of an anonymous
+  # registry. /etc/hosts maps ollitex.registry -> 127.0.0.1 on this host;
+  # docker-daemon-side pulls/pushes resolve through host DNS, which is the
+  # only path the build needs.
+  #  ENABLE_REGISTRY restart flag · REGISTRY_PORT parameterized port.
+  registry:
+    image: registry:2
+    restart: ${ENABLE_REGISTRY:-unless-stopped}   # Option no / unless-stopped
+    ports:
+      - "${REGISTRY_PORT:-11435}:5000"
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"   # allow DELETE /v2/<name>/manifests/<ref> for registry pruning
+    volumes:
+      # owner data tree (same convention as every other store in this stack)
+      - ${PREFIX}/data/registry:/var/lib/registry
+    healthcheck:
+      # registry:2 is alpine-based (busybox wget present).
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/v2/_catalog"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 # --------------------------------------------------------------------------
 # External network: the shared content store (overleafmongo = the legacy
 # cep store holding the imported `ollitex` DB) lives on overleaf-network.
