@@ -297,6 +297,25 @@ export class ConnectionManager extends EventTarget {
       // already failed — keep the state, onclose finalizes it.
     }
 
+    // minimal y-websocket protocol keepalive (the collab service speaks the
+    // y-websocket protocol on this room): answer 'meta' with meta, answer
+    // 'sync' step0 with an empty state vector, ignore 'update' frames (the
+    // text engine's own provider does the real sync on its connection).
+    // Without the meta handshake the server watchdog closes an idle join
+    // socket — the 1006/reconnect loop the owner saw 2026-10-07.
+    ws.onmessage = (ev: MessageEvent) => {
+      try {
+        const m = JSON.parse(String(ev.data))
+        if (m && m.type === 'meta') {
+          ws.send(JSON.stringify({ type: 'meta' }))
+        } else if (m && m.type === 'sync') {
+          ws.send(JSON.stringify({ type: 'sync', step: 0, stateVector: {} }))
+        }
+      } catch {
+        // non-JSON frame — nothing to do for the join gate.
+      }
+    }
+
     ws.onclose = (ev: CloseEvent) => {
       this.socket.socket.connected = false
       this.socket.socket.connecting = false

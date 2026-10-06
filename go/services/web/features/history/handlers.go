@@ -524,13 +524,42 @@ func v1Call(cxt *core.Cxt, rawurl, method string, body []byte) (*upBody, error) 
 	return &upBody{ct: resp.Header.Get("Content-Type"), body: b}, nil
 }
 
+// ensureHistID — legacy (pre-v1) projects have no overleaf.history.id, but
+// the v1 history service keys history by the PROJECT id (proven 2026-10-07:
+// GET /api/projects/<pid>/latest/history -> 200 on the live stack). So a
+// missing HistID is resolvable, not fatal: initialize the v1 history for
+// the project on first use (Node: getHistoryId + initProject). POST
+// /api/projects -> 200 {projectId} (created) or 409 AlreadyInitialized
+// (imported/migrated project) — either way the history id is the project
+// id. Any other upstream failure keeps the Node 500-page parity.
+func (h *svc) ensureHistID(cxt *core.Cxt, p *projDoc) bool {
+	if p.HistID != "" {
+		return true
+	}
+	pid := p.idHex()
+	if pid == "" {
+		return false
+	}
+	_, err := v1Call(cxt, v1Base()+"/projects", "POST",
+		[]byte(`{"projectId":"`+pid+`"}`))
+	if err != nil {
+		if code, ok := asUpstream(err); ok && code == 409 {
+			p.HistID = pid // already initialized — the pid IS the history id
+			return true
+		}
+		return false
+	}
+	p.HistID = pid
+	return true
+}
+
 // latestHistory -> V1 /projects/:historyId/latest/history -> res.json.
 func (h *svc) latestHistory(cxt *core.Cxt, res *core.Res) {
 	uid, p, ok := h.gate(cxt, res, "read")
 	if !ok {
 		return
 	}
-	if p.HistID == "" { // getHistoryId OError -> Node 500 page
+	if !h.ensureHistID(cxt, p) { // legacy project without v1 history -> Node 500 parity
 		h.s500(cxt, res, cxt.Req.URL.Path)
 		return
 	}
@@ -556,7 +585,7 @@ func (h *svc) changes(cxt *core.Cxt, res *core.Res) {
 		res.JSON(400, []byte(`{"error":"Validation error: `+sErr+` at \"query.since\"","statusCode":400}`))
 		return
 	}
-	if p.HistID == "" {
+	if !h.ensureHistID(cxt, p) {
 		h.s500(cxt, res, cxt.Req.URL.Path)
 		return
 	}
@@ -727,8 +756,8 @@ func (h *svc) versionZip(cxt *core.Cxt, res *core.Res) {
 		res.JSON(404, []byte(`{"error":"Validation error: `+vErr+` at \"params.version\"","statusCode":404}`))
 		return
 	}
-	if p.HistID == "" {
-		res.SendStatus(402) // pinned: "Payment Required"
+	if !h.ensureHistID(cxt, p) {
+		res.SendStatus(402) // pinned: "Payment Required" (legacy path, unchanged)
 		return
 	}
 	url := v1Base() + "/projects/" + p.HistID + "/version/" + vRaw + "/zip"

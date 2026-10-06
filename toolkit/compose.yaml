@@ -672,6 +672,21 @@ services:
       AWS_S3_PATH_STYLE: "${AWS_S3_PATH_STYLE:-true}"
       # hub grafana embed (empty = pane hidden — the safe default)
       HUB_GRAFANA_EMBED_URL: "${HUB_GRAFANA_EMBED_URL:-}"
+      # ── SANDBOXED COMPILES (docker-in-docker on the HOST daemon) ──────
+      # clsi (tex) + clsi_typst compile via `docker run` children: the tex
+      # side reads SANDBOXED_COMPILES_HOST_DIR_* (env.sh dump of the
+      # container env), the typst run script re-exports the SAME dirs from
+      # ${TYPSF_*}. 2026-10-07 (owner: compile 500 + clsi_typst
+      # crash-loop): the image had SANDBOXED_COMPILES on but THIS container
+      # lacked the host dirs + the docker socket → config gate crashed on
+      # start. Host dirs live under /data_1 (owner data root convention).
+      SANDBOXED_COMPILES: "true"
+      SANDBOXED_COMPILES_HOST_DIR_COMPILES: "${SANDBOXED_COMPILES_HOST_DIR_COMPILES:-/data_1/ols/compiles}"
+      SANDBOXED_COMPILES_HOST_DIR_CACHE: "${SANDBOXED_COMPILES_HOST_DIR_CACHE:-/data_1/ols/cache}"
+      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "${SANDBOXED_COMPILES_HOST_DIR_OUTPUT:-/data_1/ols/output}"
+      TYPSF_COMPILES: "${SANDBOXED_COMPILES_HOST_DIR_COMPILES:-/data_1/ols/compiles}"
+      TYPSF_OUTPUT: "${SANDBOXED_COMPILES_HOST_DIR_OUTPUT:-/data_1/ols/output}"
+      TYPSF_CACHE: "${SANDBOXED_COMPILES_HOST_DIR_CACHE:-/data_1/ols/cache}"
     # ── DATA PLANE: durable file content ──────────────────────────────
     # The app's default filestore/docstore is fs on /var/lib/overleaf, and the
     # imported prod settings DB has no S3 row yet (legacy overleafserver ran
@@ -680,6 +695,10 @@ services:
     # import (files-import.sh) can supersede this later (G2 STOR-1).
     volumes:
       - ${FILESTORE_DATA_DIR:-/data_1/docker/compose_cep/overleafserver/data}:/var/lib/overleaf
+      # sandboxed compiles run as docker children on the HOST daemon (the
+      # clsi run scripts add www-data to the socket group when it is
+      # present): 2026-10-07 (compile 500: no /var/run/docker.sock here)
+      - /var/run/docker.sock:/var/run/docker.sock
     # no host port: haproxy is the facade
     healthcheck:
       # the app ships curl; anonymous `/` answers 302→/login (curl -f accepts

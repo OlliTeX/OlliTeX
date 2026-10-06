@@ -82,6 +82,16 @@ func strArr(v any) []string {
 
 // dmap — v2 driver has no bson.D.Map(); first-key-wins conversion (matches the
 // reads above; docs are mongo-shaped with unique keys).
+// idHex — the project _id as a hex string. The v1 history plane is keyed
+// by the project id, so for legacy projects this doubles as their history
+// id (ensureHistID, handlers.go).
+func (p *projDoc) idHex() string {
+	if p == nil || p.D == nil {
+		return ""
+	}
+	return oidHex(dmap(*p.D)["_id"])
+}
+
 func dmap(d bson.D) map[string]any {
 	m := make(map[string]any, len(d))
 	for _, e := range d {
