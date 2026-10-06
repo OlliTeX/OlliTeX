@@ -22,6 +22,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -121,9 +122,12 @@ func ldapBuildSearchFilter(attr, username string) string {
 }
 
 // ldapConnectTimeout — passport connectTimeout / timeout (ms); default 10s.
+// Node stores `timeout` as a STRING ("", "3000", ...) — the prod
+// `sso-settings` doc carries "" — accept a numeric string and a number.
 func ldapTimeout(p *LDAPProvider) time.Duration {
-	if p.Timeout > 0 {
-		return time.Duration(p.Timeout) * time.Millisecond
+	n, err := strconv.Atoi(strings.TrimSpace(p.Timeout))
+	if err == nil && n > 0 {
+		return time.Duration(n) * time.Millisecond
 	}
 	return 10 * time.Second
 }

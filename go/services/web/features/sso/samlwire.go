@@ -86,9 +86,10 @@ func envSAMLProvider() *SAMLProvider {
 		UpdateUserDetails:        e("OVERLEAF_SAML_UPDATE_USER_DETAILS_ON_LOGIN") == "true",
 		ValidateInResponseTo:     e("OVERLEAF_SAML_VALIDATE_IN_RESPONSE_TO"),
 	}
-	n, _ := strconvI64(e("OVERLEAF_SAML_ACCEPTED_CLOCK_SKEW_MS"))
-	if n >= 0 {
-		p.AcceptedClockSkewMs = n
+	// acceptedClockSkewMs — Node stores a STRING ("" = unset); keep the raw
+	// value and parse at the point of use (saml.MaxClockSkew below).
+	if s := e("OVERLEAF_SAML_ACCEPTED_CLOCK_SKEW_MS"); s != "" {
+		p.AcceptedClockSkewMs = s
 	}
 	w := e("OVERLEAF_SAML_WANT_ASSERTIONS_SIGNED")
 	p.WantAssertionsSigned = w != "false"
@@ -317,8 +318,10 @@ func buildSP(p *SAMLProvider, spCfg *SPConfig, siteURL string) *saml.ServiceProv
 		sp.AllowIDPInitiated = true
 	}
 	// Node acceptedClockSkewMs (default 0).
-	if p.AcceptedClockSkewMs >= 0 {
-		saml.MaxClockSkew = time.Duration(p.AcceptedClockSkewMs) * time.Millisecond
+	if s := strings.TrimSpace(p.AcceptedClockSkewMs); s != "" {
+		if n, ok := strconvI64(s); ok && n >= 0 {
+			saml.MaxClockSkew = time.Duration(n) * time.Millisecond
+		}
 	}
 	// IdP signing cert. crewjam v0.5.1 IDPCertificate is RAW BASE64 (DER),
 	// not PEM: parseCert base64-decodes it after stripping whitespace — a

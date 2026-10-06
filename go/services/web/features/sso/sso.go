@@ -149,8 +149,8 @@ type SAMLProvider struct {
 	AuthnContext             string `bson:"authnContext,omitempty"`
 	DisableRequestedAuthn    bool   `bson:"disableRequestedAuthnContext,omitempty"`
 	LogoutURL                string `bson:"logoutUrl,omitempty"`
-	AcceptedClockSkewMs      int64  `bson:"acceptedClockSkewMs,omitempty"`
-	RequestIdExpirationMs    int64  `bson:"requestIdExpirationPeriodMs,omitempty"`
+	AcceptedClockSkewMs      string `bson:"acceptedClockSkewMs,omitempty"`         // Node stores a STRING ("" = unset) — decode-tolerant
+	RequestIdExpirationMs    string `bson:"requestIdExpirationPeriodMs,omitempty"` // ditto
 	ValidateInResponseTo     string `bson:"validateInResponseTo,omitempty"` // never|ifPresent|always
 	AttributeConsumingSvcIdx string `bson:"attributeConsumingServiceIndex,omitempty"`
 	AuthnRequestBinding      string `bson:"authnRequestBinding,omitempty"` // default http-redirect
@@ -208,7 +208,7 @@ type LDAPProvider struct {
 	IsAdminAtt               string     `bson:"isAdminAtt,omitempty"`
 	ValAdmin                 string     `bson:"valAdmin,omitempty"`
 	UpdateUserDetailsOnLogin bool       `bson:"updateUserDetailsOnLogin"`
-	Timeout                  int        `bson:"timeout,omitempty"`
+	Timeout                  string       `bson:"timeout,omitempty"`
 	AttrFilter               []AttrRule `bson:"attrFilter,omitempty"`
 }
 

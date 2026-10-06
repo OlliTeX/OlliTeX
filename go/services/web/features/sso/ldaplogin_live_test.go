@@ -51,7 +51,7 @@ func TestLdapAuthenticateLive(t *testing.T) {
 			IsAdminAtt:      "employeeType",
 			ValAdmin:        "admin",
 			SearchScope:     eDef("LIVE_LDAP_SCOPE", ""),
-			Timeout:         5000,
+			Timeout:         "5000",
 		}
 	}
 	ctx := context.Background()
