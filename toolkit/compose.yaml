@@ -622,6 +622,29 @@ services:
       OVERLEAF_INVITE_TOKEN_SECRET: "${OVERLEAF_INVITE_TOKEN_SECRET:-}"
       LLM_KEY_SECRET: "${LLM_KEY_SECRET:-}"
       OT_JWT_AUTH_KEY: "${OT_JWT_AUTH_KEY:-}"
+      # ── PROD SETTINGS (owner 2026-10-06: from /data_1/docker/compose_cep/.env ──
+      # hostnames, SSO/OIDC, mail, LLM, app branding — values live in .env)
+      OVERLEAF_SITE_URL: "${OVERLEAF_SITE_URL:-}"
+      OVERLEAF_APP_NAME: "${OVERLEAF_APP_NAME:-}"
+      OVERLEAF_NAV_TITLE: "${OVERLEAF_NAV_TITLE:-}"
+      OVERLEAF_CUSTOM_EMAIL_FOOTER: "${OVERLEAF_CUSTOM_EMAIL_FOOTER:-}"
+      OVERLEAF_ADMIN_EMAIL: "${OVERLEAF_ADMIN_EMAIL:-}"
+      OVERLEAF_EMAIL_FROM_ADDRESS: "${OVERLEAF_EMAIL_FROM_ADDRESS:-}"
+      OVERLEAF_EMAIL_PASSWORD: "${OVERLEAF_EMAIL_PASSWORD:-}"
+      OVERLEAF_EMAIL_SMTP_HOST: "${OVERLEAF_EMAIL_SMTP_HOST:-}"
+      OVERLEAF_EMAIL_SMTP_PORT: "${OVERLEAF_EMAIL_SMTP_PORT:-}"
+      OVERLEAF_EMAIL_SMTP_SECURE: "${OVERLEAF_EMAIL_SMTP_SECURE:-}"
+      OVERLEAF_EMAIL_SMTP_USER: "${OVERLEAF_EMAIL_SMTP_USER:-}"
+      OVERLEAF_EMAIL_SMTP_IGNORE_TLS: "${OVERLEAF_EMAIL_SMTP_IGNORE_TLS:-}"
+      OVERLEAF_OIDC_ISSUER: "${OVERLEAF_OIDC_ISSUER:-}"
+      OVERLEAF_OIDC_CLIENT_ID: "${OVERLEAF_OIDC_CLIENT_ID:-}"
+      OVERLEAF_OIDC_CLIENT_SECRET: "${OVERLEAF_OIDC_CLIENT_SECRET:-}"
+      OVERLEAF_OIDC_IDENTITY_SERVICE_NAME: "${OVERLEAF_OIDC_IDENTITY_SERVICE_NAME:-}"
+      LLM_API_URL: "${LLM_API_URL:-}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      LLM_MODEL_NAME: "${LLM_MODEL_NAME:-}"
+      CRYPTO_RANDOM: "${CRYPTO_RANDOM:-}"
+      WEB_API_PASSWORD: "${WEB_API_PASSWORD:-}"
       NODE_ENV: production
       # git contract (the legacy git-bridge container is attached to this
       # stack's network — verified 2026-10-06)
@@ -666,10 +689,14 @@ services:
       - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${HAPROXY_TLS_PORT:-443}:443"    # the TLS facade (dev override in .env)
     volumes:
       - ./web/haproxy.cfg:/haproxy.cfg:ro
-      # self-signed web cert (dev plane; under the owner's ${PREFIX} data
-      # tree). A real CA cert later = swap that one file — haproxy.cfg
-      # already points at /etc/haproxy/certs/web.pem.
-      # NOTE: must be readable by the haproxy user (uid 99) — chown 99:99.
+      # REAL prod TLS (owner 2026-10-06): the Let's Encrypt pair for
+      # psintern.neuro.uni-bremen.de (fullchain2 + privkey2), combined into
+      # this ONE haproxy-format PEM on the host. The host privkey stays
+      # 0600 root (haproxy runs as uid 99 and cannot hold a direct
+      # /etc/letsencrypt mount); renewal = re-run:
+      #   cat /etc/letsencrypt/live/psintern.neuro.uni-bremen.de/fullchain.pem \
+      #       /etc/letsencrypt/live/psintern.neuro.uni-bremen.de/privkey.pem \
+      #       > ${PREFIX}/data/ssl/web/web.pem
       - ${PREFIX}/data/ssl/web/web.pem:/etc/haproxy/certs/web.pem:ro
     healthcheck:
       # image ships NO wget/curl/busybox — core perl is the probe (verified
