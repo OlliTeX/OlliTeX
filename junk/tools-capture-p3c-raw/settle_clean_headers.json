@@ -1,0 +1,89 @@
+{
+ "status": 200,
+ "headers": [
+  [
+   "Server",
+   "nginx/1.24.0 (Ubuntu)"
+  ],
+  [
+   "Date",
+   "Mon, 14 Sep 2026 08:56:10 GMT"
+  ],
+  [
+   "Content-Type",
+   "text/html; charset=utf-8"
+  ],
+  [
+   "Content-Length",
+   "17316"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Content-Security-Policy",
+   "script-src 'nonce-GByx1wkESewW9BBOr7VO1g==' 'unsafe-inline' 'strict-dynamic' https: 'report-sample'; object-src 'none'; base-uri 'none'"
+  ],
+  [
+   "Surrogate-Control",
+   "no-store"
+  ],
+  [
+   "Cache-Control",
+   "no-store, no-cache, must-revalidate, proxy-revalidate"
+  ],
+  [
+   "Pragma",
+   "no-cache"
+  ],
+  [
+   "Expires",
+   "0"
+  ],
+  [
+   "Cross-Origin-Opener-Policy",
+   "same-origin-allow-popups"
+  ],
+  [
+   "Cross-Origin-Resource-Policy",
+   "same-origin"
+  ],
+  [
+   "Referrer-Policy",
+   "origin-when-cross-origin"
+  ],
+  [
+   "X-Content-Type-Options",
+   "nosniff"
+  ],
+  [
+   "X-Download-Options",
+   "noopen"
+  ],
+  [
+   "X-Frame-Options",
+   "SAMEORIGIN"
+  ],
+  [
+   "X-Permitted-Cross-Domain-Policies",
+   "none"
+  ],
+  [
+   "X-XSS-Protection",
+   "0"
+  ],
+  [
+   "Permissions-Policy",
+   "accelerometer=(), browsing-topics=(), camera=(), display-capture=(), encrypted-media=(), gamepad=(), geolocation=(), gyroscope=(), hid=(), identity-credentials-get=(), idle-detection=(), local-fonts=(), magnetometer=(), midi=(), otp-credentials=(), picture-in-picture=(), screen-wake-lock=(), serial=(), storage-access=(), usb=(), window-management=(), xr-spatial-tracking=(), autoplay=(self \"https://videos.ctfassets.net\"), fullscreen=(self), on-device-speech-recognition=(self), payment=(self \"https://js.stripe.com\")"
+  ],
+  [
+   "ETag",
+   "W/\"43a4-Ky1tRoNFepvxOKUfjcapGwCr8lE\""
+  ],
+  [
+   "Set-Cookie",
+   "overleaf.sid=s%3A1rGL5Ac3BhXSl3COJK8qVqWLjNMOeoDo.K4zbdk408V9gFaC9TGh54LFDA%2BfED1TGjLMFlBZYr5A; Path=/; Expires=Sat, 19 Sep 2026 08:56:10 GMT; HttpOnly; SameSite=Lax"
+  ]
+ ]
+}
