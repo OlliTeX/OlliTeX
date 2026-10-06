@@ -150,6 +150,13 @@ export const trackedChangesCapture = (
           },
           body: JSON.stringify(body),
         }
+      ).then(
+        () => {
+          // D40 live-echo: the server now holds a fresh tracked-change
+          // record — refresh the ranges hydration (throttled in the ranges
+          // provider) so the new tracked edit renders without a reload.
+          currentDoc.trigger('ranges:hydrate')
+        }
       ).catch(e =>
         debugConsole.warn(
           '[d40] tracked-change capture failed: ' + String(e)

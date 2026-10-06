@@ -19,7 +19,6 @@ import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'
 import { UserId } from '../../../../types/user'
 import { deleteJSON, getJSON, postJSON } from '@/infrastructure/fetch-json'
 import RangesTracker from '@overleaf/ranges-tracker'
-import { CommentOperation } from '../../../../types/change'
 import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
 import { useEditorContext } from '@/shared/context/editor-context'
 import { debugConsole } from '@/utils/debugging'
@@ -72,6 +71,20 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
   const [data, setData] = useState<Threads>()
 
   const isHistoryOT = currentDocument?.isHistoryOT()
+
+  // D40 live-echo helper: the Yjs engine has no OT op-ack path, so thread
+  // mutations refresh the local panel state from the REST source of truth
+  // (the server write is durable before the caller resolves).
+  const syncThreadsFromServer = useCallback(async () => {
+    try {
+      const fresh = await getJSON<Threads>(`/project/${projectId}/threads`)
+      if (fresh) {
+        setData(fresh)
+      }
+    } catch (error) {
+      debugConsole.warn('review threads sync failed', error)
+    }
+  }, [projectId])
 
   // load the initial threads data
   useEffect(() => {
@@ -294,24 +307,26 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
           'mentions-count': countMentionedUsers(content),
         })
 
-        const op: CommentOperation = {
-          c: text,
-          p: pos,
-          t: threadId,
-        }
-
-        currentDocument.submitOp(op)
+        // D40 live-echo (replaces the OT submitOp below, a no-op on the Yjs
+        // engine — the server record is durable after the POST above):
+        // refresh the comment chips (ranges hydration, throttled in the
+        // ranges provider) and the panel thread list, so the new comment is
+        // visible without leaving and re-entering the project.
+        currentDocument?.trigger('ranges:hydrate')
+        void syncThreadsFromServer()
       },
       async resolveThread(threadId: string, docId: string) {
         await postJSON(
           `/project/${projectId}/doc/${docId}/thread/${threadId}/resolve`
         )
+        void syncThreadsFromServer()
         sendEvent('rp-comment-resolve', { view: reviewPanelView })
       },
       async reopenThread(threadId: string, docId: string) {
         await postJSON(
           `/project/${projectId}/doc/${docId}/thread/${threadId}/reopen`
         )
+        void syncThreadsFromServer()
         sendEvent('rp-comment-reopen')
       },
       async deleteThread(threadId: string, docId: string) {
@@ -320,13 +335,17 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
         )
         if (docId === currentDocument.doc_id) {
           currentDocument.ranges?.removeCommentId(threadId)
+          currentDocument?.trigger('ranges:hydrate')
         }
+        void syncThreadsFromServer()
         sendEvent('rp-comment-delete')
       },
       async addMessage(threadId: ThreadId, content: string) {
         await postJSON(`/project/${projectId}/thread/${threadId}/messages`, {
           body: { content },
         })
+
+        void syncThreadsFromServer()
 
         sendEvent('rp-comment-reply', {
           view: reviewPanelView,
@@ -344,16 +363,19 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
           `/project/${projectId}/thread/${threadId}/messages/${commentId}/edit`,
           { body: { content } }
         )
+        void syncThreadsFromServer()
       },
       async deleteMessage(threadId: ThreadId, commentId: CommentId) {
         await deleteJSON(
           `/project/${projectId}/thread/${threadId}/messages/${commentId}`
         )
+        void syncThreadsFromServer()
       },
       async deleteOwnMessage(threadId: ThreadId, commentId: CommentId) {
         await deleteJSON(
           `/project/${projectId}/thread/${threadId}/own-messages/${commentId}`
         )
+        void syncThreadsFromServer()
       },
     }
 
@@ -435,6 +457,7 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
     projectId,
     isHistoryOT,
     sendEvent,
+    syncThreadsFromServer,
   ])
 
   if (!actions) {

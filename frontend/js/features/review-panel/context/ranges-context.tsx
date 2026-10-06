@@ -130,14 +130,65 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
     }
   }, [currentDocument])
 
-  // audit 005/029 (2026-09-30): the Yjs engine (D25/D40) carries comments in
-  // the room's Y.Doc, not in a document-native RangesTracker — so
-  // buildRanges() above yields an EMPTY tracker and the review panel shows
-  // no entries even though the server holds the threads. D40's shipping
-  // contract is the REST surface (Go web features/review: /ranges returns
-  // the exact CommentShape/ChangeShape the panel renders, keyed by content
-  // doc — 'main.tex' P1). Hydrate the ranges context from that endpoint
-  // whenever the native tracker is empty for the open document.
+  // audit 005/029 (2026-09-30) + D40 live echo (2026-10-06): the Yjs engine
+  // (D25/D40) carries comments in the room's Y.Doc / the REST records, not
+  // in a document-native RangesTracker — so buildRanges() above yields an
+  // EMPTY tracker and the review panel shows no entries even though the
+  // server holds the threads. D40's shipping contract is the REST surface
+  // (Go web features/review: /ranges returns the exact CommentShape/
+  // ChangeShape the panel renders, keyed by content doc — 'main.tex' P1).
+  // Hydrate the ranges context from that endpoint whenever the native
+  // tracker is empty for the open document — at mount (below) AND live
+  // whenever a server-side record lands (comment create, tracked-change
+  // capture, resolve/reopen), signalled via the document container's
+  // 'ranges:hydrate' event.
+  const hydrateFromServer = useCallback(
+    async (stale: () => boolean) => {
+      if (!currentDocument) {
+        return
+      }
+      const items =
+        await getJSON<Array<{ id: string; ranges?: { changes?: any[]; comments?: any[] } }>>(
+          `/project/${projectId}/ranges`
+        )
+      if (stale() || !items?.length) {
+        return
+      }
+      const docId = openDocName || ''
+      const pick =
+        items.find(it => (it.id || '') === docId) ||
+        items.find(
+          it =>
+            (it.ranges?.comments?.length ?? 0) > 0 ||
+            (it.ranges?.changes?.length ?? 0) > 0
+        )
+      if (!pick) {
+        setRanges({
+          docId: currentDocument.doc_id,
+          changes: [],
+          comments: [],
+        })
+        return
+      }
+      setRanges({
+        docId: currentDocument.doc_id,
+        changes: (pick.ranges?.changes ?? []).map(c => ({
+          id: (c as any).id,
+          op: (c as any).op,
+          state: (c as any).state,
+          metadata: (c as any).metadata,
+        })),
+        comments: (pick.ranges?.comments ?? []).map(c => ({
+          id: (c as any).id,
+          op: (c as any).op,
+          resolved: (c as any).resolved,
+          metadata: (c as any).metadata,
+        })),
+      })
+    },
+    [currentDocument, openDocName, projectId]
+  )
+
   useEffect(() => {
     if (!currentDocument) {
       return
@@ -153,53 +204,39 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
     }
     let cancelled = false
     hydratedRef.current = true
-    getJSON<Array<{ id: string; ranges?: { changes?: any[]; comments?: any[] } }>>(
-      `/project/${projectId}/ranges`
-    )
-      .then(items => {
-        if (cancelled || !items?.length) {
-          return
-        }
-        const docId = openDocName || ''
-        const pick =
-          items.find(it => (it.id || '') === docId) ||
-          items.find(
-            it =>
-              (it.ranges?.comments?.length ?? 0) > 0 ||
-              (it.ranges?.changes?.length ?? 0) > 0
-          )
-        if (!pick) {
-          setRanges({
-            docId: currentDocument.doc_id,
-            changes: [],
-            comments: [],
-          })
-          return
-        }
-        setRanges({
-          docId: currentDocument.doc_id,
-          changes: (pick.ranges?.changes ?? []).map(c => ({
-            id: (c as any).id,
-            op: (c as any).op,
-            state: (c as any).state,
-            metadata: (c as any).metadata,
-          })),
-          comments: (pick.ranges?.comments ?? []).map(c => ({
-            id: (c as any).id,
-            op: (c as any).op,
-            resolved: (c as any).resolved,
-            metadata: (c as any).metadata,
-          })),
-        })
-      })
-      .catch(() => {
-        // keep the (empty) native ranges; panel shows the empty state
-      })
+    void hydrateFromServer(() => cancelled).catch(() => {
+      // keep the (empty) native ranges; panel shows the empty state
+    })
     return () => {
       cancelled = true
       hydratedRef.current = false
     }
-  }, [currentDocument, openDocName, projectId])
+  }, [currentDocument, openDocName, projectId, hydrateFromServer])
+
+  // D40 live echo (Yjs engine): after a server-side review record is
+  // written (comment POST /project/:pid/thread/:tid/messages, tracked-change
+  // POST /project/:pid/doc/:doc/changes, resolve/reopen), the writing side
+  // triggers 'ranges:hydrate' on the document container; re-hydrate from
+  // the REST source of truth so chips/panel stay current without a reload.
+  useEffect(() => {
+    if (!currentDocument || currentDocument.isHistoryOT()) {
+      return
+    }
+    const listener = throttle(
+      () => {
+        void hydrateFromServer(() => false).catch(() => {
+          // best-effort live refresh; keep the last good state
+        })
+      },
+      500,
+      { leading: true, trailing: true }
+    )
+    currentDocument.on('ranges:hydrate', listener)
+    return () => {
+      currentDocument.off('ranges:hydrate', listener)
+      listener.cancel()
+    }
+  }, [currentDocument, hydrateFromServer])
 
   useEffect(() => {
     if (currentDocument && currentDocument.isHistoryOT()) {
