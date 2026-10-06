@@ -26,24 +26,16 @@ tests/e2e/parity/reference/
 /plan_6.2.0_6.2.1.md
 /plan_6.2.1_6.2.2.md
 /plan_6.2.2_6.3.0.md
-/BIB_ORCID_TEMPLATES_PLAN.md
-/EDITOR_RENOVATION_PLAN.md
-/MODULE_MANTINE_PLAN.md
-/SSO_MULTI_PROVIDER_PLAN.md
-/TYPST_INTEGRATION_PLAN.md
 /UI_ROUND10_PLAN.md
 /UI_ROUND11_PLAN.md
 /UI_ROUND12_PLAN.md
-/BUGHUNT_REPORT.md
-/BUG_HUNT_*.md
-/BUG_AUDIT_*.md
-/MODULE_HYGIENE_REPORT.md
 /SSO_TEST_ENV_README.md
 /TOOLKIT_ENV_GAP.md
-/todo_07_09_2026.md
-/nav_structure.md
 /BRANDING.md
 /ext_explain.md
+# local working documents (plans/bug-hunts/problem reports) — never committed
+/local-plans/
+
 # Go service build output (make go-build)
 /bin/
 
