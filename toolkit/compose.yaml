@@ -687,6 +687,16 @@ services:
       TYPSF_COMPILES: "${SANDBOXED_COMPILES_HOST_DIR_COMPILES:-/data_1/ols/compiles}"
       TYPSF_OUTPUT: "${SANDBOXED_COMPILES_HOST_DIR_OUTPUT:-/data_1/ols/output}"
       TYPSF_CACHE: "${SANDBOXED_COMPILES_HOST_DIR_CACHE:-/data_1/ols/cache}"
+      # v1 history basic-auth pair (web caller -> historyv1 service): BOTH
+      # sides read V1_HISTORY_PASSWORD; the user defaults to "staging" on
+      # both (keep it that way — the two sides have DIFFERENT user keys).
+      # 2026-10-07 (owner: history 500/401): unset => web sent empty
+      # password => every v1 call 401.
+      V1_HISTORY_PASSWORD: "${V1_HISTORY_PASSWORD:-}"
+      # SeaweedFS S3 emulation 500s on a conditional (If-None-Match) PUT;
+      # real AWS/minio accept it (Node parity). 2026-10-07 live evidence:
+      # v1 initializeProject -> s3x 500 InternalError on If-None-Match.
+      OVERLEAF_HISTORY_S3_IF_NONE_MATCH: "${OVERLEAF_HISTORY_S3_IF_NONE_MATCH:-false}"
     # ── DATA PLANE: durable file content ──────────────────────────────
     # The app's default filestore/docstore is fs on /var/lib/overleaf, and the
     # imported prod settings DB has no S3 row yet (legacy overleafserver ran

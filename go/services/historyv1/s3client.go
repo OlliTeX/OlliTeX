@@ -27,11 +27,16 @@ import (
 
 type s3xAdapter struct {
 	c *s3x.Client
+	// ifNoneMatch — send If-None-Match on conditional puts. Node parity has
+	// it ON; the SeaweedFS S3 emulation 500s on it (owner 2026-10-07 live
+	// evidence: initializeProject -> 500 InternalError), so the deployment
+	// can opt out via OVERLEAF_HISTORY_S3_IF_NONE_MATCH=false.
+	ifNoneMatch bool
 }
 
 // NewS3xAdapter exposes the gateway adapter for main wiring.
-func NewS3xAdapter(endpoint, key, secret string) persistors.S3Client {
-	return &s3xAdapter{c: s3x.New(endpoint, key, secret)}
+func NewS3xAdapter(endpoint, key, secret string, ifNoneMatch bool) persistors.S3Client {
+	return &s3xAdapter{c: s3x.New(endpoint, key, secret), ifNoneMatch: ifNoneMatch}
 }
 
 // toS3Error normalizes s3x classified errors to the persistor duck-typed
@@ -105,7 +110,7 @@ func (a *s3xAdapter) PutObject(_ context.Context, p persistors.PutObjectParams) 
 	if p.ContentEncoding != "" {
 		hdr.Set("Content-Encoding", p.ContentEncoding)
 	}
-	if p.IfNoneMatch != "" {
+	if a.ifNoneMatch && p.IfNoneMatch != "" {
 		hdr.Set("If-None-Match", p.IfNoneMatch)
 	}
 	resp, err := a.doBuf(p.Bucket, p.Key, http.MethodPut, nil, hdr, buf)

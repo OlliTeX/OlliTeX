@@ -60,7 +60,7 @@ func main() {
 	// s3x gateway adapter (basic-auth SeaweedFS) wired in as the client
 	// factory — without it persistors refuse to issue any request.
 	factory := func(bucket string) (persistors.S3Client, error) {
-		return historyv1.NewS3xAdapter(cfg.PersistorEndpoint, cfg.PersistorKey, cfg.PersistorSecret), nil
+		return historyv1.NewS3xAdapter(cfg.PersistorEndpoint, cfg.PersistorKey, cfg.PersistorSecret, cfg.S3IfNoneMatch), nil
 	}
 	pers := persistors.NewS3Persistor(persistors.S3Settings{
 		Key:       cfg.PersistorKey,

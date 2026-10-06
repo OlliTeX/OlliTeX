@@ -66,6 +66,7 @@ type Config struct {
 	PersistorPathStyle bool   // AWS_S3_PATH_STYLE === 'true'
 	ChunkBucket        string // OVERLEAF_HISTORY_CHUNKS_BUCKET || 'chunks'
 	ZipBucket          string // OVERLEAF_HISTORY_ZIPS_BUCKET || 'zips'
+	S3IfNoneMatch      bool   // OVERLEAF_HISTORY_S3_IF_NONE_MATCH (default on)
 
 	// Security (api/middleware/security.js: security.basicHttpAuth)
 	SecurityUser     string // SECURITY_BASIC_AUTH_USER     || (OT_SECURITY_BASIC_HTTP_AUTH_USER default 'staging')
@@ -140,6 +141,10 @@ func FromEnv() Config {
 	}
 	c.ChunkBucket = penv("OVERLEAF_HISTORY_CHUNKS_BUCKET")
 	c.ZipBucket = penv("OVERLEAF_HISTORY_ZIPS_BUCKET")
+	// Node parity: If-None-Match on conditional puts (real AWS/minio accept
+	// it). The SeaweedFS S3 emulation 500s on it — owner 2026-10-07 live
+	// evidence — so this stack opts out (see toolkit .env).
+	c.S3IfNoneMatch = penv("OVERLEAF_HISTORY_S3_IF_NONE_MATCH") != "false"
 
 	u := penv("SECURITY_BASIC_AUTH_USER")
 	if u == "" {
