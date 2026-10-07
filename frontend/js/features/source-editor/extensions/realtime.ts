@@ -9,20 +9,16 @@
 //     seed) is mirrored into the CM6 document through the container's sink
 //     (a `userEvent:'input.remote'` dispatch, out of the undo stack).
 //
-// `EditorFacade`, `trackChangesAnnotation` and `ChangeDescription` are
-// kept as compatibility exports for OT-era modules that still import them
-// (they are inert under the Yjs engine — D25 disables the OT review
-// surfaces).
+// `trackChangesAnnotation` and `ChangeDescription` are kept as
+// compatibility exports for OT-era modules that still import them (they
+// are inert under the Yjs engine — D25 disables the OT review surfaces).
 
 import {
   Annotation,
-  type ChangeSpec,
   type Extension,
   Transaction,
 } from '@codemirror/state'
 import { EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view'
-import { EventEmitter } from 'events'
-import type RangesTracker from '@overleaf/ranges-tracker'
 import { debugConsole } from '@/utils/debugging'
 import getMeta from '@/utils/meta'
 import { DocumentContainer } from '@/features/ide-react/editor/document-container'
@@ -165,54 +161,8 @@ export const trackedChangesCapture = (
     }
   })
 
-// ------------------------------------------------------------------------
-// Compatibility surface (OT-era imports still reference these; all inert
-// under the Yjs engine — D25).
-// ------------------------------------------------------------------------
-
-export class EditorFacade extends EventEmitter {
-  constructor(public view: EditorView) {
-    super()
-  }
-
-  getValue(): string {
-    return this.view.state.doc.toString()
-  }
-
-  cmChange(changes: ChangeSpec, _origin?: string): void {
-    this.view.dispatch({ changes })
-  }
-
-  cmInsert(position: number, text: string): void {
-    this.cmChange({ from: position, insert: text })
-  }
-
-  cmDelete(position: number, text: string): void {
-    this.cmChange({ from: position, to: position + text.length })
-  }
-
-  attachShareJs(_shareDoc: unknown, _maxDocLength?: number): void {
-    // Inert under the Yjs engine (D25).
-  }
-
-  detachShareJs(): void {
-    // Inert under the Yjs engine (D25).
-  }
-
-  handleUpdateFromCM(
-    _transactions: readonly Transaction[],
-    _ranges?: RangesTracker
-  ): void {
-    // Inert: the D24 local bridge (syncExtension) handles CM6→Y.Text.
-  }
-
-  setTrackChangesUserId(userId: string | null): void {
-    if (userId != null) {
-      debugConsole.log(
-        '[cm6] tracked changes requested (Yjs engine — DISABLED, D25)'
-      )
-    }
-  }
-}
+// (The former EditorFacade OT-compat surface was removed in the S2 sweep
+// 2026-10-06 — no importer remained after the Yjs flip; the D24 bridge
+// above is the live local-direction path.)
 
 export const trackChangesAnnotation = Annotation.define()

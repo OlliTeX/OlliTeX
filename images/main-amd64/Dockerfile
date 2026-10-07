@@ -112,21 +112,11 @@ ENV NODE_OPTIONS="--require /overleaf/.pnp.cjs --import /overleaf/.pnp.register.
 
 # Copy runit service startup scripts to its location
 # --------------------------------------------------
+# S3 sweep (2026-10-06): the three `web-go-*` A/B shadow service dirs were
+# removed from the tree (P7 hard cutover is final; nothing routes to their
+# :4010/:4011 shadows), together with the flip confs they consumed
+# (images/main-amd64/nginx/flips/) and the `web-go-flip` nginx injector.
 ADD images/main-amd64/runit /etc/service
-
-# P7 cutover (2026-09-24): after the Go web drop-in, `web-overleaf` and
-# `web-api-overleaf` are the CANONICAL web services (they exec
-# /usr/local/bin/go-services/web). The three `web-go-*` entries are A/B *shadow*
-# experiments left over from the flip work — they must NOT be enabled by
-# default (web-go-overleaf/web-go-flip run non-executable ./run → runit
-# "access denied" crash-loop + log spam; web-go-api-overleaf is a redundant
-# shadow instance). Their definitions are preserved under /etc/service.disabled
-# for MANUAL re-enable (flips: images/main-amd64/nginx/flips/*) if a future A/B is
-# needed.
-RUN mkdir -p /etc/service.disabled \
- && for s in web-go-overleaf web-go-flip web-go-api-overleaf; do \
-      [ -d /etc/service/$s ] && mv /etc/service/$s /etc/service.disabled/; \
-    done
 
 # Copy runit global settings to its location
 # ------------------------------------------
@@ -176,12 +166,10 @@ RUN chmod 755 /usr/local/bin/go-services/*
 # ---------------
 ADD images/main-amd64/nginx/nginx.conf.template /etc/nginx/templates/nginx.conf.template
 ADD images/main-amd64/nginx/overleaf.conf.template /etc/nginx/templates/overleaf.conf.template
-ADD images/main-amd64/nginx/clsi-nginx.conf /etc/nginx/sites-enabled/clsi-nginx.conf
-# Ollitex Go web flips (WEB_GO_PLAN.md): exact-path location blocks that
-# the web-go-flip runit service injects into the overleaf vhost ONLY when
-# FLIP_GO_WEB_P0=1 (default off → inert).
-ADD images/main-amd64/nginx/flips /usr/local/share/overleaf-flips
-RUN chmod 644 /usr/local/share/overleaf-flips/web-p0.conf
+# S3 sweep (2026-10-06): the legacy clsi-nginx vhost (old Node-CLSI file
+# serving on :8080) is retired — the Go web on :4000 serves the
+# compile-output paths (overleaf.conf.template: "web dispatch (was
+# clsi-nginx :8080)"); nothing proxies to :8080 anymore.
 # B (owner queue 2026-09-30, def #1 hardening): this image runs the nginx
 # workers as www-data (user directive), but the base image ships
 # /var/lib/nginx owned nginx:nginx 700 → www-data cannot create the
