@@ -436,10 +436,11 @@ test: test-go ## Run repo tests (Go services; node front-end uses 'unit'/'hub')
 .PHONY: go-build
 go-build: ## Build all Go service binaries into ./bin
 	@mkdir -p bin
-	$(GO) build -o bin/linked-url-proxy ./cmd/linked-url-proxy
-	$(GO) build -o bin/webdavinterface ./cmd/webdavinterface
-	$(GO) build -o bin/dropboxinterface ./cmd/dropboxinterface
-	$(GO) build -o bin/githubinterface ./cmd/githubinterface
+	# (AJ wave 2026-10-08) the standalone linked-url-proxy / webdavinterface /
+	# dropboxinterface / githubinterface cmds were absorbed into the in-process
+	# web feature plane (TPDS merge — go/services/web/features/{webdav,ghsync,
+	# federation} consume the go/services/* clients directly); their cmd entry
+	# points no longer exist.
 	$(GO) build -o bin/datamanipulator ./cmd/datamanipulator
 	$(GO) build -o bin/filestore ./cmd/filestore
 	$(GO) build -o bin/notifications ./cmd/notifications
@@ -450,7 +451,7 @@ go-build: ## Build all Go service binaries into ./bin
 	$(GO) build -o bin/configdb ./cmd/configdb  ## operator CLI for the SQLite config DB (P7-post)
 	$(GO) build -o bin/cronmail ./cmd/cronmail  ## scheduled notification-email dispatch (replaces the Node process_notifications cron)
 	$(GO) build -o bin/collab ./cmd/collab  ## Yjs/Ygo collaboration service (ARC-9, D19)
-	$(GO) build -o bin/realtime ./cmd/realtime  ## socket.io 0.9 event-bus service (D28a: replaces the Node real-time service)
+	# (socket.io 0.9 / realtime bus RETIRED — the collab plane owns realtime)
 
 .PHONY: go-test-cronmail
 go-test-cronmail: ## cronmail gate (byte-exact oracle templates + claim/loop semantics)
@@ -458,27 +459,8 @@ go-test-cronmail: ## cronmail gate (byte-exact oracle templates + claim/loop sem
 .PHONY: go-test-collab
 go-test-collab: ## collab gate (ARC-9: auth gate + CRDT convergence + persistence)
 	$(GO) build -buildvcs=false ./go/services/collab/... ./cmd/collab/ && $(GO) vet -buildvcs=false ./go/services/collab/... ./cmd/collab/ && test -z "$$(gofmt -l go/services/collab cmd/collab)" && $(GO) test -count=1 -race -buildvcs=false ./go/services/collab/...
-.PHONY: go-test-realtime
-go-test-realtime: ## real-time bus gate (D28a: wire pins + join flow + presence + drain + ws e2e)
-	$(GO) build -buildvcs=false ./go/services/realtime/... ./cmd/realtime/ && $(GO) vet -buildvcs=false ./go/services/realtime/... ./cmd/realtime/ && test -z "$$(gofmt -l go/services/realtime cmd/realtime)" && $(GO) test -count=1 -race -buildvcs=false ./go/services/realtime/...
-.PHONY: go-run-linked-url-proxy
-go-run-linked-url-proxy: ## Run the linked-url-proxy Go service (dev)
-	$(GO) run ./cmd/linked-url-proxy
-
-.PHONY: go-run-webdavinterface
-go-run-webdavinterface: ## Run the webdavinterface Go service (dev)
-	$(GO) run ./cmd/webdavinterface
-
-.PHONY: go-run-dropboxinterface
-go-run-dropboxinterface: ## Run the dropboxinterface Go service (dev)
-	$(GO) run ./cmd/dropboxinterface
-
-.PHONY: go-run-githubinterface
-go-run-githubinterface: ## Run the githubinterface Go service (dev)
-	$(GO) run ./cmd/githubinterface
-
 .PHONY: go-run-datamanipulator
-go-run-datamanipulator: ## Run the datamanipulator Go service (dev)
+go-run-datamanipulator: ## Run the datamanipulator CLI (dev)
 	$(GO) run ./cmd/datamanipulator
 
 .PHONY: go-run-filestore

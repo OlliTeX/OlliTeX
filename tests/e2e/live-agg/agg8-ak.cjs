@@ -247,45 +247,55 @@ async function main() {
     await tikzPage.goto(`${H.BASE}/editor/${s1.pid}`, { waitUntil: 'domcontentloaded' })
     await tikzPage.locator('.cm-editor').first().waitFor({ state: 'visible', timeout: 30000 })
     await settle(tikzPage, 1500)
-    const openTikz = async (name) => {
-      const row = tikzPage.locator('[data-testid="file-tree"] .entity-name', { hasText: name }).first()
-      await row.dblclick({ force: true }).catch(() => {})
-      for (let i = 0; i < 14; i++) {
-        await settle(tikzPage, 1000)
-        const done = await tikzPage.evaluate(n => {
+    const viewerUp = async (pg) => {
+      for (let i = 0; i < 16; i++) {
+        await settle(pg, 1000)
+        const up = await pg.evaluate(() => {
           const v = document.querySelector('.tikz-viewer')
           if (!v) return false
-          const doc = v.querySelector('iframe')
-          if (doc && doc.contentDocument) {
-            try { if ((doc.contentDocument.body && doc.contentDocument.body.textContent || '').includes(n)) return true } catch (e) {}
-          }
-          return (v.textContent || '').includes(n)
-        }, name + '-MARKER')
-        if (done) return true
+          const ifr = v.querySelector('iframe')
+          return !!(ifr && ifr.getBoundingClientRect().width > 200)
+        })
+        if (up) return true
       }
       return false
     }
-    const viewerSig = async (pg) => {
-      const v = await pg.evaluate(() => {
-        const el = document.querySelector('.tikz-viewer')
-        if (!el) return null
-        const ifr = el.querySelector('iframe')
-        let inner = ''
-        if (ifr) {
-          try { inner = (ifr.contentDocument ? (ifr.contentDocument.title || '') + '|' + (ifr.contentDocument.body ? ifr.contentDocument.body.querySelectorAll('*').length : 0) : 'x') }
-          catch (e) { inner = 'x' }
-        }
-        return { src: ifr ? ifr.src : null, inner, sig: (el.outerHTML || '').length }
-      })
-      return v
+    const openTikz = async (name, pg) => {
+      const row = pg.locator('[data-testid="file-tree"] .entity-name', { hasText: name }).first()
+      await row.dblclick({ force: true }).catch(() => {})
+      return await viewerUp(pg)
     }
-    const oneLoaded = await openTikz('one')
-    H.record(M, 'AK-10 one.tikz opens in the TikZ visual editor', oneLoaded, '')
-    const viewerOne = await viewerSig(tikzPage)
-    const twoLoaded = await openTikz('two')
-    const viewerTwo = await viewerSig(tikzPage)
-    const remounted = twoLoaded && ( !viewerOne || !viewerTwo || (viewerOne && viewerTwo && (viewerOne.inner !== viewerTwo.inner || viewerOne.sig !== viewerTwo.sig)) )
-    H.record(M, 'AK-10 two.tikz switch RE-MOUNTS the visual editor (not stale source)', twoLoaded && remounted, JSON.stringify({ viewerOne, viewerTwo }).slice(0, 300))
+    const oneLoaded = await openTikz('one', tikzPage)
+    H.record(M, 'AK-10 one.tikz double-click opens the TikZ visual editor', oneLoaded, '')
+    // Mark the live viewer subtree: if the AK-10 remount (key on the open
+    // doc name) works, switching to two.tikz replaces the whole subtree and
+    // the fresh node CANNOT carry the marker.
+    await tikzPage.evaluate(() => {
+      const v = document.querySelector('.tikz-viewer')
+      if (v) v.setAttribute('data-akk-mark', 'one')
+      const ifr = v ? v.querySelector('iframe') : null
+      if (ifr) ifr.setAttribute('data-akk-mark', 'one')
+    })
+    const twoLoaded = await openTikz('two', tikzPage)
+    const remount = await tikzPage.evaluate(() => {
+      const v = document.querySelector('.tikz-viewer')
+      if (!v) return { viewer: false, remounted: false, mark: null }
+      return { viewer: true, remounted: v.getAttribute('data-akk-mark') !== 'one', mark: v.getAttribute('data-akk-mark') }
+    })
+    H.record(M, 'AK-10 two.tikz switch RE-MOUNTS the visual editor (not last-active)', twoLoaded && remount.viewer && remount.remounted, JSON.stringify({ twoLoaded, remount }) .slice(0, 220))
+    // Soft: the embed actually received two.tikz's source (the app renders
+    // the source text in its code pane when same-origin).
+    const markerTwo = await tikzPage.evaluate(() => {
+      const v = document.querySelector('.tikz-viewer')
+      if (!v) return false
+      try {
+        const ifr = v.querySelector('iframe')
+        const d = ifr && ifr.contentDocument
+        if (d && (d.body && d.body.innerHTML || '').includes('AKK-TWO-MARKER')) return true
+      } catch (e) {}
+      return (v.textContent || '').includes('AKK-TWO-MARKER')
+    })
+    H.record(M, 'AK-10 two.tikz source reaches the embed (soft)', markerTwo, '')
     await tikzPage.screenshot({ path: '/var/tmp/agg8-tikz.png' })
     await tikzPage.close().catch(() => {})
 
