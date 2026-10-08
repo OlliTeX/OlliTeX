@@ -97,10 +97,13 @@ async function main() {
       const done = await page.evaluate(w => {
         const s = document.querySelector('.editor-toggle-switch')
         if (!s) return 'no-switch'
+        // radio inputs are SIBLINGS of their labels (label[for]=input.id) —
+        // resolve the input via the label's for-attribute.
         const labels = Array.from(s.querySelectorAll('label'))
-        const l = labels.find(x => new RegExp(w, 'i').test(x.textContent || '')) || labels.find(x => /code|visual/i.test(x.textContent || ''))
+        const l = labels.find(x => new RegExp(w, 'i').test(x.textContent || ''))
+          || labels.find(x => /code|visual/i.test(x.textContent || ''))
         if (!l) return 'no-label'
-        const input = l.querySelector('input')
+        const input = l.htmlFor ? s.querySelector('#' + CSS.escape(l.htmlFor)) : l.querySelector('input')
         if (!input) return 'no-input'
         input.click()
         return 'cl:' + input.value
@@ -127,7 +130,7 @@ async function main() {
       if (s) {
         const labels = Array.from(s.querySelectorAll('label'))
         const l = labels.find(x => /code/i.test(x.textContent || ''))
-        const input = l && l.querySelector('input')
+        const input = (l && l.htmlFor) ? s.querySelector('#' + CSS.escape(l.htmlFor)) : (l && l.querySelector('input'))
         if (input) input.click()
       }
       return null

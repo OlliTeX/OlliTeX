@@ -158,31 +158,33 @@ export default function TikzViewer () {
       if (!bootedRef.current) return
       const doc = cmView.state.doc
       const shown = docRef.current
-      // Cheap rejection first (no content materialization): length or head
-      // tail differ -> must compare. Head/tail compare catches most real
-      // switches at O(1) cost.
-      if (
-        doc.length === shown.length &&
-        doc.toString(0, 64) === shown.slice(0, 64) &&
-        doc.toString(Math.max(0, doc.length - 64)) === shown.slice(-64)
-      ) {
-        return // identical for all practical purposes
-      }
+      // NOTE: a length+head/tail "cheap identical" shortcut is NOT safe —
+      // two sources can be equal in length, first-64 and last-64 and still
+      // differ in the middle (AKK-ONE-MARKER vs AKK-TWO-MARKER defeated it;
+      // the re-push never happened and the canvas kept the previous file).
+      // So: full string compare only, gated by CM state-identity below.
       const src = doc.toString()
       if (src !== shown) {
         docRef.current = src
         post({ action: 'load', source: src, autosave: 1, fileName: openDocNameRef.current ?? '' })
       }
     }
-    // CM6 has no public state subscription on an existing view, so poll on
-    // requestAnimationFrame: each tick is O(1) (length compare) until the
-    // doc content actually diverges from the canvas's last source; the
-    // equality guard makes re-pushes impossible (no loop).
+    // CM6 has no public subscription on an existing view, so poll on
+    // requestAnimationFrame — but only the STATE IDENTITY (O(1)); the full
+    // document comparison runs exactly once per real CM update (file switch,
+    // edit, or the canvas's own write-back), never per frame. The equality
+    // guard in onDocChange makes re-pushes impossible (no loop): the
+    // write-back dispatch changes state once, compares equal, and stops.
+    let lastState: unknown = null
     let raf = 0
     let cancelled = false
     const tick = () => {
       if (cancelled) return
-      onDocChange()
+      const st = cmView.state
+      if (lastState !== st) {
+        lastState = st
+        onDocChange()
+      }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
