@@ -287,16 +287,22 @@ async function main() {
     H.record(M, 'AK-10 two.tikz switch RE-MOUNTS the visual editor (not last-active)', twoLoaded && remount.viewer && remount.remounted, JSON.stringify({ twoLoaded, remount }) .slice(0, 220))
     // Soft: the embed actually received two.tikz's source (the app renders
     // the source text in its code pane when same-origin).
-    const markerTwo = await tikzPage.evaluate(() => {
-      const v = document.querySelector('.tikz-viewer')
-      if (!v) return false
-      try {
-        const ifr = v.querySelector('iframe')
-        const d = ifr && ifr.contentDocument
-        if (d && (d.body && d.body.innerHTML || '').includes('AKK-TWO-MARKER')) return true
+    // Bounded poll: the embed's code pane hydrates asynchronously after the
+    // remount — a single sample races it (run-all flake 2026-10-08).
+    let markerTwo = false
+    for (let i = 0; i < 10 && !markerTwo; i++) {
+      await settle(tikzPage, 700)
+      markerTwo = await tikzPage.evaluate(() => {
+        const v = document.querySelector('.tikz-viewer')
+        if (!v) return false
+        try {
+          const ifr = v.querySelector('iframe')
+          const d = ifr && ifr.contentDocument
+          if (d && (d.body && d.body.innerHTML || '').includes('AKK-TWO-MARKER')) return true
       } catch (e) {}
       return (v.textContent || '').includes('AKK-TWO-MARKER')
-    })
+      })
+    }
     H.record(M, 'AK-10 two.tikz source reaches the embed (soft)', markerTwo, '')
     await tikzPage.screenshot({ path: '/var/tmp/agg8-tikz.png' })
     await tikzPage.close().catch(() => {})
