@@ -60,68 +60,84 @@ async function main() {
     const nowThere = (await page.locator('.entity-name', { hasText: 'diagram.svg' }).count()) > 0
     H.record(M, 'AD-3a diagram.svg fixture present in project', nowThere)
     const svgFile = page.locator('[data-testid="file-tree"] .entity-name', { hasText: 'diagram.svg' }).first()
-    // The SVG surface is the two-stage toast-svg editor (owner AD 2026-10-07):
-    // dblclick opens the FILE VIEW (preview + header), whose header carries
-    // the "Edit SVG" button (fileViewButtons hook, next to Download). The old
-    // svgedit-iframe surface is retired.
-    for (let i = 0; i < 3; i++) {
-      await svgFile.dblclick({ force: true }).catch(() => {})
-      await page.waitForTimeout(4000)
-      if ((await page.locator('button:has-text("Edit SVG")').count()) > 0) break
-      await svgFile.click({ force: true }).catch(() => {})
-      await page.waitForTimeout(2500)
+    // SHIPPED .svg surface (build #34, verified 2026-10-08): `svg` is a text
+    // extension → the file opens as a DOCUMENT in the visual diagram canvas
+    // editor (modules/diagram claims *.svg, default-visual) with a Code|Visual
+    // switch to the raw SVG source. (The two-stage toast-svg modal is the
+    // raster-image surface — AD-1/AD-2; the old svgedit-iframe is retired.)
+    await svgFile.dblclick({ force: true }).catch(() => {})
+    await page.waitForTimeout(2000)
+    const svg404 = bad404.filter(u => /svgedit/i.test(u))
+    H.record(M, 'AD-3 svg opens WITHOUT svgedit-era 404s', svg404.length === 0, JSON.stringify(svg404).slice(0, 200))
+    // AD-3 SHIPPED .svg SURFACE (verified 2026-10-08, build #34):
+    // `svg` IS a text extension, so a .svg opens as a DOCUMENT. Its editor
+    // surface is the VISUAL diagram canvas (modules/diagram claims *.svg,
+    // default-visual per house convention) with a Code|Visual switch to the
+    // raw SVG source — the two-stage toast-svg modal is the raster-image
+    // surface (AD-1/AD-2). Pin what actually ships.
+    // AD-3b: the double-click lands on the canvas visual editor (no crash).
+    let canvas = null
+    for (let i = 0; i < 12; i++) {
+      await page.waitForTimeout(1000)
+      canvas = await page.evaluate(() => {
+        const cs = Array.from(document.querySelectorAll('canvas'))
+        const big = cs.filter(c => c.getBoundingClientRect().width > 200)
+        const hit = big[0]
+        if (!hit) return null
+        const r = hit.getBoundingClientRect()
+        return { w: Math.round(r.width), h: Math.round(r.height) }
+      })
+      if (canvas) break
     }
-    const svg404 = bad404.filter(u => /svgedit|svg/.test(u))
-    H.record(M, 'AD-3 svg file view opens WITHOUT 404s', svg404.length === 0, JSON.stringify(svg404).slice(0, 200))
-    // Stage 1: the file view renders an <img> preview AND the Edit SVG button.
-    const stage1 = await page.evaluate(() => {
-      const preview = document.querySelector('img[src*="diagram.svg"], img[src*=".svg"], svg, object[data*="svg"], embed[src*="svg"]')
-      const btn = Array.from(document.querySelectorAll('button')).find(b => /edit\s*svg/i.test(b.textContent || ''))
-      return { preview: !!preview, editSvgButton: !!btn }
-    })
-    H.record(M, 'AD-3b svg file view: preview + "Edit SVG" header button', stage1.preview && stage1.editSvgButton, JSON.stringify(stage1))
-    // Stage 2: the full-size editor modal (source textarea + live preview + Save).
-    await page.locator('button:has-text("Edit SVG")').first().click()
-    await page.waitForTimeout(3500)
-    const svgApp = await page.evaluate(() => {
-      const modal = document.querySelector('.toast-svg-editor-modal, [class*="toast-svg"]')
-      if (!modal) return { modal: false }
-      const r = modal.getBoundingClientRect()
-      const ta = modal.querySelector('textarea')
-      const img = modal.querySelector('img')
-      const buttons = Array.from(modal.querySelectorAll('button')).map(b => (b.textContent || '').trim()).filter(Boolean)
-      return { modal: true, w: Math.round(r.width), h: Math.round(r.height), hasTextarea: !!ta, hasPreviewImg: !!img, hasSave: buttons.some(b => /save/i.test(b)), hasClose: buttons.some(b => /close/i.test(b)), taLen: ta ? ta.value.length : 0 }
-    })
-    H.record(M, 'AD-4 svg stage-2 editor modal rendered (source+preview+Save)', svgApp.modal && svgApp.hasTextarea && svgApp.hasPreviewImg && svgApp.hasSave, JSON.stringify(svgApp).slice(0, 220))
-    // Live-preview sanity: append a marker comment to the source — the
-    // preview <img> src must change (re-renders from the edited source).
-    let livePreviewOk = false
-    if (svgApp.modal && svgApp.hasTextarea) {
-      const before = await page.evaluate(() => {
-        const modal = document.querySelector('.toast-svg-editor-modal, [class*="toast-svg"]')
-        const img = modal ? modal.querySelector('img') : null
-        return img ? img.src : null
-      })
-      await page.evaluate(() => {
-        const modal = document.querySelector('.toast-svg-editor-modal, [class*="toast-svg"]')
-        const ta = modal ? modal.querySelector('textarea') : null
-        if (ta) {
-          const next = ta.value.includes('</svg>')
-            ? ta.value.replace('</svg>', '<line x1="0" y1="0" x2="50" y2="50" stroke="red" stroke-width="4"/>\n</svg>')
-            : ta.value + ' <!-- agg-live -->'
-          ta.value = next
-          ta.dispatchEvent(new Event('input', { bubbles: true }))
-        }
-      })
-      await page.waitForTimeout(3000)
-      const after = await page.evaluate(() => {
-        const modal = document.querySelector('.toast-svg-editor-modal, [class*="toast-svg"]')
-        const img = modal ? modal.querySelector('img') : null
-        return img ? img.src : null
-      })
-      livePreviewOk = !!(before && after && before !== after)
-      H.record(M, 'AD-4b svg live preview re-renders on source edit', livePreviewOk, `before=${(before || '').slice(0, 80)} after=${(after || '').slice(0, 80)}`)
+    const crash = await page.evaluate(() => /Sorry, something went wrong/.test(document.body.innerText || ''))
+    H.record(M, 'AD-3b .svg double-click opens the visual canvas editor (no crash)', !!canvas && !crash, JSON.stringify({ canvas, crash }))
+    // AD-4: the Code|Visual switch flips to the raw SVG SOURCE (editable)
+    // and back to the canvas — the two halves of the SVG editor.
+    const toggle = async (which) => {
+      const done = await page.evaluate(w => {
+        const s = document.querySelector('.editor-toggle-switch')
+        if (!s) return 'no-switch'
+        const labels = Array.from(s.querySelectorAll('label'))
+        const l = labels.find(x => new RegExp(w, 'i').test(x.textContent || '')) || labels.find(x => /code|visual/i.test(x.textContent || ''))
+        if (!l) return 'no-label'
+        const input = l.querySelector('input')
+        if (!input) return 'no-input'
+        input.click()
+        return 'cl:' + input.value
+      }, which)
+      await page.waitForTimeout(3500)
+      return done
     }
+    const toCode = await toggle('code')
+    const codeState = await page.evaluate(() => {
+      const cm = document.querySelector('.cm-editor')
+      if (!cm) return { codeVisible: false, hasSVGSource: false }
+      const txt = cm.textContent || ''
+      return { codeVisible: getComputedStyle(cm).display !== 'none', hasSVGSource: /<svg[\s>]/i.test(txt) }
+    })
+    const toVis = await toggle('visual')
+    const visBack = await page.evaluate(() => {
+      const cs = Array.from(document.querySelectorAll('canvas')).filter(c => c.getBoundingClientRect().width > 200)
+      return cs.length > 0
+    })
+    H.record(M, 'AD-4 .svg editor switch: code shows SVG source, visual restores canvas', toCode.startsWith('cl:') && codeState.codeVisible && codeState.hasSVGSource && visBack, JSON.stringify({ toCode, codeState, visBack }))
+    // AD-4b: the code view carries the fixture content (source fidelity).
+    const fid = await page.evaluate(() => {
+      const s = document.querySelector('.editor-toggle-switch')
+      if (s) {
+        const labels = Array.from(s.querySelectorAll('label'))
+        const l = labels.find(x => /code/i.test(x.textContent || ''))
+        const input = l && l.querySelector('input')
+        if (input) input.click()
+      }
+      return null
+    })
+    await page.waitForTimeout(2500)
+    const srcHasMarker = await page.evaluate(() => {
+      const cm = document.querySelector('.cm-editor')
+      return !!(cm && /AGG/.test(cm.textContent || ''))
+    })
+    H.record(M, 'AD-4b .svg code view preserves the fixture content', srcHasMarker, 'fixture marker present: ' + srcHasMarker)
     // Clean close (discard the probe edit — no save, owner fixture untouched).
     await page.keyboard.press('Escape')
     await page.waitForTimeout(1500)
