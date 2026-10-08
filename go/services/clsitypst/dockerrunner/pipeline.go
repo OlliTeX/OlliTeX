@@ -366,8 +366,12 @@ func (d *DockerRunner) drainStream(rc *runCtx, stream io.ReadCloser, containerID
 			dm.Write(buf[:n])
 		}
 		if rerr != nil {
-			clsl.Error(map[string]any{"err": rerr, "containerId": containerID},
-				"error reading from container stream")
+			if !errors.Is(rerr, io.EOF) {
+				clsl.Error(map[string]any{"err": rerr, "containerId": containerID},
+					"error reading from container stream")
+			}
+			// io.EOF is the normal stream close (the daemon ends the attach
+			// stream when the container stops) — not an error.
 			break
 		}
 	}
