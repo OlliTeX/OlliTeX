@@ -60,13 +60,17 @@ export SANDBOXED_COMPILES=true
 # Honor explicit overrides first (TYPSF_*_DIR, classic names), then the
 # mounted tree, keeping legacy behaviour for flat deployments where
 # /var/lib/overleaf IS the bind target.
-_TYPSF_COMPILES="${TYPSF_COMPILES_DIR:-${TYPSF_COMPILES:-}}"
+# TYPSF_* (no _DIR) in the toolkit env are the HOST-side intent
+# (=/data_1/ols/*) — they are the daemon bind dirs, already carried by
+# SANDBOXED_COMPILES_HOST_DIR_*. The service view must be a CONTAINER-visible
+# path, so only the explicit *_DIR overrides (container view) are honored here.
+_TYPSF_COMPILES="${TYPSF_COMPILES_DIR:-}"
 [ -z "$_TYPSF_COMPILES" ] && [ -d /var/lib/overleaf/data/compiles ] && _TYPSF_COMPILES=/var/lib/overleaf/data/compiles
 [ -z "$_TYPSF_COMPILES" ] && _TYPSF_COMPILES=/var/lib/overleaf/typst/compiles
-_TYPSF_OUTPUT="${TYPSF_OUTPUT_DIR:-${TYPSF_OUTPUT:-}}"
+_TYPSF_OUTPUT="${TYPSF_OUTPUT_DIR:-}"
 [ -z "$_TYPSF_OUTPUT" ] && [ -d /var/lib/overleaf/data/output ] && _TYPSF_OUTPUT=/var/lib/overleaf/data/output
 [ -z "$_TYPSF_OUTPUT" ] && _TYPSF_OUTPUT=/var/lib/overleaf/typst/output
-_TYPSF_CACHE="${TYPSF_CACHE_DIR:-${TYPSF_CACHE:-}}"
+_TYPSF_CACHE="${TYPSF_CACHE_DIR:-}"
 [ -z "$_TYPSF_CACHE" ] && [ -d /var/lib/overleaf/data/cache ] && _TYPSF_CACHE=/var/lib/overleaf/data/cache
 [ -z "$_TYPSF_CACHE" ] && _TYPSF_CACHE=/var/lib/overleaf/typst/cache
 _TYPSF_UPLOAD="${TYPSF_UPLOAD_DIR:-/var/lib/overleaf/tmp/typst-uploads}"
