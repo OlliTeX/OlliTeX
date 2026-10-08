@@ -192,21 +192,36 @@ async function main() {
     )
     await p3.close()
 
-    // ---------- AH-8: hub rail links ----------
+    // ---------- AH-8 (superseded by AJ-7): the /hub nav "My settings" +
+    // "Site settings" surfaces are RETIRED now that the dedicated pages
+    // exist — pin the retirement: both labels are gone from the /hub nav,
+    // and both dedicated pages remain reachable. ----------
     const p4 = await ctx.newPage()
-    await p4.goto(H.BASE + '/hub', { waitUntil: 'domcontentloaded' })
-    await p4.waitForTimeout(2500)
-    const nav = await p4.evaluate(() => {
-      const links = Array.from(document.querySelectorAll('[data-hub-settings-link]')).map((a) => ({
-        id: a.getAttribute('data-hub-settings-link'),
-        href: a.getAttribute('href'),
-      }))
-      return links
+    await p4.goto(H.BASE + '/hub#/home', { waitUntil: 'domcontentloaded' })
+    await p4.waitForTimeout(3000)
+    const hubNav = await p4.evaluate(() => {
+      const items = Array.from(document.querySelectorAll('nav button, nav a, aside button, [class*="rail"] button, [class*="rail"] a'))
+        .map((b) => (b.getAttribute('aria-label') || b.textContent || '').trim()
+          .replace(/\s+/g, ' '))
+        .filter(Boolean)
+      const isSetting = (t) => /^(my|site)\s+settings/i.test(t) && t.length <= 16
+      return {
+        items: items.slice(0, 24),
+        hasMySettings: items.some(isSetting) && items.some((t) => /^my\s+settings/i.test(t)),
+        hasSiteSettings: items.some((t) => /^site\s+settings/i.test(t))
+      }
     })
-    const need = { 'sec.personal': '/user-settings', 'sec.admin': '/admin-settings' }
-    const okNav = Object.entries(need).every(([id, href]) => nav.some((l) => l.id === id && l.href === href))
-    const workspaceGone = !nav.some((l) => l.id === 'sec.workspace')
-    H.record(M, 'AH-8 hub rail links point at the dedicated pages (no template-settings link)', okNav && workspaceGone, JSON.stringify(nav).slice(0, 240))
+    const status = async (u) => {
+      try { const r = await ctx.request.get(H.BASE + u); return r.status() } catch (e) { return 0 }
+    }
+    const userSettingsOk = await status('/user-settings')
+    const adminSettingsOk = await status('/admin-settings')
+    H.record(
+      M,
+      'AH-8 (AJ-7) /hub My settings + Site settings retired; dedicated pages reachable',
+      !hubNav.hasMySettings && !hubNav.hasSiteSettings && userSettingsOk === 200 && adminSettingsOk === 200,
+      JSON.stringify({ hasMySettings: hubNav.hasMySettings, hasSiteSettings: hubNav.hasSiteSettings, userSettings: userSettingsOk, adminSettings: adminSettingsOk, nav: hubNav.items.slice(0, 10) }).slice(0, 320)
+    )
     await p4.close()
   } finally {
     await browser.close()

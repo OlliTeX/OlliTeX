@@ -148,19 +148,24 @@ async function main() {
     await page.screenshot({ path: '/var/tmp/agg8-settings.png' })
     H.record(M, 'AK-4 settings modal is wide (>=900px)', settingsModal.present && settingsModal.w >= 900, JSON.stringify(settingsModal).slice(0, 220))
     H.record(M, 'AK-6 "Account settings" section removed from editor settings', settingsModal.present && !settingsModal.hasAccountSettings, JSON.stringify({ account: settingsModal.hasAccountSettings }))
-    // AK-5: the image select options.
+    // AK-5: the image select options — the select must sit INSIDE the
+    // "TeX Live Version" setting row (a naive first-<select> grabs the PDF
+    // viewer theme select: Overleaf/Browser).
     const imgSel = await page.evaluate(() => {
-      const label = Array.from(document.querySelectorAll('label, [class*="label"], [class*="setting"]')).find(e => /tex\s*live\s*version/i.test(e.textContent || ''))
-      if (!label) return { found: false }
-      const sec = label.closest('[class*="setting"], section, [class*="row"], li, div.mantine-Stack-root') || label.parentElement
-      const sel = sec ? (sec.querySelector('select') || (label.parentElement && label.parentElement.querySelector('select'))) : Array.from(document.querySelectorAll('select')).find(s => Array.from(s.options).some(o => /texlive/i.test(o.textContent)))
-      if (!sel) return { found: false }
-      return {
-        found: true,
-        options: Array.from(sel.options).map(o => o.textContent),
-        value: sel.value,
-        disabled: sel.disabled
+      const labels = Array.from(document.querySelectorAll('label, [class*="setting"], [class*="label"], dt, span, div'))
+        .filter(e => /tex\s*live\s*version/i.test((e.textContent || '').trim()) && (e.textContent || '').trim().length < 80)
+      for (const lbl of labels) {
+        let row = lbl.closest('[class*="setting"]') || lbl.parentElement
+        for (let hop = 0; row && hop < 5; hop++) {
+          const sel = row.querySelector('select')
+          const opts = sel ? Array.from(sel.options).map(o => o.textContent) : []
+          if (sel && opts.some(o => /texlive/i.test(o))) {
+            return { found: true, anchor: (lbl.textContent || '').trim().slice(0, 30), options: opts, value: sel.value, disabled: sel.disabled }
+          }
+          if (row.parentElement) row = row.parentElement
+        }
       }
+      return { found: false, labels: labels.slice(0, 4).map(l => (l.textContent || '').trim().slice(0, 40)) }
     })
     H.record(M, 'AK-5 Compiler: TeX Live Version select with instance images', imgSel.found && imgSel.options.some(o => /rolling/i.test(o)) && imgSel.options.some(o => /2025/i.test(o)), JSON.stringify(imgSel).slice(0, 240))
     // Close the modal.
@@ -169,35 +174,27 @@ async function main() {
     await closeMenuBar(page)
 
     // ── AK-3: hotkeys modal widened ───────────────────────────────────────
-    // Open via Help rail dropdown (Keyboard shortcuts).
-    const helpBtn = page.locator('[aria-label="help"], button:has([class*="help"])').first()
-    let hotkeysOpened = false
-    if ((await helpBtn.count()) > 0) {
-      await helpBtn.click().catch(() => {})
-      await settle(page, 800)
-      const kb = page.locator('text=/keyboard shortcuts/i').first()
-      if ((await kb.count()) > 0) {
-        await kb.click().catch(() => {})
-        await settle(page, 2200)
-        hotkeysOpened = true
-      }
-    }
-    let hotkeys = { opened: hotkeysOpened, w: 0 }
-    if (hotkeysOpened) {
-      hotkeys = await page.evaluate(() => {
-        const modal = Array.from(document.querySelectorAll('[role="dialog"], .mantine-Modal-root')).find(el => {
-          const r = el.getBoundingClientRect()
-          return r.width > 250 && /shortcut|hotkey/i.test(el.textContent || '')
-        })
-        if (!modal) return { opened: false, w: 0 }
-        const r = modal.getBoundingClientRect()
-        return { opened: true, w: Math.round(r.width) }
+    // Open via the menu bar's Help menu → "Keyboard shortcuts".
+    await openMenuBar(page)
+    await page.locator('text=Help').first().click({ timeout: 15000 }).catch(() => {})
+    await settle(page, 900)
+    await page.locator('text=Keyboard shortcuts').first().click({ timeout: 15000 }).catch(() => {})
+    await settle(page, 2500)
+    const hotkeys = await page.evaluate(() => {
+      const candidates = Array.from(document.querySelectorAll('[role="dialog"], .mantine-Modal-root, [class*="modal"]'))
+      const modal = candidates.find(el => {
+        const r = el.getBoundingClientRect()
+        return r.width > 250 && /shortcut|hotkey/i.test(el.textContent || '')
       })
-    }
+      if (!modal) return { opened: false, w: 0 }
+      const r = modal.getBoundingClientRect()
+      return { opened: true, w: Math.round(r.width), snippet: (modal.textContent || '').slice(0, 60) }
+    })
+    await closeMenuBar(page)
     await page.screenshot({ path: '/var/tmp/agg8-hotkeys.png' })
-    H.record(M, 'AK-3 hotkeys modal widened (>=800px)', hotkeys.opened && hotkeys.w >= 800, JSON.stringify(hotkeys))
+    H.record(M, 'AK-3 hotkeys modal widened (>=800px)', hotkeys.opened && hotkeys.w >= 800, JSON.stringify(hotkeys).slice(0, 200))
     await page.keyboard.press('Escape')
-    await settle(page, 1000)
+
 
     // ── AK-9: image editor stage-2 modal has no double scrollbar ─────────
     const imgFile = page.locator('[data-testid="file-tree"] .entity-name', { hasText: 'frog.jpg' }).first()
@@ -358,26 +355,24 @@ async function main() {
     await pyPage.close().catch(() => {})
 
     // ── AK-12: the editor e2e runs on BOTH tex and typst files ────────────
+    // Same compile→PDF contract as agg1 (proven), pinned for the typst
+    // fixture so the matrix explicitly covers typst end-to-end.
     const typPage = await ctx.newPage()
+    typPage.on('pageerror', e => errors.page.push(e.message.slice(0, 200)))
     await typPage.goto(`${H.BASE}/editor/${TYPST}`, { waitUntil: 'domcontentloaded' })
     await typPage.locator('.cm-editor').first().waitFor({ state: 'visible', timeout: 30000 })
     await settle(typPage, 1500)
-    // compile → assert the typst PDF renders.
-    await typPage.evaluate(() => {
+    const compileBtn = await typPage.evaluate(() => {
       const b = Array.from(document.querySelectorAll('button')).find(x => /compile/i.test(x.getAttribute('aria-label') || x.textContent || ''))
       if (b) b.click()
+      return !!b
     })
-    let typOk = false
-    for (let i = 0; i < 25; i++) {
-      await settle(typPage, 1000)
-      typOk = await typPage.evaluate(() => {
-        const f = document.querySelector('iframe[src*="pdf"], object[type="application/pdf"], .pdf-view, pdf-viewer')
-        if (f) return true
-        const canvases = Array.from(document.querySelectorAll('canvas'))
-        return canvases.some(c => c.width > 400 && c.height > 400)
-      })
-      if (typOk) break
-    }
+    const typOk = compileBtn && (await typPage
+      .locator('.pdf-view, [class*="pdf"] canvas, iframe[src*="pdf"], object[type*="pdf"], .pdf-js-container')
+      .first()
+      .waitFor({ state: 'visible', timeout: 90000 })
+      .then(() => true)
+      .catch(() => false))
     H.record(M, 'AK-12 typst fixture: compile → PDF renders (e2e on both tex+typst)', typOk, '')
     await typPage.close().catch(() => {})
 

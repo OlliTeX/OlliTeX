@@ -92,6 +92,12 @@ function CodeMirrorEditorComponents({
 }: CodeMirrorEditorComponentsProps) {
   useToolbarMenuBarEditorCommands()
   const { features } = useProjectContext()
+  // AK-10 (owner 2026-10-08): the per-document key below needs the OPEN DOC
+  // NAME in THIS component's scope — the outer CodeMirrorEditor's binding is
+  // not visible here (referencing it bare threw ReferenceError the moment a
+  // visual editor claimed a document: .svg, .tikz, .drawio all crashed the
+  // editor pane). Read it from the same context the outer scope uses.
+  const { openDocName } = useEditorOpenDocContext()
   return (
     <ReviewPanelProviders>
       <CodemirrorOutline />
