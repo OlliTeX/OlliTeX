@@ -40,30 +40,32 @@ async function clickText(page, text) {
   await page.locator(`text="${text}"`).first().click({ timeout: 15000 })
 }
 
-async function openMenuBar(page) {
-  const toggle = page.locator('button[aria-label="Menu bar"]').first()
-  await toggle.click()
-  await settle(page, 900)
+// Owner item Y (final) — the menu bar is SIX rail icons (File/Edit/Insert/
+// View/Format/Help) above the file tree; clicking a rail icon opens that
+// menu's own dropdown in the mounted ToolbarMenuBar.
+async function openRailMenu(page, label) {
+  const icon = page.locator('button.ol-v2-rail-menu-entry[aria-label="' + label + '"]').first()
+  await icon.click({ timeout: 15000 })
+  await settle(page, 1000)
   if (!(await page.evaluate(() => document.body.classList.contains('ol-v2-menubar-open')))) {
-    await toggle.click()
+    await icon.click()
     await settle(page, 1200)
   }
   return await page.evaluate(() => document.body.classList.contains('ol-v2-menubar-open'))
 }
 
 async function closeMenuBar(page) {
+  await page.keyboard.press('Escape').catch(() => {})
   await page.evaluate(() => document.body.classList.remove('ol-v2-menubar-open'))
-  await settle(page, 300)
-  const toggle = page.locator('button[aria-label="Menu bar"]').first()
-  if ((await toggle.count()) === 1) await toggle.click().catch(() => {})
   await settle(page, 400)
 }
 
 async function fileMenuItem(page, label) {
-  // File menu (menu bar) → hover File, then click the item.
-  await page.locator('text=File').first().click({ timeout: 15000 }).catch(() => {})
-  await settle(page, 700)
-  await page.locator(`text="${label}"`).first().click({ timeout: 15000 })
+  // rail File icon → the File dropdown opens → click the item.
+  await openRailMenu(page, 'File')
+  await page.locator(`[role="menuitem"], .mantine-Menu-item, .mantine-Dropdown-item`).filter({ hasText: label }).first().click({ timeout: 15000 }).catch(async () => {
+    await page.locator(`text="${label}"`).first().click({ timeout: 15000 })
+  })
   await settle(page, 1500)
 }
 
@@ -107,7 +109,7 @@ async function main() {
 
     // ── AK-8: File → Download group (zip/pdf/docx/md/html) ────────────────
     const dl = await (async () => {
-      await openMenuBar(page)
+      await openRailMenu(page, 'File')
       await fileMenuItem(page, 'Download')
       await settle(page, 1200)
       const out = await page.evaluate(() => {
@@ -125,7 +127,7 @@ async function main() {
     H.record(M, 'AK-8 File→Download: zip/pdf/docx/markdown/html all present', dlOk, JSON.stringify(dl).slice(0, 300))
 
     // ── AK-4 + AK-5 + AK-6: the widened settings modal ───────────────────
-    await openMenuBar(page)
+    await openRailMenu(page, 'File')
     await fileMenuItem(page, 'Settings')
     await settle(page, 2500)
     const settingsModal = await page.evaluate(() => {
@@ -174,11 +176,11 @@ async function main() {
     await closeMenuBar(page)
 
     // ── AK-3: hotkeys modal widened ───────────────────────────────────────
-    // Open via the menu bar's Help menu → "Keyboard shortcuts".
-    await openMenuBar(page)
-    await page.locator('text=Help').first().click({ timeout: 15000 }).catch(() => {})
-    await settle(page, 900)
-    await page.locator('text=Keyboard shortcuts').first().click({ timeout: 15000 }).catch(() => {})
+    // Open via the rail's Help icon → "Keyboard shortcuts".
+    await openRailMenu(page, 'Help')
+    await page.locator('[role="menuitem"], .mantine-Menu-item, .mantine-Dropdown-item').filter({ hasText: 'Keyboard shortcuts' }).first().click({ timeout: 15000 }).catch(async () => {
+      await page.locator('text=Keyboard shortcuts').first().click({ timeout: 15000 })
+    })
     await settle(page, 2500)
     const hotkeys = await page.evaluate(() => {
       const candidates = Array.from(document.querySelectorAll('[role="dialog"], .mantine-Modal-root, [class*="modal"]'))

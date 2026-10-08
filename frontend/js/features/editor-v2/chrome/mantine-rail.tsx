@@ -35,6 +35,75 @@ import { useLayoutContext } from '@/shared/context/layout-context'
 import { shouldIncludeElement } from '@/features/ide-react/util/rail-utils'
 import type { RailElement } from '@/features/ide-react/util/rail-types'
 
+// -- Owner item Y (2026-10-08 final shape): the File/Edit/Insert/View/Format/
+//    Help menu bar as SIX rail icons + tooltips, above the file tree. --
+// Inline SVG glyphs (stroke=currentColor) -- the owner's browser renders raw
+// material-symbols ligature text, so new chrome uses inline SVG.
+const RAIL_MENU_PATHS: Record<string, string> = {
+  // page sheet
+  File: 'M6 2.5h7.2L17.5 6v15.5H6zM13 2.5V6h4.5',
+  // pencil
+  Edit: 'M4 20l1-4L15.5 5.5a2.1 2.1 0 013 3L8 19zM14 7l3 3',
+  // plus tray (insert)
+  Insert: 'M5 5h14v14H5zM12 9v6M9 12h6',
+  // eye (view)
+  View: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zm9.5 3a3 3 0 100-6 3 3 0 000 6z',
+  // paragraph lines (format)
+  Format: 'M4 6h16M4 10h16M4 14h10M4 18h7',
+  // help ring
+  Help: 'M12 21a9 9 0 110-18 9 9 0 010 18zM9.8 9.6a2.4 2.4 0 113.6 2.1c-.8.6-1.4 1.1-1.4 2.2M12 17.2v.2',
+}
+
+function RailMenuGlyph({ label }: { label: string }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d={RAIL_MENU_PATHS[label] || RAIL_MENU_PATHS.File} />
+    </svg>
+  )
+}
+
+function MenubarIcons({
+  t,
+  activeMenu,
+  onOpen,
+}: {
+  t: (key: string, fallback?: string) => string
+  activeMenu: string | null
+  onOpen: (label: string) => void
+}) {
+  const menus = ['File', 'Edit', 'Insert', 'View', 'Format', 'Help']
+  return (
+    <div className="ol-v2-rail-menus" role="menubar" aria-label={t('menu_bar', 'Menu bar')}>
+      {menus.map(label => (
+        <Tooltip key={label} label={label} position="right" withArrow withinPortal>
+          <ActionIcon
+            variant={activeMenu === label ? 'filled' : 'subtle'}
+            aria-label={label}
+            aria-haspopup="menu"
+            aria-expanded={activeMenu === label}
+            className="ol-v2-rail-menu-entry"
+            style={{ width: 40, height: 40 }}
+            onClick={() => onOpen(label)}
+          >
+            <RailMenuGlyph label={label} />
+          </ActionIcon>
+        </Tooltip>
+      ))}
+    </div>
+  )
+}
+
 function V2RailTabButton({
   tab,
   open,
@@ -98,6 +167,40 @@ export function MantineRailNavChrome({
   // editor-v2-tokens.css floats the existing .ide-redesign-toolbar-menu-bar node above the
   // rail while .ol-v2-menubar-open is set.
   const [menuOpen, setMenuOpen] = useState(false)
+  // Owner item Y final shape (2026-10-08): the menu bar is the SIX top menus —
+  // File/Edit/Insert/View/Format/Help — as icons + tooltips above the file
+  // tree. Each icon opens the matching top menu of the already-mounted
+  // ToolbarMenuBar (delegated click on its own trigger — the proven Mantine
+  // dropdown does the rest; no menu-bar import-graph change).
+  const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const closeMenuChrome = () => {
+    setMenuOpen(false)
+    setActiveMenu(null)
+  }
+  const openRailMenu = (label: string) => {
+    const next = !menuOpen || activeMenu !== label
+    if (!next) {
+      // clicking the same icon again just closes everything (the dropdown's
+      // own outside-click handler would do this too; be deterministic here)
+      document.body.classList.remove('ol-v2-menubar-open')
+      closeMenuChrome()
+      return
+    }
+    setActiveMenu(label)
+    setMenuOpen(true)
+    document.body.classList.add('ol-v2-menubar-open')
+    // double rAF: let the floating panel become visible (display:flex) first
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const bar = document.querySelector('.ide-redesign-toolbar-menu-bar')
+        if (!bar) return
+        const btn = Array.from(bar.querySelectorAll('button')).find(
+          b => (b.textContent || '').trim() === label
+        ) as HTMLButtonElement | undefined
+        if (btn) btn.click()
+      })
+    })
+  }
   useEffect(() => {
     const el = document.body
     if (menuOpen) {
@@ -111,11 +214,15 @@ export function MantineRailNavChrome({
     if (!menuOpen) return
     const onClick = (e: MouseEvent) => {
       const tEl = e.target as HTMLElement | null
-      if (tEl && (tEl.closest('.ol-v2-rail-menu-bar-entry') || tEl.closest('.ide-redesign-toolbar-menu-bar'))) return
+      if (tEl && (tEl.closest('.ol-v2-rail-menu-entry') || tEl.closest('.ide-redesign-toolbar-menu-bar'))) return
       setMenuOpen(false)
+      setActiveMenu(null)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false)
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        setActiveMenu(null)
+      }
     }
     document.addEventListener('click', onClick)
     document.addEventListener('keydown', onKey)
@@ -139,26 +246,13 @@ export function MantineRailNavChrome({
       data-ol-v2-rail=""
     >
       <div className="ide-rail-tabs-nav ol-v2-rail-nav">
-        {/* Owner item Y: menu-bar entry (toggles the floating ToolbarMenuBar;
-            styled/positioned in editor-v2-tokens.css) — above the file tree. */}
-        <Tooltip
-          label={t('menu_bar', 'Menu bar')}
-          position="right"
-          withArrow
-          withinPortal
-        >
-          <ActionIcon
-            variant={menuOpen ? 'filled' : 'subtle'}
-            aria-label={t('menu_bar', 'Menu bar')}
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
-            className="ol-v2-rail-menu-bar-entry"
-            style={{ width: 40, height: 40, fontSize: 20 }}
-            onClick={() => setMenuOpen(o => !o)}
-          >
-            <MaterialIcon type="menu" aria-hidden />
-          </ActionIcon>
-        </Tooltip>
+        {/* Owner item Y (final form 2026-10-08): the File/Edit/Insert/View/
+            Format/Help menu bar lives in the rail — six icons + tooltips,
+            ABOVE the file tree. Inline SVG glyphs (the owner's browser shows
+            raw material-symbols ligature text; inline SVG is the standing
+            rule for new chrome). Each icon opens the matching top menu of
+            the mounted ToolbarMenuBar via openRailMenu (delegated click). */}
+        <MenubarIcons t={t} activeMenu={activeMenu} onOpen={openRailMenu} />
         <div className="ide-rail-tabs-wrapper" ref={tabWrapperRef as never}>
           {tabs
             .filter(shouldIncludeElement)
