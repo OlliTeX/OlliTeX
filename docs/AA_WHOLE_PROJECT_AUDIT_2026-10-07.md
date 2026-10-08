@@ -222,6 +222,41 @@ build `ollitex/ollitex:main` 2026-10-08 19:1x, `tests/e2e/live-agg/run-all.cjs`)
 **75/75.** Toolkit TUI battery TK remains 37/37 (unchanged; toolkit image
 untouched by this wave).
 
+## Post-75/75 closeout — Option B on production, parity gate, [Y] rail menus, AG 86/86 (2026-10-08, build #39)
+
+### Option B (024) — true multi-file collaboration, CLOSED on production
+`tests/e2e/live-agg/agg9-ob.cjs` (10 checks OB-1…OB-10) runs against
+production `psintern`: per-(project,doc) Yjs rooms — the root doc's room is
+`{pid}` (D19 contract, history preserved), other docs get their own room
+`{pid}-{docID}` with own seed + write-through; foreign docs 404; both
+directions no-contamination; real second-client CRDT convergence; write-through
+survives a full reload; root-room history keeps its version chain (7 versions at
+close time). **10/10 PASS** (commit `ed0186b2`).
+
+### Parity spec lift — CLOSED (single-stack final)
+- `specs/parity` sweep: **190 passed**, 1 flaky→passed, Node-baseline legs skipped by design (Node shadow retired in single-stack; canonical legs carry the contract).
+- "did not run" cohort all re-run green after the e2e web crash-loop fix (stale container upper-layer glibc web binary over a musl image — clean container removal fixed it; `--force-recreate` had been silently reusing it).
+- **`tests/e2e/parity/check.mjs` gate: GREEN — 13 matrices, 99 features, 99 covered on BOTH sides, 0 gaps** (5 legacy tokens re-anchored to the post-retirement spec titles, commit `4d4850e6`; p69 confirmed committed under `d09a0d74`).
+- Remaining by design: `leg1: Node baseline (flip OFF)` legs have no stack in single-stack; the parity-check gate is the standing coverage guarantee.
+
+### [Y] menu bar into the rail — CLOSED (owner item Y, final shape)
+The six menu triggers (File/Edit/Insert/View/Format/Help) are now inline-SVG
+rail icons above the file tree (`mantine-rail.tsx`, `.ol-v2-rail-menu-entry`);
+each opens its existing Mantine dropdown in the zero-size `ToolbarMenuBar` host
+via a delegated real click under `body.ol-v2-menubar-open` (outside-click/Escape
+close). Deployed in build #39 (`ollitex/ollitex:main-506ff3e7`); live verification:
+agg8-ak **15/15** (File→Download, File→Settings, Help→Keyboard shortcuts all via
+rail icons) + full matrix below.
+
+### AG live matrix — 86/86 on build #39 (psintern, 2026-10-08)
+agg1 10/10 · agg2 12/12 · agg3 8/8 · agg4 8/8 · agg5 10/10 · agg6 5/5 ·
+agg7 8/8 · agg8 15/15 · agg9 10/10.
+
+### TK toolkit TUI battery — 37/37
+tk1 18/18, tk2 14/14, tk3 5/5 (H4 two-concurrent-sessions passed on re-run;
+first failure was CPU contention flake while AG+build+parity ran concurrently).
+
+
 ### Root causes fixed this wave (e2e-caught, not cosmetic)
 
 1. **OpenDocName scope crash (AK-10 family + all .tikz/.svg/.drawio opens
