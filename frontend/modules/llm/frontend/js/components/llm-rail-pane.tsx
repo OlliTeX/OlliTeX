@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
+import MaterialIcon from '@/shared/components/material-icon'
 import LLMChatPane from './llm-chat-pane'
 import LLMCompliancePane from './llm-compliance-pane'
 import { RailElement } from '@/features/ide-react/util/rail-types'
 import getMeta from '@/utils/meta'
+import { readSelectedModel } from '../utils/llm-selected-model'
 import { useLLMFeatures } from '../hooks/use-llm-features'
+import { useLLMModelSelection } from '../hooks/use-llm-model-selection'
 import '../../stylesheets/llm-ui.scss'
 import { watchEditorTheme } from '../utils/llm-editor-theme'
 
@@ -32,6 +35,13 @@ function LLMRailPane() {
     const features = useLLMFeatures()
     const chatVisible = features.chatEnabled
     const reviewVisible = features.reviewEnabled
+
+    // overleaf-lab (owner request Q, 2026-10-07): even when the admin enabled
+    // chat/review, a deployment with NO selectable model is a dead end for the
+    // assistant — show a clear, actionable notice (consistent with the
+    // select-model modal H) instead of an empty chat pane.
+    const { options, loaded: modelsLoaded } = useLLMModelSelection()
+    const noModel = modelsLoaded && options.length === 0
 
     // overleaf-lab: never leave the active tab pointing at a hidden pane. Once the
     // flags are loaded, fall back to whichever tab is still visible.
@@ -81,6 +91,23 @@ function LLMRailPane() {
                     {t(
                         'llm_all_features_disabled',
                         'AI features are currently disabled by the administrator.'
+                    )}
+                </div>
+            ) : features.loaded && noModel ? (
+                // overleaf-lab (owner request Q): features on, but no model to
+                // serve them — do not render a chat pane that would only error.
+                <div
+                    style={{
+                        padding: '12px',
+                        color: 'var(--content-secondary, inherit)',
+                        opacity: 0.7,
+                        fontSize: 13,
+                    }}
+                >
+                    <MaterialIcon type="notification_important" className="me-2" />
+                    {t(
+                        'llm_no_models',
+                        'No LLM model has been configured on this server. Ask an administrator to set one up, then pick it under File → Select LLM Model.'
                     )}
                 </div>
             ) : (
@@ -166,7 +193,18 @@ const llmRailEntry: RailElement = {
     icon: 'smart_toy',
     title: 'AI Assistant',
     component: <LLMRailPane />,
-    hide: () => !(getMeta('ol-ExposedSettings') as any)?.llmEnabled,
+    hide: () => {
+        const s = (getMeta('ol-ExposedSettings') as any) ?? {}
+        // Admin gate (unchanged): the feature must be enabled for the instance.
+        if (!s.llmEnabled) return true
+        // AB (owner 2026-10-07): the tab is only visible when an LLM model is
+        // selected (per-project selection with the global key as fallback —
+        // llm-selected-model.ts). "Admin ON but no model chosen" keeps the
+        // rail clean; picking a model in the modal re-renders the rail
+        // (overleaf-llm-model-changed → rail.tsx tick) and the tab appears.
+        const pid = (getMeta('ol-project_id') as string) || undefined
+        return !readSelectedModel(pid)
+    },
 }
 
 export default llmRailEntry

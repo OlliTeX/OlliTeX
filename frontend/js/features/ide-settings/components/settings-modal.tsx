@@ -39,7 +39,10 @@ const SettingsModal = () => {
       // Compiler (and other) tabs no longer need their own scrollbars,
       // and the label|control rows get room instead of compressed labels
       // (owner #18).
-      size="xl"
+      // AK-4 (owner 2026-10-08): "Settings modal is unnecessary narrow" —
+      // widened further (xl 1000 → 1200) so the Compiler pane (now with
+      // the sandbox compile-image select, AK-5) has comfortable room.
+      size={1200}
       backdropClassName={
         activeTab === 'appearance'
           ? 'ide-settings-modal-transparent-backdrop'

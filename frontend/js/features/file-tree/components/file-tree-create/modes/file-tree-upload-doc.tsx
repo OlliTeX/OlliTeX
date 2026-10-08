@@ -28,7 +28,7 @@ import { useActiveOverallTheme } from '@/shared/hooks/use-active-overall-theme'
 export default function FileTreeUploadDoc() {
   const { parentFolderId, cancel, droppedFiles, setDroppedFiles } =
     useFileTreeActionable()
-  const { fileTreeData } = useFileTreeData()
+  const { fileTreeData, dispatchCreateDoc, dispatchCreateFile } = useFileTreeData()
   const { projectId } = useProjectContext()
 
   const [error, setError] = useState<string>()
@@ -190,6 +190,36 @@ export default function FileTreeUploadDoc() {
                 ? file?.name.split('.').pop()
                 : '',
           })
+          // D40-live (owner 2026-10-07 item W: "diagram.svg not in the file
+          // tree / tabs until re-entry"): the old flow dropped the new file
+          // into the tree via the reciveNewDoc / reciveNewFile SOCKET relay
+          // (Node realtime :3026) — dead on the Go stack. Apply the creation
+          // locally from the upload response instead: the handler answers
+          // {success:true, entity_id, n:'doc'|'file', hash?}.
+          const body = response?.body ?? {}
+          if (body.success && body.entity_id) {
+            const rel = file?.meta?.relativePath
+            if (!rel) {
+              const targetFolder = file?.meta?.targetFolderId ?? parentFolderId
+              if (body.n === 'doc') {
+                dispatchCreateDoc(targetFolder, {
+                  name: file?.name,
+                  _id: body.entity_id,
+                })
+              } else {
+                dispatchCreateFile(targetFolder, {
+                  name: file?.name,
+                  _id: body.entity_id,
+                  hash: body.hash,
+                  rev: 0,
+                  created: new Date().toISOString(),
+                })
+              }
+            }
+            // (nested folder drops land in server-created subfolders — no
+            // local tree knowledge of the new folder ids; they appear on
+            // the next project load, same as before.)
+          }
           if (response.body.entity_type === 'doc') {
             window.setTimeout(() => {
               refreshProjectMetadata(projectId, response.body.entity_id)

@@ -1,4 +1,4 @@
-import { FC, RefObject, useCallback, useEffect, useMemo } from 'react'
+import { FC, RefObject, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Nav, TabContainer } from 'react-bootstrap'
 import { useLayoutContext } from '@/shared/context/layout-context'
@@ -102,6 +102,19 @@ export const RailLayout = () => {
     )
   )
 
+  // AB (owner 2026-10-07): the LLM rail tab's `hide()` reads a LIVE selection
+  // (llm-selected-model.ts). When the model modal applies a choice it
+  // dispatches `overleaf-llm-model-changed` (use-llm-model-selection.ts);
+  // bump a tick here so railTabs re-evaluates and the tab appears immediately
+  // ("visible only when a model is selected" — without waiting for a reload).
+  const [llmSelectionTick, setLlmSelectionTick] = useState(0)
+  useEffect(() => {
+    const onLlmSelection = () => setLlmSelectionTick(n => n + 1)
+    window.addEventListener('overleaf-llm-model-changed', onLlmSelection)
+    return () =>
+      window.removeEventListener('overleaf-llm-model-changed', onLlmSelection)
+  }, [])
+
   const railTabs: RailElement[] = useMemo(
     () => [
       {
@@ -169,6 +182,7 @@ export const RailLayout = () => {
       features.trackChangesVisible,
       view,
       isRestrictedTokenMember,
+      llmSelectionTick,
     ]
   )
 
@@ -181,17 +195,15 @@ export const RailLayout = () => {
         dropdown: <RailHelpDropdown />,
       },
       ...moduleRailActions,
-      {
-        key: 'settings',
-        icon: 'settings',
-        title: t('settings'),
-        action: () => {
-          sendEvent('rail-click', { tab: 'settings' })
-          setSettingsShown(true)
-        },
-      },
-      // 2026-09-09 (owner R10 #4): account menu below the Settings rail
-      // button (the editor page has no sidebar account dropdown).
+      // 2026-10-07 owner item O: removed the rail "Settings" action button —
+      // "Open Settings" is already in the File menu (the `open-settings`
+      // command provider below is unchanged, so File → Settings → Open
+      // Settings and cmd-palette keep working). The icon-only rail button was
+      // a duplicate entry point.
+      // 2026-09-09 (owner R10 #4): account menu (kept — the editor page is
+      // full-bleed with NO top nav bar, so this rail action is the only
+      // log-out/my-settings access inside the editor; owner's 2026-10-07
+      // removal target assumed a nav-bar home that does not exist here).
       {
         key: 'account',
         icon: 'person',

@@ -115,9 +115,15 @@ Global keys: `F10` menu bar · `F1`/`?` help · `s` start · `t` (or `d`) stop
 shell SIGINT · `ctrl-z` → detach the shell back to the panes · in the shell,
 `exit` returns to the TUI.
 
-The menu bar, the centered prompt boxes and the click targets come from three
-small MIT-licensed Charm-ecosystem libraries (`jejacks0n/bubbletea-menubar`,
-`rmhubbert/bubbletea-overlay`, `lrstanley/bubblezone`) — credited in
+The TUI runtime is the retained-mode stack `rivo/tview` + `gdamore/tcell`
+(ported 2026-10-07, owner item AI: tview repaints only changed cells over the
+SSH link, which is the fix for the previous full-frame redraw slowness).
+Over SSH the TUI runs on a screen bound to the session's io (the server side
+is not a `/dev/tty` — see the `SessionScreen` helper in `tui.go`); locally
+(`toolkit local` / `toolkit tui`) it runs on the terminal's own screen.
+The classic console look (menu strip · two panes · status + keystrip footer ·
+centered confirm/prompt boxes · the j/k + number key map) and the
+charmbracelet helper libraries it originally used are credited in
 `CREDITS.md` per the project's credits policy.
 
 ## 5. First boot (the happy path)

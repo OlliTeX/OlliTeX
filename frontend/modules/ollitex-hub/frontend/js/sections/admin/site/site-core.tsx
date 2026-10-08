@@ -9,7 +9,6 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-  Badge,
   Button,
   Card,
   Group,
@@ -118,7 +117,9 @@ export function SectionShell({
       <Group justify="space-between" wrap="wrap" mb="sm" gap="sm">
         <Group gap="sm">
           <Text size="lg" fw={700}>{title}</Text>
-          {badge ? <Badge size="sm" variant="light" radius="sm">{badge}</Badge> : null}
+          {/* AJ-5#2 (2026-10-08): badge CHIPS RETIRED — the owner: the
+              badge duplicates the label next to it. The prop stays accepted
+              (harmless) for the existing call sites, but is never rendered. */}
         </Group>
         {onEnabled ? (
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>

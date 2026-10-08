@@ -86,8 +86,30 @@ func statusLine(text string) string { return text }
 // "" yields 0 after Number("") semantics via the validation-tools fallback:
 // the primary schema coerces, and the fallback schema does the same; an
 // unparseable value fails the request before it reaches here).
+// coerceInt mirrors the Node oracle's parseInt() semantics for the synctex
+// query fields: JS parseInt("263.20") === 263 (leading integer run, optional
+// sign, stop at first non-digit; NaN -> 0). 2026-10-07 AF (owner: "clicking
+// in the pdf does not jump to the correct position"): the pdf.js client sends
+// h/v with 2 decimal places (h.toFixed(2)); strconv.Atoi("263.20") FAILS and
+// silently returned 0, so every backwards-synctex call resolved as
+// `synctex edit <page>:0:0:<pdf>` — landing on a wrong-but-consistent source
+// line (the doc's top-left entry) instead of the clicked character.
 func coerceInt(raw string) int {
-	n, _ := strconv.Atoi(raw)
+	i := 0
+	if i < len(raw) && (raw[i] == '-' || raw[i] == '+') {
+		i++
+	}
+	digits := i
+	for i < len(raw) && raw[i] >= '0' && raw[i] <= '9' {
+		i++
+	}
+	if i == digits {
+		return 0 // NaN -> 0, like JS parseInt
+	}
+	n, err := strconv.Atoi(raw[:i])
+	if err != nil {
+		return 0 // overflow -> JS would give a float; clamp to 0 (h/v are < 1e5)
+	}
 	return n
 }
 

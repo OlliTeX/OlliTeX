@@ -189,6 +189,11 @@ RUN chmod 644 /etc/logrotate.d/overleaf
 # Configure cron tasks
 # ----------------------
 ADD images/main-amd64/cron /overleaf/cron
+# AJ-3 (owner 2026-10-08): the scripts must be EXECUTABLE — the crontab
+# entries run them directly and the kernel's shebang line never runs if the
+# +x bit is missing ("permission denied" — the reason the instance-stats
+# collector (Overview & activity) had never collected a single data point).
+RUN chmod 755 /overleaf/cron/*.sh
 ADD images/main-amd64/config/crontab-history /etc/cron.d/crontab-history
 RUN chmod 600 /etc/cron.d/crontab-history
 ADD images/main-amd64/config/crontab-deletion /etc/cron.d/crontab-deletion

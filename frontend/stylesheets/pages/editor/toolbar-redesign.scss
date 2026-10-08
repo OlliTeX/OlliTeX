@@ -49,9 +49,11 @@
   }
 
   .ide-redesign-toolbar-home-button {
-    width: $home-button-size;
+    width: 40px; /* == .ide-rail width (40px sidebar strip) — same width as
+                   the sidebar container so the logo cannot sit off to the
+                   right of the rail column (owner 2026-10-07) */
     height: $home-button-size;
-    margin: math.div($toolbar-height - $home-button-size, 2) 0;
+    margin: math.div($toolbar-height - $home-button-size, 2) 0 0 0;
   }
 
   .ide-redesign-toolbar-button-subdued {
@@ -88,24 +90,46 @@
     }
   }
 
+
+/* AK-1 (owner 2026-10-08): the rail home entry is now a Menu-bar-styled
+   ActionIcon (ol-v2-rail-home-entry) — the logo keeps its 24px contract. */
+.ol-v2-rail-home-entry {
+  .ol-v2-rail-home-logo {
+    display: block;
+    width: 24px;
+    height: 24px;
+    background-image: var(--redesign-toolbar-logo-url);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+  }
+}
+
   .ide-redesign-toolbar-home-link {
     display: flex;
     height: 100%;
     width: 100%;
-    justify-content: center;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     text-align: center;
     border-radius: 100%;
     color: var(--redesign-toolbar-home-link-color);
+    padding: 0 8px; /* logo (24px) lands exactly inside the 40px rail width:
+                       x=8..32 → center x=20 = the 40px rail strip centre */
+    gap: 4px;
 
     .toolbar-ol-home-button {
-      display: none;
+      /* Owner 2026-10-07: the house icon is ALWAYS visible next to the logo
+         — no hover-only reveal, and no logo→icon swap on hover. */
+      display: block;
       font-size: $home-icon-font-size;
+      line-height: 1;
     }
 
     .toolbar-ol-logo {
-      margin: 0 auto;
+      margin: 0;
       display: block;
+      flex: 0 0 auto;
       width: $ol-icon-height;
       height: $ol-icon-height;
       background-image: var(--redesign-toolbar-logo-url);
@@ -116,14 +140,6 @@
 
     &:hover {
       background-color: var(--redesign-toolbar-home-button-hover-background);
-
-      .toolbar-ol-home-button {
-        display: block;
-      }
-
-      .toolbar-ol-logo {
-        display: none;
-      }
     }
   }
 

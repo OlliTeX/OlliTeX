@@ -148,3 +148,121 @@ html[data-mantine-color-scheme='dark'] .ol-editor-mantine {
   justify-content: center;
   line-height: 0;
 }
+
+/* AE (owner 2026-10-07): the rail's home/logo entry — centered like every
+   other rail icon. The toolbar's own styles are scoped to
+   .ide-redesign-toolbar (toolbar-redesign.scss), so inside the rail the
+   markup renders as unstyled inline flow ("noticeable off to the left"). */
+.ol-editor-mantine .ol-v2-rail-home {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+}
+.ol-editor-mantine .ol-v2-rail-home .ide-redesign-toolbar-home-button {
+  width: 40px;
+  height: 56px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ol-editor-mantine .ol-v2-rail-home .ide-redesign-toolbar-home-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 100%;
+  text-decoration: none;
+  color: inherit;
+  gap: 2px;
+}
+.ol-editor-mantine .ol-v2-rail-home .toolbar-ol-logo {
+  display: block;
+  margin: 0 auto;
+  width: 24px;
+  height: 24px;
+  /* Owner 2026-10-07: the logo painted nothing in the rail — these background
+     properties come from the `.ide-redesign-toolbar`-scoped rules in
+     toolbar-redesign.scss, which do not apply here (the rail is outside
+     .ide-redesign-toolbar). The --redesign-toolbar-logo-url variable itself
+     resolves globally (dark/light variants); this is the missing paint. */
+  background-image: var(--redesign-toolbar-logo-url);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.ol-editor-mantine .ol-v2-rail-home .toolbar-ol-home-button {
+  /* Owner 2026-10-07: house icon ALWAYS visible (logo above, icon below) —
+     no hover-only reveal in the rail column either. */
+  display: block;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* AG agg1 negative test (live, 2026-10-07): the HOME logo was ALSO invisible
+   in the non-mantine v1 toolbar chrome — the paint in toolbar-redesign.scss
+   is scoped under `.ide-redesign-toolbar ...` which that chrome does not
+   carry. Unscoped rule: paint the logo in EVERY home-link context (v1
+   toolbar, v2 rail, mantine and legacy). Size/sizing stay with the chrome. */
+.ide-redesign-toolbar-home-link .toolbar-ol-logo {
+  display: block;
+  background-image: var(--redesign-toolbar-logo-url);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+/* AK-1 (owner 2026-10-08): the rail home entry is a Menu-bar-styled
+   ActionIcon (ol-v2-rail-home-entry). The logo span is PAINTED HERE, in the
+   editor-v2 token stylesheet — the toolbar-redesign.scss copy was nested
+   inside `.ide-redesign-toolbar { }` (compiled selector
+   `.ide-redesign-toolbar .ol-v2-rail-home-entry ...`), which never matches
+   the rail (nav.ol-v2-rail is outside that wrapper), so the logo rendered
+   as an invisible 0x0 span. Unscoped on purpose: the rail is not inside
+   .ide-redesign-toolbar. */
+.ol-v2-rail-home-entry .ol-v2-rail-home-logo {
+  display: block;
+  width: 24px;
+  height: 24px;
+  background-image: var(--redesign-toolbar-logo-url);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+/* ── Owner item Y + AE (2026-10-07): menu bar lives in the rail now ──
+   AE: the toolbar STRIP is fully removed (mantine-toolbar.tsx renders a
+   zero-size invisible host for the ToolbarMenuBar only — proven import
+   graph, the rail toggles the body class below). While open, the SAME
+   node floats at the top-left, docked next to the rail's menu toggle.
+   The menus' own dropdowns are portaled by Mantine and stack above this
+   panel (higher z-index). */
+.ol-editor-mantine .ol-v2-toolbar .ide-redesign-toolbar-menu-bar {
+  display: none;
+}
+body.ol-v2-menubar-open .ol-v2-toolbar .ide-redesign-toolbar-menu-bar {
+  display: flex;
+  position: fixed;
+  top: 12px;
+  left: 64px;
+  right: auto;
+  z-index: 30;
+  margin: 0;
+  height: auto;
+  padding: 6px 10px;
+  align-items: center;
+  background: var(--bg-primary-themed, #ffffff);
+  border: 1px solid var(--border-divider-themed, #e0e0e0);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+  gap: var(--spacing-05, 4px);
+  max-width: min(92vw, 760px);
+  pointer-events: auto;
+}
+body.ol-v2-menubar-open .ol-v2-toolbar .ide-redesign-toolbar-menu-bar > * {
+  height: auto;
+}
+

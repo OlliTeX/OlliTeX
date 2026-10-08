@@ -260,7 +260,10 @@ func oidcJIT(ctx context.Context, db *mongo.Database, p *OIDCProvider, profile s
 	all := append(bson.D{
 		{Key: "firstName", Value: firstName},
 		{Key: "lastName", Value: lastName},
-		{Key: "isAdmin", Value: isAdmin},
+		// isAdmin is deliberately ABSENT from the login-time update for
+		// existing users: the admin-attribute grant applies at JIT
+		// creation only; writing it here clobbered a locally administered
+		// users.isAdmin (owner regression 2026-10-07).
 		{Key: "lastSSOLogin", Value: time.Now().UTC()},
 	}, roleDetails...)
 	return loginEpochBump(ctx, users, u, true, all)
@@ -329,12 +332,16 @@ func buildEpochUpdate(withDetails bool, details bson.D) bson.D {
 }
 
 func detailsSAML(p *SAMLProvider, firstName, lastName string, isAdmin bool) bson.D {
+	// LOGIN-TIME details for an EXISTING user: profile sync only.
+	// isAdmin is NEVER written here — the IdP's admin attribute is a JIT
+	// grant applied at user CREATION only; a locally administered admin
+	// flag (users.isAdmin set by instance operators) must survive SSO
+	// logins. (Live regression 2026-10-07: the owner's isAdmin:true was
+	// clobbered to false by an OIDC/SAML login carrying no admin attr.)
+	_ = isAdmin
 	d := bson.D{
 		{Key: "firstName", Value: firstName},
 		{Key: "lastName", Value: lastName},
-	}
-	if p.AttAdmin != "" && p.ValAdmin != "" {
-		d = append(d, bson.E{Key: "isAdmin", Value: isAdmin})
 	}
 	if len(d) == 0 {
 		return bson.D{}

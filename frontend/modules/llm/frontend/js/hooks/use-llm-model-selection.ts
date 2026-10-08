@@ -21,21 +21,68 @@ export interface LLMModelOption {
     rowName?: string
 }
 
-async function fetchServerSelection(): Promise<string> {
-    try {
-        const data: any = await getJSON('/user/llm/selected-model')
-        const value = typeof data?.selected === 'string' ? data.selected : ''
-        return value
-    }
-    catch {
-        return ''
-    }
+// overleaf-lab (owner request H/J/Q/Z gating): the model list + user selection
+// are shared across EVERY AI surface (toolbar ask-AI, rail, Insert→AI Generate,
+// the select-model modal). Cache + dedupe at module level so mounting the
+// selection hook in several components performs ONE request pair instead of N.
+let optionsInflight: Promise<LLMModelOption[]> | null = null
+let optionsCache: LLMModelOption[] | null = null
+let serverSelInflight: Promise<string> | null = null
+let serverSelCache: string | null = null
+
+function fetchOptions(projectId: string): Promise<LLMModelOption[]> {
+    if (optionsInflight) return optionsInflight
+    optionsInflight = getJSON<{
+        models?: Array<{ id: string; name?: string; isDefault?: boolean }>
+        userRows?: Array<{ id: string; name: string; models: Array<{ id: string; name?: string }> }>
+    }>(`/project/${projectId}/llm/models`).then((data: any) => {
+        const opts: LLMModelOption[] = []
+        for (const m of data.models || []) {
+            opts.push({ value: m.id, label: m.name || m.id })
+        }
+        for (const row of data.userRows || []) {
+            for (const m of row.models || []) {
+                // overleaf-lab: the backend already returns fully namespaced
+                // ids (u:<rowId>:<model>) — use as-is.
+                opts.push({
+                    value: m.id,
+                    label: m.name || m.id,
+                    rowName: row.name,
+                })
+            }
+        }
+        optionsCache = opts
+        return opts
+    })
+    return optionsInflight
+}
+
+function fetchServerSelection(): Promise<string> {
+    if (serverSelInflight) return serverSelInflight
+    serverSelInflight = getJSON('/user/llm/selected-model')
+        .then((data: any) => {
+            const value = typeof data?.selected === 'string' ? data.selected : ''
+            serverSelCache = value
+            return value
+        })
+        .catch(() => {
+            serverSelCache = ''
+            return ''
+        })
+    return serverSelInflight
+}
+
+// overleaf-lab: when a surface applies a new selection, refresh the cached
+// server value so siblings reading it don't act on a stale profile value.
+export function invalidateLLMSelectionCache() {
+    serverSelInflight = null
+    serverSelCache = null
 }
 
 export function useLLMModelSelection() {
     const projectId = (getMeta('ol-project_id') as string | undefined) || undefined
-    const [options, setOptions] = useState<LLMModelOption[]>([])
-    const [loaded, setLoaded] = useState(false)
+    const [options, setOptions] = useState<LLMModelOption[]>(optionsCache || [])
+    const [loaded, setLoaded] = useState(!!optionsCache)
     const [selected, setSelected] = useState<string>(() => readSelectedModel(projectId))
 
     useEffect(() => {
@@ -48,26 +95,9 @@ export function useLLMModelSelection() {
             try {
                 // Shared with the chat hook's model list: site models first,
                 // then BYO rows namespaced u:<rowId>:<model>.
-                const data: any = await getJSON<{
-                    models?: Array<{ id: string; name?: string; isDefault?: boolean }>
-                    userRows?: Array<{ id: string; name: string; models: Array<{ id: string; name?: string }> }>
-                }>(`/project/${projectId}/llm/models`)
                 if (cancelled) return
-                const opts: LLMModelOption[] = []
-                for (const m of data.models || []) {
-                    opts.push({ value: m.id, label: m.name || m.id })
-                }
-                for (const row of data.userRows || []) {
-                    for (const m of row.models || []) {
-                        // overleaf-lab: the backend already returns fully
-                        // namespaced ids (u:<rowId>:<model>) — use as-is.
-                        opts.push({
-                            value: m.id,
-                            label: m.name || m.id,
-                            rowName: row.name,
-                        })
-                    }
-                }
+                const opts = await fetchOptions(projectId)
+                if (cancelled) return
                 setOptions(opts)
 
                 // overleaf-lab (owner request): user-scoped selection — the
@@ -130,6 +160,8 @@ export function useLLMModelSelection() {
                 .catch(() => {
                     /* profile write failed — local selection still works */
                 })
+            // overleaf-lab: keep the shared cache in sync with the new choice.
+            invalidateLLMSelectionCache()
         },
         [projectId],
     )

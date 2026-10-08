@@ -192,10 +192,14 @@
   }
 }
 
-// Mantine frame (/editor): the Mantine Modal-body is the single scroller.
+// AK-9 (owner 2026-10-08): 0 scrollbars — the Edit Image modal must not
+// scroll inside itself. The body used to cap at 80vh (the "single
+// scroller") which produced the double scrollbar the owner retired;
+// with max-height removed the modal sizes to its content (the page is
+// the only scroll surface, per the owner's rule).
 .ol-mant-modal .mantine-Modal-body {
-  overflow-y: auto;
-  max-height: 80vh;
+  overflow-y: visible;
+  max-height: none;
 }
 
 // Legacy bootstrap frame (/project): cap the dialog to the viewport and

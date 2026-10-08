@@ -105,35 +105,64 @@ const isRemoteMirror = (update: ViewUpdate) =>
 
 export const trackedChangesCapture = (
   currentDoc: DocumentContainer
-): Extension =>
-  EditorView.updateListener.of(update => {
-    if (!update.docChanged || isRemoteMirror(update)) return
-    if (currentDoc.track_changes_as == null) return
-    const pid = getMeta('ol-project_id')
-    if (!pid) return
-    const spans: LocalChange[] = []
-    update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-      spans.push({ from: fromA, to: toA, insert: inserted.toString() })
-    })
-    for (const spanBody of spanBodies(spans)) {
-    let body = spanBody as Record<string, unknown>
-    const bStart = body.start as number
-    const bEnd = body.end as number
-    if (bEnd > bStart && (body.content as unknown) === undefined) {
-      // d11b: carry the DELETED text (old-space slice from startState)
-      // so the server stores it and the panel renders op.d. The d5
-      // delete body {start,end} stays shape-compatible (the create
-      // surface accepts content on deletes). Capped at 4 KiB (honest
-      // pin for pathological deletions). **Explicit kind**: the create
-      // surface infers kind from content-emptiness, so a delete WITH
-      // content must pin kind: 'delete' or it would record as insert.
-      body = {
-        ...body,
-        kind: 'delete',
-        content: update.startState.sliceDoc(bStart, bEnd).slice(0, 4096),
+): Extension => {
+  // AC (owner 2026-10-07): typing "bbbbbbbbbb" must NOT create ten change
+  // records. Strategy mimics the ORIGINAL overleaf (6.3.0 editor-core,
+  // libraries/overleaf-editor-core/lib/file_data/tracked_change_list.js +
+  // tracked_change.js + tracking_props.js):
+  //   * a tracked change = range + {type, userId, ts};
+  //   * two changes MERGE iff same type (insert|delete) + same user +
+  //     TOUCHING/overlapping ranges (TrackingProps.canMergeWith +
+  //     Range.canMerge) — no time window, no gaps;
+  //   * the list is MERGED ONCE, AT THE END ("merged only once at the end,
+  //     for performance and to avoid intermediate ranges getting
+  //     incorrectly merged"), SORTED BY START before folding;
+  //   * merged ts = MIN(ts) (start of the burst).
+  // Our REST record model is the direct analogue (kind = type, one local
+  // user, touching = contiguous): buffered bodies are sorted by start and
+  // contiguous same-kind runs fold into one record; deletes never merge
+  // with inserts (canMergeWith); disjoint runs stay separate.
+  const FLUSH_DELAY_MS = 400
+  let pending: TrackedChangeBody[] = []
+  let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+  type InsertBody = { content: string; start: number; end: number }
+  const isInsert = (b: TrackedChangeBody): b is InsertBody =>
+    typeof (b as { content?: unknown }).content === 'string' &&
+    (b as { start?: number; end?: number }).start ===
+      (b as { start?: number; end?: number }).end
+
+  const coalesce = (bodies: TrackedChangeBody[]): TrackedChangeBody[] => {
+    // Deletes: separate records, in original order (single-kind record
+    // model; canMergeWith forbids delete+insert merges).
+    const deletes = bodies.filter(b => !isInsert(b)).map(b => ({ ...b }))
+    // Inserts: sort by start (original _mergeRanges), then fold
+    // contiguous runs (Range.touches: end === other.start).
+    const inserts = bodies.filter(isInsert).slice().sort((a, b) => a.start - b.start)
+    const folded: InsertBody[] = []
+    for (const cur of inserts) {
+      const last = folded[folded.length - 1]
+      if (last && cur.start === last.start + last.content.length) {
+        last.content += cur.content
+      } else {
+        folded.push({ start: cur.start, end: cur.end, content: cur.content })
       }
     }
-    void fetch(
+    return [...deletes, ...folded]
+  }
+
+  const flush = () => {
+    if (flushTimer) {
+      clearTimeout(flushTimer)
+      flushTimer = null
+    }
+    const bodies = pending
+    pending = []
+    if (!bodies.length) return
+    const pid = getMeta('ol-project_id')
+    if (!pid) return
+    for (const body of coalesce(bodies)) {
+      void fetch(
         `/project/${pid}/doc/${encodeURIComponent(
           currentDoc.doc_id
         )}/changes`,
@@ -146,20 +175,82 @@ export const trackedChangesCapture = (
           },
           body: JSON.stringify(body),
         }
-      ).then(
-        () => {
-          // D40 live-echo: the server now holds a fresh tracked-change
-          // record — refresh the ranges hydration (throttled in the ranges
-          // provider) so the new tracked edit renders without a reload.
-          currentDoc.trigger('ranges:hydrate')
-        }
       ).catch(e =>
         debugConsole.warn(
           '[d40] tracked-change capture failed: ' + String(e)
         )
       )
     }
+    // D40 live-echo: the server now holds fresh tracked-change records —
+    // refresh the ranges hydration (throttled in the ranges provider) so
+    // the new tracked edit renders without a reload.
+    void currentDoc.trigger('ranges:hydrate')
+  }
+
+  const beforeUnload = () => {
+    // never lose the typing burst if the page unloads mid-flush
+    const bodies = pending
+    pending = []
+    if (!bodies.length) return
+    const pid = getMeta('ol-project_id')
+    if (!pid) return
+    for (const body of coalesce(bodies)) {
+      fetch(
+        `/project/${pid}/doc/${encodeURIComponent(
+          currentDoc.doc_id
+        )}/changes`,
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': getMeta('ol-csrfToken') ?? '',
+          },
+          body: JSON.stringify(body),
+        }
+      )
+    }
+  }
+  window.addEventListener('beforeunload', beforeUnload)
+
+  return EditorView.updateListener.of(update => {
+    if (!update.docChanged || isRemoteMirror(update)) return
+    if (currentDoc.track_changes_as == null) return
+    const pid = getMeta('ol-project_id')
+    if (!pid) return
+    const spans: LocalChange[] = []
+    update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+      spans.push({ from: fromA, to: toA, insert: inserted.toString() })
+    })
+    let bodies: TrackedChangeBody[] = []
+    for (const spanBody of spanBodies(spans)) {
+      const body = spanBody as Record<string, unknown>
+      const bStart = body.start as number
+      const bEnd = body.end as number
+      if (bEnd > bStart && (body.content as unknown) === undefined) {
+        // d11b: carry the DELETED text (old-space slice from startState)
+        // so the server stores it and the panel renders op.d. The d5
+        // delete body {start,end} stays shape-compatible (the create
+        // surface accepts content on deletes). Capped at 4 KiB (honest
+        // pin for pathological deletions). **Explicit kind**: the create
+        // surface infers kind from content-emptiness, so a delete WITH
+        // content must pin kind: 'delete' or it would record as insert.
+        bodies.push({
+          ...body,
+          kind: 'delete',
+          content: update.startState.sliceDoc(bStart, bEnd).slice(0, 4096),
+        })
+      } else {
+        bodies.push(spanBody)
+      }
+    }
+    if (!bodies.length) return
+    pending.push(...bodies)
+    if (!flushTimer) {
+      flushTimer = setTimeout(flush, FLUSH_DELAY_MS)
+    }
   })
+}
 
 // (The former EditorFacade OT-compat surface was removed in the S2 sweep
 // 2026-10-06 — no importer remained after the Yjs flip; the D24 bridge

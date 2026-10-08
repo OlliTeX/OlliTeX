@@ -159,6 +159,19 @@ func entIsDocObj(v any) bool {
 }
 
 func entParseTree(v any) []entFolder {
+	// 2026-10-07 (AG-3a e2e: upload 422 folder_not_found even with the root
+	// folder id): the project doc's `rootFolder` is a SINGLE folder object
+	// (bson.D / map), not an array — entArr() refused it and the tree came
+	// out empty, so entFindLoc could never find the root. Accept a lone
+	// folder object as a one-element tree (arrays keep working as before).
+	if entIsDocObj(v) {
+		arr := any([]any{v})
+		return entParseTreeImpl(arr)
+	}
+	return entParseTreeImpl(v)
+}
+
+func entParseTreeImpl(v any) []entFolder {
 	arr := entArr(v)
 	if arr == nil {
 		return nil

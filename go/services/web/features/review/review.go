@@ -72,6 +72,7 @@ var (
 	msgOwnDelPattern = regexp.MustCompile(`^/project/(` + hex24 + `)/thread/(` + idRe + `)/own-messages/(` + idRe + `)$`)
 	changesPat       = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes$`)
 	changesAcceptPat = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes/accept$`)
+	changesRejectPat = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes/reject$`)
 	changesListPat   = regexp.MustCompile(`^/project/(` + hex24 + `)/doc/([A-Za-z0-9._\-/]+)/changes$`)
 	trackChangesPat  = regexp.MustCompile(`^/project/(` + hex24 + `)/track_changes$`)
 	rangesPat        = regexp.MustCompile(`^/project/(` + hex24 + `)/ranges$`)
@@ -162,6 +163,7 @@ func Feature(a *core.App) core.Feature {
 		{Method: http.MethodPost, Pattern: changesPat, Handler: h.changesCreate},
 		{Method: http.MethodGet, Pattern: changesListPat, Handler: h.changesList},
 		{Method: http.MethodPost, Pattern: changesAcceptPat, Handler: h.changesAccept},
+		{Method: http.MethodPost, Pattern: changesRejectPat, Handler: h.changesReject},
 		{Method: http.MethodPost, Pattern: trackChangesPat, Handler: h.trackChanges},
 		{Method: http.MethodGet, Pattern: rangesPat, Handler: h.rangesList},
 		{Method: http.MethodGet, Pattern: changesUsersPat, Handler: h.changesUsers},
@@ -828,10 +830,49 @@ func (h *Handlers) changesCreate(cxt *core.Cxt, res *core.Res) {
 	now := h.nowMS()
 	var out collab.TrackedChange
 	err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		// TC-2 (owner 2026-10-07, "typing VERY slow must still be ONE
+		// change"): the ORIGINAL 6.3.0 merged at STORE time
+		// (TrackedChangeList.add → _mergeRanges: same kind + same user +
+		// TOUCHING ranges → one change, MIN(ts), no time window). Mimic it
+		// here: if the tail of an existing PENDING change by the same
+		// user/kind sits exactly adjacent (ex.Start + len(ex.Content) ==
+		// this.Start), this POST folds INTO it (content concat, the first
+		// record's id + earlier ts kept) instead of creating a second
+		// record.
+		if exAll, lerr := collab.ListChanges(ctx, st, pid); lerr == nil {
+			for _, ex := range exAll {
+				if ex.File != doc || ex.Kind != kind || ex.State != collab.ChangeStatePending {
+					continue
+				}
+				if uidOf(ex.Author) != uid {
+					continue
+				}
+				if ex.Start+len(ex.Content) == body.Start {
+					ch, _, _, merr := collab.MergeChangeContent(ctx, st, pid, ex.ID, body.Content)
+					if merr != nil {
+						return merr
+					}
+					out = ch
+					return nil
+				}
+			}
+		}
+		// NoAnchors: capture records carry creation-time PLAIN coords (the
+		// original static-range model). Anchoring them at REST time raced
+		// the in-flight typed content and the anchors later resolved away
+		// from the real text (owner's wrong-line marks) — so tracked changes
+		// are plain-coord by construction.
 		ch, _, _, err := collab.AddChange(ctx, st, pid, collab.TrackedChange{
-			ID: body.ChangeID, Kind: kind, File: doc,
-			Start: body.Start, End: body.End, Content: body.Content,
-			Author: h.authorOf(cxt, uid), Created: now, State: collab.ChangeStatePending,
+			ID:        body.ChangeID,
+			Kind:      kind,
+			File:      doc,
+			Start:     body.Start,
+			End:       body.End,
+			Content:   body.Content,
+			Author:    h.authorOf(cxt, uid),
+			Created:   now,
+			State:     collab.ChangeStatePending,
+			NoAnchors: true,
 		})
 		if err != nil {
 			return err
@@ -883,6 +924,41 @@ func (h *Handlers) changesAccept(cxt *core.Cxt, res *core.Res) {
 		ProjectID string `json:"project_id"`
 		Accepted  int    `json:"accepted"`
 	}{pid, accepted})
+}
+
+// changesReject — POST /project/:pid/doc/:doc/changes/reject
+// (panel reject flow, S2/Yjs: the editor reverts the text locally and the
+// record state moves pending→rejected here — same contract as accept).
+func (h *Handlers) changesReject(cxt *core.Cxt, res *core.Res) {
+	pid := strings.ToLower(cxt.Params["1"])
+	if _, ok := h.gate(cxt, res, pid, collab.ReadWrite); !ok {
+		return
+	}
+	var body struct {
+		ChangeIDs []string `json:"change_ids"`
+	}
+	if err := decodeBody(cxt.Req.Body, &body); err != nil || len(body.ChangeIDs) == 0 {
+		badBody(res)
+		return
+	}
+	rejected := 0
+	if err := h.run(cxt, func(ctx context.Context, st persistence.VersionedPersistence) error {
+		for _, id := range body.ChangeIDs {
+			if _, applied, _, err := collab.RejectChange(ctx, st, pid, id); err == nil && applied {
+				rejected++
+			}
+		}
+		return nil
+	}); err != nil {
+		internalErr(res, err)
+		return
+	}
+	// pinned listener 'reject-changes' (ranges-context.tsx): (docId, entryIds)
+	h.relay(cxt.Req.Context(), pid, "reject-changes", []any{cxt.Params["2"], body.ChangeIDs})
+	okJSON(res, http.StatusOK, struct {
+		ProjectID string `json:"project_id"`
+		Rejected  int    `json:"rejected"`
+	}{pid, rejected})
 }
 
 // changesList — GET /project/:pid/doc/:doc/changes (d10 — the D40-surface
@@ -1216,13 +1292,13 @@ func (h *Handlers) rangesList(cxt *core.Cxt, res *core.Res) {
 	okJSON(res, http.StatusOK, []rangesE{e})
 }
 
-// d12Meta — entry metadata: user_id (changes/users lookup) + ts (SECONDS —
-// OT parity: the panel's FormatTimeBasedOnYear consumes the OT-era shape)
-// + name for one-line display.
+// d12Meta — entry metadata: user_id (changes/users lookup) + ts (MILLISECONDS
+// — the panel's FormatTimeBasedOnYear feeds the value to moment(), which is
+// ms-only; seconds rendered as epoch 1970) + name for one-line display.
 func (h *Handlers) d12Meta(ctx context.Context, uid string, ms int64) map[string]any {
 	md := map[string]any{"user_id": uid}
 	if ms > 0 {
-		md["ts"] = ms / 1000
+		md["ts"] = ms
 	}
 	if h.UserFor != nil {
 		if raw := h.UserFor(ctx, uid); raw != nil {

@@ -36,6 +36,7 @@
 package editorpages
 
 import (
+	"encoding/json"
 	"context"
 	"fmt"
 	"io"
@@ -278,7 +279,7 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 			"ol-capabilities":       pinned_ol_capabilities,
 			"ol-grammarSettings":    pinned_ol_grammarSettings,
 			"ol-wsRetryHandshake":   pinned_ol_wsRetryHandshake,
-			"ol-imageNames":         pinned_ol_imageNames,
+			"ol-imageNames":         imageNamesJSON(a, ctx),
 			"ol-languages":          pinned_ol_languages,
 			"ol-editorThemes":       pinned_ol_editorThemes,
 			"ol-legacyEditorThemes": pinned_ol_legacyEditorThemes,
@@ -290,6 +291,22 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 		writeEditor(res.W, d, views.EditorPage(d))
 		a.CommitSess(cxt.Sess, res.W)
 	}
+}
+
+// imageNamesJSON — the selectable sandbox compile images (AK-5): the
+// `ol-imageNames` meta comes from the site-settings `sandboxed-compiles`
+// section (instance curates; seeds default to the TeXLive set). Empty
+// section → [] (the frontend then hides the select, as before).
+func imageNamesJSON(a *core.App, ctx context.Context) string {
+	list := sitesettings.CompileImageNames(a, ctx)
+	if list == nil {
+		return "[]"
+	}
+	b, err := json.Marshal(list)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
 }
 
 // serializeTags — Node project.tags: array of {id,name} or strings; the

@@ -174,9 +174,14 @@ func (s *svc) heartbeatBulk(cxt *core.Cxt, res *core.Res) {
 
 func (s *svc) handleHeartbeats(cxt *core.Cxt, res *core.Res, bulk bool) {
 	ctx := cxt.Req.Context()
+	// Candidate F (owner report 2026-10-07): heartbeats are fire-and-forget.
+	// When the instance feature is OFF or the user has not linked an account,
+	// answer a quiet 204 No Content no-op instead of a 404/400 error — the
+	// tracker already swallows failures, but a non-2xx response still surfaces
+	// as console/network noise on every editor keystroke (the owner's "403/
+	// 404" wakatime complaint). 204 = "received, nothing to record".
 	if !s.enabled(ctx) {
-		res.JSON(http.StatusNotFound, []byte(
-			`{"message":"WakaTime integration is disabled on this instance"}`))
+		res.SendStatus(http.StatusNoContent)
 		return
 	}
 	gate := s.gateProject(cxt)
@@ -220,8 +225,10 @@ func (s *svc) handleHeartbeats(cxt *core.Cxt, res *core.Res, bulk bool) {
 		res.SendStatus(http.StatusInternalServerError)
 		return
 	}
+	// Candidate F: not linked = nothing to record → quiet 204 no-op (not a
+	// 400 error the tracker would have to swallow as noise).
 	if !linked {
-		res.JSON(http.StatusBadRequest, []byte(`{"message":"WakaTime not linked"}`))
+		res.SendStatus(http.StatusNoContent)
 		return
 	}
 	// server-side project fill (reference: the client never supplies

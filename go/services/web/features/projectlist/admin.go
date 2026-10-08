@@ -320,29 +320,21 @@ func adminActiveProjects(a *core.App) func(*core.Cxt, *core.Res) {
 		if _, ok := aLoginAdmin(a, cxt, res); !ok {
 			return
 		}
-		base := os.Getenv("REALTIME_URL")
+		// AJ-3 (owner 2026-10-08): the presence plane moved from the (gone)
+		// Node realtime service (/clients) to the Go collab service
+		// (GET /presence — registered at every authorized editor socket,
+		// cleared on last-peer/room-unload, TTL-decayed; presence.go).
+		base := os.Getenv("COLLAB_URL")
 		if base == "" {
-			base = "http://127.0.0.1:3026"
-		}
-		user := os.Getenv("REALTIME_USER")
-		if user == "" {
-			user = os.Getenv("WEB_API_USER")
-		}
-		if user == "" {
-			user = "overleaf"
-		}
-		pass := os.Getenv("REALTIME_PASS")
-		if pass == "" {
-			pass = os.Getenv("WEB_API_PASSWORD")
+			base = "http://127.0.0.1:3450"
 		}
 		ctx, cancel := context.WithTimeout(cxt.Req.Context(), 10*time.Second)
 		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, "GET", strings.TrimSuffix(base, "/")+"/clients", nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", strings.TrimSuffix(base, "/")+"/presence", nil)
 		if err != nil {
 			aPage500(cxt, res)
 			return
 		}
-		req.SetBasicAuth(user, pass)
 		rsp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			aPage500(cxt, res)
@@ -350,38 +342,70 @@ func adminActiveProjects(a *core.App) func(*core.Cxt, *core.Res) {
 		}
 		body, _ := io.ReadAll(io.LimitReader(rsp.Body, 4<<20))
 		rsp.Body.Close()
-		var clients []map[string]any
-		if json.Unmarshal(body, &clients) != nil {
+		type pair struct {
+			Room   string `json:"room"`
+			UserID string `json:"userId"`
+		}
+		var pairs []pair
+		if json.Unmarshal(body, &pairs) != nil {
 			aPage500(cxt, res)
 			return
 		}
-		type slot struct{ clients []map[string]any }
-		order := []string{}
-		ids := map[string]*slot{}
-		for _, cl := range clients {
-			pid := asStr(cl["project_id"])
-			if pid == "" {
-				pid = oidHex(cl["project_id"])
+		// dedupe (uid, project) pairs
+		uniq := map[string]map[string]bool{}
+		var order []string
+		for _, pp := range pairs {
+			if _, has := uniq[pp.Room]; !has {
+				order = append(order, pp.Room)
+				uniq[pp.Room] = map[string]bool{}
 			}
-			if _, has := ids[pid]; !has {
-				order = append(order, pid)
-				ids[pid] = &slot{}
-			}
-			ids[pid].clients = append(ids[pid].clients, cl)
+			uniq[pp.Room][pp.UserID] = true
 		}
 		db, dbErr := a.Mongo.DB(ctx)
+		// user cache (name/email) across projects
+		type uinfo struct{ name, email string }
+		ucache := map[string]uinfo{}
+		gu := func(uid string) uinfo {
+			if u, has := ucache[uid]; has {
+				return u
+			}
+			inf := uinfo{}
+			if dbErr == nil && uid != "" {
+				var du struct {
+					FirstName *string `bson:"first_name"`
+					LastName  *string `bson:"last_name"`
+					Email     *string `bson:"email"`
+				}
+				if uidMatch := regexp.MustCompile(`^[0-9a-f]{24}$`).MatchString(uid); uidMatch {
+					oid, _ := bson.ObjectIDFromHex(uid)
+					if dbErr2 := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&du); dbErr2 == nil {
+						nm := strings.TrimSpace(asStr(du.FirstName) + " " + asStr(du.LastName))
+						if du.Email != nil {
+							inf.email = *du.Email
+						}
+						if du.FirstName != nil || du.LastName != nil {
+							inf.name = nm
+						}
+					}
+				}
+			}
+			if inf.name == "" && inf.email != "" {
+				inf.name = inf.email
+			}
+			ucache[uid] = inf
+			return inf
+		}
 		parts := make([]string, 0, len(order))
 		for _, pid := range order {
 			if !validOID.MatchString(pid) {
-				aPage500(cxt, res)
-				return
+				continue
 			}
 			oid, _ := bson.ObjectIDFromHex(pid)
 			var name *string
+			var proj struct {
+				Name *string `bson:"name"`
+			}
 			if dbErr == nil {
-				var proj struct {
-					Name *string `bson:"name"`
-				}
 				if dbErr = db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&proj); dbErr == nil {
 					name = proj.Name
 				}
@@ -391,37 +415,32 @@ func adminActiveProjects(a *core.App) func(*core.Cxt, *core.Res) {
 				aPage500(cxt, res)
 				return
 			}
-			var au strings.Builder
+			uidsSorted := make([]string, 0, len(uniq[pid]))
+			for u := range uniq[pid] {
+				uidsSorted = append(uidsSorted, u)
+			}
+			sort.Strings(uidsSorted)
+			au := strings.Builder{}
 			au.WriteByte('[')
-			for i, cl := range ids[pid].clients {
+			for i, uid := range uidsSorted {
 				if i > 0 {
 					au.WriteByte(',')
 				}
-				nm := strings.TrimSpace(asStr(cl["first_name"]) + " " + asStr(cl["last_name"]))
-				em := ""
-				if v, okm := cl["email"]; okm && v != nil {
-					em = asStr(v)
-				}
-				if nm == "" {
-					nm = em
-				}
+				inf := gu(uid)
+				nm := inf.name
 				if nm == "" {
 					nm = "Unknown"
 				}
 				au.WriteString(`{"name":` + jstr(nm) + `,"email":`)
-				if v, okm := cl["email"]; okm && v != nil {
-					au.WriteString(jstr(asStr(v)))
+				if inf.email != "" {
+					au.WriteString(jstr(inf.email))
 				} else {
 					au.WriteString(`null`)
 				}
 				au.WriteByte('}')
 			}
 			au.WriteByte(']')
-			nmJSON := `null`
-			if name != nil {
-				nmJSON = jstr(*name)
-			}
-			parts = append(parts, `{"id":`+jstr(pid)+`,"name":`+nmJSON+`,"activeUsers":`+au.String()+`,"connectionCount":`+fmt.Sprint(len(ids[pid].clients))+`}`)
+			parts = append(parts, `{"id":`+jstr(pid)+`,"name":`+jstr(*name)+`,"activeUsers":`+au.String()+`,"connectionCount":`+fmt.Sprint(len(uidsSorted))+`}`)
 		}
 		res.JSON(200, []byte("["+strings.Join(parts, ",")+"]"))
 	}

@@ -98,6 +98,11 @@ type Options struct {
 	// (Info). Operations may set a Debug-level logger to see dropped sync
 	// frames / persistence decisions (D22: structured ops surface).
 	Logger *slog.Logger
+	// PresenceRegistry — AJ-3 "active projects": the in-process
+	// (room, uid) presence plane (presence.go). Nil = disabled (the
+	// admin surface reports an empty list).
+	PresenceRegistry *presenceRegistry
+
 	// Lifecycle observers (ops; nil = ignored): peer transitions and room
 	// unload. D22: room occupancy is the first real-time signal we can
 	// surface for the collab engine.
@@ -116,11 +121,22 @@ type Options struct {
 type Service struct {
 	Server *ws.Server
 	store  persistence.VersionedPersistence
+
+	// presence — AJ-3: live (room, uid) registry behind Presences().
+	presence *presenceRegistry
 }
 
 // Store — the versioned store backing this service (history endpoints use
 // this surface directly).
 func (s *Service) Store() persistence.VersionedPersistence { return s.store }
+
+// Presences — the live collaboration pairs (projectId, user id); see presence.go.
+func (s *Service) Presences() []PresenceEntry {
+	if s.presence == nil {
+		return []PresenceEntry{}
+	}
+	return ListProjects(s.presence)
+}
 
 // New builds the service. ygo server = relay + doc lifecycle + persistence;
 // the Authorize hook is the only place OlliTeX policy enters.
@@ -208,6 +224,11 @@ func New(opts Options) (*Service, error) {
 		if err != nil || role == Deny {
 			return ws.ConnectionConfig{}, false
 		}
+		// AJ-3: the Authorize hook is the ONLY admission path, so the
+		// presence registry sees every live connection exactly once.
+		if opts.PresenceRegistry != nil && pid != "" {
+			opts.PresenceRegistry.Add(pid, uid)
+		}
 		return ws.ConnectionConfig{ReadOnly: role == ReadOnly}, true
 	}
 	srv.AllowedOrigins = opts.AllowedOrigins
@@ -219,8 +240,19 @@ func New(opts Options) (*Service, error) {
 	if opts.OnFirstPeer != nil {
 		srv.OnFirstPeer = func(ctx context.Context, room string) { opts.OnFirstPeer(room) }
 	}
-	if opts.OnLastPeer != nil {
-		srv.OnLastPeer = func(ctx context.Context, room string) { opts.OnLastPeer(room) }
+	if opts.OnLastPeer != nil || opts.PresenceRegistry != nil {
+		srv.OnLastPeer = func(ctx context.Context, room string) {
+			pid := RoomProject(room)
+			if pid == "" {
+				pid = room
+			}
+			if opts.PresenceRegistry != nil {
+				opts.PresenceRegistry.DropRoom(pid)
+			}
+			if opts.OnLastPeer != nil {
+				opts.OnLastPeer(room)
+			}
+		}
 	}
 	if opts.OnUnloadDocument != nil {
 		srv.OnUnloadDocument = func(ctx context.Context, room string) {
@@ -235,7 +267,7 @@ func New(opts Options) (*Service, error) {
 		}
 	}
 	}
-	return &Service{Server: srv, store: store}, nil
+	return &Service{Server: srv, store: store, presence: opts.PresenceRegistry}, nil
 }
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {

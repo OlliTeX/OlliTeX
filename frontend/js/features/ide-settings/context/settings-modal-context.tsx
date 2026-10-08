@@ -330,17 +330,10 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
         hidden: false // [IV] CE: un-gated (upstream: hidden: !hasEmailNotifications, i.e. the saas 'email-notifications' split-test flag); the CE backend exists, so the tab is always available,
       },
 
-      {
-        key: 'account_settings',
-        title: t('account_settings'),
-        icon: 'settings',
-        // Owner #17 (2026-09-13 editor wave): account settings point to the
-        // hub (mysettings.account), the canonical settings surface on this
-        // deployment. (2026-09 owner decision: the canonical account-settings
-        // URL on this deployment is /user/mysettings (our own shell page)
-        // — the hub route renders the same content.)
-        href: '/hub#/mysettings.account',
-      },
+      // AK-6 (owner 2026-10-08): the "Account settings" section of the
+      // settings modal is RETIRED — account editing lives in /user-settings
+      // (the My-settings surface) and /account; the modal keeps its
+      // scope (editor / compiler / appearance / notifications).
     ],
     [
       t,

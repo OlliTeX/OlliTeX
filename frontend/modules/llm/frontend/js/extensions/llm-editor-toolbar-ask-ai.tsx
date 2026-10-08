@@ -1,5 +1,6 @@
 import React from 'react'
 import { useCodeMirrorViewContext } from '@/features/source-editor/components/codemirror-context'
+import { useLLMAvailability } from '../hooks/use-llm-availability'
 
 /**
  * overleaf-lab (reference-synced 2026-08): the "Ask AI" button of the editor
@@ -12,6 +13,7 @@ import { useCodeMirrorViewContext } from '@/features/source-editor/components/co
  * provider tree (the view can be read from the context).
  */
 const LLMEditorToolbarAskAi = React.memo(function LLMEditorToolbarAskAi() {
+    const { available } = useLLMAvailability()
     const view = useCodeMirrorViewContext()
 
     // overleaf-lab (owner bug report #6): capture the CURRENT selection at
@@ -43,6 +45,12 @@ const LLMEditorToolbarAskAi = React.memo(function LLMEditorToolbarAskAi() {
             new CustomEvent('ol-llm-open-ask-ai', { detail }),
         )
     }
+
+    // overleaf-lab (owner request J, 2026-10-07): no LLM available (admin
+    // disabled OR no model selectable) → the entry point would be a dead-end,
+    // so render nothing at all (no dead key, no console noise; the toolbar
+    // simply collapses the button out). Fail-closed while the flags load.
+    if (!available) return null
 
     return (
         <div className="writefull" data-overflow="main-toolbar-ai-context-menu">

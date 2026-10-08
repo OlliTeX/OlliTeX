@@ -39,6 +39,7 @@ const (
 	// P3.3 slots (tools/webviews-capture-p3c.py):
 	slot33User     = "\x01USR33\x02"   // ol-user meta JSON (settings page)
 	slot33HBS      = "\x01HBS33\x02"   // ,&quot;hasSamlBeta&quot;:... fragment (or empty)
+	slot33Waka     = "\x01WAKA33\x02"  // wakaTimeEnabled true/false (settings ExposedSettings)
 	slot33HasPw    = "\x01HASPW33\x02" // " content" (true) or "" (false)
 	slot33ShowAI   = "\x01AI33\x02"    // same bare-content boolean rule
 	slot33SamlMeta = "\x01SAMLM33\x02" // ol-samlBeta content attribute (or none)
@@ -206,6 +207,7 @@ type PageData struct {
 	// P3.3 dynamic slots (userpages feature):
 	UserMetaJSON                 string // settings page ol-user meta JSON (Node serializeUser order)
 	SamlBeta                     string // session samlBeta ("" → ExposedSettings key + meta absent)
+	WakaEnabled                  bool   // wakaTimeEnabled in settings ExposedSettings (Wakepi/V)
 	HasPassword                  bool   // ol-hasPassword bare-content boolean meta
 	ShowAiFeatures               bool   // ol-showAiFeatures bare-content boolean meta
 	SsoErrorMessage              string // settings page pop-flag metas
@@ -279,6 +281,14 @@ func (p PageData) finalize(html string) string {
 		out = strings.ReplaceAll(out, slotCanMgtTpl, "true")
 	} else {
 		out = strings.ReplaceAll(out, slotCanMgtTpl, "false")
+	}
+	// 2026-10-10 (Wakepi/V): the settings-page WakatimeCard gates on
+	// wakaTimeEnabled in ol-ExposedSettings — always render the key
+	// (true/false) so the card shows; the Go gate stays authoritative.
+	if p.WakaEnabled {
+		out = strings.ReplaceAll(out, slot33Waka, "true")
+	} else {
+		out = strings.ReplaceAll(out, slot33Waka, "false")
 	}
 	out = strings.ReplaceAll(out, slotNavAdmin, p.NavAdmin)
 	// U10.3r one_time_login slots: OTLNAV injects the auth-branching navbar

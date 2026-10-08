@@ -35,7 +35,9 @@ export default memo(function HotkeysModal({
 
   return (
     <OLModal
-      size="lg"
+      // AK-3 (owner 2026-10-08): the hotkeys modal was "unnecessarily
+      // narrow" — widened (lg 800 → 1000) so the shortcut groups get room.
+      size={1000}
       onHide={handleHide}
       show={show}
       animation={animation}

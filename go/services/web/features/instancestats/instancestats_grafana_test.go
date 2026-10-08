@@ -25,13 +25,13 @@ func TestGrafanaEmbedDashboardURLs(t *testing.T) {
 	if ds[0].ID != "ollitex-overview" || ds[1].ID != "ollitex-toolkit-mongo-redis" {
 		t.Fatalf("dashboard uids drifted: %v / %v", ds[0].ID, ds[1].ID)
 	}
-	if ds[0].Kiosk != "http://grafana.example.org:3180/kiosk-d/ollitex-overview" {
+	if ds[0].Kiosk != "http://grafana.example.org:3180/d/ollitex-overview" {
 		t.Fatalf("kiosk form wrong: %s", ds[0].Kiosk)
 	}
 	if ds[0].Full != "http://grafana.example.org:3180/d/ollitex-overview" {
 		t.Fatalf("full form wrong: %s", ds[0].Full)
 	}
-	if ds[1].Kiosk != "http://grafana.example.org:3180/kiosk-d/ollitex-toolkit-mongo-redis" {
+	if ds[1].Kiosk != "http://grafana.example.org:3180/d/ollitex-toolkit-mongo-redis" {
 		t.Fatalf("mongo/redis kiosk wrong: %s", ds[1].Kiosk)
 	}
 }

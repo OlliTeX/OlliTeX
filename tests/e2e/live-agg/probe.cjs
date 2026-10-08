@@ -1,0 +1,5 @@
+console.log('probe start')
+const H = require('./harness.cjs')
+console.log('harness loaded', typeof H.getContext)
+const pw = require('playwright')
+console.log('playwright loaded', typeof pw.chromium)

@@ -9,6 +9,15 @@ interface RailProps {
   onSelect: (id: string) => void
 }
 
+// AH (owner queue 2026-10-07): the hub's settings surfaces each have a
+// dedicated top-level page — the section heading rows link to them.
+// AJ (owner queue 2026-10-08): /template-settings retired — the template
+// nav stays a plain section row (the /hub workspace covers templates).
+const SECTION_PAGES: Record<string, { href: string; label: string }> = {
+  'sec.personal': { href: '/user-settings', label: 'Open user settings page →' },
+  'sec.admin': { href: '/admin-settings', label: 'Open site settings page →' },
+}
+
 /**
  * Recursive hub rail (nav_structure.md §3):
  * - every folder folds independently (accordion-state store, persisted)
@@ -191,21 +200,37 @@ export default function Rail({ nav, active, onSelect }: RailProps) {
         // non-interactive headings that group the rail by function.
         if (n.section) {
           return (
-            <div
-              key={n.id}
-              role="presentation"
-              aria-hidden="true"
-              style={{
-                margin: '8px 2px 2px',
-                fontSize: 10.5,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase' as const,
-                color: 'var(--mantine-color-text-dimmed)',
-              }}
-            >
-              {n.label}
-            </div>
+            <React.Fragment key={n.id}>
+              <div
+                role="presentation"
+                aria-hidden="true"
+                style={{
+                  margin: '8px 2px 2px',
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase' as const,
+                  color: 'var(--mantine-color-text-dimmed)',
+                }}
+              >
+                {n.label}
+              </div>
+              {SECTION_PAGES[n.id] ? (
+                <a
+                  href={SECTION_PAGES[n.id].href}
+                  data-hub-settings-link={n.id}
+                  style={{
+                    display: 'inline-block',
+                    margin: '0 2px 2px',
+                    fontSize: 11.5,
+                    color: 'var(--mantine-color-link)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  {SECTION_PAGES[n.id].label}
+                </a>
+              ) : null}
+            </React.Fragment>
           )
         }
         return n.children && n.children.length > 0 ? (

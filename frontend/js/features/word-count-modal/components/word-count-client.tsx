@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from 'react'
+import { FC, useEffect, useMemo, useRef, useState } from 'react'
 import { WordCountData } from '@/features/word-count-modal/components/word-count-data'
 import { WordCountError } from '@/features/word-count-modal/components/word-count-error'
 import { useProjectContext } from '@/shared/context/project-context'
@@ -25,6 +25,13 @@ export const WordCountClient: FC = () => {
   const { pathInFolder } = useFileTreePathContext()
 
   const { signal } = useAbortController()
+  // 2026-10-07 (owner console ss→Ws→qs re-render flood after
+  // "Couldn't find main.tex from /"): this effect re-runs every time any
+  // upstream context consumer regenerates currentDocument/openDocs
+  // identity — with no guard it re-counts (warn/refresh/render) forever, a
+  // React state-update loop. Guard per counted document: re-count on
+  // document switch, never on pure identity churn.
+  const countedRef = useRef<string | null>(null)
 
   const segmenters = useMemo(() => {
     return createSegmenters(spellCheckLanguage?.replace(/_/, '-'))
@@ -32,6 +39,11 @@ export const WordCountClient: FC = () => {
 
   useEffect(() => {
     if (currentDocument && segmenters) {
+      const countedKey = currentDocument.doc_id || currentDocument
+      if (countedRef.current === countedKey) {
+        return // identity churn only — do not re-count (loop guard)
+      }
+      countedRef.current = countedKey
       const countWords = async () => {
         await openDocs.awaitBufferedOps(signalWithTimeout(signal, 5000))
         await projectSnapshot.refresh()

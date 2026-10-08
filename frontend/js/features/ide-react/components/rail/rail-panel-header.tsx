@@ -17,20 +17,21 @@ export default function RailPanelHeader({
   const { handlePaneCollapse, selectedTab, selectTab } = useRailContext()
 
   const handleClose = useCallback(() => {
-    // live-audit 023 (symbol palette "X closes the railbar tab instead"): the
-    // modern rail is multi-tab (rail-panel.tsx renders one Tab.Pane per rail
-    // entry), so the pane header's X must close the ACTIVE PANE — return to
-    // the default tab (file-tree) and keep the rail open — not collapse the
-    // whole rail from inside a pane. X on the default tab itself falls back
-    // to the previous collapse behaviour.
+    // overleaf-lab (owner request I, 2026-10-07, re: live-audit 023): a pane
+    // that supplies its OWN close action (e.g. the symbol-palette bottom panel
+    // hiding itself) wins — close the PANE, never collapse the whole rail from
+    // inside it. Only when a pane has no bespoke close do we fall back to the
+    // generic rail behaviour: return to the default tab if one is active, else
+    // collapse the rail (X on the file-tree tab keeps its original collapse).
+    if (onClose) {
+      onClose()
+      return
+    }
     if (selectedTab !== 'file-tree') {
       selectTab('file-tree')
       return
     }
     handlePaneCollapse()
-    if (onClose) {
-      onClose()
-    }
   }, [selectedTab, selectTab, handlePaneCollapse, onClose])
 
   return (

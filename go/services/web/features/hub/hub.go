@@ -70,9 +70,22 @@ type mode = map[string]any
 // U9: Express is case-insensitive AND trailing-slash tolerant — variants
 // pinned by the U9 gate oracle (N/G A/B 2026-09-22).
 var (
-	hubRe          = regexp.MustCompile(`^/(?i:hub)/?$`)
-	hubAdminRe     = regexp.MustCompile(`^/(?i:hub/admin)/?$`)
-	hubWorkspaceRe = regexp.MustCompile(`^/(?i:hub/workspace)/?$`)
+	// U9: Express is case-insensitive AND slash-tolerant — /HUB, /hub/,
+	// /HUB/ all render the hub (canonical link reflects the requested
+	// path — Node oracle 2026-09-22). Same for the /hub/admin and
+	// /hub/workspace redirect aliases (302 /hub).
+	hubRe                = regexp.MustCompile(`^/(?i:hub)/?$`)
+	hubAdminRe           = regexp.MustCompile(`^/(?i:hub/admin)/?$`)
+	hubWorkspaceRe       = regexp.MustCompile(`^/(?i:hub/workspace)/?$`)
+	// AH: the two settings split pages, same U9 tolerance.
+	// (the owner retired /template-settings in the AJ queue, 2026-10-08:
+	// templates stay in the /hub workspace).
+	userSettingsRe = regexp.MustCompile(`^/(?i:user-settings)/?$`)
+	adminSettingsRe = regexp.MustCompile(`^/(?i:admin-settings)/?$`)
+	// AJ-1 (2026-10-08): settings are INDIVIDUAL PAGES — one route per
+	// section. Same envelope/bundle; the React dispatches off pathname.
+	userSettingsSectionRe = regexp.MustCompile(`^/(?i:user-settings)/[^/]+$`)
+	adminSettingsSectionRe = regexp.MustCompile(`^/(?i:admin-settings)/[^/]+$`)
 )
 
 func Feature(a *core.App) core.Feature {
@@ -98,7 +111,29 @@ func Feature(a *core.App) core.Feature {
 				Method:  "GET",
 				Pattern: hubWorkspaceRe, Handler: redirectToHub,
 			},
-			{Method: "GET", Path: "/api/hub-theme", Handler: getTheme(a)},
+			// AH (owner queue 2026-10-07): the hub settings split — three
+		// dedicated top-level pages rendering the SAME sections as /hub
+		// (same HubPage envelope, same React bundle; the page dispatches
+		// off location.pathname). /hub itself keeps working.
+		{Method: "GET", Path: "/user-settings", Handler: hubPage(a)},
+		{
+			Method:  "GET", Pattern: userSettingsRe, Handler: hubPage(a),
+		},
+		// AJ-1: /user-settings/<section> — one section per page.
+		{
+			Method:  "GET", Pattern: userSettingsSectionRe, Handler: hubPage(a),
+		},
+		{
+			Method:  "GET", Path: "/admin-settings", Handler: siteAdminOnly(a, hubPage(a)),
+		},
+		{
+			Method:  "GET", Pattern: adminSettingsRe, Handler: siteAdminOnly(a, hubPage(a)),
+		},
+		// AJ-1: /admin-settings/<section> — one section per page (admin-only).
+		{
+			Method:  "GET", Pattern: adminSettingsSectionRe, Handler: siteAdminOnly(a, hubPage(a)),
+		},
+		{Method: "GET", Path: "/api/hub-theme", Handler: getTheme(a)},
 			{Method: "PUT", Path: "/api/hub-theme", Handler: saveTheme(a)},
 			{Method: "DELETE", Path: "/api/hub-theme", Handler: clearTheme(a)},
 			{Method: "GET", Path: "/api/hub/health", Handler: hubHealth(a)},
@@ -1167,4 +1202,17 @@ func loadUserDoc(a *core.App, ctx context.Context, uid string) (map[string]any, 
 		return nil, nil, false
 	}
 	return core.LooseDoc(doc), aceRaw, true
+}
+
+// siteAdminOnly — AH: the admin/template settings pages are site-admin
+// surfaces; members bounce exactly like the rest of the site-admin route
+// family (302 /restricted?from=<enc(path)>, Accept-negotiated body —
+// core.restrictedBounce, pinned P3.1).
+func siteAdminOnly(a *core.App, next func(*core.Cxt, *core.Res)) func(*core.Cxt, *core.Res) {
+	return func(cxt *core.Cxt, res *core.Res) {
+		if !a.RequireSiteAdmin(cxt, res) {
+			return
+		}
+		next(cxt, res)
+	}
 }

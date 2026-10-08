@@ -18,7 +18,7 @@ import {
 } from '@/features/editor-v2/variant'
 
 type OLModalProps = ModalProps & {
-  size?: 'sm' | 'lg' | 'xl' | number
+  size?: 'sm' | 'lg' | 'xl' | 'full' | number
   onHide: () => void
   show?: boolean
   themed?: boolean
@@ -60,18 +60,32 @@ export function OLModal({
   // never remounted).
   const ctx = useEditorUiVariant()
   if (canUseMantineSurface(ctx)) {
+    // Mantine 9 Modal: there is NO `size` prop (v8-era API). Widths come from
+    // the content style; 'full availability' is the native `fullScreen` prop
+    // (owner AD 2026-10-07: image/SVG editors must use the WHOLE available
+    // space). Named sizes map to the legacy react-bootstrap widths so the
+    // non-full frames keep their classic proportions.
+    const full = size === 'full'
+    const width = full
+      ? undefined
+      : size === 'sm'
+      ? 420
+      : size === 'xl'
+      ? 1000
+      : typeof size === 'number'
+      ? size
+      : 800 // 'lg' / default
     return (
       <MantineSurfaceGate>
         <MantineModal
           opened={show}
           onClose={onHide}
-          // 'xl' / custom widths exist on the Mantine surface (image editor,
-          // owner #6); the legacy react-bootstrap frame maps xl→lg (its
-          // widest named size).
-          size={size === 'sm' ? 'sm' : size === 'lg' ? 'lg' : size === 'xl' || typeof size === 'number' ? size : 'lg'}
-          withinPortal
-          trapFocus
-          position="center"
+          fullScreen={full}
+          styles={
+            width !== undefined
+              ? { content: { width, maxWidth: '100%', height: 'auto', maxHeight: '100%' } }
+              : { content: { width: '100%', height: '100%', maxHeight: '100%' } }
+          }
           closeButtonProps={{ 'aria-label': t('close_dialog') }}
           className={classNames('ol-mant-modal', { 'modal-themed': themed }, className)}
         >

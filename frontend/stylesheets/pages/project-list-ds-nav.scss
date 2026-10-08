@@ -599,6 +599,30 @@ body {
   .material-symbols {
     font-size: var(--font-size-03);
   }
+}
+
+// AJ-6 (owner 2026-10-08): the theme control is now a dropdown (buttons
+// retired) — it sits in the account menu like the other list items.
+.theme-toggle-select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--spacing-01) var(--spacing-02);
+  border: 1px solid var(--border-divider-themed);
+  border-radius: var(--border-radius-01);
+  background-color: var(--bg-secondary-themed);
+  color: var(--content-primary-themed);
+  font-size: var(--font-size-02);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--bg-secondary-hover-themed);
+  }
+}
+
+.theme-toggle-radios-legacy-kept {
+  .material-symbols {
+    font-size: var(--font-size-03);
+  }
 
   input:checked + label {
     background-color: var(--theme-toggle-selected-background);

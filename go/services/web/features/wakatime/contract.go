@@ -77,8 +77,15 @@ func (s *svc) Routes() []core.Route {
 		{Method: "GET", Pattern: statusPat, Handler: s.status, NoLogin: false},
 		{Method: "PUT", Pattern: userPat, Handler: s.link, NoLogin: false},
 		{Method: "DELETE", Pattern: userPat, Handler: s.unlink, NoLogin: false},
-		{Method: "POST", Pattern: heartbeatPat, Handler: s.heartbeat, NoLogin: false},
-		{Method: "POST", Pattern: bulkPat, Handler: s.heartbeatBulk, NoLogin: false},
+		// Candidate F (owner report 2026-10-07): the tracker is a fire-and-forget
+		// fetch that deliberately sends NO CSRF token (raw fetch, credentials
+		// same-origin — reference PR#249 design). Requiring CSRF here made
+		// EVERY heartbeat a 403 "Forbidden" (console noise on each editor
+		// flush). These are login-gated + project-read-gated, and the payload
+		// only relays the caller's own usage to the caller's own WakaTime
+		// account (no attacker benefit), so NoCSRF is the correct parity.
+		{Method: "POST", Pattern: heartbeatPat, Handler: s.heartbeat, NoLogin: false, NoCSRF: true},
+		{Method: "POST", Pattern: bulkPat, Handler: s.heartbeatBulk, NoLogin: false, NoCSRF: true},
 		{Method: "GET", Pattern: summaryPat, Handler: s.summary, NoLogin: false},
 	}
 }

@@ -155,6 +155,18 @@ type TrackedChange struct {
 	// P3 stable anchors ("" = pre-P3 record; resolve to plain coords).
 	AnchorStart string
 	AnchorEnd   string
+
+	// NoAnchors — capture-path records (2026-10-07 owner bug: change marks
+	// on the wrong line): the capture POSTs creation-time PLAIN coordinates
+	// in the same stream as the typed edit; anchoring them against a head
+	// that may still be missing the typed prefix produced end-of-type
+	// / mid-text anchors that later resolved far away from the real text
+	// (verified: plain=[249,249) → resolved=[258,258) — stick-to-end). The
+	// ORIGINAL 6.3.0 tracked-change model stores STATIC ranges (no
+	// re-anchoring), which is exactly the capture semantics — so
+	// tracked-change records are plain-coord by construction; comment
+	// threads keep their P3 anchors (selection-based, a different path).
+	NoAnchors bool
 }
 
 // --- record encode/decode ---
@@ -773,8 +785,10 @@ func AddChange(ctx context.Context, store persistence.VersionedPersistence, room
 	// record survives later edits (read paths resolve to live positions).
 	// Best-effort: a failed anchor keeps the P1 plain-only record (the
 	// documented drift), never blocks the change creation itself.
-	if ar, err := MakeRangeAnchors(ctx, store, room, ch.Start, ch.End); err == nil {
-		ch.AnchorStart, ch.AnchorEnd = ar.Start, ar.End
+	if !ch.NoAnchors {
+		if ar, err := MakeRangeAnchors(ctx, store, room, ch.Start, ch.End); err == nil {
+			ch.AnchorStart, ch.AnchorEnd = ar.Start, ar.End
+		}
 	}
 	svBefore := d.StateVector().Clone()
 	m := crdt.NewMapPrelim()
@@ -857,8 +871,51 @@ func AcceptChange(ctx context.Context, store persistence.VersionedPersistence, r
 	return cur, true, v, nil
 }
 
-// RejectChange — pending → rejected + CONTENT MUTATION (the only place D40
-// mutates the shared text, server-side, exactly once):
+// MergeChangeContent — the ORIGINAL 6.3.0 TrackedChangeList semantics
+// (owner 2026-10-07: "typing very, very slow must still be ONE change"):
+// the original merged on EVERY add — same kind + same user + TOUCHING
+// ranges (Range.touches) — content concatenated, MIN(ts) kept (the
+// original TrackingProps.mergeWith takes min of the two timestamps), the
+// FIRST record's id preserved. No time window: adjacency in the text is
+// the merge criterion, so slow typing still folds into one change.
+//
+// Appends `content` to the existing pending record `id` (the caller has
+// already verified kind/author/state adjacency). The record's Start (and
+// End for zero-width inserts) is unchanged — the merged change still
+// starts where the first character of the run began.
+func MergeChangeContent(ctx context.Context, store persistence.VersionedPersistence, room, id, appendContent string) (TrackedChange, bool, persistence.Version, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock()
+
+d, err := loadReviewDoc(ctx, store, room)
+	if err != nil {
+		return TrackedChange{}, false, 0, err
+	}
+	m, _, ok := findRecord(d, ChangesType, id)
+	if !ok {
+		return TrackedChange{}, false, 0, ErrChangeNotFound
+	}
+	cur, err := mapToChange(m)
+	if err != nil {
+		return TrackedChange{}, false, 0, err
+	}
+	if cur.State != ChangeStatePending {
+		lr, _ := store.Load(ctx, room)
+		return cur, false, lr.Version, nil
+	}
+	svBefore := d.StateVector().Clone()
+	cur.Content = cur.Content + appendContent
+	// MIN(ts): the original mergeWith keeps the EARLIER timestamp — this
+	// record was created first, so Created is already the min (untouched).
+	d.Transact(func(txn *crdt.Transaction) {
+		m.Set(txn, "content", cur.Content)
+	})
+	v, err := appendReviewDelta(ctx, store, room, d, svBefore)
+	if err != nil {
+		return TrackedChange{}, false, 0, err
+	}
+	return cur, true, v, nil
+}
 //
 //	kind=insert → delete [Start,End)   (the inserted text is removed)
 //	kind=delete → insert Content at Start (the deleted text is restored)
@@ -867,6 +924,14 @@ func AcceptChange(ctx context.Context, store persistence.VersionedPersistence, r
 // rejects cannot double-restore / double-remove. Drifted ranges (outside the
 // current text) fail with ErrChangeRange and leave the change PENDING —
 // the caller re-resolves it (P3 anchors remove the drift class).
+// RejectChange — pending → rejected + CONTENT MUTATION (the only place D40
+// mutates the shared text, server-side, exactly once):
+//
+//	- insert → delete [Start,End)   (the inserted text is removed)
+//	- delete → insert Content at Start (the deleted text is restored)
+//
+// Idempotent: a second reject mutates NOTHING (applied=false), so racing
+// rejects cannot double-restore / double-remove.
 func RejectChange(ctx context.Context, store persistence.VersionedPersistence, room, id string) (TrackedChange, bool, persistence.Version, error) {
 	writeMu.Lock()
 	defer writeMu.Unlock() // D40-P3: serialize the write window (client-id identity + idempotency)

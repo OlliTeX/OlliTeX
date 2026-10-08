@@ -35,6 +35,11 @@ import EditorCloneProjectModalWrapper from '@/features/clone-project-modal/compo
 import useOpenProject from '@/shared/hooks/use-open-project'
 import importOverleafModules from '../../../../../macros/import-overleaf-module.macro'
 import ReviewModeOptions from './review-mode-options'
+// Owner 2026-10-07 item S: File → Rename (below "Make a Copy")
+import RenameProjectEditorModal from './rename-project-editor-modal'
+// Owner 2026-10-07 item T: File → Share (below Settings)
+import ShareProjectModal from '@/features/share-project-modal/components/share-project-modal'
+import { useEditorContext } from '@/shared/context/editor-context'
 
 const menubarExtraComponents = importOverleafModules(
   'menubarExtraComponents',
@@ -51,10 +56,13 @@ export const ToolbarMenuBar = () => {
 
   const { setView, view } = useLayoutContext()
   const { pdfUrl } = useCompileContext()
+  const { isProjectOwner } = useEditorContext()
   const wordCountEnabled = pdfUrl || isSplitTestEnabled('word-count-client')
   const isDisabledDueToNetworkStall = useIsNetworkStalled()
   const [showWordCountModal, setShowWordCountModal] = useState(false)
   const [showCloneProjectModal, setShowCloneProjectModal] = useState(false)
+  const [showRenameModal, setShowRenameModal] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
   const openProject = useOpenProject()
 
   const anonymous = getMeta('ol-anonymous')
@@ -93,6 +101,31 @@ export const ToolbarMenuBar = () => {
         },
         id: 'copy_project',
       },
+      // Owner 2026-10-07 item S: File → Rename (rename the project) below
+      // "Make a Copy". Owner-only (server: POST /project/:pid/rename is
+      // owner/admin). Reuses the editor project context for the live name.
+      {
+        type: 'command',
+        label: t('rename_project'),
+        disabled:
+          anonymous || !isProjectOwner || isDisabledDueToNetworkStall,
+        handler: () => {
+          setShowRenameModal(true)
+        },
+        id: 'rename_project',
+      },
+      // Owner 2026-10-07 item T: File → Share (share the project with
+      // others) below "Settings". Same ShareProjectModal the toolbar Share
+      // button opens; owner-only.
+      {
+        type: 'command',
+        label: t('share_project'),
+        disabled: anonymous || !isProjectOwner || isDisabledDueToNetworkStall,
+        handler: () => {
+          setShowShareModal(true)
+        },
+        id: 'share_project',
+      },
     ],
     [
       t,
@@ -101,13 +134,20 @@ export const ToolbarMenuBar = () => {
       wordCountEnabled,
       anonymous,
       isDisabledDueToNetworkStall,
+      isProjectOwner,
     ],
   )
   const fileMenuStructure: MenuStructure = useMemo(
     () => [
       {
         id: 'file-file-tree',
-        children: ['new_file', 'new_folder', 'upload_file', 'copy_project'],
+        children: [
+          'new_file',
+          'new_folder',
+          'upload_file',
+          'copy_project',
+          'rename_project', // owner 2026-10-07 item S: below Make a Copy
+        ],
       },
       { id: 'file-tools', children: ['show_version_history', 'word_count'] },
       { id: 'submit', children: ['submit-project', 'manage-template'] },
@@ -143,7 +183,10 @@ export const ToolbarMenuBar = () => {
       },
       {
         id: 'settings',
-        children: ['open-settings'],
+        children: [
+          'open-settings',
+          'share_project', // owner 2026-10-07 item T: below Settings
+        ],
       },
     ],
     [t],
@@ -392,6 +435,15 @@ export const ToolbarMenuBar = () => {
         show={showCloneProjectModal}
         handleHide={() => setShowCloneProjectModal(false)}
         openProject={openProject}
+      />
+      <RenameProjectEditorModal
+        show={showRenameModal}
+        handleHide={() => setShowRenameModal(false)}
+      />
+      <ShareProjectModal
+        show={showShareModal}
+        handleOpen={() => setShowShareModal(true)}
+        handleHide={() => setShowShareModal(false)}
       />
       {menubarExtraComponents.map(
         ({ import: { default: Component } }, index) => (

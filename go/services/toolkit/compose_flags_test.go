@@ -68,7 +68,10 @@ func TestCanonical_PortEnvelope(t *testing.T) {
 		`${REDIS_PORT_HOST:-6379}:6379`,
 		`${SSH_PORT:-2222}:2222`,
 		`${PROMETHEUS_PORT:-9090}:9090`,
-		`${GRAFANA_PORT:-3000}:3000`,
+		// AJ-3 (owner 2026-10-08): Grafana has NO host port anymore — it is
+		// served under /grafana/ on the main origin (haproxy single-edge,
+		// 80/443 only); the old `${GRAFANA_PORT:-3000}:3000` line is retired
+		// by design (sub-path embed, not a facaded port).
 		`${MONGODB_EXPORTER_PORT:-9216}:9216`,
 		`${REDIS_EXPORTER_PORT:-9121}:9121`,
 		`${NODE_EXPORTER_PORT:-9100}:9100`,

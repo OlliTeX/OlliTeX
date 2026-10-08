@@ -120,6 +120,85 @@ func loadProject(ctx context.Context, a *core.App, idHex string) (*bson.D, error
 	return &d, nil
 }
 
+// chatUserWire is the shape the editor chat pane reads off each message:
+// message.user.{id, first_name, last_name?, email}. The Go chat service
+// returns only user_id (string); the Node web ChatController enriched the
+// sender details, so we do the same here (R: own message rendered as
+// "Deleted user" because message.user was undefined).
+func chatUserWire(ctx context.Context, a *core.App, idHex string) map[string]any {
+	uid, err := bson.ObjectIDFromHex(strings.ToLower(strings.TrimSpace(idHex)))
+	if err != nil {
+		return nil
+	}
+	if a.Mongo == nil {
+		return nil
+	}
+	db, err := a.Mongo.DB(ctx)
+	if err != nil {
+		return nil
+	}
+	var d bson.D
+	if err := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: uid}}).
+		Decode(&d); err != nil {
+		return nil
+	}
+	if v, ok := dget(d, "deleted").(bool); ok && v {
+		return nil
+	}
+	out := map[string]any{"id": uid.Hex()}
+	if s, ok := dget(d, "first_name").(string); ok {
+		out["first_name"] = s
+	}
+	if s, ok := dget(d, "last_name").(string); ok {
+		out["last_name"] = s
+	}
+	if s, ok := dget(d, "email").(string); ok {
+		out["email"] = s
+	}
+	return out
+}
+
+// enrichChatMessages adds a resolved `user` object to each message that
+// carries a user_id (keeping user_id for parity). Unknown/deleted senders
+// stay without a user object (the pane shows the deleted-user affordance).
+func enrichChatMessages(ctx context.Context, a *core.App, body []byte) []byte {
+	var msgs []map[string]any
+	if err := json.Unmarshal(body, &msgs); err != nil {
+		return body
+	}
+	seen := map[string]map[string]any{}
+	for _, m := range msgs {
+		s, _ := m["user_id"].(string)
+		if s == "" {
+			continue
+		}
+		k := strings.ToLower(s)
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = chatUserWire(ctx, a, s)
+	}
+	changed := false
+	for _, m := range msgs {
+		s, _ := m["user_id"].(string)
+		if s == "" {
+			continue
+		}
+		if u, ok := seen[strings.ToLower(s)]; ok && u != nil {
+			m["user"] = u
+			changed = true
+		}
+	}
+	if !changed {
+		return body
+	}
+	out, err := json.Marshal(msgs)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
 // gate applies the read/write project membership check (owner,
 // collabs, reviewers, read-only refs for reads; owner/collabs for writes).
 func gate(a *core.App, cxt *core.Cxt, res *core.Res, write bool) (uid string, p *bson.D, ok bool) {
@@ -228,6 +307,9 @@ func messagesHandler(a *core.App, send bool) func(*core.Cxt, *core.Res) {
 			if err != nil {
 				coreJSON(cxt, res, 500, []byte(internal500))
 				return
+			}
+			if code == 200 {
+				body = enrichChatMessages(cxt.Req.Context(), a, body)
 			}
 			coreJSON(cxt, res, code, body)
 			return

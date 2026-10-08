@@ -185,21 +185,69 @@ func (d *DockerRunner) startOnce(rc *runCtx, opts CreateOpts, cb func(err error,
 				"error attaching to container")
 			return aerr
 		}
-		clsl.Debug(map[string]any{"containerId": opts.Name}, "attached to container")
-		go d.drainStream(rc, stream, opts.Name)
 
 		// start (304 = already running, treated as success).
 		serr := d.Engine.Start(opts.Name)
 		if serr != nil {
 			var api *APIError
-			if errors.As(serr, &api) && api.StatusCode == 304 {
+			switch {
+			case errors.As(serr, &api) && api.StatusCode == 304:
 				// already running
 				clsl.Debug(map[string]any{"containerId": opts.Name},
 					"container already started")
-				return nil
+			case errors.As(serr, &api) && api.StatusCode == 409:
+				// Stale-name race (live 2026-10-07, synctex): the previous
+				// run's AutoRemove container is still being reaped ("marked
+				// for removal and cannot be started") while the deterministic
+				// fingerprint reuses the same name. Wait for the in-progress
+				// reap to finish (Remove would 409 "removal already in
+				// progress" otherwise), then recreate + re-attach. The OLD
+				// attach stream is closed WITHOUT draining it into rc — its
+				// empty markStream would otherwise clobber the new run's
+				// captured stdout.
+				clsl.Warn(map[string]any{"containerId": opts.Name, "err": serr},
+					"container marked for removal; waiting for reap then recreating")
+				stream.Close()
+				reapDeadline := time.Now().Add(10 * time.Second)
+				for time.Now().Before(reapDeadline) {
+					_, ierr := d.Engine.Inspect(opts.Name)
+					var iapi *APIError
+					if errors.As(ierr, &iapi) && (iapi.StatusCode == 404 || iapi.StatusCode == 410) {
+						break // reaped
+					}
+					if ierr == nil {
+						time.Sleep(100 * time.Millisecond)
+						continue
+					}
+					break // unexpected inspect error; proceed to create attempt
+				}
+				if rerr := d.Engine.Remove(opts.Name, true); rerr != nil {
+					var rapi *APIError
+					// 404 gone, 409 reap still in flight — both acceptable.
+					if !(errors.As(rerr, &rapi) && (rapi.StatusCode == 404 || rapi.StatusCode == 409)) {
+						return rerr
+					}
+				}
+				if cerr := d.Engine.Create(opts.Name, opts); cerr != nil {
+					return cerr
+				}
+				stream, aerr = d.Engine.Attach(opts.Name)
+				if aerr != nil {
+					return aerr
+				}
+				if serr2 := d.Engine.Start(opts.Name); serr2 != nil {
+					var api2 *APIError
+					if !(errors.As(serr2, &api2) && api2.StatusCode == 304) {
+						return serr2
+					}
+				}
+			default:
+				stream.Close()
+				return serr
 			}
-			return serr
 		}
+		clsl.Debug(map[string]any{"containerId": opts.Name}, "attached to container")
+		go d.drainStream(rc, stream, opts.Name)
 		return nil
 	})
 	if err != nil {

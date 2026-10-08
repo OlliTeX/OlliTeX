@@ -38,6 +38,8 @@ export default function TikzViewer () {
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const docRef = useRef<string>('')
+  const openDocNameRef = useRef<string | null>(openDocName)
+  openDocNameRef.current = openDocName
   const pendingExportRef = useRef<{
     resolve: (v: string | null) => void
     reject: (e: Error) => void
@@ -142,6 +144,53 @@ export default function TikzViewer () {
         return
     }
   }, [isOwnIframe, openDocName, post, t, writeDoc])
+
+  // AK-10 (owner 2026-10-08): race guard — the embed can request its
+  // document (boot-load/ready) before the open-doc switch has landed in the
+  // CodeMirror state, so the first push can carry the PREVIOUS file's
+  // source. Listen to the CM state directly: whenever the doc CONTENT
+  // diverges from what the canvas last received (docRef) AND the change is
+  // NOT the canvas's own write-back, re-push. The content-equality guard
+  // makes the loop impossible (a push only happens when the two differ).
+  useEffect(() => {
+    if (!cmView) return
+    const onDocChange = () => {
+      if (!bootedRef.current) return
+      const doc = cmView.state.doc
+      const shown = docRef.current
+      // Cheap rejection first (no content materialization): length or head
+      // tail differ -> must compare. Head/tail compare catches most real
+      // switches at O(1) cost.
+      if (
+        doc.length === shown.length &&
+        doc.toString(0, 64) === shown.slice(0, 64) &&
+        doc.toString(Math.max(0, doc.length - 64)) === shown.slice(-64)
+      ) {
+        return // identical for all practical purposes
+      }
+      const src = doc.toString()
+      if (src !== shown) {
+        docRef.current = src
+        post({ action: 'load', source: src, autosave: 1, fileName: openDocNameRef.current ?? '' })
+      }
+    }
+    // CM6 has no public state subscription on an existing view, so poll on
+    // requestAnimationFrame: each tick is O(1) (length compare) until the
+    // doc content actually diverges from the canvas's last source; the
+    // equality guard makes re-pushes impossible (no loop).
+    let raf = 0
+    let cancelled = false
+    const tick = () => {
+      if (cancelled) return
+      onDocChange()
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(raf)
+    }
+  }, [cmView, post])
 
   useEffect(() => {
     // Read the initial document (CodeMirror state is the single source of

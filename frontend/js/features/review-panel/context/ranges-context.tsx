@@ -114,6 +114,9 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
   const { sendEvent } = useEditorAnalytics()
   const { openDocName } = useEditorOpenDocContext()
   const hydratedRef = useRef(false)
+  // 2026-10-07 (AG-2): which open-doc identity the last hydration covered,
+  // so a late-resolving openDocName can still re-hydrate the panel.
+  const hydratedForRef = useRef<string | null>(null)
   const [ranges, setRanges] = useState<Ranges | undefined>(() =>
     buildRanges(currentDocument)
   )
@@ -155,18 +158,49 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
         return
       }
       const docId = openDocName || ''
-      const pick =
-        items.find(it => (it.id || '') === docId) ||
-        items.find(
-          it =>
-            (it.ranges?.comments?.length ?? 0) > 0 ||
-            (it.ranges?.changes?.length ?? 0) > 0
-        )
+      // 2026-10-07 (AG-2 flake root cause): when the open-doc name is not
+      // known (open-docs still hydrating — a race with fast first typing in
+      // review mode), we CANNOT decide that the doc has no ranges — do NOT
+      // clear the tracker; keep the last state and wait for the next
+      // hydration (the 'ranges:hydrate' event fires on every capture, and
+      // the openDocName effect below re-hydrates when the name lands).
+      if (!docId) {
+        return
+      }
+      // NO cross-doc fallback (owner 2026-10-07: sample.bib showed
+      // main.tex's comment tags — the old "first entry with any comments"
+      // fallback leaked one doc's ranges onto every other doc, which is
+      // exactly what /ranges — keyed per content doc by pathname — is not
+      // for). A doc with no server-side review records renders NO marks.
+      const pick = items.find(it => (it.id || '') === docId)
       if (!pick) {
+        // openDocName is the basename the panel uses ('main.tex') but
+        // accept the root-anchored form as well — a mismatch here
+        // previously cleared a doc that DOES have review records.
+        const alt = items.find(it => (it.id || '').replace(/\/+/, '') === docId.replace(/\/+/, ''))
+          || items.find(it => (it.id || '').split('/').pop() === docId.split('/').pop() && docId.length > 0)
+        if (!alt) {
+          setRanges({
+            docId: currentDocument.doc_id,
+            changes: [],
+            comments: [],
+          })
+          return
+        }
         setRanges({
           docId: currentDocument.doc_id,
-          changes: [],
-          comments: [],
+          changes: (alt.ranges?.changes ?? []).map(c => ({
+            id: (c as any).id,
+            op: (c as any).op,
+            state: (c as any).state,
+            metadata: (c as any).metadata,
+          })),
+          comments: (alt.ranges?.comments ?? []).map(c => ({
+            id: (c as any).id,
+            op: (c as any).op,
+            resolved: (c as any).resolved,
+            metadata: (c as any).metadata,
+          })),
         })
         return
       }
@@ -199,11 +233,18 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
     if (nativeHasEntries) {
       return
     }
-    if (hydratedRef.current) {
+    // 2026-10-07 (AG-2 flake): allow a re-hydration when the open-doc name
+    // is only NOW known (open-docs hydrate late; the first hydration with
+    // an unknown identity must not permanently gate the panel).
+    const docName = openDocName || ''
+    if (hydratedRef.current && hydratedForRef.current !== docName) {
+      hydratedForRef.current = docName
+    } else if (hydratedRef.current) {
       return
     }
     let cancelled = false
     hydratedRef.current = true
+    hydratedForRef.current = docName
     void hydrateFromServer(() => cancelled).catch(() => {
       // keep the (empty) native ranges; panel shows the empty state
     })
@@ -263,7 +304,17 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
       const listener = throttle(
         () => {
           window.setTimeout(() => {
-            setRanges(buildRanges(currentDocument))
+            const native = buildRanges(currentDocument)
+            // D40 live echo (owner 2026-10-07: comment tags appeared "for a
+            // short moment" then vanished): on the Yjs engine the native
+            // tracker is EMPTY BY DESIGN — the REST-hydrated ranges are the
+            // source of truth. Clobbering them with an empty native build on
+            // every ranges:redraw/dirty.cm6 (any editor edit/redraw) erased
+            // live comment chips. Only take native state when it actually
+            // carries entries; otherwise keep the hydrated state.
+            if (native.comments.length > 0 || native.changes.length > 0) {
+              setRanges(native)
+            }
           })
         },
         500,
@@ -428,24 +479,71 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
     } else {
       return {
         async acceptChanges(...changes) {
-          if (currentDocument.ranges) {
-            const ids = changes.map(change => change.id)
-            const url = `/project/${projectId}/doc/${currentDocument.doc_id}/changes/accept`
-            await postJSON(url, { body: { change_ids: ids } })
-            currentDocument.ranges.removeChangeIds(ids)
-            setRanges(buildRanges(currentDocument))
-            sendEvent('rp-changes-accepted', {
-              count: ids.length,
-              view: reviewPanelView,
-            })
-          }
+          // 2026-10-07 (AG-2 hardening): the state flip is SERVER-side
+          // (collab.AcceptChange) — do not gate it on the OT tracker being
+          // mounted (S2 docs may not attach one); the local bookkeeping is
+          // best-effort on top.
+          const ids = changes.map(change => change.id)
+          const url = `/project/${projectId}/doc/${currentDocument.doc_id}/changes/accept`
+          await postJSON(url, { body: { change_ids: ids } })
+          currentDocument.ranges?.removeChangeIds(ids)
+          // 2026-10-07 (AG-2 TC-5/CM-1b): do NOT rebuild from the OT tracker
+          // (empty on S2 — it CLEARED the hydrated panel state right after
+          // each action, hiding the remaining entries). Re-hydrate from the
+          // REST source of truth instead (the D40 event path).
+          try { currentDocument?.trigger?.('ranges:hydrate') } catch (e) { /* no-op */ }
+          sendEvent('rp-changes-accepted', {
+            count: ids.length,
+            view: reviewPanelView,
+          })
         },
         async rejectChanges(...changes) {
-          if (currentDocument.ranges) {
+          {
             const ids = changes.map(change => change.id)
-            view.dispatch(
-              rejectChanges(view.state, currentDocument.ranges, ids)
-            )
+            // 2026-10-07 (AG-2 TC-5): the OLD S2 reject called
+            // reject-changes.ts, which resolves specs from the OT RangesTracker
+            // — EMPTY on Yjs/S2 docs (the changes live server-side + in the
+            // panel state), so it returned {} and the button did NOTHING
+            // (no text revert, no state change). Reject must work from the
+            // change ops the panel already holds:
+            //   insert  → remove [p, p+len(i))
+            //   delete  → re-insert d at p
+            // sorted DESC by p (adjacent-change interaction rule from
+            // reject-changes.ts) — best effort: a drifted position skips its
+            // spec instead of aborting the whole action.
+            const specs: Array<{ from: number; to?: number; insert: string }> = []
+            const ordered = [...changes].sort((a, b) => (b.op?.p ?? 0) - (a.op?.p ?? 0))
+            for (const change of ordered) {
+              const op: any = change.op
+              const p = typeof op?.p === 'number' ? op.p : -1
+              if (p < 0) continue
+              if (typeof op?.i === 'string') {
+                const to = p + op.i.length
+                try {
+                  if (view.state.doc.sliceString(p, to) === op.i) {
+                    specs.push({ from: p, to, insert: '' })
+                  }
+                } catch (e) {
+                  // position drifted — skip (server record still flips)
+                }
+              } else if (typeof op?.d === 'string') {
+                specs.push({ from: p, insert: op.d })
+              }
+            }
+            if (specs.length > 0) {
+              view.dispatch({
+                changes: specs,
+                effects: rangesUpdatedEffect.of(null),
+              })
+            }
+            currentDocument.ranges?.removeChangeIds(ids)
+            // Server state pending→rejected (the panel's source of truth;
+            // collab.RejectChange). Accept mirrors this shape.
+            const url = `/project/${projectId}/doc/${currentDocument.doc_id}/changes/reject`
+            await postJSON(url, { body: { change_ids: ids } })
+            // 2026-10-07 (AG-2): same rule — re-hydrate from the server
+            // (pending→rejected), never rebuild from the empty S2 tracker.
+            try { currentDocument?.trigger?.('ranges:hydrate') } catch (e) { /* no-no-op */ }
             sendEvent('rp-changes-rejected', {
               count: ids.length,
               view: reviewPanelView,

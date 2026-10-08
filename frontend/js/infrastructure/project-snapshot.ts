@@ -24,6 +24,13 @@ export class ProjectSnapshot {
   private initialized: boolean
   private refreshing: boolean
   private queued: boolean
+  // Owner 2026-10-07 item P: the corpus is ALSO loaded from the server-side
+  // docstore (GET /project/:id/search-corpus). For S2/Yjs projects the V1
+  // history snapshot above is empty (no projectHistoryChunks), but the docstore
+  // holds the live doc text (compile reads the same source). Populated during
+  // refresh(); consulted by getDocPaths()/getDocContents().
+  private corpusPaths: string[] = []
+  private corpusContents: Map<string, string> = new Map()
 
   constructor(projectId: string) {
     this.projectId = projectId
@@ -64,8 +71,18 @@ export class ProjectSnapshot {
    * Get the list of paths to editable docs.
    */
   getDocPaths(): string[] {
-    const allPaths = this.snapshot.getFilePathnames()
-    return allPaths.filter(path => this.snapshot.getFile(path)?.isEditable())
+    const snap = this.snapshot
+      .getFilePathnames()
+      .filter(path => this.snapshot.getFile(path)?.isEditable())
+    const known = new Set(snap)
+    const out = [...snap]
+    for (const p of this.corpusPaths) {
+      if (!known.has(p)) {
+        out.push(p)
+        known.add(p)
+      }
+    }
+    return out
   }
 
   /**
@@ -107,6 +124,16 @@ export class ProjectSnapshot {
     }
 
     const snapshotPaths = new Set(this.snapshot.getFilePathnames())
+    // 2026-10-07 AF (owner: word count broken, console "Couldn't find
+    // main.tex from /"): in S2/Yjs projects the V1 history snapshot holds NO
+    // chunks, so getFilePathnames() alone is empty and every locateFile
+    // lookup fails — even though the docstore corpus (same refresh()) knows
+    // the real doc paths. Mirror getDocPaths() and consult the corpus paths
+    // as the second truth source. (getDocContents already falls back to the
+    // corpus; this closes the last gap in the word-count include walk.)
+    for (const p of this.corpusPaths) {
+      snapshotPaths.add(p)
+    }
 
     const basePaths = [
       // relative to the root of the compile directory
@@ -138,10 +165,17 @@ export class ProjectSnapshot {
    */
   getDocContents(path: string): string | null {
     const file = this.snapshot.getFile(path)
-    if (file == null) {
-      return null
+    if (file != null) {
+      const content = file.getContent({ filterTrackedDeletes: true })
+      if (content != null) {
+        return content
+      }
     }
-    return file.getContent({ filterTrackedDeletes: true }) ?? null
+    const corpus = this.corpusContents.get(path)
+    if (corpus !== undefined) {
+      return corpus
+    }
+    return null
   }
 
   async getBinaryFileContents(
@@ -230,6 +264,7 @@ export class ProjectSnapshot {
     this.snapshot.applyAll(chunk.getChanges())
     this.version = chunk.getEndVersion()
     await this.loadDocs()
+    await this.loadCorpus()
     this.initialized = true
   }
 
@@ -250,6 +285,28 @@ export class ProjectSnapshot {
     }
 
     await this.loadDocs()
+    await this.loadCorpus()
+  }
+
+  /**
+   * Load the docstore corpus (GET /project/:id/search-corpus) into memory.
+   * Best-effort: a failure must not break the V1 snapshot path, so errors are
+   * swallowed and the corpus stays empty (S1 projects are unaffected).
+   */
+  private async loadCorpus() {
+    try {
+      const arr = await getSearchCorpus(this.projectId)
+      const nextPaths: string[] = []
+      const nextContents = new Map<string, string>()
+      for (const entry of arr) {
+        nextPaths.push(entry.path)
+        nextContents.set(entry.path, entry.content)
+      }
+      this.corpusPaths = nextPaths
+      this.corpusContents = nextContents
+    } catch (e) {
+      console.warn('[project-snapshot] search-corpus unavailable', e)
+    }
   }
 
   /**
@@ -339,6 +396,15 @@ async function fetchLatestChanges(
     changes: changes.map(Change.fromRaw).filter(change => change != null),
     hasMore,
   }
+}
+
+type SearchCorpusEntry = { path: string; content: string }
+
+async function getSearchCorpus(projectId: string): Promise<SearchCorpusEntry[]> {
+  const response = await getJSON<SearchCorpusEntry[]>(
+    `/project/${projectId}/search-corpus`
+  )
+  return Array.isArray(response) ? response : []
 }
 
 async function fetchBlob(

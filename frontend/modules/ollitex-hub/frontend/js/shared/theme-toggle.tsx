@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ActionIcon, Group, Tooltip } from '@mantine/core'
+import { Group, Tooltip } from '@mantine/core'
 import { notify } from './notify'
 import Icon from './icons'
 import { OverallTheme, setTheme, storedOverallTheme } from '../../../../../js/shared/mantine/overall-theme'
@@ -10,11 +10,17 @@ import { OverallTheme, setTheme, storedOverallTheme } from '../../../../../js/sh
  * ('' | 'light-' | 'system'), same write path (POST /user/settings).
  * Local apply is immediate; the server call is best-effort with a toast
  * on failure.
+ *
+ * AJ-6 (owner 2026-10-08): the three icon RADIO BUTTONS are RETIRED — ONE
+ * dropdown is THE theme picker, saved per user, applied on all pages (hub
+ * header + the /user-settings / /admin-settings shells render this same
+ * component). The per-editor code-theme dropdowns (Appearance tab) are a
+ * different setting and stay.
  */
-const OPTIONS: { value: OverallTheme; label: string; icon: string }[] = [
-  { value: '', label: 'Dark', icon: 'dark_mode' },
-  { value: 'light-', label: 'Light', icon: 'light_mode' },
-  { value: 'system', label: 'Use system theme', icon: 'contrast' },
+const OPTIONS: { value: OverallTheme; label: string }[] = [
+  { value: '', label: 'Dark' },
+  { value: 'light-', label: 'Light' },
+  { value: 'system', label: 'Use system theme' },
 ]
 
 export default function ThemeToggle() {
@@ -44,42 +50,58 @@ export default function ThemeToggle() {
   }
 
   return (
-    // a11y (axe: aria-prohibited-attr + button-name, 2026-09-08): the group
-    // needs a labelling role, and each icon button needs its own name.
-    <Group gap={2} wrap="nowrap" role="group" aria-label="Theme selector and account">
-      {OPTIONS.map(o => (
-        <Tooltip key={o.value || 'dark'} label={o.label} withArrow position="bottom">
-          <ActionIcon
-            variant={active === o.value ? 'filled' : 'subtle'}
-            color="ollitex"
-            size="md"
-            disabled={busy}
-            onClick={() => {
-              void choose(o.value)
-            }}
-            aria-pressed={active === o.value}
-            aria-label={`${o.label} theme`}
-          >
-            <Icon name={o.icon} size={17} />
-          </ActionIcon>
-        </Tooltip>
-      ))}
+    <Group gap={6} wrap="nowrap" aria-label="Theme picker and account">
+      {/* AJ-6: the radio buttons live on — the owner wanted the appearance
+          RADIO retired in favour of the editor-style dropdown. */}
+      <label className="ol-theme-dropdown-wrap" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+          Theme
+        </span>
+        <select
+          className="ol-theme-dropdown"
+          aria-label="Theme"
+          value={active}
+          disabled={busy}
+          style={{
+            height: 32,
+            padding: '0 8px',
+            borderRadius: 8,
+            border: '1px solid rgba(120,120,140,0.35)',
+            background: 'var(--mantine-color-ollitex-light, transparent)',
+            color: 'inherit',
+            font: 'inherit',
+            fontSize: 13.5,
+            cursor: busy ? 'default' : 'pointer',
+          }}
+          onChange={e => {
+            void choose(e.target.value as OverallTheme)
+          }}>
+          {OPTIONS.map(o => (
+            <option key={o.value || 'dark'} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
       {/* 2026-09-08 (owner request): log-out lives in the same group.
           GET /logout is the CE logout route (router.mjs) — a plain
           navigation ends the session and lands on the login page. */}
       <Tooltip label="Log out" withArrow position="bottom">
-        <ActionIcon
-          variant="subtle"
-          color="red"
-          size="md"
-          style={{ marginLeft: 6 }}
-          onClick={() => {
-            window.location.href = '/logout'
-          }}
+        <a
+          href="/logout"
           aria-label="Log out"
-        >
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            textDecoration: 'none',
+            color: 'inherit',
+          }}>
           <Icon name="logout" size={17} />
-        </ActionIcon>
+        </a>
       </Tooltip>
     </Group>
   )

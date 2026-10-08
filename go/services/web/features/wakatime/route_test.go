@@ -320,16 +320,23 @@ func TestNotLinkedHeartbeat(t *testing.T) {
 		strings.NewReader(`{"entity":"f.tex"}`))
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("not-linked: got %d, want 400 (%s)", rr.Code, rr.Body.String())
+	// Candidate F (owner report 2026-10-07): a not-linked user gets a QUIET
+	// 204 no-op — not 400/404 — so the editor tracker produces zero
+	// console/network noise on keystrokes before any account is linked.
+	if rr.Code != http.StatusNoContent {
+		t.Errorf("not-linked: got %d, want 204 (%s)", rr.Code, rr.Body.String())
 	}
 }
 
-func TestResolveEnabledDefaultOff(t *testing.T) {
-	// OlliTeX owner directive: off-by-default (reference repo default ON).
+func TestResolveEnabledDefaultOn(t *testing.T) {
+	// 2026-10-07 (owner directive, supersedes off-by-default): default ON.
 	t.Setenv("WAKATIME_INTEGRATION_ENABLED", "")
+	if !ResolveEnabled(context.Background(), &core.App{}) {
+		t.Error("default must be ON (owner directive)")
+	}
+	t.Setenv("WAKATIME_INTEGRATION_ENABLED", "false")
 	if ResolveEnabled(context.Background(), &core.App{}) {
-		t.Error("default must be OFF (opt-in)")
+		t.Error("env false must disable (admin opt-out)")
 	}
 	t.Setenv("WAKATIME_INTEGRATION_ENABLED", "true")
 	if !ResolveEnabled(context.Background(), &core.App{}) {

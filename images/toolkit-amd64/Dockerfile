@@ -52,6 +52,7 @@ RUN apk add --no-cache \
       docker-cli \
       docker-cli-compose \
       openssh-client \
+      ncurses-libs \
       tzdata \
       unzip \
       wget

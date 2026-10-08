@@ -140,6 +140,7 @@ func TestRoutesRegistered(t *testing.T) {
 		"POST|/project/[a-fA-F0-9]{24}/doc/.+/changes",
 		"GET|/project/[a-fA-F0-9]{24}/doc/.+/changes",
 		"POST|/project/[a-fA-F0-9]{24}/doc/.+/changes/accept",
+		"POST|/project/[a-fA-F0-9]{24}/doc/.+/changes/reject",
 		"POST|/project/[a-fA-F0-9]{24}/track_changes",
 		"GET|/project/[a-fA-F0-9]{24}/ranges",
 		"GET|/project/[a-fA-F0-9]{24}/changes/users",

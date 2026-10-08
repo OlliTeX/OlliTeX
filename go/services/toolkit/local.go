@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // DoctorRow is one CLI doctor line.
@@ -17,7 +15,7 @@ type DoctorRow struct {
 
 // NewAppForLocal exposes the TUI model for local (non-SSH) runs — the same
 // model wish sessions get, so dev and deployed behavior stay identical.
-func NewAppForLocal(t *Toolkit) tea.Model {
+func NewAppForLocal(t *Toolkit) *app {
 	return newApp(t)
 }
 
@@ -61,4 +59,17 @@ func Doctor(ctx context.Context, t *Toolkit) ([]DoctorRow, error) {
 		rows = append(rows, DoctorRow{Label: "data dir", Detail: t.DataDir + " (missing/not writable)", OK: false})
 	}
 	return rows, nil
+}
+
+// SetStartScreen — boot straight into a named master-list screen
+// (`ssh host hub` / `ssh host doctor` ...; the gate's pendingStartScreens).
+func SetStartScreen(a *app, screen string) {
+	if a == nil || screen == "" {
+		return
+	}
+	if i, ok := a.findItem(screen); ok {
+		a.dcur = i
+		a.screen = screen
+		a.boot()
+	}
 }

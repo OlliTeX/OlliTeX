@@ -25,6 +25,12 @@ const LLMModelSelectModal = React.memo(function LLMModelSelectModal({
     // option is gone — only concrete models (site + BYO rows) are selectable.
     const { options, loaded, selected, apply } = useLLMModelSelection()
     const [local, setLocal] = useState('')
+    // overleaf-lab (owner request H, 2026-10-07): an empty model list is a real,
+    // informational state (LLM not configured on this server) — surface a clear
+    // notice and disable the apply button instead of a dead empty radiogroup
+    // + an active "Use this model" that does nothing. The modal stays openable
+    // for exactly this (the admin then knows to configure a model).
+    const noModels = loaded && options.length === 0
 
     // Re-seed each time the modal opens (and live if another surface changed
     // the selection while it is open). When nothing is selected yet, preselect
@@ -64,7 +70,21 @@ const LLMModelSelectModal = React.memo(function LLMModelSelectModal({
                         'This model is used everywhere — AI Assistant chat, Review, the AI Generate menu items and ask-AI on selected text. The choice is saved to your profile and follows you across projects.',
                     )}
                 </p>
-                <div className="llm-model-option-list" role="radiogroup">
+                <div className="llm-model-option-list" role="radiogroup" aria-busy={!loaded}>
+                    {!loaded && (
+                        <div className="llm-model-option loading">
+                            {t('llm_loading', 'Loading…')}
+                        </div>
+                    )}
+                    {noModels && (
+                        <div className="llm-model-option llm-model-option-notice" role="note">
+                            <MaterialIcon type="notification_important" className="me-2" />
+                            {t(
+                                'llm_no_models',
+                                'No LLM model has been configured on this server. Ask an administrator to set one up — you can pick a model here once one is available.',
+                            )}
+                        </div>
+                    )}
                     {options.map(o => (
                         <label
                             key={o.value || 'default'}
@@ -89,18 +109,13 @@ const LLMModelSelectModal = React.memo(function LLMModelSelectModal({
                             </span>
                         </label>
                     ))}
-                    {!loaded && (
-                        <div className="llm-model-option loading">
-                            {t('llm_loading', 'Loading…')}
-                        </div>
-                    )}
                 </div>
             </div>
             <div className="modal-footer">
                 <Btn variant="tertiary" onClick={onHide}>
                     {t('cancel', 'Cancel')}
                 </Btn>
-                <Btn variant="primary" onClick={save} disabled={!loaded}>
+                <Btn variant="primary" onClick={save} disabled={!loaded || noModels}>
                     {t('llm_apply_model', 'Use this model')}
                 </Btn>
             </div>

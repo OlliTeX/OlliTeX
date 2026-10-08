@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	cerrors "ollitex/go/services/clsitex/errors"
 	"ollitex/go/services/clsitex/logger"
@@ -58,12 +59,24 @@ func (m *Manager) runSynctex(projectID, userID string, command []string,
 		return "", false, &cerrors.InvalidParameter{Message: "invalid buildId"}
 	}
 
-	outputDir := filepath.Join(m.Paths.OutputDir, projectID, userID)
+	outputDir := filepath.Join(m.Paths.OutputDir, compileName(projectID, userID))
 	runInOutputDir := opts.BuildID != "" && m.Runner.CanRunSyncTeXInOutputDir()
 
 	directory := compileDirOf(m.Paths.CompilesDir, projectID, userID)
 	if runInOutputDir {
 		directory = filepath.Join(outputDir, "generated-files", opts.BuildID)
+	}
+	// CE layout fix (2026-10-07 AF, owner: "clicking in the pdf does not
+	// jump / synctex still broken"): the Node oracle assumes the build
+	// directory holds the FULL project (sources + outputs) — original CE
+	// generated-files copies did. Our compile runner only copies output.*
+	// into generated-files/<buildId>, so `synctex view` (tex->pdf) cannot
+	// find the source lines there and returns nothing, while `synctex edit`
+	// (pdf->tex, output.pdf only) still works. Fall back to the compile dir,
+	// which holds sources + output.pdf + output.synctex.gz.
+	if runInOutputDir && !dirHasTexSources(directory) {
+		directory = compileDirOf(m.Paths.CompilesDir, projectID, userID)
+		runInOutputDir = false
 	}
 	const timeout = int64(60 * 1000) // increased to allow for large projects
 	compileName := compileName(projectID, userID)
@@ -131,8 +144,10 @@ func (m *Manager) runSynctex(projectID, userID string, command []string,
 // mounts the host compile dir there).
 func (m *Manager) SyncFromCode(projectID, userID, filename string,
 	line, column int, opts SyncOpts) (SyncFromCodeResult, error) {
-	compileName := compileName(projectID, userID)
-	baseDir := filepath.Join(m.Paths.SynctexBase, compileName)
+	// Node docker-mode oracle: synctexBaseDir() is the FIXED '/compile' (it
+	// ignores the projectId arg) — the runner mounts the host compile/output
+	// dir at /compile, so PDF + source paths must live at its root.
+	baseDir := m.Paths.SynctexBase
 	inputFilePath := filepath.Join(baseDir, filename)
 	outputFilePath := filepath.Join(baseDir, "output.pdf")
 	command := []string{
@@ -157,8 +172,8 @@ func (m *Manager) SyncFromCode(projectID, userID, filename string,
 // SyncFromPdf ports syncFromPdf: synctex edit <page>:<h>:<v>:<output.pdf>.
 func (m *Manager) SyncFromPdf(projectID, userID string, page, h, v int,
 	opts SyncOpts) (SyncFromPdfResult, error) {
-	compileName := compileName(projectID, userID)
-	baseDir := filepath.Join(m.Paths.SynctexBase, compileName)
+	// Fixed '/compile' base (Node docker-mode oracle) — see SyncFromCode.
+	baseDir := m.Paths.SynctexBase
 	outputFilePath := filepath.Join(baseDir, "output.pdf")
 	command := []string{
 		"synctex", "edit",
@@ -176,6 +191,22 @@ func (m *Manager) SyncFromPdf(projectID, userID string, page, h, v int,
 		PdfPositions:        synctexparser.ParseEditOutput(stdout, baseDir),
 		DownloadedFromCache: downloadedFromCache,
 	}, nil
+}
+
+// dirHasTexSources reports whether dir contains at least one .tex file
+// (the oracle assumption that a synctex build dir holds the project
+// sources — see the CE layout fix note in runSynctex).
+func dirHasTexSources(dir string) bool {
+	eni, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range eni {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".tex") {
+			return true
+		}
+	}
+	return false
 }
 
 // checkFileExists ports _checkFileExists: stat the dir (ENOENT ->

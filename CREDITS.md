@@ -12,29 +12,36 @@ something from their code we put them into CREDITS.md").
   autoheal does not have: a per-container cooldown window to break tight
   restart loops on top of docker's own restart policy.
 
-- **charmbracelet** — `wish` (SSH server), `bubbletea` (TUI event loop),
-  `bubbles`, `lipgloss` (styling). Used by the operator TUI in
-  `go/services/toolkit`.
+- **charmbracelet** — `wish` (SSH server), `log` (structured logging).
+  Used by the operator TUI service in `go/services/toolkit`.
 
-- **bubbletea-console-classic libraries (MIT, credited per the policy)** —
-  the classic-console (midnight-commander / freebsd-installer) TUI structure
-  in `go/services/toolkit` (menu bar + two-pane layout + prompt boxes +
-  mouse click targets) borrows three small Charm-ecosystem libraries, used
-  through their public APIs (no code copied):
-  - **jejacks0n/bubbletea-menubar**
-    (https://github.com/jejacks0n/bubbletea-menubar) — the top menu bar
-    (`ui_menu.go`): the `File · Stack · Settings · Shells · Doctor · Backup ·
-    Actions · Help` strip with hotkeys + dropdowns + its own mouse handling.
-  - **rmhubbert/bubbletea-overlay**
-    (https://github.com/rmhubbert/bubbletea-overlay) — the centered prompt
-    boxes (`ui_dialog.go`): `Composite`/`Position` do the background/foreground
-    compositing + centering of the mc-style confirm and input dialogs over the
-    panes.
-  - **lrstanley/bubblezone**
-    (https://github.com/lrstanley/bubblezone) — zone click targets
-    (`ui_view.go` / `ui_dialog.go` / `ui.go`): `zone.Mark`/`zone.Scan`/
-    `zone.Get` register the master-list rows, the keystrip chips and the
-    dialog buttons as hit-testable zones (the classic clickable UI).
+- **rivo — the retained-mode TUI stack (MIT/Apache-2.0 dual, credited per the
+  policy)** — the operator TUI in `go/services/toolkit` was ported to this
+  stack on 2026-10-07 (owner item AI): `rivo/tview` provides the retained-mode
+  widget tree (Application/Grid/List/TextView/Modal/InputField/Button +
+  QueueUpdateDraw), and `gdamore/tcell` (v2) the terminal engine (terminfo
+  screens, events, styles — the session-screen path runs the TUI over the
+  SSH pty through a `tcell.Tty` bound to the wish session's io in
+  `tui.go`). The classic console look (menu strip + two panes + status/
+  keystrip footer + centered confirm/prompt dialogs + the j/k/number key map)
+  is reproduced with the public tview API (no code copied).
+  - **rivo/tview** (https://github.com/rivo/tview) — retained-mode TUI
+    widgets + event loop.
+  - **gdamore/tcell** (https://github.com/gdamore/tcell) — the terminal
+    screen/event layer under tview.
+  - **rivo/uniseg** (https://github.com/rivo/uniseg) — Unicode segmentation
+    used by tview/tcell text measurement.
+
+- **retired 2026-10-07 (the bubbletea era)** — the previous TUI runtime
+  (`charmbracelet/bubbletea` + `lipgloss` + `bubbles`, with the three helper
+  libraries `jejacks0n/bubbletea-menubar`, `rmhubbert/bubbletea-overlay`,
+  `lrstanley/bubblezone`) is no longer linked by this codebase; the port
+  replaced its full-frame redraw (the "ultra slow over SSH" wall) with the
+  retained-mode tview screen. The credits above are kept for provenance of
+  the classic layout the tview port preserves.
+  - jejacks0n/bubbletea-menubar (https://github.com/jejacks0n/bubbletea-menubar)
+  - rmhubbert/bubbletea-overlay (https://github.com/rmhubbert/bubbletea-overlay)
+  - lrstanley/bubblezone (https://github.com/lrstanley/bubblezone)
 
 - **Moby (Docker)** — `github.com/moby/moby/client` (official Go client) for all
   daemon operations (container list/logs/images, exec attach for interactive

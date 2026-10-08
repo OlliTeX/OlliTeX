@@ -88,11 +88,47 @@ export const TrackChangesStateProvider: FC<React.PropsWithChildren> = ({
 
   const saveTrackChanges = useCallback(
     async (trackChangesBody: SaveTrackChangesRequestBody) => {
-      postJSON(`/project/${projectId}/track_changes`, {
-        body: trackChangesBody,
-      })
+      const prev = project?.trackChangesState
+      try {
+        await postJSON(`/project/${projectId}/track_changes`, {
+          body: trackChangesBody,
+        })
+        // D40-live (owner 2026-10-07: "Reviewing does not stick and switches
+        // straight back to Editing"): the Go route answers 204 with NO body
+        // and the classic way to learn the new state was the
+        // 'toggle-track-changes' SOCKET broadcast — retired with socket.io
+        // on the Yjs stack, so the UI state never moved and the mode fell
+        // back to Editing. Apply the accepted state locally (server is the
+        // source of truth — it validated + stored this exact body);
+        // the socket listener above stays as a harmless no-op if some stack
+        // ever emits again.
+        if (trackChangesBody.on_for) {
+          const merged: Record<string, boolean> = { ...((prev ?? {}) as Record<string, boolean>) }
+          for (const [k, v] of Object.entries<{ [u: string]: boolean }>(
+            trackChangesBody.on_for
+          )) {
+            merged[k] = v
+          }
+          if (trackChangesBody.on_for_guests !== undefined) {
+            merged.__guests__ = trackChangesBody.on_for_guests
+          }
+          updateProject({ trackChangesState: merged })
+        } else if (trackChangesBody.on_for_guests !== undefined) {
+          updateProject({
+            trackChangesState: {
+              ...((prev ?? {}) as Record<string, boolean>),
+              __guests__: trackChangesBody.on_for_guests,
+            },
+          })
+        }
+      } catch {
+        // rejected/5xx: roll the UI back — never let the toggle lie
+        if (prev !== undefined) {
+          updateProject({ trackChangesState: prev })
+        }
+      }
     },
-    [projectId]
+    [projectId, project?.trackChangesState, updateProject]
   )
 
   const saveTrackChangesForCurrentUser = useCallback(

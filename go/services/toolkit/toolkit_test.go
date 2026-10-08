@@ -64,13 +64,10 @@ func TestNewApp_DashboardRenders(t *testing.T) {
 	a := newApp(tk)
 	a.width, a.height = 100, 30
 	a.screen = "dashboard"
-	a.Init()
-	v := a.View()
-	if !strings.Contains(v, "OlliTeX Toolkit") {
-		t.Fatalf("dashboard missing title:\n%s", v)
-	}
+	a.boot()
+	v := a.rightPane() + "\n" + a.statusLine() + "\n" + a.keyStrip()
 	if !strings.Contains(v, "ollitex-test") {
-		t.Fatalf("dashboard missing project: %s", v)
+		t.Fatalf("dashboard missing project:\n%s", v)
 	}
 }
 
@@ -80,15 +77,16 @@ func TestNewApp_AllScreensRender(t *testing.T) {
 	a.width, a.height = 100, 30
 	for _, screen := range []string{"dashboard", "stack", "shells", "settings", "logs", "actions", "doctor", "backup", "about"} {
 		a.screen = screen
-		v := a.View()
+		v := a.rightPane() + "\n" + a.statusLine() + "\n" + a.keyStrip()
 		if strings.TrimSpace(v) == "" {
 			t.Fatalf("screen %s rendered empty", screen)
 		}
 	}
-	// the mc prompt box (the overlay compositor) must render over the panes
+	// the stop confirmation (tview era: the modal paints in a dedicated
+	// root; the state must carry title + YES action)
 	a.askStop()
-	if !strings.Contains(a.View(), "STOP THE STACK") {
-		t.Fatalf("the stop-confirm box did not render over the panes")
+	if a.dlg == nil || a.dlg.kind != dlgConfirm || a.dlg.onYes == nil {
+		t.Fatalf("the stop-confirm dialog must be armed with title + YES action")
 	}
 	a.dlg = nil
 }
@@ -412,10 +410,16 @@ func TestPlan_KioskOptIn(t *testing.T) {
 		t.Fatal(err)
 	}
 	sc := string(ov)
+	// AJ-3 (owner 2026-10-08): the Instance statistics section IS the Grafana
+	// system, so the canonical compose now defaults the ANONYMOUS Viewer
+	// ON (the embedded dashboards carry no credentials) and serves Grafana
+	// from a sub-path on the main origin (single-edge; 80/443 only). The
+	// pre-AJ-3 safe-defaults (`:-false` / `:-self`) are superseded.
 	for _, want := range []string{
-		"GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}",
+		"GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-true}",
 		"GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer",
-		"GF_SECURITY_CSP_FRAME_ANCESTORS: ${GRAFANA_CSP_FRAME_ANCESTORS:-self}",
+		"GF_SERVER_SERVE_FROM_SUB_PATH: ${GF_SERVER_SERVE_FROM_SUB_PATH:-true}",
+		"GF_SECURITY_CSP_FRAME_ANCESTORS: ${GRAFANA_CSP_FRAME_ANCESTORS:-'self' https://psintern.neuro.uni-bremen.de}",
 	} {
 		if !strings.Contains(sc, want) {
 			t.Fatalf("canonical compose.yaml missing kiosk line %q", want)

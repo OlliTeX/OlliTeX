@@ -6,10 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/charmbracelet/lipgloss"
-
-	zone "github.com/lrstanley/bubblezone"
 )
 
 // ---- the master list (the LEFT pane) ----------------------------------------
@@ -60,147 +56,12 @@ func (a *app) doctorText() string {
 	return fmtS
 }
 
-// ---- View ------------------------------------------------------------------
-
-func (a *app) View() string {
-	if a.screen == "shell" && a.shell != nil {
-		base := a.viewShell()
-		if a.dlg != nil {
-			base = a.dlg.render(a, base)
-		}
-		return a.scan(base)
-	}
-	base := a.viewClassic()
-	if a.dlg != nil {
-		base = a.dlg.render(a, base)
-	}
-	return a.scan(base) // the zone markers are stripped + registered here, once
-}
-
-// scan strips the zone markers after registration (the library contract:
-// Scan on the outermost view only, once — the view is rendered top-down so
-// the marks exist at the time of this call).
-func (a *app) scan(v string) string {
-	if zone.Enabled() {
-		if s := zone.Scan(v); s != "" {
-			return s
-		}
-	}
-	return v
-}
-
-// viewClassic — the mc composition: title · menu bar · two bordered panes ·
-// status line · keystrip.
-func (a *app) viewClassic() string {
-	var out strings.Builder
-	// line 1: title (the rev only when it is set — the build ldflags)
-	var right string
-	if a.tk.Ver != "" {
-		right = styleDim.Render(fmt.Sprintf("  rev %s · project %s", a.tk.Ver, a.tk.Project))
-	} else {
-		right = styleDim.Render(fmt.Sprintf("  project %s", a.tk.Project))
-	}
-	title := " " + stylePaneTitle.Render(" OlliTeX Toolkit ")
-	gap := a.width - lipgloss.Width(title) - lipgloss.Width(right)
-	if gap < 0 {
-		gap = 0
-	}
-	out.WriteString(title + strings.Repeat(" ", gap) + right + "\n")
-
-	// line 2: the menu bar (the menubar library renders it + dropdowns)
-	out.WriteString(a.menuBarLine() + "\n")
-
-	// LAYOUT CONTRACT (owner: "will the footer finally stay at the bottom
-	// of the terminal?"): when the terminal is tall enough the frame is
-	// EXACTLY the terminal height — row 1 title, row 2 menu bar, the pane
-	// block filling everything down to the last two rows, and the status
-	// line + keystrip (the footer) ALWAYS on the bottom two rows (the mc /
-	// ncurses convention). Both panes take the same height (two true equal
-	// windows side by side); content taller than the pane is clamped by the
-	// rectangular fit, and the master pane is padded so the boxes match.
-	paneH := a.height - 6 // fixed: title + menu + status + keystrip + box borders
-	if paneH < 4 {        // belt+braces: zero/odd sizes must never reach the slice math
-		paneH = 4
-	}
-	var left strings.Builder
-	left.WriteString(stylePaneTitle.Render("  S C R E E N S  "))
-	left.WriteString("\n")
-	items := a.masterList()
-	for i, it := range items {
-		row := a.masterRow(i, it)
-		left.WriteString(row + "\n")
-	}
-	body := strings.TrimRight(left.String(), "\n")
-	lbody := strings.Split(body, "\n")
-	if len(lbody) > paneH { // top window: the master list keeps its head
-		lbody = lbody[:paneH]
-		body = strings.Join(lbody, "\n")
-	} else {
-		body += strings.Repeat("\n", paneH-len(lbody)) // fill the pane (classic equal windows)
-	}
-	leftS := stylePanel.Render(body)
-
-	rightBody := fitRect(a.rightPane(), 0, paneH) // tail window: the LIVE tail wins (logs/doctor/settings)
-	rb := rightBody
-	rfilled := len(strings.Split(rb, "\n"))
-	if rfilled < paneH {
-		rb += strings.Repeat("\n", paneH-rfilled)
-	}
-	rightS := stylePanel.Render(rb)
-
-	leftW := a.width / 3
-	if a.width >= 100 {
-		leftW = a.width * 2 / 5
-	}
-	if leftW < 24 {
-		leftW = 24
-	}
-	rightW := a.width - leftW
-	if rightW < 10 {
-		rightW = 10
-	}
-	leftFit := fit(leftS, leftW)
-	rightFit := fit(rightS, rightW)
-	// THE JOIN (owner: "the two windows failed"): naive string concatenation
-	// of two multi-line boxes is not a layout — the right box's top border
-	// lands on the left box's bottom row (exactly the broken screen the
-	// owner saw). JoinHorizontal aligns them as two true side-by-side panes
-	// (top-anchored; the shorter pane leaves the terminal background clear
-	// below it — the mc look).
-	out.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftFit, rightFit) + "\n")
-
-	// status line + keystrip form the FOOTER — with paneH = height-6 the
-	// frame is exactly the terminal height, so these rest on the bottom two
-	// rows (the mc / ncurses convention the owner asked for).
-	out.WriteString(a.statusLine() + "\n")
-	// keystorep (the classic bracketed keys, zone-targeted)
-	out.WriteString(a.keyStrip())
-	return out.String()
-}
-
-// menuBarLine renders the menubar (bar + any open dropdown) at full width.
-func (a *app) menuBarLine() string {
-	s := a.menu.View()
-	s = strings.TrimRight(s, "\n")
-	lines := strings.Split(s, "\n")
-	bar := lines[0]
-	if lipgloss.Width(bar) < a.width {
-		bar += strings.Repeat(" ", a.width-lipgloss.Width(bar))
-	} else {
-		bar = fit(bar, a.width)
-	}
-	if len(lines) > 1 {
-		return bar + "\n" + strings.Join(lines[1:], "\n")
-	}
-	return bar
-}
-
 // masterRow — one left-pane row; the selected row is the mc cursor.
 func (a *app) masterRow(i int, it masterItem) string {
 	label := fit(it.label, 14)
 	detail := fit(it.detail, 20)
 	if i == a.dcur {
-		return zone.Mark(a.zoneID+".row."+fmt.Sprint(i), styleSelected.Render("> "+label+" ")+styleDim.Render(detail))
+		return styleSelected.Render("> "+label+" ")+styleDim.Render(detail)
 	}
 	return "   " + styleValue.Render(label) + "  " + styleDim.Render(detail)
 }
@@ -230,7 +91,7 @@ func (a *app) statusLine() string {
 // the primary actions are clickable.
 func (a *app) keyStrip() string {
 	zc := func(id, k, label string) string {
-		return zone.Mark(a.zoneID+".strip."+id, styleChip.Render("["+k+"] "+label))
+		return styleChip.Render("["+k+"] "+label)
 	}
 	var seg []string
 	seg = append(seg, zc("move", "j/k", "move"))
@@ -253,7 +114,7 @@ func (a *app) keyStrip() string {
 	}
 	seg = append(seg, zc("menu", "F10|esc0", "menu"), zc("help", "?", "help"))
 	s := " " + strings.Join(seg, " ")
-	if lipgloss.Width(s) > a.width {
+	if dispW(s) > a.width {
 		s = " " + strings.Join(seg[:len(seg)-2], " ")
 	}
 	return fit(s, a.width)
@@ -348,7 +209,7 @@ func (a *app) panelStack() string {
 func (a *app) btnRow(pairs ...string) string {
 	var b strings.Builder
 	for i := 0; i+1 < len(pairs); i += 2 {
-		b.WriteString(zone.Mark(a.zoneID+".chip."+pairs[i], styleChip.Render("["+strings.TrimPrefix(pairs[i+1], " ")+"] "+pairs[i+1])) + " ")
+		b.WriteString(styleChip.Render("["+strings.TrimPrefix(pairs[i+1], " ")+"] "+pairs[i+1]) + " ")
 	}
 	return b.String()
 }
@@ -653,10 +514,10 @@ func ageStr(ms int64, now time.Time) string {
 
 // leftPad pads to width W (for the aligned sample columns).
 func leftPad(s string, w int) string {
-	if lipgloss.Width(s) >= w {
+	if dispW(s) >= w {
 		return s
 	}
-	return s + strings.Repeat(" ", w-lipgloss.Width(s))
+	return s + strings.Repeat(" ", w-dispW(s))
 }
 
 func (a *app) panelBackup() string {
@@ -700,27 +561,7 @@ func (a *app) panelAbout() string {
 		b.WriteString("  " + styleKvK.Render(r[0]) + " " + fit(r[1], 60) + "\n")
 	}
 	b.WriteString("\n  " + styleDim.Render("console layout: the classic two-pane (this one) + the menu bar + the keystrip.") + "\n")
-	b.WriteString("  " + styleDim.Render("TUI stack: bubbletea · menubar (jejacks0n) · overlay (rmhubbert) · zone (lrstanley) — MIT, CREDITS.md") + "\n")
-	return b.String()
-}
-
-// ---- the shell full-screen (unchanged contract) -----------------------------
-
-func (a *app) viewShell() string {
-	var b strings.Builder
-	b.WriteString("\n")
-	b.WriteString(" " + stylePaneTitle.Render(" Shell — "+a.shellLabel) + styleDim.Render("   ctrl-z detach · ctrl+c → SIGINT"))
-	if a.shellExited {
-		b.WriteString("\n  " + styleErr.Render("session ended"))
-	}
-	tail := a.shellBuf
-	if len(tail) > 6000 {
-		tail = tail[len(tail)-6000:]
-	}
-	for _, ln := range strings.SplitAfter(string(tail), "\n") {
-		b.WriteString("  " + ln)
-	}
-	b.WriteString("\n")
+	b.WriteString("  " + styleDim.Render("TUI stack: rivo/tview + tcell (retained-mode, delta repaint) — the 2026-10-07 switch from bubbletea full-frame redraw") + "\n")
 	return b.String()
 }
 

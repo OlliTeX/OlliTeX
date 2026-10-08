@@ -4,7 +4,6 @@ import { ToolbarProjectTitle } from './project-title'
 import { OnlineUsers } from './online-users'
 import ShareProjectButton from './share-project-button'
 import ChangeLayoutButton from './change-layout-button'
-import ShowHistoryButton from './show-history-button'
 import RequestAccessButton from './request-access-button'
 import { useLayoutContext } from '@/shared/context/layout-context'
 import BackToEditorButton from '@/features/editor-navigation-toolbar/components/back-to-editor-button'
@@ -27,7 +26,7 @@ const SubmitProjectButton = publishModalModules?.import.default
 export const Toolbar = () => {
   const { view, restoreView, focusMode, setFocusMode, pdfLayout, setView } =
     useLayoutContext()
-  const { cobranding, isRestrictedTokenMember } = useEditorContext()
+  const { cobranding } = useEditorContext()
   const { permissionsLevel } = useIdeReactContext()
   const improvedFlakyConnections = useFeatureFlag(
     'intermittent-connection-improvements'
@@ -135,8 +134,16 @@ export const Toolbar = () => {
         <div className="ide-redesign-toolbar-actions">
           {!isOfflineDueToNetworkStall && <OnlineUsers />}
           <RequestAccessButton />
-          {!isRestrictedTokenMember && <ShowHistoryButton />}
-          <ChangeLayoutButton />
+          {/* 2026-10-07 owner item L: removed the toolbar History button —
+              "Show Version History" is already in the File menu, so the
+              toolbar icon was a duplicate. View switch (editor<->pdf) and
+              the View menu remain the canonical entry points. */}
+          {/* 2026-10-07 owner item N: removed the toolbar Layout options
+              dropdown (#layout-dropdown-btn) from the NORMAL toolbar —
+              "Change Layout" lives in the View menu. NOTE: the focus-mode
+              toolbar above intentionally keeps its ChangeLayoutButton (the
+              menu bar is hidden in focus mode, so that button is the only
+              layout entry point there). */}
           {shouldDisplaySubmitButton && cobranding && (
             <SubmitProjectButton cobranding={cobranding} />
           )}

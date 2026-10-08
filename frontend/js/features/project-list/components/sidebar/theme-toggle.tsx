@@ -25,34 +25,27 @@ export default function ThemeToggle() {
   const overallThemes = getMeta('ol-overallThemes')
   const { t } = useTranslation()
 
+  // AJ-6 (owner 2026-10-08): the theme BUTTONS (three icon radios —
+  // dark/light/system) are RETIRED in favour of ONE dropdown. Per-user +
+  // global semantics unchanged (useSetOverallTheme persists the user
+  // setting — the same store the /editor Appearance tab reads).
   return (
     <fieldset className="dropdown-item theme-toggle">
       <legend>{t('theme')}</legend>
-      <div className="theme-toggle-radios">
-        {overallThemes.map(theme => (
-          <OLTooltip
-            key={theme.val}
-            description={theme.name}
-            id={`theme-switch-${theme.name}-tooltip`}
-          >
-            <div className="theme-toggle-radio">
-              <input
-                id={`theme-switch-${theme.name}`}
-                type="radio"
-                value={theme.val}
-                checked={overallTheme === theme.val}
-                onChange={() => setOverallTheme(theme.val)}
-              />
-              <label
-                htmlFor={`theme-switch-${theme.name}`}
-                aria-label={theme.name}
-              >
-                <MaterialIcon type={getIcon(theme)} />
-              </label>
-            </div>
-          </OLTooltip>
+      <select
+        className="theme-toggle-select"
+        aria-label={t('theme')}
+        value={overallTheme}
+        onChange={e => {
+          const chosen = overallThemes?.find(x => x.val === e.target.value)
+          if (chosen) setOverallTheme(chosen.val)
+        }}>
+        {overallThemes?.map(theme => (
+          <option key={theme.val} value={theme.val}>
+            {theme.name}
+          </option>
         ))}
-      </div>
+      </select>
     </fieldset>
   )
 }

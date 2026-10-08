@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/wakatime"
 	"ollitex/go/services/web/views"
 	"strings"
 
@@ -63,6 +64,10 @@ func getSettings(a *core.App) func(*core.Cxt, *core.Res) {
 		d.ProjectSyncSuccessMessage = syncOK
 		d.ProjectSyncErrorMessage = syncErr
 		d.ReferenceLinkingErrorMessage = refErr
+		// 2026-10-10 (Wakepi/V): expose wakaTimeEnabled in the settings-page
+		// ExposedSettings so the WakatimeCard renders there (the editor-page
+		// gate stays authoritative for the relay endpoints).
+		d.WakaEnabled = wakatime.ResolveEnabled(ctx, a)
 		views.SettingsPage(res.W, d)
 		a.CommitSess(cxt.Sess, res.W)
 	}

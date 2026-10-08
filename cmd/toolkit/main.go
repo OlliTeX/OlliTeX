@@ -15,7 +15,6 @@
 package main
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 
 	"context"
 	"flag"
@@ -62,6 +61,8 @@ func run(args []string) error {
 		return serve(rest)
 	case "local":
 		return local(rest)
+	case "tui":
+		return tuicmd(rest)
 	case "init":
 		return initcmd(rest)
 	case "bootstrap":
@@ -305,8 +306,51 @@ func local(args []string) error {
 	}
 	defer t.Close()
 
-	p := tea.NewProgram(toolkit.NewAppForLocal(t), tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	// the tview retained-mode TUI (the AI-era replacement for the
+	// bubbletea program — the same model, the faster screen)
+	app := toolkit.NewAppForLocal(t)
+	if err := toolkit.NewTUI(app).Run(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// tuicmd is the retained-mode TUI entry (the same surface as `local`; the
+// ssh child process calls it with --screen for `ssh host <screen>`).
+func tuicmd(args []string) error {
+	f := flag.NewFlagSet("tui", flag.ExitOnError)
+	dsn := f.String("dsn", os.Getenv(toolkit.EnvDSN), "config store Postgres DSN (overrides env chain)")
+	dataDir := f.String("data-dir", envOr(toolkit.EnvDataDir, "./.ollitex-toolkit"), "mounted data dir")
+	composeFile := f.String("compose", envOr(toolkit.EnvComposeFile, "./toolkit.yaml"), "compose file")
+	project := f.String("project", envOr(toolkit.EnvProjectName, "ollitex"), "stack project name")
+	screen := f.String("screen", "", "boot straight into a master-list screen (hub, doctor, ...)")
+	dockerSock := f.String("docker-sock", envOr("DOCKER_HOST", "/var/run/docker.sock"), "docker socket path")
+	_ = f.Parse(args)
+
+	// no DSN → the documented OFFLINE EMERGENCY path (loud warning at boot)
+	// against a local file in the data dir — the TUI must still boot (the
+	// owner's dev / disconnected-host flow). A configured DSN always wins.
+	if *dsn == "" {
+		os.Setenv("CONFIG_DB_PATH", *dataDir+"/config-emergency.sqlite")
+	}
+
+	t, err := toolkit.New(toolkit.Options{
+		DSN:         *dsn,
+		DataDir:     *dataDir,
+		ComposeFile: *composeFile,
+		Project:     *project,
+		DockerSock:  *dockerSock,
+	})
+	if err != nil {
+		return err
+	}
+	defer t.Close()
+
+	app := toolkit.NewAppForLocal(t)
+	if *screen != "" {
+		toolkit.SetStartScreen(app, *screen)
+	}
+	if err := toolkit.NewTUI(app).Run(); err != nil {
 		return err
 	}
 	return nil

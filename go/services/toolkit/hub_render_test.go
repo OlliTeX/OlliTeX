@@ -103,7 +103,7 @@ func TestHub_PanelRenders(t *testing.T) {
 
 	// not loaded yet
 	a.screen = "hub"
-	v := a.View()
+	v := a.rightPane() + "\n" + a.statusLine() + "\n" + a.keyStrip()
 	if !strings.Contains(v, "HUB") || !strings.Contains(v, "not loaded") {
 		t.Errorf("the hub panel must show its not-loaded state:\n%s", v)
 	}
@@ -125,7 +125,7 @@ func TestHub_PanelRenders(t *testing.T) {
 	a.hub.Users.Sample = []HubUserRow{
 		{Email: "admin@example.com", IsAdmin: true, LastActive: hubNow.UnixMilli(), SignUp: hubNow.Add(-400 * 24 * time.Hour).UnixMilli()},
 	}
-	v = a.View()
+	v = a.rightPane() + "\n" + a.statusLine() + "\n" + a.keyStrip()
 	for _, want := range []string{"PROJECTS", "USERS", "280", "frog", "admin@example.com"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("hub panel missing %q:\n%s", want, v)
@@ -167,13 +167,13 @@ func TestAppBootScreen(t *testing.T) {
 	if c := newApp(tk); c.screen != "dashboard" {
 		t.Fatalf("default boot stays dashboard")
 	}
-	// the hub boot must kick the load in Init()
+	// the hub boot must kick the auto-load (the tview-era newApp does it
+	// synchronously through the job runner: the loading flag is set)
 	a2 := newApp(tk, "hub")
 	if a2.hubSample == 0 {
 		a2.hubSample = 10
 	}
-	cmd := a2.Init()
-	if cmd == nil {
-		t.Errorf("hub boot must return the auto-load command from Init")
+	if !a2.loading && a2.hub == nil {
+		t.Errorf("hub boot must kick the auto-load (loading or hub set)")
 	}
 }

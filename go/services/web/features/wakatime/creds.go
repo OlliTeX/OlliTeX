@@ -279,7 +279,14 @@ func dgetS(d bson.D, key string) (string, bool) {
 //	merged = stored site_settings.global.wakatime.enabled (bool) wins when
 //	         present (admin UI / config surface, zotero parity).
 func (s *svc) enabled(ctx context.Context) bool {
-	enabled := false
+	// 2026-10-07 (owner directive, supersedes the earlier off-by-default
+	// pin): WakaTime tracking is ENABLED BY DEFAULT — a logged-in user
+	// without linked credentials gets quiet 204 no-ops (no external calls;
+	// the relay only ever dials an endpoint the user linked after a
+	// successful verify, and the host allowlist still applies). An admin
+	// opts out via WAKATIME_INTEGRATION_ENABLED=false or
+	// site_settings.global.wakatime{.enabled:false}.
+	enabled := true
 	if raw := strings.TrimSpace(os.Getenv("WAKATIME_INTEGRATION_ENABLED")); raw != "" {
 		if b, err := strconv.ParseBool(raw); err == nil {
 			enabled = b
@@ -328,7 +335,8 @@ func DebugLogging() bool { return os.Getenv("WAKATIME_DEBUG_LOGGING") == "true" 
 
 // ResolveEnabled — the merged wakatime "enabled" flag (env seed +
 // site_settings override), available to other features (the IDE
-// ol-ExposedSettings gate). OlliTeX default OFF (owner directive).
+// ol-ExposedSettings gate). OlliTeX: ON by default (owner directive);
+// admins can force it off via env or site settings.
 func ResolveEnabled(ctx context.Context, a *core.App) bool {
 	return newSvc(a).enabled(ctx)
 }

@@ -22,7 +22,7 @@ import (
 //	ollitex-overview            — OlliTeX — overview
 //	ollitex-toolkit-mongo-redis — MongoDB + Redis overview
 //
-// kiosk URL form: {base}/kiosk-d/{uid} (Grafana "Kiosk" embed mode —
+// embed URL form: {base}/d/{uid} (Grafana 11+ removed the Kiosk app) (Grafana "Kiosk" embed mode —
 // read-only dashboard, no chrome; requires GF_AUTH_ANONYMOUS_* +
 // GF_SECURITY_CSP_FRAME_ANCESTORS on the Grafana side for cross-origin
 // framing — the toolkit monitoring overlay renders both from the
@@ -51,12 +51,17 @@ func grafanaDashboards(base string) []struct {
 		{"ollitex-overview", "OlliTeX — overview"},
 		{"ollitex-toolkit-mongo-redis", "MongoDB + Redis overview"},
 	} {
+		// AJ-3 (owner 2026-10-08): Grafana 11.x REMOVED the Kiosk app
+		// (kiosk-d → 404, verified live on grafana-oss 11.6). The modern
+		// embed = the dashboard URL itself with anonymous Viewer auth
+		// (GF_AUTH_ANONYMOUS_ENABLED) + CSP frame-ancestors, so "kiosk"
+		// and "full" collapse onto the same /d/{id} form.
 		out = append(out, struct {
 			ID    string `json:"id"`
 			Title string `json:"title"`
 			Kiosk string `json:"kiosk"`
 			Full  string `json:"full"`
-		}{d.id, d.title, base + "/kiosk-d/" + d.id, base + "/d/" + d.id})
+		}{d.id, d.title, base + "/d/" + d.id, base + "/d/" + d.id})
 	}
 	return out
 }

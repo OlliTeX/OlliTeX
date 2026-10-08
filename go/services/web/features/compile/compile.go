@@ -185,6 +185,11 @@ func Feature(a *core.App) core.Feature {
 		Name: "compile",
 		Routes: []core.Route{
 			{Method: "POST", Pattern: compilePat, Handler: compileHandler(a)},
+			// Owner 2026-10-07 item P: full-project search corpus. Serves the
+			// same doc text the compiler reads (rootFolder walk + docstore
+			// lines) so rail search works for S2/Yjs projects whose V1-history
+			// snapshot is empty. Read-auth (preflight/canRead).
+			{Method: "GET", Pattern: searchCorpusPat, Handler: searchCorpusHandler(a)},
 			// audit-013: Word/Markdown/HTML export (Node
 			// ProjectDownloadsController.exportProjectConversion +
 			// downloadPreparedProjectExport).
@@ -845,14 +850,22 @@ func compileHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 		}
 		for _, d := range docs {
-			if l, ok := lines[d.ID]; ok && len(l) > 0 {
+			if l, ok := lines[d.ID]; ok {
+				content := strings.Join(l, "\n")
 				// Node oracle (ClssiManager ~L1159): a doc with lines == null is
 				// a stub entry and is NOT added to resources. Go's docstore
-				// reports the same stub as lines: [] (empty) — an empty content
-				// string is omitempty-erased, leaving a path-only resource that
-				// CLSI rejects ("all resources should have either a url or content
-				// attribute"). Skip zero-line docs to match Node's effective set.
-				resources = append(resources, resEntry{Path: d.Path, Content: strings.Join(l, "\n")})
+				// reports a brand-new (blank) doc as a single empty line; joined,
+				// THAT yields "" and omitempty would erase the content key, leaving
+				// a path-only resource that CLSI rejects ("all resources should
+				// have either a url or content attribute") — killing the WHOLE
+				// compile (owner 2026-10-07: a fresh blank drawing.tikz 500'd
+				// /compile for the project). A blank doc contributes no bytes to
+				// the typescript anyway, so skip it — the same effective resource
+				// set Node served for lines == null.
+				if content == "" {
+					continue
+				}
+				resources = append(resources, resEntry{Path: d.Path, Content: content})
 			}
 		}
 		for _, f := range files {
@@ -947,6 +960,15 @@ func compileHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 		if cresp.StatusCode >= 400 {
+			// CLSI error bodies are res.sendStatus-style PLAIN TEXT ("500
+			// Internal Server Error\n") — forwarding them verbatim leaves the
+			// browser JSON.parse crash (owner 2026-10-07, console
+			// "Unexpected non-whitespace character after JSON at position 4").
+			// Sanitize to the Node JSON 500 body; keep the pass-through when
+			// the body is already valid JSON.
+			if !json.Valid(cbody) {
+				cbody = []byte(internal500)
+			}
 			res.JSON(cresp.StatusCode, cbody)
 			return
 		}
@@ -1236,19 +1258,24 @@ func wordCountHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			}
 		}
 		for _, d := range docs {
-			if l, lok := lines[d.ID]; lok && len(l) > 0 {
-				resources = append(resources, wcResEntry{Path: d.Path, Content: strings.Join(l, "\n")})
+			if l, lok := lines[d.ID]; lok {
+				content := strings.Join(l, "\n")
+				if content == "" {
+					continue // blank/stub doc — same rule as the compile path (500-class)
+				}
+				resources = append(resources, wcResEntry{Path: d.Path, Content: content})
 			}
-			// zero-line stub docs: omitted, same rule as the compile path
 		}
 		for _, f := range files {
+			if f.Hash == "" || historyID == "" {
+				continue // no fetch URL possible — a path-only entry would be
+				// rejected by CLSI (same class of 500 as the compile path)
+			}
 			e := wcResEntry{Path: f.Path}
-			if f.Hash != "" && historyID != "" {
-				e.URL = filestoreBase() + "/history/project/" + historyID + "/hash/" + f.Hash
-				if f.Created > 0 {
-					ms := f.Created
-					e.Modified = &ms
-				}
+			e.URL = filestoreBase() + "/history/project/" + historyID + "/hash/" + f.Hash
+			if f.Created > 0 {
+				ms := f.Created
+				e.Modified = &ms
 			}
 			resources = append(resources, e)
 		}

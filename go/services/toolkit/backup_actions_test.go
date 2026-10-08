@@ -15,7 +15,7 @@ func TestBackup_PanelDataActions(t *testing.T) {
 	tk, _ := offlineToolkit(t)
 	a := newApp(tk)
 	a.screen = "backup"
-	v := a.View()
+	v := a.rightPane() + "\n" + a.statusLine() + "\n" + a.keyStrip()
 	for _, want := range []string{"b backup", "r restore", "d data backup", "v drill"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("backup panel missing action %q:\n%s", want, v)

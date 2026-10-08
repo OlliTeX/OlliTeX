@@ -20,6 +20,7 @@ import { OLModal } from '@/shared/components/ol/ol-modal'
 import OLButton from '@/shared/components/ol/ol-button'
 import MaterialIcon from '@/shared/components/material-icon'
 import LLMModelSelectModal from '../components/llm-model-select-modal'
+import { useLLMAvailability } from '../hooks/use-llm-availability'
 // overleaf-lab: upstream-AI design tokens for the generator modal's result surface
 import '../../stylesheets/llm-ui.scss'
 
@@ -45,6 +46,12 @@ const KIND_LABEL: Record<GenerateKind, string> = {
 export default function LLMFileMenuCommands() {
     const { t } = useTranslation()
     const { isReady } = useWaitForI18n()
+    // overleaf-lab (owner request Z, 2026-10-07): availability gate — the
+    // whole-document AI Generate items (Title/Abstract/Keywords) are shown only
+    // when the LLM is admin-enabled AND a model is selectable. The
+    // "Select LLM Model" entry (H) stays registered regardless so the model can
+    // still be configured; its modal renders a "no model" notice when empty.
+    const { available } = useLLMAvailability()
     const [kind, setKind] = useState<GenerateKind | null>(null)
     // overleaf-lab (owner request 2026-08-26): the File → "Select LLM Model"
     // modal lives here (this component mounts in the menubar tree via
@@ -120,33 +127,43 @@ export default function LLMFileMenuCommands() {
     )
 
     useCommandProvider(
-        () =>
-            isReady
-                ? [
-                    ...KINDS.map(k => ({
+        () => {
+            if (!isReady) return undefined
+            const commands: any[] = []
+            // overleaf-lab (owner request Z): insert the AI Generate group ONLY
+            // when a model is actually usable. When unregistered, the core
+            // CommandDropdown drops the "AI Generate" group from the Insert menu
+            // (it renders only registered command ids), so the user never sees
+            // generators that would immediately fail with "no model".
+            if (available) {
+                for (const k of KINDS) {
+                    commands.push({
                         type: 'command' as const,
                         id: `llm_generate_${k}`,
                         label: t(`llm_file_generate_${k}`, MENU_LABEL[k]),
                         handler: () => {
                             void open(k)
                         },
-                    })),
-                    // overleaf-lab (owner request 2026-08-26): the ONE model
-                    // selection entry point — File → "Select LLM Model" with the
-                    // AI icon in front of the label (leadingIcon is a ReactNode
-                    // in the core Command type).
-                    {
-                        type: 'command' as const,
-                        id: 'llm_select_model',
-                        label: t('llm_select_model', 'Select LLM Model'),
-                        leadingIcon: <MaterialIcon type="smart_toy" />,
-                        handler: () => {
-                            setModelModalOpen(true)
-                        },
-                    },
-                ]
-                : undefined,
-        [isReady, open, t],
+                    })
+                }
+            }
+            // overleaf-lab (owner request 2026-08-26): the ONE model selection
+            // entry point — File → "Select LLM Model" with the AI icon in front
+            // of the label (leadingIcon is a ReactNode in the core Command type).
+            // Kept ALWAYS registered (even when no model exists) so the
+            // deployment can still be configured; H's modal shows a notice.
+            commands.push({
+                type: 'command' as const,
+                id: 'llm_select_model',
+                label: t('llm_select_model', 'Select LLM Model'),
+                leadingIcon: <MaterialIcon type="smart_toy" />,
+                handler: () => {
+                    setModelModalOpen(true)
+                },
+            })
+            return commands
+        },
+        [isReady, open, t, available],
     )
 
     const copy = async () => {

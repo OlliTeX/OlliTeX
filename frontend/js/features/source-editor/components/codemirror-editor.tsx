@@ -131,7 +131,13 @@ function CodeMirrorEditorComponents({
       )}
       {VisualEditor && (
         <Suspense fallback={null}>
-          <VisualEditor />
+          {/* AK-10 (owner 2026-10-08): the visual editor must RE-MOUNT for
+              every document it renders — e.g. switching one.tikz -> two.tikz
+              with the canvas up leaves the embedded editor on the LAST file
+              it loaded (the "last active editor" bug). Keying on the open
+              doc name unmounts/remounts so the embed re-boots against the
+              double-clicked file's source. */}
+          <VisualEditor key={openDocName ?? 'visual'} />
         </Suspense>
       )}
     </ReviewPanelProviders>

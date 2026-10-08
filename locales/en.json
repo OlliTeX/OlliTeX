@@ -4712,5 +4712,10 @@
   "wakatime_cancel": "Cancel",
   "wakatime_error_api_key_required": "Please paste your WakaTime API key.",
   "wakatime_error_link": "Could not verify the API key.",
-  "project_inspection": "Project inspection"
+  "project_inspection": "Project inspection",
+  "drawio_title": "draw.io diagram",
+  "drawio_status_loading": "Loading draw.io…",
+  "drawio_status_ready": "Ready — edit on the canvas; changes save to the file",
+  "drawio_error_boot": "draw.io failed to load",
+  "drawio_new_file": "Diagram (draw.io)"
 }

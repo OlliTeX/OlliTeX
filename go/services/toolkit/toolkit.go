@@ -57,6 +57,12 @@ type Toolkit struct {
 	Project string
 	// DockerSocket is the mounted docker socket path.
 	DockerSocket string
+
+	// TUICmd is the optional child command for the retained-mode TUI in
+	// SSH sessions (default: <this binary> tui). Tests point it at a
+	// freshly built real binary — the test binary itself has no `tui`
+	// subcommand.
+	TUICmd []string
 	// Ver is the build revision string (set at link time via -ldflags).
 	Ver string
 }

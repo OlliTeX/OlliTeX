@@ -250,7 +250,8 @@ export const FileTreeActionableProvider: FC<React.PropsWithChildren> = ({
     defaultState
   )
 
-  const { fileTreeData, dispatchRename, dispatchMove } = useFileTreeData()
+  const { fileTreeData, dispatchRename, dispatchMove, dispatchDelete, dispatchCreateDoc, dispatchCreateFile, dispatchCreateFolder } =
+    useFileTreeData()
   const { selectedEntityIds, isRootFolderSelected } = useFileTreeSelectable()
 
   const [droppedFiles, setDroppedFiles] = useState<DroppedFiles | null>(null)
@@ -304,7 +305,10 @@ export const FileTreeActionableProvider: FC<React.PropsWithChildren> = ({
     dispatch({ type: ACTION_TYPES.START_DELETE, actionedEntities })
   }, [fileTreeData, selectedEntityIds])
 
-  // deletes entities in series. Tree will be updated via the socket event
+  // deletes entities in series. D40-live (owner 2026-10-07): the tree was
+  // refreshed via the 'removeEntity' SOCKET relay (dead on the Go stack) —
+  // apply each deletion locally from the successful sync instead (the
+  // server is the source of truth: we only remove what it confirmed).
   const finishDeleting = useCallback(() => {
     dispatch({ type: ACTION_TYPES.DELETING })
     let shouldReindexReferences = false
@@ -314,14 +318,17 @@ export const FileTreeActionableProvider: FC<React.PropsWithChildren> = ({
         const found = findInTreeOrThrow(fileTreeData, id)
         shouldReindexReferences =
           shouldReindexReferences || /\.bib$/.test(found.entity.name)
-        return syncDelete(projectId, found.type, found.entity._id).catch(
-          error => {
+        return syncDelete(projectId, found.type, found.entity._id)
+          .then(res => {
+            dispatchDelete(id)
+            return res
+          })
+          .catch(error => {
             // throw unless 404
             if (error.info.statusCode !== 404) {
               throw error
             }
-          }
-        )
+          })
       })
         // @ts-ignore (TODO: improve mapSeries types)
         .then(() => {
@@ -335,7 +342,13 @@ export const FileTreeActionableProvider: FC<React.PropsWithChildren> = ({
           dispatch({ type: ACTION_TYPES.ERROR, error })
         })
     )
-  }, [fileTreeData, projectId, selectedEntityIds, indexAllReferences])
+  }, [
+    fileTreeData,
+    projectId,
+    selectedEntityIds,
+    indexAllReferences,
+    dispatchDelete,
+  ])
 
   // moves entities. Tree is updated immediately and data are sync'd after.
   const finishMoving = useCallback(
@@ -434,14 +447,20 @@ export const FileTreeActionableProvider: FC<React.PropsWithChildren> = ({
     (name: string) => {
       dispatch({ type: ACTION_TYPES.CREATING_FOLDER })
       return finishCreatingEntity({ endpoint: 'folder', name })
-        .then(() => {
+        .then(folder => {
+          // D40-live: no socket relay (reciveNewFolder) on the Go stack —
+          // create locally from the response ({name,_id,...}).
+          if (folder?._id) {
+            dispatchCreateFolder(parentFolderId, folder)
+          }
           dispatch({ type: ACTION_TYPES.CLEAR })
+          return folder
         })
         .catch(error => {
           dispatch({ type: ACTION_TYPES.ERROR, error })
         })
     },
-    [finishCreatingEntity]
+    [finishCreatingEntity, dispatchCreateFolder, parentFolderId]
   )
 
   const startCreatingFile = useCallback((newFileCreateMode: any) => {
@@ -470,6 +489,14 @@ export const FileTreeActionableProvider: FC<React.PropsWithChildren> = ({
 
       return finishCreatingEntity(entity)
         .then(docOrFile => {
+          // D40-live (owner 2026-10-07 item W, tree side): the socket
+          // relay (reciveNewDoc/reciveNewFile) is dead on the Go stack —
+          // create locally from the response. (linked_file endpoint always
+          // 400s in this stack — no linked-file agents — so only the doc
+          // branch can ever succeed.)
+          if (entity.endpoint === 'doc' && docOrFile?._id && docOrFile?.name) {
+            dispatchCreateDoc(parentFolderId, docOrFile)
+          }
           dispatch({ type: ACTION_TYPES.CLEAR })
           return docOrFile
         })
@@ -477,7 +504,7 @@ export const FileTreeActionableProvider: FC<React.PropsWithChildren> = ({
           dispatch({ type: ACTION_TYPES.ERROR, error })
         }) as FinishCreatingDocOrFileReturn<T>
     },
-    [finishCreatingEntity]
+    [finishCreatingEntity, dispatchCreateDoc, parentFolderId]
   )
 
   const finishCreatingDoc = useCallback(
@@ -567,18 +594,42 @@ export const FileTreeActionableProvider: FC<React.PropsWithChildren> = ({
   // New 2 (2026-08-28): duplicate the single selected file in the same
   // folder (a.b -> a_copy.b -> a_copy(1).b ...). Text entities (docstore
   // docs: tex/bib/txt...) copy their content; binary entities share the
-  // filestore blob of the source. File tree refreshes via the
-  // reciveNewDoc / reciveNewFile socket events.
+  // filestore blob of the source.
+  // D40-live (owner 2026-10-07 item U: "Duplicate succeeds server-side but
+  // the copy never appears in the tree"): the old flow refreshed the tree
+  // via the reciveNewDoc / reciveNewFile SOCKET relay (Node realtime :3026)
+  // — dead on the Go stack (3026 answers nothing). Apply the creation
+  // locally from the HTTP response instead: it carries exactly what the
+  // socket broadcast carried ({name,_id,...}).
   const duplicateSelectedFile = useCallback(() => {
     const [selectedEntityId] = selectedEntityIds
     const found = findInTreeOrThrow(fileTreeData, selectedEntityId)
     const { type, entity } = found
     if (type !== 'doc' && type !== 'fileRef') return undefined
     void dispatch({ type: ACTION_TYPES.CLEAR })
-    return syncDuplicate(projectId, type, entity._id).catch(error => {
-      dispatch({ type: ACTION_TYPES.ERROR, error })
-    })
-  }, [fileTreeData, projectId, selectedEntityIds])
+    return syncDuplicate(projectId, type, entity._id)
+      .then(response => {
+        const id = response?._id
+        if (id && response?.name) {
+          if (type === 'doc') {
+            dispatchCreateDoc(found.parentFolderId, response)
+          } else {
+            dispatchCreateFile(found.parentFolderId, response)
+          }
+        }
+        return response
+      })
+      .catch(error => {
+        dispatch({ type: ACTION_TYPES.ERROR, error })
+        return undefined
+      })
+  }, [
+    fileTreeData,
+    projectId,
+    selectedEntityIds,
+    dispatchCreateDoc,
+    dispatchCreateFile,
+  ])
 
   const value = useMemo(
     () => ({

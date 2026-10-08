@@ -1,6 +1,10 @@
 // /hub → Site settings → Compilation: Sandboxed compiles (owner #32).
-// Native Mantine remake of the legacy SandboxedCompilesTab — same fields
-// incl. the dynamic compile-image rows with default-image selection.
+// AJ-4 (2026-10-08): the container-host fields (compile host dir, docker
+// socket, extra docker flags, image user) are ENV-OWNED (toolkit env
+// example) — removed from the UI per the owner. What remains: the body
+// size limit + the selectable compile images (texlive docker image) —
+// the sandbox features the owner wants visible (also AK-5 in the /editor
+// settings modal Compiler pane).
 
 import React from 'react'
 import { ActionIcon, Button, Group, Radio, Table, Text } from '@mantine/core'
@@ -61,15 +65,7 @@ export function SandboxedSection() {
         compileBodySizeLimitMb: num0(v.bodySize, 50),
       })}
     >
-      <SectionTitle top>Container host</SectionTitle>
-      <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start', width: '100%' }}>
-        <Field label="Compile host dir" required value={String(v.hostDir || '')} onChange={x => up({ hostDir: x })} placeholder="/data/overleaf/compiles" hint="Host directory mounted into compile containers." width="100%" />
-        <Field label="Docker socket" required value={String(v.socketPath || '')} onChange={x => up({ socketPath: x })} placeholder="/var/run/docker.sock" hint="Path to the docker socket (in the web container)." width="100%" />
-      </Group>
-      <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
-        <Field label="Extra docker flags" value={String(v.extraFlags || '')} onChange={x => up({ extraFlags: x })} placeholder="-shell-escape" />
-        <Field label="Image user" value={String(v.imageUser || '')} onChange={x => up({ imageUser: x })} placeholder="www-data" hint="User used inside compile images." />
-      </Group>
+      <SectionTitle top>Compile limits</SectionTitle>
       <Group wrap="wrap" gap="md" mb="xs" style={{ alignItems: 'flex-start' }}>
         <Field label="Compile body size limit (MiB)" value={String(v.bodySize || '')} onChange={x => up({ bodySize: x.replace(/[^\d]/g, '') })} placeholder="50" width="34%" type="number" />
       </Group>

@@ -341,17 +341,9 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               color="ollitex"
             />
           </Group>
-          <Group gap="xs" align="flex-end">
-            <div style={{ flex: 1, minWidth: 260 }}>
-              <TextInput
-                label="LanguageTool server URL"
-                placeholder="http://languagetool:8010"
-                value={state.languageToolUrl || ''}
-                onChange={e => setState(s => (s ? { ...s, languageToolUrl: e.currentTarget.value } : s))}
-              />
-            </div>
-            <Text size="xs" c="dimmed" pr={2}>Blank = env fallbacks only</Text>
-          </Group>
+          {/* AJ-4 (2026-10-08): the LanguageTool server URL input is RETIRED here (dedupe:
+              the URL is env-owned — toolkit env example). The loaded value still
+              rides along in saves so it is not wiped. The Check button above stays. */}
           {ltResult ? (
             <Alert icon={null} variant="light" color={ltResult.ok ? 'teal' : 'red'}>
               <Text size="sm">{ltResult.message}</Text>

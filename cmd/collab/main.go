@@ -37,6 +37,7 @@
 package main
 
 import (
+	"encoding/json"
 	"context"
 	"errors"
 	"fmt"
@@ -64,6 +65,10 @@ func env(k, def string) string {
 		return v
 	}
 	return def
+}
+
+func encodeJSON(w http.ResponseWriter, v any) {
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func main() {
@@ -252,6 +257,14 @@ func main() {
 		fmt.Fprint(w, `{"status":"ok","service":"collab","engine":"ygo"}`)
 	})
 	mux.Handle("/collab/", svc)
+
+	// AJ-3: the presence plane behind the admin "Active projects" section.
+	// Internal port only (the edge does not forward this); the caller
+	// (Go web) does authz.
+	mux.HandleFunc("/presence", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		encodeJSON(w, svc.Presences())
+	})
 
 	ln, err := net.Listen("tcp", env("COLLAB_LISTEN", ":3450"))
 	if err != nil {

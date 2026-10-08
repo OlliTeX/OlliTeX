@@ -1,28 +1,28 @@
 package toolkit
 
-// ui.go — the classic-console TUI core (the model, jobs, shell, key routing).
+// ui.go — the classic-console TUI core (the state model, jobs, shell,
+// screen transitions).
 //
-// Layout (the mc / ncurses / freebsd-installer structure):
+// Layout contract (the mc / ncurses / freebsd-installer structure — kept
+// identical to the bubbletea era):
 //
-//	line 1    title bar        "OlliTeX Toolkit" · project · rev
-//	line 2    menu bar         Stack · Settings · Shells · Logs · Doctor ·
-//	                           Backup · Actions · Help   ← jejacks0n/bubbletea-menubar
-//	middle    LEFT pane        the master list (screens) — the mc left panel
-//	            RIGHT pane     the detail of the selection (table, keys, log,
-//	                           doctor rows, action output) — bordered panes
-//	last 2    status line      docker/store/stack state · job + spinner
-//	            keystorep      [j/k] move [enter] open [u] start [d] stop [F10] menu
-//	                           ← bracketed-key row (mc keystrip), clickable
+//	row 0    menu strip       Dashboard Stack Shells Logs Hub Settings
+//	                         Actions Doctor Backup About  [Menu ▾]
+//	middle   LEFT pane        the master list (screens) — the mc left panel
+//	           RIGHT pane     the detail of the selection (dashboard, stack,
+//	                         keys, log tail, doctor rows, action output)
+//	bottom   status line      docker/store/stack state · job + result
+//
+// Ported 2026-10-07 from bubbletea/lipgloss to rivo/tview (owner AI item):
+// tview is retained-mode on tcell — only changed cells repaint, which is the
+// fix for the "ultra slow over SSH" jank (the old full-frame redraw every
+// keystroke + the 2 s log tick repainting ~400 lines).
 //
 // Dialogs (stop/restart/restore/quit confirmations + the two-step input
-// prompts) are the mc prompt boxes: a bordered box centered over the panes
-// (rmhubbert/bubbletea-overlay compositor), with click-targeted [y]/[n] and
-// [enter]/[esc] buttons (lrstanley/bubblezone hit-testing).
-//
-// All three libraries are MIT, credited in CREDITS.md.
+// prompts) are tview modals; the security contract is unchanged: [y]/[n]
+// (y is confirm, n is the default) or [enter]/[esc] are the only exits.
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -33,23 +33,7 @@ import (
 	"time"
 
 	"ollitex/go/libraries/configschema"
-
-	tea "github.com/charmbracelet/bubbletea"
-	menubar "github.com/jejacks0n/bubbletea-menubar"
-	zone "github.com/lrstanley/bubblezone"
 )
-
-// ---- messages --------------------------------------------------------------
-
-type jobMsg struct {
-	job  string
-	out  string
-	err  error
-	done bool
-}
-
-// menuActionMsg is delivered by the menubar when a menu item is chosen.
-type menuActionMsg struct{ action string }
 
 // ---- app -------------------------------------------------------------------
 
@@ -71,10 +55,6 @@ type app struct {
 	width  int
 	height int
 
-	menu     menubar.Model
-	menuOpen bool
-	zoneID   string // this session's zone namespace (bubblezone prefix)
-
 	statusMsg string
 	errMsg    string
 	loading   bool
@@ -83,10 +63,6 @@ type app struct {
 	// logs
 	logLines []string
 	logName  string
-
-	// esc fallback state (the terminal-friendly alt-0 / esc+0 menu opener:
-	// a lone ESC still gets its semantics after the 300ms window)
-	escPending bool
 
 	// hub views (the site.general.projects.* + users.* inside the TUI)
 	hub       *HubStats
@@ -109,7 +85,7 @@ type app struct {
 	// doctor
 	doctorRows []doctorRow
 
-	// shell (full-screen mode — the classic attach)
+	// shell (the classic attach)
 	shell       *ShellSession
 	shellLabel  string
 	shellBuf    []byte
@@ -120,70 +96,145 @@ type app struct {
 	actCert   string
 	actKey    string
 
-	// the active mc prompt box (nil = none)
+	// the active prompt box (nil = none)
 	dlg *dialog
+
+	// the tview application (set by newTUI)
+	tview *tviewApp
+}
+
+// boot — the initial auto-load for the screen the app booted on
+// (the old tea Init command, now a direct job start).
+func (a *app) boot() {
+	if a.screen == "hub" && a.hub == nil {
+		a.refreshHub()
+	}
+	a.redraw()
+}
+
+// newApp builds the state model for a Toolkit. startScreens: `ssh host
+// <screen>` boot targets.
+func newApp(t *Toolkit, startScreens ...string) *app {
+	// the ssh session io (and a bare `ssh host tui` CLI invocation)
+	// carries no TERM; tcell needs one that resolves in the image
+	// terminfo DB (the alpine image ships ncurses-libs).
+	if term := os.Getenv("TERM"); term == "" {
+		os.Setenv("TERM", "xterm-256color")
+	}
+
+	a := &app{tk: t, width: 100, height: 40}
+	if d, derr := NewDocker(t.DockerSocket); derr == nil {
+		a.dock = d
+	}
+	if t.Store != nil {
+		a.set = newSettings(t)
+	}
+	screen := "dashboard"
+	if len(startScreens) > 0 {
+		screen = startScreens[0]
+	}
+	if a.screenExists(screen) {
+		a.screen = screen
+	}
+	if i, ok := a.findItem(a.screen); ok {
+		a.dcur = i
+	}
+	if a.screen != "dashboard" {
+		a.openItem(a.dcur)
+	}
+	a.boot()
+	return a
+}
+
+// screenExists reports whether id is a master-list screen.
+func (a *app) screenExists(id string) bool {
+	_, ok := a.findItem(id)
+	return ok
 }
 
 // validScreen reports whether id is a master-list screen (the boot targets
 // for `ssh host <screen>`).
 func validScreen(a *app, id string) bool {
-	for _, it := range a.masterList() {
+	return a.screenExists(id)
+}
+
+// openItem sets the screen for the master row (the right pane re-renders).
+func (a *app) openItem(i int) {
+	items := a.masterList()
+	if i < 0 || i >= len(items) {
+		return
+	}
+	if os.Getenv("TK_TRACE") != "" {
+		traceFile("NAV openItem->" + items[i].id + "\n")
+	}
+	a.screen = items[i].id
+	a.editKey, a.editVal, a.editMask = "", "", false
+	if items[i].id == "settings" {
+		a.setLevel, a.setCurGroup, a.setCurSel = 0, 0, 0 // fresh navigation
+		a.focus = 1                                      // the settings tree owns j/k
+	} else {
+		a.focus = 0 // every other screen: the left list owns j/k
+	}
+	a.actResult = ""
+}
+
+// gotoScreen moves the master cursor to the named row (the left pane) and opens it.
+func (a *app) gotoScreen(id string) {
+	if i, ok := a.findItem(id); ok {
+		a.dcur = i
+	}
+	a.screen = id
+	a.editKey, a.editVal, a.editMask = "", "", false
+	if id == "settings" {
+		a.setLevel, a.setCurGroup, a.setCurSel = 0, 0, 0
+		a.focus = 1 // the settings tree owns the keys (two-pane focus)
+	} else {
+		a.focus = 0
+	}
+}
+
+func (a *app) findItem(id string) (int, bool) {
+	for i, it := range a.masterList() {
 		if it.id == id {
-			return true
+			return i, true
 		}
 	}
-	return false
+	return 0, false
 }
 
-func newApp(t *Toolkit, startScreens ...string) *app {
-	start := ""
-	if len(startScreens) > 0 {
-		start = startScreens[0]
+// openScreen opens the named row and runs its initial job (logs refresh,
+// doctor run, hub collect).
+func (a *app) openScreen(id string) {
+	if i, ok := a.findItem(id); ok {
+		a.dcur = i
+		a.openItem(i)
 	}
-	d, derr := NewDocker(t.DockerSocket)
-	screen := "dashboard"
-	a0 := &app{
-		tk:     t,
-		set:    newSettings(t),
-		width:  80,
-		height: 24,
-	}
-	if start != "" && validScreen(a0, start) {
-		screen = start
-	}
-	a := &app{
-		tk:     t,
-		set:    newSettings(t),
-		screen: screen,
-		width:  80,
-		height: 24,
-	}
-	if derr != nil {
-		a.dock = nil
-		a.errMsg = "docker: " + derr.Error()
-	} else {
-		a.dock = d
-	}
-	zone.NewGlobal() // idempotent: the one-per-process zone manager
-	a.zoneID = zone.NewPrefix()
-	a.menu = newMenus(a)
-	zone.SetEnabled(true)
-	if a.tk.Store != nil {
+	// FIRST publish the screen switch and the frame (synchronously, via the
+	// app's update channel so it is processed before any later event — no
+	// visible one-behind lag under key bursts); THEN start the screen's
+	// async job. Starting the job first let its settle-redraw (a separate
+	// queued draw) race the navigation redraw and render a stale a.screen —
+	// the off-by-one "digit lands on the previous screen" the owner's e2e
+	// caught (TK S14: each digit one behind).
+	a.redraw()
+	switch id {
+	case "logs":
+		a.refreshLogs(a.logName)
+	case "doctor":
+		a.runDoctor()
+	case "settings":
 		a.loadSettings()
-	}
-	return a
-}
-
-// Init (tea.Model)
-func (a *app) Init() tea.Cmd {
-	if a.screen == "hub" {
+	case "hub":
 		if a.hubSample == 0 {
 			a.hubSample = 10
 		}
-		return tea.Sequence(a.refreshStatus(), a.refreshHub())
+		if a.hub == nil || time.Since(a.hub.Now) > 15*time.Second {
+			a.refreshHub()
+		}
 	}
-	return a.refreshStatus()
 }
+
+// small helpers ---------------------------------------------------------------
 
 func max2(a, b int) int {
 	if a > b {
@@ -206,706 +257,127 @@ func tail(out string) string {
 	return " — …" + out[len(out)-n:]
 }
 
-func (a *app) runJob(job string, f func(ctx context.Context) (string, error)) tea.Cmd {
-	a.loading = true
-	a.jobName = job
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-		defer cancel()
-		out, err := f(ctx)
-		return jobMsg{job: job, out: out, err: err, done: true}
+func digit(i int) string { return string(rune('1' + i)) }
+
+func cutPrefix(s, pre string) (string, bool) {
+	if len(s) > len(pre) && s[:len(pre)] == pre {
+		return s[len(pre):], true
+	}
+	return "", false
+}
+
+// ---- jobs (goroutines — the retained-mode replacement for tea.Cmd) ---------
+//
+// Every job: kick off a goroutine, mark loading, run the work, publish the
+// result onto the app state, then schedule ONE tview redraw. tview
+// coalesces redraws (QueueUpdateDraw), so the classic full-frame repaint
+// storm over slow SSH links is gone: the frame is drawn only when state
+// actually changed, and tcell repaints only the cells that differ.
+
+// schedule redraws (safe from any goroutine — no-op when the app finished).
+func (a *app) redraw() {
+	if a.tview != nil {
+		if a.tview.inLoop {
+			// inside the event loop (key capture): render inline — tview
+			// paints (a.draw()) right after the capture returns, so the new
+			// state is on the screen BEFORE the next key reaches us (no
+			// burst lag).
+			// NOTE: state publishers (jobs settling, dialogs) call this
+			// BEFORE their setRoot switch; a tview repaint in between is
+			// harmless (old root, new content — replaced by the follow-up
+			// paint) and the async settle-redraw still lands the final
+			// frame.
+			a.tview.render(a)
+			a.tview.requestPaint()
+			return
+		}
+		a.tview.schedule(func() { a.tview.render(a) })
 	}
 }
 
-// runJobLong is for store-heavy jobs (the data-backup round tars the full
-// SeaweedFS volume — minutes, not seconds). Same message contract.
-func (a *app) runJobLong(job string, f func(ctx context.Context) (string, error)) tea.Cmd {
+func (a *app) job(name string, timeout time.Duration, f func(ctx context.Context) (string, error), settle func(job, out string, err error)) {
 	a.loading = true
-	a.jobName = job
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Minute)
+	a.jobName = name
+	a.redraw()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		out, err := f(ctx)
-		return jobMsg{job: job, out: out, err: err, done: true}
-	}
+		a.loading = false
+		if settle != nil {
+			settle(name, out, err)
+		} else {
+			if err != nil {
+				a.setErr("%s: %v", name, err)
+			} else {
+				a.statusMsg = name + " done" + tail(out)
+			}
+		}
+		a.redraw()
+	}()
+}
+
+func (a *app) runJob(job string, f func(ctx context.Context) (string, error)) {
+	a.job(job, 180*time.Second, f, nil)
+}
+
+// runJobLong is for store-heavy jobs (the data-backup round tars the full
+// SeaweedFS volume — minutes, not seconds).
+func (a *app) runJobLong(job string, f func(ctx context.Context) (string, error)) {
+	a.job(job, 25*time.Minute, f, nil)
+}
+
+func (a *app) silentJob(job string, f func(ctx context.Context) (string, error)) {
+	a.job(job, 60*time.Second, f, func(name, out string, err error) {
+		if err != nil {
+			a.setErr("%s: %v", name, err)
+			return
+		}
+		// silent jobs set their own state (logLines, doctorRows, hub…);
+		// keep the status line calm.
+		if a.statusMsg == "" || strings.HasPrefix(a.statusMsg, name+" ") {
+			a.statusMsg = name + " ok" + tail(out)
+		}
+	})
 }
 
 // refreshHub — one read pass over the content DB (the exact /hub view
 // predicates; see hubdata.go). The sample width is what "t" toggles.
-func (a *app) refreshHub() tea.Cmd {
-	return a.runJob("hub-refresh", func(ctx context.Context) (string, error) {
+func (a *app) refreshHub() {
+	a.silentJob("hub-refresh", func(ctx context.Context) (string, error) {
 		s, err := a.tk.HubCollect(ctx, a.hubSample)
 		if err != nil {
 			return "", err
 		}
 		a.hub = s
-		return fmt.Sprintf("%s: %d projects (all) · %d users (all)", s.DB,
-			s.Projects.All, s.Users.All), nil
+		return "hub refreshed", nil
 	})
 }
 
-// runBackupScript runs one of the toolkit/backup/*.sh suites (baked into the
-// image at /opt/ollitex/backup; OLLITEX_TOOLKIT_BACKUP_DIR points at the repo
-// copy during host-side dev) and returns its tail — the [backup]/[drill]
-// status lines the TUI renders in the result pane.
 func runBackupScript(dir, script string, ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, "sh", filepath.Join(dir, script))
-	if v := os.Getenv("OLLITEX_TOOLKIT_DATA_DIR"); v != "" {
-		cmd.Env = append(cmd.Env, "BACKUP_ROOT="+filepath.Join(v, "backups"))
+	p := filepath.Join(dir, script)
+	if fi, err := os.Stat(p); err != nil || fi.IsDir() {
+		return "", fmt.Errorf("backup script missing: %s", p)
 	}
-	var b bytes.Buffer
+	cmd := exec.CommandContext(ctx, p)
+	cmd.Dir = dir
+	var b strings.Builder
 	cmd.Stdout = &b
 	cmd.Stderr = &b
 	err := cmd.Run()
 	out := b.String()
+	// tail-truncation (the TUI renders a bounded tail, not a 1000-line
+	// dump) + the exit note INLINED (the TUI renders job results, never
+	// Go errors — a failing script is a normal observation)
+	const maxLines = 40
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	if len(lines) > 40 {
-		out = "… " + strconv.Itoa(len(lines)-40) + " earlier lines…\n" + strings.Join(lines[len(lines)-40:], "\n")
+	if len(lines) > maxLines {
+		out = "  (earlier lines…)\n" + strings.Join(lines[len(lines)-maxLines:], "\n")
 	}
 	if err != nil {
-		return out + "\n[exit " + err.Error() + "]", nil
+		return out + "\n  [exit: " + err.Error() + "]", nil
 	}
 	return out, nil
-}
-
-func (a *app) silentJob(job string, f func(ctx context.Context) (string, error)) tea.Cmd {
-	a.loading = true
-	a.jobName = job
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-		defer cancel()
-		out, err := f(ctx)
-		return jobMsg{job: job, out: out, err: err, done: true}
-	}
-}
-
-// ---- shell (the classic full-screen exec attach — unchanged contract) ------
-
-type shellChunkMsg struct {
-	text string
-	eof  bool
-}
-
-func (a *app) pumpShell() tea.Cmd {
-	sess := a.shell
-	if sess == nil {
-		return nil
-	}
-	return func() tea.Msg {
-		buf := make([]byte, 256*1024)
-		n, err := sess.ReadOne(buf)
-		if n > 0 {
-			return shellChunkMsg{text: DecodeShellChunk(buf[:n]), eof: err != nil}
-		}
-		return shellChunkMsg{eof: err != nil}
-	}
-}
-
-func (a *app) endShell() {
-	if a.shell != nil {
-		a.shell.Close()
-		a.shell = nil
-	}
-}
-
-type shellStartMsg struct {
-	label string
-	err   error
-}
-
-func (a *app) startShell(label string) tea.Cmd {
-	dk, tk := a.dock, a.tk
-	a.loading = true
-	a.jobName = "shell " + label
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		defer cancel()
-		sess, err := NewShell(ctx, dk, tk.Project, label)
-		if err == nil {
-			a.shell = sess
-			a.shellLabel = label
-			a.shellBuf = nil
-			a.shellExited = false
-		}
-		return shellStartMsg{label: label, err: err}
-	}
-}
-
-// ---- Update ----------------------------------------------------------------
-
-func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch m := msg.(type) {
-	case tea.WindowSizeMsg:
-		a.width = m.Width
-		a.height = m.Height
-		// some front-end paths draw frame 0 before the size arrives — a zero
-		// size must never reach the pane math (the old [:-6] slice panic)
-		if a.width < 40 {
-			a.width = 80
-		}
-		if a.height < 12 {
-			a.height = 24
-		}
-		return a, nil
-
-	case shellStartMsg:
-		a.loading = false
-		if m.err != nil {
-			a.setErr("shell %s: %v", m.label, m.err)
-			return a, nil
-		}
-		a.screen = "shell"
-		return a, a.pumpShell()
-
-	case shellChunkMsg:
-		a.shellBuf = append(a.shellBuf, []byte(m.text)...)
-		if len(a.shellBuf) > 1<<20 { // 1 MiB cap: keep the tail
-			a.shellBuf = a.shellBuf[len(a.shellBuf)-(1<<20):]
-		}
-		if m.eof {
-			a.shellExited = true
-			a.endShell()
-			return a, nil
-		}
-		return a, a.pumpShell()
-
-	case menuActionMsg:
-		return a, a.dispatchMenu(m.action)
-
-	case escTimeoutMsg:
-		// the esc+0 window closed without a 0 → the lone ESC gets its
-		// semantics now (no delayed back/close/quit surprise).
-		a.escPending = false
-		next, cmd := a.escSemantics()
-		return next, cmd
-
-	case logTickMsg:
-		// auto-refresh chain: while the logs screen is focused and idle, keep
-		// the tail live (the classic: the log window refreshes itself — no
-		// manual [f] needed to see the box fill).
-		if a.screen == "logs" && !a.loading && a.logName != "" && a.dock != nil {
-			return a, a.refreshLogs(a.logName)
-		}
-		return a, nil
-
-	case jobMsg:
-		a.loading = false
-		if m.err != nil {
-			a.setErr("%s: %v%s", m.job, m.err, tail(m.out))
-			return a, nil
-		}
-		a.errMsg = ""
-		switch m.job {
-		case "ping":
-			a.statusMsg = ""
-			return a, nil
-		case "logs":
-			a.statusMsg = ""
-			// re-arm the 2s tick (the chain stops of its own accord once the
-			// user leaves the logs screen or the dock goes away).
-			return a, logTickCmd()
-		case "start", "stop", "restart":
-			a.statusMsg = m.job + " done" + tail(m.out)
-			return a, a.refreshStatus()
-		case "pull":
-			a.statusMsg = "images pulled" + tail(m.out)
-			return a, a.refreshStatus()
-		case "hub-refresh":
-			a.statusMsg = "hub: " + m.out
-			return a, nil
-		case "backup":
-			a.statusMsg = "backup saved → " + a.tk.BackupPath() + tail(m.out)
-			return a, nil
-		case "restore":
-			a.statusMsg = "restore done" + tail(m.out)
-			a.loadSettings()
-			return a, nil
-		case "set", "unset":
-			a.statusMsg = m.job + " " + m.out
-			a.loadSettings()
-			return a, nil
-		case "tls", "ngram", "bootstrap":
-			a.statusMsg = m.job + " done" + tail(m.out)
-			a.actResult = m.out
-			return a, nil
-		default:
-			a.statusMsg = m.job + " done" + tail(m.out)
-			return a, nil
-		}
-
-	case tea.MouseMsg:
-		return a.handleMouse(m)
-
-	case tea.KeyMsg:
-		if a.screen == "shell" && a.shell != nil {
-			return a.shellKey(m)
-		}
-		if a.dlg != nil {
-			return a, a.dialogKey(m)
-		}
-		// MENU-OPEN DELEGATION (owner: "It can be open but nothing can be
-		// selected") — MUST run before the global/nav/screen switches: the
-		// menubar library owns up/down/left/right/enter/esc while active, and
-		// those are exactly the keys our navigation + screen handlers used to
-		// eat first (k/j = down/up, enter = openCmd, l/h = cycle), so no menu
-		// item could ever be reached. Items fire as their Action cmd
-		// (menuActionMsg → dispatchMenu, which closes the bar itself).
-		// Explicit toggles (F10/F9) close it; anything else stays inert.
-		if a.menuOpen {
-			switch k2 := m.String(); k2 {
-			case "up", "down", "left", "right", "enter", "esc", "tab", "shift+tab":
-				next, cmd := a.menu.Update(m)
-				a.menu = next
-				a.syncMenu()
-				return a, cmd
-			case "f10", "f9", "ctrl+m":
-				a.menuActive(false)
-				return a, nil
-			}
-			return a, nil // other keys: no hidden navigation while the menu is open
-		}
-		return a.handleKey(m)
-	}
-	return a, nil
-}
-
-// syncMenu mirrors the menubar's active state onto our routing flag.
-func (a *app) syncMenu() { a.menuOpen = a.menu.Active }
-
-// shellKey forwards operator input to the exec stream.
-//
-//	ctrl-c → to the shell (SIGINT) · ctrl-z → detach & close (back to the panes)
-func (a *app) shellKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	w := func(s string) tea.Cmd {
-		_, err := a.shell.Write([]byte(s))
-		if err != nil {
-			a.setErr("shell write: %v", err)
-			a.shellExited = true
-			a.endShell()
-		}
-		return nil
-	}
-	code := func(c byte) string { return string(c) }
-	switch msg.String() {
-	case "ctrl+z":
-		a.endShell()
-		a.screen = "dashboard"
-		return a, a.refreshStatus()
-	case "ctrl+c":
-		return a, w(code(3))
-	case "ctrl+d":
-		return a, w(code(4))
-	case "ctrl+u":
-		return a, w(code(21))
-	case "ctrl+l":
-		return a, w(code(12))
-	case "enter":
-		return a, w(code(13))
-	case "backspace", "delete":
-		return a, w(code(127))
-	case "left":
-		return a, w("\x1b[D")
-	case "right":
-		return a, w("\x1b[C")
-	case "up":
-		return a, w("\x1b[A")
-	case "down":
-		return a, w("\x1b[B")
-	case "tab":
-		return a, w(code(9))
-	case "shift+tab":
-		return a, w("\x1b[Z")
-	case "esc":
-		return a, w(code(27))
-	case "home":
-		return a, w("\x1b[H")
-	case "end":
-		return a, w("\x1b[F")
-	case "pgup":
-		return a, w("\x1b[5~")
-	case "pgdown":
-		return a, w("\x1b[6~")
-	default:
-		if len(msg.Runes) > 0 {
-			return a, w(string(msg.Runes))
-		}
-	}
-	return a, nil
-}
-
-// ---- master-list keys (the left pane) ---------------------------------------
-//
-// mc muscle memory: j/k roam the panel, enter opens, digits jump, F10 the
-// menu bar, and the screen keys (u/d/e/h/l/f/t/n/b/r) act on the selection.
-
-func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	k := msg.String()
-
-	// pending-ESC resolution runs BEFORE the global switch (a second ESC
-	// must be consumed, not re-armed): ESC+0 → the menu; anything else →
-	// the ESC semantics run first, then this key is processed normally.
-	if a.escPending {
-		a.escPending = false
-		if k == "0" {
-			a.menuActive(true)
-			return a, nil
-		}
-		if k == "esc" {
-			next, cmd := a.escSemantics() // the double ESC is the first ESC
-			return next, cmd
-		}
-		next, cmd := a.escSemantics()
-		ap, ok := next.(*app)
-		if !ok {
-			return next, cmd // the ESC quit: nothing left to do
-		}
-		a = ap
-		// fall through: process this key normally below
-	}
-
-	// global
-	switch k {
-	case "f10", "ctrl+m", "f9":
-		// f10 is primary (the mc convention); ctrl+m is the vt100-era F10
-		// byte; f9 is a safe alias for terminals whose F10 never arrives.
-		a.menuActive(true)
-		return a, nil
-	case "f1", "?":
-		a.screen = "about"
-		return a, nil
-	case "ctrl+c":
-		if a.screen != "dashboard" {
-			a.screen = "dashboard"
-			a.dcur = 0
-			a.loading = false
-			return a, nil
-		}
-		if a.stackUpNow() {
-			a.askQuit()
-			return a, nil
-		}
-		return a, tea.Quit
-	case "q":
-		// q is the unambiguous exit — no fallback-window ambiguity.
-		next, cmd := a.escSemantics()
-		return next, cmd
-	case "esc":
-		// ESC is special: it is also the prefix of the terminal-friendly
-		// menu fallback (ESC then 0 — the mc alt-F habit, for terminals
-		// where the F-keys do not arrive). A 300ms window (standard
-		// ESCDELAY shape) decides which meaning it was; ESC while the menu
-		// is open stays immediate (close the menu — mc behavior).
-		if a.menuOpen {
-			next, cmd := a.escSemantics()
-			return next, cmd
-		}
-		a.escPending = true
-		return a, tea.Tick(300*time.Millisecond, func(time.Time) tea.Msg { return escTimeoutMsg{} })
-	}
-
-	items := a.masterList()
-
-	// TWO-PANE FOCUS (owner's two-pane contract): when the settings screen
-	// is open, focus starts on the RIGHT pane (the settings tree); tab or
-	// left/right hops between panes; j/k/enter act on the pane in focus.
-	rightActive := a.screen == "settings"
-	if rightActive {
-		// tab or an arrow hops between the two panes
-		if k == "tab" || k == "left" || k == "right" {
-			if k == "tab" {
-				a.focus = 1 - a.focus
-			}
-			if k == "left" {
-				a.focus = 0
-			}
-			if k == "right" {
-				a.focus = 1
-			}
-			return a, nil
-		}
-		if a.focus == 1 {
-			return a.settingsKey(msg)
-		}
-	}
-
-	// master-list navigation — the LEFT pane (live on every screen)
-	switch k {
-	case "j", "down":
-		a.dcur = (a.dcur + 1) % len(items)
-		a.openItem(a.dcur)
-		return a, nil
-	case "k", "up":
-		a.dcur = (a.dcur - 1 + len(items)) % len(items)
-		a.openItem(a.dcur)
-		return a, nil
-	case "1":
-		a.dcur, _ = 0, items[0]
-		return a, a.openCmd(0)
-	case "2":
-		a.dcur = 1
-		return a, a.openCmd(1)
-	case "3":
-		a.dcur = 2
-		return a, a.openCmd(2)
-	case "4":
-		a.dcur = 3
-		return a, a.openCmd(3)
-	case "5":
-		a.dcur = 4
-		return a, a.openCmd(4)
-	case "6":
-		a.dcur = 5
-		return a, a.openCmd(5)
-	case "7":
-		a.dcur = 6
-		return a, a.openCmd(6)
-	case "8":
-		a.dcur = 7
-		return a, a.openCmd(7)
-	case "enter", "space":
-		return a, a.openCmd(a.dcur)
-	}
-
-	// screen keys (mc: the keys act on the pane in focus)
-	switch a.screen {
-	case "dashboard":
-		switch k {
-		case "u", "s":
-			return a, a.runJob("start", a.tk.StackUp)
-		case "d", "t":
-			a.askStop()
-			return a, nil
-		}
-	case "stack":
-		switch k {
-		case "u", "s":
-			return a, a.runJob("start", a.tk.StackUp)
-		case "d", "t":
-			a.askStop()
-			return a, nil
-		case "r":
-			a.askRestart()
-			return a, nil
-		case "p":
-			return a, a.runJob("pull", a.tk.PullImages)
-		case "m":
-			return a, a.startShell(Shells[0].Label)
-		case "g":
-			return a, a.startShell(Shells[1].Label)
-		case "e":
-			return a, a.startShell(Shells[2].Label)
-		}
-	case "shells":
-		for i, s := range Shells {
-			if k == "enter" || k == "x"+digit(i) {
-				return a, a.startShell(s.Label)
-			}
-		}
-	case "logs":
-		return a.logsKey(msg)
-	case "settings":
-		return a.settingsKey(msg)
-	case "actions":
-		return a, a.actionsKey(k)
-	case "doctor":
-		if k == "r" {
-			return a, a.runDoctor()
-		}
-	case "hub":
-		switch k {
-		case "r", "enter":
-			return a, a.refreshHub()
-		case "t":
-			if a.hubSample == 10 {
-				a.hubSample = 20
-			} else {
-				a.hubSample = 10
-			}
-			return a, a.refreshHub()
-		}
-	case "backup":
-		switch k {
-		case "b", "enter":
-			return a, a.runJob("backup", func(ctx context.Context) (string, error) {
-				if a.tk.Store == nil {
-					return "", context.Canceled
-				}
-				m, err := a.tk.Store.Dump(a.tk.BackupPath())
-				if err != nil {
-					return "", err
-				}
-				return fmt.Sprintf("%d keys", len(m)), nil
-			})
-		case "r":
-			a.askRestore()
-			return a, nil
-		case "d":
-			return a, a.runJobLong("data-backup", func(ctx context.Context) (string, error) {
-				return runBackupScript(a.tk.BackupDir(), "backup-data.sh", ctx)
-			})
-		case "v":
-			return a, a.runJobLong("data-drill", func(ctx context.Context) (string, error) {
-				return runBackupScript(a.tk.BackupDir(), "restore-drill.sh", ctx)
-			})
-		}
-	}
-	return a, nil
-}
-
-func digit(i int) string { return string(rune('1' + i)) }
-
-// menuActive opens/closes the menu bar (the menubar library drives its own
-// keys + mouse once active).
-func (a *app) menuActive(on bool) {
-	a.menu.Active = on
-	if !on {
-		a.menu.OpenSubMenu = -1
-		a.menu.SubMenuState = nil
-	}
-	a.menuOpen = on
-}
-
-// escSemantics — what a lone ESC does (mc order: close dialog → close menu →
-// back to the dashboard → quit confirm — quit only when the stack is up).
-func (a *app) escSemantics() (tea.Model, tea.Cmd) {
-	a.dlg = nil
-	a.editKey, a.editVal, a.editMask = "", "", false
-	if a.menuOpen {
-		a.menuActive(false)
-		return a, nil
-	}
-	if a.screen != "dashboard" {
-		a.screen = "dashboard"
-		a.dcur = 0
-		return a, nil
-	}
-	if a.stackUpNow() {
-		a.askQuit()
-		return a, nil
-	}
-	return a, tea.Quit
-}
-
-// escTimeoutMsg — fired when the ESC fallback window expires without a 0.
-type escTimeoutMsg struct{}
-
-// logTickMsg — the logs auto-refresh heartbeat (2s chain while focused).
-type logTickMsg struct{}
-
-func logTickCmd() tea.Cmd {
-	return tea.Tick(2*time.Second, func(time.Time) tea.Msg { return logTickMsg{} })
-}
-
-// openItem sets the screen for the master row (the right pane re-renders).
-func (a *app) openItem(i int) {
-	items := a.masterList()
-	if i < 0 || i >= len(items) {
-		return
-	}
-	a.screen = items[i].id
-	a.editKey, a.editVal, a.editMask = "", "", false
-	if items[i].id == "settings" {
-		a.setLevel, a.setCurGroup, a.setCurSel = 0, 0, 0 // fresh navigation
-		a.focus = 1                                      // the settings tree owns j/k
-	} else {
-		a.focus = 0 // every other screen: the left list owns j/k
-	}
-	a.actResult = ""
-}
-
-// openCmd = openItem + the row's initial job (logs refresh, doctor run…).
-func (a *app) openCmd(i int) tea.Cmd {
-	a.openItem(i)
-	switch a.masterList()[i].id {
-	case "logs":
-		return a.refreshLogs(a.logName)
-	case "doctor":
-		return a.runDoctor()
-	case "settings":
-		a.loadSettings()
-	case "hub":
-		if a.hubSample == 0 {
-			a.hubSample = 10
-		}
-		if a.hub == nil || time.Since(a.hub.Now) > 15*time.Second {
-			return a.refreshHub()
-		}
-	}
-	return nil
-}
-
-// ---- mouse (bubblezone hit-testing + the menubar's own) --------------------
-
-func (a *app) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	// the dialog owns the screen when open (its [y]/[n]/[enter]/[esc] zones)
-	if a.dlg != nil {
-		for _, zid := range []string{a.dlg.id + ".y", a.dlg.id + ".ok"} {
-			if z := zone.Get(zid); z != nil && z.InBounds(msg) {
-				return a, a.dialogConfirm()
-			}
-		}
-		for _, zid := range []string{a.dlg.id + ".n"} {
-			if z := zone.Get(zid); z != nil && z.InBounds(msg) {
-				a.dlg = nil
-				return a, nil
-			}
-		}
-		return a, nil
-	}
-	if a.screen == "shell" {
-		return a, nil
-	}
-	// the menu bar: its own bounds (top rows) or when open
-	if a.menuOpen || msg.Y <= 2 {
-		next, cmd := a.menu.Update(msg)
-		a.menu = next
-		a.syncMenu()
-		return a, cmd
-	}
-	// the left-pane rows
-	for i := range a.masterList() {
-		if z := zone.Get(a.zoneID + ".row." + fmt.Sprint(i)); z != nil && z.InBounds(msg) {
-			a.dcur = i
-			return a, a.openCmd(i)
-		}
-	}
-	// the action chips (right pane)
-	for _, c := range []chip{
-		{"start", func() tea.Cmd { return a.runJob("start", a.tk.StackUp) }},
-		{"stop", func() tea.Cmd { a.askStop(); return nil }},
-		{"restart", func() tea.Cmd { a.askRestart(); return nil }},
-		{"pull", func() tea.Cmd { return a.runJob("pull", a.tk.PullImages) }},
-		{"backup", func() tea.Cmd {
-			return a.runJob("backup", func(ctx context.Context) (string, error) {
-				m, err := a.tk.Store.Dump(a.tk.BackupPath())
-				if err != nil {
-					return "", err
-				}
-				return fmt.Sprintf("%d keys", len(m)), nil
-			})
-		}},
-		{"data-backup", func() tea.Cmd {
-			return a.runJobLong("data-backup", func(ctx context.Context) (string, error) {
-				return runBackupScript(a.tk.BackupDir(), "backup-data.sh", ctx)
-			})
-		}},
-		{"data-drill", func() tea.Cmd {
-			return a.runJobLong("data-drill", func(ctx context.Context) (string, error) {
-				return runBackupScript(a.tk.BackupDir(), "restore-drill.sh", ctx)
-			})
-		}},
-		{"restore", func() tea.Cmd { a.askRestore(); return nil }},
-	} {
-		if z := zone.Get(a.zoneID + ".chip." + c.id); z != nil && z.InBounds(msg) {
-			return a, c.fn()
-		}
-	}
-	return a, nil
-}
-
-type chip struct {
-	id string
-	fn func() tea.Cmd
 }
 
 // ---- status / stack ---------------------------------------------------------
@@ -959,11 +431,11 @@ func (a *app) firstLoggable() string {
 	return ""
 }
 
-func (a *app) refreshStatus() tea.Cmd {
+func (a *app) refreshStatus() {
 	if a.dock == nil {
-		return nil
+		return
 	}
-	return a.silentJob("ping", func(ctx context.Context) (string, error) {
+	a.silentJob("ping", func(ctx context.Context) (string, error) {
 		if err := a.dock.Ping(ctx); err != nil {
 			return "", err
 		}
@@ -976,15 +448,15 @@ func (a *app) refreshStatus() tea.Cmd {
 
 // ---- logs ------------------------------------------------------------------
 
-func (a *app) refreshLogs(name string) tea.Cmd {
+func (a *app) refreshLogs(name string) {
 	if name == "" {
 		name = a.firstLoggable()
 	}
 	a.logName = name
 	if a.dock == nil || name == "" {
-		return nil
+		return
 	}
-	return a.silentJob("logs", func(ctx context.Context) (string, error) {
+	a.silentJob("logs", func(ctx context.Context) (string, error) {
 		st, err := a.dock.TailLog(ctx, name, maxLines)
 		if err != nil {
 			return "", err
@@ -1003,51 +475,39 @@ func (a *app) refreshLogs(name string) tea.Cmd {
 	})
 }
 
-func (a *app) logsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "f", "enter":
-		return a, a.refreshLogs(a.logName)
-	case "left", "h", "right", "l":
-		dir := 1
-		if msg.String() == "left" || msg.String() == "h" {
-			dir = -1
-		}
-		lst := a.containerList()
-		if len(lst) == 0 {
-			return a, nil
-		}
-		idx := -1
-		for i, c := range lst {
-			if c.Name == a.logName {
-				idx = i
-				break
-			}
-		}
-		if idx < 0 {
-			idx = 0
-		}
-		next := idx
-		for step := 0; step < len(lst); step++ {
-			next = (idx + dir*(step+1)) % len(lst)
-			if next < 0 {
-				next += len(lst)
-			}
-			if lst[next].Up {
-				break
-			}
-			if step == len(lst)-1 {
-				next = idx
-			}
-		}
-		return a, a.refreshLogs(lst[next].Name)
+// logCycle steps to the next/prev container (h/l = left/right, classic).
+func (a *app) logCycle(dir int) {
+	lst := a.containerList()
+	if len(lst) == 0 {
+		return
 	}
-	return a, nil
+	idx := -1
+	for i, c := range lst {
+		if c.Name == a.logName {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		idx = 0
+	}
+	next := idx
+	for step := 0; step < len(lst); step++ {
+		next = (idx + dir*(step+1)) % len(lst)
+		if next < 0 {
+			next += len(lst)
+		}
+		if lst[next].Up {
+			break
+		}
+	}
+	a.refreshLogs(lst[next].Name)
 }
 
 // ---- doctor ----------------------------------------------------------------
 
-func (a *app) runDoctor() tea.Cmd {
-	return a.silentJob("doctor", func(ctx context.Context) (string, error) {
+func (a *app) runDoctor() {
+	a.silentJob("doctor", func(ctx context.Context) (string, error) {
 		var rows []doctorRow
 		if a.dock != nil {
 			if err := a.dock.Ping(ctx); err == nil {
@@ -1085,8 +545,12 @@ func (a *app) runDoctor() tea.Cmd {
 // ---- settings ----------------------------------------------------------------
 
 func (a *app) loadSettings() {
-	if a.tk.Store == nil {
+	if a.tk == nil || a.tk.Store == nil {
+		a.setGroups = nil
 		return
+	}
+	if a.set == nil {
+		a.set = newSettings(a.tk)
 	}
 	a.setGroups, _ = a.set.Groups()
 	if a.setCurSel >= len(a.flatKeys()) {
@@ -1107,8 +571,9 @@ func isSecret(key string) bool {
 	return ok && p.Secret
 }
 
-func (a *app) settingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	k := msg.String()
+// settingsNav handles the two-pane settings navigation + edit mode for the
+// key `k` (port of the old settingsKey state machine — tea types removed).
+func (a *app) settingsNav(k string, runes []rune) (handled bool) {
 	// EDIT MODE (unchanged behavior from the flat era): the box consumes typing
 	if a.editKey != "" {
 		switch k {
@@ -1116,33 +581,35 @@ func (a *app) settingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if len(a.editVal) > 0 {
 				a.editVal = a.editVal[:len(a.editVal)-1]
 			}
-			return a, nil
+			return true
 		case "esc", "q":
 			a.editKey, a.editVal, a.editMask = "", "", false
-			return a, nil
+			return true
 		case "enter", "x", "ctrl+s":
 			key := a.editKey
 			val := strings.TrimSpace(a.editVal)
 			a.editKey, a.editVal, a.editMask = "", "", false
 			if val == "" {
-				return a, a.runJob("unset", func(ctx context.Context) (string, error) {
+				a.runJob("unset", func(ctx context.Context) (string, error) {
 					if err := a.set.Delete(key, "toolkit-tui"); err != nil {
 						return "", err
 					}
 					return key, nil
 				})
+			} else {
+				a.runJob("set", func(ctx context.Context) (string, error) {
+					if err := a.set.Set(key, val, "toolkit-tui"); err != nil {
+						return "", err
+					}
+					return key, nil
+				})
 			}
-			return a, a.runJob("set", func(ctx context.Context) (string, error) {
-				if err := a.set.Set(key, val, "toolkit-tui"); err != nil {
-					return "", err
-				}
-				return key, nil
-			})
+			return true
 		}
-		if len(msg.Runes) > 0 {
-			a.editVal += string(msg.Runes)
+		if len(runes) > 0 {
+			a.editVal += string(runes)
 		}
-		return a, nil
+		return true
 	}
 	// LEVEL 0 — navigate the groups (owner: the settings tree)
 	if a.setLevel == 0 || len(a.setGroups) == 0 {
@@ -1152,21 +619,23 @@ func (a *app) settingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if len(a.setGroups) > 0 {
 				a.setCurGroup = (a.setCurGroup + 1) % n
 			}
-			return a, nil
+			return true
 		case "up", "k":
 			if len(a.setGroups) > 0 {
 				a.setCurGroup = (a.setCurGroup - 1 + n) % n
 			}
-			return a, nil
+			return true
 		case "enter", "l":
 			if len(a.setGroups) == 0 {
-				return a, nil
+				return true
 			}
 			a.setLevel = 1
 			a.setCurSel = 0
-			return a, nil
+			return true
 		}
-		return a, nil
+		return false // level 0 only eats j/k/enter/l; the rest fall through
+		// (was `return !handled` = always true — swallowed digit keys from
+		// the settings screen, breaking 1-9/0 screen jumps after `4`.)
 	}
 	// LEVEL 1 — the keys of the selected group
 	if a.setCurGroup >= len(a.setGroups) {
@@ -1179,19 +648,19 @@ func (a *app) settingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(gkeys) > 0 {
 			a.setCurSel = (a.setCurSel + 1) % n
 		}
-		return a, nil
+		return true
 	case "up", "k":
 		if len(gkeys) > 0 {
 			a.setCurSel = (a.setCurSel - 1 + n) % n
 		}
-		return a, nil
+		return true
 	case "b":
 		// back a level (to the groups); tab/arrow-left hops panes instead
 		a.setLevel = 0
-		return a, nil
+		return true
 	case "enter", "e":
 		if len(gkeys) == 0 {
-			return a, nil
+			return true
 		}
 		e := gkeys[a.setCurSel%len(gkeys)]
 		v := e.Value
@@ -1203,9 +672,9 @@ func (a *app) settingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		a.editKey = e.Key
 		a.editVal = v
 		a.editMask = e.Secret
-		return a, nil
+		return true
 	}
-	return a, nil
+	return false
 }
 
 // ---- actions (admin): TLS import + n-gram models + first-admin -------------
@@ -1235,10 +704,10 @@ func (a *app) ngramStatusText() string {
 	return b.String()
 }
 
-// actionsKey drives the Actions prompts through the mc prompt boxes (dlg):
+// actionsKey drives the Actions prompts through the prompt boxes (dlg):
 // the classic two-step flows (TLS cert→key, bootstrap email→password) are
-// each an overlay dialog; the jobs run unchanged.
-func (a *app) actionsKey(k string) tea.Cmd {
+// each a dialog; the jobs run unchanged.
+func (a *app) actionsKey(k string) {
 	switch k {
 	case "t":
 		a.actCert, a.actKey = "", ""
@@ -1251,12 +720,12 @@ func (a *app) actionsKey(k string) tea.Cmd {
 		a.actCert, a.actKey = "", ""
 		a.dialogPrompt("boot-email", "first-admin bootstrap", "admin email:")
 	}
-	return nil
+	a.redraw()
 }
 
-func (a *app) runNgram(langs string) tea.Cmd {
+func (a *app) runNgram(langs string) {
 	t := a.tk
-	return a.runJob("ngram", func(ctx context.Context) (string, error) {
+	a.runJob("ngram", func(ctx context.Context) (string, error) {
 		parts := []string{}
 		for _, p := range strings.Split(langs, ",") {
 			if s2 := strings.TrimSpace(p); s2 != "" {
@@ -1279,20 +748,21 @@ func (a *app) runNgram(langs string) tea.Cmd {
 	})
 }
 
-func (a *app) runBootstrap(email, password string) tea.Cmd {
+func (a *app) runBootstrap(email, password string) {
 	t := a.tk
 	var b strings.Builder
 	if err := t.BootstrapFreshInstance(email, password, &b); err != nil {
 		a.actResult = "bootstrap FAILED: " + err.Error()
-		return nil
+		a.redraw()
+		return
 	}
 	a.actResult = b.String() + "\n  first admin created: " + email + " — sign in with email + password; the instance is bootable."
-	return nil
+	a.redraw()
 }
 
-func (a *app) runTLS(certSrc, keySrc string) tea.Cmd {
+func (a *app) runTLS(certSrc, keySrc string) {
 	t, dk := a.tk, a.dock
-	return a.runJob("tls", func(ctx context.Context) (string, error) {
+	a.runJob("tls", func(ctx context.Context) (string, error) {
 		info, err := ImportCert(certSrc, keySrc, certSrc, keySrc)
 		_ = info
 		if err != nil {
@@ -1319,5 +789,83 @@ func (a *app) runTLS(certSrc, keySrc string) tea.Cmd {
 	})
 }
 
-// (the View + menu + dialog surfaces live in ui_view.go / ui_menu.go /
-//  ui_dialog.go — this file is the model + jobs + keys + mouse.)
+// ---- shell (the classic attach) ---------------------------------------------
+
+func (a *app) startShell(label string) {
+	dk, tk := a.dock, a.tk
+	a.loading = true
+	a.jobName = "shell " + label
+	a.redraw()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		sess, err := NewShell(ctx, dk, tk.Project, label)
+		a.loading = false
+		if err != nil {
+			a.setErr("shell %s: %v", label, err)
+			a.redraw()
+			return
+		}
+		a.shell = sess
+		a.shellLabel = label
+		a.shellBuf = nil
+		a.shellExited = false
+		a.screen = "shell"
+		a.redraw()
+		go a.pumpShellLoop()
+	}()
+}
+
+// pumpShellLoop reads the exec stream until EOF, appending decoded chunks
+// (tview redraws are coalesced — no full-frame flood over SSH).
+func (a *app) pumpShellLoop() {
+	sess := a.shell
+	if sess == nil {
+		return
+	}
+	buf := make([]byte, 256*1024)
+	for {
+		n, err := sess.ReadOne(buf)
+		if n > 0 {
+			text := DecodeShellChunk(buf[:n])
+			a.shellBuf = append(a.shellBuf, []byte(text)...)
+			if len(a.shellBuf) > 1<<20 { // 1 MiB cap: keep the tail
+				a.shellBuf = a.shellBuf[len(a.shellBuf)-(1<<20):]
+			}
+			a.redraw()
+		}
+		if err != nil {
+			a.shellExited = true
+			a.endShell()
+			a.screen = "dashboard"
+			a.refreshStatus()
+			a.redraw()
+			return
+		}
+	}
+}
+
+func (a *app) endShell() {
+	if a.shell != nil {
+		a.shell.Close()
+		a.shell = nil
+	}
+}
+
+// shellForward sends operator input to the exec stream (the shellKey port:
+// ctrl-z → detach & close · ctrl+c → to the shell · everything else verbatim).
+func (a *app) shellForward(b string) {
+	sess := a.shell
+	if sess == nil {
+		return
+	}
+	if _, err := sess.Write([]byte(b)); err != nil {
+		a.setErr("shell write: %v", err)
+		a.shellExited = true
+		a.endShell()
+		a.screen = "dashboard"
+		a.redraw()
+	}
+}
+
+var _ = strconv.Itoa // (kept for the settings parsers that live in config.go)

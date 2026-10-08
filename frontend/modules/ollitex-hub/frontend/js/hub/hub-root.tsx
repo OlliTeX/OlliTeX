@@ -113,7 +113,17 @@ export default function HubRoot() {
   }, [])
 
   const nav = useMemo<HubNode[]>(() => {
-    const base = visibleNav(HUB_NAV, admin)
+    // AJ-7 (owner 2026-10-08): /hub's "My settings" + "Site settings" nav
+    // surfaces are RETIRED — the dedicated pages /user-settings and
+    // /admin-settings replace them (AJ-1). Their section heading rows go
+    // with them; the dedicated pages keep their own sidebar (they build
+    // their nav straight from HUB_NAV, so this filter is /hub-scoped).
+    const RETIRED_FROM_HUB = new Set(['mysettings', 'site', 'sec.personal', 'sec.admin'])
+    const dropRetired = (ns: HubNode[]): HubNode[] =>
+      ns
+        .filter(n => !RETIRED_FROM_HUB.has(n.id))
+        .map(n => (n.children?.length ? { ...n, children: dropRetired(n.children) } : n))
+    const base = dropRetired(visibleNav(HUB_NAV, admin))
     if (!cats) return base
     const merge = (ns: HubNode[]): HubNode[] =>
       ns.map(n => {

@@ -18,11 +18,9 @@ import (
 	"sync"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	teaMiddleware "github.com/charmbracelet/wish/bubbletea"
 	xssh "golang.org/x/crypto/ssh"
 )
 
@@ -138,15 +136,27 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 	var pendingStartScreens sync.Map
 	allOpts := append([]ssh.Option{wish.WithHostKeyPath(hostKey)}, authOpts...)
 	allOpts = append(allOpts, wish.WithMiddleware(
-		teaMiddleware.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
-			start := ""
-			if v, ok := pendingStartScreens.LoadAndDelete(sess); ok {
-				if ss, ok2 := v.(string); ok2 {
-					start = ss
+		// The TUI session — the AI-era replacement for the bubbletea
+		// middleware (2026-10-07): the retained-mode tview app runs
+		// in-process on a screen bound to the ssh session's io (the
+		// server-side pipe is not a /dev/tty, so the stdio screen cannot
+		// Start — SessionScreen injects a session-backed tcell.Tty). Each
+		// connection keeps its own state model against the live docker
+		// socket (the old per-session contract), and every screen boot
+		// target (`ssh host hub`) still lands through the pendingStart
+		// gate above.
+		func(next ssh.Handler) ssh.Handler {
+			return func(sess ssh.Session) {
+				start := ""
+				if v, ok := pendingStartScreens.LoadAndDelete(sess); ok {
+					if ss, ok2 := v.(string); ok2 {
+						start = ss
+					}
 				}
+				runTUIOverSession(sess, t, start, o.Log)
+				_ = next
 			}
-			return newApp(t, start), []tea.ProgramOption{tea.WithInput(sess), tea.WithOutput(sess), tea.WithAltScreen()}
-		}),
+		},
 		// Both middlewares go in ONE WithMiddleware call: wish.WithMiddleware
 		// does `s.Handler = h` per option, so two separate options REPLACE
 		// each other (last wins) — which silently drops the TUI middleware
@@ -171,6 +181,25 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 						pendingStartScreens.Store(sess, cmd)
 						next(sess)
 						return
+					}
+					if start, ok := parseTUIBoot(cmd); ok {
+						pendingStartScreens.Store(sess, start)
+						next(sess)
+						return
+					}
+					// a wrapped screen boot (`timeout N doctor`, `timeout 5 hub`) also
+					// lands in the in-process TUI — a child exec has no controlling tty.
+					if inner := stripTimeout(cmd); inner != cmd {
+						if v, ok := parseTUIBoot(inner); ok {
+							pendingStartScreens.Store(sess, v)
+							next(sess)
+							return
+						}
+						if fs := strings.Fields(inner); len(fs) == 1 && validScreen(newApp(t), fs[0]) {
+							pendingStartScreens.Store(sess, fs[0])
+							next(sess)
+							return
+						}
 					}
 					runCLI(sess, cmd)
 					return
@@ -208,6 +237,53 @@ func (t *Toolkit) Serve(ctx context.Context, o ServerOpts) error {
 	case err := <-serveErr:
 		return err
 	}
+}
+
+// runTUIOverSession — the TUI over one ssh session (in-process, the
+// retained-mode replacement for the tea program over WithInput/WithOutput).
+func runTUIOverSession(sess ssh.Session, t *Toolkit, start string, l *log.Logger) {
+	app := newApp(t, start)
+	// the client's terminal size (ssh pty allocation + live window-change
+	// channel) — without this the TUI is pinned to 80x24 no matter the
+	// operator's terminal (owner report: "controls don't work" / tiny UI).
+	cols, rows := 0, 0
+	var wins <-chan ssh.Window
+	if pty, ch, ok := sess.Pty(); ok {
+		cols, rows = int(pty.Window.Width), int(pty.Window.Height)
+		wins = ch
+	}
+	screen, tty, err := SessionScreen(sess, cols, rows)
+	if err != nil {
+		l.Error("tui screen", "err", err.Error())
+		fmt.Fprintln(sess, "toolkit: cannot attach the TUI screen: "+err.Error())
+		sess.Close()
+		return
+	}
+	if wins != nil {
+		go func() {
+			for w := range wins {
+				tty.SetSize(int(w.Width), int(w.Height))
+			}
+		}()
+	}
+	// tview.Run only Init's a screen it created itself — an externally
+	// injected screen must be Init'ed by its owner or inputLoop never
+	// starts and every key is lost (verified on the live ssh smoke).
+	if ierr := screen.Init(); ierr != nil {
+		l.Error("tui screen init", "err", ierr.Error())
+		fmt.Fprintln(sess, "toolkit: cannot start the TUI screen: "+ierr.Error())
+		sess.Close()
+		return
+	}
+	tv := NewTUI(app, screen)
+	// bind the session io so teardown (q→yes / menu quit / bare q) can
+	// write the terminal teardown and close the stream directly — tcell's
+	// own Fini deadlocks on the blocked ssh read (see tviewApp.tearDown).
+	tv.SetRIO(sess)
+	if rerr := tv.Run(); rerr != nil {
+		l.Debug("tui session ended", "err", rerr.Error())
+	}
+	sess.Close()
 }
 
 // to the session (the multi-command owner usage: `ssh host "toolkit ..."`).
@@ -250,4 +326,53 @@ func writeHostKey(path string) error {
 	}
 	defer f.Close()
 	return pem.Encode(f, &pem.Block{Type: "PRIVATE KEY", Bytes: der})
+}
+
+// parseTUIBoot — a TUI boot command (`tui` / `toolkit tui <flags>`, an
+// optional leading `timeout N`) runs IN-PROCESS on the session screen — a
+// child exec has no controlling tty, so the terminal screen cannot attach
+// (open /dev/tty ENXIO). Returns the requested --screen ("" = dashboard).
+func parseTUIBoot(raw string) (string, bool) {
+	fields := strings.Fields(raw)
+	i := 0
+	if i < len(fields) && fields[i] == "timeout" {
+		if i+2 > len(fields) {
+			return "", false
+		}
+		i += 2
+	}
+	if i < len(fields) && fields[i] == "toolkit" && i+1 < len(fields) {
+		i++
+	}
+	if i >= len(fields) || fields[i] != "tui" {
+		return "", false
+	}
+	start := ""
+	for j := i + 1; j < len(fields); j++ {
+		switch {
+		case fields[j] == "--screen" && j+1 < len(fields):
+			start = fields[j+1]
+			j++
+		case strings.HasPrefix(fields[j], "--screen="):
+			start = strings.TrimPrefix(fields[j], "--screen=")
+		}
+	}
+	return start, true
+}
+
+// stripTimeout drops a leading `timeout N` (or `timeout -s KILL N`) so
+// the wrapped form of a TUI boot is recognized.
+func stripTimeout(raw string) string {
+	f := strings.Fields(raw)
+	if len(f) < 2 || f[0] != "timeout" {
+		return raw
+	}
+	i := 1
+	if f[i] == "-s" {
+		i++
+	}
+	if i >= len(f) {
+		return raw
+	}
+	return strings.Join(f[i+1:], " ")
 }

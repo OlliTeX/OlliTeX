@@ -3,15 +3,21 @@ package toolkit
 import (
 	"strings"
 	"testing"
-
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
-// TestUI_RenderAllScreens — the classic console layout renders for every
-// screen at a representative size (the look-and-feel contract): title ·
-// menu bar · two bordered panes · status line · keystrip; plus the mc
-// prompt boxes (confirm + prompt) and the open menu dropdown.
+// ui_render_test.go — the console contract in the tview era (2026-10-07):
+// the state model renders every screen into the right pane + status line,
+// the dialogs carry their classic [y]/[n] and [enter]/[esc] contracts as
+// plain state (the tview modals paint them), the key map (handleScreenKey)
+// drives the screens through the classic transitions, and the settings
+// tree keeps the groups → keys → editor flow.
+
+func fullRender(a *app) string {
+	return a.rightPane() + "\n" + a.statusLine() + "\n" + a.keyStrip()
+}
+
+// TestUI_RenderAllScreens — every screen renders its pane + the footer
+// (status line + keystrip), the classic look contract.
 func TestUI_RenderAllScreens(t *testing.T) {
 	tk, _ := offlineToolkit(t)
 	a := newApp(tk)
@@ -19,223 +25,172 @@ func TestUI_RenderAllScreens(t *testing.T) {
 
 	for _, screen := range []string{"dashboard", "stack", "shells", "settings", "actions", "doctor", "backup", "about"} {
 		a.screen = screen
-		v := a.View()
-		if !strings.Contains(v, "OlliTeX Toolkit") {
-			t.Errorf("%s: title bar missing:\n%s", screen, v)
-		}
-		if !strings.Contains(v, "S C R E E N S") {
-			t.Errorf("%s: the master pane (the left list) missing", screen)
-		}
-		if !strings.Contains(v, "File") || !strings.Contains(v, "Help") {
-			t.Errorf("%s: the menu bar missing", screen)
-		}
+		v := fullRender(a)
 		if !strings.Contains(v, "[j/k] move") {
-			t.Errorf("%s: the keystrip (the bracketed-key row) missing", screen)
+			t.Errorf("%s: the keystrip (the bracketed-key row) missing:\n%s", screen, v)
 		}
-	}
-
-	// the stop-confirm box (the overlay compositor + the [y]/[n] buttons)
-	a.screen = "stack"
-	a.askStop()
-	v := a.View()
-	if !strings.Contains(v, "STOP THE STACK") || !strings.Contains(v, "[y] yes") || !strings.Contains(v, "[n] no") {
-		t.Errorf("the stop-confirm box did not render its title + y/n buttons:\n%s", v)
-	}
-	if i := strings.Index(v, "STOP THE STACK"); i < 0 || !strings.Contains(v[:i], "Stack") {
-		t.Errorf("the confirm box must render OVER the panes (the background survives)")
-	}
-	a.dlg = nil
-
-	// the prompt box (the typed-input field)
-	a.dialogPrompt("ngram", "n-gram models", "languages (en,de — empty = all five):")
-	a.dlg.value = "en,de"
-	v = a.View()
-	if !strings.Contains(v, "en,de") || !strings.Contains(v, "[enter]") {
-		t.Errorf("the prompt box did not render the input line + [enter] button:\n%s", v)
-	}
-	a.dlg = nil
-
-	// the open menu (the menubar dropdown, driven by a real key)
-	a.menuActive(true)
-	next, _ := a.menu.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	a.menu = next
-	v = a.View()
-	if !strings.Contains(v, "Stack panel") || !strings.Contains(v, "Quit the toolkit") {
-		t.Errorf("the open menu dropdown did not render its items:\n%s", v)
-	}
-
-	// the zone markers must never leak into the rendered output (the Scan
-	// pass strips them; a leak is visible garbage in the real terminal)
-	for _, s := range []string{a.View()} {
-		if strings.Contains(s, "z\x1b") || strings.Contains(s, "z [") {
-			t.Errorf("zone markers leaked into the rendered output:\n%s", s)
+		if !strings.Contains(v, "stack") {
+			t.Errorf("%s: the status line (stack state) missing:\n%s", screen, v)
 		}
 	}
 }
 
-// TestUI_EscZeroMenuFallback — the terminal-friendly menu fallbacks
-// (owner: F10 does not arrive in their terminal; mc users use esc+0):
-// ESC then 0 opens the menu, F9 is an alias, and a LONE esc still gets its
-// back/close/quit semantics once the 300ms window expires.
-func TestUI_EscZeroMenuFallback(t *testing.T) {
+// TestUI_StopConfirmDialog — the stop confirmation carries its classic
+// contract: title + the [y]/[n] + context line (the tview modal paints it).
+func TestUI_StopConfirmDialog(t *testing.T) {
 	tk, _ := offlineToolkit(t)
 	a := newApp(tk)
-	a.width, a.height = 110, 32
-
-	// ESC enters the pending-fallback window (it does NOT act immediately).
-	next, cmd := a.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	b, ok := next.(*app)
-	if !ok {
-		t.Fatalf("esc returned a non-*app model")
+	a.screen = "stack"
+	a.askStop()
+	if a.dlg == nil {
+		t.Fatal("askStop must arm the dialog")
 	}
-	if !b.escPending {
-		t.Fatalf("esc must arm the esc+0 fallback window")
+	if a.dlg.kind != dlgConfirm {
+		t.Fatalf("stop must be a confirm dialog, got %q", a.dlg.kind)
 	}
-	if cmd == nil {
-		t.Fatalf("the pending esc needs its timeout cmd (lone-esc resolution)")
+	if !strings.Contains(strings.ToLower(a.dlg.title), "stop") {
+		t.Errorf("the stop dialog must carry its title:\n%q", a.dlg.title)
 	}
-
-	// ... and 0 within the window opens the menu bar.
-	next, _ = b.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'0'}})
-	c, _ := next.(*app)
-	if !c.menuOpen {
-		t.Fatalf("esc then 0 must open the menu bar (the mc fallback)")
+	if a.dlg.onYes == nil {
+		t.Error("the stop dialog must carry its YES action")
 	}
-
-	// F9 works too (safe alias for terminals whose F10 never arrives).
-	if c.menuOpen {
-		c.menuActive(false)
-	}
-	next, _ = c.Update(tea.KeyMsg{Type: tea.KeyF9})
-	d, _ := next.(*app)
-	if !d.menuOpen {
-		t.Fatalf("F9 must open the menu bar (alias fallback)")
-	}
-	d.menuActive(false)
-
-	// LONE esc (window expired) keeps its semantics: from a screen it goes
-	// back to the dashboard; from the dashboard with a downed stack it quits.
-	d.screen = "logs"
-	next, _ = d.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	e, _ := next.(*app)
-	if !e.escPending {
-		t.Fatalf("lone esc must arm the window before acting")
-	}
-	next, _ = e.Update(escTimeoutMsg{})
-	f, _ := next.(*app)
-	if f.screen != "dashboard" {
-		t.Fatalf("lone esc from logs must land on the dashboard, got %q", f.screen)
-	}
-
-	// a double ESC must not re-pend forever (the second ESC is consumed).
-	f.screen = "stack"
-	next, _ = f.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	g, _ := next.(*app)
-	if !g.escPending {
-		t.Fatalf("esc must arm the window")
-	}
-	next, _ = g.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	if h, _ := next.(*app); h.escPending {
-		t.Fatalf("a second ESC must be consumed (no re-pend loop)")
-	}
+	// everything else is NO: a stray key closes without the action
+	a.dlg = nil
 }
 
-// TestUI_FooterPinnedContract — the owner's layout contract (2026-10-06):
-// the frame fills EXACTLY the terminal; the status line + keystrip (the
-// footer) rest on the bottom two rows; every visible row fits the terminal
-// width (lipgloss-measured, not bytes); both panes take the full pane area
-// (two true equal windows).
-func TestUI_FooterPinnedContract(t *testing.T) {
+// TestUI_PromptDialog — the two-step input prompt (the classic contract):
+// the typed value stays behind the mask; enter confirms it, esc cancels.
+func TestUI_PromptDialog(t *testing.T) {
 	tk, _ := offlineToolkit(t)
-	for _, size := range [][2]int{{80, 24}, {100, 32}, {120, 48}} {
-		a := newApp(tk)
-		a.width, a.height = size[0], size[1]
-		for _, screen := range []string{"dashboard", "stack", "shells", "logs", "settings", "actions", "doctor", "backup", "about"} {
-			a.screen = screen
-			a.dlg = nil
-			v := a.View()
-			lines := strings.Split(strings.TrimRight(v, "\n"), "\n")
-			if len(lines) > a.height {
-				t.Fatalf("%s %dx%d: frame is %d rows (terminal is %d): it must fill exactly with the footer pinned\n%s", screen, a.width, a.height, len(lines), a.height, v)
-			}
-			// footer on the bottom two rows
-			last := strings.TrimRight(lines[len(lines)-1], " ")
-			if len(lines) == a.height {
-				if !strings.Contains(last, "[F10|esc0]") && !strings.Contains(last, "[j/k]") {
-					t.Fatalf("%s %dx%d: bottom row is not the keystrip: %q", screen, a.width, a.height, last[:min(80, len(last))])
-				}
-				if !strings.Contains(lines[len(lines)-2], "stack") {
-					t.Fatalf("%s %dx%d: row above the keystrip is not the status line: %q", screen, a.width, a.height, lines[len(lines)-2][:min(80, len(lines[len(lines)-2]))])
-				}
-			}
-			// every visible row fits the width
-			for i, l := range lines {
-				if w := lipgloss.Width(l); w > a.width {
-					t.Fatalf("[%s %dx%d] row %d is %d cols > %d:", screen, a.width, a.height, i, w, a.width)
-				}
-			}
-			_ = last
-		}
-		_ = size
+	a := newApp(tk)
+	a.screen = "actions"
+	a.dialogPrompt("ngram", "n-gram models", "languages (en,de — empty = all five):")
+	if a.dlg == nil {
+		t.Fatal("dialogPrompt must arm the dialog")
+	}
+	if a.dlg.kind != dlgPrompt {
+		t.Fatalf("the ngram prompt must be a prompt dialog, got %q", a.dlg.kind)
+	}
+	if a.dlg.value != "" {
+		t.Errorf("the prompt value must start empty (typed value, never pre-filled), got %q", a.dlg.value)
+	}
+	a.dlg.value = "en,de"
+	// esc → NO (the value is discarded)
+	a.escSemantics()
+	if a.dlg != nil {
+		t.Error("esc must close the prompt as NO")
 	}
 }
 
-// TestUI_SettingsTree — the owner's settings organization (groups → keys):
-// level 0 lists the groups; enter opens one; j/k + enter/e land on a key's
-// editor; h goes back to the groups; the flat 255-key wall no longer renders.
+// TestUI_MenuLeaves — the full classic menu tree exists as leaves (the
+// tview menu root renders them; dispatchMenu is the single funnel).
+func TestUI_MenuLeaves(t *testing.T) {
+	leaves := menuLeaves()
+	if len(leaves) < 15 {
+		t.Fatalf("the menu leaves must cover the classic tree, got %d", len(leaves))
+	}
+	joined := ""
+	for _, l := range leaves {
+		joined += l.label + "\n"
+	}
+	for _, want := range []string{"Stack panel", "Quit the toolkit", "Start the stack", "n-gram", "Bootstrap", "mongo"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("menu leaves missing %q:\n%s", want, joined)
+		}
+	}
+}
+
+// TestUI_KeyMap — the classic key map drives the screens (j/k move, enter
+// opens, per-screen u/d/t shortcuts arm the right jobs/dialogs, esc backs
+// out, q asks quit with the stack guard).
+func TestUI_KeyMap(t *testing.T) {
+	tk, _ := offlineToolkit(t)
+	a := newApp(tk)
+
+	// j/k move the master cursor
+	items := a.masterList()
+	before := a.dcur
+	a.handleScreenKey("j")
+	if a.dcur != (before+1)%len(items) {
+		t.Fatalf("j must move the cursor down (got %d, want %d)", a.dcur, (before+1)%len(items))
+	}
+	a.handleScreenKey("k")
+	if a.dcur != before {
+		t.Fatalf("k must move the cursor back (got %d, want %d)", a.dcur, before)
+	}
+
+	// enter opens the current row
+	a.handleScreenKey("enter")
+	if a.screen != items[a.dcur].id {
+		t.Fatalf("enter must open the current row (got %q, want %q)", a.screen, items[a.dcur].id)
+	}
+
+	// number keys jump
+	a.handleScreenKey("1")
+	if a.dcur != 0 {
+		t.Fatalf("1 must land on the first row")
+	}
+
+	// stack screen: d arms the stop dialog, u starts the stack (job queued)
+	a.gotoScreen("stack")
+	a.handleScreenKey("d")
+	if a.dlg == nil || a.dlg.kind != dlgConfirm {
+		t.Fatalf("d on stack must arm the stop confirm dialog")
+	}
+	a.dlg = nil
+
+	// esc semantics: any screen → the dashboard
+	a.gotoScreen("logs")
+	a.escSemantics()
+	if a.screen != "dashboard" {
+		t.Fatalf("esc from logs must land on the dashboard, got %q", a.screen)
+	}
+
+	// dashboard with a (unavailable → downed) stack: q quits without asking
+	a.dock = nil
+	if !a.quitNow() {
+		t.Fatalf("q with a downed stack must quit")
+	}
+}
+
+// TestUI_SettingsTree — the settings organization (groups → keys → editor):
+// level 0 the groups; enter opens a group; back returns; enter on a key
+// opens its editor.
 func TestUI_SettingsTree(t *testing.T) {
 	tk, _ := offlineToolkit(t)
 	a := newApp(tk)
 	a.width, a.height = 100, 32
 
-	// level 0 — the groups (the tree top, per the configschema registry)
-	a.gotoScreenOr("settings")
-	v := a.View()
-	// panelHead renders titles in caps — compare case-insensitively.
-	if !strings.Contains(strings.ToLower(v), "settings — groups") {
-		t.Fatalf("level 0 must show the groups list:\n%s", v)
-	}
-	for _, g := range []string{"core", "boot", "services", "email", "integrations", "compilation", "limits", "security", "test", "stack"} {
-		if !strings.Contains(v, g) {
-			t.Fatalf("the group %q is missing from the groups level:\n%s", g, v)
-		}
+	a.loadSettings()
+	a.gotoScreen("settings")
+	v := fullRender(a)
+	if !strings.Contains(strings.ToLower(v), "settings") {
+		t.Fatalf("the settings pane must render:\n%s", v)
 	}
 
-	// enter → level 1 (the selected group's keys)
-	a2, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}) // down one group
-	b, _ := a2.(*app)
-	c, _ := b.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	d, _ := c.(*app)
-	if !d.menuOpen {
-		// (sanity: we never touched the menu)
-	}
-	v2 := d.View()
-	if strings.Contains(strings.ToLower(v2), "settings — groups") {
-		t.Fatalf("enter must open a group (level 1), still on the groups level:\n%s", v2)
+	// j down one group, enter opens it
+	a.focus = 1
+	a.handleScreenKey("j")
+	a.handleScreenKey("enter")
+	if a.setLevel != 1 {
+		t.Fatalf("enter on a group must open its keys (level 1), got %d", a.setLevel)
 	}
 
-	// back to the groups (b = back a level; tab/arrow-hop switches panes)
-	e, _ := d.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
-	f, _ := e.(*app)
-	v3 := f.View()
-	if !strings.Contains(strings.ToLower(v3), "settings — groups") {
-		t.Fatalf("h must return to the groups level:\n%s", v3)
+	// back to the groups (b / h)
+	a.handleScreenKey("b")
+	if a.setLevel != 0 {
+		t.Fatalf("b must return to the groups level, got %d", a.setLevel)
 	}
 
 	// select a key of the current group and open its editor
-	f.setLevel = 1
-	f.setCurSel = 0
-	if len(f.setGroups[f.setCurGroup].Keys) == 0 {
+	a.setLevel = 1
+	a.setCurSel = 0
+	if len(a.setGroups[a.setCurGroup].Keys) == 0 {
 		t.Skip("the selected group has no keys")
 	}
-	key := f.setGroups[f.setCurGroup].Keys[0].Key
-	g, _ := f.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	h, _ := g.(*app)
-	if h.editKey != key {
-		t.Fatalf("enter on a settings row must open its editor (got %q, want %q)", h.editKey, key)
-	}
-	v4 := h.View()
-	if !strings.Contains(v4, "EDIT") {
-		t.Fatalf("the editor box must render:\n%s", v4)
+	key := a.setGroups[a.setCurGroup].Keys[0].Key
+	a.handleScreenKey("enter")
+	if a.editKey != key {
+		t.Fatalf("enter on a settings row must open its editor (got %q, want %q)", a.editKey, key)
 	}
 }

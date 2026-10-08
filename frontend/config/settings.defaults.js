@@ -933,7 +933,6 @@ function buildSettings() {
     // Typst: .typ documents are editable (created/uploaded files are docs,
     // not binaries).
     'typ',
-    'drawio',
     parseTextExtensions(process.env.ADDITIONAL_TEXT_EXTENSIONS)
   ),
 
@@ -1083,6 +1082,11 @@ function buildSettings() {
         '../modules/tikz/frontend/js/components/create-tikz-file'
       ),
 
+      // AK-11 (owner 2026-10-08): "New file > Draw.io diagram" (.drawio)
+      Path.resolve(
+        __dirname,
+        '../modules/drawio/frontend/js/components/create-drawio-file'
+      ),
     ],
     // [IVd] Buttons rendered next to the download button in the file view header
     // (e.g. the "Edit Image" action from the toast-image module).
@@ -1090,6 +1094,12 @@ function buildSettings() {
       Path.resolve(
         __dirname,
         '../modules/toast-image/frontend/js/components/toast-image-editor'
+      ),
+      // AD (owner 2026-10-07): stage-1 "Edit SVG" button → the toast-svg
+      // stage-2 full-size editor modal (two-stage pattern, like images).
+      Path.resolve(
+        __dirname,
+        '../modules/toast-svg/frontend/js/components/toast-svg-editor'
       ),
     ],
     devToolbar: [],
@@ -1375,6 +1385,11 @@ function buildSettings() {
       Path.resolve(
         __dirname,
         '../modules/tikz/frontend/js/visual-editor-provider'
+      ),
+      // AK-11 (owner 2026-10-08): draw.io canvas editor claims *.drawio
+      Path.resolve(
+        __dirname,
+        '../modules/drawio/frontend/js/visual-editor-provider'
       ),
     ],
     usGovBanner: [],

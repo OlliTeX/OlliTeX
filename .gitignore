@@ -63,3 +63,8 @@ tests/e2e/parity/reference/
 # generated locally, never committed (GH 100MB limit / non-reproducible values).
 go/services/clsitypst/resourcewriter/cache/
 go/services/clsitypst/urlcache/cache/
+
+# local build/run artifacts (never commit)
+collab
+go/collab
+.ollitex-toolkit/

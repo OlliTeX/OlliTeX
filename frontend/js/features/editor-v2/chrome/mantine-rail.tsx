@@ -25,12 +25,12 @@
  * chrome for the /editor route; /project keeps the byte-identical legacy
  * list.
  */
-import { ActionIcon, Group, Tooltip } from '@mantine/core'
+import { useEffect, useState } from 'react'
+import { ActionIcon, Tooltip } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import MaterialIcon from '@/shared/components/material-icon'
 import classNames from 'classnames'
 import RailActionElement from '@/features/ide-react/components/rail/rail-action-element'
-import { useRailContext } from '@/features/ide-react/context/rail-context'
 import { useLayoutContext } from '@/shared/context/layout-context'
 import { shouldIncludeElement } from '@/features/ide-react/util/rail-utils'
 import type { RailElement } from '@/features/ide-react/util/rail-types'
@@ -70,22 +70,6 @@ function V2RailTabButton({
   )
 }
 
-function V2RailAction({ action }: { action: { icon: string; title: string; action: () => void } }) {
-  return (
-    <Tooltip label={action.title} position="right" withArrow withinPortal>
-      <ActionIcon
-        variant="subtle"
-        aria-label={action.title}
-        className="ol-v2-rail-action"
-        style={{ width: 40, height: 40, fontSize: 20 }}
-        onClick={() => action.action()}
-      >
-        <MaterialIcon type={action.icon as never} aria-hidden />
-      </ActionIcon>
-    </Tooltip>
-  )
-}
-
 export function MantineRailNavChrome({
   tabs,
   moreOptions,
@@ -104,21 +88,47 @@ export function MantineRailNavChrome({
   tabWrapperRef?: React.Ref<HTMLDivElement>
 }) {
   const { t } = useTranslation()
-  const { setActiveModal } = useRailContext()
   const { isHistoryView, focusMode } = useLayoutContext()
 
-  const shortcutsAction = {
-    key: 'shortcuts',
-    icon: 'keyboard',
-    title: t('keyboard_shortcuts', 'Keyboard shortcuts'),
-    action: () => setActiveModal('keyboard-shortcuts'),
-  }
+  // 2026-10-07 owner item Y: the menu bar (File/Edit/Insert/View/Format/Help) lives in the
+  // rail now — a 'menu' icon + tooltip ABOVE the file tree. Implementation note (lessons
+  // learned): a STATIC import of menu-bar into this rail module changed the webpack module
+  // graph badly enough to break app startup, so the rail only TOGGLES a body class; the
+  // ToolbarMenuBar stays mounted in mantine-toolbar.tsx (unchanged import graph) and
+  // editor-v2-tokens.css floats the existing .ide-redesign-toolbar-menu-bar node above the
+  // rail while .ol-v2-menubar-open is set.
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => {
+    const el = document.body
+    if (menuOpen) {
+      el.classList.add('ol-v2-menubar-open')
+      return () => el.classList.remove('ol-v2-menubar-open')
+    }
+    el.classList.remove('ol-v2-menubar-open')
+    return undefined
+  }, [menuOpen])
+  useEffect(() => {
+    if (!menuOpen) return
+    const onClick = (e: MouseEvent) => {
+      const tEl = e.target as HTMLElement | null
+      if (tEl && (tEl.closest('.ol-v2-rail-menu-bar-entry') || tEl.closest('.ide-redesign-toolbar-menu-bar'))) return
+      setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('click', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('click', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
 
-  // Owner #3 (2026-09-13 editor wave): the renovated rail carries the hotkeys
-  // button as a first-class action, so the legacy Help DROPDOWN is dropped here
-  // (its only editor-relevant entry was "Keyboard shortcuts"). The /project
-  // legacy rail keeps the Help button untouched (no standalone shortcut there).
-  const visibleActions = actions.filter(a => a.key !== 'support')
+  // (Owner 2026-10-07, toolbar/rail strip: the keyboard-shortcuts entry and
+  //  the account/actions cluster are GONE from the rail — the actions area
+  //  now carries the logo/home entry, exactly the owner's markup. The
+  //  shortcuts surface remains in Help → Keyboard shortcuts in the menu bar.)
 
   return (
     <nav
@@ -129,6 +139,26 @@ export function MantineRailNavChrome({
       data-ol-v2-rail=""
     >
       <div className="ide-rail-tabs-nav ol-v2-rail-nav">
+        {/* Owner item Y: menu-bar entry (toggles the floating ToolbarMenuBar;
+            styled/positioned in editor-v2-tokens.css) — above the file tree. */}
+        <Tooltip
+          label={t('menu_bar', 'Menu bar')}
+          position="right"
+          withArrow
+          withinPortal
+        >
+          <ActionIcon
+            variant={menuOpen ? 'filled' : 'subtle'}
+            aria-label={t('menu_bar', 'Menu bar')}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            className="ol-v2-rail-menu-bar-entry"
+            style={{ width: 40, height: 40, fontSize: 20 }}
+            onClick={() => setMenuOpen(o => !o)}
+          >
+            <MaterialIcon type="menu" aria-hidden />
+          </ActionIcon>
+        </Tooltip>
         <div className="ide-rail-tabs-wrapper" ref={tabWrapperRef as never}>
           {tabs
             .filter(shouldIncludeElement)
@@ -164,25 +194,31 @@ export function MantineRailNavChrome({
             <RailActionElement action={moreOptions as never} />
           )}
         </div>
-        <Group
-          as="nav"
-          gap={2}
-          className="ol-v2-rail-actions"
-          aria-label={t('help_editor_settings', 'Help and settings')}
+                {/* AK-1 (owner 2026-10-08): the home entry retires the raw-text
+            material-symbols `home` ligature AND takes the EXACT style of
+            the rail's Menu-bar ActionIcon entry (same 40x40 geometry, same
+            --ai-* hover contract) — the owner's exact target markup. The
+            Overleaf logo is the entry icon (keeps its aria-label). */}
+        <ActionIcon
+          variant="subtle"
+          type="button"
+          className="ol-v2-rail-home-entry ol-v2-rail-menu-bar-entry"
+          aria-label="OlliTeX home — go to the hub"
+          style={
+            Object.assign(
+              {
+                '--ai-bg': 'transparent',
+                '--ai-hover': 'var(--mantine-color-ollitex-light-hover)',
+                '--ai-color': 'var(--mantine-color-ollitex-light-color)',
+                '--ai-bd': 'calc(0.0625rem * var(--mantine-scale)) solid transparent',
+              },
+              { width: 40, height: 40, fontSize: 20 },
+            )
+          }
+          onClick={() => { window.location.href = '/hub#/projects' }}
         >
-          <V2RailAction action={shortcutsAction} />
-          {visibleActions
-            .filter(shouldIncludeElement)
-            .map(action =>
-              'dropdown' in action && action.dropdown ? (
-                <span key={action.key} className="ol-v2-rail-dropdown-wrap">
-                  <RailActionElement action={action as never} />
-                </span>
-              ) : (
-                <V2RailAction key={action.key} action={action as never} />
-              )
-            )}
-        </Group>
+          <span className="ol-v2-rail-home-logo" aria-label="Overleaf logo" />
+        </ActionIcon>
       </div>
     </nav>
   )

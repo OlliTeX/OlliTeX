@@ -25,9 +25,6 @@ import { ToolbarLogos } from '@/features/ide-react/components/toolbar/logos'
 import { ToolbarMenuBar } from '@/features/ide-react/components/toolbar/menu-bar'
 import { ToolbarProjectTitle } from '@/features/ide-react/components/toolbar/project-title'
 import { OnlineUsers } from '@/features/ide-react/components/toolbar/online-users'
-import ShareProjectButton from '@/features/ide-react/components/toolbar/share-project-button'
-import ChangeLayoutButton from '@/features/ide-react/components/toolbar/change-layout-button'
-import ShowHistoryButton from '@/features/ide-react/components/toolbar/show-history-button'
 import RequestAccessButton from '@/features/ide-react/components/toolbar/request-access-button'
 import BackToEditorButton from '@/features/editor-navigation-toolbar/components/back-to-editor-button'
 import OLIconButton from '@/shared/components/ol/ol-icon-button'
@@ -41,7 +38,7 @@ const SubmitProjectButton = publishModalModules?.import.default
 export function MantineToolbar() {
   const { view, restoreView, focusMode, setFocusMode, pdfLayout, setView } =
     useLayoutContext()
-  const { cobranding, isRestrictedTokenMember } = useEditorContext()
+  const { cobranding } = useEditorContext()
   const { permissionsLevel } = useIdeReactContext()
   const improvedFlakyConnections = useFeatureFlag(
     'intermittent-connection-improvements'
@@ -149,36 +146,30 @@ export function MantineToolbar() {
       aria-label={t('project_actions')}
       data-ol-editor-v2="toolbar"
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--mantine-spacing-sm)',
-        padding: 'var(--mantine-spacing-xs) var(--mantine-spacing-sm)',
-        background: 'var(--bg-primary-themed)',
-        borderBottom: '1px solid var(--border-divider-themed)',
-        position: 'relative',
-        zIndex: 10,
+        // AE (owner 2026-10-07): the toolbar STRIP is gone from the editor —
+        // zero-size, out-of-flow, invisible. The node ONLY exists to host the
+        // ToolbarMenuBar (its proven import graph) which the rail's menu
+        // toggle floats over the editor (editor-v2-tokens.css +
+        // body.ol-v2-menubar-open). position:fixed on the panel escapes the
+        // zero-size parent, so nothing here may set transform/filter.
+        position: 'absolute',
+        width: 0,
+        height: 0,
+        overflow: 'visible',
+        pointerEvents: 'none',
+        zIndex: 20,
       }}
     >
-      <Group gap="sm" style={{ flexShrink: 0 }}>
-        <ToolbarLogos cobranding={cobranding} />
-        <ToolbarMenuBar />
-      </Group>
-      <Box style={{ flex: 1, minWidth: 0 }}>
+      <ToolbarMenuBar />
+      {/* AK-8 (owner 2026-10-08): the File → Download group (source zip /
+          PDF / docx / markdown / html) needs the commands ToolbarProjectTitle
+          registers. That component is VISIBLE only in the history view —
+          here it is mounted invisibly so the menu bar's command registry
+          has all five items (they were being filtered out unregistered,
+          which is why the whole Download block disappeared). */}
+      <span data-ol-editor-v2="command-host" style={{ display: 'none' }}>
         <ToolbarProjectTitle />
-      </Box>
-      <Group gap="sm" style={{ flexShrink: 0 }}>
-        {improvedFlakyConnections && (
-          <OfflineIndicator isOffline={isOfflineDueToNetworkStall} />
-        )}
-        {!isOfflineDueToNetworkStall && <OnlineUsers />}
-        <RequestAccessButton />
-        {!isRestrictedTokenMember && <ShowHistoryButton />}
-        <ChangeLayoutButton />
-        {shouldDisplaySubmitButton && cobranding && (
-          <SubmitProjectButton cobranding={cobranding} />
-        )}
-        <ShareProjectButton />
-      </Group>
+      </span>
     </Box>
   )
 }

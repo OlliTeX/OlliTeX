@@ -243,17 +243,19 @@ func ldapJIT(ctx context.Context, db *mongo.Database, p *LDAPProvider, profile s
 		_, _ = users.UpdateOne(ctx, bson.D{{Key: "_id", Value: uid2}},
 			bson.D{{Key: "$set", Value: bson.D{{Key: "emails.0.confirmedAt", Value: time.Now().UTC()}}}})
 	}
-	// Node: userDetails = updateOnLogin ? {first,last} : {}; always sync
-	// isAdmin when attAdmin+valAdmin set; always $inc loginEpoch + $unset
-	// hashedPassword; Go adds the P1c ssoRoles stamp in the same update.
+	// Node: userDetails = updateOnLogin ? {first,last} : {}; always $inc
+	// loginEpoch + $unset hashedPassword; Go adds the P1c ssoRoles stamp in
+	// the same update.
+	// isAdmin is NEVER written on the login-time update: the IdP admin
+	// attribute is a JIT grant applied at user CREATION only — writing it
+	// here would clobber a locally administered users.isAdmin (owner
+	// regression 2026-10-07).
+	_ = isAdmin
 	details := bson.D{}
 	if p.UpdateUserDetailsOnLogin && (firstName != "" || lastName != "") {
 		details = append(details,
 			bson.E{Key: "firstName", Value: firstName},
 			bson.E{Key: "lastName", Value: lastName})
-	}
-	if p.IsAdminAtt != "" && p.ValAdmin != "" {
-		details = append(details, bson.E{Key: "isAdmin", Value: isAdmin})
 	}
 	roleDetails := bson.D{
 		{Key: "ssoRoles." + providerID, Value: bson.M{"role": role, "at": time.Now().UTC()}},

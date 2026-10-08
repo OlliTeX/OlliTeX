@@ -127,6 +127,27 @@ function ImageEditorModal({
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [initTick, setInitTick] = useState(0)
 
+  // Candidate C (owner report 2026-10-07): "Edit Image modal stuck on the
+  // loading spinner forever". The internal 20s deadline only fires once init
+  // REACHES the tick registration (after import + construction). If the
+  // dynamic import of tui-image-editor hangs at runtime, that tick never gets
+  // scheduled and the spinner is truly infinite. This hard backstop is
+  // registered BEFORE any await, so NO init path can hang the user on the
+  // spinner: within 30s they see the failure/fallback state (with an "open
+  // the original image" escape hatch), regardless of what is failing.
+  const BACKSTOP_MS = 30_000
+  useEffect(() => {
+    const backstop = setTimeout(() => {
+      if (!mountedRef.current || readyRef.current) return
+      setFailed(true)
+      setError(
+        t('image_edit_backstop', 'The image editor could not be initialized. You can still open the original image.'),
+      )
+    }, BACKSTOP_MS)
+    return () => clearTimeout(backstop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initTick])
+
   useEffect(() => {
     treeRef.current = (fileTreeData as unknown as TreeNode) ?? null
   }, [fileTreeData])
@@ -179,7 +200,21 @@ function ImageEditorModal({
     }
 
     const init = async () => {
-      const container = containerRef.current
+      // 2026-10-07 LIVE ROOT CAUSE (owner: "C: spinner forever, NOT FIXED"):
+      // at the FIRST effect run the OLModal portal body may not have attached
+      // the container div yet; the old `if (!container) return` exited silently
+      // and NEVER re-ran — no chunk request, no error, spinner until the 30s
+      // backstop. Production repro: chunk 8275 never loaded until a manual
+      // Retry click (which re-ran this effect with the container attached —
+      // and then the editor booted perfectly). Make init self-healing:
+      // bounded-poll for the container before anything else. The 30s backstop
+      // still covers genuine failure later in the chain.
+      let container = containerRef.current
+      for (let i = 0; !container && i < 250; i++) {
+        if (cancelled) return
+        await sleep(20)
+        container = containerRef.current
+      }
       if (!container) return
       for (let i = 0; i < SIZE_POLL_ATTEMPTS; i++) {
         if (cancelled) return
@@ -366,20 +401,59 @@ function ImageEditorModal({
         // initial image load has settled; every other command (and
         // afterUndo/afterRedo) means the pixels were modified.
         const ui: TuiImageEditorUi | undefined = editor.ui
+        // 2026-10-07 (AG-3 repro, owner-visible defect): Escape on the
+        // pristine image editor opened the unsaved-changes confirm because
+        // TUI fires invoker commands at boot (load/menu init) and the old
+        // rule `name !== 'Load' → dirty` counted boots as edits. Correct
+        // semantics: dirty = undo-stack depth past the post-load baseline
+        // ('undoStackChanged' fires only for undoable real edits). These
+        // declarations live at EDITOR scope so BOTH the ui.on listeners
+        // and the tick fallback below can use them (build #14 shipped a
+        // version that declared them inside the if-block — ReferenceError
+        // on the tick path).
+        let baselineDepth = -1
+        let baselineSeeded = false
+        const depthNow = () => {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const inv = (editorRef.current as any)?._invoker
+            if (inv && Array.isArray(inv._undoStack)) return inv._undoStack.length
+          } catch (e) {
+            /* ignore */
+          }
+          return baselineDepth
+        }
+        const seedBaseline = () => {
+          if (baselineSeeded) return
+          const d = depthNow()
+          if (d >= 0) {
+            baselineDepth = d
+            if (d > 0) dirtyRef.current = false
+            baselineSeeded = true
+          }
+        }
         if (ui && typeof ui.on === 'function') {
+          const onDepth = (d: unknown) => {
+            const depth = typeof d === 'number' ? d : depthNow()
+            if (!baselineSeeded) {
+              baselineDepth = depth
+              baselineSeeded = true
+              dirtyRef.current = false
+              return
+            }
+            if (depth > baselineDepth) dirtyRef.current = true
+          }
+          ui.on('undoStackChanged', onDepth)
+          ui.on('afterUndo', () => { dirtyRef.current = true })
+          ui.on('afterRedo', () => { dirtyRef.current = true })
           const onCommand = (name: unknown) => {
             if (name === 'Load') {
               markReady()
-            } else if (name) {
-              dirtyRef.current = true
+              seedBaseline()
             }
+            // NO generic dirty-marking — the undo-stack rule owns it.
           }
           ui.on('executeCommand', onCommand)
-          const onHistory = () => {
-            dirtyRef.current = true
-          }
-          ui.on('afterUndo', onHistory)
-          ui.on('afterRedo', onHistory)
         }
         // Bounded fallback for the same completion signal: Ui sets
         // initializeImgUrl when the internal load promise settles (the
@@ -400,6 +474,7 @@ function ImageEditorModal({
             uiNow.initializeImgUrl
           ) {
             markReady()
+            seedBaseline()
             return
           }
           if (Date.now() < deadline) {
@@ -520,9 +595,12 @@ function ImageEditorModal({
 
   return (
     <OLModal
-      // Owner #6 (2026-09-13 editor wave): an image editor needs real
-      // canvas space — widest named sizes (Mantine xl=780, legacy lg=800).
-      size="xl"
+      // AD (owner 2026-10-07): "the modal is too narrow and not high
+      // enough… use the whole size of the available space." Full-viewport
+      // dialog; the canvas container below sizes itself against the
+      // viewport so it fills the body regardless of header/footer height.
+      size="full"
+      style={{ padding: 8 }}
       show
       className="toast-image-editor-modal"
       onHide={requestClose}
@@ -544,6 +622,14 @@ function ImageEditorModal({
             }}
           >
             <p>{error || t('image_edit_failed')}</p>
+            <a
+              href={`/project/${projectId}/blob/${file.hash}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ textDecoration: 'underline', fontSize: 14 }}
+            >
+              {t('image_edit_open_original', 'Open original image')}
+            </a>
             <OLButton
               variant="primary"
               onClick={() => {
@@ -566,11 +652,26 @@ function ImageEditorModal({
               <div
                 style={{
                   display: 'flex',
-                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 10,
                   padding: '24px 0',
                 }}
               >
                 <LoadingSpinner />
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 4 }}>
+                  <span style={{ fontSize: 13, opacity: 0.7 }}>
+                    {t('image_edit_loading', 'Loading the image editor…')}
+                  </span>
+                  <a
+                    href={`/project/${projectId}/blob/${file.hash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 13, textDecoration: 'underline' }}
+                  >
+                    {t('image_edit_open_original', 'Open original image')}
+                  </a>
+                </div>
               </div>
             )}
             <div
@@ -578,7 +679,8 @@ function ImageEditorModal({
               style={{
                 position: 'relative',
                 width: '100%',
-                height: '70vh',
+                // AD (2026-10-07): fill the full-size modal body.
+                height: 'calc(100vh - 170px)',
                 minHeight: 360,
               }}
             />
