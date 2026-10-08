@@ -8,7 +8,7 @@
  */
 const { spawnSync } = require('child_process')
 const path = require('path')
-const MODS = ['agg1-shell', 'agg2-review', 'agg3-ad', 'agg4-af', 'agg5-modes', 'agg6-wakatime', 'agg7-ah', 'agg8-ak']
+const MODS = ['agg1-shell', 'agg2-review', 'agg3-ad', 'agg4-af', 'agg5-modes', 'agg6-wakatime', 'agg7-ah', 'agg8-ak', 'agg9-ob']
 const want = process.argv.slice(2).length ? process.argv.slice(2) : MODS.map(m => m.slice(4, -4))
 
 const results = {}
