@@ -11,7 +11,7 @@ import {
   ServerMessageEntry,
 } from '@/features/chat/context/chat-context'
 import { stubMathJax, tearDownMathJaxStubs } from '../components/stubs'
-import { SocketIOMock } from '@/ide/connection/SocketIoShim'
+import { SocketIOMock } from '../../../../helpers/socket-io-mock'
 import {
   EditorProviders,
   EditorProvidersProps,

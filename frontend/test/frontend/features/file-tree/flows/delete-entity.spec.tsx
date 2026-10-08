@@ -1,6 +1,6 @@
 import FileTreeRoot from '../../../../../js/features/file-tree/components/file-tree-root'
 import { EditorProviders } from '../../../helpers/editor-providers'
-import { SocketIOMock } from '@/ide/connection/SocketIoShim'
+import { SocketIOMock } from '../../../helpers/socket-io-mock'
 import type { Socket } from '@/features/ide-react/connection/types/socket'
 
 describe('FileTree Delete Entity Flow', function () {

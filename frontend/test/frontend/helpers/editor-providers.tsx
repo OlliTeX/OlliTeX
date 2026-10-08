@@ -2,7 +2,7 @@
 /* eslint-disable react/prop-types */
 import fetchMock from 'fetch-mock'
 import { merge } from 'lodash'
-import { SocketIOMock } from '@/ide/connection/SocketIoShim'
+import { SocketIOMock } from './socket-io-mock'
 import { IdeContext } from '@/shared/context/ide-context'
 import React, {
   useCallback,

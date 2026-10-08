@@ -8,7 +8,6 @@ import {
 } from '../fixtures/compile'
 import useFetchMock from '../hooks/use-fetch-mock'
 import { useMeta } from '../hooks/use-meta'
-import SocketIOShim, { SocketIOMock } from '@/ide/connection/SocketIoShim'
 import { IdeContext } from '@/shared/context/ide-context'
 import { IdeReactContext } from '@/features/ide-react/context/ide-react-context'
 import { IdeEventEmitter } from '@/features/ide-react/create-ide-event-emitter'
@@ -53,9 +52,20 @@ const project: Project = {
   ],
 }
 
-const socket = new SocketIOShim.SocketShimNoop(
-  new SocketIOMock()
-) as unknown as Socket
+// socket.io 0.9 retired: the live socket surface is now the ConnectionManager
+// event bus (yjs/ygo). The storybook scope needs a STRUCTURAL noop of the
+// Socket type (publicId + on/removeListener/emit sinks) — no server round-
+// trip in stories.
+const socket = {
+  publicId: 'storybook-socket',
+  on: () => {},
+  removeListener: () => {},
+  emit: () => {},
+  disconnect: () => {},
+  connected: false,
+  connect: () => {},
+  off: () => {},
+} as unknown as Socket
 
 const initializeMetaTags = () => {
   // window.metaAttributesCache is reset in preview.tsx
