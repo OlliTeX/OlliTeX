@@ -27,7 +27,7 @@ features:
   - id: renders
     kind: page
     desc: library page renders with the entry list + add control
-    legacy_test: renders
+    legacy_test: retired   # 2026-10-08: legacy PAGE retired (spec proves the 404); hub #/library surface renders (hub side)
     hub_test: renders
 
   - id: denied

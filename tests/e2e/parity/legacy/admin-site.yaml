@@ -36,7 +36,7 @@ features:
   - id: denied
     kind: access
     desc: non-site-admins (tpladmin/user/guest) are denied
-    legacy_test: deny
+    legacy_test: non-site-admins   # 2026-10-08: spec title 'retired: non-site-admins get 404 / restricted'
     hub_test: deny
 
   - id: settings-read

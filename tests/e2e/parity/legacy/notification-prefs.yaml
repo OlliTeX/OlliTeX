@@ -20,7 +20,7 @@ features:
   - id: renders   # 2026-09-10: legacy page removed; legacy side now asserts the 301 redirect to the hub
     kind: form
     desc: page renders "Email preferences" with mute-all checkbox + delay input
-    legacy_test: redirects
+    legacy_test: retired   # 2026-10-08: page retired (spec proves the 404; redirect removed 2026-10-05)
     hub_test: renders
 
   - id: denied
