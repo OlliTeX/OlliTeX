@@ -521,7 +521,9 @@ const cspRestrictive = "base-uri 'none'; default-src 'none'; form-action 'none';
 func ReactorCSP(nonce string) string { return cspReact(nonce) }
 
 func cspReact(nonce string) string {
-	return "script-src 'nonce-" + nonce + "' 'unsafe-inline' 'strict-dynamic' https: 'report-sample'; object-src 'none'; base-uri 'none'"
+	// 'wasm-unsafe-eval' — see core.CSPViewPolicy deviation note (2026-10-08):
+	// streaming WebAssembly (hunspell / typst fmt) is a product requirement.
+	return "script-src 'nonce-" + nonce + "' 'unsafe-inline' 'strict-dynamic' 'wasm-unsafe-eval' https: 'report-sample'; object-src 'none'; base-uri 'none'"
 }
 
 func Page(w http.ResponseWriter, d PageData, skeleton string) {

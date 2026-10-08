@@ -216,9 +216,16 @@ const CSPDefaultPolicy = "base-uri 'none'; default-src 'none'; form-action 'none
 // CSPViewPolicy is buildViewPolicy for non-excluded rendered views
 // (per-render random nonce, 16 random bytes base64 — express-session
 // style, exactly crypto.randomBytes(16).toString('base64')).
+//
+// DEVIATION (documented 2026-10-08): the oracle 6.3.0 policy predates the
+// product's WebAssembly features (hunspell spellcheck, typst formatting —
+// both WebAssembly.instantiateStreaming in the page context). Chrome
+// requires 'wasm-unsafe-eval' in script-src for streaming WASM; without it
+// the features reject as CSP violations (unhandled pageerrors). It enables
+// WASM evaluation only — no JS eval surface is added.
 func CSPViewPolicy(nonce string) string {
 	return fmt.Sprintf(
-		`script-src 'nonce-%s' 'unsafe-inline' 'strict-dynamic' https: 'report-sample'; object-src 'none'; base-uri 'none'`,
+		`script-src 'nonce-%s' 'unsafe-inline' 'strict-dynamic' 'wasm-unsafe-eval' https: 'report-sample'; object-src 'none'; base-uri 'none'`,
 		nonce)
 }
 

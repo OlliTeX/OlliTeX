@@ -314,7 +314,7 @@ async function main() {
     const row2 = drwPage.locator('[data-testid="file-tree"] .entity-name', { hasText: 'fig.drawio' }).first()
     await row2.dblclick({ force: true }).catch(() => {})
     let drawio = { booted: false }
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 30; i++) {
       await settle(drwPage, 1000)
       drawio = await drwPage.evaluate(() => {
         const v = document.querySelector('.drawio-viewer')
@@ -325,14 +325,19 @@ async function main() {
         let appReady = false
         try {
           const d = ifr.contentDocument
-          appReady = !!(d && d.querySelector('[id="editor"], #graph, .ge diagramEditor, mxgraph'))
-        } catch (e) { appReady = true }
+          const win = d.defaultView
+          appReady = !!(win && win.App && win.App.isMainCalled) || /draw\.io/i.test(d.title || '')
+          if (d.getElementById && d.getElementById('geStatus')) {
+            const t = d.getElementById('geStatus').textContent || ''
+            if (/error/i.test(t)) appReady = false
+          }
+        } catch (e) { appReady = false }
         return { booted: true, iframeW: Math.round(r.width), iframeH: Math.round(r.height), appReady }
       })
-      if (drawio.booted && (drawio.appReady || i > 4)) break
+      if (drawio.booted && drawio.appReady) break
     }
     await drwPage.screenshot({ path: '/var/tmp/agg8-drawio.png' })
-    H.record(M, 'AK-11 .drawio double-click boots the draw.io canvas editor', drawio.booted && drawio.iframeW > 300, JSON.stringify(drawio))
+    H.record(M, 'AK-11 .drawio double-click boots the draw.io canvas editor (app ready, no error status)', drawio.booted && drawio.iframeW > 300 && drawio.appReady, JSON.stringify(drawio).slice(0, 220))
     await drwPage.close().catch(() => {})
 
     // ── AK-7: Python Runner split editor + output pane ────────────────────
