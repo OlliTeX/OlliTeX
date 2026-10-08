@@ -382,12 +382,23 @@ async function main() {
       if (b) b.click()
       return !!b
     })
-    const typOk = compileBtn && (await typPage
-      .locator('.pdf-view, [class*="pdf"] canvas, iframe[src*="pdf"], object[type*="pdf"], .pdf-js-container')
-      .first()
-      .waitFor({ state: 'visible', timeout: 90000 })
-      .then(() => true)
-      .catch(() => false))
+    // First typst compile can exceed the tex path (image warm-up); poll the
+    // full 180s window before declaring failure.
+    let typOk = false
+    if (compileBtn) {
+      const t0 = Date.now()
+      const sel = '.pdf-view, [class*="pdf"] canvas, iframe[src*="pdf"], object[type*="pdf"], .pdf-js-container'
+      while (Date.now() - t0 < 180000) {
+        const found = await typPage.evaluate(s2 => {
+          const el = document.querySelector(s2)
+          if (!el) return false
+          const r = el.getBoundingClientRect()
+          return r.width > 50 && r.height > 50
+        }, sel)
+        if (found) { typOk = true; break }
+        await settle(typPage, 3000)
+      }
+    }
     H.record(M, 'AK-12 typst fixture: compile → PDF renders (e2e on both tex+typst)', typOk, '')
     await typPage.close().catch(() => {})
 

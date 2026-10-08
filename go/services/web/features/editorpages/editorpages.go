@@ -83,8 +83,11 @@ func Feature(a *core.App) core.Feature {
 // cspEditor — the editor/ide-react view CSP (Node layout-react csp, pinned
 // live 2026-09-15): the React nonce + strict-dynamic policy PLUS the
 // img-src 'self' data: blob: allowance the editor uses for rendered images.
+// 'wasm-unsafe-eval' (2026-10-08): streaming WebAssembly in the editor
+// context (hunspell spellcheck + typst formatting) — see core.CSPViewPolicy
+// deviation note for the rationale.
 func cspEditor(nonce string) string {
-	return "script-src 'nonce-" + nonce + "' 'unsafe-inline' 'strict-dynamic' https: 'report-sample'; " +
+	return "script-src 'nonce-" + nonce + "' 'unsafe-inline' 'strict-dynamic' 'wasm-unsafe-eval' https: 'report-sample'; " +
 		"object-src 'none'; base-uri 'none'; img-src 'self' data: blob:"
 }
 
