@@ -267,7 +267,7 @@ services:
       POSTGRES_PASSWORD: overleaf
       POSTGRES_DB: overleaf-history-v1
     ports:
-      - '127.0.0.1:5432:5432'   # debugging only
+      - '127.0.0.1:17542:5432'   # debugging only (bumped 2026-10-08: 5432 is the production ollitex-pg's host port)
     volumes:
       - pg-data:/var/lib/postgresql   # PG18+ layout: mount at /var/lib/postgresql (not /data)
     healthcheck:
