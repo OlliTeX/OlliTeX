@@ -198,3 +198,75 @@ Key fixes verified by this matrix (this session):
 
 *Audit produced from live deployment inspection. "Verified" marks were probed against the running
 `ollitex-toolkit` stack on 2026-10-07 under the owner's OIDC session.*
+
+---
+
+## AK + AJ queue closeout — AG matrix 75/75 GREEN (2026-10-08, build #38)
+
+The owner's AK (11 items) and AJ (8 items) queues are fully implemented, live-
+verified, and pinned by the reproducible AG e2e matrix running against
+production (`https://psintern.neuro.uni-bremen.de`, toolkit deploy,
+build `ollitex/ollitex:main` 2026-10-08 19:1x, `tests/e2e/live-agg/run-all.cjs`):
+
+| module | result | what it proves |
+|---|---|---|
+| agg1-shell | **10/10** | shell, PDF, upload, typst compile, palette, presentation mode |
+| agg2-review | **12/12** | tracked changes, entry-scoped accept/reject, comment persistence |
+| agg3-ad  | **8/8**  | image modal, **shipped .svg visual canvas + Code\|Visual switch (real label→input[for] resolution) + fixture fidelity** |
+| agg4-af  | **8/8**  | synctex both directions (tex **and** typst), word count |
+| agg5-modes | **10/10** | focus mode, mode switch, S2 semantics, SVG canvas |
+| agg6-wakatime | **5/5** | WakaTime default-on card, 204 no-op, gating |
+| agg7-ah  | **8/8**  | /user-settings + /admin-settings page-per-section, theme dropdown persistence, /template-settings retired, **AH-8: "My settings"/"Site settings" RETIRED from /hub nav + sections still reachable as dedicated pages** |
+| agg8-ak  | **15/15** | AK-1 logo painted 24px, AK-3 hotkeys ≥800px, AK-4 settings 1500px, **AK-5 TeX Live image select (live options, value bound)**, AK-6 Account section gone, AK-7 Python split+Run, AK-8 Download block, AK-9 zero scrollbars, **AK-10 .tikz opens-on-clicked + RE-MOUNTS on switch + source reaches embed (AKK-TWO-MARKER present, stale AKK-ONE absent)**, **AK-11 .drawio boots (appReady, 614×885)**, **AK-12 typst fixture compile → fresh PDF (output.pdf regenerated after deletion = true e2e)** |
+
+**75/75.** Toolkit TUI battery TK remains 37/37 (unchanged; toolkit image
+untouched by this wave).
+
+### Root causes fixed this wave (e2e-caught, not cosmetic)
+
+1. **OpenDocName scope crash (AK-10 family + all .tikz/.svg/.drawio opens
+   on fresh mount)** — `CodeMirrorEditorComponents` read the bare global
+   `openDocName` (binding lived in the outer `CodeMirrorEditor`); every open
+   of a visual file threw `ReferenceError` and the error boundary replaced
+   the pane with "Sorry, something went wrong". Fixed by pulling the value
+   from `useEditorOpenDocContext()` inside the component.
+2. **AK-10 tikz source hand-off defeated by my own O(1) guard** — the re-push
+   polling shortcut declared two sources "identical" from equal length +
+   first/last-64 matches; the matrix's own `AKK-ONE-MARKER`/`AKK-TWO-MARKER`
+   pair (identical length, identical head/tail, mid-doc diff) tripped it and
+   the canvas kept the PREVIOUS file's source. Replaced with CM
+   **state-identity** polling (O(1) ticks; full compare only on real CM
+   updates; equality guard still makes re-pushes impossible).
+3. **AK-12 typst compile — "no output.pdf generated", every compile** —
+   `images/main-amd64/runit/clsi_typst-overleaf/run` defaulted the service
+   view to container-local `/var/lib/overleaf/typst/*` AND exported those
+   same strings as `SANDBOXED_COMPILES_HOST_DIR_*`, overriding the
+   deployment's correct host dirs (`/data_1/ols/*`). Result: the daemon
+   auto-created an EMPTY PHANTOM host dir (host btrfs), bound it to
+   `/compile`, and the compile container ran `typst compile` on an empty
+   dir; the service meanwhile wrote `main.typ` to a different physical
+   directory (www-data tree). Fixed: service view = the MOUNTED data tree
+   (`/var/lib/overleaf/data/*`, which IS `/data_1/ols/*`), daemon bind =
+   deployment env kept intact; phantom tree removed (verified 0 files).
+   Fresh-run proof: output.pdf deleted + compile container removed → next
+   compile regenerated `output.pdf` (10 KB, typst 0.15.1) with a clean log.
+4. **clsitypst attach-stream logging** — normal `io.EOF` stream close was
+   logged as `ERROR "error reading from container stream"` on every healthy
+   compile; now EOF is treated as the normal close, real errors still logged.
+5. **adj test-suite fixes (tests were lying in one spot)** — AD-4's toggle
+   used `label.querySelector('input')` but the shipped switch renders radio
+   inputs as label SIBLINGS (`label[for]=input#id`); the locator silently
+   never clicked and asserted on pre-existing state. Fixed to resolve via
+   `htmlFor`, making the Code\|Visual assertions real.
+
+### Known soft/deferred
+
+- Option B (true multi-file collaboration) — in progress (TODO-90296a84).
+- Parity lift: 16 spec promotions + ~40 stale retirements — in progress
+  (TODO-655a2768).
+- WakaTime per-user key/link (V) — blocked on owner's key; Wakapi
+  auto-provisioning payload unknown (DB-level provisioning remains the
+  practical path).
+- [Y] menu-bar-into-rail — deferred P3 layout.
+- Owner's one manual OIDC login to confirm davrot `isAdmin` survives the next
+  cutover wave.
