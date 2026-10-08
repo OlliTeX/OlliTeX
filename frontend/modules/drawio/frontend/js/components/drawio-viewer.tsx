@@ -190,7 +190,7 @@ export default function DrawioViewer () {
       <iframe
         ref={iframeRef}
         className="drawio-viewer-frame"
-        src="/static/drawio/index.html?spin=1&amp;noHelpS=1"
+        src="/static/drawio/index.html?spin=1&amp;noHelpS=1&amp;od=0"
         title="draw.io canvas editor"
       />
     </div>
