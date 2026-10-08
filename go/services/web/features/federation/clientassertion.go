@@ -290,6 +290,12 @@ type VerifiedCaller struct {
 	ExpiresAt int64
 	Jti       string
 	Sub       string
+	// AnchorSource — how the trusted anchor was resolved (02 §4):
+	// "pairwise" = the direct anchor pin (pinning IS establishment);
+	// "institutional" = the registered child anchor, gated by the
+	// explicit-registration trust-chain expiry (chain resolve on the peer
+	// PIN — institutional TOFU).
+	AnchorSource string
 }
 
 // VerifyS2sClientAssertion — steps ①–③ (④ replay is the router's
@@ -306,12 +312,28 @@ func (p *KeyProvider) VerifyS2sClientAssertion(assertion string, from string) (v
 	if !ok {
 		return nil, "bad-signature", "undecodable assertion", ErrBadAssertion
 	}
-	if kid != "" && peer.Kid != "" && kid != peer.Kid {
-		return nil, "unknown-kid", "kid " + kid + " not pinned for " + from, ErrUnknownKid
+	anchorNow := time.Now().Unix()
+	anchorJwk, anchorSource, mcode, aerr := resolvePeerAnchor(peer, anchorNow)
+	if aerr != nil {
+		if mcode != "" {
+			return nil, mcode, aerr.Error(), aerr
+		}
+		return nil, "bad-signature", aerr.Error(), aerr
 	}
-	anchorJwk, err := parsePeerAnchorJwks(peer.AnchorJwks)
-	if err != nil {
-		return nil, "bad-signature", "peer anchor JWK malformed: " + err.Error(), err
+	// kid pre-check (03 §6 `unknown-kid`): the accepted kids are the
+	// direct pin (pairwise) and the registered child anchor kid
+	// (institutional, 02 §4).
+	if kid != "" {
+		accepted := map[string]bool{}
+		if peer.Kid != "" {
+			accepted[peer.Kid] = true
+		}
+		if anchorSource == "institutional" && peer.Registration != nil && peer.Registration.ChildAnchorKid != "" {
+			accepted[peer.Registration.ChildAnchorKid] = true
+		}
+		if len(accepted) > 0 && !accepted[kid] {
+			return nil, "unknown-kid", "kid " + kid + " not pinned for " + from, ErrUnknownKid
+		}
 	}
 	verifiedKid, payload, verr := VerifyJWT(anchorJwk, assertion)
 	if verr == ErrUnknownKid {
@@ -352,13 +374,55 @@ func (p *KeyProvider) VerifyS2sClientAssertion(assertion string, from string) (v
 		return nil, "bad-signature", "assertion expired", ErrBadAssertion
 	}
 	return &VerifiedCaller{
-		Peer:      peer,
-		ClientID:  claims.Iss,
-		IssuedAt:  claims.Iat,
-		ExpiresAt: claims.Exp,
-		Jti:       claims.Jti,
-		Sub:       claims.Sub,
+		Peer:         peer,
+		ClientID:     claims.Iss,
+		IssuedAt:     claims.Iat,
+		ExpiresAt:    claims.Exp,
+		Jti:          claims.Jti,
+		Sub:          claims.Sub,
+		AnchorSource: anchorSource,
 	}, "", "", nil
+}
+
+// resolvePeerAnchor — 02 §4 institutional chain resolve vs the pairwise
+// pin (the "heavy lift" adminPinPeer defers): the anchor the assertion is
+// verified against depends on the peer MODE.
+//
+//	institutional (02 §4 explicit registration): the trusted key is the
+//	REGISTERED child anchor (the registration statement result stored on
+//	the peer row). The chain (child → trust anchor) is re-verified
+//	offline against the stored registration — the pin is ground truth —
+//	and is only valid until TrustChainExpiresAt (02 §4:
+//	"how long the trust chain (up to the trust anchor) is valid").
+//	Expired chain → `chain-expired`; no usable registration →
+//	`anchor-missing`. An institutional row does NOT fall back to a direct
+//	pin: trust is only what the registration established.
+//
+//	pairwise (02 §3): pinning IS establishment — the direct AnchorJwks is
+//	the trusted anchor (legacy path, unchanged).
+func resolvePeerAnchor(peer *FederationPeer, nowSec int64) (*JWK, string, string, error) {
+	if peer.Mode == string(PeerModeInstitutional) {
+		reg := peer.Registration
+		if reg == nil || reg.ChildAnchorJwks == "" {
+			return nil, "institutional", "anchor-missing", Errorf("federation: institutional peer %s has no registered child anchor", peer.Origin)
+		}
+		if reg.TrustChainExpiresAt > 0 && reg.TrustChainExpiresAt <= nowSec {
+			return nil, "institutional", "chain-expired", Errorf("federation: trust chain for %s expired at %d", peer.Origin, reg.TrustChainExpiresAt)
+		}
+		var jwk JWK
+		if err := json.Unmarshal([]byte(reg.ChildAnchorJwks), &jwk); err != nil {
+			return nil, "institutional", "", Errorf("federation: child anchor JWK malformed: %v", err)
+		}
+		if jwk.Kty == "" || jwk.X == "" || jwk.Y == "" || jwk.Crv == "" {
+			return nil, "institutional", "", Errorf("federation: child anchor JWK incomplete (kty/crv/x/y)")
+		}
+		return &jwk, "institutional", "", nil
+	}
+	jwk, err := parsePeerAnchorJwks(peer.AnchorJwks)
+	if err != nil {
+		return nil, "pairwise", "", err
+	}
+	return jwk, "pairwise", "", nil
 }
 
 func parsePeerAnchorJwks(s string) (*JWK, error) {
