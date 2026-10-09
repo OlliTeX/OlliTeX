@@ -210,10 +210,18 @@ func CodeExchange(
 	defer cancel()
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
+		"client_id":     {getClientIdGo(origin)},
 		"code":          {code},
 		"redirect_uri":  {redirectURI},
 		"code_verifier": {st.Verifier},
 	}
+	// client_id is MANDATORY at the vendored token endpoint
+	// (authenticateClient: no client_id -> invalid_request 'no client
+	// authentication mechanism provided' — the public-client model is
+	// client_id + PKCE, no secret/assertion). The original CodeExchange
+	// omitted it, so every live RP callback token swap 400'd (dual
+	// instance E2E 2026-10-09: 'token-error:invalid_request'); pinned by
+	// the live S11 leg (TestFedB_LiveS11RoundTrip mint step).
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, disc.TokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
