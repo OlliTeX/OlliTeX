@@ -18,6 +18,13 @@ http {
 	# Basic Settings
 	##
 
+	# Keep underscored headers flowing to the app: the federation S2S wire
+	# pins the `client_assertion` / `client_assertion_type` headers
+	# (03 §2 assertion transport), and nginx's default is to DROP headers
+	# containing underscores — every dual-instance S2S call arrived with
+	# "client_assertion header missing" (live fed-a/fed-b E2E, 2026-10-09).
+	underscores_in_headers on;
+
 	sendfile on;
 	tcp_nopush on;
 	tcp_nodelay on;

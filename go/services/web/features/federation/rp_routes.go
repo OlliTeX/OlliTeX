@@ -66,14 +66,23 @@ func rpValidLocalName(s string) bool {
 	if s == "" || len(s) > 254 {
 		return false
 	}
+	at := 0
 	for _, r := range s {
-		// reject '@' (origin separator), ALL whitespace (space, tab, \n,
-		// \r) and control/DEL bytes — a localName is a bare identifier.
-		if r == '@' || r <= ' ' || r == 0x7f {
+		// A localName is B's local user identifier — the pinned wire form is
+		// the e-mail (f1 pin: "x@b.example"; B's oidc claims set
+		// localName=user.email). Exactly ONE '@' is allowed; all whitespace
+		// (space, tab, \n, \r), control/DEL bytes, and multi-'@' strings are
+		// rejected. (Found by the live fed-a/fed-b RP dance, 2026-10-09:
+		// the pre-fix validator rejected '@' so NO real B user could ever
+		// satisfy the callback identity guard claims.LocalName==state.LocalName.)
+		switch {
+		case r == '@':
+			at++
+		case r <= ' ' || r == 0x7f:
 			return false
 		}
 	}
-	return true
+	return at <= 1
 }
 
 // rpAuthorizeStarter — POST /api/federation/invite/authorize.

@@ -421,10 +421,10 @@ func TestRPValidation(t *testing.T) {
 			t.Errorf("bad origin must fail: %q", bad)
 		}
 	}
-	if !rpValidLocalName("jane.doe-1") {
-		t.Errorf("localname good must pass")
+	if !rpValidLocalName("jane.doe-1") || !rpValidLocalName("jane@b.example") {
+		t.Errorf("localname good must pass (incl. the pinned e-mail wire form)")
 	}
-	for _, bad := range []string{"", "a@b", "a b", strings.Repeat("x", 255)} {
+	for _, bad := range []string{"", "a@b@c", "a b", strings.Repeat("x", 255)} {
 		if rpValidLocalName(bad) {
 			t.Errorf("bad localname must fail: %q", bad)
 		}
@@ -539,6 +539,26 @@ func TestRPStarter_ErrorLegs(t *testing.T) {
 		r.Handler(cxt3, &core.Res{W: rec3})
 		if !strings.Contains(rec3.Body.String(), "bad-localname") {
 			t.Fatalf("bad-localname leg: %s", rec3.Body.String())
+		}
+		// e-mail localName (the pinned wire form — f1 "x@b.example"); ONE '@' is
+		// legal and must pass validation (the RP dance dies if it doesn't:
+		// B claims localName=user.email, the callback guard compares equality).
+		req3b, _ := http.NewRequest(http.MethodPost, "/api/federation/invite/authorize",
+			strings.NewReader(`{"origin":"b.example","localName":"jane@b.example"}`))
+		cxt3b := &core.Cxt{Req: req3b, A: a, SiteURL: rpSite}
+		rec3b := httptest.NewRecorder()
+		r.Handler(cxt3b, &core.Res{W: rec3b})
+		if strings.Contains(rec3b.Body.String(), "bad-localname") {
+			t.Fatalf("e-mail localName must be accepted: %s", rec3b.Body.String())
+		}
+		// multi-'@' is still rejected
+		req3c, _ := http.NewRequest(http.MethodPost, "/api/federation/invite/authorize",
+			strings.NewReader(`{"origin":"b.example","localName":"a@b@c"}`))
+		cxt3c := &core.Cxt{Req: req3c, A: a, SiteURL: rpSite}
+		rec3c := httptest.NewRecorder()
+		r.Handler(cxt3c, &core.Res{W: rec3c})
+		if !strings.Contains(rec3c.Body.String(), "bad-localname") {
+			t.Fatalf("multi-at localName must be rejected: %s", rec3c.Body.String())
 		}
 		// not logged in (no session) → 401 before any network
 		req0, _ := http.NewRequest(http.MethodPost, "/api/federation/invite/authorize",
