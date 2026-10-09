@@ -58,7 +58,12 @@ func s2sHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			To     string         `json:"to"`
 			Action string         `json:"action"`
 			Data   map[string]any `json:"data"` // LOCKED alias: `payload`
-			TS     string         `json:"ts"`
+			// ts is a NUMBER on the pinned wire (03 §2; the f1 pin asserts
+			// float64). A strict `string` type 400'd every real dual-instance
+			// S2S call (found by the live fed-a/fed-b E2E, 2026-10-09): Go's
+			// json.Unmarshal is strict, so `string` refuses numeric ts.
+			// json.RawMessage accepts number-or-string; TS is not read further.
+			TS     json.RawMessage `json:"ts"`
 		}
 		var body []byte
 		if cxt.Req != nil && cxt.Req.Body != nil {
