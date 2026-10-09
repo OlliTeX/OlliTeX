@@ -310,8 +310,22 @@ func exportPostHandler(a *core.App) func(*core.Cxt, *core.Res) {
 
 // formString — the wizard reads the (NoCSRF) form body fields; the core
 // app already parses form values into PostForm (express req.body shape).
+// NOTE: the core pipeline re-attaches the buffered form body BEFORE
+// dispatch but clears r.PostForm (Node's urldecoded body-parser shape
+// arrives as a stream here), so the handler side must ParseForm itself
+// — a bare PostForm read silently returns empty fields and the export
+// POST 403's as 'peer not approved' on every live call (dual-instance
+// E2E 2026-10-09, live leg S12).
 func formString(cxt *core.Cxt, field string) string {
-	if cxt == nil || cxt.Req == nil || cxt.Req.PostForm == nil {
+	if cxt == nil || cxt.Req == nil {
+		return ""
+	}
+	if cxt.Req.PostForm == nil {
+		if perr := cxt.Req.ParseForm(); perr != nil {
+			return ""
+		}
+	}
+	if cxt.Req.PostForm == nil {
 		return ""
 	}
 	return cxt.Req.PostForm.Get(field)
