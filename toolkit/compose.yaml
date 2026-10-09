@@ -390,6 +390,11 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_AUTH_ANONYMOUS_ORG_NAME: Main Org.
       GF_SECURITY_CSP_FRAME_ANCESTORS: ${GRAFANA_CSP_FRAME_ANCESTORS:-'self' https://psintern.neuro.uni-bremen.de}
+      # F (owner 2026-10-09): Grafana's DEFAULT x-frame-options: deny blocked the
+      # stats-section iframe (ERR_BLOCKED_BY_RESPONSE). allow_embedding flips it
+      # to SAMEORIGIN (the stats page is same-origin); CSP frame-ancestors
+      # above remains the fine-grained allowlist.
+      GF_SECURITY_ALLOW_EMBEDDING: ${GRAFANA_ALLOW_EMBEDDING:-true}
     volumes:
       - ${MONITORING_DATA_PATH:-${PREFIX}/data/monitoring}/grafana-provisioning:/etc/grafana/provisioning
       - ${MONITORING_DATA_PATH:-${PREFIX}/data/monitoring}/grafana-dashboards:/var/lib/grafana/dashboards
