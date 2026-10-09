@@ -554,7 +554,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
             value={state.systemPrompt || ''}
             onChange={e => setState(s => (s ? { ...s, systemPrompt: e.currentTarget.value } : s))}
             // 2026-10-09 (owner item I): prompt inputs are a fixed 250px height.
-            style={{ height: 250 }}
+            styles={{ input: { height: 250 } }}
             resize="vertical"
             placeholder="You are a helpful LaTeX assistant…"
           />
@@ -593,7 +593,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               label="Ask AI system prompt"
               value={state.askAiSystemPrompt || ''}
               onChange={e => setState(s => (s ? { ...s, askAiSystemPrompt: e.currentTarget.value } : s))}
-              style={{ height: 250 }}
+              styles={{ input: { height: 250 } }}
               resize="vertical"
               placeholder="…(empty = built-in default)"
             />
@@ -622,7 +622,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
                         : s
                     )
                   }
-                  style={{ height: 250 }}
+                  styles={{ input: { height: 250 } }}
                   resize="vertical"
                 />
               ))}
@@ -636,7 +636,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               label="Error / compile-fix prompt"
               value={state.errorPrompt || ''}
               onChange={e => setState(s => (s ? { ...s, errorPrompt: e.currentTarget.value } : s))}
-              style={{ height: 250 }}
+              styles={{ input: { height: 250 } }}
               resize="vertical"
               placeholder="…(empty = built-in default)"
             />
@@ -650,7 +650,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               label="Compliance review prompt"
               value={state.reviewSystemPrompt || ''}
               onChange={e => setState(s => (s ? { ...s, reviewSystemPrompt: e.currentTarget.value } : s))}
-              style={{ height: 250 }}
+              styles={{ input: { height: 250 } }}
               resize="vertical"
             />
             <Group justify="flex-end">
