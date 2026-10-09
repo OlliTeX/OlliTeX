@@ -296,12 +296,71 @@ first failure was CPU contention flake while AG+build+parity ran concurrently).
 
 ### Known soft/deferred
 
-- Option B (true multi-file collaboration) — in progress (TODO-90296a84).
-- Parity lift: 16 spec promotions + ~40 stale retirements — in progress
-  (TODO-655a2768).
 - WakaTime per-user key/link (V) — blocked on owner's key; Wakapi
   auto-provisioning payload unknown (DB-level provisioning remains the
   practical path).
-- [Y] menu-bar-into-rail — deferred P3 layout.
 - Owner's one manual OIDC login to confirm davrot `isAdmin` survives the next
   cutover wave.
+
+---
+
+## 2026-10-08 closeout update (post-75/75 wave)
+
+**Closed since the 75/75 table above:**
+
+- **Option B (true multi-file collaboration)** — CLOSED on production
+  (TODO-90296a84): `agg9-ob` 10/10 green against psintern; wired into
+  `run-all.cjs`; evidence committed (ed0186b2).
+- **Parity lift** — CLOSED (TODO-655a2768): full `specs/parity` run 190
+  passed; the "did not run" cohort re-run green on the healthy e2e stack;
+  `tests/e2e/parity/check.mjs` gate GREEN — **13 matrices, 99 features,
+  99 covered BOTH sides, 0 gaps** (5 legacy tokens re-anchored to
+  post-retirement spec titles, 4d4850e6).
+- **[Y] menu bar into the rail** — CLOSED (TODO-367c48ce): six inline-SVG
+  rail menu icons (File/Edit/Insert/View/Format/Help) delegating real
+  clicks to the existing Mantine menu bar; build #39; agg8 15/15.
+- **AK-10 soft-check flake** — bounded polling (10x700 ms) in agg8
+  (b1e6a588).
+- **Storybook** — build was silently broken by the socket.io retirement
+  (deleted `@/ide/connection/SocketIoShim` still imported by the decorator
+  + 6 specs); restored with a structural `SocketIOMock` helper
+  (14e852f5). **`yarn build-storybook` GREEN: 290 stories + docs**
+  (incl. the new hub-chrome stories: HUB_NAV outline, AJ-6 theme
+  dropdown, AH-1/AJ-1 settings shells — 25365cec).
+- **Federation institutional TOFU** — delivered (c39e3bcd):
+  `resolvePeerAnchor()` + `VerifiedCaller.AnchorSource`; institutional
+  peers trust ONLY the registered child anchor, gated on
+  `TrustChainExpiresAt` (codes `chain-expired` / `anchor-missing`), no
+  direct-pin fallback; pairwise path unchanged. 6 hermetic tests green.
+  The f2 live S11 mint window remains owner/fixture-gated (the `goodtest`
+  fed-b fixture shares production Mongo — unsafe for live mint).
+- **Legacy-infra staged retirement (TODO-d36307b1) — CLOSED**:
+  - Stage 2 verified: the "OT" extensions are the LIVE review-panel
+    ranges bridge (AG2 12/12 production) — kept on evidence.
+  - Stage 3: launchpad "WebSockets" chip re-homed from the retired
+    socket.io 0.9 bus (`window.io` gone -> ReferenceError on exactly the
+    page it guarded) to a plain `WebSocket` handshake of the live
+    `/collab` transport; both dead `<script src="/socket.io/socket.io.js">`
+    template tags removed. Build #40 verified (0 socket.io tags in page
+    HTML; bundle ships the /collab probe, `io.connect` = 0).
+  - Stage 4 audit GREEN: zero live `socket.io|socketio|OTDocument` code in
+    app JS + Go + image + toolkit (remaining hits are comments).
+- **Go build hygiene** — stale probe trees junked (3982260f);
+  `go build ./go/... ./cmd/...` clean.
+- **OWNER DECK (2026-10-03)** — SUPERSEDED: 8/9 closed; item 9 (Option B)
+  closed today; item 3 (registry push) + item 8 (f2 live mint) tracked by
+  their own owner-gated todos.
+
+**Standing gates (build #40 = `main-25365cec`):** AG matrix 86/86
+(agg1 10/10 · agg2 12/12 · agg3 8/8 · agg4 8/8 · agg5 10/10 · agg6 5/5 ·
+agg7 8/8 · agg8 15/15 · agg9 10/10; agg1's presentation item flaked once
+under full-AG concurrency and passed 10/10 on re-run — the known
+H4-class flake, human-paced poll) · TK battery 37/37 · parity check
+99/99 · Go build + federation package tests green · `yarn
+build-storybook` GREEN (290 stories).
+
+**Owner-gated open items (unchanged, none executable here):**
+WakaTime key/link; socket-diagnostics junk-page selection (P7 5b);
+Docker Hub sharelatex->ollitex push; `server-ce` rename decision;
+f2 live S11 mint window (isolated-DB fixture needed); owner OTP/OIDC
+smoke legs.
