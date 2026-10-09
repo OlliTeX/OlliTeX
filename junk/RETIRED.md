@@ -94,3 +94,27 @@ Kept on disk as evidence; nothing consumes these paths.
   `web-go-flip`/`overleaf-flips`, `bus-retired`, socket.io-0.9 editor refs —
   zero live references outside historical planning docs (WEB_GO_PLAN/
   WEB_GO_STATE/OPEN_QUEUE, intentionally retained as decision records).
+
+## S5 — launchpad WebSockets chip re-homed to /collab (2026-10-08, stage 3 closeout)
+
+- **`frontend/modules/launchpad/frontend/js/pages/launchpad.ts`** — the
+  fresh-install "WebSockets" status chip was still probing the RETIRED
+  socket.io 0.9 bus: `declare const io` + `io.connect(null, {… projectId:
+  404…})` listening for the 0.9 join-proto `connectionRejected`. Since the
+  retire, `public/socket.io/socket.io.js` is GONE (the two template
+  `<script src="/socket.io/socket.io.js">` tags — both removed today from
+  `go/services/web/views/pages_data_p620.go`, launchpad admin + fresh —
+  404'd in the browser) and `window.io` never exists, so the chip's
+  promise body would **ReferenceError on exactly the page it guards**
+  (fresh installs, where the check runs via `ol-adminUserExists`).
+  Re-homed per the owner's "repoint to /collab or drop": a plain
+  `WebSocket` handshake to `wss(s)://<host>/collab?projectId=404…` —
+  101 upgrade = transport up (chip green), refused/failed = real error
+  (red, with the existing retry affordance). Same element, same
+  inflightHelper contract, no bus.
+- **Stage 4 grep audit (2026-10-08)** — `socket.io|socketio|OTDocument`
+  in app JS (`frontend/js`, `frontend/modules`): ZERO live code — every
+  remaining hit is a retirement comment (connection-manager's
+  intentional legacy-contract stubs + docs). `shareDoc|historyOT` remain
+  the LIVE review-panel ranges bridge (AG2 12/12 production evidence) —
+  kept, per the S2 keep-list.

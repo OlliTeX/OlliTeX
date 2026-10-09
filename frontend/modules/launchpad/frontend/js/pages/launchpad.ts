@@ -4,16 +4,16 @@ import {
   toggleDisplay,
 } from '@/features/form-helpers/hydrate-form'
 import getMeta from '@/utils/meta'
-import { Socket } from '@/features/ide-react/connection/types/socket'
 
-declare const io: {
-  connect: (url: string | null, options?: Record<string, unknown>) => Socket
-}
-
-interface ConnectionRejectedError {
-  code?: string
-  message?: string
-}
+// 2026-10-08 (legacy-infra stage 3 / owner: "repoint to /collab or drop"):
+// the socket.io client was RETIRED — the page no longer loads
+// /socket.io/socket.io.js (the template script tags were removed) and
+// `window.io` no longer exists, so the old io.connect(...) probe would
+// ReferenceError on exactly the page it guards (fresh installs). The honest
+// replacement: probe THE live transport — a plain WebSocket handshake to
+// /collab (ygo collab service behind nginx). A 101 upgrade means the
+// websockets plane is up (which is what the chip asserts); a refused/
+// failed handshake is a real error.
 
 function setUpStatusIndicator(el: HTMLElement, fn: () => Promise<void>) {
   inflightHelper(el)
@@ -71,29 +71,34 @@ function setUpStatusIndicators() {
 
   setUpStatusIndicator(launchpadCheckElement, () => {
     const timeout = 10 * 1000
-    const socket = io.connect(null, {
-      reconnect: false,
-      'connect timeout': timeout,
-      'force new connection': true,
-      query: new URLSearchParams({
-        projectId: '404404404404404404404404',
-      }).toString(),
-    })
+    const wsUrl =
+      (window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
+      window.location.host +
+      '/collab?projectId=404404404404404404404404'
     return new Promise<void>((resolve, reject) => {
-      setTimeout(() => reject(new Error('timed out')), timeout)
-      socket.on('connectionRejected', function (err?: ConnectionRejectedError) {
-        if (err?.code === 'ProjectNotFound') {
-          // We received the response from joinProject, so the websocket is up.
-          resolve()
-        } else {
-          reject(new Error(err && err.message))
-        }
-      })
-      socket.on('connect_failed', function (err?: Error) {
-        reject(new Error(err && err.message))
-      })
-    }).finally(() => {
-      socket.disconnect()
+      const timer = window.setTimeout(() => {
+        try { ws.close() } catch { /* ignore */ }
+        reject(new Error('timed out'))
+      }, timeout)
+      const ws = new WebSocket(wsUrl)
+      ws.onopen = () => {
+        // The websocket handshake succeeded: the collab plane is up.
+        // (The collab service will reject/close the bogus projectId join —
+        //  we do not care; the chip asserts transport, not membership.)
+        window.clearTimeout(timer)
+        try { ws.close() } catch { /* ignore */ }
+        resolve()
+      }
+      ws.onerror = () => {
+        window.clearTimeout(timer)
+        try { ws.close() } catch { /* ignore */ }
+        reject(new Error('websocket handshake failed'))
+      }
+      ws.onclose = () => {
+        window.clearTimeout(timer)
+        // Closed without ever opening = failure; closing after open is the
+        // normal tear-down of the probe (resolve already fired).
+      }
     })
   })
 }
