@@ -223,14 +223,15 @@ html[data-mantine-color-scheme='dark'] .ol-editor-mantine {
    the rail (nav.ol-v2-rail is outside that wrapper), so the logo rendered
    as an invisible 0x0 span. Unscoped on purpose: the rail is not inside
    .ide-redesign-toolbar. */
+/* 2026-10-09 (owner item U): the home entry renders a clean inline house
+   SVG (stroke=currentColor, 20px) — the old --redesign-toolbar-logo-url
+   background-image paint (which rendered empty in this tree) is retired.
+   Unscoped on purpose: the rail is not inside .ide-redesign-toolbar. */
 .ol-v2-rail-home-entry .ol-v2-rail-home-logo {
   display: block;
-  width: 24px;
-  height: 24px;
-  background-image: var(--redesign-toolbar-logo-url);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
+  width: 20px;
+  height: 20px;
+  color: inherit;
 }
 
 /* ── Owner item Y + AE (2026-10-07): menu bar lives in the rail now ──

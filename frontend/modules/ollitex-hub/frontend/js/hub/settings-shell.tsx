@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Anchor,
   Box,
@@ -88,6 +88,21 @@ export function SettingsShell({
   const mobile = useMediaQuery('(max-width: 768px)')
   const [mobileOpen, { toggle: toggleMobile, close: closeMobile }] = useDisclosure()
 
+  // 2026-10-09 (owner item D): when the active section changes, keep the
+  // active left-nav entry visible — auto scrollIntoView within the sidebar.
+  const asideRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!activeId || !asideRef.current) return
+    const el = asideRef.current.querySelector(
+      `a[data-settings-entry="${CSS.escape(activeId)}"]`,
+    )
+    if (el) {
+      // block:'center' — the long admin rail has many entries; center keeps
+      // the highlighted row readable without a jump to the page bottom.
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [activeId])
+
   const go = useCallback(
     (href: string) => {
       closeMobile()
@@ -172,8 +187,15 @@ export function SettingsShell({
           ) : null}
         </Group>
         <Group gap="sm" align="center" wrap="nowrap">
-          <Anchor href={backHref || '/hub'} size="sm">
-            {backLabel || (activeId ? `← ${title}` : '← Hub')}
+          {/* 2026-10-09 (owner item B): BOTH header links are always visible on
+              every settings page — the surface self-link ("Site settings" →
+              /admin-settings; self-link on the landing, base link on sections)
+              AND "← Hub" → /hub. (backHref/backLabel remain for API compat.) */}
+          <Anchor href={backHref || basePath} size="sm">
+            {backLabel || title}
+          </Anchor>
+          <Anchor href="/hub" size="sm">
+            ← Hub
           </Anchor>
           <ThemeToggle />
           {email && !mobile ? (
@@ -195,6 +217,7 @@ export function SettingsShell({
 
       {/* fixed sidebar (mobile → overlay) — below the full-width header */}
       <aside
+        ref={asideRef}
         style={{
           position: 'fixed',
           top: HEADER_HEIGHT,
@@ -219,6 +242,7 @@ export function SettingsShell({
                   c="dimmed"
                   px={8}
                   mb={3}
+                  lh={1.15}
                   style={{ letterSpacing: '0.08em' }}
                 >
                   {group.group}
@@ -228,6 +252,7 @@ export function SettingsShell({
                   return (
                     <a
                       key={entry.id}
+                      id={'nav-' + entry.id}
                       href={`${basePath}/${entry.id}`}
                       onClick={e => {
                         e.preventDefault()
@@ -243,6 +268,13 @@ export function SettingsShell({
                         color: activeNow ? 'var(--mantine-color-blue)' : 'inherit',
                         fontWeight: activeNow ? 600 : 400,
                         background: activeNow ? 'var(--mantine-color-blue-light)' : 'transparent',
+                        backgroundImage:
+                          activeNow
+                            ? 'linear-gradient(0deg, color-mix(in srgb, var(--mantine-color-blue) 20%, transparent), color-mix(in srgb, var(--mantine-color-blue) 20%, transparent))'
+                            : 'none',
+                        boxShadow: activeNow
+                          ? 'inset 3px 0 0 0 var(--mantine-color-blue)'
+                          : 'none',
                         textDecoration: 'none',
                       }}
                     >

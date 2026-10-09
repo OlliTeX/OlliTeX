@@ -553,8 +553,9 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
             label="System prompt (optional)"
             value={state.systemPrompt || ''}
             onChange={e => setState(s => (s ? { ...s, systemPrompt: e.currentTarget.value } : s))}
-            minRows={8}
-            maxRows={16}
+            // 2026-10-09 (owner item I): prompt inputs are a fixed 250px height.
+            style={{ height: 250 }}
+            resize="vertical"
             placeholder="You are a helpful LaTeX assistant…"
           />
           <Text size="xs" c="dimmed" ta="right">
@@ -592,8 +593,8 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               label="Ask AI system prompt"
               value={state.askAiSystemPrompt || ''}
               onChange={e => setState(s => (s ? { ...s, askAiSystemPrompt: e.currentTarget.value } : s))}
-              minRows={6}
-              maxRows={14}
+              style={{ height: 250 }}
+              resize="vertical"
               placeholder="…(empty = built-in default)"
             />
             <Group justify="flex-end">
@@ -621,8 +622,8 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
                         : s
                     )
                   }
-                  minRows={3}
-                  maxRows={8}
+                  style={{ height: 250 }}
+                  resize="vertical"
                 />
               ))}
             </Stack>
@@ -635,8 +636,8 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               label="Error / compile-fix prompt"
               value={state.errorPrompt || ''}
               onChange={e => setState(s => (s ? { ...s, errorPrompt: e.currentTarget.value } : s))}
-              minRows={6}
-              maxRows={14}
+              style={{ height: 250 }}
+              resize="vertical"
               placeholder="…(empty = built-in default)"
             />
             <Group justify="flex-end">
@@ -649,8 +650,8 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
               label="Compliance review prompt"
               value={state.reviewSystemPrompt || ''}
               onChange={e => setState(s => (s ? { ...s, reviewSystemPrompt: e.currentTarget.value } : s))}
-              minRows={6}
-              maxRows={14}
+              style={{ height: 250 }}
+              resize="vertical"
             />
             <Group justify="flex-end">
               <Button variant="subtle" size="xs" onClick={() => setState(s => (s ? { ...s, reviewSystemPrompt: '' } : s))}>

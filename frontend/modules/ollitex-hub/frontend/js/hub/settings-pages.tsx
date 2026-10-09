@@ -305,6 +305,7 @@ function LandingGrid({
                 textTransform: 'uppercase',
                 color: 'var(--mantine-color-dimmed)',
                 margin: '0 0 6px 2px',
+                lineHeight: 1.15, // 2026-10-09 (owner item C): tight labels
               }}
             >
               {g.group}

@@ -32,8 +32,9 @@ describe('<HubRoot /> shell', () => {
 
     const site = await screen.findAllByText('Site settings')
     expect(site.length).toBeGreaterThan(0)
-    const overview = screen.getAllByText(/Overview & activity/)
-    expect(overview.length).toBeGreaterThan(0)
+    // 2026-10-09 (owner item N): the "Overview & activity" rail entry is gone
+    // from /hub — the page now lives on /admin-settings/overview only.
+    expect(screen.queryByText('Overview & activity')).toBeNull()
   })
 
   it('deep-links: #/site.general.messages renders the System messages leaf', async () => {

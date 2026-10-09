@@ -1,8 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-  Anchor,
-  Badge,
-  Button,
   Card,
   Group,
   SimpleGrid,
@@ -11,9 +8,7 @@ import {
   Title,
 } from '@mantine/core'
 import { getJSON } from '@/infrastructure/fetch-json'
-import Icon from '../../shared/icons'
 import { PageError, PageLoading } from '../../shared/page-state'
-import WhatSNew from './whats-new'
 
 const METRICS = [
   { key: 'user_count', label: 'Users', suffix: '' },
@@ -56,7 +51,7 @@ function KpiCard({ label, value, icon }: { label: string; value: string; icon: s
   )
 }
 
-export default function AdminInstanceSection({ onNavigate }: { onNavigate?: (id: string) => void }) {
+export default function AdminInstanceSection() {
   const [values, setValues] = useState<Record<string, number | null>>({})
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -95,20 +90,10 @@ export default function AdminInstanceSection({ onNavigate }: { onNavigate?: (id:
     mongodb_storage: 'dns',
   }
 
-  const navLinks = [
-    { id: 'site', label: 'Site settings', icon: 'settings' },
-    { id: 'users', label: 'Manage users', icon: 'manage_accounts' },
-    { id: 'projects', label: 'Manage projects', icon: 'folder_managed' },
-    { id: 'templates', label: 'Templates', icon: 'extension' },
-    { id: 'llm', label: 'LLM instance', icon: 'smart_toy' },
-  ]
-
   if (loading) return <PageLoading label="Collecting instance statistics…" />
 
   return (
     <Stack gap="md">
-      {/* 2026-09-16 (P1 #8): "What's new" from docs/RELEASE_NOTES.md */}
-      <WhatSNew />
       {error ? <PageError label="Couldn’t load instance stats" detail={error} onRetry={() => void load()} /> : null}
       <SimpleGrid cols={{ base: 1, sm: 2, xl: 3 }} spacing="md">
         {METRICS.map(m => (
@@ -126,48 +111,6 @@ export default function AdminInstanceSection({ onNavigate }: { onNavigate?: (id:
           />
         ))}
       </SimpleGrid>
-
-      <Card withBorder paddings="md" radius="lg">
-        <Group justify="space-between" wrap="wrap" gap="sm">
-          <div>
-            <Text fw={700}>Instance management</Text>
-            <Text size="sm" c="dimmed" mt={4}>
-              Shortcuts to the administration sections of this hub.
-            </Text>
-          </div>
-          <Group gap="xs" wrap="wrap">
-            {navLinks.map(link => (
-              <Button
-                key={link.id}
-                size="sm"
-                variant="light"
-                color="ollitex"
-                leftSection={<Icon name={link.icon} size={16} />}
-                onClick={() => onNavigate?.(link.id)}
-              >
-                {link.label}
-              </Button>
-            ))}
-          </Group>
-        </Group>
-      </Card>
-
-      <Card withBorder paddings="md" radius="lg">
-        <Stack gap="sm">
-          <Text fw={700}>About this instance</Text>
-          <Group gap="md" wrap="wrap" align="center">
-            <Badge variant="light" color="blue" radius="sm" size="sm">
-              OlliTeX 6.3.0 (Community Edition base)
-            </Badge>
-            <Text size="sm" c="dimmed" truncate>
-              Time series, charts and alert settings live in the Instance statistics section.
-            </Text>
-            <Anchor href="#/site.general.stats" size="sm">
-              Open instance statistics
-            </Anchor>
-          </Group>
-        </Stack>
-      </Card>
     </Stack>
   )
 }

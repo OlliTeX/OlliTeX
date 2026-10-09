@@ -60,9 +60,10 @@ describe('hub nav tree (rail)', () => {
   it('admins see the full site-settings tree (owner #16 parity)', () => {
     const adminLeaves = leaves(visibleNav(HUB_NAV, true)).map(n => n.id)
     for (const expected of [
-      'overview',
       'site.general.misc',
-      'site.general.appearance',
+      // 2026-10-09 (owner): 'overview' (Overview & activity) rail entry
+      // retired — page stays reachable via hub home; 'site.general.appearance'
+      // retired — hub theme editing surface removed.
       'site.general.emailtemplates',
       'site.general.signup',
       'site.general.managetpl',
@@ -122,7 +123,6 @@ describe('hub nav tree (rail)', () => {
   })
 
   it('rail tones: admin surfaces red, user surfaces blue', () => {
-    expect(nodeById('overview')?.tone).to.equal('admin')
     expect(nodeById('site')?.tone).to.equal('admin')
     expect(nodeById('mysettings')?.tone).to.equal('user')
   })

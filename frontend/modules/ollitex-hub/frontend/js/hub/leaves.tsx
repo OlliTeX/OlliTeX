@@ -1,5 +1,5 @@
 import React from 'react'
-import { Stack, Text, Alert, Card } from '@mantine/core'
+import { Stack, Text, Alert, Card, Button } from '@mantine/core'
 import type { HubNode } from './nav-tree'
 import { hubNavigate } from './navigate'
 import Icon from '../shared/icons'
@@ -11,7 +11,6 @@ import MySettingsSection from '../sections/workspace/my-settings-section'
 import KeybindingsSection from '../sections/workspace/keybindings-section'
 import GitIntegrationSection from '../sections/workspace/git-integration-section'
 import LlmSettingsSection from '../sections/workspace/llm-settings-section'
-import AppearanceSection from '../sections/appearance-section'
 import EmailTemplatesSection from '../sections/email-templates-section'
 import AdminInstanceSection from '../sections/admin/admin-instance-section'
 import AdminSiteSection from '../sections/admin/admin-site-section'
@@ -39,6 +38,18 @@ import DropboxWidget from '../../../../dropbox/frontend/js/components/dropbox-wi
 import { ZoteroWidget } from '../../../../zotero/frontend/js/components/zotero-widget'
 import { MendeleyWidget } from '../../../../mendeley/frontend/js/components/mendeley-widget'
 
+/** Retired section placeholder (2026-10-09): explicit notice + back-link,
+ *  so retired bookmarks do NOT land on the "being built" default. */
+function RetiredNotice({ id, to }: { id: string; to: string }) {
+  return (
+    <Alert icon={undefined} title={`“${id}” is no longer available`} color="grey" variant="light" radius="md">
+      <Button component="a" href={to} size="xs" variant="default" mt="xs">
+        Back to overview
+      </Button>
+    </Alert>
+  )
+}
+
 
 /**
  * Leaf renderer for the unified /hub (nav_structure.md §4).
@@ -60,9 +71,9 @@ export function renderLeaf(node: HubNode): React.ReactNode {
     return <AdminSiteSection key={node.id} fixedSection={node.siteId} hideNav />
   }
   if (kind === 'overview') {
-    // Overview "Instance management" shortcuts (owner review #2): navigate
-    // to the relevant section instead of dead links (no-op before).
-    return <AdminInstanceSection key={node.id} onNavigate={hubNavigate} />
+    // 2026-10-09 (owner): the What's new / Instance management / About cards
+    // were retired from this page — the KPI grid remains.
+    return <AdminInstanceSection key={node.id} />
   }
   if (kind === 'library') return <LibrarySection key={node.id} />
 
@@ -114,7 +125,9 @@ export function renderLeaf(node: HubNode): React.ReactNode {
     case 'site.general.managetpl':
       return <AdminTemplatesSection key={node.id} />
     case 'site.general.appearance':
-      return <AppearanceSection key={node.id} />
+      // 2026-10-09 (owner): retired — old bookmarks land on an explicit
+      // redirect notice to the overview (not the "being built" placeholder).
+      return <RetiredNotice id="site.general.appearance" to="#/#overview" />
     case 'site.general.emailtemplates':
       // owner item 3 (remember.md): /hub-managed e-mail templates
       return <EmailTemplatesSection key={node.id} />

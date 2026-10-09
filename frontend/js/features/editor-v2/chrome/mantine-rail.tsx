@@ -297,7 +297,7 @@ export function MantineRailNavChrome({
           variant="subtle"
           type="button"
           className="ol-v2-rail-home-entry ol-v2-rail-menu-bar-entry"
-          aria-label="OlliTeX home — go to the hub"
+          aria-label="Home — go to the hub"
           style={
             Object.assign(
               {
@@ -311,7 +311,23 @@ export function MantineRailNavChrome({
           }
           onClick={() => { window.location.href = '/hub#/projects' }}
         >
-          <span className="ol-v2-rail-home-logo" aria-label="Overleaf logo" />
+          {/* 2026-10-09 (owner): clean house icon (20px, currentColor stroke,
+              same family as the other rail icons) replaces the old brand logo. */}
+          <svg
+            className="ol-v2-rail-home-logo"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 10.5 12 3l9 7.5" />
+            <path d="M5 9.5V21h5v-6h4v6h5V9.5" />
+          </svg>
         </ActionIcon>
       </div>
     </nav>

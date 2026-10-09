@@ -118,7 +118,10 @@ export default function HubRoot() {
     // /admin-settings replace them (AJ-1). Their section heading rows go
     // with them; the dedicated pages keep their own sidebar (they build
     // their nav straight from HUB_NAV, so this filter is /hub-scoped).
-    const RETIRED_FROM_HUB = new Set(['mysettings', 'site', 'sec.personal', 'sec.admin'])
+    // 2026-10-09 (owner item N): 'overview' (Overview & activity) is also
+    // retired from /hub — the page itself survives on
+    // /admin-settings/overview (sidebar + landing grid, item A).
+    const RETIRED_FROM_HUB = new Set(['mysettings', 'site', 'sec.personal', 'sec.admin', 'overview'])
     const dropRetired = (ns: HubNode[]): HubNode[] =>
       ns
         .filter(n => !RETIRED_FROM_HUB.has(n.id))
@@ -174,7 +177,9 @@ export default function HubRoot() {
   )
 
   // initial selection: valid leaf from hash, else the landing default
-  const landing = admin ? 'overview' : 'projects.all'
+  // 2026-10-09 (owner item N): admin hub landing is the project list — the
+  // overview page is admin-settings-only now.
+  const landing = 'projects.all'
   const initial = useMemo(() => {
     const h = parseHash()
     if (!h) return landing
@@ -343,6 +348,23 @@ export default function HubRoot() {
               <Group gap={6}>
                 <Icon name="open_in_new" size={16} />
                 {standalone.label}
+              </Group>
+            </Anchor>
+          ) : null}
+          {/* 2026-10-09 (owner item O): explicit settings navigation — every
+              user gets "User settings"; admins additionally get
+              "Admin settings" (role-conditional on the ol-hub-admin flag). */}
+          <Anchor href="/user-settings" size="sm" style={{ textDecoration: 'none' }}>
+            <Group gap={6}>
+              <Icon name="settings" size={16} />
+              User settings
+            </Group>
+          </Anchor>
+          {admin ? (
+            <Anchor href="/admin-settings" size="sm" style={{ textDecoration: 'none' }}>
+              <Group gap={6}>
+                <Icon name="shield" size={16} />
+                Admin settings
               </Group>
             </Anchor>
           ) : null}

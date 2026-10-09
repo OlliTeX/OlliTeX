@@ -104,6 +104,10 @@ export const HUB_NAV: HubNode[] = [
   // ---- Administration (owner UX 2026-10-06: admin surface grouped under
   //      its own heading; Overview & activity rejoins Site settings) --------
   { id: 'sec.admin', label: 'Administration', icon: 'shield', section: true, admin: true },
+  // 2026-10-09 (owner items A/N): the hub's "Overview & activity" rail entry
+  // and page are retired — hub-root drops 'overview' from the /hub rail — but
+  // the NODE STAYS so /admin-settings/overview keeps rendering (trimmed KPI
+  // page per item A) and the admin-settings sidebar keeps its entry.
   {
     id: 'overview',
     label: 'Overview & activity',
@@ -129,7 +133,8 @@ export const HUB_NAV: HubNode[] = [
         icon: 'layers',
         children: [
           { id: 'site.general.misc', label: 'Miscellaneous', icon: 'tune', render: 'site-sec', siteId: 'misc' },
-          { id: 'site.general.appearance', label: 'Appearance', icon: 'palette' },
+          // 2026-10-09 (owner): site.general.appearance retired (hub theme
+          // editing surface removed; stored themes still apply).
           { id: 'site.general.emailtemplates', label: 'Email templates', icon: 'mail' },
           { id: 'site.general.signup', label: 'Sign-up', icon: 'person_add', render: 'site-sec', siteId: 'signup' },
           {
