@@ -95,7 +95,13 @@ var opAuthResumePattern = regexp.MustCompile(`^/federation/oidc/auth(?:/(?P<uid>
 // opInteractBridgePattern — GET /interact/<uid> + POST
 // /interact/<uid>/{consent,deny} (bridge.mjs, mounted BEFORE the
 // OP catch-all, plan 05 §1.1).
-var opInteractBridgePattern = regexp.MustCompile(`^/federation/oidc/interact/(?P<uid>[^/]+)(?://(?P<act>consent|deny))?$`)
+var opInteractBridgePattern = regexp.MustCompile(`^/federation/oidc/interact/(?P<uid>[^/]+)(?:/(?P<act>consent|deny))?$`)
+
+// NOTE: the optional act segment is single-slash (/consent, /deny) —
+// the earlier (?://...) double-slash literal never matched the wire
+// URL (/interact/<uid>/consent), so POST consent/deny fell through to
+// the CSRF gate (403 "Forbidden") and the whole live consent dance
+// silently broke — pinned by TestDIAGBridgePatternMatch.
 
 // s4Routes — the OP routes (S4b-1: jwks + discovery; S4b-2/3: auth /
 // resume + bridge + token). Mount order = vendored (bridge BEFORE the
