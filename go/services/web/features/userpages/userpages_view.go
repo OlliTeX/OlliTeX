@@ -63,11 +63,21 @@ func str(v any) bool {
 }
 
 func rolesInclude(v any, role string) bool {
-	rl, ok := v.([]any)
-	if !ok {
+	// mongo-decoded arrays arrive as bson.A (named slice type) — the web
+	// driver yields bson.A for arrays decoded into ANY interface target
+	// (Q regression, 2026-10-10). Accept both shapes, else role-based
+	// admins (adminRoles: ["admin"]) lose their isAdmin flag silently.
+	var list []any
+	switch a := v.(type) {
+	case []any:
+		list = a
+	case bson.A:
+		list = a
+	}
+	if list == nil {
 		return false
 	}
-	for _, e := range rl {
+	for _, e := range list {
 		if e == role {
 			return true
 		}

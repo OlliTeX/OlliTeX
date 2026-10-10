@@ -175,10 +175,17 @@ func (f *fs) loadProjectDoc(ctx context.Context, oid bson.ObjectID) (*projectDoc
 	return p, nil
 }
 
-// canReadLLM — ensureUserCanReadProject (Node AuthorizationManager).
-func canReadLLM(p *projectDoc, uid string) bool {
+// canReadLLM — ensureUserCanReadProject (Node AuthorizationManager) +
+// the fork's plane-consistent site-admin leg (C audit 2026-10-10: collab,
+// trackchanges, join, compile and wakatime all grant site admins; LLM was
+// the laggard — an admin viewing a non-member project 403'd on
+// llm/models|features|prompts during boot).
+func canReadLLM(p *projectDoc, uid string, isAdmin bool) bool {
 	if uid == "" {
 		return false
+	}
+	if isAdmin {
+		return true
 	}
 	for _, o := range append(append(append(append([]string{p.owner}, p.collab...), p.review...), p.readOnl...), p.tokRW...) {
 		if o == uid {
@@ -224,11 +231,41 @@ func (f *fs) llmPref(cxt *core.Cxt, res *core.Res, idParam string) (*projectDoc,
 	if cxt.Sess != nil {
 		uid = cxt.Sess.UserIDHex()
 	}
-	if !canReadLLM(p, uid) {
+	if !canReadLLM(p, uid, llmSiteAdmin(f, cxt, uid)) {
 		views.Restricted403(res.W, pageBaseOf(cxt))
 		return nil, zero, false
 	}
 	return p, oid, true
+}
+
+// llmSiteAdmin — the admin leg of canReadLLM (users.isAdmin).
+func llmSiteAdmin(f *fs, cxt *core.Cxt, uid string) bool {
+	if uid == "" || f == nil || f.app == nil || f.app.Mongo == nil {
+		return false
+	}
+	uid = strings.ToLower(strings.TrimSpace(uid))
+	if !reOID.MatchString(uid) {
+		return false
+	}
+	oid, err := bson.ObjectIDFromHex(uid)
+	if err != nil {
+		return false
+	}
+	db, err := f.app.Mongo.DB(cxt.Req.Context())
+	if err != nil {
+		return false
+	}
+	doc := bson.D{}
+	if err := db.Collection("users").FindOne(cxt.Req.Context(), bson.D{{Key: "_id", Value: oid}}).Decode(&doc); err != nil {
+		return false
+	}
+	for _, e := range doc {
+		if e.Key == "isAdmin" {
+			b, _ := e.Value.(bool)
+			return b
+		}
+	}
+	return false
 }
 
 // ---------------------------------------------------------------------------

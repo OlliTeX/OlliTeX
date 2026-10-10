@@ -200,7 +200,7 @@ func lfCreateHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
 			return
 		}
-		if !entCanWrite(uid, *pj) {
+		if !entCanWrite(uid, *pj) && !loadUserAdmin(a, cxt, uid) {
 			res.JSON(403, []byte(`{"message":"restricted"}`))
 			return
 		}
@@ -242,7 +242,7 @@ func lfRefreshHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
 			return
 		}
-		if !entCanWrite(uid, *pj) {
+		if !entCanWrite(uid, *pj) && !loadUserAdmin(a, cxt, uid) {
 			res.JSON(403, []byte(`{"message":"restricted"}`))
 			return
 		}

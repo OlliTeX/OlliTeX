@@ -298,13 +298,19 @@ func TestSessionAuthIdentityFingerprint(t *testing.T) {
 }
 
 func TestSessionAuthProjectRoles(t *testing.T) {
-	f := &fakeMongo{projects: map[string]bson.D{
-		"AABBCC": bson.D{
-			{Key: "owner_ref", Value: "ownerX"},
-			{Key: "collaborator_refs", Value: bson.A{"collabY"}},
-			{Key: "readOnly_refs", Value: bson.A{"viewerZ"}},
+	f := &fakeMongo{
+		projects: map[string]bson.D{
+			"AABBCC": bson.D{
+				{Key: "owner_ref", Value: "ownerX"},
+				{Key: "collaborator_refs", Value: bson.A{"collabY"}},
+				{Key: "readOnly_refs", Value: bson.A{"viewerZ"}},
+			},
 		},
-	}}
+		users: map[string]bson.D{
+			"adminU": bson.D{{Key: "email", Value: "a@x"}, {Key: "isAdmin", Value: true}},
+			"plainU": bson.D{{Key: "email", Value: "p@x"}},
+		},
+	}
 	cases := []struct {
 		uid  string
 		want Role
@@ -313,6 +319,11 @@ func TestSessionAuthProjectRoles(t *testing.T) {
 		{"collabY", ReadWrite},
 		{"viewerZ", ReadOnly},
 		{"strangerW", Deny},
+		// C audit 2026-10-10: site-admin bypass — without it a site admin
+		// viewing a non-member private project 401'd at the WS handshake
+		// and the IDE boot hung forever (blank editor page).
+		{"adminU", ReadWrite},
+		{"plainU", Deny},
 	}
 	a := &SessionAuth{M: f}
 	for _, tc := range cases {

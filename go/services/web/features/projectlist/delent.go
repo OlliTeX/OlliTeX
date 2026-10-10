@@ -198,7 +198,8 @@ func delEntityHandler(a *core.App, kind string) func(cxt *core.Cxt, res *core.Re
 			views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(path, "/")))
 			return
 		}
-		if !entCanWrite(uid, *doc) {
+		// admin leg (C audit 2026-10-10; same pattern as projectsettings.go)
+		if !entCanWrite(uid, *doc) && !loadUserAdmin(a, cxt, uid) {
 			if core.AcceptsJSON(req) {
 				res.JSON(403, []byte(colRestricted))
 			} else {

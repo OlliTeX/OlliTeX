@@ -284,7 +284,8 @@ func addEntityHandler(a *core.App, kind string) func(*core.Cxt, *core.Res) {
 			views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
 			return
 		}
-		if !entCanWrite(uid, *doc) {
+		// admin leg (C audit 2026-10-10; same pattern as projectsettings.go)
+		if !entCanWrite(uid, *doc) && !loadUserAdmin(a, cxt, uid) {
 			if core.AcceptsJSON(cxt.Req) {
 				res.JSON(403, []byte(colRestricted))
 			} else {

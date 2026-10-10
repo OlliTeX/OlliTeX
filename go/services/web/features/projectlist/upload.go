@@ -803,7 +803,8 @@ func uploadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			views.NotFoundPage(res.W, pbase())
 			return
 		}
-		if !entCanWrite(uid, *doc) {
+		// admin leg (C audit 2026-10-10; same pattern as projectsettings.go)
+		if !entCanWrite(uid, *doc) && !loadUserAdmin(a, cxt, uid) {
 			accept := cxt.Req.Header.Get("Accept")
 			if strings.Contains(accept, "application/json") {
 				res.JSON(403, []byte(colRestricted))

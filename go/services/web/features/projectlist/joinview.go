@@ -154,6 +154,14 @@ func joinHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 			invited = joinInvitedMember(uidHex, pd, pal)
 			tokenMemb = joinTokenMember(uidHex, pd, pal)
 		}
+		if level == "" && !anon && uidHex != "" && joinUserIsAdmin(a, ctx, uidHex) {
+			// site-admin bypass — plane consistency (C audit 2026-10-10):
+			// projectlist.canRead and editorpages.projectCanRead both
+			// `return isAdmin`; without this, a site admin viewing a
+			// non-member project 403'd at /project/:id/join and the IDE boot
+			// stalled on "Loading..." (blank editor page).
+			level = "readAndWrite"
+		}
 		if level == "" { // Node: privilegeLevel null/NONE → project=null → 403
 			r.W.Header().Set("X-Powered-By", "Express")
 			apiText(r, 403, "Forbidden")
@@ -220,6 +228,13 @@ func joinRespondCore(a *core.App, c *core.Cxt, r *core.Res, pidHex, uidHex strin
 		invited = joinInvitedMember(uidHex, pd, pal)
 		tokenMemb = joinTokenMember(uidHex, pd, pal)
 	}
+	if level == "" && !anon && uidHex != "" && joinUserIsAdmin(a, ctx, uidHex) {
+		// site-admin bypass (C audit 2026-10-10) — shared session-join core:
+		// without this a site admin viewing a non-member project 403'd at
+		// GET /project/:id/join and the IDE boot stalled ("Loading...").
+		// Plane consistency with projectlist.canRead / projectCanRead.
+		level = "readAndWrite"
+	}
 	if level == "" {
 		r.W.Header().Set("X-Powered-By", "Express")
 		apiText(r, 403, "Forbidden")
@@ -280,6 +295,37 @@ func joinVA(status int, segs ...string) []byte {
 }
 
 // --- privilege / member flags (non-site-admin path) ---
+
+// joinUserIsAdmin — site-admin check for the join bypass (C audit
+// 2026-10-10). Mirrors the isAdmin leg of projectlist.canRead.
+func joinUserIsAdmin(a *core.App, ctx context.Context, uidHex string) bool {
+	if a == nil || a.Mongo == nil || uidHex == "" {
+		return false
+	}
+	uidHex = strings.ToLower(strings.TrimSpace(uidHex))
+	if len(uidHex) != 24 {
+		return false
+	}
+	oid, err := bson.ObjectIDFromHex(uidHex)
+	if err != nil {
+		return false
+	}
+	db, err := a.Mongo.DB(ctx)
+	if err != nil {
+		return false
+	}
+	doc := bson.D{}
+	if err := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&doc); err != nil {
+		return false
+	}
+	for _, e := range doc {
+		if e.Key == "isAdmin" {
+			b, _ := e.Value.(bool)
+			return b
+		}
+	}
+	return false
+}
 
 func joinPrivilegeForUser(uidHex string, d bson.D, pal string) string {
 	if ownerRefHex(d) == uidHex {

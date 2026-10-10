@@ -75,7 +75,7 @@ func tcAuthzProject(a *core.App, cxt *core.Cxt, res *core.Res, write bool) (stri
 		views.NotFoundPage(res.W, tcPageData(cxt, tcRelPath(cxt)))
 		return "", false
 	}
-	if uid == "" || !tcCanAccess(uid, *doc, write) {
+	if uid == "" || (!tcCanAccess(uid, *doc, write) && !tcUserIsAdmin(a, cxt.Req.Context(), uid)) {
 		if core.AcceptsJSON(cxt.Req) {
 			res.JSON(403, []byte(`{"message":"restricted"}`))
 		} else {
@@ -84,6 +84,39 @@ func tcAuthzProject(a *core.App, cxt *core.Cxt, res *core.Res, write bool) (stri
 		return "", false
 	}
 	return seg, true
+}
+
+// tcUserIsAdmin — site-admin bypass (Node parity; the web plane's
+// projectlist.canRead also returns true for admins). Missing here, a site
+// admin viewing a foreign project 403'd on the track-changes plane — C
+// repro 2026-10-10.
+func tcUserIsAdmin(a *core.App, ctx context.Context, uidHex string) bool {
+	if a == nil || a.Mongo == nil || uidHex == "" {
+		return false
+	}
+	uidHex = strings.ToLower(strings.TrimSpace(uidHex))
+	if !tcHex24.MatchString(uidHex) {
+		return false
+	}
+	oid, err := bson.ObjectIDFromHex(uidHex)
+	if err != nil {
+		return false
+	}
+	db, err := a.Mongo.DB(ctx)
+	if err != nil {
+		return false
+	}
+	doc := bson.D{}
+	if err := db.Collection("users").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&doc); err != nil {
+		return false
+	}
+	for _, e := range doc {
+		if e.Key == "isAdmin" {
+			b, _ := e.Value.(bool)
+			return b
+		}
+	}
+	return false
 }
 
 func tcLoadProject(a *core.App, ctx context.Context, oid bson.ObjectID) (*bson.D, error) {

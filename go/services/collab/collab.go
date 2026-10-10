@@ -388,6 +388,22 @@ func (a *SessionAuth) ProjectRole(uid, projectID string) (Role, error) {
 			return ReadOnly, nil
 		}
 	}
+	// Site-admin bypass — Node parity (the web plane's projectCanRead does
+	// `return isAdmin`, editorpages.go): a site admin may open/inspect ANY
+	// project, so the collab join must not 401 them. Without this, a site
+	// admin viewing a private project they don't own hangs forever at boot
+	// (the IDE gates on the join) — C repro 2026-10-10 (blank editor page).
+	if u, uerr := a.M.UserByID(ctx, uid); uerr == nil {
+		for _, e := range u {
+			if e.Key != "isAdmin" {
+				continue
+			}
+			if b, ok := e.Value.(bool); ok && b {
+				return ReadWrite, nil
+			}
+			break
+		}
+	}
 	return Deny, nil
 }
 

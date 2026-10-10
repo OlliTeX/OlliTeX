@@ -383,7 +383,8 @@ func entGateAuth(a *core.App, cxt *core.Cxt, res *core.Res, projectId string) (s
 		views.NotFoundPage(res.W, pageBase(cxt, strings.TrimPrefix(cxt.Req.URL.Path, "/")))
 		return "", nil, false
 	}
-	if !entCanWrite(uid, *doc) {
+	// admin leg (C audit 2026-10-10; same pattern as projectsettings.go)
+	if !entCanWrite(uid, *doc) && !loadUserAdmin(a, cxt, uid) {
 		if core.AcceptsJSON(cxt.Req) {
 			res.JSON(403, []byte(colRestricted))
 		} else {

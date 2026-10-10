@@ -71,9 +71,18 @@ function formSubmitHelper(formEl: HTMLFormElement) {
       }
       formEl.dispatchEvent(new Event('sent'))
 
-      // Handle redirects
-      if (data.redir || data.redirect) {
-        window.location.href = data.redir || data.redirect!
+      // Handle redirects — security C (defense-in-depth 2026-10-10): only
+      // same-origin root-relative paths are honored. The current login
+      // endpoint already validates server-side (audit C2), but this helper is
+      // generic (2FA/SSO responses too), so never follow an absolute URL,
+      // protocol-relative //host, or scheme (`javascript:`/`http:`) value.
+      const redir = data.redir || data.redirect
+      if (
+        typeof redir === 'string' &&
+        redir.startsWith('/') &&
+        !redir.startsWith('//')
+      ) {
+        window.location.href = redir
         return
       }
 
