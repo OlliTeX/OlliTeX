@@ -76,9 +76,30 @@ administrator tools) **plus** the OlliTeX-specific stack:
   token budgets) on a single hub page; grammar checking via LanguageTool
   and/or LLM; an optional self-hosted LanguageTool service.
 - **Extended collaboration tools** — Zotero integration, Mendeley, reference
-  search & pick, equation editor, symbol palette, diagram canvas,
-  document import (`.docx`, `.md`) and export (`.docx`, `.md`, `.html`),
-  WebDAV/Nextcloud sync, Dropbox, sign-up page.
+  search & pick, equation editor, symbol palette,
+  **TikZ / SVG / Draw.io diagram files**, document import (`.docx`, `.md`)
+  and export (`.docx`, `.md`, `.html`), WebDAV/Nextcloud sync, Dropbox,
+  sign-up page.
+- **Markdown visual editor** — `.md` project files with a block-based visual
+  editor (headings, lists, tables, links, code blocks) beside the CodeMirror
+  6 code mode, following the editor theme; new files start empty (no LaTeX
+  boilerplate).
+- **WakaTime, self-hosted** — per-user editing-time tracking relayed to a
+  local [Wakapi](https://wakapi.dev/) instance (browser → OlliTeX → local
+  Wakapi; never wakatime.com), admin master switch + per-user keys
+  (rate-limited, `200/1h` default); users enable it under
+  My settings → WakaTime.
+- **In-browser Python runner** — `.py` files execute through bundled
+  Pyodide (CPython 3.12 / Pyodide 0.29.3) in a browser worker, offline, with
+  an admin package allow-list — no server-side Python.
+- **SSO federation** — OIDC provider + relying-party flows for
+  cross-OlliTeX-instance identity and project sharing (PKCE + redirect_uri
+  pinned to registered URIs + consent screens), alongside the classic
+  SAML/OIDC/LDAP login slots and the multi-provider manager.
+- **Monitoring** — self-hosted Grafana (admin-gated same-origin proxy,
+  anonymous access off) + Prometheus with bundled instance-stats alert
+  rules and a token-gated alert webhook relay; the hub's Instance
+  statistics leaf shows the core time series.
 - **Operations toolkit** — environment-driven configuration
   (`server-ce/config/env.sh` + `toolkit` seed), a central
   [Makefile](Makefile) entry point, an AGPL-compliant rebrand with provenance
@@ -92,16 +113,20 @@ administrator tools) **plus** the OlliTeX-specific stack:
 > The local (in-container) compile path and the local TeX Live installation
 > have been removed from the server image.
 >
-> - Default compile image: **`texlive/texlive:latest-full`** (the official
->   TeX Live image); pin a specific build with the `TEXLIVE_IMAGE`
->   environment variable or [`toolkit/lib/images.env`](toolkit/lib/images.env).
+> - Default compile image: **`olpsint/texlive-full:2026.1`** — TeX Live
+>   **2026**, built from the ayaka-notes `texlive-full` 2026 recipe (credit
+>   kept in `CREDITS.md`); override with the `TEXLIVE_IMAGE` environment
+>   variable, the site-setting (Compilation → Sandboxed compiles), or
+>   [`toolkit/lib/images.env`](toolkit/lib/images.env).
 > - The server needs access to a Docker socket (or rootless Docker) so the
 >   compile containers can start — the same mechanism that runs the Typst
 >   compile containers. Mounting the Docker socket is the standard way to
 >   run sandboxed compiles; keep the Docker host itself trusted, and note
->   the bundled seccomp profile (embedded in the Go `clsitex` binary;
->   the profile source is `go/services/clsitex/seccomp/clsi-profile.json`)
->   restricts the compile containers.
+>   the bundled seccomp profile (embedded in the Go `clsitex` binary via
+>   `//go:embed`; the profile source is
+>   `go/services/clsitex/config/seccomp/clsi-profile.json`, 179 syscalls
+>   incl. `faccessat2` for the 2026 toolchain) restricts the compile
+>   containers.
 
 ## Getting started
 
@@ -151,6 +176,16 @@ A ready-to-run local deployment (nginx + overleaf + mongo + redis) lives in
   [Forgejo](https://codeberg.org/forgejo/forgejo).
 
 ## Documentation
+
+The canonical wiki is [`docs/wiki/`](docs/wiki) — user guide (hub, editor,
+Markdown + diagrams, WakaTime, settings), admin guide (users, projects, site
+settings → integrations/services/storage/compilation, LLM, WakaTime relay,
+Python runner, instance stats + Grafana, SSO + federation, operations), and
+installation (Docker, configuration, upgrade, security & sandbox, **TeX
+Live 2026**, toolkit). Every page ends with a `Verified against:`
+provenance line, and the credential leak guard (no keys, secrets, or personal
+data in docs or screenshots, ever) is a hard rule — see
+`docs/wiki/installation/04-security-sandbox.md`.
 
 - **Wiki** — [`docs/wiki`](docs/wiki/README.md): user guide, admin guide,
   and installation docs, with auto-generated screenshots. A data-safety
