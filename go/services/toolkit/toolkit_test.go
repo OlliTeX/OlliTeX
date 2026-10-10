@@ -415,15 +415,27 @@ func TestPlan_KioskOptIn(t *testing.T) {
 	// ON (the embedded dashboards carry no credentials) and serves Grafana
 	// from a sub-path on the main origin (single-edge; 80/443 only). The
 	// pre-AJ-3 safe-defaults (`:-false` / `:-self`) are superseded.
+	// AG (owner 2026-10-09) SUPERSEDES the AJ-3 assertions: anonymous access
+	// is OFF by default and the embeds go through the admin-gated proxy
+	// (root URL /admin/grafana/). The old anonymous-default lines were the
+	// exact security hole the owner closed with AG.
+	contains := func(want string) bool {
+		return strings.Contains(sc, want)
+	}
 	for _, want := range []string{
-		"GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-true}",
+		"GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}",
 		"GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer",
 		"GF_SERVER_SERVE_FROM_SUB_PATH: ${GF_SERVER_SERVE_FROM_SUB_PATH:-true}",
 		"GF_SECURITY_CSP_FRAME_ANCESTORS: ${GRAFANA_CSP_FRAME_ANCESTORS:-'self' https://psintern.neuro.uni-bremen.de}",
 	} {
-		if !strings.Contains(sc, want) {
+		if !contains(want) {
 			t.Fatalf("canonical compose.yaml missing kiosk line %q", want)
 		}
+	}
+	// the root URL line is YAML-double-quoted in the canonical file — assert
+	// the URL value itself (the gating contract: /admin/grafana/).
+	if !contains("psintern.neuro.uni-bremen.de/admin/grafana") {
+		t.Fatalf("canonical compose.yaml missing the AG admin-gated Grafana root URL")
 	}
 	_ = dir
 }

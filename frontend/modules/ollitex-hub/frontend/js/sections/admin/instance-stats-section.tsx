@@ -81,7 +81,16 @@ export default function InstanceStatsSection() {
     enabled: boolean
     dashboards: { id: string; title: string; kiosk: string; full: string }[]
   } | null>(null)
-  const [grafanaSel, setGrafanaSel] = useState('ollitex-overview')
+  const [grafanaSel, setGrafanaSel] = useState('ollitex-instance-stats')
+  // AG (owner 2026-10-09): the pane's first listed dashboard
+  // (ollitex-instance-stats) wins over the stale default.
+  useEffect(() => {
+    if (grafana && Array.isArray(grafana.dashboards) && grafana.dashboards.length) {
+      if (!grafana.dashboards.some(d => d.id === grafanaSel)) {
+        setGrafanaSel(grafana.dashboards[0].id)
+      }
+    }
+  }, [grafana, grafanaSel])
   useEffect(() => {
     let alive = true
     getJSON<{ enabled: boolean; dashboards: { id: string; title: string; kiosk: string; full: string }[] }>(
@@ -234,7 +243,8 @@ export default function InstanceStatsSection() {
                 Live dashboards
               </Text>
               <Text size="sm" c="dimmed" mt={2}>
-                Grafana (read-only kiosk) — the OlliTeX observability dashboards on this instance.
+                Grafana dashboards on this instance — served through the admin-gated OlliTeX proxy
+                (no Grafana credentials in the browser; anonymous access is disabled).
               </Text>
             </div>
             <Group gap="xs">
@@ -260,101 +270,20 @@ export default function InstanceStatsSection() {
           />
         </Card>
       ) : null}
-      <Group justify="space-between" wrap="wrap" gap="sm" align="center">
-        <Group gap={10} wrap="nowrap">
-          <Icon name="monitoring" size={22} style={{ color: 'var(--mantine-color-ollitex-6)' }} />
-          <div>
-            <Text fw={700} size="md">
-              Instance statistics
-            </Text>
-            <Text size="sm" c="dimmed" mt={4}>
-              Time series from the instance-stats collector, in the same layout as the classic page.
-            </Text>
-          </div>
-        </Group>
-        <NativeSelect
-          aria-label="Time window"
-          value={windowKey}
-          onChange={e => setWindowKey(e.currentTarget.value as WindowKey)}
-          data={WINDOW_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
-          size="sm"
-          style={{ width: 170 }}
-        />
-      </Group>
-
-      {loadError ? (
-        <Alert color="yellow" variant="light" title={loadError} icon={<Icon name="error" size={20} />} />
-      ) : null}
-
-      {loading && !loaded ? <Text size="sm" c="dimmed">Loading instance statistics…</Text> : null}
-
-      {allEmpty ? (
-        <Alert
-          icon={<Icon name="hourglass_empty" size={20} />}
-          title="No data in this window yet"
-          color="yellow"
-          variant="light"
-        >
-          The collector samples every 24 h — a freshly provisioned instance (or a
-          very short window like “Last day”) has no points yet. Try a wider window;
-          the first day of collection fills in within a day.
-        </Alert>
-      ) : null}
-
-      {/* ── sub-sections: User / Projects / Storage / System ─────────────── */}
-      {tabs.map(tab => (
-        <Card key={tab.tabId} withBorder radius="lg" p="md">
-          <Group justify="space-between" wrap="wrap" gap="sm" mb="sm" align="flex-start">
-            <div>
-              <Text fw={700}>{tab.meta.title}</Text>
-              <Text size="sm" c="dimmed" mt={2}>
-                {tab.meta.blurb}
-              </Text>
-            </div>
-          </Group>
-          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-            {tab.stats.map(def => {
-              const pts = series[def.metric] || []
-              const last = pts.length ? pts[pts.length - 1] : null
-              const lastV = last && last.values.length ? def.transform(last.values[0]) : null
-              return (
-                <Paper key={def.id} withBorder radius="lg" p="sm" w="100%">
-                  <Group justify="space-between" wrap="nowrap" gap="xs" mb={6}>
-                    <Text size="sm" fw={700} truncate>
-                      {def.title}
-                    </Text>
-                    <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                      latest{' '}
-                      {lastV == null
-                        ? '—'
-                        : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(lastV)}${def.ylabel ? ` ${def.ylabel}` : ''}`}
-                    </Text>
-                  </Group>
-                  <StatsChart
-                    points={pts}
-                    colors={[def.colors?.y1, def.colors?.y2]}
-                    labels={def.labels}
-                    transform={def.transform}
-                    ylabel={def.ylabel}
-                    chartType={def.chartType === 'bar' ? 'bar' : 'line'}
-                    height={150}
-                  />
-                </Paper>
-              )
-            })}
-          </SimpleGrid>
-        </Card>
-      ))}
-
-      {/* ── Alert settings ────────────────────────────────────────────────── */}
+      {/* ── AG (owner 2026-10-09): alert recipients — the rules fire from the
+          monitoring stack and mail these addresses; threshold inputs are retired
+          (managed with the monitoring rules). ── */}
+            {/* ── Alert settings ────────────────────────────────────────────────── */}
       <Card withBorder paddings="md" radius="lg">
         <Group justify="space-between" wrap="wrap" gap="sm" align="flex-start">
           <div>
             <Text fw={700}>Alert settings</Text>
             <Text size="sm" c="dimmed" mt={4}>
-              Recipients and disk/RAM warning thresholds for the instance-stats
-              alert checker. The “Send test” button emails the configured
-              recipients without touching any threshold logic.
+              Recipients for the instance-stats alerts. The alerts fire from the
+              monitoring stack (disk / RAM rules at the 90% defaults, migrated off the
+              native admin page) and are mailed to these addresses. “Send test” emails the
+              list without firing a rule; thresholds are managed with the monitoring
+              stack, not here.
             </Text>
           </div>
           <Group gap="xs">
@@ -421,35 +350,11 @@ export default function InstanceStatsSection() {
               is configured).
             </Text>
           )}
-          <Group gap="sm" wrap="wrap" mt="xs">
-            <TextInput
-              label="Disk warning threshold (%)"
-              type="number"
-              value={diskPct}
-              onChange={e => setDiskPct(e.currentTarget.value)}
-              min={1}
-              max={100}
-              size="sm"
-              style={{ width: 220 }}
-            />
-            <TextInput
-              label="RAM warning threshold (%)"
-              type="number"
-              value={ramPct}
-              onChange={e => setRamPct(e.currentTarget.value)}
-              min={1}
-              max={100}
-              size="sm"
-              style={{ width: 220 }}
-            />
-            {cfg ? (
-              <Text size="xs" c="dimmed" ta="right" mt={30}>
-                Loaded from the instance (last saved: disk {cfg.diskWarningPercent}% ·
-                RAM {cfg.ramWarningPercent}% · {cfg.alertEmails?.length ?? 0}
-                recipient(s)).
-              </Text>
-            ) : null}
-          </Group>
+                    {cfg ? (
+            <Text size="xs" c="dimmed" mt="xs">
+              Loaded from the instance ({cfg.alertEmails?.length ?? 0} recipient(s)).
+            </Text>
+          ) : null}
         </Stack>
       </Card>
 

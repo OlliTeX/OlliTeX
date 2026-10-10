@@ -514,6 +514,7 @@ func absData(base, p string) string {
 // placeholders). Layout (matching the overlay's mounts):
 //
 //	<monitoring>/prometheus.yml            ← monitoring/prometheus/prometheus.yml
+//	<monitoring>/prometheus-rules.yml       ← monitoring/prometheus/rules/instance-stats.yml (AG alerts)
 //	<monitoring>/grafana-provisioning/*    ← monitoring/grafana/provisioning/*
 //	<monitoring>/grafana-dashboards/*      ← monitoring/grafana/dashboards/*
 func (t *Toolkit) materializeMonitoring(destRoot string) error {
@@ -549,6 +550,16 @@ func (t *Toolkit) materializeMonitoring(destRoot string) error {
 	if err := os.WriteFile(filepath.Join(destRoot, "prometheus.yml"), []byte(yml), 0o644); err != nil {
 		return err
 	}
+	// AG (owner 2026-10-09): the alert rules file (disk/RAM thresholds →
+	// the OlliTeX /internal/alerts webhook → email). Rendered with the
+	// same host placeholders as the scrape config.
+	if rulesRaw, rerr := os.ReadFile(filepath.Join(td, "prometheus", "rules", "instance-stats.yml")); rerr == nil {
+		rules := strings.ReplaceAll(string(rulesRaw), "__OVERLEAF_HOST__", "ollitex")
+		if werr := os.WriteFile(filepath.Join(destRoot, "prometheus-rules.yml"), []byte(rules), 0o644); werr != nil {
+			return werr
+		}
+	}
+	// (the rules file is optional — pre-AG repo layouts are skipped silently)
 	// 2) grafana provisioning + dashboards (tree copies).
 	pairs := []struct{ src, dst string }{
 		{filepath.Join(td, "grafana", "provisioning"), filepath.Join(destRoot, "grafana-provisioning")},

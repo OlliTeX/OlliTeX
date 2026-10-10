@@ -1,0 +1,250 @@
+{
+  "uid": "ollitex-instance-stats",
+  "title": "OlliTeX — Instance statistics (AG)",
+  "tags": ["ollitex", "ag", "instance-stats"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "30s",
+  "description": "AG (owner 2026-10-09): the instance statistics system — the five groups the classic admin page had (Users, Projects, Storage, Host) plus the Go service plane. Collected values come from the hourly instance-stats collector (overleaf_stat_* gauges on the ollitex-web scrape target; admin-gated origin — no Grafana tokens); live series come from node-exporter / mongo / redis exporters at 15s resolution.",
+  "panels": [
+    {
+      "type": "row",
+      "title": "Users",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 90
+    },
+    {
+      "type": "stat",
+      "title": "Total users",
+      "description": "users collection (hourly collector).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "id": 11,
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "stat_user_count{service=\"web\"}", "legendFormat": "users" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Active users (24h)",
+      "description": "users.lastActive >= now-24h (hourly collector).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "id": 12,
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "stat_active_users{service=\"web\"}", "legendFormat": "active 24h" } ]
+    },
+    {
+      "type": "stat",
+      "title": "New users (24h)",
+      "description": "users.signUpDate >= now-24h (hourly collector).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "id": 13,
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "light-green", "value": null }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "stat_new_users{service=\"web\"}", "legendFormat": "new 24h" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Users over time",
+      "description": "Total vs active (collected hourly).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "id": 14,
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "stat_user_count{service=\"web\"}", "legendFormat": "total" },
+        { "refId": "B", "expr": "stat_active_users{service=\"web\"}", "legendFormat": "active 24h" },
+        { "refId": "C", "expr": "stat_new_users{service=\"web\"}", "legendFormat": "new 24h" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Projects",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 91
+    },
+    {
+      "type": "stat",
+      "title": "Total projects",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 6 },
+      "id": 21,
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "stat_project_count{service=\"web\"}", "legendFormat": "projects" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Active projects (24h)",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 6 },
+      "id": 22,
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "light-purple", "value": null }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "stat_active_projects{service=\"web\"}", "legendFormat": "active 24h" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Shared projects (token)",
+      "description": "projects with tokens.readAndWrite present (public link shares).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 6 },
+      "id": 23,
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "stat_shared_projects{service=\"web\"}", "legendFormat": "shared" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Files (docs)",
+      "description": "docs collection total (the Yjs document store backing project files).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 6 },
+      "id": 24,
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "cyan", "value": null }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "stat_file_count{service=\"web\"}", "legendFormat": "docs" } ]
+    },
+    {
+      "type": "row",
+      "title": "Storage",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
+      "id": 92
+    },
+    {
+      "type": "timeseries",
+      "title": "Storage by subsystem",
+      "description": "Collected hourly: /var/lib/overleaf tree size, MongoDB totalSize, Redis used-memory. Live MongoDB/Redis exporter values alongside.",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 11 },
+      "id": 31,
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "stat_overleaf_storage{service=\"web\"}", "legendFormat": "overleaf data dir" },
+        { "refId": "B", "expr": "stat_mongodb_storage{service=\"web\"}", "legendFormat": "mongodb (collector)" },
+        { "refId": "C", "expr": "mongodb_ss_dbstats_size{db=\"sharelatex\"}", "legendFormat": "mongodb (live)" },
+        { "refId": "D", "expr": "stat_redis_storage{service=\"web\"}", "legendFormat": "redis (collector)" },
+        { "refId": "E", "expr": "redis_memory_used_bytes", "legendFormat": "redis (live)" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis operations",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 11 },
+      "id": 32,
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(redis_commands_processed_total[5m])", "legendFormat": "commands/s" },
+        { "refId": "B", "expr": "redis_connected_clients", "legendFormat": "clients (raw)" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Host",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "id": 93
+    },
+    {
+      "type": "gauge",
+      "title": "CPU usage (%)",
+      "description": "node_exporter (live).",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 20 },
+      "id": 41,
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval])))", "legendFormat": "cpu" } ]
+    },
+    {
+      "type": "gauge",
+      "title": "RAM usage (%)",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 20 },
+      "id": 42,
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 90 }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "ram" } ]
+    },
+    {
+      "type": "gauge",
+      "title": "CPU load (1 min)",
+      "description": "node_load1 (live) — the classic page's load-average tile.",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 20 },
+      "id": 43,
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 2 }, { "color": "red", "value": 4 }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "node_load1", "legendFormat": "load1" } ]
+    },
+    {
+      "type": "gauge",
+      "title": "Root filesystem (%)",
+      "description": "node_exporter live; the /var/lib/overleaf volume shares the host root fs here.",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 20 },
+      "id": 44,
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 90 }] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})", "legendFormat": "/" } ]
+    },
+    {
+      "type": "row",
+      "title": "Disk — /var/lib/overleaf (collected, df -B1)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 94
+    },
+    {
+      "type": "timeseries",
+      "title": "Data-disk usage (available vs total)",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 26 },
+      "id": 51,
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "stat_disk_usage_avail{service=\"web\"}", "legendFormat": "available" },
+        { "refId": "B", "expr": "stat_disk_usage_total{service=\"web\"}", "legendFormat": "total" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Disk free / used on data volume",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 26 },
+      "id": 52,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (1 - stat_disk_usage_avail{service=\"web\"} / stat_disk_usage_total{service=\"web\"})",
+          "legendFormat": "disk used %"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Services (Go plane)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "id": 95
+    },
+    {
+      "type": "timeseries",
+      "title": "Request rate by app",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 33 },
+      "id": 61,
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "sum by (app) (rate(requests[$__rate_interval]))", "legendFormat": "{{app}}" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "5xx error rate by app",
+      "datasource": { "uid": "ollitex-prometheus", "type": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 33 },
+      "id": 62,
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "sum by (app) (rate(requests{code=~\"5..\"}[$__rate_interval])) / sum by (app) (rate(requests[$__rate_interval])) * 100", "legendFormat": "{{app}} %5xx" } ]
+    }
+  ]
+}

@@ -27,6 +27,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"ollitex/go/libraries/ometrics"
 	"ollitex/go/services/web/core"
 )
 
@@ -48,10 +49,15 @@ const retentionDays = 365 // Node `Settings.instanceStats?.retentionDays ?? 365`
 //	disk_usage        [availableBytes, totalBytes] (df -B1)
 //	cpu_load          [loadavg1] (/proc/loadavg)
 //	ram_usage         [freeBytes, usedBytes] (/proc/meminfo)
-func collectForDay(ctx context.Context, a *core.App, day time.Time) (errs []string) {
+//
+// Returns the computed scalar stats (statKey → latest value) so the caller
+// can mirror them as Prometheus gauges (AG dashboards read the same numbers
+// the hub series read).
+func collectForDay(ctx context.Context, a *core.App, day time.Time) (scalars map[string]float64, errs []string) {
+	scalars = map[string]float64{}
 	db, err := a.Mongo.DB(ctx)
 	if err != nil {
-		return []string{"mongo: " + err.Error()}
+		return nil, []string{"mongo: " + err.Error()}
 	}
 	now := time.Now()
 	oneDayAgo := now.Add(-24 * time.Hour)
@@ -94,6 +100,27 @@ func collectForDay(ctx context.Context, a *core.App, day time.Time) (errs []stri
 	redisDisk, redisRam := getRedisMemory(a)
 	ramFree, ramUsed := getRamUsage()
 
+	// AG: the scalar mirror the Grafana dashboards read (Prometheus
+	// gauges on the web service's own scrape surface — no new datasource,
+	// no static token; values = exactly what the hub series store).
+	scalars = map[string]float64{
+		"active_projects":  float64(activeProjects),
+		"active_users":     float64(activeUsers),
+		"new_users":        float64(newUserCount),
+		"shared_projects":  float64(sharedProjectCount),
+		"user_count":       float64(totalUsers),
+		"project_count":    float64(projectCount),
+		"file_count":       float64(fileCount),
+		"mongodb_storage":  float64(mongodbStorage),
+		"overleaf_storage": float64(duBytes),
+		"redis_storage":    float64(redisRam),
+		"disk_usage_avail": float64(diskAvail),
+		"disk_usage_total": float64(diskTotal),
+		"cpu_load":         cpuLoad,
+		"ram_usage_free":   float64(ramFree),
+		"ram_usage_used":   float64(ramUsed),
+	}
+
 	generatedAt := now
 	entries := []map[string]any{
 		{"statKey": "active_projects", "values": []int64{activeProjects}},
@@ -134,7 +161,7 @@ func collectForDay(ctx context.Context, a *core.App, day time.Time) (errs []stri
 	if _, perr := db.Collection("instanceStats").DeleteMany(ctx, bson.D{{Key: "day", Value: bson.D{{Key: "$lt", Value: pruneCutoff}}}}); perr != nil {
 		errs = append(errs, "prune: "+perr.Error())
 	}
-	return errs
+	return scalars, errs
 }
 
 func duBytes(ctx context.Context, path string) int64 {
@@ -244,7 +271,14 @@ func collectHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 		defer cancel()
 		day := toUtcMidnight(time.Now())
-		errs := collectForDay(ctx, a, day)
+		scalars, errs := collectForDay(ctx, a, day)
+		// AG: mirror the run's scalar stats as Prometheus gauges on THIS
+		// service's /metrics surface (Prometheus already scrapes ollitex-web
+		// — no new datasource, no credential anywhere). The Grafana
+		// "Instance statistics" dashboard reads overleaf_stat_* from here.
+		for k, v := range scalars {
+			ometrics.Gauge("stat."+k, v, map[string]any{"source": "collector"})
+		}
 		body := map[string]any{
 			"ok":  len(errs) == 0,
 			"day": day.Format(time.RFC3339),

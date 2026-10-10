@@ -4,9 +4,19 @@ server {
 
 	root /overleaf/public/;
 
-	# block external access to prometheus /metrics
-	location /metrics {
-		internal;
+	# AG (owner 2026-10-09): the app's /metrics is LOOPBACK-only (the Go web
+	# binds 127.0.0.1:4000). The Prometheus container scrapes THROUGH nginx
+	# — permitted ONLY from the two docker internal subnets (the edge never
+	# forwards this path), proxied onto the loopback Go upstream. Everyone
+	# else (public) gets 403.
+	location ~* ^/metrics/?$ {
+		allow 172.30.0.0/16;   # ollitex-toolkit_default
+		allow 172.18.0.0/16;   # overleaf-network
+		deny all;
+		proxy_pass http://127.0.0.1:4000;
+		proxy_http_version 1.1;
+		proxy_set_header Host $host;
+		proxy_buffering off;
 	}
 
 	# ACME HTTP-01 challenge webroot (edge: HAProxy proxies this path here;
@@ -142,10 +152,9 @@ server {
 		proxy_http_version 1.1;
   }
 
-  # block external access to metrics
-  location ~* ^/metrics/?$ {
-    return 404 'Not found';
-  }
+  # (AG: the metrics route moved to the top-of-server location —
+  # docker-internal-only via the /metrics block at the top of this file;
+  # this duplicate that 404'd it is retired.)
 
   # block external access to all health checks /health_check, /health_check/full, etc
   location ~* ^/health_check {

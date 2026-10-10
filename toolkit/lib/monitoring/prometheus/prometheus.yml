@@ -20,6 +20,30 @@
 # ---------------------------------------------------------------------------
 global:
   scrape_interval: 15s
+  # AG (owner 2026-10-09): alert firing goes to the OlliTeX instance-stats
+  # webhook (web service) — it reads the configured alert recipients from
+  # instanceStatAlertConfigs and mails the firing alerts (the D22 mail
+  # pipeline; no separate alertmanager needed on this single-host stack).
+# (alertmanagers: [] is explicit: prometheus 2.x wants the section even
+#  when webhook_configs carries the only route.)
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    stack: ollitex-toolkit
+
+# AG (owner 2026-10-09): firing alerts -> the OlliTeX instance-stats webhook
+# (recipients from instanceStatAlertConfigs; the D22 mail pipeline).
+# AG (owner 2026-10-09): alert NOTIFICATION path — this prometheus
+# (prom/prometheus v2.53.5) build's config schema rejects webhook_configs
+# (verified by bisection on the exact image), so delivery is the 1-minute
+# alert-relay cron in the web container (images/main-amd64/cron/alert-relay.sh)
+# posting firing alerts to /internal/alerts (the D22 mail pipeline; recipients
+# from instanceStatAlertConfigs). The rules themselves load via rule_files
+# (prom-entrypoint.sh). alertmanagers: [] kept (accepted by this schema).
+alerting:
+  alertmanagers: []
+
   evaluation_interval: 15s
   external_labels:
     stack: ollitex-toolkit
@@ -29,7 +53,10 @@ scrape_configs:
   - job_name: ollitex-web
     metrics_path: /metrics
     static_configs:
-      - targets: ["__OVERLEAF_HOST__:4000"]
+      # AG (owner 2026-10-09): the Go web binds 127.0.0.1:4000 inside the
+      # container (loopback-only by design); nginx serves /metrics restricted
+      # to the docker subnets — scrape port 80, path /metrics.
+      - targets: ["__OVERLEAF_HOST__:80"]
         labels: { service: web }
 
   - job_name: ollitex-collab

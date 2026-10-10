@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------------
+# OlliTeX toolkit — Prometheus alert rules (AG, owner 2026-10-09).
+#
+# "migrate the alert settings into Grafana-based alerts" — the alerts fire
+# in the monitoring stack and notify through the OlliTeX instance-stats
+# mail pipeline (the same recipients the native admin UI configured, read
+# from instanceStatAlertConfigs by POST /internal/alerts on the web
+# service). Thresholds default to the Node-era values (90% disk, 90% RAM);
+# they were NOT raised or widened by this migration.
+#
+# Rendered by the toolkit into <monitoring>/prometheus-rules.yml and fed
+# to prometheus via --rule.files (the live container command adds the flag
+# only when the file exists — pre-AG layouts keep booting unchanged).
+#
+# Signals: the LIVE node_exporter pair (15s scrape — fast alerting) and the
+# hourly instance-stats collector gauges (the exact numbers the classic
+# admin page showed). Both fire the same alert names.
+# ---------------------------------------------------------------------------
+groups:
+  - name: ollitex-instance-stats
+    interval: 1m
+    rules:
+      - alert: InstanceDiskUsageHigh
+        expr: >
+          100 * (1 - node_filesystem_avail_bytes{mountpoint="/"}
+                 / node_filesystem_size_bytes{mountpoint="/"}) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance disk usage above 90% (root fs, live)"
+          description: "The host root filesystem holding /var/lib/overleaf is {{ $value | printf \"%.0f\" }}% full — the classic admin page's disk alert."
+
+      - alert: InstanceDiskUsageHighCollector
+        expr: >
+          100 * (1 - stat_disk_usage_avail / stat_disk_usage_total) > 90
+        for: 30m
+        labels:
+          severity: warning
+          source: instance-stats-collector
+        annotations:
+          summary: "Instance disk usage above 90% (/var/lib/overleaf vol, collector)"
+          description: "The hourly instance-stats collector reports the data volume at {{ $value | printf \"%.0f\" }}% used."
+
+      - alert: InstanceRamUsageHigh
+        expr: >
+          100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance RAM usage above 90% (live)"
+          description: "Host RAM is at {{ $value | printf \"%.0f\" }}% used — the classic admin page's RAM alert."
+
+      - alert: InstanceRamUsageHighCollector
+        expr: >
+          100 * (stat_ram_usage_used / (stat_ram_usage_used + stat_ram_usage_free)) > 90
+        for: 30m
+        labels:
+          severity: warning
+          source: instance-stats-collector
+        annotations:
+          summary: "Instance RAM usage above 90% (collector)"
+          description: "The hourly instance-stats collector reports RAM at {{ $value | printf \"%.0f\" }}% used."
+
+      - alert: InstanceCollectorSilent
+        expr: time() - timestamp(stat_user_count) > 4 * 3600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance-stats collector silent for 4h+"
+          description: "The hourly collect-instance-stats run has not produced fresh gauges within 4 hours (cron or the web service may be down)."
+
+      - alert: InstanceMongodbDown
+        expr: up{job=~"ollitex-mongodb|mongodb.*"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MongoDB scrape target down"
+          description: "The mongo exporter is no longer reachable — instance data access may be impaired."

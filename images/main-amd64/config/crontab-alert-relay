@@ -1,0 +1,1 @@
+* * * * *   root  /overleaf/cron/alert-relay.sh >> /var/log/overleaf/cron-alert-relay.log 2>&1

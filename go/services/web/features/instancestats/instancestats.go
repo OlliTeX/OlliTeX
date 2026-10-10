@@ -147,7 +147,7 @@ func Feature(a *core.App) core.Feature {
 			// D22 (8cbc1526) phase D: Prometheus (d22 sidecar) alert webhook —
 			// internal-only (docker network; the HAProxy edge never forwards
 			// /internal/*), machine caller, no CSRF/auth by design.
-			{Method: "POST", Path: "/internal/alerts", Handler: alertWebhook(a, mail)},
+			{Method: "POST", Path: "/internal/alerts", NoSession: true, Handler: alertWebhook(a, mail)},
 			// audit 002 (2026-09-30): cron collector — re-implementation of the
 			// retired Node module's /internal/collect-instance-stats (Node tree
 			// gone with P7 step-4; its crontab pointed at a dead route, which
