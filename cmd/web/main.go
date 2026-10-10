@@ -25,6 +25,7 @@ import (
 	"ollitex/go/libraries/ometrics"
 	"ollitex/go/mongoh"
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/replset"
 	"ollitex/go/services/web/features/adminusers"
 	"ollitex/go/services/web/features/analytics"
 	"ollitex/go/services/web/features/authpages"
@@ -42,6 +43,7 @@ import (
 	"ollitex/go/services/web/features/healthcheck"
 	"ollitex/go/services/web/features/history"
 	"ollitex/go/services/web/features/hub"
+	"ollitex/go/services/web/features/admingrafana"
 	"ollitex/go/services/web/features/instancestats"
 	"ollitex/go/services/web/features/languagetool"
 	"ollitex/go/services/web/features/launchpad"
@@ -145,6 +147,10 @@ func main() {
 	ometrics.Initialize()
 	app.MetricsHTTP = ometrics.PrometheusHandler(nil)
 	app.SetMongo(core.NewMongoLazy(cfg.MongoURI))
+	// AG-era (owner 2026-10-09): self-heal the single-member replica set at
+	// boot (fresh data dirs need initiate; daemon-restart REMOVED states
+	// need the reconfig attempt + a loud log). Non-fatal by design.
+	go replset.Boot(context.Background(), app.Mongo)
 	// i18n (docs/go-i18n-evaluation.md §4): optional catalog dir. Nil by
 	// default = English-only = today's bytes (byte-pinned e2e contract).
 	if dir := os.Getenv("WEB_I18N_LOCALES_DIR"); dir != "" {
@@ -168,6 +174,11 @@ func main() {
 	// P3.1 surface: ServerAdmin leaf — system-message CRUD + editor gate.
 	app.RegisterFeature(serveradmin.Feature(app))
 	app.RegisterFeature(instancestats.Feature(app))
+	// AG (owner 2026-10-09): admin-gated same-origin Grafana proxy — the
+	// stats pane's kiosk iframes go through /admin/grafana (site-admin
+	// session check + server-side Basic auth); the public /grafana/ edge
+	// is retired.
+	app.RegisterFeature(admingrafana.Feature(app))
 	app.RegisterFeature(userpages.Feature(app))
 	app.RegisterFeature(registrationpage.Feature(app))
 

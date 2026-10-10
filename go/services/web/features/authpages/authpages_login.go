@@ -188,7 +188,11 @@ func postLogin(a *core.App) func(*core.Cxt, *core.Res) {
 		// the hook; no-op when no SSO providers exist).
 		a.PasswordLoginHooked(cxt)
 
-		target := "/project"
+		// 2026-10-09: default landing "/" (→ 302 /hub) — same convention as the
+			// SSO finishlogin flow (finishlogin.go: "not the Node-era \"/project\"").
+			// The old "/project" default rendered the 404 page for logged-in users
+			// (owner report: right after login the instance appeared down).
+			target := "/"
 		if raw, ok := old.GetRaw("postLoginRedirect"); ok && len(raw) >= 2 {
 			var s string
 			if json.Unmarshal(raw, &s) == nil && s != "" {

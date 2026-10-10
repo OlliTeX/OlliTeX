@@ -27,7 +27,7 @@ export const MenuBarOption = ({
   rel,
   eventKey,
 }: MenuBarOptionProps) => {
-  const { setSelected } = useNestableDropdown()
+  const { setSelected, inline } = useNestableDropdown()
   const { sendEvent } = useEditorAnalytics()
   const onClick: MouseEventHandler = useCallback(
     e => {
@@ -41,7 +41,15 @@ export const MenuBarOption = ({
   return (
     <DropdownListItem>
       <OLDropdownItem
-        onMouseEnter={() => setSelected(null)}
+        // 2026-10-09 (owner round-3): in the v2 rail's INLINE groups the
+        // owner wants them kept unfolded — hovering a sibling row must not
+        // collapse the open group (legacy flyout keeps close-on-hover).
+        onMouseEnter={() => {
+          if (inline) {
+            return
+          }
+          setSelected(null)
+        }}
         onClick={onClick}
         disabled={disabled}
         leadingIcon={leadingIcon}

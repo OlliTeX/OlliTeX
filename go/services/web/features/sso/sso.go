@@ -311,7 +311,10 @@ func samlProviderByID(cfg *SSOConfig, id string) *SAMLProvider {
 		if uerr := bson.Unmarshal(cfg.Providers[i], &p); uerr != nil {
 			continue
 		}
-		if p.ID == id && p.Type == "saml" {
+		// enabled check (live-verified gap 2026-10-09): a disabled provider
+		// must not be routable by explicit id — the 404 copy says
+		// "not found or disabled" so both must behave alike.
+		if p.ID == id && p.Type == "saml" && p.Enabled {
 			out := p
 			return &out
 		}
@@ -319,7 +322,7 @@ func samlProviderByID(cfg *SSOConfig, id string) *SAMLProvider {
 	return nil
 }
 
-// oidcProviderByID — DB row by id (nil when absent).
+// oidcProviderByID — DB row by id (nil when absent or disabled).
 func oidcProviderByID(cfg *SSOConfig, id string) *OIDCProvider {
 	if cfg == nil {
 		return nil
@@ -329,7 +332,7 @@ func oidcProviderByID(cfg *SSOConfig, id string) *OIDCProvider {
 		if uerr := bson.Unmarshal(cfg.Providers[i], &p); uerr != nil {
 			continue
 		}
-		if p.ID == id && p.Type == "oidc" {
+		if p.ID == id && p.Type == "oidc" && p.Enabled {
 			out := p
 			return &out
 		}

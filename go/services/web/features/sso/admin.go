@@ -27,10 +27,12 @@ package sso
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -170,22 +172,19 @@ func adminAddProvider(a *core.App) func(*core.Cxt, *core.Res) {
 		col := db.Collection("ssoConfigs")
 		cfg := loadRawConfig(cxt, col)
 		if cfg == nil {
-			cfg = bson.M{"_id": ssoConfigID, "providers": []any{}}
+			cfg = bson.M{"_id": ssoConfigID}
+			setProviders(cfg, nil)
 		}
-		providers, _ := cfg["providers"].([]any)
+		providers := providersField(cfg)
 		maxOrder := -1
 		sameType := 0
 		for _, pr := range providers {
-			pm, _ := pr.(bson.M)
-			if pm == nil {
-				continue
-			}
-			if t, _ := pm["type"].(string); t == body.Type {
+			if t, _ := pr["type"].(string); t == body.Type {
 				sameType++
 			}
-			if o, ok := pm["order"].(int32); ok && int(o) > maxOrder {
+			if o, ok := pr["order"].(int32); ok && int(o) > maxOrder {
 				maxOrder = int(o)
-			} else if of, ok := pm["order"].(float64); ok && int(of) > maxOrder {
+			} else if of, ok := pr["order"].(float64); ok && int(of) > maxOrder {
 				maxOrder = int(of)
 			}
 		}
@@ -202,7 +201,7 @@ func adminAddProvider(a *core.App) func(*core.Cxt, *core.Res) {
 			provider["scope"] = "openid profile email"
 		}
 		providers = append(providers, provider)
-		cfg["providers"] = providers
+		setProviders(cfg, providers)
 		if _, uerr := col.ReplaceOne(cxt.Req.Context(),
 			bson.D{{Key: "_id", Value: ssoConfigID}}, cfg,
 			mongooptions.Replace().SetUpsert(true)); uerr != nil {
@@ -239,16 +238,15 @@ func adminDeleteProvider(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(200, []byte(`{"success":true}`))
 			return
 		}
-		providers, _ := cfg["providers"].([]any)
-		var kept []any
+		providers := providersField(cfg)
+		kept := []bson.M{}
 		for _, pr := range providers {
-			pm, _ := pr.(bson.M)
-			if pm != nil && pm["id"] == id {
+			if pm, ok := toMap(pr); ok && pm["id"] == id {
 				continue
 			}
 			kept = append(kept, pr)
 		}
-		cfg["providers"] = kept
+		setProviders(cfg, kept)
 		if _, uerr := col.ReplaceOne(cxt.Req.Context(),
 			bson.D{{Key: "_id", Value: ssoConfigID}}, cfg,
 			mongooptions.Replace().SetUpsert(true)); uerr != nil {
@@ -290,18 +288,17 @@ func adminReorder(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(400, []byte(`{"error":"Invalid data"}`))
 			return
 		}
-		providers, _ := cfg["providers"].([]any)
-		byID := map[string]any{}
+		providers := providersField(cfg)
+		byID := map[string]bson.M{}
 		for _, pr := range providers {
-			pm, _ := pr.(bson.M)
-			if pm != nil {
+			if pm, ok := toMap(pr); ok {
 				if s, ok := pm["id"].(string); ok {
-					byID[s] = pr
+					byID[s] = pm
 				}
 			}
 		}
 		for _, o := range body.Providers {
-			if p, ok := byID[o.ID].(bson.M); ok {
+			if p, ok := byID[o.ID]; ok {
 				p["order"] = int32(o.Order)
 			}
 		}
@@ -542,13 +539,11 @@ func maskConfigDoc(doc bson.M) bson.M {
 		ldap["bindCredentials"] = maskSentinel
 		out["ldap"] = ldap
 	}
-	if providers, ok := out["providers"].([]any); ok {
-		for i, pr := range providers {
-			if pm, ok2 := toMap(pr); ok2 {
-				providers[i] = maskProviderDoc(pm)
-			}
-		}
+	maskedProviders := []bson.M{}
+	for _, pr := range providersField(out) {
+		maskedProviders = append(maskedProviders, maskProviderDoc(pr))
 	}
+	setProviders(out, maskedProviders)
 	if sp, ok := toMap(out["spMetadata"]); ok {
 		if v, _ := sp["privateKey"].(string); v != "" {
 			sp["privateKey"] = maskSentinel
@@ -582,6 +577,15 @@ func toMap(v any) (bson.M, bool) {
 	switch m := v.(type) {
 	case bson.M:
 		return m, true
+	case bson.D:
+		// mongo-driver v2 decodes embedded subdocs as bson.D (ordered key/value
+		// pairs) when the target is interface{} — the live shape captured from
+		// ollitex-mongo 2026-10-09. Accept it everywhere we accept maps.
+		out := bson.M{}
+		for _, e := range m {
+			out[e.Key] = e.Value
+		}
+		return out, true
 	case map[string]any:
 		out := bson.M{}
 		for k, x := range m {
@@ -600,13 +604,7 @@ func sanitizeConfigDoc(body, existing map[string]any) bson.M {
 	// normalize the nested containers to concrete map types the rest of
 	// this function can work with (Node passes plain objects; Go's
 	// json/decode gives map[string]any for API bodies):
-	if prov, ok := out["providers"].([]any); ok {
-		for i, pr := range prov {
-			if pm, ok := toMap(pr); ok {
-				prov[i] = pm
-			}
-		}
-	}
+	setProviders(out, providersField(out))
 	if ldap, ok := toMap(out["ldap"]); ok {
 		if ldap["bindCredentials"] == maskSentinel {
 			if exL, ok := toMap(existing["ldap"]); ok {
@@ -621,20 +619,10 @@ func sanitizeConfigDoc(body, existing map[string]any) bson.M {
 		}
 		out["ldap"] = ldap
 	}
-	if providers, ok := out["providers"].([]any); ok {
-		exProviders := []bson.M{}
-		if exP, ok := existing["providers"].([]any); ok {
-			for _, pr := range exP {
-				if pm, ok := toMap(pr); ok {
-					exProviders = append(exProviders, pm)
-				}
-			}
-		}
-		for i, pr := range providers {
-			pm, ok := toMap(pr)
-			if !ok {
-				continue
-			}
+	providersForSanitize := providersField(out)
+	if len(providersForSanitize) > 0 {
+		exProviders := providersField(bson.M(existing))
+		for _, pm := range providersForSanitize {
 			id, _ := pm["id"].(string)
 			var exP bson.M
 			for _, ep := range exProviders {
@@ -655,21 +643,16 @@ func sanitizeConfigDoc(body, existing map[string]any) bson.M {
 				}
 			}
 			// attrFilter sanitize
-			if af, ok := pm["attrFilter"].([]any); ok {
+			if af, afOK := toAttrFilterRows(pm["attrFilter"]); afOK {
 				cleaned := []bson.M{}
-				for _, row := range af {
-					rm, ok := toMap(row)
-					if !ok {
-						continue
-					}
+				for _, rm := range af {
 					if a, _ := rm["attribute"].(string); a == "" {
 						continue
 					}
 					if r, _ := rm["role"].(string); r != "guest" && r != "blocked" {
 						rm["role"] = "local"
 					}
-					m, _ := rm["match"].(string)
-					if m != "includes" && m != "regex" {
+					if m, _ := rm["match"].(string); m != "includes" && m != "regex" {
 						rm["match"] = "equals"
 					}
 					cleaned = append(cleaned, rm)
@@ -680,8 +663,8 @@ func sanitizeConfigDoc(body, existing map[string]any) bson.M {
 					delete(pm, "attrFilter")
 				}
 			}
-			providers[i] = pm
 		}
+		setProviders(out, providersForSanitize)
 	}
 	sp, spOK := toMap(out["spMetadata"])
 	exSP, _ := toMap(existing["spMetadata"])
@@ -702,6 +685,68 @@ func sanitizeConfigDoc(body, existing map[string]any) bson.M {
 
 // ---- helpers ----
 
+// providersField — robust extraction of the `providers` array from a decoded
+// Mongo doc / API body. REGRESSION FIX (2026-10-09, live): mongo-driver v2
+// decodes a stored doc-array as the NAMED type bson.A (= []interface{}), so
+// the old `cfg["providers"].([]any)` assertions SILENTLY FAILED (a type
+// switch does not match named types) and returned nil. Consequences in the
+// wild: every adminAddProvider ReplaceOne'd a ONE-element list (wiping all
+// earlier providers), deleteProvider wiped the list, and the mask/sanitize
+// secret-restore loops never ran. Reflection-based extraction handles
+// every shape (bson.A, []bson.M, []interface{}, single map).
+func providersField(m bson.M) []bson.M {
+	v, _ := m["providers"]
+	out := []bson.M{}
+	if v == nil {
+		return out
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < rv.Len(); i++ {
+			if mm, ok := toMap(rv.Index(i).Interface()); ok {
+				out = append(out, mm)
+			}
+		}
+	case reflect.Map: // a single provider doc (tolerant shape)
+		if mm, ok := toMap(v); ok {
+			out = append(out, mm)
+		}
+	}
+	return out
+}
+
+func setProviders(m bson.M, ps []bson.M) {
+	if ps == nil {
+		ps = []bson.M{}
+	}
+	m["providers"] = ps
+}
+
+// toAttrFilterRows — same robust extraction for a provider's `attrFilter`
+// row array (stored shapes include bson.A).
+func toAttrFilterRows(v any) ([]bson.M, bool) {
+	if v == nil {
+		return nil, false
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return nil, false
+	}
+	out := []bson.M{}
+	has := false
+	for i := 0; i < rv.Len(); i++ {
+		if mm, ok := toMap(rv.Index(i).Interface()); ok {
+			out = append(out, mm)
+			has = true
+		}
+	}
+	if !has {
+		return nil, false
+	}
+	return out, true
+}
+
 func loadRawConfig(cxt *core.Cxt, col *mongo.Collection) bson.M {
 	r := col.FindOne(cxt.Req.Context(), bson.D{{Key: "_id", Value: ssoConfigID}})
 	if r.Err() != nil {
@@ -717,14 +762,17 @@ func loadRawConfig(cxt *core.Cxt, col *mongo.Collection) bson.M {
 func randID() string {
 	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, 15)
-	for i := range b {
-		b[i] = alphabet[(i*7+3)%len(alphabet)]
+	// crypto/rand + safe modulo — the old deterministic seed walk overflowed
+	// int64 (seed*31) and Go's signed % produced NEGATIVE indices →
+	// "index out of range [-5]" panic in adminAddProvider (live 500,
+	// 2026-10-09). Fixed with real randomness and an always-positive mod.
+	if _, rerr := rand.Read(b); rerr != nil {
+		for i := range b {
+			b[i] = uint8(i) // deterministic fallback; still never panics
+		}
 	}
-	// mix in randomness
-	seed := time.Now().UnixNano()
 	for i := range b {
-		b[i] = alphabet[(int(seed)+i*13)%len(alphabet)]
-		seed = seed*31 + 17
+		b[i] = alphabet[int(b[i])%len(alphabet)]
 	}
 	return string(b)
 }

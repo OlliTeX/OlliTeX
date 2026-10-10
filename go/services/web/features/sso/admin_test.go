@@ -52,8 +52,11 @@ func TestSanitizeConfigDoc_MaskRestore(t *testing.T) {
 		"spMetadata": map[string]any{"privateKey": maskSentinel},
 	}
 	out := sanitizeConfigDoc(body, existing)
-	prov, _ := out["providers"].([]any)
-	p1, _ := prov[0].(bson.M)
+	prov := providersField(out)
+	if len(prov) != 1 {
+		t.Fatalf("providers missing: %v", out)
+	}
+	p1 := prov[0]
 	if p1["clientSecret"] != "real-secret" {
 		t.Errorf("mask restore failed: %q (p1=%#v)", p1["clientSecret"], p1)
 	}
@@ -78,12 +81,15 @@ func TestSanitizeConfigDoc_AttrFilter(t *testing.T) {
 		},
 	}
 	out := sanitizeConfigDoc(body, nil)
-	prov, _ := out["providers"].([]any)
+	prov := providersField(out)
 	if len(prov) != 1 {
-		t.Fatalf("providers: %#v", out)
+		t.Fatalf("providers: %v", out)
 	}
-	p1, _ := prov[0].(bson.M)
-	af, _ := p1["attrFilter"].([]bson.M)
+	p1 := prov[0]
+	af := []bson.M{}
+	if rs, ok := toAttrFilterRows(p1["attrFilter"]); ok {
+		af = rs
+	}
 	if len(af) != 2 {
 		t.Fatalf("expected 2 surviving rows, got %d: %#v", len(af), p1["attrFilter"])
 	}
@@ -113,9 +119,13 @@ func TestSanitizeConfigDoc_AttrFilterRoleCoercion(t *testing.T) {
 		},
 	}
 	out := sanitizeConfigDoc(body, nil)
-	prov, _ := out["providers"].([]any)
-	p1, _ := prov[0].(bson.M)
-	af, _ := p1["attrFilter"].([]bson.M)
+	prov := providersField(out)
+	if len(prov) != 1 {
+		t.Fatalf("providers missing: %v", out)
+	}
+	p1 := prov[0]
+	af := []bson.M{}
+	if rs, ok := toAttrFilterRows(p1["attrFilter"]); ok { af = rs }
 	sawRole := ""
 	for _, row := range af {
 		if row["attribute"] == "a" {

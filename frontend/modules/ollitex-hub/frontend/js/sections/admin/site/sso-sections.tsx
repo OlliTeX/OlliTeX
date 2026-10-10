@@ -52,7 +52,7 @@ export function SsoSamlSection() {
       badge="SAML"
       enabled={Boolean(v.enabled)}
       onEnabled={v2 => up({ enabled: v2 })}
-      description="Single sign-on with a SAML 2.0 identity provider."
+      description="Single sign-on with a SAML 2.0 identity provider. (Legacy single-provider store: the live multi-provider list lives in 'SSO · Providers (multi)'; this section is the fallback used when the provider list has no SAML provider.)"
       footerNote="Applies at next login (no container restart required)."
       flash={flash}
       onSave={() => void save({
@@ -131,7 +131,7 @@ export function SsoOidcSection() {
       badge="OIDC"
       enabled={Boolean(v.enabled)}
       onEnabled={x => up({ enabled: x })}
-      description="OpenID Connect sign-in. URL fields may stay empty for issuer auto-discovery."
+      description="OpenID Connect sign-in. URL fields may stay empty for issuer auto-discovery. (Legacy single-provider store: OIDC logins are resolved from the 'SSO · Providers (multi)' list or the OVERLEAF_OIDC_* environment variables.)"
       footerNote="Applies at next login (no container restart required)."
       flash={flash}
       onSave={() => void save({
@@ -233,7 +233,7 @@ export function SsoLdapSection() {
       badge="LDAP"
       enabled={Boolean(v.enabled)}
       onEnabled={x => up({ enabled: x })}
-      description="Authenticate against an LDAP directory (search + bind)."
+      description="Authenticate against an LDAP directory (search + bind). (Legacy store: LDAP login is resolved from the LDAP block in 'SSO · Providers (multi)'.)"
       footerNote="Applies at next login (no container restart required)."
       flash={flash}
       onSave={() => void save({
