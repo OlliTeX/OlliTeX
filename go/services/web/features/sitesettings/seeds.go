@@ -165,7 +165,9 @@ func seedObj(name string) Obj {
 			KV{"extraFlags", os.Getenv("TEX_COMPILER_EXTRA_FLAGS")},
 			KV{"imageUser", os.Getenv("TEXLIVE_IMAGE_USER")},
 			KV{"images", seedSandboxedImages()},
-			KV{"defaultImage", envVarOr("TEX_LIVE_DOCKER_IMAGE", "texlive/texlive:latest-full")},
+			// owner 2026-10-10: TeXLive 2026 (ayaka-notes texlive-full) is the
+			// project's DEFAULT sandbox image — built by `make build-texlive`.
+			KV{"defaultImage", envVarOr("TEX_LIVE_DOCKER_IMAGE", "olpsint/texlive-full:2026.1")},
 		}
 	case "git-integration":
 		port := 8000
@@ -334,7 +336,11 @@ func seedSandboxedImages() []any {
 		return out
 	}
 	return []any{
-		Obj{KV{"image", "texlive/texlive:latest-full"}, KV{"name", "TeXLive 2025"}},
+		// owner 2026-10-10: TeXLive 2026 (ayaka-notes texlive-full) first — the
+		// project's default sandbox compile image.
+		Obj{KV{"image", "olpsint/texlive-full:2026.1"}, KV{"name", "TeXLive 2026"}},
+		Obj{KV{"image", "texlive/texlive:latest-full"}, KV{"name", "TeXLive rolling (2025)"}},
+		Obj{KV{"image", "texlive/texlive:TL2025-historic"}, KV{"name", "TeXLive 2025"}},
 		Obj{KV{"image", "texlive/texlive:TL2024-historic"}, KV{"name", "TeXLive 2024"}},
 		Obj{KV{"image", "texlive/texlive:TL2023-historic"}, KV{"name", "TeXLive 2023"}},
 	}

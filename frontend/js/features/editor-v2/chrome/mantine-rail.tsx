@@ -25,21 +25,30 @@
  * chrome for the /editor route; /project keeps the byte-identical legacy
  * list.
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ActionIcon, Tooltip } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import MaterialIcon from '@/shared/components/material-icon'
 import classNames from 'classnames'
 import RailActionElement from '@/features/ide-react/components/rail/rail-action-element'
 import { useLayoutContext } from '@/shared/context/layout-context'
 import { shouldIncludeElement } from '@/features/ide-react/util/rail-utils'
 import type { RailElement } from '@/features/ide-react/util/rail-types'
+import { useRailContext } from '@/features/ide-react/context/rail-context'
+import { RailMenuCluster } from '@/features/ide-react/components/toolbar/rail-menus'
 
 // -- Owner item Y (2026-10-08 final shape): the File/Edit/Insert/View/Format/
 //    Help menu bar as SIX rail icons + tooltips, above the file tree. --
+// 2026-10-09 (owner item AC) — the mechanism was replaced: the icons are NOW
+// the direct targets of their own Mantine menus (rail-menus.tsx, ide-react
+// module — the import-safe replacement for the old "float the whole menu bar
+// + delegated proxy-click" approach, which desynced react-bootstrap state
+// and left the full 6-header bar floating with no dropdown open). The old
+// RailMenuIcon/MenubarIcons + floating-proxy code is gone.
 // Inline SVG glyphs (stroke=currentColor) -- the owner's browser renders raw
 // material-symbols ligature text, so new chrome uses inline SVG.
-const RAIL_MENU_PATHS: Record<string, string> = {
+export const RAIL_MENU_PATHS: Record<string, string> = {
   // page sheet
   File: 'M6 2.5h7.2L17.5 6v15.5H6zM13 2.5V6h4.5',
   // pencil
@@ -54,7 +63,7 @@ const RAIL_MENU_PATHS: Record<string, string> = {
   Help: 'M12 21a9 9 0 110-18 9 9 0 010 18zM9.8 9.6a2.4 2.4 0 113.6 2.1c-.8.6-1.4 1.1-1.4 2.2M12 17.2v.2',
 }
 
-function RailMenuGlyph({ label }: { label: string }) {
+export function RailMenuGlyph({ label }: { label: string }) {
   return (
     <svg
       width="20"
@@ -73,34 +82,27 @@ function RailMenuGlyph({ label }: { label: string }) {
   )
 }
 
-function MenubarIcons({
-  t,
-  activeMenu,
-  onOpen,
-}: {
-  t: (key: string, fallback?: string) => string
-  activeMenu: string | null
-  onOpen: (label: string) => void
-}) {
-  const menus = ['File', 'Edit', 'Insert', 'View', 'Format', 'Help']
+// House glyph — the bottom home entry's icon (owner 2026-10-09: clean house,
+// 20px, currentColor stroke, same family as the menu glyphs). Exported for
+// the rail-chrome storybook contract.
+export function RailHomeGlyph({ className }: { className?: string } = {}) {
   return (
-    <div className="ol-v2-rail-menus" role="menubar" aria-label={t('menu_bar', 'Menu bar')}>
-      {menus.map(label => (
-        <Tooltip key={label} label={label} position="right" withArrow withinPortal>
-          <ActionIcon
-            variant={activeMenu === label ? 'filled' : 'subtle'}
-            aria-label={label}
-            aria-haspopup="menu"
-            aria-expanded={activeMenu === label}
-            className="ol-v2-rail-menu-entry"
-            style={{ width: 40, height: 40 }}
-            onClick={() => onOpen(label)}
-          >
-            <RailMenuGlyph label={label} />
-          </ActionIcon>
-        </Tooltip>
-      ))}
-    </div>
+    <svg
+      className={className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V21h5v-6h4v6h5V9.5" />
+    </svg>
   )
 }
 
@@ -166,71 +168,15 @@ export function MantineRailNavChrome({
   // ToolbarMenuBar stays mounted in mantine-toolbar.tsx (unchanged import graph) and
   // editor-v2-tokens.css floats the existing .ide-redesign-toolbar-menu-bar node above the
   // rail while .ol-v2-menubar-open is set.
-  const [menuOpen, setMenuOpen] = useState(false)
-  // Owner item Y final shape (2026-10-08): the menu bar is the SIX top menus —
-  // File/Edit/Insert/View/Format/Help — as icons + tooltips above the file
-  // tree. Each icon opens the matching top menu of the already-mounted
-  // ToolbarMenuBar (delegated click on its own trigger — the proven Mantine
-  // dropdown does the rest; no menu-bar import-graph change).
+  // 2026-10-09 (owner item AC) — deterministic open state: the six rail menus
+  // are Mantine Menus anchored on the icons (rail-menus.tsx). One open at a
+  // time via this single state; ESC + outside-click are Mantine-native.
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
-  const closeMenuChrome = () => {
-    setMenuOpen(false)
-    setActiveMenu(null)
+  const { setActiveModal } = useRailContext()
+  const railMenuHelpers = {
+    onKeyboardShortcuts: () => setActiveModal('keyboard-shortcuts'),
+    onContactUs: () => setActiveModal('contact-us'),
   }
-  const openRailMenu = (label: string) => {
-    const next = !menuOpen || activeMenu !== label
-    if (!next) {
-      // clicking the same icon again just closes everything (the dropdown's
-      // own outside-click handler would do this too; be deterministic here)
-      document.body.classList.remove('ol-v2-menubar-open')
-      closeMenuChrome()
-      return
-    }
-    setActiveMenu(label)
-    setMenuOpen(true)
-    document.body.classList.add('ol-v2-menubar-open')
-    // double rAF: let the floating panel become visible (display:flex) first
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const bar = document.querySelector('.ide-redesign-toolbar-menu-bar')
-        if (!bar) return
-        const btn = Array.from(bar.querySelectorAll('button')).find(
-          b => (b.textContent || '').trim() === label
-        ) as HTMLButtonElement | undefined
-        if (btn) btn.click()
-      })
-    })
-  }
-  useEffect(() => {
-    const el = document.body
-    if (menuOpen) {
-      el.classList.add('ol-v2-menubar-open')
-      return () => el.classList.remove('ol-v2-menubar-open')
-    }
-    el.classList.remove('ol-v2-menubar-open')
-    return undefined
-  }, [menuOpen])
-  useEffect(() => {
-    if (!menuOpen) return
-    const onClick = (e: MouseEvent) => {
-      const tEl = e.target as HTMLElement | null
-      if (tEl && (tEl.closest('.ol-v2-rail-menu-entry') || tEl.closest('.ide-redesign-toolbar-menu-bar'))) return
-      setMenuOpen(false)
-      setActiveMenu(null)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setMenuOpen(false)
-        setActiveMenu(null)
-      }
-    }
-    document.addEventListener('click', onClick)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('click', onClick)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [menuOpen])
 
   // (Owner 2026-10-07, toolbar/rail strip: the keyboard-shortcuts entry and
   //  the account/actions cluster are GONE from the rail — the actions area
@@ -252,7 +198,7 @@ export function MantineRailNavChrome({
             raw material-symbols ligature text; inline SVG is the standing
             rule for new chrome). Each icon opens the matching top menu of
             the mounted ToolbarMenuBar via openRailMenu (delegated click). */}
-        <MenubarIcons t={t} activeMenu={activeMenu} onOpen={openRailMenu} />
+        <RailMenuCluster t={t} labels={['File', 'Edit', 'Insert', 'View', 'Format']} glyphFor={label => <RailMenuGlyph label={label} />} helpers={railMenuHelpers} active={activeMenu} onActiveChange={setActiveMenu} />
         <div className="ide-rail-tabs-wrapper" ref={tabWrapperRef as never}>
           {tabs
             .filter(shouldIncludeElement)
@@ -288,7 +234,12 @@ export function MantineRailNavChrome({
             <RailActionElement action={moreOptions as never} />
           )}
         </div>
-                {/* AK-1 (owner 2026-10-08): the home entry retires the raw-text
+                {/* 2026-10-09 (owner a39c8a3a #2): the Help entry lives here —
+            next to the home button, at the bottom of the rail — instead of
+            the top menu bar. Same delegated open (Help → Keyboard
+            shortcuts in the menu bar). */}
+        <RailMenuCluster t={t} labels={['Help']} glyphFor={label => <RailMenuGlyph label={label} />} helpers={railMenuHelpers} active={activeMenu} onActiveChange={setActiveMenu} />
+        {/* AK-1 (owner 2026-10-08): the home entry retires the raw-text
             material-symbols `home` ligature AND takes the EXACT style of
             the rail's Menu-bar ActionIcon entry (same 40x40 geometry, same
             --ai-* hover contract) — the owner's exact target markup. The
@@ -313,22 +264,7 @@ export function MantineRailNavChrome({
         >
           {/* 2026-10-09 (owner): clean house icon (20px, currentColor stroke,
               same family as the other rail icons) replaces the old brand logo. */}
-          <svg
-            className="ol-v2-rail-home-logo"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M3 10.5 12 3l9 7.5" />
-            <path d="M5 9.5V21h5v-6h4v6h5V9.5" />
-          </svg>
-        </ActionIcon>
+          {<RailHomeGlyph className="ol-v2-rail-home-logo" />}        </ActionIcon>
       </div>
     </nav>
   )

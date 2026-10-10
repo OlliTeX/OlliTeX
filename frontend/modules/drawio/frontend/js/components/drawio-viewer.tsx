@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
 import { useCodeMirrorViewContext } from '@/features/source-editor/components/codemirror-context'
+import EditorSwitch from '@/features/source-editor/components/editor-switch'
 
 import {
   parseDrawioFile,
@@ -186,6 +187,15 @@ export default function DrawioViewer () {
           {statusText ||
             (status === 'booting' ? t('drawio_status_loading') : '')}
         </span>
+        {/* AB (owner 2026-10-09): the Code|Visual switch lives in the CodeMirror
+            toolbar, which CodeMirrorView[hidden] hides together with the code
+            pane — so in VISUAL mode the switch is invisible (measured 0x0) and
+            the user is stuck in the canvas with no way back to the source.
+            Mounting it in THIS toolbar row: visible exactly when the code pane
+            is hidden, driven by the same editor-properties state. */}
+        <div className="drawio-viewer-switch">
+          <EditorSwitch />
+        </div>
       </div>
       <iframe
         ref={iframeRef}

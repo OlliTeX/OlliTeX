@@ -12,7 +12,7 @@ import {
   TextInput,
 } from '@mantine/core'
 import { notify } from '../../shared/notify'
-import { postJSON } from '@/infrastructure/fetch-json'
+import { getJSON, postJSON, deleteJSON } from '@/infrastructure/fetch-json'
 import Icon from '../../shared/icons'
 
 function getMetaJson(name: string): any {
@@ -349,6 +349,168 @@ function EditorTab() {
   )
 }
 
+function WakaTimeTab() {
+  // G (owner 2026-10-09): per-user opt-in for the self-hosted WakaTime
+  // (wakapi) relay. ON → PUT /user/wakatime {auto:true} (the server
+  // provisions the wakapi account from the user's email and stores the
+  // key); OFF → DELETE /user/wakatime. Status via GET /user/wakatime/status.
+  //
+  // owner 2026-10-10 (Q2): the user's OWN WakaTime VIEW lives here too —
+  // cross-project time (GET /user/wakatime/summary) + dashboard access
+  // (url/login/api-key come back on the status endpoint, user-scoped only).
+  type WakaStatus = {
+    connected?: boolean
+    apiUrl?: string
+    dashboardUrl?: string
+    apiKey?: string
+    username?: string
+    password?: string
+  }
+  const [checking, setChecking] = useState(true)
+  const [st, setSt] = useState<WakaStatus>({ connected: false })
+  const [totalSeconds, setTotalSeconds] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  const [copied, setCopied] = useState(false)
+  const on = Boolean(st.connected)
+
+  const refresh = () => {
+    getJSON<WakaStatus>('/user/wakatime/status')
+      .then(r => setSt({ connected: false, ...(r || {}) }))
+      .catch(() => setSt({ connected: false }))
+      .finally(() => setChecking(false))
+  }
+
+  useEffect(() => {
+    void refresh()
+  }, [])
+
+  // the cross-project time figure (best-effort — the settings page never
+  // breaks on a WakaTime API wobble)
+  useEffect(() => {
+    if (!on) {
+      setTotalSeconds(null)
+      return
+    }
+    let live = true
+    getJSON<{ connected?: boolean; totalSeconds?: number }>('/user/wakatime/summary')
+      .then(r => { if (live && r && r.connected) setTotalSeconds(Number(r.totalSeconds || 0)) })
+      .catch(() => undefined)
+    return () => { live = false }
+  }, [on])
+
+  const flip = async (next: boolean) => {
+    setBusy(true)
+    setNote('')
+    try {
+      if (next) {
+        const r: any = await postJSON('/user/wakatime', { body: { auto: true } })
+        if (r && (r.ok === false || r.message)) {
+          setNote(String(r.message || 'Could not enable WakaTime.'))
+          setSt({ connected: false })
+          return
+        }
+        await refresh()
+        setNote('Enabled — your editor activity now relays to your wakapi account (username = your email local part).')
+      } else {
+        await deleteJSON('/user/wakatime')
+        setSt({ connected: false })
+        setTotalSeconds(null)
+        setNote('Disabled — heartbeats are no longer sent.')
+      }
+    } catch (e: any) {
+      setNote(e?.data?.message || e?.message || 'Could not change WakaTime state.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const copyKey = async () => {
+    try {
+      await navigator.clipboard.writeText(String(st.apiKey || ''))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* clipboard unavailable — the key stays visible in the line above */
+    }
+  }
+
+  const fmtTime = (secs: number): string => {
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    if (h > 0) return `${h} h ${m} min`
+    if (m > 0) return `${m} min`
+    return `${Math.floor(secs)} s`
+  }
+
+  return (
+    <Card withBorder paddings="lg" radius="lg">
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">
+          Editor activity tracking (WakaTime / wakapi, self-hosted). When on,
+          OlliTeX relays your editing statistics to your wakapi account
+          (username = your institutional email). The browser never talks to
+          wakapi directly; the API key stays on the server.
+        </Text>
+        <Group justify="space-between" align="center">
+          <Text size="sm" fw={600}>
+            {checking ? 'Checking account…' : on ? 'WakaTime tracking: on' : 'WakaTime tracking: off'}
+          </Text>
+          <Switch
+            checked={on}
+            onChange={() => undefined}
+            onClick={() => void flip(!on)}
+            loading={busy}
+            color="ollitex"
+          />
+        </Group>
+        {note ? <Text size="sm" c={on ? 'teal' : 'dimmed'}>{note}</Text> : null}
+        {on ? (
+          <Stack gap="xs" pt="xs">
+            <Text size="sm" fw={600}>Your WakaTime data</Text>
+            {totalSeconds !== null ? (
+              <Text size="sm">
+                <Text size="sm" inline fw={600}>{fmtTime(totalSeconds)}</Text>
+                {' '}tracked in the last 14 days (all projects)
+              </Text>
+            ) : null}
+            <Group gap="xs" wrap="wrap" align="center">
+              {st.dashboardUrl ? (
+                <Button
+                  component="a"
+                  href={st.dashboardUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  size="xs"
+                  variant="light"
+                  color="ollitex"
+                >
+                  Open my WakaTime dashboard ↗
+                </Button>
+              ) : null}
+              {st.username ? (
+                <Text size="xs" c="dimmed">
+                  dashboard login: <Text size="xs" inline component="code">{st.username}</Text>
+                  {st.password ? <> / <Text size="xs" inline component="code">{st.password}</Text></> : null}
+                </Text>
+              ) : null}
+            </Group>
+            {st.apiKey ? (
+              <Group gap="xs" wrap="wrap" align="center">
+                <Text size="xs" c="dimmed">API key (URL + key for local WakaTime plugins):</Text>
+                <Text size="xs" component="code" lineClamp={1} style={{ maxWidth: 340 }}>{st.apiKey}</Text>
+                <Button size="xs" variant="subtle" loading={copied} onClick={() => void copyKey()}>
+                  {copied ? 'Copied' : 'Copy key'}
+                </Button>
+              </Group>
+            ) : null}
+          </Stack>
+        ) : null}
+      </Stack>
+    </Card>
+  )
+}
+
 export default function MySettingsSection({
   initialTab,
 }: {
@@ -375,6 +537,9 @@ export default function MySettingsSection({
             <Tabs.Tab value="editor" leftSection={<Icon name="code" size={16} />}>
               Editor defaults
             </Tabs.Tab>
+            <Tabs.Tab value="waka" leftSection={<Icon name="query_stats" size={16} />}>
+              WakaTime
+            </Tabs.Tab>
           </Tabs.List>
         )}
         <Tabs.Panel value="account">
@@ -388,6 +553,9 @@ export default function MySettingsSection({
         </Tabs.Panel>
         <Tabs.Panel value="editor">
           <EditorTab />
+        </Tabs.Panel>
+        <Tabs.Panel value="waka">
+          <WakaTimeTab />
         </Tabs.Panel>
       </Tabs>
     </Stack>

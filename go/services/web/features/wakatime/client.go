@@ -163,6 +163,43 @@ func (c *wakaClient) projectSummary(ctx context.Context, cr wakaCreds, project s
 	return total, nil
 }
 
+// userSummary — GET {base}/users/current/summaries?start=&end= (NO project
+// filter): totals ALL of the user's projects. owner 2026-10-10 (Q2):
+// the /user-settings WakaTime tab shows the user's own cross-project time
+// there (their dashboard remains the full view).
+func (c *wakaClient) userSummary(ctx context.Context, cr wakaCreds, rangeDays int) (int64, error) {
+	q := url.Values{}
+	end := time.Now()
+	start := end.AddDate(0, 0, -rangeDays)
+	q.Set("start", start.UTC().Format("2006-01-02"))
+	q.Set("end", end.UTC().Format("2006-01-02"))
+	status, raw, err := c.do(ctx, cr, http.MethodGet,
+		normalizeAPIURL(cr.APIURL)+"/users/current/summaries?"+q.Encode(), nil)
+	if err != nil {
+		return 0, err
+	}
+	if status >= 400 {
+		return 0, mapStatus(status)
+	}
+	var m struct {
+		Data []struct {
+			Projects []struct {
+				TotalSecs int64 `json:"total_seconds"`
+			} `json:"projects"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(raw, &m) != nil {
+		return 0, errUpstream
+	}
+	var total int64
+	for _, day := range m.Data {
+		for _, p := range day.Projects {
+			total += p.TotalSecs
+		}
+	}
+	return total, nil
+}
+
 func mapStatus(code int) *ErrWaka {
 	switch code {
 	case http.StatusUnauthorized, http.StatusForbidden:

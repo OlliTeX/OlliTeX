@@ -43,6 +43,8 @@ type svc struct {
 	wakaOne     func(ctx context.Context, cr wakaCreds, hb map[string]any) error
 	wakaBulk    func(ctx context.Context, cr wakaCreds, hbs []map[string]any) error
 	wakaSummary func(ctx context.Context, cr wakaCreds, project string, days int) (int64, error)
+	// wakaUserSummary — all-projects total (the /user-settings view).
+	wakaUserSummary func(ctx context.Context, cr wakaCreds, days int) (int64, error)
 	// loadProjectName (mongo `projects` → name) for server-side project fill
 	loadProjectName func(ctx context.Context, pid string) (string, bool, error)
 	// gateOverride — full project-gate replacement (tests); nil = real
@@ -62,9 +64,17 @@ func newSvc(a *core.App) *svc {
 	s.wakaOne = c.sendHeartbeat
 	s.wakaBulk = c.sendHeartbeatsBulk
 	s.wakaSummary = c.projectSummary
+	s.wakaUserSummary = c.userSummary
 	s.loadProjectName = s.loadProjectNameDefault
 	s.encryptor = bootEncryptor()
 	return s
+}
+
+// encryptorSecret — the credential-encryptor password source, exposed for
+// stableProvisionPassword (provision.go): same secret the per-user keys
+// are sealed with (env or the persisted bootstrap file).
+func (s *svc) encryptorSecret() string {
+	return os.Getenv("WAKATIME_TOKEN_CIPHER_PASSWORD")
 }
 
 // bootEncryptor — cipher password from WAKATIME_TOKEN_CIPHER_PASSWORD (or

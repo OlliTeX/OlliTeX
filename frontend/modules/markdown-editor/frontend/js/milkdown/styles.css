@@ -1,0 +1,332 @@
+/* extras/viewers/milkdown/styles.css */
+[data-milkdown-root="true"] {
+	height: 100%;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.milkdown-viewer-container {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	width: 100%;
+	min-height: 0;
+	background-color: var(--pico-secondary-background);
+	overflow: hidden;
+}
+
+.milkdown-viewer-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+	position: relative;
+	background-color: var(--pico-background);
+}
+
+.milkdown-visual-pane {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.milkdown-editor-shell {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	height: 100%;
+	width: 100%;
+	overflow: hidden;
+}
+
+.milkdown-editor-scroll {
+	flex: 1;
+	min-height: 0;
+	width: 100%;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.milkdown-editor-scroll.mod-held .ol-milkdown a {
+	cursor: pointer;
+}
+
+.milkdown-editor-scroll .milkdown {
+	width: 100%;
+	min-height: 100%;
+}
+
+.milkdown-editor-scroll .milkdown > .editor {
+	width: 100%;
+	min-height: 100%;
+}
+
+.milkdown-error-message,
+.milkdown-loading-message {
+	padding: 1rem;
+	margin: 1rem;
+	flex-shrink: 0;
+}
+
+.milkdown-math-block {
+	display: block;
+	margin: 0.75rem 0;
+	border-radius: 0.5rem;
+}
+
+.milkdown-math-block.is-preview {
+	cursor: pointer;
+}
+
+.milkdown-math-block.is-preview:hover .milkdown-math-block-preview {
+	background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.milkdown-math-block-preview {
+	overflow-x: auto;
+	padding: 0.75rem 1rem;
+	border-radius: 0.5rem;
+	background: var(--pico-background) !important;
+}
+
+.milkdown-math-block-preview.is-empty {
+	opacity: 0.6;
+	font-style: italic;
+}
+
+.milkdown-math-block-editor {
+	overflow: hidden;
+	border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+	border-radius: 0.5rem;
+	background: var(--pico-background) !important;
+}
+
+.milkdown-math-editor-header {
+	margin: 6px 0;
+	font-size: 12px;
+	color: color-mix(in srgb, var(--crepe-color-on-surface), transparent 40%);
+	font-weight: 600;
+	text-transform: uppercase;
+	font-family: var(--crepe-font-default);
+	user-select: none;
+}
+
+.milkdown-math-block-editor-host .cm-editor {
+	min-height: 4rem;
+	background: transparent;
+}
+
+.milkdown-math-block-editor-host .cm-scroller {
+	font-family:
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+		"Courier New", monospace;
+}
+
+.milkdown-math-block.is-editing {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0.5rem;
+}
+
+.milkdown-math-block.is-editing .milkdown-math-block-preview {
+	border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.milkdown-math-inline.is-editing {
+	display: inline-grid;
+	grid-template-columns: minmax(10rem, 1fr);
+	gap: 0.25rem;
+	vertical-align: middle;
+	min-width: 16rem;
+	max-width: min(32rem, 100%);
+	padding: 0.25rem;
+	border-radius: 0.375rem;
+	background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.milkdown-math-editor-inline {
+	display: block;
+}
+
+.milkdown-math-editor-inline .cm-editor {
+	min-height: 2.25rem;
+}
+
+.milkdown-math-editor-inline .cm-content {
+	padding: 0.25rem 0.5rem;
+}
+
+.milkdown-math-editor-inline .cm-scroller {
+	overflow: hidden;
+}
+
+.milkdown-latex-preview {
+	padding: 0.8em 1em;
+	overflow-x: auto;
+}
+
+.ol-milkdown {
+	padding: 1rem 0.75rem !important;
+	outline: none;
+	color: var(--text-color);
+	caret-color: var(--pico-primary);
+	min-height: 100%;
+	box-sizing: border-box;
+}
+
+.ol-milkdown hr {
+	border: none !important;
+	height: 1px;
+	background-color: var(--accent-color) !important;
+}
+
+.milkdown-code-block .list-wrapper {
+	background-color: var(--pico-secondary-background) !important;
+}
+
+.milkdown-code-block .list-wrapper .search-input {
+	background-color: var(--pico-background) !important;
+}
+
+.ol-milkdown .milkdown-code-block .cm-editor,
+.ol-milkdown .milkdown-code-block .cm-editor .cm-scroller,
+.ol-milkdown .milkdown-code-block .cm-content,
+.ol-milkdown .milkdown-code-block .cm-gutters {
+	background: transparent;
+	color: inherit;
+}
+
+.milkdown-table-block {
+	border: 1px solid var(--accent-color);
+}
+
+.milkdown-table-block table.children {
+	border-collapse: collapse;
+}
+
+.milkdown-table-block table.children th,
+.milkdown-table-block table.children td {
+	border-width: 0.5px;
+	border-style: solid;
+	border-color: var(--accent-color, var(--crepe-color-outline, #73777f));
+}
+
+.milkdown-table-block td {
+	background-color: color-mix(
+		in srgb,
+		var(--pico-background) 50%,
+		var(--pico-secondary-background)
+	);
+}
+
+.milkdown-table-block th {
+	background-color: var(--pico-secondary-background);
+}
+
+.milkdown-link-preview,
+.milkdown-link-edit {
+	background-color: var(--pico-secondary-background);
+	border: 1px solid var(--accent-color);
+	border-radius: 0.5rem;
+	min-height: fit-content;
+}
+
+.milkdown-link-edit .input-area {
+	height: inherit;
+	padding: 0;
+	margin: 0;
+}
+
+.milkdown-editor-shell:fullscreen {
+	background-color: var(--pico-background);
+}
+
+.milkdown-editor-shell:fullscreen::backdrop {
+	background-color: var(--pico-background);
+}
+
+@media (max-width: 768px) {
+	.ol-milkdown {
+		padding: 0.5rem !important;
+	}
+}
+
+/* OlliT (AI 2026-10-09): shell + toolbar for the .md visual editor */
+.ol-md-editor-shell
+{
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	width: 100%;
+	min-height: 0;
+	background: var(--olive-paper, #fdfdf8);
+}
+
+.ol-md-editor-toolbar-row
+{
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 2px 8px;
+	border-bottom: 1px solid var(--overleaf-border-light, #d8e1d8);
+	background: var(--overleaf-white, #fff);
+	flex: 0 0 auto;
+	min-height: 0;
+}
+
+.ol-md-editor-switch
+{
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	flex: 0 0 auto;
+}
+
+.ol-md-editor-note
+{
+	padding: 24px;
+	color: var(--overleaf-grey, #788287);
+}
+
+.ol-md-toolbar
+{
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px;
+	min-width: 0;
+}
+
+.ol-md-toolbar-btn
+{
+	border: 1px solid transparent;
+	background: transparent;
+	border-radius: 4px;
+	padding: 2px 7px;
+	font-size: 12.5px;
+	line-height: 1.5;
+	cursor: pointer;
+	color: #2f3437;
+}
+
+.ol-md-toolbar-btn:hover
+{
+	background: rgba(0, 0, 0, 0.06);
+	border-color: rgba(0, 0, 0, 0.12);
+}
+
+.ol-md-toolbar-img
+{
+	font-size: 12px;
+	padding: 2px 6px;
+	border: 1px solid rgba(0, 0, 0, 0.15);
+	border-radius: 4px;
+	min-width: 90px;
+	max-width: 160px;
+}

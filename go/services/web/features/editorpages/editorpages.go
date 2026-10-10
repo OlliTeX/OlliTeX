@@ -267,11 +267,12 @@ func editorPage(a *core.App) func(*core.Cxt, *core.Res) {
 		// split-test flags (front-end shows the Export items only when both
 		// are on — export-project-with-conversion-button.tsx).
 		pandocConversionsOn := sitesettings.PandocConversionsEnabled(a, ctx)
+		pythonRunnerOn := sitesettings.PythonRunnerEnabled(a, ctx)
 		d.JSON = map[string]string{
 			"ol-ab":                 pinned_ol_ab,
 			"ol-i18n":               pinned_ol_i18n,
 			"ol-ExposedSettings":    ExposedSettingsJSON(cxt.SiteURL, templates.MenuGrant(ctx, cxt), wakatime.ResolveEnabled(ctx, a), wakatime.DebugLogging(), sitesettings.MendeleyEnabled(a, ctx), pandocConversionsOn, sitesettings.GHSyncEnabled(a, ctx)),
-			"ol-splitTestVariants":  SplitTestVariants(pandocConversionsOn),
+			"ol-splitTestVariants":  SplitTestVariants(pandocConversionsOn, pythonRunnerOn),
 			"ol-splitTestInfo":      pinned_ol_splitTestInfo,
 			"ol-navbar":             navbarJSON(cxt.SiteURL, currentURL, email, isAdmin, sitesettings.RegistrationEnabled(a, ctx)),
 			"ol-footer":             withSiteURL(pinned_ol_footer, cxt.SiteURL),

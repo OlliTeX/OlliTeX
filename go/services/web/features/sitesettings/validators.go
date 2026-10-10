@@ -558,6 +558,9 @@ func validateMiscSection(value any) []string {
 	if v, p := m["defaultLatexCompiler"]; p && (!isStr(v) || len(sval(v)) == 0 || !reCompiler.MatchString(sval(v))) {
 		errs = append(errs, "defaultLatexCompiler must be a non-empty compiler name (e.g. pdflatex, lualatexmk)")
 	}
+	if v, p := m["allowedPipPackages"]; p && !isStr(v) {
+		errs = append(errs, "allowedPipPackages must be a string (comma-separated package list)")
+	}
 	return errs
 }
 
@@ -612,6 +615,24 @@ func validateLanguagetoolSection(value any) []string {
 	}
 	if v, p := m["url"]; p && !isStr(v) {
 		errs = append(errs, "url must be a string")
+	}
+	return errs
+}
+
+// G (owner 2026-10-09): the wakatime site section — enabled + the
+// self-hosted wakapi server URL (default for the admin section +
+// the auto-provisioned per-user accounts).
+func validateWakatimeSection(value any) []string {
+	m, ok := validObj(value)
+	if !ok {
+		return notObj()
+	}
+	var errs []string
+	if v, p := m["enabled"]; p && !isBool(v) {
+		errs = append(errs, "enabled must be a boolean")
+	}
+	if v, p := m["serverUrl"]; p && !isStr(v) {
+		errs = append(errs, "serverUrl must be a string")
 	}
 	return errs
 }
@@ -706,6 +727,7 @@ var SECTION_VALIDATORS = map[string]func(any) []string{
 	"dropbox":            validateDropboxSection,
 	"misc":               validateMiscSection,
 	"languagetool":       validateLanguagetoolSection,
+	"wakatime":           validateWakatimeSection,
 	"llm":                validateLlmSection,
 	"branding":           validateBrandingSection,
 	"services":           validateServicesSection,

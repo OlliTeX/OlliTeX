@@ -1,0 +1,28 @@
+{
+  "theme": {
+    "&": {
+      "backgroundColor": "#000",
+      "color": "#fff"
+    },
+    ".cm-gutters": {
+      "background": "#000",
+      "color": "#ada9a9",
+      "borderRightColor": "transparent"
+    },
+    ".cm-cursor, .cm-dropCursor": {
+      "color": "#fff"
+    },
+    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
+      "backgroundColor": "#5c6c9b"
+    },
+    ".cm-activeLine": {
+      "backgroundColor": "#82828275"
+    },
+    ".cm-tooltip": {
+      "backgroundColor": "#000",
+      "color": "#fff"
+    }
+  },
+  "highlightStyle": {},
+  "dark": true
+}

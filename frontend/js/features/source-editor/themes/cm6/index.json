@@ -1,0 +1,149 @@
+{
+  "themes": [
+    {
+      "name": "abcdef",
+      "dark": true,
+      "label": "Abcdef"
+    },
+    {
+      "name": "abyss",
+      "dark": true,
+      "label": "Abyss"
+    },
+    {
+      "name": "androidstudio",
+      "dark": true,
+      "label": "Androidstudio"
+    },
+    {
+      "name": "andromeda",
+      "dark": true,
+      "label": "Andromeda"
+    },
+    {
+      "name": "atomone",
+      "dark": true,
+      "label": "Atomone"
+    },
+    {
+      "name": "aura",
+      "dark": true,
+      "label": "Aura"
+    },
+    {
+      "name": "basic",
+      "dark": true,
+      "label": "Basic"
+    },
+    {
+      "name": "bbedit",
+      "dark": false,
+      "label": "Bbedit"
+    },
+    {
+      "name": "bespin",
+      "dark": true,
+      "label": "Bespin"
+    },
+    {
+      "name": "console",
+      "dark": true,
+      "label": "Console"
+    },
+    {
+      "name": "copilot",
+      "dark": true,
+      "label": "Copilot"
+    },
+    {
+      "name": "darcula",
+      "dark": true,
+      "label": "Darcula"
+    },
+    {
+      "name": "duotone",
+      "dark": false,
+      "label": "Duotone"
+    },
+    {
+      "name": "kimbie",
+      "dark": true,
+      "label": "Kimbie"
+    },
+    {
+      "name": "material",
+      "dark": true,
+      "label": "Material"
+    },
+    {
+      "name": "monokai-dimmed",
+      "dark": true,
+      "label": "Monokai Dimmed"
+    },
+    {
+      "name": "noctis-lilac",
+      "dark": false,
+      "label": "Noctis Lilac"
+    },
+    {
+      "name": "nord",
+      "dark": true,
+      "label": "Nord"
+    },
+    {
+      "name": "okaidia",
+      "dark": true,
+      "label": "Okaidia"
+    },
+    {
+      "name": "quietlight",
+      "dark": false,
+      "label": "Quietlight"
+    },
+    {
+      "name": "red",
+      "dark": true,
+      "label": "Red"
+    },
+    {
+      "name": "solarized",
+      "dark": false,
+      "label": "Solarized"
+    },
+    {
+      "name": "sublime",
+      "dark": true,
+      "label": "Sublime"
+    },
+    {
+      "name": "tokyo-night",
+      "dark": true,
+      "label": "Tokyo Night"
+    },
+    {
+      "name": "tokyo-night-day",
+      "dark": false,
+      "label": "Tokyo Night Day"
+    },
+    {
+      "name": "tokyo-night-storm",
+      "dark": true,
+      "label": "Tokyo Night Storm"
+    },
+    {
+      "name": "tomorrow-night-blue",
+      "dark": true,
+      "label": "Tomorrow Night Blue"
+    },
+    {
+      "name": "vscode",
+      "dark": true,
+      "label": "Vscode"
+    },
+    {
+      "name": "white",
+      "dark": false,
+      "label": "White"
+    }
+  ]
+}

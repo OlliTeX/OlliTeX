@@ -4,6 +4,7 @@
 
 import type { ComponentType } from 'react'
 import { SsoLdapSection, SsoOidcSection, SsoSamlSection } from './sso-sections'
+import { SsoProvidersSection as SsoProvidersSectionM } from './sso-providers-section'
 import { EmailSection } from './email-section'
 import {
   BrandingSection,
@@ -21,11 +22,14 @@ import {
 import { SandboxedSection } from './sandboxed-section'
 import { StorageSection } from './storage-section'
 import { TypstSection } from './typst-section'
+import { PythonRunnerSection } from './pythonrunner-section'
+import { WakatimeSection } from './wakatime-section'
 
 export const NATIVE_SITE_SECTIONS: Record<string, ComponentType> = {
   'sso-saml': SsoSamlSection,
   'sso-oidc': SsoOidcSection,
   'sso-ldap': SsoLdapSection,
+  'sso-providers': SsoProvidersSectionM,
   email: EmailSection,
   branding: BrandingSection,
   services: ServicesSection,
@@ -34,6 +38,8 @@ export const NATIVE_SITE_SECTIONS: Record<string, ComponentType> = {
   languagetool: GrammarSection,
   'sandboxed-compiles': SandboxedSection,
   typst: TypstSection,
+  pythonrunner: PythonRunnerSection,
+  wakatime: WakatimeSection,
   pandoc: PandocSection,
   'git-integration': GitSection,
   'github-sync': GithubSection,

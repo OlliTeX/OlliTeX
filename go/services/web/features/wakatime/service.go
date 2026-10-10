@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -96,8 +97,33 @@ func (s *svc) status(cxt *core.Cxt, res *core.Res) {
 			`{"connected":false,"apiUrl":`+qstr(cr.APIURL)+`,"error":true}`))
 		return
 	}
-	res.JSON(http.StatusOK, []byte(
-		`{"connected":true,"apiUrl":`+qstr(cr.APIURL)+`}`))
+	// owner 2026-10-10 (Q2: "show it under /user-settings"): the status
+	// endpoint doubles as the user's own account VIEW — where their data
+	// lands + how to reach it (dashboard login + API key for local
+	// WakaTime clients). All fields belong to the session user only.
+	out := map[string]any{"connected": true, "apiUrl": cr.APIURL}
+	if u, uerr := url.Parse(cr.APIURL); uerr == nil && u.Host != "" {
+		dash := u.Scheme + "://" + u.Host
+		if strings.HasPrefix(u.Path, "/wakapi") {
+			dash += "/wakapi"
+		}
+		out["dashboardUrl"] = strings.TrimSuffix(dash, "/")
+	}
+	if cr.APIKey != "" {
+		out["apiKey"] = cr.APIKey
+	}
+	// Instance-wakapi accounts (auto-provisioned from the user's email)
+	// have a deterministic password the server re-derives — expose it so
+	// the user can actually log into their dashboard.
+	if email, eerr := s.emailForUID(ctx, uid); eerr == nil && email != "" {
+		base, berr := s.resolveServerBase(ctx, cxt, "")
+		if berr == nil && (cr.APIURL == base || strings.Contains(cr.APIURL, "/wakapi")) {
+			out["username"] = strings.SplitN(email, "@", 2)[0]
+			out["password"] = stableProvisionPassword(s.encryptorSecret(), email)
+		}
+	}
+	b, _ := json.Marshal(out)
+	res.JSON(http.StatusOK, b)
 }
 
 // link — PUT /user/wakatime {apiUrl, apiKey} (login).
@@ -114,11 +140,48 @@ func (s *svc) link(cxt *core.Cxt, res *core.Res) {
 		return
 	}
 	var body struct {
-		APIURL string `json:"apiUrl"`
-		APIKey string `json:"apiKey"`
+		APIURL          string `json:"apiUrl"`
+		APIKey          string `json:"apiKey"`
+		AutoProvision   bool   `json:"auto"`
 	}
 	if raw, rerr := readBody(cxt.Req.Body); rerr == nil {
 		_ = json.Unmarshal(raw, &body)
+	}
+	if body.APIKey == "" && body.AutoProvision {
+		// G (owner 2026-10-09): the self-hosted wakapi flow — provision the
+		// account from the session user's email (username = the email,
+		// server-generated password) and store the fresh key encrypted.
+		base, berr := s.resolveServerBase(ctx, cxt, "")
+		if berr != nil {
+			res.JSON(http.StatusOK, []byte(
+				`{"ok":false,"message":"`+jsonq(berr.Error())+`"}`))
+			return
+		}
+		email, eerr := s.emailForUID(ctx, uid)
+		if eerr != nil || email == "" {
+			res.JSON(http.StatusBadGateway, []byte(
+				`{"ok":false,"message":"could not resolve your email for wakapi provisioning"}`))
+			return
+		}
+		local := strings.SplitN(email, "@", 2)[0]
+		pr, perr := provisionAccount(ctx, ProvisionRequest{
+			ServerBase:     base,
+			Username:       local,
+			Email:          email,
+			InstanceSecret: s.encryptorSecret(),
+		})
+		if perr != nil {
+			res.JSON(http.StatusBadGateway, []byte(
+				`{"ok":false,"message":"`+jsonq(perr.Error())+`"}`))
+			return
+		}
+		if serr := s.storeCreds(ctx, uid, apiBaseFor(base), pr.Key); serr != nil {
+			res.JSON(http.StatusInternalServerError, []byte(
+				`{"ok":false,"message":"provisioned, but storing the key failed"}`))
+			return
+		}
+		res.SendStatus(http.StatusOK)
+		return
 	}
 	if body.APIKey == "" {
 		res.JSON(http.StatusBadRequest, []byte(`{"message":"apiKey is required"}`))
@@ -316,6 +379,42 @@ func (s *svc) summary(cxt *core.Cxt, res *core.Res) {
 	}
 	res.JSON(http.StatusOK, []byte(
 		`{"connected":true,"totalSeconds":`+itoa(total)+`,"rangeDays":7}`))
+}
+
+// userSummaryHandler — GET /user/wakatime/summary (login) →
+// {connected, totalSeconds, rangeDays} | {connected:false} — the user's own
+// CROSS-PROJECT time (all projects, last 14 days). owner 2026-10-10 (Q2):
+// the /user-settings WakaTime tab renders this (their dashboard at
+// {dashboardUrl} remains the full per-project view). API errors never break
+// the settings page (reference widget contract).
+func (s *svc) userSummaryHandler(cxt *core.Cxt, res *core.Res) {
+	ctx := cxt.Req.Context()
+	if !s.enabled(ctx) {
+		res.JSON(http.StatusNotFound, []byte(
+			`{"message":"WakaTime integration is disabled on this instance"}`))
+		return
+	}
+	uid := sessionUID(cxt)
+	if uid == "" {
+		res.JSON(http.StatusUnauthorized, []byte(`{"message":"Authentication required"}`))
+		return
+	}
+	cr, ok, err := s.loadCreds(ctx, uid)
+	if err != nil {
+		res.SendStatus(http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		res.JSON(http.StatusOK, []byte(`{"connected":false}`))
+		return
+	}
+	total, terr := s.wakaUserSummary(ctx, cr, 14)
+	if terr != nil {
+		res.JSON(http.StatusOK, []byte(`{"connected":false}`))
+		return
+	}
+	res.JSON(http.StatusOK, []byte(
+		`{"connected":true,"totalSeconds":`+itoa(total)+`,"rangeDays":14}`))
 }
 
 // ---- shared helpers --------------------------------------------------------

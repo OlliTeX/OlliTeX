@@ -51,7 +51,11 @@ const insertMenuSections = importOverleafModules('insertMenuSections') as {
   import: { default: MenuSectionStructure[] }
 }[]
 
-export const ToolbarMenuBar = () => {
+export const ToolbarMenuBar = ({
+  menuBar = true,
+}: {
+  menuBar?: boolean
+}) => {
   const { t } = useTranslation()
 
   const { setView, view } = useLayoutContext()
@@ -335,95 +339,97 @@ export const ToolbarMenuBar = () => {
 
   return (
     <>
-      <MenuBar
-        className="ide-redesign-toolbar-menu-bar"
-        id="toolbar-menu-bar-item"
-      >
-        <CommandDropdown menu={fileMenuStructure} title={t('file')} id="file" />
-        <CommandDropdown menu={editMenuStructure} title={t('edit')} id="edit" />
-        <CommandDropdown
-          menu={insertMenuStructure}
-          title={t('insert')}
-          id="insert"
-        />
-        <MenuBarDropdown
-          title={t('view')}
-          id="view"
-          className="ide-redesign-toolbar-dropdown-toggle-subdued ide-redesign-toolbar-button-subdued"
+      {menuBar && (
+        <MenuBar
+          className="ide-redesign-toolbar-menu-bar"
+          id="toolbar-menu-bar-item"
         >
-          <ChangeLayoutOptions />
-          <ReviewModeOptions />
-          <OLDropdownDivider />
-          <OLDropdownHeader>{t('editor_settings')}</OLDropdownHeader>
-          <MenuBarOption
-            eventKey="show_breadcrumbs"
-            title={t('show_breadcrumbs')}
-            leadingIcon={
-              breadcrumbs ? 'check' : <OLDropdownItem.EmptyLeadingIcon />
-            }
-            onClick={toggleBreadcrumbs}
+          <CommandDropdown menu={fileMenuStructure} title={t('file')} id="file" />
+          <CommandDropdown menu={editMenuStructure} title={t('edit')} id="edit" />
+          <CommandDropdown
+            menu={insertMenuStructure}
+            title={t('insert')}
+            id="insert"
           />
-          <MenuBarOption
-            eventKey="show_editor_tabs"
-            title={t('show_editor_tabs')}
-            leadingIcon={
-              editorTabs ? 'check' : <OLDropdownItem.EmptyLeadingIcon />
-            }
-            onClick={toggleEditorTabs}
-          />
-          <MenuBarOption
-            eventKey="show_equation_preview"
-            title={t('show_equation_preview')}
-            leadingIcon={
-              mathPreview ? 'check' : <OLDropdownItem.EmptyLeadingIcon />
-            }
-            onClick={toggleMathPreview}
-          />
-          <CommandSection
-            section={commandPaletteMenuSectionStructure}
-            includeDivider
-          />
-          <CommandSection
-            section={pdfControlsMenuSectionStructure}
-            includeDivider
-          />
-        </MenuBarDropdown>
-        <CommandDropdown
-          menu={formatMenuStructure}
-          title={t('format')}
-          id="format"
-        />
-        <MenuBarDropdown
-          title={t('help')}
-          id="help"
-          className="ide-redesign-toolbar-dropdown-toggle-subdued ide-redesign-toolbar-button-subdued"
-        >
-          <MenuBarOption
-            eventKey="keyboard_shortcuts"
-            title={t('keyboard_shortcuts')}
-            onClick={openKeyboardShortcutsModal}
-          />
-          {showDocumentation && (
+          <MenuBarDropdown
+            title={t('view')}
+            id="view"
+            className="ide-redesign-toolbar-dropdown-toggle-subdued ide-redesign-toolbar-button-subdued"
+          >
+            <ChangeLayoutOptions />
+            <ReviewModeOptions />
+            <OLDropdownDivider />
+            <OLDropdownHeader>{t('editor_settings')}</OLDropdownHeader>
             <MenuBarOption
-              title={t('documentation')}
-              eventKey="documentation"
-              href="/learn"
-              target="_blank"
-              rel="noopener noreferrer"
+              eventKey="show_breadcrumbs"
+              title={t('show_breadcrumbs')}
+              leadingIcon={
+                breadcrumbs ? 'check' : <OLDropdownItem.EmptyLeadingIcon />
+              }
+              onClick={toggleBreadcrumbs}
             />
-          )}
-          {showSupport && (
-            <>
-              <OLDropdownDivider />
+            <MenuBarOption
+              eventKey="show_editor_tabs"
+              title={t('show_editor_tabs')}
+              leadingIcon={
+                editorTabs ? 'check' : <OLDropdownItem.EmptyLeadingIcon />
+              }
+              onClick={toggleEditorTabs}
+            />
+            <MenuBarOption
+              eventKey="show_equation_preview"
+              title={t('show_equation_preview')}
+              leadingIcon={
+                mathPreview ? 'check' : <OLDropdownItem.EmptyLeadingIcon />
+              }
+              onClick={toggleMathPreview}
+            />
+            <CommandSection
+              section={commandPaletteMenuSectionStructure}
+              includeDivider
+            />
+            <CommandSection
+              section={pdfControlsMenuSectionStructure}
+              includeDivider
+            />
+          </MenuBarDropdown>
+          <CommandDropdown
+            menu={formatMenuStructure}
+            title={t('format')}
+            id="format"
+          />
+          <MenuBarDropdown
+            title={t('help')}
+            id="help"
+            className="ide-redesign-toolbar-dropdown-toggle-subdued ide-redesign-toolbar-button-subdued"
+          >
+            <MenuBarOption
+              eventKey="keyboard_shortcuts"
+              title={t('keyboard_shortcuts')}
+              onClick={openKeyboardShortcutsModal}
+            />
+            {showDocumentation && (
               <MenuBarOption
-                eventKey="contact_us"
-                title={t('contact_us')}
-                onClick={openContactUsModal}
+                title={t('documentation')}
+                eventKey="documentation"
+                href="/learn"
+                target="_blank"
+                rel="noopener noreferrer"
               />
-            </>
-          )}
-        </MenuBarDropdown>
-      </MenuBar>
+            )}
+            {showSupport && (
+              <>
+                <OLDropdownDivider />
+                <MenuBarOption
+                  eventKey="contact_us"
+                  title={t('contact_us')}
+                  onClick={openContactUsModal}
+                />
+              </>
+            )}
+          </MenuBarDropdown>
+        </MenuBar>
+      )}
       <WordCountModal
         show={showWordCountModal}
         handleHide={() => {

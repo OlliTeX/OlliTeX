@@ -48,13 +48,6 @@ function isAdminUser(): boolean {
   }
 }
 
-/** Standalone classic pages for the header "Open full page" link (kept for
- * templates only — projects/library links removed per owner review 2026-09-07). */
-const STANDALONE: Record<string, { href: string; label: string }> = {
-  'templates.all': { href: '/templates', label: 'Full template gallery' },
-  'templates.*': { href: '/templates', label: 'Full template gallery' },
-}
-
 const TITLES: Record<string, { title: string; subtitle?: string }> = {
   'projects.all': { title: 'Projects', subtitle: 'Everything you work on — create, open, and manage projects.' },
   'projects.owned': { title: 'My projects', subtitle: 'Projects you own.' },
@@ -298,12 +291,8 @@ export default function HubRoot() {
   const themePatch = useMemo(() => buildThemePatch(appliedTheme), [appliedTheme])
   const cssVars = useMemo(() => cssVarsFor(appliedTheme, scheme === 'dark'), [appliedTheme, scheme])
 
-  const standalone =
-    STANDALONE[path] ||
-    (node && node.id.startsWith('templates.')
-      ? { href: '/templates', label: 'Full template gallery' }
-      : undefined)
-
+  // 2026-10-09 (owner item AH): the dead "/templates" "Full template gallery"
+  // standalone header link is gone — templates are fully served inside the Hub.
   return (
     <OlliTProvider themePatch={themePatch}>
       <SplitTestProvider>
@@ -343,14 +332,6 @@ export default function HubRoot() {
           />
         </a>
         <Group gap="sm" wrap="nowrap">
-          {standalone ? (
-            <Anchor href={standalone.href} target="_blank" rel="noreferrer" size="sm" style={{ textDecoration: 'none' }}>
-              <Group gap={6}>
-                <Icon name="open_in_new" size={16} />
-                {standalone.label}
-              </Group>
-            </Anchor>
-          ) : null}
           {/* 2026-10-09 (owner item O): explicit settings navigation — every
               user gets "User settings"; admins additionally get
               "Admin settings" (role-conditional on the ol-hub-admin flag). */}

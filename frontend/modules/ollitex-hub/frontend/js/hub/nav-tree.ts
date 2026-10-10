@@ -56,6 +56,8 @@ export const HUB_NAV: HubNode[] = [
       },
     ],
   },
+  // 2026-10-09 (owner item AA): "Reference library" ABOVE "Templates".
+  { id: 'library', label: 'Reference library', icon: 'menu_book', render: 'library' },
   {
     id: 'templates',
     label: 'Templates',
@@ -67,7 +69,6 @@ export const HUB_NAV: HubNode[] = [
       { id: 'templates.all', label: 'All templates', icon: 'layers', render: 'template-cat', category: 'none' },
     ],
   },
-  { id: 'library', label: 'Reference library', icon: 'menu_book', render: 'library' },
 
   // ---- Personal -----------------------------------------------------------
   { id: 'sec.personal', label: 'Personal', icon: 'person', section: true },
@@ -86,6 +87,9 @@ export const HUB_NAV: HubNode[] = [
       { id: 'mysettings.sessions', label: 'Sessions', icon: 'computer' },
       { id: 'mysettings.appearance', label: 'Appearance', icon: 'palette' },
       { id: 'mysettings.editordefaults', label: 'Editor defaults', icon: 'tune' },
+      // icon: query_stats — chart_bar was NOT in the bundled icon font slice
+      // (broken the WakaTime wave); query_stats is in the slice (nav icon test).
+      { id: 'mysettings.wakatime', label: 'WakaTime', icon: 'query_stats' },
       { id: 'mysettings.email', label: 'Email preferences', icon: 'mail' },
       {
         id: 'mysettings.llm',
@@ -191,10 +195,12 @@ export const HUB_NAV: HubNode[] = [
           { id: 'site.integrations.zotero', label: 'Zotero', icon: 'auto_stories', render: 'site-sec', siteId: 'zotero' },
           // Owner #8 (2026-09-07): Mendeley connector credentials (CLIENT_ID/SECRET + toggle).
           { id: 'site.integrations.mendeley', label: 'Mendeley', icon: 'menu_book', render: 'site-sec', siteId: 'mendeley' },
+          { id: 'site.integrations.wakatime', label: 'WakaTime', icon: 'query_stats', render: 'site-sec', siteId: 'wakatime' },
           { id: 'site.integrations.externalurl', label: 'External URLs', icon: 'link', render: 'site-sec', siteId: 'externalUrl' },
-          { id: 'site.integrations.sso-saml', label: 'SSO · SAML', icon: 'verified_user', render: 'site-sec', siteId: 'sso-saml' },
-          { id: 'site.integrations.sso-oidc', label: 'SSO · OIDC', icon: 'badge', render: 'site-sec', siteId: 'sso-oidc' },
-          { id: 'site.integrations.sso-ldap', label: 'SSO · LDAP', icon: 'groups', render: 'site-sec', siteId: 'sso-ldap' },
+          { id: 'site.integrations.sso-providers', label: 'SSO · Providers (multi)', icon: 'verified_user', render: 'site-sec', siteId: 'sso-providers' },
+          { id: 'site.integrations.sso-saml', label: 'SSO · SAML (legacy)', icon: 'verified_user', render: 'site-sec', siteId: 'sso-saml' },
+          { id: 'site.integrations.sso-oidc', label: 'SSO · OIDC (legacy)', icon: 'badge', render: 'site-sec', siteId: 'sso-oidc' },
+          { id: 'site.integrations.sso-ldap', label: 'SSO · LDAP (legacy)', icon: 'groups', render: 'site-sec', siteId: 'sso-ldap' },
         ],
       },
       {
@@ -223,6 +229,7 @@ export const HUB_NAV: HubNode[] = [
         children: [
           { id: 'site.compilation.sandboxed', label: 'Sandboxed compiles', icon: 'build', render: 'site-sec', siteId: 'sandboxed-compiles' },
           { id: 'site.compilation.typst', label: 'Typst compiles', icon: 'description', render: 'site-sec', siteId: 'typst' },
+          { id: 'site.compilation.pythonrunner', label: 'Python runner', icon: 'code', render: 'site-sec', siteId: 'pythonrunner' },
           { id: 'site.compilation.pandoc', label: 'Pandoc', icon: 'swap_vert', render: 'site-sec', siteId: 'pandoc' },
           { id: 'site.compilation.git', label: 'Git integration', icon: 'commit', render: 'site-sec', siteId: 'git-integration' },
           { id: 'site.compilation.github', label: 'GitHub sync', icon: 'cloud_sync', render: 'site-sec', siteId: 'github-sync' },

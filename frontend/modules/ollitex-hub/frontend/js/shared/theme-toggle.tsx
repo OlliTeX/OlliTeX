@@ -1,108 +1,193 @@
-import React, { useState } from 'react'
-import { Group, Tooltip } from '@mantine/core'
-import { notify } from './notify'
-import Icon from './icons'
-import { OverallTheme, setTheme, storedOverallTheme } from '../../../../../js/shared/mantine/overall-theme'
-
 /**
- * Dark / Light / System selector for the hub headers.
- * Mirrors the OL account-menu theme toggle: same value space
- * ('' | 'light-' | 'system'), same write path (POST /user/settings).
- * Local apply is immediate; the server call is best-effort with a toast
- * on failure.
+ * Theme picker (J, 2026-10-09):
  *
- * AJ-6 (owner 2026-10-08): the three icon RADIO BUTTONS are RETIRED — ONE
- * dropdown is THE theme picker, saved per user, applied on all pages (hub
- * header + the /user-settings / /admin-settings shells render this same
- * component). The per-editor code-theme dropdowns (Appearance tab) are a
- * different setting and stay.
+ * The old three-option ThemeSwitch (Dark / Light / System) now lives inside a
+ * single `ThemeToggle` menu that ADDITIONALLY lists the vendored editor color
+ * themes (J) from `js/features/source-editor/themes/cm6/index.json` — the
+ * themes sourced from the react-codemirror reference repo (see CREDITS.md).
+ *
+ * Picking a code theme:
+ *   1. saves it as `overallTheme` (same /user/settings endpoint as before),
+ *      which resolves the chrome light/dark from the theme's own dark flag
+ *      (js/shared/mantine/overall-theme.ts);
+ *   2. is applied in the editor via shared/hooks/use-active-editor-theme,
+ *      where an explicit code theme wins over the paired
+ *      editorLightTheme/editorDarkTheme settings.
+ *
+ * Widget: a Mantine Menu — unlike a <select>, the value (the cm6 registry
+ * name, e.g. `tokyo-night`) is independent of the display label
+ * ("Tokyo Night"), and the current dark/light chip is possible.
+ *
+ * No React state: the selection is read from the ol-userSettings meta +
+ * the overall-theme store (body data-theme), so re-renders stay driven by
+ * the Mantine colorScheme subscription.
  */
-const OPTIONS: { value: OverallTheme; label: string }[] = [
-  { value: '', label: 'Dark' },
-  { value: 'light-', label: 'Light' },
-  { value: 'system', label: 'Use system theme' },
+
+import type { ReactNode } from 'react'
+import { Button, Menu } from '@mantine/core'
+import Icon from './icons'
+import {
+  type OverallTheme,
+  isCodeTheme,
+  setTheme,
+} from '../../../../../js/shared/mantine/overall-theme'
+import {
+  themes as VENDORED_THEMES,
+} from '../../../../../js/features/source-editor/themes/cm6/index.json'
+
+const CHROME_OPTIONS: { value: OverallTheme; label: string; icon: ReactNode }[] = [
+  { value: '', label: 'Dark', icon: <Icon name="bedtime" size={20} /> },
+  { value: 'light-', label: 'Light', icon: <Icon name="light_mode" size={20} /> },
+  { value: 'system', label: 'System', icon: <Icon name="brightness_4" size={20} /> },
 ]
 
-export default function ThemeToggle() {
-  const [active, setActive] = useState<OverallTheme>(() => storedOverallTheme())
-  const [busy, setBusy] = useState(false)
+interface Selection {
+  value: OverallTheme
+  label: string
+}
 
-  async function choose(value: OverallTheme) {
-    if (busy || value === active) return
-    setBusy(true)
-    setActive(value)
-    try {
-      await setTheme(value)
-    } catch (err) {
-      setActive(storedOverallTheme())
-      try {
-        notify({
-          color: 'red',
-          title: 'Theme not saved',
-          message: 'Could not save the theme preference. The change is applied for this page only.',
-        })
-      } catch {
-        // notifications are cosmetic; the local switch already happened
+function currentSelection(): Selection {
+  try {
+    const el = document.querySelector('meta[name=ol-userSettings]')
+    const raw = el ? el.getAttribute('content') : null
+    if (raw) {
+      const v = (JSON.parse(raw) as { overallTheme?: string }).overallTheme
+      const opt = CHROME_OPTIONS.find(o => o.value === (v === undefined ? '' : v))
+      if (opt) return { value: opt.value, label: opt.label }
+      if (typeof v === 'string') {
+        const theme = VENDORED_THEMES.find(t => t.name === v)
+        if (theme) return { value: v, label: theme.label }
       }
-    } finally {
-      setBusy(false)
     }
+  } catch {
+    // fall through to the default
   }
+  return { value: '', label: 'Dark' }
+}
+
+// Lazily populated with the selected theme's palette (cosmetic chip only).
+const PALETTES: Record<string, string | null> = {}
+
+function loadPalette(name: string) {
+  if (name in PALETTES) return
+  PALETTES[name] = null
+  import(/* webpackChunkName: "cm6-theme" */ '../../../../../js/features/source-editor/themes/cm6/' + name + '.json')
+    .then(m => {
+      const mod = (m as { default?: { theme?: Record<string, Record<string, string>> } }).default ?? m
+      const bg = mod.theme?.['&']?.backgroundColor
+      PALETTES[name] = bg || null
+    })
+    .catch(() => {
+      PALETTES[name] = null
+    })
+}
+
+export function ThemeToggle() {
+  const current = currentSelection()
+  const isCode = isCodeTheme(current.value)
+  if (isCode) loadPalette(current.value)
+  const chip = isCode ? PALETTES[current.value] : null
 
   return (
-    <Group gap={6} wrap="nowrap" aria-label="Theme picker and account">
-      {/* AJ-6: the radio buttons live on — the owner wanted the appearance
-          RADIO retired in favour of the editor-style dropdown. */}
-      <label className="ol-theme-dropdown-wrap" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        <span className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
-          Theme
-        </span>
-        <select
-          className="ol-theme-dropdown"
-          aria-label="Theme"
-          value={active}
-          disabled={busy}
-          style={{
-            height: 32,
-            padding: '0 8px',
-            borderRadius: 8,
-            border: '1px solid rgba(120,120,140,0.35)',
-            background: 'var(--mantine-color-ollitex-light, transparent)',
-            color: 'inherit',
-            font: 'inherit',
-            fontSize: 13.5,
-            cursor: busy ? 'default' : 'pointer',
-          }}
-          onChange={e => {
-            void choose(e.target.value as OverallTheme)
-          }}>
-          {OPTIONS.map(o => (
-            <option key={o.value || 'dark'} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {/* 2026-09-08 (owner request): log-out lives in the same group.
-          GET /logout is the CE logout route (router.mjs) — a plain
-          navigation ends the session and lands on the login page. */}
-      <Tooltip label="Log out" withArrow position="bottom">
-        <a
-          href="/logout"
-          aria-label="Log out"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            textDecoration: 'none',
-            color: 'inherit',
-          }}>
-          <Icon name="logout" size={17} />
-        </a>
-      </Tooltip>
-    </Group>
+    <Menu
+      position="bottom-end"
+      withinPortal
+      width={250}
+    >
+      <Menu.Target>
+        <Button variant="subtle" aria-label="Theme" leftSection={
+          chip ? (
+            <span
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 999,
+                display: 'inline-block',
+                background: chip,
+                border: '1px solid rgba(128,128,128,0.6)',
+              }}
+              aria-hidden
+            />
+          ) : (
+            <Icon name="contrast" size={18} />
+          )
+        }>
+          {current.label}
+        </Button>
+      </Menu.Target>
+      <Menu.Dropdown>
+        <Menu.Label>Theme</Menu.Label>
+        {CHROME_OPTIONS.map(opt => (
+          <Menu.Item
+            key={opt.value === '' ? 'dark' : opt.value}
+            leftSection={opt.icon}
+            onClick={() => setTheme(opt.value).catch(() => {
+              // save failures surface via existing toast layers upstream
+            })}
+            style={current.value === opt.value && !isCode ? { fontWeight: 700 } : undefined}
+          >
+            {opt.label}
+          </Menu.Item>
+        ))}
+        <Menu.Divider />
+        <Menu.Label>Editor themes</Menu.Label>
+        {VENDORED_THEMES.map(t => (
+          <Menu.Item
+            key={t.name}
+            onClick={() => setTheme(t.name).catch(() => {
+              // cosmetic; logged upstream
+            })}
+            style={current.value === t.name ? { fontWeight: 700 } : undefined}
+          >
+            {t.label}
+            <span
+              style={{
+                marginLeft: 10,
+                width: 10,
+                height: 10,
+                borderRadius: 999,
+                display: 'inline-block',
+                verticalAlign: 'baseline',
+                background: t.dark ? '#2a2e33' : '#f2f3f5',
+                border: '1px solid rgba(128,128,128,0.6)',
+              }}
+              aria-label={t.dark ? 'dark theme' : 'light theme'}
+            />
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
   )
 }
+
+/**
+ * Kept for surfaces that want the classic three-option switch only.
+ */
+export function ThemeSwitch() {
+  const current = currentSelection()
+  return (
+    <Menu position="bottom-end" width={200}>
+      <Menu.Target>
+        <Button variant="subtle" leftSection={<Icon name="contrast" size={18} />}>
+          {current.label}
+        </Button>
+      </Menu.Target>
+      <Menu.Dropdown>
+        {CHROME_OPTIONS.map(opt => (
+          <Menu.Item
+            key={opt.value === '' ? 'dark' : opt.value}
+            leftSection={opt.icon}
+            onClick={() => setTheme(opt.value).catch(() => {
+              // ignore
+            })}
+            style={current.value === opt.value ? { fontWeight: 700 } : undefined}
+          >
+            {opt.label}
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
+  )
+}
+
+export default ThemeToggle

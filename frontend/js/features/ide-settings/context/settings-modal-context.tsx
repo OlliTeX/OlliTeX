@@ -27,8 +27,11 @@ import ImageNameSetting from '@/features/ide-settings/components/compiler-settin
 import DraftSetting from '@/features/ide-settings/components/compiler-settings/draft-setting'
 import StopOnFirstErrorSetting from '@/features/ide-settings/components/compiler-settings/stop-on-first-error-setting'
 import AutoCompileSetting from '@/features/ide-settings/components/compiler-settings/auto-compile-setting'
-import OverallThemeSetting from '@/features/ide-settings/components/appearance-settings/overall-theme-setting'
-import EditorThemeSetting from '@/features/ide-settings/components/appearance-settings/editor-theme-setting'
+// 2026-10-09 (owner item AF): OverallThemeSetting/EditorThemeSetting retired
+// here — theme choice now lives in the Hub (My settings → Appearance, Hub
+// header toggle, admin menus). The files are deleted; the user settings
+// underneath (overallTheme/editorTheme) are unchanged and still read/written
+// by those hub surfaces.
 import FontSizeSetting from '@/features/ide-settings/components/appearance-settings/font-size-setting'
 import LineHeightSetting from '@/features/ide-settings/components/appearance-settings/line-height-setting'
 import FontFamilySetting from '@/features/ide-settings/components/appearance-settings/font-family-setting'
@@ -283,12 +286,25 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
             key: 'general',
             settings: [
               {
-                key: 'overallTheme',
-                component: <OverallThemeSetting />,
-              },
-              {
-                key: 'editorTheme',
-                component: <EditorThemeSetting />,
+                key: 'themeLocationPointer',
+                component: (
+                  // 2026-10-09 (owner item AF): replaced the Overall theme +
+                  // Editor theme selects with a pointer to the hub controls.
+                  <div style={{ padding: '2px 0 10px' }}>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: 13,
+                        lineHeight: 1.55,
+                        color: 'var(--codemirror-ide-settings-dimmed, rgba(140, 140, 140, 0.9))',
+                      }}
+                    >
+                      Overall and editor themes are now set in the Hub —
+                      My settings → Appearance, or the theme toggle in the Hub
+                      header.
+                    </span>
+                  </div>
+                ),
               },
               {
                 key: 'pdfDarkMode',

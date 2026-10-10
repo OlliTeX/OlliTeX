@@ -267,3 +267,152 @@ body.ol-v2-menubar-open .ol-v2-toolbar .ide-redesign-toolbar-menu-bar > * {
   height: auto;
 }
 
+
+/* 2026-10-09 (owner item AC) — the rail-anchored menus (rail-menus.tsx):
+   each File/Edit/Insert/View/Format/Help rail icon is the target of its
+   own Mantine Menu. Rows deliberately reuse the Bootstrap `.dropdown-item`
+   / `.dropdown-divider` / `.dropdown-header` classes (same look as the
+   legacy menu bar) but are THEME-PINNED to the v2 chrome tokens — plain
+   Bootstrap values are fixed light-mode colors and would be unreadable on
+   the dark editor chrome. Scoped to the Mantine dropdown portal content. */
+/* 2026-10-09 (owner item AC, round 2) — portal-safe restyle. The Mantine
+   Menu dropdown renders in a BODY-LEVEL portal (outside .ol-editor-mantine
+   and outside any Mantine-Portal-root wrapper), so the previous
+   ancestor-scoped rules never matched — the menu fell back to raw Mantine
+   defaults (heavy full-strength border = the owner's "ultra thick",
+   unstyled 0-padding 14px rows = the owner's "design is broken").
+   The dropdown now carries the .ol-v2-rail-menu-panel marker class
+   (Menu.Dropdown className) and is styled with THEMES-AGNOSTIC
+   currentColor mixes: Mantine already provides the correct foreground
+   per light/dark colorScheme (and inside portals), so deriving from it
+   keeps the menu correct in EVERY theme (app dark/light, hub themes). */
+.ol-v2-rail-menu-panel {
+  /* 1px kept, but ~28% of the text color reads as a hairline in both
+     schemes instead of Mantine's full-strength gray frame */
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 24%);
+  min-width: 190px;
+  max-width: 320px;
+  padding: 4px 0;
+  z-index: 2000;
+  overflow: visible;
+}
+/* row base — the new rail rows AND the legacy `.dropdown-item` rows
+   (layout options, editing mode, command groups) share one metric set:
+   13px text, 5/12 padding, flex icon gap, inherited (scheme-correct)
+   text color */
+.ol-v2-rail-menu-panel .ol-v2-rail-menu-item,
+.ol-v2-rail-menu-panel a.dropdown-item,
+.ol-v2-rail-menu-panel span.dropdown-item,
+.ol-v2-rail-menu-panel button.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 12px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  border-radius: 0;
+}
+.ol-v2-rail-menu-panel .ol-v2-rail-menu-item.disabled,
+.ol-v2-rail-menu-panel a.dropdown-item[aria-disabled="true"],
+.ol-v2-rail-menu-panel button.dropdown-item[aria-disabled="true"],
+.ol-v2-rail-menu-panel .dropdown-item.disabled {
+  color: color-mix(in srgb, currentColor 50%, transparent);
+  opacity: 0.75;
+  cursor: default;
+  pointer-events: none;
+}
+/* 2026-10-09 (owner round-3, View menu): the two Editing-mode entries
+   ("Editing" / "Reviewing", legacy DropdownMenuItem buttons) kept their
+   old surface background (#1b222c) because the legacy `.dropdown-item
+   .active` / `:focus` rules were not overridden in the portal. Reset to
+   the panel's transparent surface; hover (next rule) still wins. */
+.ol-v2-rail-menu-panel .dropdown-item.active,
+.ol-v2-rail-menu-panel .dropdown-item[aria-current],
+.ol-v2-rail-menu-panel a.dropdown-item:focus,
+.ol-v2-rail-menu-panel button.dropdown-item:focus,
+.ol-v2-rail-menu-panel a.dropdown-item:active,
+.ol-v2-rail-menu-panel button.dropdown-item:active {
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+.ol-v2-rail-menu-panel .ol-v2-rail-menu-item:hover:not(.disabled),
+.ol-v2-rail-menu-panel a.dropdown-item:hover,
+.ol-v2-rail-menu-panel span.dropdown-item:hover,
+.ol-v2-rail-menu-panel button.dropdown-item:hover {
+  background: color-mix(in srgb, currentColor 9%, transparent);
+}
+.ol-v2-rail-menu-panel .ol-v2-rail-menu-item-label {
+  flex: 0 1 auto;
+}
+.ol-v2-rail-menu-panel .dropdown-divider {
+  height: 1px;
+  margin: 4px 8px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  border: 0;
+}
+.ol-v2-rail-menu-panel .dropdown-header {
+  padding: 5px 12px 3px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, currentColor 55%, transparent);
+  text-transform: none;
+}
+/* nested groups (Download ▸ Math ▸ Figure ▸ PDF zoom ▸ Editing mode ▸) —
+   inline accordion targets + children (see rail-menus.tsx /
+   menu-bar-dropdown.tsx) */
+.ol-v2-rail-menu-panel .ol-v2-rail-sub-target {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  justify-content: flex-start !important;
+  padding: 5px 12px !important;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: left;
+  text-decoration: none;
+  font-weight: 400;
+  color: inherit !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ol-v2-rail-menu-panel .ol-v2-rail-sub-target:hover {
+  background: color-mix(in srgb, currentColor 9%, transparent) !important;
+}
+.ol-v2-rail-menu-panel .ol-v2-rail-sub-chevron {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.65;
+}
+.ol-v2-rail-menu-panel .ol-v2-rail-sub-chevron svg {
+  transition: transform 0.12s ease;
+}
+.ol-v2-rail-menu-panel .ol-v2-rail-sub-chevron.open {
+  transform: rotate(90deg);
+}
+.ol-v2-rail-menu-panel .ol-v2-nested-inline {
+  margin: 0 0 3px;
+}
+.ol-v2-rail-menu-panel .ol-v2-nested-inline > * {
+  padding-left: 28px;
+}
+.ol-v2-rail-menu-panel .ol-v2-nested-inline .ol-v2-rail-sub-target {
+  padding-left: 28px !important;
+}

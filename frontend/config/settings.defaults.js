@@ -1391,6 +1391,11 @@ function buildSettings() {
         __dirname,
         '../modules/drawio/frontend/js/visual-editor-provider'
       ),
+      // AI (owner 2026-10-09): Milkdown Markdown editor claims *.md/*.markdown
+      Path.resolve(
+        __dirname,
+        '../modules/markdown-editor/frontend/js/visual-editor-provider.ts'
+      ),
     ],
     usGovBanner: [],
     rollingBuildsUpdatedAlert: [],

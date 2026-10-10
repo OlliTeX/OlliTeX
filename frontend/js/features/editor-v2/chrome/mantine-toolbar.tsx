@@ -160,7 +160,14 @@ export function MantineToolbar() {
         zIndex: 20,
       }}
     >
-      <ToolbarMenuBar />
+      {/* 2026-10-09 (owner item AC): the v2 rail icons are now the direct
+          targets of their own Mantine menus (rail-menus.tsx). The visible
+          6-dropdown menu bar is HIDDEN here — ToolbarMenuBar stays mounted
+          in headless mode so its command registrations (new_file, undo,
+          find, insert-*, format-*, word_count, copy_project, …) and its
+          modal hosts (Word count / Make a copy / Rename / Share) keep
+          serving the rail menus. */}
+      <ToolbarMenuBar menuBar={false} />
       {/* AK-8 (owner 2026-10-08): the File → Download group (source zip /
           PDF / docx / markdown / html) needs the commands ToolbarProjectTitle
           registers. That component is VISIBLE only in the history view —

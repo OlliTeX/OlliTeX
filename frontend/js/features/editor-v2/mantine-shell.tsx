@@ -14,6 +14,12 @@
  */
 import React from 'react'
 import OlliTProvider from '@/shared/mantine/provider'
+// Material Symbols webfont: every legacy MaterialIcon in the editor page
+// (menu rows from change-layout-options/viewing-mode-options, shortcut
+// glyphs, file-tree icons) relies on this @font-face. The hub page imports
+// the same file itself (hub.tsx); the v2 editor chunk must do the same or
+// every ligature renders as raw text (owner-reported on AC). 2026-10-09.
+import '../../../fonts/material-symbols/material-symbols.css'
 import './editor-v2-tokens.css'
 
 // Named export first: the webpack/babel CJS transform in this workspace is

@@ -58,6 +58,13 @@ var (
 		`^/project/(?P<1>` + pj + `)/(?i:wakatime)/(?i:summary)/?$`)
 	statusPat = regexp.MustCompile(`^/(?i:user)/(?i:wakatime)/(?i:status)/?$`)
 	userPat   = regexp.MustCompile(`^/(?i:user)/(?i:wakatime)/?$`)
+	// owner 2026-10-10 (Q2): the user's own cross-project summary for the
+	// /user-settings WakaTime view.
+	userSummaryPat = regexp.MustCompile(`^/(?i:user)/(?i:wakatime)/(?i:summary)/?$`)
+
+	// G (owner 2026-10-09): the admin section endpoints.
+	wakaCheckPat     = regexp.MustCompile(`^/(?i:admin)/(?i:wakatime)/(?i:check)/?$`)
+	wakaProvisionPat = regexp.MustCompile(`^/(?i:admin)/(?i:wakatime)/(?i:provision)/?$`)
 )
 
 // MAX_BULK_HEARTBEATS — reference controller constant.
@@ -75,6 +82,7 @@ func Feature(a *core.App) core.Feature {
 func (s *svc) Routes() []core.Route {
 	return []core.Route{
 		{Method: "GET", Pattern: statusPat, Handler: s.status, NoLogin: false},
+		{Method: "GET", Pattern: userSummaryPat, Handler: s.userSummaryHandler, NoLogin: false},
 		{Method: "PUT", Pattern: userPat, Handler: s.link, NoLogin: false},
 		{Method: "DELETE", Pattern: userPat, Handler: s.unlink, NoLogin: false},
 		// Candidate F (owner report 2026-10-07): the tracker is a fire-and-forget
@@ -87,6 +95,11 @@ func (s *svc) Routes() []core.Route {
 		{Method: "POST", Pattern: heartbeatPat, Handler: s.heartbeat, NoLogin: false, NoCSRF: true},
 		{Method: "POST", Pattern: bulkPat, Handler: s.heartbeatBulk, NoLogin: false, NoCSRF: true},
 		{Method: "GET", Pattern: summaryPat, Handler: s.summary, NoLogin: false},
+		// G (owner 2026-10-09): admin surface (requireLogin + site admin
+		// inside the handlers — the RequireSiteAdmin mirror lives there so
+		// non-members get the Node-parity restricted bounce).
+		{Method: "POST", Pattern: wakaCheckPat, Handler: s.adminCheck, NoLogin: false},
+		{Method: "POST", Pattern: wakaProvisionPat, Handler: s.adminProvision, NoLogin: false},
 	}
 }
 

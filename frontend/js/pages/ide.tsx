@@ -6,6 +6,7 @@ import localesReady from '@/i18n' // default export: promise that resolves when 
 import { createRoot } from 'react-dom/client'
 import IdeRoot from '@/features/ide-react/components/ide-root'
 import { EditorUiShell } from '@/features/editor-v2/variant'
+import { startWakaTicker } from '@/features/ide-react/waka-ticker'
 
 const container = document.getElementById('ide-root')
 if (container) {
@@ -32,6 +33,10 @@ if (container) {
     render()
   }
 }
+
+// G (owner 2026-10-09): WakaTime relay ticker — side-effect startup, off
+// (zero requests) on instances where the feature is not enabled.
+try { startWakaTicker() } catch { /* never block the editor on the relay */ }
 
 // work around Safari 15's incomplete support for dvh units
 // https://github.com/overleaf/internal/issues/18109

@@ -93,11 +93,19 @@ func ExposedSettingsJSON(siteURL string, isAdmin bool, wakaEnabled bool, wakaDeb
 // flip "default" → "enabled" (front-end isSplitTestEnabled requires exactly
 // "enabled" to render the Export items); otherwise the pinned constants are
 // served unchanged.
-func SplitTestVariants(pandocConversions bool) string {
-	if !pandocConversions {
-		return pinned_ol_splitTestVariants
+// H (2026-10-09): pythonRunnerEnabled=false (the new Python-runner admin
+// toggle, misc.pythonRunner) flips the overleaf-code variant "enabled" →
+// "default" so the .py split-pane (Pyodide runner) is hidden; default ON
+// preserves the historically pinned behaviour.
+func SplitTestVariants(pandocConversions bool, pythonRunnerEnabled bool) string {
+	s := pinned_ol_splitTestVariants
+	if !pythonRunnerEnabled {
+		s = strings.ReplaceAll(s, `"overleaf-code":"enabled"`, `"overleaf-code":"default"`)
 	}
-	s := strings.ReplaceAll(pinned_ol_splitTestVariants, `"export-docx":"default"`, `"export-docx":"enabled"`)
+	if !pandocConversions {
+		return s
+	}
+	s = strings.ReplaceAll(s, `"export-docx":"default"`, `"export-docx":"enabled"`)
 	s = strings.ReplaceAll(s, `"export-markdown":"default"`, `"export-markdown":"enabled"`)
 	s = strings.ReplaceAll(s, `"export-html":"default"`, `"export-html":"enabled"`)
 	return s

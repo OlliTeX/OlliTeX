@@ -1,0 +1,59 @@
+{
+  "theme": {
+    "&": {
+      "backgroundColor": "#0f0f0f",
+      "color": "#defdef"
+    },
+    ".cm-gutters": {
+      "background": "#555",
+      "color": "#FFFFFF",
+      "borderRightColor": "transparent"
+    },
+    ".cm-cursor, .cm-dropCursor": {
+      "color": "#00FF00"
+    },
+    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
+      "backgroundColor": "#515151"
+    },
+    ".cm-activeLine": {
+      "backgroundColor": "#0a6bcb3d"
+    },
+    ".cm-tooltip": {
+      "backgroundColor": "#555",
+      "color": "#defdef"
+    }
+  },
+  "highlightStyle": {
+    ".tok-keyword": {
+      "color": "darkgoldenrod"
+    },
+    ".tok-literal": {
+      "color": "#77F"
+    },
+    ".tok-comment": {
+      "color": "#7a7b7c"
+    },
+    ".tok-number": {
+      "color": "violet"
+    },
+    ".tok-variableName": {
+      "color": "#fffabc"
+    },
+    ".tok-function": {
+      "color": "#fffabc"
+    },
+    ".tok-type": {
+      "color": "#FFDD44"
+    },
+    ".tok-string": {
+      "color": "#2b4"
+    },
+    ".tok-attributeValue": {
+      "color": "#DDFF00"
+    },
+    ".tok-heading": {
+      "color": "aquamarine"
+    }
+  },
+  "dark": true
+}

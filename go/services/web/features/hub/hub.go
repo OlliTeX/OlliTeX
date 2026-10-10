@@ -185,7 +185,7 @@ func hubPage(a *core.App) func(*core.Cxt, *core.Res) {
 			GitBridge:  os.Getenv("OVERLEAF_GITBRIDGE_ENABLED") == "true",
 			JSON: map[string]string{
 				"ol-ExposedSettings":   editorpages.ExposedSettingsJSON(cxt.SiteURL, isAdmin, wakatime.ResolveEnabled(cxt.Req.Context(), cxt.A), wakatime.DebugLogging(), sitesettings.MendeleyEnabled(cxt.A, cxt.Req.Context()), sitesettings.PandocConversionsEnabled(cxt.A, cxt.Req.Context()), sitesettings.GHSyncEnabled(cxt.A, cxt.Req.Context())),
-				"ol-splitTestVariants": editorpages.SplitTestVariants(sitesettings.PandocConversionsEnabled(cxt.A, cxt.Req.Context())),
+				"ol-splitTestVariants": editorpages.SplitTestVariants(sitesettings.PandocConversionsEnabled(cxt.A, cxt.Req.Context()), sitesettings.PythonRunnerEnabled(cxt.A, cxt.Req.Context())),
 				"ol-navbar":            hubNavbar(a, ctx, email, cxt.Req.URL.Path, isAdmin),
 				"ol-footer":            editorpages.HubFooterJSON(cxt.SiteURL),
 				"ol-user":              serializeHubUser(uid, email, udoc, aceRaw),

@@ -15,3 +15,13 @@ Provenance chain (all MIT):
 Served at: /static/tikz-editor/index.html (same origin; isolated via iframe,
 same pattern as public/static/svgedit/ — offline, no CDN, no telemetry).
 Consumer: frontend/modules/tikz (visual-editor provider for .tikz / .pgf).
+
+V (owner 2026-10-09 — "TikZ/drawio/SVG/TUI editors must be part of the
+image, no external loads"): the vendored bundle previously lazy-loaded
+three runtime resources from CDNs; all are now same-origin:
+  - MathJax 4 (startup.js, cdn.jsdelivr.net)  -> /js/libs/mathjax-4.1.2/tex-svg.js
+    (full v4.1.2 build already in the image; assets/index-*.js +
+    assets/thumbnail-render.worker-*.js const patched)
+  - TikzJax engine @drgrice1/tikzjax@1.0.0-beta24 (tikzjax.js + fonts.css
+    + 140 woff2 glyph fonts, cdn.jsdelivr.net) -> /static/tikz-editor/tikzjax/
+    (vendored 2026-10-09; assets/TikzJaxModal-*.js patched)

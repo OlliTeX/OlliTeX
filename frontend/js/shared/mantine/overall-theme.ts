@@ -1,5 +1,9 @@
 import { useSyncExternalStore } from 'react'
 import { postJSON } from '@/infrastructure/fetch-json'
+// J (2026-10-09): the vendored editor color themes (cm6 registry index)
+// are part of the overall-theme value space now — picking one applies its
+// dark/light mode to the chrome AND sets the editor theme.
+import { themes as CM6_VENDORED_THEMES } from '../../features/source-editor/themes/cm6/index.json'
 
 /**
  * OlliTeX overall-theme state: 'Dark' (''), 'Light' ('light-'), 'System'
@@ -14,10 +18,19 @@ import { postJSON } from '@/infrastructure/fetch-json'
  * hub (and OL settings) pages already emit.
  */
 
-export type OverallTheme = '' | 'light-' | 'system'
+export type OverallTheme = '' | 'light-' | 'system' | (string & {})
+
+/** The vendored editor color themes (name → dark flag) from the cm6 registry index. */
+const CODE_THEME_DARK: ReadonlyMap<string, boolean> = new Map(
+  CM6_VENDORED_THEMES.map(t => [t.name, t.dark]),
+)
+
+export function isCodeTheme(value: string | null | undefined): boolean {
+  return !!value && value !== '' && value !== 'light-' && value !== 'system' && CODE_THEME_DARK.has(value)
+}
 export type ColorScheme = 'light' | 'dark'
 
-const listeners = new Set<() => void>()
+const listeners = new Set<(scheme: ColorScheme) => void>()
 let currentScheme: ColorScheme | null = null
 
 export function prefersDark(): boolean {
@@ -36,6 +49,7 @@ export function storedOverallTheme(): OverallTheme {
     const parsed = JSON.parse(raw)
     const v = parsed ? parsed.overallTheme : ''
     if (v === 'light-' || v === 'system') return v
+    if (typeof v === 'string' && isCodeTheme(v)) return v
     return ''
   } catch {
     return ''
@@ -43,6 +57,10 @@ export function storedOverallTheme(): OverallTheme {
 }
 
 export function schemeForTheme(value: OverallTheme = storedOverallTheme()): ColorScheme {
+  if (isCodeTheme(value)) {
+    // J: a vendored editor theme carries its own light/dark identity.
+    return CODE_THEME_DARK.get(value) ? 'dark' : 'light'
+  }
   if (value === 'light-') return 'light'
   if (value === 'system') return prefersDark() ? 'dark' : 'light'
   return 'dark' // '' (OL default) → dark, matches body[data-theme='default']
@@ -98,7 +116,7 @@ export function setTheme(value: OverallTheme): Promise<unknown> {
   return postJSON('/user/settings', { body: { overallTheme: value } })
 }
 
-export function onColorSchemeChange(fn: () => void): () => void {
+export function onColorSchemeChange(fn: (scheme: ColorScheme) => void): () => void {
   listeners.add(fn)
   return () => {
     listeners.delete(fn)

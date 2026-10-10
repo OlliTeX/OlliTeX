@@ -39,7 +39,7 @@ var SECTION_KNOWN_KEYS = map[string][]string{
 	"pandoc":             {"enabled", "image"},
 	"webdav":             {"enabled", "rootPath", "requestTimeoutMs", "retryCount", "retryDelayMs", "cipherLabel", "cipherPassword", "previousCipherLabel", "previousCipherPassword"},
 	"dropbox":            {"enabled", "appKey", "appSecret"},
-	"misc":               {"appName", "navHidePoweredBy", "robotsNoindex", "allowPublicAccess", "allowAnonymousReadWriteSharing", "disableLinkSharing", "disableChat", "projectHardDeletionDelayDays", "userHardDeletionDelayDays", "historyRestore", "enablePdfCaching", "pythonRunner", "maxUploadSizeMiB", "maxEntitiesPerProject", "defaultLatexCompiler", "projectChangeNotificationDelayMs"},
+	"misc":               {"appName", "navHidePoweredBy", "robotsNoindex", "allowPublicAccess", "allowAnonymousReadWriteSharing", "disableLinkSharing", "disableChat", "projectHardDeletionDelayDays", "userHardDeletionDelayDays", "historyRestore", "enablePdfCaching", "pythonRunner", "allowedPipPackages", "maxUploadSizeMiB", "maxEntitiesPerProject", "defaultLatexCompiler", "projectChangeNotificationDelayMs"},
 	"languagetool":       {"enabled", "url"},
 	"monitoring":         {"enabled", "grafanaEmbedURL"},
 	"llm":                {"enabled", "allowUserSettings", "userRatePerMinute", "adminRatePerMinute", "userDailyTokens"},
@@ -54,6 +54,7 @@ var GET_SECTION_ORDER = []string{
 	"sso-saml", "sso-oidc", "sso-ldap", "sandboxed-compiles", "git-integration",
 	"typst", "github-sync", "email", "linked-file-types", "pandoc", "webdav",
 	"dropbox", "misc", "languagetool", "llm", "branding", "services", "storage",
+	"wakatime", // G (owner 2026-10-09): appended — post-Node section, no parity order
 }
 
 // defaultTemplateCategories — the manual's 12 example categories (node).

@@ -301,7 +301,7 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
       {show('features') ? (
         <SectionCard
           title="Services (availability)"
-          help="Force the AI or LanguageTool grammar checking off for every user, even configured / BYO."
+          help="The on/off for grammar checking lives in this card: \u201cLanguageTool grammar checking\u201d is the site-level enable; \u201cAI master switch\u201d covers Ask AI / LLM grammar / review. Switching off affects every user, including BYO configurations."
           actions={
             <Group gap="xs" align="flex-end">
               <Button variant="default" size="sm" h={34} loading={ltBusy} onClick={() => {
@@ -332,13 +332,19 @@ export default function AdminLlmSection({ section = 'all' }: { section?: Section
             />
           </Group>
           <Group justify="space-between" wrap="nowrap" gap="sm">
-            <Text size="sm" fw={600}>
-              Disable LanguageTool for all users (force off)
-            </Text>
+            <div>
+              <Text size="sm" fw={600}>
+                LanguageTool grammar checking (on/off)
+              </Text>
+              <Text size="xs" c="dimmed">
+                Site-level enable for every user, including BYO configurations.
+              </Text>
+            </div>
             <Switch
               checked={!state.languageToolDisabledByAdmin}
               onChange={() => setState(s => (s ? { ...s, languageToolDisabledByAdmin: state.languageToolDisabledByAdmin === true } : s))}
               color="ollitex"
+              label={state.languageToolDisabledByAdmin ? 'Off' : 'On'}
             />
           </Group>
           {/* AJ-4 (2026-10-08): the LanguageTool server URL input is RETIRED here (dedupe:

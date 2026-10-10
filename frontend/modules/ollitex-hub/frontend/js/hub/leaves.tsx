@@ -161,6 +161,9 @@ export function renderLeaf(node: HubNode): React.ReactNode {
       return <MySettingsSection key={node.id} initialTab="appearance" />
     case 'mysettings.editordefaults':
       return <MySettingsSection key={node.id} initialTab="editor" />
+    case 'mysettings.wakatime':
+      // G (owner 2026-10-09): per-user WakaTime (wakapi) opt-in
+      return <MySettingsSection key={node.id} initialTab="waka" />
     case 'mysettings.keybindings':
       // Owner #5a/5b (2026-09-07): Mantine rework (legacy bootstrap card →
       // Mantine Radio.Group + custom-bindings modal, same saveUserSettings

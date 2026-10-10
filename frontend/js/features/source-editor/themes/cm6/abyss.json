@@ -1,0 +1,65 @@
+{
+  "theme": {
+    "&": {
+      "backgroundColor": "#000c18",
+      "color": "#6688cc"
+    },
+    ".cm-gutters": {
+      "background": "#000c18",
+      "color": "#6688cc",
+      "borderRightColor": "transparent"
+    },
+    ".cm-cursor, .cm-dropCursor": {
+      "color": "#ddbb88"
+    },
+    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
+      "backgroundColor": "#770811"
+    },
+    ".cm-activeLine": {
+      "backgroundColor": "#0055ff30"
+    },
+    ".cm-tooltip": {
+      "backgroundColor": "#000c18",
+      "color": "#6688cc"
+    }
+  },
+  "highlightStyle": {
+    ".tok-keyword": {
+      "color": "#225588"
+    },
+    ".tok-variableName": {
+      "color": "#2277ff"
+    },
+    ".tok-propertyName": {
+      "color": "#9966b8"
+    },
+    ".tok-string": {
+      "color": "#22aa44"
+    },
+    ".tok-function": {
+      "color": "#9966b8"
+    },
+    ".tok-label": {
+      "color": "#9966b8"
+    },
+    ".tok-literal": {
+      "color": "#f280d0"
+    },
+    ".tok-type": {
+      "color": "#ddbb88"
+    },
+    ".tok-number": {
+      "color": "#f280d0"
+    },
+    ".tok-namespace": {
+      "color": "#f280d0"
+    },
+    ".tok-comment": {
+      "color": "#384887"
+    },
+    ".tok-invalid": {
+      "color": "#A22D44"
+    }
+  },
+  "dark": true
+}
