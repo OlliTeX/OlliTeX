@@ -265,7 +265,7 @@ export function SettingsShell({
                         gap: 8,
                         padding: '5px 8px',
                         borderRadius: 6,
-                        color: activeNow ? 'var(--mantine-color-blue)' : 'inherit',
+                        color: activeNow ? 'var(--mantine-color-blue-8)' : 'inherit',
                         fontWeight: activeNow ? 600 : 400,
                         background: activeNow ? 'var(--mantine-color-blue-light)' : 'transparent',
                         backgroundImage:

@@ -75,6 +75,7 @@ function CodeMirrorEditor() {
         <CodeMirrorEditorComponents
           hidden={VisualEditor != null}
           VisualEditor={VisualEditor}
+          docFingerprint={state.doc.length}
         />
       </CodeMirrorViewContext.Provider>
     </CodeMirrorStateContext.Provider>
@@ -84,11 +85,16 @@ function CodeMirrorEditor() {
 type CodeMirrorEditorComponentsProps = {
   hidden: boolean
   VisualEditor: ElementType | null
+  /** owner O (2026-10-10): the opened document's CM char count — a content
+      fingerprint that flips when a document switch settles into the shared
+      CM state (lets the visual embed re-mount against the real content). */
+  docFingerprint?: number
 }
 
 function CodeMirrorEditorComponents({
   hidden = false,
   VisualEditor,
+  docFingerprint = 0,
 }: CodeMirrorEditorComponentsProps) {
   useToolbarMenuBarEditorCommands()
   const { features } = useProjectContext()
@@ -143,7 +149,13 @@ function CodeMirrorEditorComponents({
               it loaded (the "last active editor" bug). Keying on the open
               doc name unmounts/remounts so the embed re-boots against the
               double-clicked file's source. */}
-          <VisualEditor key={openDocName ?? 'visual'} />
+          {/* owner O (2026-10-10): + docFingerprint in the key — remounting
+              on openDocName alone can boot the embed BEFORE the opened doc
+              settles into the shared CM state (the embed then boots from
+              the PREVIOUS file's content — the "new .md pre-filled with
+              LaTeX" defect). Including the settled char count forces one
+              more re-mount at the right content. */}
+          <VisualEditor key={`${openDocName ?? 'visual'}:${docFingerprint}`} />
         </Suspense>
       )}
     </ReviewPanelProviders>

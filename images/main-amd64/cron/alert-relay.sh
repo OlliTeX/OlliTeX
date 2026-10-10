@@ -76,10 +76,16 @@ if due:
             for _, fn in due
         ],
     }
+    # X-Internal-Token: the instance-stats webhook guard (shared-secret
+    # header; set in the web container env — same container as this cron).
+    headers = {"Content-Type": "application/json"}
+    token = os.environ.get("INTERNAL_ALERTS_TOKEN", "")
+    if token:
+        headers["X-Internal-Token"] = token
     req = urllib.request.Request(
         web_url.rstrip("/") + "/internal/alerts",
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     try:

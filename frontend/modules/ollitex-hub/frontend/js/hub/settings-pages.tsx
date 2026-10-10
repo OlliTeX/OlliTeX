@@ -259,7 +259,7 @@ function CardIcon({ name }: { name: string }) {
         justifyContent: 'center',
         borderRadius: 6,
         background: 'var(--mantine-color-blue-light)',
-        color: 'var(--mantine-color-blue)',
+        color: 'var(--mantine-color-blue-8)',
         flexShrink: 0,
       }}
     >
@@ -376,7 +376,7 @@ function SectionPage({
             <div style={{ color: 'var(--mantine-color-dimmed)', marginBottom: 16 }}>
               “{activeId}” is not a section on this page.
             </div>
-            <a href={base} style={{ color: 'var(--mantine-color-blue)' }}>← Back to {title}</a>
+            <a href={base} style={{ color: 'var(--mantine-color-blue-8)' }}>← Back to {title}</a>
           </div>
         </SettingsShell>
       </SettingsProviders>

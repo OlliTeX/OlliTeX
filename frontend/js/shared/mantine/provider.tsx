@@ -113,9 +113,61 @@ export default function OlliTProvider({
     }
   }, [effectivePatch])
 
+  // R (owner 2026-10-10, WCAG contrast gate): Mantine resolves the anchor
+  // from theme.primaryColor (default-css-variables-resolver: light →
+  // primaryColor[primaryShade], dark → primaryColor-4); with the instance
+  // Appearance patch that lands on blue-6 #228be6 = 3.56:1 on white (< 4.5
+  // AA text). The dimmed var (gray-6 #868e96 = 3.32:1) fails AA for normal
+  // text too. Pin per scheme to AA-passing steps (blue-8 #1971c2 5.02:1;
+  // blue-4 light on dark-7 ≈ 7.9:1; dimmed → gray-7 #495057 ≈ 7.6:1):
+  // <Anchor>, <Text component="a">, every Mantine link + <Text c="dimmed">
+  // flip at once.
+  const anchorSafeTheme = useMemo(() => {
+    const t: any = theme
+    const base = typeof t.getCssVariables === 'function' ? t.getCssVariables : undefined
+    return {
+      ...t,
+      getCssVariables: (scheme: string) => {
+        const vars = base ? (base as any).call(t, scheme) : {}
+        return {
+          ...vars,
+          '--mantine-color-anchor':
+            scheme === 'dark' ? 'var(--mantine-color-blue-4)' : 'var(--mantine-color-blue-8)',
+          ...(scheme === 'light'
+            ? { '--mantine-color-dimmed': 'var(--mantine-color-gray-7)' }
+            : {}),
+        }
+      },
+    }
+  }, [theme])
+
+  // Runtime enforcement (R): Mantine injects the resolved variables into a
+  // <style> tag on :root, which can out-cascade stylesheet overrides. The
+  // inline custom properties below are set on documentElement itself, so
+  // they win the cascade in ALL surfaces of this provider regardless of
+  // injection order or theme identity. Re-applied on every theme or
+  // colour-scheme change.
+  useEffect(() => {
+    const apply = () => {
+      const el = typeof document !== 'undefined' ? document.documentElement : null
+      if (!el) return
+      const dark = currentColorScheme() === 'dark'
+      el.style.setProperty('--mantine-color-anchor', dark ? 'var(--mantine-color-blue-4)' : 'var(--mantine-color-blue-8)')
+      if (dark) el.style.removeProperty('--mantine-color-dimmed')
+      else el.style.setProperty('--mantine-color-dimmed', 'var(--mantine-color-gray-7)')
+    }
+    apply()
+    const offScheme = onColorSchemeChange(apply)
+    const offTheme = onAppliedHubThemeChange(() => apply())
+    return () => {
+      try { offScheme && offScheme() } catch (e) { /* noop */ }
+      try { offTheme && offTheme() } catch (e) { /* noop */ }
+    }
+  }, [theme])
+
   return (
     <MantineProvider
-      theme={theme as any}
+      theme={anchorSafeTheme as any}
       defaultColorScheme={currentColorScheme()}
       colorSchemeManager={hubColorSchemeManager}
     >

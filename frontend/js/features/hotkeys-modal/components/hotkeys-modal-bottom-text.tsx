@@ -12,7 +12,10 @@ export default function HotkeysModalBottomText() {
           // key-bindings settings (Default / Vim / Emacs).
           <a
             onClick={() => eventTracking.sendMB('left-menu-hotkeys-template')}
-            href="/user/mysettings#key-bindings"
+            /* owner 2026-10-10 (item M): the old /user/mysettings#key-bindings
+               hash is a retired pre-reorg route — the key-bindings page is
+               now the /user-settings leaf mysettings.keybindings. */
+            href="/user-settings/mysettings.keybindings"
           />,
         ]}
       />

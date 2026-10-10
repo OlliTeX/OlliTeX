@@ -312,21 +312,107 @@
 	font-size: 12.5px;
 	line-height: 1.5;
 	cursor: pointer;
-	color: #2f3437;
+	/* owner O (2026-10-10): theme-aware — was hardcoded #2f3437 (unreadable on dark) */
+	color: var(--mantine-color-text);
 }
 
 .ol-md-toolbar-btn:hover
 {
-	background: rgba(0, 0, 0, 0.06);
-	border-color: rgba(0, 0, 0, 0.12);
+	background: color-mix(in srgb, var(--mantine-color-text) 7%, transparent);
+	border-color: color-mix(in srgb, var(--mantine-color-text) 14%, transparent);
 }
 
 .ol-md-toolbar-img
 {
 	font-size: 12px;
 	padding: 2px 6px;
-	border: 1px solid rgba(0, 0, 0, 0.15);
+	border: 1px solid color-mix(in srgb, var(--mantine-color-text) 16%, transparent);
 	border-radius: 4px;
 	min-width: 90px;
 	max-width: 160px;
+	color: var(--mantine-color-text);
+}
+
+/* owner O (2026-10-10) — THEME BRIDGE: the vendored Milkdown/Crepe CSS reads
+   this app defined, so the surface fell back to hardcoded light values
+   — the md editor did not respect the theme. Both token families are
+   aliased to Mantine theme variables so LIGHT, DARK and OWNER themes all
+   flow through the provider variables. Light base first, dark override
+   scoped to the house selector html[data-mantine-color-scheme='dark'] —
+   the same pattern editor-v2-tokens.css uses.
+   NOTE: no parentheses anywhere in this comment — cssnano 7.1.4 +
+   postcss-selector-parser mis-parses paren-bearing comments that sit
+   directly before a rule selector, original build error was
+   "Expected an opening parenthesis". */
+.ol-md-editor-shell .milkdown,
+.ol-md-editor-shell .milkdown-editor-scroll
+{
+	--text-color: var(--mantine-color-text);
+	--pico-background: var(--mantine-color-white);
+	--pico-secondary-background: var(--mantine-color-gray-1);
+	--pico-primary: var(--mantine-color-blue-filled);
+
+	--crepe-color-background: var(--mantine-color-body);
+	--crepe-color-on-background: var(--mantine-color-text);
+	--crepe-color-surface: var(--mantine-color-gray-0);
+	--crepe-color-surface-low: var(--mantine-color-gray-1);
+	--crepe-color-on-surface: var(--mantine-color-text);
+	--crepe-color-on-surface-variant: var(--mantine-color-dark-5);
+	--crepe-color-outline: var(--mantine-color-gray-4);
+	--crepe-color-primary: var(--mantine-color-blue-6);
+	--crepe-color-secondary: var(--mantine-color-blue-1);
+	--crepe-color-on-secondary: var(--mantine-color-white);
+	--crepe-color-inverse: var(--mantine-color-dark-8);
+	--crepe-color-on-inverse: var(--mantine-color-white);
+	--crepe-color-inline-code: var(--mantine-color-red-7);
+	--crepe-color-error: var(--mantine-color-red-8);
+	--crepe-color-hover: var(--mantine-color-gray-1);
+	--crepe-color-selected: var(--mantine-color-blue-0);
+	--crepe-color-inline-area: var(--mantine-color-gray-2);
+	--crepe-color-diff-added: var(--mantine-color-green-7);
+	--crepe-color-diff-added-bg: var(--mantine-color-green-0);
+	--crepe-color-diff-added-text: var(--mantine-color-green-8);
+	--crepe-color-diff-removed: var(--mantine-color-red-6);
+	--crepe-color-diff-removed-bg: var(--mantine-color-red-0);
+	--crepe-color-diff-removed-text: var(--mantine-color-red-8);
+
+	--crepe-base-font-size: var(--mantine-font-size-md, 16px);
+	--crepe-font-default: var(--mantine-font-family, system-ui, sans-serif);
+	--crepe-font-title: Georgia, Cambria, 'Times New Roman', Times, serif;
+	--crepe-font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+	--crepe-shadow-1: 0px 1px 3px 1px rgb(0 0 0 / 0.15), 0px 1px 2px 0px rgb(0 0 0 / 0.3);
+	--crepe-shadow-2: 0px 2px 6px 2px rgb(0 0 0 / 0.15), 0px 1px 3px 0px rgb(0 0 0 / 0.3);
+}
+
+html[data-mantine-color-scheme='dark'] .ol-md-editor-shell .milkdown,
+html[data-mantine-color-scheme='dark'] .ol-md-editor-shell .milkdown-editor-scroll
+{
+	--text-color: var(--mantine-color-text);
+	--pico-background: var(--mantine-color-dark-7);
+	--pico-secondary-background: var(--mantine-color-dark-6);
+	--pico-primary: var(--mantine-color-blue-filled);
+
+	--crepe-color-background: var(--mantine-color-dark-7);
+	--crepe-color-on-background: var(--mantine-color-dark-0);
+	--crepe-color-surface: var(--mantine-color-dark-8);
+	--crepe-color-surface-low: var(--mantine-color-dark-6);
+	--crepe-color-on-surface: var(--mantine-color-dark-0);
+	--crepe-color-on-surface-variant: var(--mantine-color-dark-2);
+	--crepe-color-outline: var(--mantine-color-dark-3);
+	--crepe-color-primary: var(--mantine-color-blue-4);
+	--crepe-color-secondary: var(--mantine-color-dark-5);
+	--crepe-color-on-secondary: var(--mantine-color-white);
+	--crepe-color-inverse: var(--mantine-color-dark-2);
+	--crepe-color-on-inverse: var(--mantine-color-dark-8);
+	--crepe-color-inline-code: var(--mantine-color-red-3);
+	--crepe-color-error: var(--mantine-color-red-4);
+	--crepe-color-hover: var(--mantine-color-dark-6);
+	--crepe-color-selected: var(--mantine-color-dark-5);
+	--crepe-color-inline-area: var(--mantine-color-dark-4);
+	--crepe-color-diff-added: var(--mantine-color-green-4);
+	--crepe-color-diff-added-bg: color-mix(in srgb, var(--mantine-color-green-9) 40%, transparent);
+	--crepe-color-diff-added-text: var(--mantine-color-green-3);
+	--crepe-color-diff-removed: var(--mantine-color-red-4);
+	--crepe-color-diff-removed-bg: color-mix(in srgb, var(--mantine-color-red-9) 40%, transparent);
+	--crepe-color-diff-removed-text: var(--mantine-color-red-3);
 }

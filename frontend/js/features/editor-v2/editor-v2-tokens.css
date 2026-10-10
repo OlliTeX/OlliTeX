@@ -113,6 +113,17 @@ html[data-mantine-color-scheme='dark'] .ol-editor-mantine {
   flex-shrink: 0;
 }
 
+/* owner 2026-10-10 (item L): a distinct spacer between the menu cluster
+   (File/Edit/Insert/View/Format) and the File Tree tab group — a short
+   1px divider on the rail's tile rhythm (24px wide, 40px-pitch gaps). */
+.ol-editor-mantine .ol-v2-rail-spacer {
+  width: 24px;
+  height: 1px;
+  margin: 8px auto;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--mantine-color-text) 16%, transparent);
+}
+
 .ol-editor-mantine .ol-v2-rail-tab {
   width: 40px;
   height: 40px;

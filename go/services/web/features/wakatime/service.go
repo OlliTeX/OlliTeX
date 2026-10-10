@@ -114,12 +114,19 @@ func (s *svc) status(cxt *core.Cxt, res *core.Res) {
 	}
 	// Instance-wakapi accounts (auto-provisioned from the user's email)
 	// have a deterministic password the server re-derives — expose it so
-	// the user can actually log into their dashboard.
+	// the user can actually log into their dashboard. Security: this
+	// leaks an instance-derived credential, so it is gated on the linked
+	// URL BEING the instance server (exact base or its compat API prefix),
+	// never on an arbitrary external URL that merely contains "/wakapi".
 	if email, eerr := s.emailForUID(ctx, uid); eerr == nil && email != "" {
 		base, berr := s.resolveServerBase(ctx, cxt, "")
-		if berr == nil && (cr.APIURL == base || strings.Contains(cr.APIURL, "/wakapi")) {
-			out["username"] = strings.SplitN(email, "@", 2)[0]
-			out["password"] = stableProvisionPassword(s.encryptorSecret(), email)
+		if berr == nil {
+			nb := strings.TrimSuffix(base, "/")
+			if cr.APIURL == nb || cr.APIURL == nb+"/api/compat/wakatime/v1" ||
+				strings.HasPrefix(cr.APIURL, nb+"/") {
+				out["username"] = strings.SplitN(email, "@", 2)[0]
+				out["password"] = stableProvisionPassword(s.encryptorSecret(), email)
+			}
 		}
 	}
 	b, _ := json.Marshal(out)

@@ -60,6 +60,9 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Path: "/user/projects", Handler: handler(a)},
 			{Method: "GET", Pattern: entPat, Handler: entitiesHandler(a)},
 			{Method: "GET", Pattern: metaPat, Handler: metadataHandler(a)},
+			// P (owner 2026-10-10): file-tree preview contract — the v2 editor
+			{Method: "POST", Pattern: docMetaPat, Handler: docMetadataHandler(a)},
+			{Method: "GET", Pattern: blobPat, Handler: blobHandler(a)},
 			{Method: "GET", Pattern: memPat, Handler: membersHandler(a)},
 			{Method: "GET", Pattern: arPat, Handler: accessRequestsHandler(a)},
 			{Method: "POST", Pattern: renPat, Handler: renameHandler(a)},

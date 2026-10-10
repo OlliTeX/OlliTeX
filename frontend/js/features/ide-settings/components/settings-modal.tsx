@@ -42,7 +42,9 @@ const SettingsModal = () => {
       // AK-4 (owner 2026-10-08): "Settings modal is unnecessary narrow" —
       // widened further (xl 1000 → 1200) so the Compiler pane (now with
       // the sandbox compile-image select, AK-5) has comfortable room.
-      size={1200}
+      // owner 2026-10-10 (item K): STILL too narrow — widen to 1440
+      // (maxWidth:100% in OLModal keeps small viewports safe).
+      size={1440}
       backdropClassName={
         activeTab === 'appearance'
           ? 'ide-settings-modal-transparent-backdrop'

@@ -15,9 +15,11 @@ package instancestats
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	"ollitex/go/services/web/core"
@@ -75,6 +77,20 @@ func alertWebhook(a *core.App, mail *core.Mail) func(*core.Cxt, *core.Res) {
 		if cxt.Req.Method != "POST" {
 			res.SendStatus(405)
 			return
+		}
+		// Shared-secret guard (owner security pass 2026-10-10): the sink is
+		// NoSession by design and sits on the docker network — the token is
+		// its only auth. The legitimate caller (the cron alert relay inside
+		// the SAME container) shares the env; any other container on the
+		// network does not. Unset → legacy open behaviour (back-compat for
+		// images deployed before this guard).
+		if want := os.Getenv("INTERNAL_ALERTS_TOKEN"); want != "" {
+			if subtle.ConstantTimeCompare(
+				[]byte(cxt.Req.Header.Get("X-Internal-Token")),
+				[]byte(want)) != 1 {
+				res.SendStatus(401)
+				return
+			}
 		}
 		body, err := io.ReadAll(cxt.Req.Body)
 		if err != nil {

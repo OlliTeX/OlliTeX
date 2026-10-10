@@ -199,6 +199,9 @@ export function MantineRailNavChrome({
             rule for new chrome). Each icon opens the matching top menu of
             the mounted ToolbarMenuBar via openRailMenu (delegated click). */}
         <RailMenuCluster t={t} labels={['File', 'Edit', 'Insert', 'View', 'Format']} glyphFor={label => <RailMenuGlyph label={label} />} helpers={railMenuHelpers} active={activeMenu} onActiveChange={setActiveMenu} />
+        {/* owner 2026-10-10 (item L): spacer between the menu cluster and
+            the File Tree tab group (CSS: .ol-v2-rail-spacer). */}
+        <div className="ol-v2-rail-spacer" role="separator" aria-hidden="true" />
         <div className="ide-rail-tabs-wrapper" ref={tabWrapperRef as never}>
           {tabs
             .filter(shouldIncludeElement)

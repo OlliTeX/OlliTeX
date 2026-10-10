@@ -66,7 +66,7 @@ const ZoteroLinkCard = () => {
             <MaterialIcon
               type="link_off"
               unfilled
-              style={{ fontSize: 18, color: 'var(--mantine-color-gray-5, #8d96a5)' }}
+              style={{ fontSize: 18, color: 'var(--mantine-color-gray-7, #495057)' }}
             />
           </span>
         )

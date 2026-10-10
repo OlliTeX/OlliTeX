@@ -306,7 +306,10 @@ const fileMenu = (t: TFunction) => (
     <RailMenuItem id="submit-project" />
     <RailMenuItem id="manage-template" />
     <RailDivider />
-    <RailSubmenu label={t('download')}>
+    {/* owner 2026-10-10 (item G): top-level "Download" group — the five
+        download/export actions live in ONE sub-menu (labels literal
+        English = the owner's exact words). */}
+    <RailSubmenu label="Download">
       <RailMenuItem id="download-as-source-zip" />
       <RailMenuItem id="download-pdf" />
       <RailMenuItem id="export-as-docx" />
@@ -332,12 +335,14 @@ const editMenu = (t: TFunction) => (
 
 const insertMenu = (t: TFunction) => (
   <>
-    <RailSubmenu label={t('math')}>
+    {/* owner 2026-10-10 (item H): "Math" + "Figure" sub-menus (literal
+        labels = the owner's exact words). */}
+    <RailSubmenu label="Math">
       <RailMenuItem id="insert-inline-math" />
       <RailMenuItem id="insert-display-math" />
     </RailSubmenu>
     <RailMenuItem id="insert-symbol" />
-    <RailSubmenu label={t('figure')}>
+    <RailSubmenu label="Figure">
       <RailMenuItem id="insert-figure-from-computer" />
       <RailMenuItem id="insert-figure-from-project-files" />
       <RailMenuItem id="insert-figure-from-another-project" />
@@ -391,7 +396,8 @@ const viewMenu = (t: TFunction) => {
       <RailMenuItem id="command-palette" />
       <RailHeader>{t('pdf_preview')}</RailHeader>
       <RailMenuItem id="view-pdf-presentation-mode" />
-      <RailSubmenu label={t('pdf_zoom')}>
+      {/* owner 2026-10-10 (item I): the zoom/fit group opens as the "PDF" sub-menu */}
+      <RailSubmenu label="PDF">
         <RailMenuItem id="view-pdf-zoom-in" />
         <RailMenuItem id="view-pdf-zoom-out" />
         <RailMenuItem id="view-pdf-fit-width" />
@@ -501,7 +507,10 @@ export const RailMenuDropdown = ({
     opened={opened}
     onOpen={() => onActiveChange(label)}
     onClose={() => onActiveChange(null)}
-    position="bottom-start"
+    /* owner 2026-10-10 (items G/H/I): the menu must open BESIDE the
+       railbar, TOP-aligned (right-start) — bottom-start opened below the
+       icon, which looked "too long" and drifted away from the rail. */
+    position="right-start"
     withinPortal
     width={250}
   >

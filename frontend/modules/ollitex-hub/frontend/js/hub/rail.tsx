@@ -146,6 +146,14 @@ function Folder({
           if (!containsActive) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
         }}
       >
+        {/* owner 2026-10-10 (item F): the same 7px slot the Leaf rows use for
+            their tone dot (transparent here) — folder and leaf labels align
+            exactly; "Reference library" is no longer indented relative to
+            the folders above it. */}
+        <span
+          aria-hidden="true"
+          style={{ width: 7, height: 7, flexShrink: 0, alignSelf: 'center', marginRight: 2 }}
+        />
         <Icon
           name={node.icon}
           size={18}

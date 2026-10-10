@@ -274,7 +274,7 @@ export function SsoProvidersSection () {
               <Group gap={10}>
                 <span style={{ fontSize: 13, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'var(--mantine-color-gray-1)', color: 'var(--mantine-color-gray-7)' }}>{(p.type || '').toUpperCase()}</span>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{str(p.name) || p.id}</span>
-                <span style={{ fontSize: 12, color: p.enabled ? 'var(--mantine-color-teal-6)' : 'var(--mantine-color-gray-5)' }}>{p.enabled ? 'ON' : 'OFF'}</span>
+                <span style={{ fontSize: 12, color: p.enabled ? 'var(--mantine-color-teal-9)' : 'var(--mantine-color-gray-7)' }}>{p.enabled ? 'ON' : 'OFF'}</span>
               </Group>
               <Group gap={6}>
                 <Button size="xs" variant="subtle" disabled={i === 0} onClick={() => void moveProvider(i, -1)}>↑</Button>
