@@ -324,7 +324,9 @@ func dockerFromEnv(st configstore.Store) (Docker, error) {
 	d.Runtime = os.Getenv("DOCKER_RUNTIME")
 	image := envOr("TEXLIVE_IMAGE", configres.String(st, "TEX_LIVE_DOCKER_IMAGE", "TEX_LIVE_DOCKER_IMAGE", ""))
 	if image == "" {
-		all := configres.String(st, "ALL_TEX_LIVE_DOCKER_IMAGES", "ALL_TEX_LIVE_DOCKER_IMAGES", "texlive/texlive:latest-full")
+		// owner 2026-10-10: TeXLive 2026 (ayaka-notes texlive-full) is the default
+		// sandbox image; the legacy texlive/texlive images remain as options.
+		all := configres.String(st, "ALL_TEX_LIVE_DOCKER_IMAGES", "ALL_TEX_LIVE_DOCKER_IMAGES", "olpsint/texlive-full:2026.1,texlive/texlive:latest-full,texlive/texlive:TL2025-historic")
 		image = strings.TrimSpace(strings.Split(all, ",")[0])
 	}
 	d.Image = image

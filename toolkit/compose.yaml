@@ -378,7 +378,10 @@ services:
       # AJ-3 (owner 2026-10-08): served under the app's origin (https://<host>/grafana/)
       # by the haproxy isgraf branch — Grafana must generate its URLs and routes
       # relative to that root (serve-from-subpath).
-      GF_SERVER_ROOT_URL: "${GF_SERVER_ROOT_URL:-https://psintern.neuro.uni-bremen.de/grafana/}"
+      # AG (owner 2026-10-09): Grafana is NO LONGER publicly embed-able — it is
+      # served same-origin through the admin-gated /admin/grafana proxy (the
+      # Go admingrafana feature adds the Basic admin header server-side).
+      GF_SERVER_ROOT_URL: "${GF_SERVER_ROOT_URL:-https://psintern.neuro.uni-bremen.de/admin/grafana/}"
       GF_SERVER_SERVE_FROM_SUB_PATH: ${GF_SERVER_SERVE_FROM_SUB_PATH:-true}
       # Hub kiosk opt-in (server-ce/grafana README: explicit owner opt-in,
       # NOT a default): anonymous Viewer role for kiosk embeds + which origin
@@ -386,7 +389,7 @@ services:
       # AJ-3 (owner 2026-10-08): the Instance statistics section IS the
       # Grafana system — the kiosk iframes need anonymous Viewer auth (no
       # credentials in the embedded dashboard) and the app origin may iframe it.
-      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-true}
+      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_AUTH_ANONYMOUS_ORG_NAME: Main Org.
       GF_SECURITY_CSP_FRAME_ANCESTORS: ${GRAFANA_CSP_FRAME_ANCESTORS:-'self' https://psintern.neuro.uni-bremen.de}
@@ -542,6 +545,13 @@ services:
       WAKAPI_DB_USER: overleaf
       WAKAPI_DB_PASSWORD: "${PG_PASSWORD:?PG_PASSWORD required (toolkit/.env)}"
       WAKAPI_DB_NAME: wakapi
+      # OlliTeX server-side auto-provisioning (wakatime section, 2026-10-10):
+      # staff emails without an MX record must not be rejected — the server's
+      # provisioner is the only signup source on this box.
+      WAKAPI_MAIL_SKIP_VERIFY_MX_RECORD: "true"
+      # the provisioner signs users up in bursts (admin "provision for all");
+      # the default 5/h rate limit 429s a batch — raise it for that.
+      WAKAPI_SIGNUP_MAX_RATE: "200/1h"
     healthcheck:
       # image has no shell/wget/ls (scratch family): liveness = the binary
       # runs; HTTP serving is proven by ollitex-wakapi-probe.
@@ -723,9 +733,12 @@ services:
       # ── AK-5 (owner 2026-10-08): the selectable sandbox compile images —
       # the settings-modal Compiler pane + the admin Compilation page list
       # comes from these (seeds.go), matching the images present on the host.
-      ALL_TEX_LIVE_DOCKER_IMAGES: "${ALL_TEX_LIVE_DOCKER_IMAGES:-texlive/texlive:latest-full,texlive/texlive:TL2025-historic}"
-      ALL_TEX_LIVE_DOCKER_IMAGE_NAMES: "${ALL_TEX_LIVE_DOCKER_IMAGE_NAMES:-TeXLive rolling,TeXLive 2025}"
-      TEX_LIVE_DOCKER_IMAGE: "${TEX_LIVE_DOCKER_IMAGE:-texlive/texlive:latest-full}"
+      # OWNER 2026-10-10: TeXLive 2026 (ayaka-notes texlive-full, built locally
+      # via `make build-texlive` from images/texlive-full-amd64) is the DEFAULT;
+      # the legacy texlive/texlive images stay in the list as options.
+      ALL_TEX_LIVE_DOCKER_IMAGES: "${ALL_TEX_LIVE_DOCKER_IMAGES:-olpsint/texlive-full:2026.1,texlive/texlive:latest-full,texlive/texlive:TL2025-historic}"
+      ALL_TEX_LIVE_DOCKER_IMAGE_NAMES: "${ALL_TEX_LIVE_DOCKER_IMAGE_NAMES:-TeXLive 2026,TeXLive rolling (2025),TeXLive 2025}"
+      TEX_LIVE_DOCKER_IMAGE: "${TEX_LIVE_DOCKER_IMAGE:-olpsint/texlive-full:2026.1}"
       SANDBOXED_COMPILES: "true"
       SANDBOXED_COMPILES_HOST_DIR_COMPILES: "${SANDBOXED_COMPILES_HOST_DIR_COMPILES:-/data_1/ols/compiles}"
       SANDBOXED_COMPILES_HOST_DIR_CACHE: "${SANDBOXED_COMPILES_HOST_DIR_CACHE:-/data_1/ols/cache}"

@@ -63,6 +63,18 @@ export OVERLEAF_TYPSF_BRANCH ?= ollitex/typst:$(BRANCH_NAME_TAG_SAFE)
 export OVERLEAF_TYPSF_LATEST ?= ollitex/typst
 export OVERLEAF_TYPSF_TAG ?= ollitex/typst:$(BRANCH_NAME_TAG_SAFE)-$(MONOREPO_REVISION)
 
+# texlive-full (ayaka-notes) 2026 — the DEFAULT sandbox compile image (owner
+# directive 2026-10-10). Source: images/texlive-full-amd64/ (nested upstream
+# repo; each stage builds its own context dir, like the upstream CI).
+# Build chain: base (texlive/Base/Dockerfile.2026) → full (texlive/2026/Dockerfile).
+# The full Dockerfile FROM-references the UPSTREAM base ref, so the local base
+# build is tagged exactly ghcr.io/ayaka-notes/texlive-full:base-2026 (no pull
+# needed for it). The full install pulls only the tlnet snapshot cache image.
+export TEXLIVE_FULL_CONTEXT ?= images/texlive-full-amd64
+export TEXLIVE_BASE_TAG ?= ghcr.io/ayaka-notes/texlive-full:base-2026
+export TEXLIVE_FULL_TAG ?= olpsint/texlive-full:2026.1
+export TEXLIVE_CACHE_IMAGE ?= ghcr.io/ayaka-notes/tlnet-cache:2026
+
 # Optional extra --cache-from references (overridable). The branch tags only
 # exist LOCALLY (they are never pushed to Docker Hub), so pulling them as cache
 # sources fails with 404/"insufficient_scope" on Docker Hub. The builds rely
@@ -86,10 +98,14 @@ BASE_FILE ?= images/base-amd64/Dockerfile
 # alpine:3.24 builder is the default; the glibc one is retired in
 # junk/images-golang-builder-amd64-ubuntu and can be passed back via
 # GO_BUILDER_TAG if ever needed).
+# GO_BUILDER_TAG — default value:
 GO_BUILDER_TAG ?= ollitex/golang-builder-amd64-alpine:1.27.1
+# (builder source lives in images/golang-builder-amd64/ — folder renamed
+# 2026-10-10 from images/golang-builder-amd64-alpine; the IMAGE TAG is
+# intentionally unchanged)
 
 .PHONY: images
-images: build-base build-community build-pandoc build-pdftocairo build-png2pdf build-typst ## Build ALL ollitex docker images (base + app + pandoc/pdftocairo/png2pdf/typst)
+images: build-base build-community build-pandoc build-pdftocairo build-png2pdf build-typst build-texlive ## Build ALL ollitex docker images (base + app + pandoc/pdftocairo/png2pdf/typst + texlive-full 2026 default sandbox)
 
 .PHONY: refresh-cache
 refresh-cache: refresh-cache-branch refresh-cache-latest ## Pull locally-tagged image refs as remote cache sources (best effort)
@@ -185,17 +201,17 @@ build-pdftocairo: ## Build the ollitex/pdftocairo image from images/pdftocairo-a
 
 # png2pdf replacement for quay.io/sharelatex/png2pdf:2026-06-24 (clsitex
 # PNG->PDF slow-PNG optimisation). python:3.14-alpine + img2pdf (pinned git
-# commit) + the png2pdf.sh CLI shim (images/png2pdf-amd/png2pdf.sh, copied
+# commit) + the png2pdf.sh CLI shim (images/png2pdf-amd64/png2pdf.sh, copied
 # from the root context, which uses the root .dockerignore like the other
 # COPY-based targets).
 .PHONY: build-png2pdf
-build-png2pdf: ## Build the ollitex/png2pdf image from images/png2pdf-amd
+build-png2pdf: ## Build the ollitex/png2pdf image from images/png2pdf-amd64
 	docker build \
 	  --build-arg BUILDKIT_INLINE_CACHE=1 \
 	  --progress=plain \
 	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
 	  $(CACHE_FROM_PNG2PDF) \
-	  --file images/png2pdf-amd/Dockerfile \
+	  --file images/png2pdf-amd64/Dockerfile \
 	  --tag $(OVERLEAF_PNG2PDF_TAG) \
 	  --tag $(OVERLEAF_PNG2PDF_BRANCH) \
 	  --network=host \
@@ -211,6 +227,27 @@ build-png2pdf: ## Build the ollitex/png2pdf image from images/png2pdf-amd
 # DefaultDockerImage); this tag is the sync/sourcemap-capable fork the
 # deployment selects via TYPST_IMAGE/TYPST_DOCKER_IMAGE when it wants
 # click-to-source.
+.PHONY: build-texlive-base
+build-texlive-base: ## Build the texlive-full base-2026 (ubuntu 24.04 + fonts + R) — skipped when the ref exists locally
+	docker inspect $(TEXLIVE_BASE_TAG) > /dev/null 2>&1 || docker build \
+	  --progress=plain \
+	  --network=host \
+	  --file $(TEXLIVE_FULL_CONTEXT)/texlive/Base/Dockerfile.2026 \
+	  --tag $(TEXLIVE_BASE_TAG) \
+	  $(TEXLIVE_FULL_CONTEXT)/texlive/Base
+
+.PHONY: build-texlive
+build-texlive: build-texlive-base ## Build the TeXLive 2026 sandbox image (default compile image) → $(TEXLIVE_FULL_TAG)
+	docker pull $(TEXLIVE_CACHE_IMAGE) || true
+	docker build \
+	  --build-arg BUILDKIT_INLINE_CACHE=1 \
+	  --progress=plain \
+	  --network=host \
+	  --build-arg TEXLIVE_BIN_ARCH=x86_64-linux \
+	  --file $(TEXLIVE_FULL_CONTEXT)/texlive/2026/Dockerfile \
+	  --tag $(TEXLIVE_FULL_TAG) \
+	  $(TEXLIVE_FULL_CONTEXT)/texlive/2026
+
 .PHONY: build-typst
 build-typst: ## Build the ollitex/typst (D21 sourcemap fork) image from images/typst-amd64
 	docker build \

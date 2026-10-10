@@ -209,6 +209,11 @@ RUN chmod 600 /etc/cron.d/crontab-notifications
 # (this one + history + deletion + notifications) were all dead.
 ADD images/main-amd64/config/crontab-instance-stats /etc/cron.d/crontab-instance-stats
 RUN chmod 600 /etc/cron.d/crontab-instance-stats
+# AG (owner 2026-10-09): relay firing Prometheus alerts to the instance-stats
+# webhook (this prometheus build has no webhook notification route; the relay
+# is the notification path for the migrated disk/RAM/collector rules).
+ADD images/main-amd64/config/crontab-alert-relay /etc/cron.d/crontab-alert-relay
+RUN chmod 600 /etc/cron.d/crontab-alert-relay
 
 # Copy Phusion Image startup and shutdown scripts to their locations
 # ------------------------------------------------------------------

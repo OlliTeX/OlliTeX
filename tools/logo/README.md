@@ -10,7 +10,7 @@ files:
 
 - Docker, plus the repo's Go builder image
   `ollitex/golang-builder-amd64-alpine:1.27.1` (built automatically from
-  `images/golang-builder-amd64-alpine/` if missing).
+  `images/golang-builder-amd64/` if missing).
 - Rasterization uses the pure-Go packages `oksvg` and `rasterx`. There are
   **no external conversion tools** — no Inkscape, ImageMagick, Python, or a
   host Go installation needed (this replaced the previous

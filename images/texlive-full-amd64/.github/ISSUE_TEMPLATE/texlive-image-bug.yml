@@ -1,0 +1,85 @@
+name: TeXLive Image Related
+description: Compiles on official Overleaf, but fails with the ayaka-notes image
+title: "[TeXLive Image]: "
+labels: ["texlive-image-bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Use this template when a project **compiles on official Overleaf but fails with our TeXLive image (ayaka-notes/texlive-full)**.
+
+        Not sure how to share a project? See Overleaf's guide: [**Sharing a project**](https://docs.overleaf.com/collaborating/sharing-a-project) (turn on link sharing → copy the **"Anyone with this link can view"** link).
+
+        After you submit, a bot downloads the project from your **read-only share link**, reproduces the compile with `latexmk` in the matching image, and posts back the **logs + compiled PDF**.
+
+        > Note: the linked content will be downloaded and compiled publicly — do not include private or unpublished material.
+
+  - type: input
+    id: share_link
+    attributes:
+      label: Overleaf read-only share link
+      description: |
+        **MUST be the "View only" link** — in Overleaf open `Menu → Share → Turn on link sharing`, then copy the link under **"Anyone with this link can view"**. It contains `/read/` (e.g. `https://www.overleaf.com/read/xxxx#yyyy`).
+
+        Do not paste the "can edit" link (without `/read/`) — anonymous download of edit links is blocked by Overleaf.
+      placeholder: https://www.overleaf.com/read/xxxxxxxxxxxx#xxxxxx
+    validations:
+      required: true
+
+  - type: dropdown
+    id: compiler
+    attributes:
+      label: Compiler
+      description: |
+        Pick the **exact same** compiler you use on Overleaf — `Menu → Settings → Compiler`. We do **not** auto-detect; we use exactly what you select here.
+      options:
+        - "pdflatex"
+        - "xelatex"
+        - "lualatex"
+        - "latex (DVI/PDF)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: texlive_version
+    attributes:
+      label: TeX Live version
+      description: |
+        Pick the **exact same** year you use on Overleaf — `Menu → Settings → TeX Live version`. We use exactly what you select (no auto).
+      options:
+        - "2026"
+        - "2025"
+        - "2024"
+        - "2023"
+        - "2022"
+        - "2021"
+        - "2020"
+    validations:
+      required: true
+
+  - type: input
+    id: main_file
+    attributes:
+      label: Main file path (optional)
+      description: |
+        Relative path to the main `.tex` (the one with `\documentclass` and `\begin{document}`), e.g. `main.tex` or `thesis/main.tex`. Leave empty to auto-detect.
+      placeholder: main.tex
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context (optional)
+      description: |
+        Anything helpful: proof it compiles on Overleaf (e.g. a screenshot), the exact error you see with this image (copy the relevant log lines, e.g. `! LaTeX Error: File 'xxx.sty' not found`), special packages/fonts, self-hosted Overleaf version, the exact image tag (e.g. `ghcr.io/ayaka-notes/texlive-full:2025.1`), CPU architecture, etc.
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: "The link is a read-only (View only) share link, accessible to anyone"
+          required: true
+        - label: "The project compiles successfully on official Overleaf"
+          required: true
+        - label: "I confirm the linked content may be public"
+          required: true

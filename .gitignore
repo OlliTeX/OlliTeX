@@ -68,3 +68,7 @@ go/services/clsitypst/urlcache/cache/
 collab
 go/collab
 .ollitex-toolkit/
+
+# session scratch (keep local)
+junk/
+old_requests.md

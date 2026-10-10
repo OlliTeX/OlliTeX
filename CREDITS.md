@@ -73,6 +73,21 @@ something from their code we put them into CREDITS.md").
   owner — listed here for provenance per the credits policy), as are the
   provisioning files `datasources/prometheus.yml` +
   `dashboards/ollitex.yml`.
+- **ayaka-notes — texlive-full (the TeXLive 2026 default sandbox image)** —
+  `https://github.com/ayaka-notes/texlive-full` (MIT, per its LICENSE). Vendor
+  dir: `images/texlive-full-amd64/` (owner-added 2026-10-10), built by the
+  root Makefile targets `build-texlive-base` + `build-texlive` →
+  `olpsint/texlive-full:2026.1`, now the project's **default** texlive
+  sandbox compile image (default in `toolkit/compose.yaml` ALL_TEX_LIVE_* +
+  `TEX_LIVE_DOCKER_IMAGE`, `go/services/web/features/sitesettings/seeds.go`
+  fallbacks, `go/services/clsitex/config/config.go` fallback list). We use
+  its 2026 Dockerfiles verbatim (base = `texlive/Base/Dockerfile.2026`, full
+  = `texlive/2026/Dockerfile`) + the tlnet snapshot cache image published by
+  the same project (`ghcr.io/ayaka-notes/tlnet-cache:2026`); the
+  `texlive/Base/extrafonts` fonts come from
+  `https://github.com/ayaka-notes/overleaf-fonts` (pinned with the upstream
+  tree). No code was copied into `go/` or `frontend/` — only the image build
+  sources + the default-image config point to it.
 
 ## n-gram model plumbing & offline-server extension review
 
@@ -86,3 +101,25 @@ something from their code we put them into CREDITS.md").
   language-detection logged as an owner-gated candidate (needs the LT binary +
   lid.176.bin). Re-implemented: all Go action code (no copy of the recipe's
   shell steps).
+
+## Editor color themes (J, 2026-10-09)
+
+- **react-codemirror theme palettes (the "Editor themes" of the theme
+  picker)** — 29 color themes vendored from the reference repo
+  `/data_1/image_mining/the_diff/react-codemirror/themes` (the
+  `@uiw/codemirror-theme-*` family of the react-codemirror project;
+  per-theme color palettes and highlight-style tag maps). Their palettes were
+  converted to this editor's cm6 registry format
+  (`frontend/js/features/source-editor/themes/cm6/<name>.json`,
+  `{ theme, highlightStyle, dark }`) by the generated
+  `generate-react-codemirror-themes.mjs` in that directory (the conversion
+  script is committed alongside the output; re-run it after upstream theme
+  updates). Names colliding with the pre-existing OL cm6 themes
+  (`dracula`, `eclipse`, `github`, `gruvbox`, `monokai`, `xcode`) keep the
+  existing OL versions; the generic `theme/` library source (no palette) was
+  not vendored. The themes are listed in the admin/user settings theme picker
+  (hub) and in the editor's theme registry (`ol-editorThemes` meta,
+  `go/services/web/features/editorpages/pinned.go`), per owner request J:
+  "list the color themes from that repo as additional options in the theme
+  toggle; each new option must correctly switch the editor theme on one
+  surface; CREDITS.md gets the credit for the source themes."

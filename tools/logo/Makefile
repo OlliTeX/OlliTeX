@@ -21,7 +21,7 @@
 # ============================================================================
 
 GO_BUILDER_TAG ?= ollitex/golang-builder-amd64-alpine:1.27.1
-GO_BUILDER_DIR ?= ../../images/golang-builder-amd64-alpine
+GO_BUILDER_DIR ?= ../../images/golang-builder-amd64
 DOCKER ?= docker
 
 HOST_GO := $(shell command -v go 2>/dev/null)

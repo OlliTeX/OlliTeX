@@ -1,0 +1,142 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+  <img alt="TeXLive Full — best TeX Live Full image for Overleaf sandbox" src="assets/banner.svg" width="640">
+</picture>
+
+<p>
+  <a href="https://ayakaleaf-pro.ayaka.space/texlive"><img alt="Documentation" src="https://img.shields.io/badge/Docs-ayakaleaf--pro.ayaka.space-138A07?style=flat-square&logo=readthedocs&logoColor=white"></a>
+  <a href="https://github.com/ayaka-notes/texlive-full/pkgs/container/texlive-full"><img alt="Container image" src="https://img.shields.io/badge/GHCR-texlive--full-2496ED?style=flat-square&logo=docker&logoColor=white"></a>
+  <a href="https://github.com/ayaka-notes/texlive-full/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/ayaka-notes/texlive-full?style=flat-square&color=FFB000&logo=github&logoColor=white&labelColor=24292f"></a>
+  <br>
+  <img alt="TeX Live versions" src="https://img.shields.io/badge/TeX%20Live-2020%20%E2%80%93%202026-008D9C?style=flat-square&logo=latex&logoColor=white">
+  <img alt="Architectures" src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-6E56CF?style=flat-square&logo=linux&logoColor=white">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-007EC6?style=flat-square"></a>
+</p>
+
+</div>
+
+A fully-featured **TeXLive Docker image** designed for sandboxed LaTeX compilation in [Ayakaleaf Pro](https://github.com/ayaka-notes/ayakaleaf-pro), [Overleaf CEP](https://github.com/yu-i-i/overleaf-cep), or standalone LaTeX compilation environments.
+
+This image aims to provide an almost complete TeXLive distribution with common fonts and tools preinstalled, in order to minimize compilation failures caused by missing packages or fonts. Notes: This Docker Image **doesn't contain** any sharelatex/overleaf component. It's used for Overleaf/Overleaf Pro's compile.
+
+
+## ✨ Features
+
+> [!Note]
+> Our TeX Live distribution has undergone rigorous testing across more than 10,000 LaTeX projects, all of which compiled successfully without errors. Our goal is to provide you with a self-hosted Overleaf experience that is as good as — or even better than — the official Overleaf service.
+
+- 🚀 Support Both x86_64 and arm64 server architectures
+- 📦 Full and Optimized TeXLive installation
+- 🧩 Preinstalled common fonts and utilities
+- 🐳 Ready to use with Docker and Docker Compose  
+- 🧪 Tested with Overleaf CEP / Ayakaleaf Pro 
+- 🔄 Regularly Updated with Latest TeXLive Releases
+- 🏷 Multiple TeXLive Version tags (2020 – Latest)
+- 🧑‍🔬 Knitr support for R code in LaTeX documents
+
+
+## 🎯 Ayakaleaf Pro Usage
+
+TeXLive Full by Ayaka-notes is specially designed for [ayakaleaf-pro](https://github.com/ayaka-notes/ayakaleaf-pro), you can use the following environment variables to `config/variables.env` file if you are [toolkit user](https://github.com/overleaf/toolkit).
+
+For example:
+```
+ALL_TEX_LIVE_DOCKER_IMAGES=ghcr.io/ayaka-notes/texlive-full:2026.1, ghcr.io/ayaka-notes/texlive-full:2025.1
+ALL_TEX_LIVE_DOCKER_IMAGE_NAMES=Texlive 2026, Texlive 2025
+TEX_LIVE_DOCKER_IMAGE=ghcr.io/ayaka-notes/texlive-full:2026.1
+```
+
+If you need more help, refer to [ayakaleaf pro documentation](https://ayakaleaf-pro.ayaka.space/on-premises/configuration/overleaf-toolkit/sandboxed-compiles)
+
+
+## 📦 Available TeXLive Version
+
+Thanks to Github Action, we can build all tex image parallel, which includes:
+
+> [!TIP]
+> For China mainland users, you can replace `ghcr.io` with `ghcr.nju.edu.cn` to speed up the download. But **DO NOT** use `ghcr.nju.edu.cn` directly in your toolkit env  settings. You should keep ghcr.io as your only choice.
+
+| TeXLive Version | Base OS | Architecture | Docker Image | Release Status |
+|:---------------:|:-------:|:------------:|:---------|:---------------:|
+| 2026 | Ubuntu 24.04 | `amd64` / `arm64` | `ghcr.io/ayaka-notes/texlive-full:2026.1` | Final |
+| 2025 | Ubuntu 24.04 | `amd64` / `arm64` | `ghcr.io/ayaka-notes/texlive-full:2025.1` | Final |
+| 2024 | Ubuntu 24.04 | `amd64` / `arm64` | `ghcr.io/ayaka-notes/texlive-full:2024.1` | Final |
+| 2023 | Ubuntu 22.04 | `amd64` / `arm64` | `ghcr.io/ayaka-notes/texlive-full:2023.1` | Final |
+| 2022 | Ubuntu 22.04 | `amd64` / `arm64` | `ghcr.io/ayaka-notes/texlive-full:2022.1` | Final |
+| 2021 | Ubuntu 20.04 | `amd64` / `arm64` | `ghcr.io/ayaka-notes/texlive-full:2021.1` | Final |
+| 2020 | Ubuntu 20.04 | `amd64` / `arm64` | `ghcr.io/ayaka-notes/texlive-full:2020.1` | Final |
+
+
+We use mirror archive from [texlive info](https://texlive.info/tlnet-archive/), which includes almost all texlive image ranging from 1996 to 2025. And thankes to Overleaf's Dockerfile, we can build this project faster.
+
+> Why texlive 2019 and earlier are not supported ?
+>
+> Maintaining these old images is extremely difficult. Also, the [texlive info](https://texlive.info/tlnet-archive/) website does not provide information for TeX Live versions released before 2019, so we are unable to build images for those versions. If you need a specific old version, please open an issue and let us know.
+
+## Available Mirror sites
+
+If you are in China mainland, you can use the following mirror sites to speed up the download of TeXLive Full image.
+```bash
+# Use Aliyun Mirror (2026.1~2020.1)
+registry.cn-hangzhou.aliyuncs.com/ayaka-notes/texlive-full:2026.1
+# Use NJU Mirror (2026.1~2020.1)
+ghcr.nju.edu.cn/ayaka-notes/texlive-full:2026.1
+```
+
+## Contained Component
+
+The following packages are contained in the docker image.
+- All TeXLive packages(in that year)
+- R packages(only selected)
+- fontconfig inkscape pandoc python3-pygments wget python3
+- gnupg gnuplot perl-modules perl ca-certificates
+- ghostscript qpdf r-base-core tar
+
+
+The following fonts are contained in the docker image.
+- [Google Fonts](https://fonts.google.com/)
+- [Microsoft msttcorefonts](https://packages.ubuntu.com/jammy/ttf-mscorefonts-installer)
+- [Overleaf supported fonts](https://www.overleaf.com/learn/latex/Questions/Which_OTF_or_TTF_fonts_are_supported_via_fontspec%3F)
+
+
+> [!WARNING] 
+> Please confirm whether the relevant fonts can be used commercially. We are **not responsible** for any legal issues arising from your incorrect use of fonts. Once you download image, You agree with this automatically.
+
+
+## License
+MIT
+
+
+## Known Issues and Solutions
+### Problem 01: Font Cache Miss Problem
+When overleaf compile latex project, if font miss occurs, **you may find the compile progress takes a long time**, that is because when a font is miss, texlive will try to **rebuild the whole font cache**. This is a time-consuming process.
+
+In our image, we have pre-built the font cache, we fix this problem by [this commit](https://github.com/ayaka-notes/texlive-full/commit/0cb66b0dc8b82be628cf6999cfd659d9784e132f)
+
+### Problem 02: Sync Tex Extremely Slow
+When you use this image in sharelatex, you may find that the sync tex is extremely slow.
+
+See: https://github.com/overleaf/overleaf/issues/1150, just disable http 2.0.
+
+### Problem 03: Re-Compile Error with Official Texlive Image
+If you use texlive official image on docker hub `texlive/texlive`, you may find that when you re-compile a project, it will report error. However, in our image, this problem is fixed. Becase we use latest ubuntu base image and install all dependencies from ubuntu official repo.
+
+### Problem 04: Minted Package Error
+If you use `minted` package in your latex project, you may find that a permission error preventing access to minted config file. Please see [#131](https://github.com/yu-i-i/overleaf-cep/issues/131) for more details.
+
+
+## Other Tech Reminder
+While build texlive image(before 2019), you may need to pay attention to the following problems:
+- Only `http`/`ftp` is supported before texlive 2017, so you can't use `https` to download, unless you modify the `peal` script.
+- Before 2015, only sha256 file is provided. So you can't use sha512 to check.
+
+## Release Note
+- (2026.8.5): TeXLive 2026.1 image is final.
+- (2026.3.12): Unified arm64 and amd64 images into a single OCI multi-architecture image.
+- (2026.3.3): TexLive 2026.1 image has been released.
+- (2026.2.1): We add a `tex` user to align with Overleaf's default compile image.
+- (2026.1.21): Knitr has been added into the image, which can support R code compile in LaTeX document. To find out more, visit [Using R with LaTeX on Overleaf](https://docs.overleaf.com/integrations-and-add-ons/r-code-knitr)
+- (2024.4.17): A long time compile bug [link #1](https://github.com/ayaka-notes/texlive-full/issues/1) has been fixed now
+- (2024.4.17): Texlive 2025 image has been added
