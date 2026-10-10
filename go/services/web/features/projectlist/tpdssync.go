@@ -100,7 +100,7 @@ func resolveSyncProject(a *core.App, c *core.Cxt, uid bson.ObjectID, pidS string
 	if db, err := a.Mongo.DB(ctx); err == nil &&
 		db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&doc) == nil && doc != nil {
 		ow, _ := dgetOID(doc, "owner_ref")
-		if ow == uid || darrContainsOID(doc, "collaborator_refs", uid) {
+		if ow == uid || tpdsIsCollab(doc, uid) {
 			return doc, tpdsProjectActive(doc, uid)
 		}
 	}

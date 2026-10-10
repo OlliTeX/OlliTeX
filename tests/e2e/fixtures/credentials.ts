@@ -30,6 +30,22 @@ export const USER = {
 } as const
 
 /**
+ * USER2 — the second collaborator (Q: two-cooperator same-file concurrency
+ * matrix, 2026-10-10). A second, independent identity so the browser runs two
+ * GENUINE sessions (two accounts, two contexts) against the same project
+ * file — the single-user two-tab pattern cannot exercise the cross-user
+ * privilege/collab path. Same fixture policy as the others (test-only
+ * dummy password, stack-disposable).
+ */
+export const USER2 = {
+  email: 'e2e-collab@e2e.test',
+  password: 'Ol-Fixture-8p4R',
+  first_name: 'E2e',
+  last_name: 'Collab',
+  isAdmin: false,
+} as const
+
+/**
  * TEMPLATE ADMIN (owner role, 2026-09-07): canManageTemplates=true, NOT a site
  * admin. Grants /templates/manage without the rest of /admin. Created by the
  * phase-0 fixture step (register+activate) then promoted via mongo — mirrors

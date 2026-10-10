@@ -277,18 +277,31 @@ func invUserEmails(a *core.App, cxt *core.Cxt, uid string) []string {
 		return nil
 	}
 	var out []string
-	if m, ok := dget(d, "emails").([]any); ok {
-		for i := range m {
-			e, ok := m[i].(bson.M)
-			if !ok {
-				continue
-			}
-			if _, has := e["confirmedAt"]; !has {
-				continue
-			}
-			if s, ok := e["email"].(string); ok && s != "" {
-				out = append(out, s)
-			}
+	// the user doc is mongo-decoded (bson.D): the `emails` array arrives as
+	// bson.A — a NAMED slice type that fails a bare `[]any` assertion.
+	var m any
+	if x, ok := dget(d, "emails").(bson.A); ok {
+		m = x
+	} else if x, ok := dget(d, "emails").([]any); ok {
+		m = x
+	}
+	sl, _ := m.([]any)
+	if sl == nil {
+		if a, ok := m.(bson.A); ok {
+			sl = make([]any, len(a))
+			copy(sl, a)
+		}
+	}
+	for i := range sl {
+		e, ok := sl[i].(bson.M)
+		if !ok {
+			continue
+		}
+		if _, has := e["confirmedAt"]; !has {
+			continue
+		}
+		if s, ok := e["email"].(string); ok && s != "" {
+			out = append(out, s)
 		}
 	}
 	return out

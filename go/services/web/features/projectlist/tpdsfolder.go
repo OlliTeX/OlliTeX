@@ -235,7 +235,7 @@ func apiFolderUpdateHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 				if db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: o}}).Decode(&doc) == nil && doc != nil {
 					pd = doc
 					ow, _ := dgetOID(pd, "owner_ref")
-					found = (ow == uid || darrContainsOID(pd, "collaborator_refs", uid)) && tpdsProjectActive(pd, uid)
+					found = (ow == uid || tpdsIsCollab(pd, uid)) && tpdsProjectActive(pd, uid)
 				}
 			}
 		} else if projectName != "" {

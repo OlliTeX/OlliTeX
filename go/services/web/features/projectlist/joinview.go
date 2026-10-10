@@ -285,8 +285,16 @@ func joinPrivilegeForUser(uidHex string, d bson.D, pal string) string {
 	if ownerRefHex(d) == uidHex {
 		return "owner"
 	}
-	if inOIDList(dget(d, "collablator_refs"), uidHex) {
-		return "readAndWrite"
+	// membership field drift (caught by Q two-cooperator e2e 2026-10-10):
+	// the canonical schema field is `collaberator_refs` (create.go /
+	// colSetLevel); this build has also carried the `collablator_refs`,
+	// `collab_refs` and `collaborator_refs` spellings — accept all.
+	// The previous single-field read 403'd every real collaborator on the
+	// join view (GET /project/:id/join), breaking their editor session.
+	for _, k := range []string{"collaberator_refs", "collablator_refs", "collab_refs", "collaborator_refs"} {
+		if inOIDList(dget(d, k), uidHex) {
+			return "readAndWrite"
+		}
 	}
 	if inOIDList(dget(d, "reviewer_refs"), uidHex) {
 		return "review"
@@ -328,8 +336,14 @@ func joinInvitedMember(uidHex string, d bson.D, pal string) bool {
 	if ownerRefHex(d) == uidHex {
 		return true
 	}
-	return inOIDList(dget(d, "collablator_refs"), uidHex) ||
-		inOIDList(dget(d, "reviewer_refs"), uidHex) ||
+	// all membership field spellings (canonical `collaberator_refs` first —
+	// see joinPrivilegeForUser).
+	for _, k := range []string{"collaberator_refs", "collablator_refs", "collab_refs", "collaborator_refs"} {
+		if inOIDList(dget(d, k), uidHex) {
+			return true
+		}
+	}
+	return inOIDList(dget(d, "reviewer_refs"), uidHex) ||
 		inOIDList(dget(d, "readOnly_refs"), uidHex)
 }
 
@@ -374,12 +388,19 @@ func joinLoadUser(a *core.App, ctx context.Context, db *mongo.Database, o any) *
 func joinInvitedMembers(a *core.App, ctx context.Context, db *mongo.Database, pd bson.D, owner string) bson.A {
 	out := bson.A{}
 	seen := map[string]bool{}
+	// every membership field spelling → privilege level. The canonical
+	// schema field is `collaberator_refs` (create.go / colSetLevel);
+	// `collablator_refs` / `collab_refs` / `collaborator_refs` are legacy
+	// spellings still tolerated elsewhere (field drift — Q e2e 2026-10-10).
 	privFor := map[string]string{
+		"collaberator_refs":  "readAndWrite",
 		"collablator_refs": "readAndWrite",
+		"collab_refs":        "readAndWrite",
+		"collaborator_refs":  "readAndWrite",
 		"reviewer_refs":    "review",
 		"readOnly_refs":    "readOnly",
 	}
-	for _, key := range []string{"collablator_refs", "reviewer_refs", "readOnly_refs"} {
+	for _, key := range []string{"collaberator_refs", "collablator_refs", "collab_refs", "collaborator_refs", "reviewer_refs", "readOnly_refs"} {
 		arr, ok := dget(pd, key).(bson.A)
 		if !ok {
 			continue
@@ -418,11 +439,15 @@ func joinAccessRequestsView(ar bson.A, pd bson.D, a *core.App, ctx context.Conte
 			continue
 		}
 		cur := ""
-		if inOIDList(dget(pd, "collablator_refs"), oidHex(uid)) {
-			cur = "readAndWrite"
-		} else if inOIDList(dget(pd, "readOnly_refs"), oidHex(uid)) {
+		for _, k := range []string{"collaberator_refs", "collablator_refs", "collab_refs", "collaborator_refs"} {
+			if inOIDList(dget(pd, k), oidHex(uid)) {
+				cur = "readAndWrite"
+			}
+		}
+		if cur == "" && inOIDList(dget(pd, "readOnly_refs"), oidHex(uid)) {
 			cur = "readOnly"
-		} else if inOIDList(dget(pd, "reviewer_refs"), oidHex(uid)) {
+		}
+		if cur == "" && inOIDList(dget(pd, "reviewer_refs"), oidHex(uid)) {
 			cur = "review"
 		}
 		e := bson.D{

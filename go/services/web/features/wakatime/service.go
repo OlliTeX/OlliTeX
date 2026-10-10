@@ -505,7 +505,7 @@ func canReadProject(uid string, isAdmin bool, p bson.D) bool {
 		return false
 	}
 	if dgetStringVal(p, "owner_ref") == uid ||
-		inListStr(p, "collab_refs", uid) || inListStr(p, "collaborator_refs", uid) || inListStr(p, "reviewer_refs", uid) ||
+		inListStr(p, "collab_refs", uid) || inListStr(p, "collaborator_refs", uid) || inListStr(p, "collaberator_refs", uid) || inListStr(p, "reviewer_refs", uid) ||
 		inListStr(p, "readOnly_refs", uid) {
 		return true
 	}

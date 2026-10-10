@@ -178,6 +178,18 @@ func dgetOID(pd bson.D, key string) (bson.ObjectID, bool) {
 	return bson.ObjectID{}, false
 }
 
+// tpdsIsCollab — membership via the canonical `collaberator_refs` field
+// or the legacy `collab_refs` / `collaborator_refs` spellings (schema drift;
+// the canonical is what create.go / colSetLevel write).
+func tpdsIsCollab(pd bson.D, uid bson.ObjectID) bool {
+	for _, k := range []string{"collaberator_refs", "collab_refs", "collaborator_refs"} {
+		if darrContainsOID(pd, k, uid) {
+			return true
+		}
+	}
+	return false
+}
+
 func darrContainsOID(pd bson.D, key string, uid bson.ObjectID) bool {
 	for _, kv := range pd {
 		if kv.Key == key {
@@ -232,7 +244,7 @@ func tpdsOwnedOrRWProjects(a *core.App, c *core.Cxt, uid bson.ObjectID) []bson.D
 			out = append(out, coll)
 		}
 	}
-	for _, key := range []string{"owner_ref", "collaborator_refs"} {
+	for _, key := range []string{"owner_ref", "collaberator_refs", "collab_refs", "collaborator_refs"} {
 		cur, _ := db.Collection("projects").Find(ctx, bson.D{{Key: key, Value: uid}})
 		var list []bson.D
 		_ = cur.All(ctx, &list)
@@ -317,7 +329,7 @@ func tpdsResolveProjectHandler(a *core.App) func(c *core.Cxt, r *core.Res) {
 				return
 			}
 			owner, _ := dgetOID(pd, "owner_ref")
-			if owner != uid && !darrContainsOID(pd, "collaborator_refs", uid) {
+			if owner != uid && !tpdsIsCollab(pd, uid) {
 				r.W.Header().Set("X-Powered-By", "Express")
 				r.JSON(200, []byte(`{"status":"rejected"}`))
 				return

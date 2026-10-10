@@ -488,7 +488,11 @@ func adNameSet(a *core.App, cxt *core.Cxt, ownerHex string) map[string]bool {
 		}
 	}
 	add(bson.D{{Key: "owner_ref", Value: oid}})
+	// membership field spellings — canonical + legacy (Q e2e 2026-10-10)
+	add(bson.D{{Key: "collaberator_refs", Value: oid}})
 	add(bson.D{{Key: "collablator_refs", Value: oid}})
+	add(bson.D{{Key: "collab_refs", Value: oid}})
+	add(bson.D{{Key: "collaborator_refs", Value: oid}})
 	add(bson.D{{Key: "reviewer_refs", Value: oid}})
 	add(bson.D{{Key: "readOnly_refs", Value: oid}})
 	add(bson.D{{Key: "tokenAccessReadAndWrite_refs", Value: oid}, {Key: "publicAccesLevel", Value: "tokenBased"}})

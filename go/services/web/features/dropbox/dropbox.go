@@ -165,7 +165,7 @@ func dbxCanWrite(uidHex string, doc bson.D) bool {
 	if own != "" && strings.EqualFold(own, uidHex) {
 		return true
 	}
-	for _, key := range []string{"collab_refs", "collaborator_refs", "tokenAccessReadAndWrite_refs"} {
+	for _, key := range []string{"collaberator_refs", "collab_refs", "collaborator_refs", "tokenAccessReadAndWrite_refs"} {
 		if arr, ok := dbxDocVal(doc, key); ok {
 			if items, ok := arr.([]interface{}); ok {
 				for _, it := range items {

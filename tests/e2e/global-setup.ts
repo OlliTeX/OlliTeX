@@ -15,7 +15,7 @@
  */
 import path from 'node:path'
 import fs from 'node:fs'
-import { ADMIN, USER, TPLADMIN, SEED_PROJECT } from './fixtures/credentials'
+import { ADMIN, USER, USER2, TPLADMIN, SEED_PROJECT } from './fixtures/credentials'
 import { promoteAdmin, latestPasswordToken, deleteTestUser, userExists, projectExists, projectIdOf, seedContactPair, ensureTpladmin, mongoEval } from './helpers/host'
 import { execSync } from 'node:child_process'
 
@@ -272,6 +272,7 @@ async function runSeed() {
     for (const acct of [
       { ...ADMIN, promote: true },
       { ...USER, promote: false },
+      { ...USER2, promote: false },
     ]) {
       const ctx = await browser.newContext({ baseURL: BASE, viewport: { width: 1280, height: 900 } })
       const page = await ctx.newPage()
@@ -362,6 +363,7 @@ async function runSeed() {
     // unchanged (the invite test requires the user to stay a non-member).
     seedContactPair(ADMIN.email, USER.email)
     seedContactPair(ADMIN.email, TPLADMIN.email)
+    seedContactPair(USER.email, USER2.email)
 
     // 2026-09 (mega-batch): seed the 'Parity Fixture Template'. A fresh stack
     // has ZERO templates, which made m5 (gallery template details) and

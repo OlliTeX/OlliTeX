@@ -486,6 +486,7 @@ func nzipUserNames(a *core.App, cxt *core.Cxt, uid string) []string {
 		}
 	}
 	find(bson.D{{Key: "owner_ref", Value: oid}})
+	find(bson.D{{Key: "collaberator_refs", Value: oid}})
 	find(bson.D{{Key: "collaborator_refs", Value: oid}})
 	find(bson.D{{Key: "reviewer_refs", Value: oid}})
 	find(bson.D{{Key: "readOnly_refs", Value: oid}})

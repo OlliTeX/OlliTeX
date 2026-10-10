@@ -60,7 +60,9 @@ func DeleteOwnedProjects(a *core.App, cxt *core.Cxt, ownerHex, actorHex, ip stri
 	// 2) remove the user from every project they are a member of (Node
 	//    dangerouslyGetAllProjectsUserIsMemberOf: readAndWrite/readOnly/
 	//    tokenReadAndWrite/tokenReadOnly).
-	refFields := []string{"collablator_refs", "readOnly_refs", "tokenAccessReadAndWrite_refs", "tokenAccessReadOnly_refs"}
+	// membership field spellings: canonical `collaberator_refs` plus the
+	// legacy variants (Q e2e 2026-10-10 drift audit).
+	refFields := []string{"collaberator_refs", "collablator_refs", "collab_refs", "collaborator_refs", "readOnly_refs", "tokenAccessReadAndWrite_refs", "tokenAccessReadOnly_refs"}
 	conds := bson.A{}
 	for _, f := range refFields {
 		conds = append(conds, bson.D{{Key: f, Value: owner}})

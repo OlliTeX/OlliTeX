@@ -559,8 +559,35 @@ func oidInList(v any, uid string) bool {
 	if uid == "" {
 		return false
 	}
-	arr, ok := v.([]any)
-	if !ok {
+	// mongo-driver v2 decodes BSON arrays into `bson.A` (a NAMED slice type —
+	// the `[]any` assertion below would silently fail on it); JSON-decoded
+	// bodies give plain []any. Handle both (plus the string / ObjectID
+	// homogenous array shapes a doc may carry).
+	var arr []any
+	switch t := v.(type) {
+	case []any:
+		arr = t
+	case bson.A:
+		arr = make([]any, len(t))
+		copy(arr, t)
+	}
+	if arr == nil {
+		switch t := v.(type) {
+		case []string:
+			for _, s := range t {
+				if s == uid {
+					return true
+				}
+			}
+			return false
+		case []bson.ObjectID:
+			for _, o := range t {
+				if o.Hex() == uid {
+					return true
+				}
+			}
+			return false
+		}
 		return false
 	}
 	for _, x := range arr {

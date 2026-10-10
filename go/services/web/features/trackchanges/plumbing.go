@@ -177,7 +177,7 @@ func tcCanAccess(uidHex string, doc bson.D, write bool) bool {
 		return true
 	}
 	if write {
-		for _, key := range []string{"collab_refs", "collaborator_refs", "tokenAccessReadAndWrite_refs"} {
+		for _, key := range []string{"collaberator_refs", "collab_refs", "collaborator_refs", "tokenAccessReadAndWrite_refs"} {
 			if tcInList(doc, key, uidHex) {
 				return true
 			}
@@ -185,7 +185,8 @@ func tcCanAccess(uidHex string, doc bson.D, write bool) bool {
 		return false
 	}
 	for _, key := range []string{
-		"collab_refs", "collaborator_refs", "readonly_refs",
+		"collaberator_refs", "collab_refs", "collaborator_refs",
+		"readOnly_refs", "readonly_refs",
 		"reviewer_refs", "tokenAccessReadOnly_refs", "tokenAccessReadAndWrite_refs",
 	} {
 		if tcInList(doc, key, uidHex) {

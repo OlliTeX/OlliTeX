@@ -372,11 +372,21 @@ func (a *SessionAuth) ProjectRole(uid, projectID string) (Role, error) {
 	if str, ok := dstr(p, "owner_ref"); ok && str == uid {
 		return ReadWrite, nil
 	}
-	if arr, ok := darr(p, "collaborator_refs"); ok && arrContains(arr, uid) {
-		return ReadWrite, nil
+	// membership field drift (caught by Q two-cooperator e2e 2026-10-10):
+	// the canonical schema field is `collaberator_refs` (see create.go /
+	// colSetLevel); pre-migration docs may carry the legacy
+	// `collab_refs` / `collaborator_refs` spellings. Accept all three —
+	// the previous single-field check 401'd every real collaborator at the
+	// WebSocket handshake (owner_ref was the only path that worked).
+	for _, k := range []string{"collaberator_refs", "collab_refs", "collaborator_refs"} {
+		if arr, ok := darr(p, k); ok && arrContains(arr, uid) {
+			return ReadWrite, nil
+		}
 	}
-	if arr, ok := darr(p, "readOnly_refs"); ok && arrContains(arr, uid) {
-		return ReadOnly, nil
+	for _, k := range []string{"readOnly_refs", "readonly_refs"} {
+		if arr, ok := darr(p, k); ok && arrContains(arr, uid) {
+			return ReadOnly, nil
+		}
 	}
 	return Deny, nil
 }

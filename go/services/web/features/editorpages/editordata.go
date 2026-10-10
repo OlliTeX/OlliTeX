@@ -246,8 +246,15 @@ func serializeUser(uid, email string, doc map[string]any) string {
 }
 
 func anySlice(v any) []any {
+	// The map doc here is mongo-decoded: BSON arrays arrive as the NAMED
+	// type bson.A, not []any (see oidInList) — accept both.
 	if x, ok := v.([]any); ok {
 		return x
+	}
+	if x, ok := v.(bson.A); ok {
+		out := make([]any, len(x))
+		copy(out, x)
+		return out
 	}
 	return []any{}
 }
@@ -274,7 +281,14 @@ func refProviderJSON(doc map[string]any, p string) string {
 	}
 	groups := `[]`
 	if pr != nil {
-		if g, ok := pr["groups"].([]any); ok {
+		var g []any
+		if x, ok := pr["groups"].([]any); ok {
+			g = x
+		} else if x, ok := pr["groups"].(bson.A); ok {
+			g = make([]any, len(x))
+			copy(g, x)
+		}
+		if g != nil {
 			var gp []string
 			for _, it := range g {
 				if m, ok := it.(map[string]any); ok {
