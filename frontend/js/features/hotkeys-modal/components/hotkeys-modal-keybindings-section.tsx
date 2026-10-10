@@ -41,7 +41,7 @@ export default function HotkeysModalKeybindingsSection({
           <OLCol xs={4}>
             <Hotkey combination="o / O" description={t('kb_vim_newline')} />
             <Hotkey combination="p" description={t('kb_vim_paste')} />
-            <a className="kb-manage" href="/user/mysettings#key-bindings">
+            <a className="kb-manage" href="/user-settings/mysettings.keybindings">
               {t('kb_manage')}
             </a>
           </OLCol>
@@ -70,7 +70,7 @@ export default function HotkeysModalKeybindingsSection({
           <OLCol xs={4}>
             <Hotkey combination="C-s / C-r" description={t('kb_emacs_search')} />
             <Hotkey combination="M-/" description={t('kb_emacs_complete')} />
-            <a className="kb-manage" href="/user/mysettings#key-bindings">
+            <a className="kb-manage" href="/user-settings/mysettings.keybindings">
               {t('kb_manage')}
             </a>
           </OLCol>
@@ -86,7 +86,7 @@ export default function HotkeysModalKeybindingsSection({
       </h3>
       <p className="mb-2">{t('kb_default_desc')}</p>
       <p className="mb-0">
-        <a className="kb-manage" href="/user/mysettings#key-bindings">
+        <a className="kb-manage" href="/user-settings/mysettings.keybindings">
           {t('kb_manage')}
         </a>{' '}
         <span className="form-text">{t('kb_switch_hint')}</span>

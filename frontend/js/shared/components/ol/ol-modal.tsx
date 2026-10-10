@@ -75,17 +75,29 @@ export function OLModal({
       : typeof size === 'number'
       ? size
       : 800 // 'lg' / default
+    // Mantine v9's `.mantine-Modal-content` is a FLEX item of the (flex)
+    // modal inner: its main-axis size comes from
+    // `flex: 0 0 var(--modal-size)` — a flex-basis that BEATS an inline
+    // `width` (K/M repro: size={1440}/1280 rendered 440px, the sm
+    // flex-basis). Override the flex-basis (+ the var it feeds) inline.
+    const w = width ?? '100%'
+    const styles = {
+      content: {
+        flexBasis: w,
+        width: '100%',
+        maxWidth: '100%',
+        height: 'auto',
+        maxHeight: '100%',
+        ['--modal-size']: w,
+      },
+    }
     return (
       <MantineSurfaceGate>
         <MantineModal
           opened={show}
           onClose={onHide}
           fullScreen={full}
-          styles={
-            width !== undefined
-              ? { content: { width, maxWidth: '100%', height: 'auto', maxHeight: '100%' } }
-              : { content: { width: '100%', height: '100%', maxHeight: '100%' } }
-          }
+          styles={styles}
           closeButtonProps={{ 'aria-label': t('close_dialog') }}
           className={classNames('ol-mant-modal', { 'modal-themed': themed }, className)}
         >
