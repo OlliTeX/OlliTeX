@@ -189,6 +189,55 @@ func projectDoc(d bson.M) HubProjectRow {
 	return r
 }
 
+// hubUserEmail reads a user doc's email: `email` first, then the legacy
+// `emails` fallback with ALL accepted shapes (bson.A / []any; bson.D /
+// bson.M / map elements), keeping the original string-entry fallback last.
+//
+// driver v2 quirk (the Q/C bug class, now in toolkit): decoding into bson.M
+// keeps nested arrays the nominal type bson.A and nested objects bson.D —
+// a `.([]any)` / `. (bson.M)` chain silently fails on both.
+func hubUserEmail(d bson.M) string {
+	if se, ok := d["email"].(string); ok && se != "" {
+		return se
+	}
+	var emails []any
+	switch v := d["emails"].(type) {
+	case bson.A:
+		emails = v
+	case []any:
+		emails = v
+	}
+	for _, m := range emails {
+		switch e2 := m.(type) {
+		case bson.D:
+			for _, kv := range e2 {
+				if kv.Key == "emailAddress" {
+					if s, ok := kv.Value.(string); ok && s != "" {
+						return s
+					}
+				}
+			}
+		case bson.M:
+			if s, ok := e2["emailAddress"].(string); ok && s != "" {
+				return s
+			}
+		case map[string]any:
+			if s, ok := e2["emailAddress"].(string); ok && s != "" {
+				return s
+			}
+		}
+	}
+	for _, m := range emails {
+		if s, ok := m.(string); ok && strings.Contains(s, "@") {
+			return s
+		}
+	}
+	if e, ok := d["email"].(string); ok {
+		return e
+	}
+	return ""
+}
+
 // usersDoc pulls the user fields (Node-parity flags).
 func usersDoc(d bson.M, now time.Time) HubUserRow {
 	r := HubUserRow{}
@@ -197,26 +246,7 @@ func usersDoc(d bson.M, now time.Time) HubUserRow {
 	} else if s, ok := d["_id"].(string); ok {
 		r.ID = s
 	}
-	if e, ok := d["email"].(string); ok {
-		r.Email = e
-	} else if emails, ok := d["emails"].([]any); ok {
-		for _, m := range emails {
-			if mm, ok := m.(bson.M); ok {
-				if ae, ok := mm["emailAddress"].(string); ok && ae != "" {
-					r.Email = ae
-					break
-				}
-			}
-		}
-		if r.Email == "" {
-			for _, s2 := range emails {
-				if ss, ok := s2.(string); ok && strings.Contains(ss, "@") {
-					r.Email = ss
-					break
-				}
-			}
-		}
-	}
+	r.Email = hubUserEmail(d)
 	if ab, ok := d["isAdmin"].(bool); ok {
 		r.IsAdmin = ab
 	}
@@ -342,19 +372,7 @@ func (t *Toolkit) HubCollect(ctx context.Context, sample int) (*HubStats, error)
 		var udocs []bson.M
 		if err := curU.All(pctx, &udocs); err == nil {
 			for _, ud := range udocs {
-				var e string
-				if se, ok := ud["email"].(string); ok {
-					e = se
-				} else if emails, ok := ud["emails"].([]any); ok {
-					for _, m := range emails {
-						if mm, ok := m.(bson.M); ok {
-							if ae, ok := mm["emailAddress"].(string); ok {
-								e = ae
-								break
-							}
-						}
-					}
-				}
+				e := hubUserEmail(ud)
 				if e != "" {
 					if id, ok := ud["_id"].(bson.ObjectID); ok {
 						emailByID[id.Hex()] = e
