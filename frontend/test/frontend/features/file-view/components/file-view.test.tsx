@@ -4,12 +4,22 @@ import {
   fireEvent,
 } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
+import getMeta from '@/utils/meta'
 
 import { renderWithEditorContext } from '../../../helpers/render-with-context'
 import FileView from '../../../../../js/features/file-view/components/file-view'
-import { imageFile, textFile } from '../util/files'
+import { imageFile, svgFile, textFile } from '../util/files'
 
 describe('<FileView/>', function () {
+  beforeEach(function () {
+    fetchMock.removeRoutes().clearHistory()
+    // The routing decision reads the exposed-settings meta (text extensions
+    // + editable filenames); the test world doesn't seed it.
+    Object.assign(getMeta('ol-ExposedSettings'), {
+      textExtensions: ['tex', 'bib', 'cls', 'bst', 'txt'],
+      editableFilenames: ['main.tex'],
+    })
+  })
   beforeEach(function () {
     fetchMock.removeRoutes().clearHistory()
     window.metaAttributesCache.set('ol-preventCompileOnLoad', true)
@@ -63,6 +73,28 @@ describe('<FileView/>', function () {
       await screen.findByText('Sorry, no preview is available', {
         exact: false,
       })
+    })
+  })
+
+  describe('for an svg file', function () {
+    beforeEach(function () {
+      window.URL.createObjectURL = function () {
+        return 'blob:fake-svg-url'
+      } as unknown as typeof URL.createObjectURL
+      window.URL.revokeObjectURL = function () {
+      } as unknown as typeof URL.revokeObjectURL
+    })
+
+    it('renders the svg as an image', async function () {
+      fetchMock.get(
+        'express:/project/:project_id/blob/:hash',
+        '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+      )
+
+      renderWithEditorContext(<FileView file={svgFile} />)
+
+      const img = await screen.findByRole('img')
+      expect(img.getAttribute('src')).to.equal('blob:fake-svg-url')
     })
   })
 })

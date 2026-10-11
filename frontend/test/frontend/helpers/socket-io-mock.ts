@@ -41,6 +41,12 @@ export class SocketIOMock {
     return this
   }
 
+  // socket.io legacy alias — live app code unmount paths use
+  // removeListener (e.g. ide-settings use-project-wide-settings-socket-listener).
+  removeListener(event: string, callback?: (...args: any[]) => void): this {
+    return this.off(event, callback)
+  }
+
   // client→server direction: sink (no server in the test world).
   emit(..._args: any[]): this {
     return this

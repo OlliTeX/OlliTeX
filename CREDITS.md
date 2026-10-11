@@ -89,6 +89,12 @@ something from their code we put them into CREDITS.md").
   tree). No code was copied into `go/` or `frontend/` — only the image build
   sources + the default-image config point to it.
 
+## File-view SVG preview (2026-10-11)
+
+- **Upstream git source:** `origin <https://github.com/MarkQuach12/overleaf.git>`, branch `svg-file-preview`, commit `eb84ef11b386d7652047b4a8682e154218b38fc8` (upstream issue #1458, "[web] add SVG file preview to the editor file view").
+- **What was ported:** `FileViewSvg` (fetch blob → re-wrap as `image/svg+xml` → object URL → `<img>`, 2 MB cap, 60 s fetch timeout, abort-controller cleanup), the `isSvgFile` routing branch in `FileView` (SVGs previously fell to "no preview" since `imageExtensions` excluded them), the `svgFile` test fixture, and the component + routing specs. Rendering goes through `<img>`, so SVG content is treated as an image rather than executable DOM (script-bearing SVGs cannot run) — this is inherited from the upstream approach and is the intended anti-XSS posture.
+- **Adopted (2026-10-11)**: 7/7 file-view specs green (vitest/jsdom TypstT1 project, where this tree's mocha-idiom FE specs run; the socket mock gained the socket.io-legacy `removeListener` alias the editor-context unmount paths call). NOTE: the owner-authored `toast-svg`/`toast-image` editor modules (AD 2026-10-07) are untouched — their file-editing modals are a separate capability from this preview.
+
 ## Review-panel comment edited timestamp (2026-10-11)
 
 - **Upstream git source:** `origin <https://github.com/BetterAndBetterII/overleaf.git>`, branch `cursor/comment-edited-timestamp-cf24`, commit `3ca22077e14bc35f46c4f8a83623af884239e36d` (upstream issue #1509).

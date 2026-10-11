@@ -191,6 +191,10 @@ module.exports = defineConfig({
             path.join(rootId, 'test/frontend/features/source-editor/languages/latex/list-continuation.test.ts'),
             // review-panel edited-timestamp display (upstream #1509 port):
             path.join(rootId, 'test/frontend/features/review-panel/components/review-panel-message.test.tsx'),
+            // file-view SVG preview (upstream port) + the sibling routing
+            // spec (mocha idiom, previously unrun in this tree):
+            path.join(rootId, 'test/frontend/features/file-view/components/file-view-svg.test.tsx'),
+            path.join(rootId, 'test/frontend/features/file-view/components/file-view.test.tsx'),
             path.join(rootId, 'modules/typst/test/frontend/languages/*.test.ts'),
           ],
           fileParallelism: true,
