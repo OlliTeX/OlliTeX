@@ -39,7 +39,10 @@ import ReviewModeOptions from './review-mode-options'
 import RenameProjectEditorModal from './rename-project-editor-modal'
 // Owner 2026-10-07 item T: File → Share (below Settings)
 import ShareProjectModal from '@/features/share-project-modal/components/share-project-modal'
+import RequestAccessModal from '@/features/ide-react/components/toolbar/request-access-modal'
 import { useEditorContext } from '@/shared/context/editor-context'
+import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
+import { useUserContext } from '@/shared/context/user-context'
 
 const menubarExtraComponents = importOverleafModules(
   'menubarExtraComponents',
@@ -61,15 +64,34 @@ export const ToolbarMenuBar = ({
   const { setView, view } = useLayoutContext()
   const { pdfUrl } = useCompileContext()
   const { isProjectOwner } = useEditorContext()
+  const { permissionsLevel, project } = useIdeReactContext()
+  const { id: userId } = useUserContext()
   const wordCountEnabled = pdfUrl || isSplitTestEnabled('word-count-client')
   const isDisabledDueToNetworkStall = useIsNetworkStalled()
   const [showWordCountModal, setShowWordCountModal] = useState(false)
   const [showCloneProjectModal, setShowCloneProjectModal] = useState(false)
   const [showRenameModal, setShowRenameModal] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showRequestAccessModal, setShowRequestAccessModal] = useState(false)
   const openProject = useOpenProject()
 
   const anonymous = getMeta('ol-anonymous')
+  // v2 chrome (owner AC, 2026-10-07): the visible toolbar is gone, so the
+  // legacy toolbar's RequestAccessButton CTA (read-only viewers asking for
+  // edit access) lost its only visible entry point on /editor. The File menu
+  // is the v2 action surface, so the command is registered THERE, but ONLY
+  // for the exact audience the legacy button served (same gate set as
+  // request-access-button.tsx): owner has sharing updates, viewer has
+  // readOnly/review, viewer is not already an editor, no pending request.
+  const requestAccessVisible =
+    Boolean(getMeta('ol-ownerHasSharingUpdates')) &&
+    !anonymous &&
+    (permissionsLevel === 'readOnly' || permissionsLevel === 'review') &&
+    !!userId &&
+    !project?.members?.some(
+      member => member._id === userId && member.privileges === 'readAndWrite',
+    ) &&
+    !project?.myAccessRequest?.privilegeLevel
   const showSupport = getMeta('ol-showSupport')
   const showDocumentation = getMeta('ol-wikiEnabled')
 
@@ -130,6 +152,24 @@ export const ToolbarMenuBar = ({
         },
         id: 'share_project',
       },
+      // 2026-10-11 (B wave, modals-p4 request-access leg): File → Request
+      // access for read-only/review viewers — the v2 home of the legacy
+      // toolbar CTA (see requestAccessVisible above). Registered only for
+      // the gated audience, so owners/editors never see it (and it is
+      // unregistered → filtered out of the menu automatically).
+      ...(requestAccessVisible
+        ? [
+            {
+              type: 'command' as const,
+              label: t('request_edit_access'),
+              disabled: isDisabledDueToNetworkStall,
+              handler: () => {
+                setShowRequestAccessModal(true)
+              },
+              id: 'request_access',
+            },
+          ]
+        : []),
     ],
     [
       t,
@@ -139,6 +179,7 @@ export const ToolbarMenuBar = ({
       anonymous,
       isDisabledDueToNetworkStall,
       isProjectOwner,
+      requestAccessVisible,
     ],
   )
   const fileMenuStructure: MenuStructure = useMemo(
@@ -153,7 +194,7 @@ export const ToolbarMenuBar = ({
           'rename_project', // owner 2026-10-07 item S: below Make a Copy
         ],
       },
-      { id: 'file-tools', children: ['show_version_history', 'word_count'] },
+      { id: 'file-tools', children: ['show_version_history', 'word_count', 'request_access'] },
       { id: 'submit', children: ['submit-project', 'manage-template'] },
       {
         id: 'file-download',
@@ -450,6 +491,11 @@ export const ToolbarMenuBar = ({
         show={showShareModal}
         handleOpen={() => setShowShareModal(true)}
         handleHide={() => setShowShareModal(false)}
+      />
+      <RequestAccessModal
+        show={showRequestAccessModal}
+        onSuccess={() => setShowRequestAccessModal(false)}
+        onCancel={() => setShowRequestAccessModal(false)}
       />
       {menubarExtraComponents.map(
         ({ import: { default: Component } }, index) => (

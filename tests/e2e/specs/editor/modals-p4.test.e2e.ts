@@ -223,11 +223,14 @@ for (const route of ['/editor'] as const) {
       const up = await cu.newPage()
       await loginRobust(up, USER.email, USER.password)
       await openEditor(up, route, roPid)
-      // read-only surface shows the request button (P2 contract) — no share
-      // click first (mirror the proven P2 flow)
-      const reqBtn = up.getByRole('button', { name: /request (edit )?access/i }).first()
-      await expect(reqBtn).toBeVisible({ timeout: 20_000 })
-      await reqBtn.click()
+      // v2 chrome (owner AC): the visible toolbar is gone — the legacy
+      // toolbar's RequestAccessButton CTA has no v2 home yet; its v2 entry
+      // point is File → "Request edit access" (menu-bar.tsx request_access
+      // command, registered ONLY for the viewer audience: owner sharing
+      // updates + readOnly/review + not-yet-editor + no pending request).
+      // The modal and POST /request-access round-trip beneath are the SAME
+      // RequestAccessModal contract the legacy button used.
+      await clickFileMenuItem(up, 'request edit access')
       await up.waitForTimeout(1500)
       await expect(up.getByText(/what access do you need|request edit access/i).first()).toBeVisible({ timeout: 10_000 })
       const seen: number[] = []
