@@ -189,6 +189,8 @@ module.exports = defineConfig({
             // source-editor keymap feature spec (list-item continuation,
             // upstream port — needs this project's jsdom CM shim setup):
             path.join(rootId, 'test/frontend/features/source-editor/languages/latex/list-continuation.test.ts'),
+            // review-panel edited-timestamp display (upstream #1509 port):
+            path.join(rootId, 'test/frontend/features/review-panel/components/review-panel-message.test.tsx'),
             path.join(rootId, 'modules/typst/test/frontend/languages/*.test.ts'),
           ],
           fileParallelism: true,

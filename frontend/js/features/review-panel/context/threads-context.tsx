@@ -147,23 +147,33 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
   useSocketListener(
     socket,
     'edit-message',
-    useCallback((threadId: ThreadId, commentId: CommentId, content: string) => {
-      setData(value => {
-        if (value) {
-          const thread = value[threadId] ?? { messages: [] }
+    useCallback(
+      (
+        threadId: ThreadId,
+        commentId: CommentId,
+        content: string,
+        editedAt: number
+      ) => {
+        setData(value => {
+          if (value) {
+            const thread = value[threadId] ?? { messages: [] }
 
-          return {
-            ...value,
-            [threadId]: {
-              ...thread,
-              messages: thread.messages.map(message =>
-                message.id === commentId ? { ...message, content } : message
-              ),
-            },
+            return {
+              ...value,
+              [threadId]: {
+                ...thread,
+                messages: thread.messages.map(message =>
+                  message.id === commentId
+                    ? { ...message, content, edited_at: editedAt }
+                    : message
+                ),
+              },
+            }
           }
-        }
-      })
-    }, [])
+        })
+      },
+      []
+    )
   )
 
   useSocketListener(

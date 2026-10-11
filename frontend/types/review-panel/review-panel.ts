@@ -20,6 +20,9 @@ export interface ReviewPanelCommentThreadMessage {
   content: string
   id: CommentId
   timestamp: Date
+  // wire `edited_at` — epoch millis (chat service, Date.now() convention);
+  // present only for messages that have been edited
+  edited_at?: number
   user?: ReviewPanelUser
   user_id: UserId
 }

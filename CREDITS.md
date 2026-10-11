@@ -89,6 +89,12 @@ something from their code we put them into CREDITS.md").
   tree). No code was copied into `go/` or `frontend/` — only the image build
   sources + the default-image config point to it.
 
+## Review-panel comment edited timestamp (2026-10-11)
+
+- **Upstream git source:** `origin <https://github.com/BetterAndBetterII/overleaf.git>`, branch `cursor/comment-edited-timestamp-cf24`, commit `3ca22077e14bc35f46c4f8a83623af884239e36d` (upstream issue #1509).
+- **What was ported:** the message header now shows the **edited** time (wire `edited_at`, epoch millis) with the "(edited)" marker (existing `edited` locale string; chat-panel marker pattern), the socket `edit-message` handler patches the `edited_at` field (not content-only), the track-changes `edit-message` socket emit carries the edited-at value (Go `hEditMessage`), `ReviewPanelCommentThreadMessage` gained `edited_at`, and a display spec was added. The chat service's `edited_at` persistence (`$set` on edit) already existed and is unchanged; the original timestamp remains the creation-order sort key.
+- **Adopted (2026-10-11)**: bug reproduced here on both FE legs (display + socket); port = FE legs + the Go emit field. Component spec green (vitest/jsdom, TypstT1 project); Go build+test green.
+
 ## n-gram model plumbing & offline-server extension review
 
 - `nschang/languagetool-101` (https://github.com/nschang/languagetool-101) —

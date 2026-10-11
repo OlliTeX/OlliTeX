@@ -30,6 +30,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -542,7 +543,11 @@ func hEditMessage(a *core.App, lim *tcLimitRunner) func(*core.Cxt, *core.Res) {
 			tcErr500(cxt, res)
 			return
 		}
-		tcEmitRoom(a, pid, "edit-message", []interface{}{tid, mid, content})
+		// emit carries the edited-at so the review panel can update the
+		// message time live (FE patch: `edited_at`). The chat service
+		// persists its own nowMs() for the same edit — values differ only
+		// by the inter-service latency (ms), invisible to display.
+		tcEmitRoom(a, pid, "edit-message", []interface{}{tid, mid, content, time.Now().UnixMilli()})
 		tc204(res)
 	}
 }

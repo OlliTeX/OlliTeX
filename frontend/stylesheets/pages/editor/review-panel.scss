@@ -116,6 +116,12 @@ $rp-type-blue: #6b7797;
 
   .review-panel-entry-time {
     color: var(--review-panel-color-secondary);
+
+    .message-edited {
+      @include body-xs;
+
+      font-weight: normal;
+    }
   }
 
   .review-panel-entry-actions {
