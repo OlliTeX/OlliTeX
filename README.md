@@ -231,6 +231,7 @@ Portions of the code are derived from other open-source projects; see
 ---
 
 <p align="center">
-  <img src="docs/ub-logo/logo_full.svg" alt="University of Bremen" width="320">
-  This project is supported by the [University of Bremen](https://www.uni-bremen.de).
+	<img src="docs/ub-logo/logo_full.svg" alt="University of Bremen" width="160">
 </p>
+This project is supported by the [University of Bremen](https://www.uni-bremen.de).
+
