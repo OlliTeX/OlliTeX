@@ -25,27 +25,40 @@ export function highlightsFromDiffResponse(
 
     if (isInsertion || isDeletion) {
       const meta = entry.meta
-      if (!meta) {
-        throw new Error('No meta found')
-      }
-      const user = meta.users?.[0]
-      const name = displayNameForUser(user)
-      const date = moment(meta.end_ts).format('Do MMM YYYY, h:mm a')
-      if (isInsertion) {
+      if (meta) {
+        const user = meta.users?.[0]
+        const name = displayNameForUser(user)
+        const date = moment(meta.end_ts).format('Do MMM YYYY, h:mm a')
+        if (isInsertion) {
+          highlights.push({
+            type: 'addition',
+            // There doesn't seem to be a convenient way to make this translatable
+            label: t('added_by_on', { name, date }),
+            range,
+            hue: getHueForUserId(user?.id),
+          })
+        } else if (isDeletion) {
+          highlights.push({
+            type: 'deletion',
+            // There doesn't seem to be a convenient way to make this translatable
+            label: t('deleted_by_on', { name, date }),
+            range,
+            hue: getHueForUserId(user?.id),
+          })
+        }
+      } else {
+        // 2026-10-11 (history-panel crash, board 8055cfa3): the Yjs diff
+        // plane (Go web) emits i/d chunks WITHOUT per-chunk meta (the Node
+        // V2 contract always carried user/attribution). The old hard throw
+        // ('No meta found') took the ENTIRE panel down via the React error
+        // boundary on every Yjs-edited project — history panel was unusable.
+        // Degrade gracefully: render the change without attribution labels.
+        // (Attribution on Yjs diffs = follow-up board item, not this fix.)
         highlights.push({
-          type: 'addition',
-          // There doesn't seem to be a convenient way to make this translatable
-          label: t('added_by_on', { name, date }),
+          type: isInsertion ? 'addition' : 'deletion',
+          label: isInsertion ? t('added', { defaultValue: 'Added' }) : t('removed', { defaultValue: 'Removed' }),
           range,
-          hue: getHueForUserId(user?.id),
-        })
-      } else if (isDeletion) {
-        highlights.push({
-          type: 'deletion',
-          // There doesn't seem to be a convenient way to make this translatable
-          label: t('deleted_by_on', { name, date }),
-          range,
-          hue: getHueForUserId(user?.id),
+          hue: getHueForUserId(undefined),
         })
       }
     }
