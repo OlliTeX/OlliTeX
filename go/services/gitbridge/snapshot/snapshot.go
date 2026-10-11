@@ -163,10 +163,33 @@ type PushResult struct {
 // status mapping)
 // ---------------------------------------------------------------------------
 
-type NetSnapshotApi struct{}
+type NetSnapshotApi struct {
+	bearerVar string // bearer token for the snapshot API calls
+}
+
+// setBearer — the thread the Go port must carry (data/oauth2.go doc): the
+// snapshot API takes `Authorization: Bearer <token>`.
+func (api *NetSnapshotApi) setBearer(tok *data.Oauth2) {
+	if api == nil {
+		return
+	}
+	if tok != nil && tok.Token != "" {
+		api.bearerVar = tok.Token
+	} else {
+		api.bearerVar = ""
+	}
+}
+
+func (api *NetSnapshotApi) bearer() string {
+	if api == nil {
+		return ""
+	}
+	return api.bearerVar
+}
 
 // GetDoc ports NetSnapshotApi.getDoc (via Facade.getDoc, see facade.go).
-func (api *NetSnapshotApi) GetDoc(_ *data.Oauth2, project string) (*GetDocResult, error) {
+func (api *NetSnapshotApi) GetDoc(tok *data.Oauth2, project string) (*GetDocResult, error) {
+	api.setBearer(tok)
 	body, sc, err := doGET(api, projectURL(project, ""))
 	if err != nil {
 		return nil, &giterrors.FailedConnectionException{}
@@ -189,7 +212,8 @@ func (api *NetSnapshotApi) GetDoc(_ *data.Oauth2, project string) (*GetDocResult
 }
 
 // GetSavedVers ports NetSnapshotApi.getSavedVers.
-func (api *NetSnapshotApi) GetSavedVers(_ *data.Oauth2, project string) ([]SnapshotInfo, error) {
+func (api *NetSnapshotApi) GetSavedVers(tok *data.Oauth2, project string) ([]SnapshotInfo, error) {
+	api.setBearer(tok)
 	body, sc, err := doGET(api, projectURL(project, "/saved_vers"))
 	if err != nil {
 		return nil, &giterrors.FailedConnectionException{}
@@ -208,7 +232,8 @@ func (api *NetSnapshotApi) GetSavedVers(_ *data.Oauth2, project string) ([]Snaps
 }
 
 // GetForVersion ports NetSnapshotApi.getForVersion.
-func (api *NetSnapshotApi) GetForVersion(_ *data.Oauth2, project string, versionID int) (*SnapshotData, error) {
+func (api *NetSnapshotApi) GetForVersion(tok *data.Oauth2, project string, versionID int) (*SnapshotData, error) {
+	api.setBearer(tok)
 	body, sc, err := doGET(api, projectURL(project, "/snapshots/"+strconv.Itoa(versionID)))
 	if err != nil {
 		return nil, &giterrors.FailedConnectionException{}
@@ -238,7 +263,8 @@ func (api *NetSnapshotApi) GetForVersion(_ *data.Oauth2, project string, version
 // Push ports NetSnapshotApi.push (PushResult: "accepted" => success,
 // "outOfDate" => not-successful). Java throws RuntimeException on unknown
 // code; we return an error.
-func (api *NetSnapshotApi) Push(_ *data.Oauth2, project string, body []byte) (*PushResult, error) {
+func (api *NetSnapshotApi) Push(tok *data.Oauth2, project string, body []byte) (*PushResult, error) {
+	api.setBearer(tok)
 	respBody, sc, err := doPOST(api, projectURL(project, "/snapshots"), body)
 	if err != nil {
 		return nil, &giterrors.FailedConnectionException{}
@@ -268,7 +294,14 @@ func (api *NetSnapshotApi) Push(_ *data.Oauth2, project string, body []byte) (*P
 // Request.performGetRequest/performPostRequest + getResult).
 func doGET(api *NetSnapshotApi, url string) (body []byte, sc int, err error) {
 	client := &http.Client{Timeout: 3 * time.Minute}
-	resp, e := client.Get(url)
+	req, e := http.NewRequest(http.MethodGet, url, nil)
+	if e != nil {
+		return nil, 0, e
+	}
+	if b := api.bearer(); b != "" {
+		req.Header.Set("Authorization", "Bearer "+b)
+	}
+	resp, e := client.Do(req)
 	if e != nil {
 		return nil, 0, e
 	}
@@ -287,6 +320,9 @@ func doPOST(api *NetSnapshotApi, url string, body []byte) (respBody []byte, sc i
 		return nil, 0, e
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if b := api.bearer(); b != "" {
+		req.Header.Set("Authorization", "Bearer "+b)
+	}
 	resp, e := client.Do(req)
 	if e != nil {
 		return nil, 0, e

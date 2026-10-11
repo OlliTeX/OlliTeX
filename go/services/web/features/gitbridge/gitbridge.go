@@ -43,6 +43,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,6 +52,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/features/emailtemplates"
+	"ollitex/go/services/web/features/history"
 	"ollitex/go/services/web/features/projectlist"
 )
 
@@ -778,6 +780,32 @@ func (g *gb) getDoc(cxt *core.Cxt, res *core.Res, uid string) {
 		res.SendStatus(400)
 		return
 	}
+	// Yjs-first (ff7d6b1a): in this fork the OT V2 flush plane has NO
+	// producer (D19 hard cut — content+versions live in the per-room Yjs
+	// logs), so the bridge-plane version number comes from the project's
+	// unified Yjs timeline (the same 024 Option B machinery the live-
+	// verified history panel uses). OT V2 fallback for projects without
+	// Yjs versions.
+	if db, derr := g.db(cxt); derr == nil && db != nil {
+		if ver, ts, author, bok := history.BridgeLatest(cxt.Req.Context(), db, projID); bok {
+			name, email := "Anonymous", "anonymous@nowhere"
+			if author != "" {
+				if u, ok := loadGBUser(g, cxt, author); ok {
+					email = u.Email
+					name = gbDisplayName(u)
+					if email == "" {
+						email = "anonymous@nowhere"
+					}
+				}
+			}
+			res.JSON(200, oj(
+				"latestVerId", int64(ver),
+				"latestVerAt", jsDate(ts),
+				"latestVerBy", oj2("email", email, "name", name),
+			))
+			return
+		}
+	}
 	var ver struct {
 		Version   int64  `json:"version"`
 		Timestamp string `json:"timestamp"`
@@ -883,6 +911,31 @@ func (g *gb) getSnapshot(cxt *core.Cxt, res *core.Res, uid string) {
 	if !projectExists(g, cxt, projID) {
 		res.SendStatus(400)
 		return
+	}
+	// Yjs-first (ff7d6b1a): render the snapshot from the project's Yjs
+	// timeline (current tree paths — a HEAD clone is exact — with per-room
+	// content at-or-before the unified version). OT V2 fallback for
+	// projects without Yjs versions.
+	if verN, perr := strconv.Atoi(version); perr == nil {
+		if db, derr := g.db(cxt); derr == nil && db != nil {
+			if files, bok := history.BridgeSnapshotAt(cxt.Req.Context(), db, projID, verN); bok {
+				srcs := []any{}
+				for path, content := range files {
+					p := "/" + path
+					if !gbValidatePath(p) {
+						res.SendStatus(400)
+						return
+					}
+					srcs = append(srcs, []any{content, p})
+				}
+				var sb strings.Builder
+				sb.WriteString(`{"srcs":`)
+				sb.Write(mustJSON(srcs))
+				sb.WriteString(`,"atts":[]}`)
+				res.JSON(200, []byte(sb.String()))
+				return
+			}
+		}
 	}
 	type fileData struct {
 		Content *string `json:"content"`
