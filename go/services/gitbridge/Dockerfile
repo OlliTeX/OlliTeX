@@ -22,6 +22,8 @@ WORKDIR /src
 COPY go.mod go.sum ./
 COPY go/services/gitbridge/ ./go/services/gitbridge/
 COPY cmd/gitbridge/ ./cmd/gitbridge/
+# shared library tree (ometrics + whatever the bridge main imports later)
+COPY go/libraries/ ./go/libraries/
 RUN --mount=type=cache,id=ol-go-mod,target=/gocache/mod \
     --mount=type=cache,id=ol-go-build,target=/gocache/build \
     CGO_ENABLED=1 GOOS=linux go build -o /out/git_bridge ./cmd/gitbridge
