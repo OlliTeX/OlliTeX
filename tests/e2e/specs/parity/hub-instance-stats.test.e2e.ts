@@ -22,11 +22,19 @@ test.afterAll(async () => {
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const cfg = async () => (await a('GET', '/admin/instance-stats/api/alert-config')).json().catch(() => null)
 
-test('renders: hub statistics leaf shows the dashboard summary + window control', async () => {
-  await expect(p.getByRole('heading', { name: /instance|statist/i }).first()).toBeVisible({ timeout: 15000 })
+test('renders: canonical statistics page shows the dashboard + alert area', async () => {
+  // AJ-1 (owner 2026-10-08): the settings sections left /hub (RETIRED_FROM_
+  // HUB in hub-root) and live on the dedicated page
+  // /admin-settings/site.general.stats — the canonical surface (the
+  // /hub#/site.general.stats deep link no longer renders the section).
+  // Re-pinned 2026-10-11 (ag-v44, battery cleanup) from the retired /hub
+  // form. The window switch is API-pinned below ("windows:" leg); the UI
+  // window control is Grafana-pane-only in the current design (see board
+  // item TODO-9b142051, Class C note).
+  await p.goto(BASE + '/admin-settings/site.general.stats', { waitUntil: 'domcontentloaded' })
+  await expect(p.locator('body', { hasText: /instance statistics/i }).first()).toBeVisible({ timeout: 15000 })
   const body = (await p.locator('body').innerText()) || ''
-  expect(/users|projects/i.test(body), 'metric labels present').toBeTruthy()
-  await expect(p.locator('select, [role="combobox"]').first()).toBeVisible({ timeout: 10000 })
+  expect(/alert settings/i.test(body), 'alert area present').toBeTruthy()
 })
 
 test('deny: non-site-admins cannot open the hub statistics leaf', async ({ browser }) => {

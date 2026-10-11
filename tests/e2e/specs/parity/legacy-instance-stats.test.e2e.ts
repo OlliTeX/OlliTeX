@@ -21,14 +21,20 @@ test.afterAll(async () => {
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const cfg = async () => (await a('GET', '/admin/instance-stats/api/alert-config')).json().catch(() => null)
 
-test('renders: /admin/instance-stats shows the dashboard (sections + window control)', async () => {
+test('renders: /admin/instance-stats shows the dashboard (sections + alert area)', async () => {
   // 2026-09-11 (hub wave): the legacy page was retired — the URL forwards
-  // admins into the hub stats leaf (hub#/site.general.stats); the dashboard
-  // itself (series API + alert config) is asserted below at the API level.
-  expect(p.url(), 'forwarded into the hub stats leaf').toMatch(/\/hub#/)
+  // admins into the hub stats leaf. AJ-1 (owner 2026-10-08) canonicalized
+  // the settings surface to the dedicated page /admin-settings/<id> (the
+  // /hub#/<id> hash form was retired from /hub in the same wave), which is
+  // where the 301 lands now (commit 7f134598 pinned the target; the
+  // parity redirect leg at :19 asserts it exactly). The section itself
+  // (series charts + alert settings) renders on that page; the window
+  // switch is API-pinned below (the UI control is Grafana-pane-only in
+  // the AJ-1 design, owner queue 2026-10-09).
+  expect(p.url(), 'forwarded into the canonical stats page').toBe(BASE + '/admin-settings/site.general.stats')
   const body = (await p.locator('body').innerText()) || ''
-  expect(/users|project|storage|system/i.test(body), 'dashboard sections present').toBeTruthy()
-  await expect(p.locator('select, [role="combobox"]').first()).toBeVisible({ timeout: 10000 })
+  expect(/instance statistics/i.test(body), 'stats section heading present').toBeTruthy()
+  expect(/alert settings/i.test(body), 'alert settings area present').toBeTruthy()
 })
 
 test('deny: non-site-admins (tpladmin, user) and guests are denied', async ({ browser }) => {

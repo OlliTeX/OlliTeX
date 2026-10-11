@@ -118,7 +118,11 @@ test('role: tpladmin + admin reach the hub BYO surface through the redirect', as
     const ctx = await browser.newContext(); const q = await ctx.newPage()
     await loginRobust(q, u.email, u.password)
     await q.goto(BASE + '/user/llm-settings', { waitUntil: 'domcontentloaded' })
-    expect(q.url(), u.email + ' lands on the hub').toContain('/hub')
+    // AJ-1 (owner 2026-10-08) canonicalized the personal LLM surface to the
+    // dedicated page /user-settings/<id>; the 301 target follows (7f134598).
+    // The assertion stays surface-agnostic: either form must land on the
+    // mysettings.llm.general section.
+    expect(q.url(), u.email + ' lands on the LLM general section').toMatch(/mysettings\.llm\.general/)
     await expect(q.locator('body', { hasText: /LLM|provider/i }).first()).toBeVisible({ timeout: 15000 })
     await ctx.close()
   }

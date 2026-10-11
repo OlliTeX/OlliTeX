@@ -20,9 +20,13 @@ test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const settings = async () => (await a('GET', '/admin/llm/settings/json')).json().catch(() => null)
 
-test('renders: hub LLM features leaf renders the admin LLM settings', async () => {
-  await expect(p.getByRole('heading', { name: /features|llm/i }).first()).toBeVisible({ timeout: 15000 })
-  const body = (await p.locator('body').innerText()) || ''
+test('renders: canonical LLM features page renders the admin LLM settings', async () => {
+  // Re-pinned 2026-10-11 (ag-v44, battery cleanup): the settings pages use
+  // bold Text labels, not role=heading elements, so the render is asserted
+  // on the section content the page renders (master switch + per-feature
+  // availability + services card).
+  const body = (await p.locator('body').innerText().catch(() => '')) || ''
+  expect(/enable ai features instance-wide/i.test(body), 'instance LLM master switch present').toBeTruthy()
   expect(/api|model|prompt|enabled/i.test(body), 'llm settings controls present').toBeTruthy()
 })
 
