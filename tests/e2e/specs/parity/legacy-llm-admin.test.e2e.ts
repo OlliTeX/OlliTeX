@@ -22,10 +22,10 @@ test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const settings = async () => (await a('GET', '/admin/llm/settings/json')).json().catch(() => null)
 
-test('redirects: /admin/llm/settings 301 → /hub#/site.llm.instance (page removed 2026-09-10)', async () => {
+test('redirects: /admin/llm/settings 301 → /admin-settings/site.llm.instance (page removed 2026-09-10)', async () => {
   const res = await p.request.get(PAGE, { maxRedirects: 0 })
   expect(res.status(), '301 expected').toBe(301)
-  expect(res.headers()['location']).toBe('/hub#/site.llm.instance')
+  expect(res.headers()['location']).toBe('/admin-settings/site.llm.instance')
 })
 
 test('deny: non-site-admins are denied the admin LLM settings (gate enforced on the hub)', async ({ browser }) => {

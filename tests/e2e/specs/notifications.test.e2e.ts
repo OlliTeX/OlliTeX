@@ -13,14 +13,17 @@ import { test, expect } from '@playwright/test'
 import { loginRobust } from '../helpers/auth'
 import { USER } from '../fixtures/credentials'
 
-test('notification preferences: legacy URL redirects to hub; mute toggle round-trips', async ({ page }) => {
+test('notification preferences: legacy URL is retired; the hub email leaf round-trips', async ({ page }) => {
   await loginRobust(page, USER.email, USER.password)
 
+  // B wave 2026-10-11: /user/notification-preferences was RETIRED (Go 404 —
+  // same retirement as /user/settings#* family, 2026-10-05; see
+  // legacy-notification-prefs.test.e2e.ts). The preferences surface lives at
+  // the canonical /user-settings leaf now.
   const res = await page.request.get('/user/notification-preferences', { maxRedirects: 0 })
-  expect(res.status(), 'legacy URL 301s').toBe(301)
-  expect(res.headers()['location']).toBe('/hub#/mysettings.email')
+  expect(res.status(), 'legacy URL is a Go 404 (retired)').toBe(404)
 
-  await page.goto('/hub#/mysettings.email', { waitUntil: 'domcontentloaded' })
+  await page.goto('/user-settings/mysettings.email', { waitUntil: 'domcontentloaded' })
   const bodyText = await page.locator('body').innerText()
   expect(bodyText.toLowerCase()).toMatch(/notification/)
 
@@ -39,7 +42,7 @@ test('notification preferences: legacy URL redirects to hub; mute toggle round-t
   await page.waitForTimeout(1200)
 
   // persist across reload
-  await page.goto('/hub#/mysettings.email', { waitUntil: 'domcontentloaded' })
+  await page.goto('/user-settings/mysettings.email', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('label.mantine-Switch-body').first().locator('input').first()).toBeChecked(want)
 
   // restore

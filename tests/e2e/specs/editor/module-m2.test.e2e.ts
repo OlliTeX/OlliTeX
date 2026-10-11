@@ -90,8 +90,8 @@ test.describe('M2 zotero/mendeley import surfaces', () => {
   test('editor route: module import states on the Mantine surface', async () => {
     await check('/editor', true)
   })
-
-  test('project route: module import states on the legacy surface', async () => {
-    await check('/Project', false)
-  })
+  // B wave 2026-10-11: the legacy `check('/Project', false)` leg was dropped —
+  // the owner retired dual-run (editorpages.go: "/editor is the ONLY editor
+  // page prefix", 2026-10-11) and /Project now 404s; the Mantine surface is
+  // the single current surface.
 })

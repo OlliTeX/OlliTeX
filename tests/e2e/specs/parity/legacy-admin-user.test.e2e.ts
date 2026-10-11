@@ -77,11 +77,11 @@ async function findUser(p: Page, mail: string) {
 async function purge(p: Page, id: string | null) { if (id) await api(p, 'DELETE', `/admin/user/${id}`).catch(() => {}) }
 
 test.describe('legacy /admin/user (baseline)', () => {
-  test('redirects: /admin/user 301 → /hub#/site.general.users.all (page removed 2026-09-10)', async ({ browser }) => {
+  test('redirects: /admin/user 301 → /admin-settings/site.general.users.all (page removed 2026-09-10)', async ({ browser }) => {
     const p = await admin(browser)
     const res = await p.request.get(BASE + '/admin/user', { maxRedirects: 0 })
     expect(res.status(), '301 expected').toBe(301)
-    expect(res.headers()['location']).toBe('/hub#/site.general.users.all')
+    expect(res.headers()['location']).toBe('/admin-settings/site.general.users.all')
   })
 
   test('denied: tpladmin + user are denied the admin user surface (gate enforced on the hub)', async ({ browser }) => {

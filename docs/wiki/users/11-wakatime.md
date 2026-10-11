@@ -6,11 +6,11 @@ browser extension or plugin. OlliTeX relays WakaTime heartbeats to a
 run** — no data leaves your infrastructure, and the official WakaTime cloud
 is never contacted by the instance.
 
-> Status: admin must enable WakaTime in
+> Status: the admin enables WakaTime in
 > [`/admin-settings/site.integrations.wakatime`](#) (see
-> [admin → WakaTime](../admins/10-wakatime.md)) before the user page below is
-> available. If the feature is disabled, your settings sidebar simply has no
-> WakaTime leaf.
+> [admin → WakaTime](../admins/10-wakatime.md)) — the feature toggle also
+> exposes the user opt-in below. Before that, your settings sidebar simply
+> has no WakaTime leaf.
 
 ## Where to find it
 
@@ -21,37 +21,47 @@ or the keyboard-accessible leaf in the settings sidebar).
 
 | Control | What it does |
 | --- | --- |
-| **Enable WakaTime** | Starts the local heartbeat relay for your account (per-keystroke activity, batched). |
-| **Your API key** | A personal key generated when you enable. This key works against the *self-hosted Wakapi* endpoint, not against wakatime.com. **Do not paste anyone else's cloud key here and do not share yours** — it is credential material. Display the key on a screen only when you must copy it; treat it like a password. |
-| **Regenerate / revoke** | Rotates your personal key (old key stops working immediately). |
-| **Status / recent activity** | Whether heartbeats are being accepted by the relay right now, and the most recent relayed entries (file, language, line) — so you can verify attribution before trusting it. |
+| **Opt-in / enable** | Starts the local heartbeat relay for your account (per-keystroke activity, batched server-side). |
+| **Status** | Whether your wakapi account is active and heartbeats are being accepted by the relay right now — so you can verify attribution before trusting it. |
+| **Your dashboard** | The local Wakapi UI at `/wakapi` on this host (e.g. `https://<your-instance>/wakapi`) — the admin page's footer shows the same link. Your wakapi username is the **local part of your OlliTeX e-mail** (e.g. `jdoe` for `jdoe@example.org`). |
+
+**Key handling (important):** your wakapi API key is **created and stored
+server-side** by OlliTeX (auto-provisioned from your e-mail; the admin can
+regenerate it for you). You never have to type or keep a key — and the
+browser never talks to wakapi at all, so the key never leaves the server.
+If a key ever does surface (admin tooling, logs), treat it like a password:
+redact it in tickets and screenshots. 
 
 ## How the relay works (what you are signing up for)
 
 1. While you edit, the editor emits activity (file path, language, cursor
    line) — the same shape Wakapi accepts.
 2. OlliTex (your instance) batches these and forwards them to the local
-   Wakapi service over the instance network. **Your browser never talks to
-   Wakapi or to wakatime.com directly.**
-3. Wakapi stores the entries locally (Postgres on the instance) and exposes
-   the standard WakaTime-compatible API if you want to query it.
+   Wakapi service over the instance network **using the server-side key**
+   (the key never appears in the browser).
+3. Wakapi stores the entries locally (its database on the instance) and
+   exposes the standard WakaTime-compatible API if you want to query it —
+   your dashboard is at `/wakapi`.
 
-Because the relay is per-user and rate-limited (`200/1h` per the site
-default; the admin can change it), accidental bursts cannot flood the
-Wakapi service.
+Because the relay is per-user and rate-limited (`200/1h` — the default
+Wakapi-side ceiling), accidental bursts cannot flood the Wakapi service.
 
 ## Privacy note
 
 - Files you edit on **this instance** are attributed to **your account on
-  the local Wakapi**. There is no external transmission.
-- If the admin later migrates the Wakapi data source, the same rule applies
-  to the new target — check with your admin what the relay's target URL is
-  (it is visible on the admin WakaTime page, not on yours).
+  the local Wakapi**. There is no external transmission by default; if the
+  admin points the relay at an off-box wakapi, the same rule applies to the
+  new target — check with your admin.
+- Your wakapi username is derived from your OlliTeX e-mail (local part), so
+  a wakapi account name reveals the e-mail *domain* to anyone who can see
+  wakapi user lists — instance-local by default, worth knowing before you
+  enable it against a public relay target.
 
 ## Troubleshooting
 
-- **Key rejected (401):** regenerate the key on this page and copy the
-  *new* key.
+- **No activity after enabling:** ask the admin to `Provision wakapi user`
+  for your e-mail (admin → WakaTime) — the key is server-side; you opt in
+  on THIS page, and heartbeats start after your next edit.
 - **No activity appearing:** confirm you are logged in, that you are editing
   an open document (heartbeats start after the first edit of a session), and
   that the admin has WakaTime enabled.

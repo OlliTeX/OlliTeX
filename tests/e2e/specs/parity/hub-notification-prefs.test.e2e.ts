@@ -3,11 +3,11 @@ import { loginRobust } from '../../helpers/auth'
 import { api, captureApi, waitForCall } from '../../parity/harness'
 import { USER, TPLADMIN } from '../../fixtures/credentials'
 
-// Parity (HUB) — /hub#/mysettings.email (email preferences leaf) vs legacy
+// Parity (HUB) — /user-settings/mysettings.email (email preferences leaf) vs legacy
 // /user/notification-preferences. Same contract: GET/POST
 // /notifications/preferences { muteAllNotifications, notificationDelayMinutes }.
 const BASE = 'http://127.0.0.1:7420'
-const LEAF = BASE + '/hub#/mysettings.email'
+const LEAF = BASE + '/user-settings/mysettings.email'
 let p: any = null
 
 test.beforeAll(async ({ browser }) => {

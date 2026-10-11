@@ -455,7 +455,7 @@ test.skip('RETIRED (dual-stack, 2026-10-05) — pin sanity: anchors hold (Node b
   expect(leg1!.pins.an_scan_127.status).toBe(500)
   expect(leg1!.pins.member_an_json.status).toBe(302)
   expect(leg1!.pins.u_page_301.loc).toBe('/hub#/mysettings.llm.general')
-  expect(leg1!.pins.an_page_301.loc).toBe('/hub#/site.llm.instance')
+  expect(leg1!.pins.an_page_301.loc).toBe('/admin-settings/site.llm.instance')
   expect(leg1!.pins.an_usage_d3.status).toBe(200)
   expect(Object.keys(leg1!.pins).length).toBeGreaterThanOrEqual(57)
 })

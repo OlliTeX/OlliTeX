@@ -7,9 +7,9 @@ import { api, mkProject, mongoEval, captureApi, waitForCall } from '../../parity
 // /hub parity for legacy /admin/project — the NEW Mantine leaves must drive the
 // same admin project API the legacy page used (endpoints + payloads + state).
 const BASE = 'http://127.0.0.1:7420'
-const HUB = '/hub#/site.general.projects.all'
-const HUB_TRASHED = '/hub#/site.general.projects.trashed'
-const HUB_DELETED = '/hub#/site.general.projects.deleted'
+const HUB = '/admin-settings/site.general.projects.all'
+const HUB_TRASHED = '/admin-settings/site.general.projects.trashed'
+const HUB_DELETED = '/admin-settings/site.general.projects.deleted'
 let ctxPage: Page | null = null
 const W = () => 'ph' + Date.now().toString(36) + Math.floor(Math.random() * 1000)
 

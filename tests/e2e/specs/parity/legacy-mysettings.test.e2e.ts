@@ -30,7 +30,7 @@ test('retired: /user/mysettings is a Go 404 now (redirect removed 2026-10-05)', 
   const loc = r?.headers()['location'] || ''
   expect(status === 404, 'expected 404 for the retired page, got ' + status + ' ' + loc.slice(0, 90)).toBeTruthy()
   // and the hub target actually renders the settings surface
-  await page.goto(BASE + '/hub#/mysettings.account', { waitUntil: 'domcontentloaded' })
+  await page.goto(BASE + '/user-settings/mysettings.account', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('body')).toContainText(/account|settings/i, { timeout: 15000 })
 })
 

@@ -14,8 +14,8 @@ import { ADMIN, TPLADMIN, USER } from '../../fixtures/credentials'
  * users purged after each test.
  */
 const BASE = process.env.OL_BASE || 'http://127.0.0.1:7420'
-const HUB_USERS = BASE + '/hub#/site.general.users.all'
-const HUB_DELETED = BASE + '/hub#/site.general.users.deleted'
+const HUB_USERS = BASE + '/admin-settings/site.general.users.all'
+const HUB_DELETED = BASE + '/admin-settings/site.general.users.deleted'
 const W = () => `ph${Date.now().toString(36)}${Math.floor(Math.random() * 997)}`
 const email = (t: string) => `${t}@e2e.test`
 

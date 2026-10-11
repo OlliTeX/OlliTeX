@@ -33,7 +33,7 @@ test('grammar settings read + save round-trip + mysettings section renders', asy
 
   // 2026-09-16: the legacy /user/llm-settings page is removed — the grammar
   // picker renders on the hub leaf (My settings → LLM → Grammar Checking).
-  await page.goto('/hub#/mysettings.llm.grammar', { waitUntil: 'domcontentloaded' })
+  await page.goto('/user-settings/mysettings.llm.grammar', { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(2_000)
   const body = await page.locator('body').innerText()
   expect(body).toMatch(/Grammar/i)

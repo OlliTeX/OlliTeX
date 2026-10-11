@@ -23,15 +23,25 @@ test('/hub site-settings: golden sections render as native leaves (no legacy rai
   // native Mantine leaves (owner #32 remakes) — these must not carry the
   // legacy bootstrap tab rail at all
   const native: Array<[string, string[]]> = [
-    ['site.compilation.sandboxed', ['Sandboxed compiles', 'Compile host dir', 'Add image']],
+    // labels follow the CURRENT section markup (v26 surface, B 2026-10-11):
+    // sandboxed compiles moved from "Compile host dir" to the body-size +
+    // image-table fields; the route moved from /hub# to /admin-settings/.
+    ['site.compilation.sandboxed', ['Sandboxed compiles', 'Compile body size limit', 'Add image']],
     ['site.compilation.git', ['Git integration', 'Host', 'Port']],
     ['site.compilation.github', ['GitHub sync', 'Client ID']],
     ['site.compilation.webdav', ['WebDAV', 'Root path']],
     ['site.compilation.dropbox', ['Dropbox', 'App key']],
   ]
   for (const [hash, labels] of native) {
-    await page.goto(`/hub/#${hash}`)
-    await page.waitForTimeout(1_600)
+    await page.goto(`/admin-settings/${hash}`)
+    // the section form loads async after the shell — resilient label wait
+    // (plain text: the text=/.../ regex form is unreliable in this
+    // Playwright build; see settings-canonical.test.e2e.ts)
+    for (const label of labels) {
+      await expect(async () => {
+        expect(await page.locator(`text=${label}`).count()).toBeGreaterThan(0)
+      }).toPass({ timeout: 15_000 })
+    }
     const body = await page.locator('body').innerText()
     for (const label of labels) {
       expect(body, `${hash} should render "${label}"`).toContain(label)
@@ -43,7 +53,7 @@ test('/hub site-settings: golden sections render as native leaves (no legacy rai
   // legacy-embed leaves (outside the #32 remake scope) still render their
   // sections — Templates + Misc
   for (const [hash, label] of [['site.general.managetpl', 'Templates'], ['site.general.misc', 'Misc']] as Array<[string, string]>) {
-    await page.goto(`/hub/#${hash}`)
+    await page.goto(`/admin-settings/${hash}`)
     await page.waitForTimeout(1_600)
     expect(await page.locator('body').innerText()).toContain(label)
   }
@@ -59,7 +69,7 @@ test('pandoc toggles + persists via /hub native leaf (site_settings round-trip)'
   // now pins it through the native /hub pandoc leaf: switch + Save flips the
   // stored flag, previous state restored afterwards.
   await go(page)
-  await page.goto('/hub/#site.compilation.pandoc')
+  await page.goto('/admin-settings/site.compilation.pandoc')
   await expect(page.getByRole('button', { name: 'Save' }).first()).toBeVisible({ timeout: 20_000 })
   // the enabled state is the FIRST role=switch on the native section
   const toggle = page.locator('input[role="switch"]').first()
@@ -92,8 +102,17 @@ test('pandoc toggles + persists via /hub native leaf (site_settings round-trip)'
   }
 })
 
-test('admin sees the LLM instance (Rate Limiter) card on the hub (R11-6, moved + relabeled 2026-09-16)', async ({ page }) => {
+test('admin sees the LLM instance (Rate Limiter) card on the hub (R11-6, moved + relabeled 2026-09-16; canonical route B 2026-10-11)', async ({ page }) => {
   await go(page)
-  await page.goto('/hub#/site.llm.instance', { waitUntil: 'domcontentloaded' })
-  await expect(page.locator('text=/Rate Limiter/i').first()).toBeVisible({ timeout: 20_000 })
+  // canonical deep-link route (B: /hub → /admin-settings). The legacy
+  // /hub hash form no longer routes ADMIN leaves (it resolves USER leaves
+  // only) — legacy parity for USER leaves stays covered by
+  // specs/settings-canonical.test.e2e.ts.
+  await page.goto('/admin-settings/site.llm.instance', { waitUntil: 'domcontentloaded' })
+  // plain-text locator — the text=/.../ regex form is unreliable in this
+  // Playwright build (verified: plain-text finds the node, regex form does
+  // not; see settings-canonical.test.e2e.ts)
+  await expect(async () => {
+    expect(await page.locator('text=Rate Limiter').count()).toBeGreaterThan(0)
+  }).toPass({ timeout: 20_000 })
 })

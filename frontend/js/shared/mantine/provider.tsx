@@ -113,15 +113,17 @@ export default function OlliTProvider({
     }
   }, [effectivePatch])
 
-  // R (owner 2026-10-10, WCAG contrast gate): Mantine resolves the anchor
-  // from theme.primaryColor (default-css-variables-resolver: light →
-  // primaryColor[primaryShade], dark → primaryColor-4); with the instance
-  // Appearance patch that lands on blue-6 #228be6 = 3.56:1 on white (< 4.5
-  // AA text). The dimmed var (gray-6 #868e96 = 3.32:1) fails AA for normal
-  // text too. Pin per scheme to AA-passing steps (blue-8 #1971c2 5.02:1;
-  // blue-4 light on dark-7 ≈ 7.9:1; dimmed → gray-7 #495057 ≈ 7.6:1):
-  // <Anchor>, <Text component="a">, every Mantine link + <Text c="dimmed">
-  // flip at once.
+  // R (owner 2026-10-10, WCAG contrast gate; dark half completed 2026-10-11
+  // in the B wave): Mantine resolves the anchor from theme.primaryColor
+  // (default-css-variables-resolver: light → primaryColor[primaryShade],
+  // dark → primaryColor-4); with the instance Appearance patch that lands on
+  // blue-6 #228be6 = 3.56:1 on white (< 4.5 AA text). The dimmed var
+  // (default #828282-#868e96) fails AA for normal text on the dark hub
+  // tables too (≈ 4.0:1 on #242424 — the hub-a11y gate caught it): pin per
+  // scheme to AA-passing steps (light: blue-8 #1971c2 5.02:1, dimmed
+  // gray-7 #495057; dark: blue-4, dimmed gray-5 #a0a8b0 ≈ 6.4:1 on
+  // dark-6/7 surfaces): <Anchor>, <Text component="a">, every Mantine link
+  // + <Text c="dimmed"> flip at once.
   const anchorSafeTheme = useMemo(() => {
     const t: any = theme
     const base = typeof t.getCssVariables === 'function' ? t.getCssVariables : undefined
@@ -133,9 +135,13 @@ export default function OlliTProvider({
           ...vars,
           '--mantine-color-anchor':
             scheme === 'dark' ? 'var(--mantine-color-blue-4)' : 'var(--mantine-color-blue-8)',
-          ...(scheme === 'light'
-            ? { '--mantine-color-dimmed': 'var(--mantine-color-gray-7)' }
-            : {}),
+          // dimmed (subdued text) per scheme: light wants a DARKER gray
+          // (gray-7), dark wants a LIGHTER one (gray-5) — the R dark
+          // half originally left dimmed at its default, which is ≈ 4.0:1 on
+          // the #242424 hub table surface (below AA 4.5): the hub-a11y
+          // gate (specs/parity/hub-a11y) caught it in the B wave.
+          '--mantine-color-dimmed':
+            scheme === 'dark' ? 'var(--mantine-color-gray-5)' : 'var(--mantine-color-gray-7)',
         }
       },
     }
@@ -153,8 +159,11 @@ export default function OlliTProvider({
       if (!el) return
       const dark = currentColorScheme() === 'dark'
       el.style.setProperty('--mantine-color-anchor', dark ? 'var(--mantine-color-blue-4)' : 'var(--mantine-color-blue-8)')
-      if (dark) el.style.removeProperty('--mantine-color-dimmed')
-      else el.style.setProperty('--mantine-color-dimmed', 'var(--mantine-color-gray-7)')
+      // dimmed (subdued text) per scheme — B wave 2026-10-11: dark now gets
+      // the LIGHTER accessible step (gray-5 ≈ 6.4:1 on the dark table
+      // surfaces) instead of removing the override (default ≈ 4.0:1 fails
+      // the hub-a11y gate)
+      el.style.setProperty('--mantine-color-dimmed', dark ? 'var(--mantine-color-gray-5)' : 'var(--mantine-color-gray-7)')
     }
     apply()
     const offScheme = onColorSchemeChange(apply)

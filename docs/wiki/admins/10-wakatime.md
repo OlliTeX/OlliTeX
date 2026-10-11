@@ -11,12 +11,16 @@ central switch. Users see it at /user-settings/mysettings.wakatime (see
 
 ## What the admin controls
 
-| Setting | Meaning | Notes |
+| Control | Meaning | Notes |
 | --- | --- | --- |
-| **Enabled** | Master switch. Disabled → user page hidden, relay stops forwarding. | Toggling off does not delete stored Wakapi entries. |
-| **Relay target (Wakapi base URL)** | The self-hosted Wakapi instance the relays forward to. | On the standard toolkit deployment this is the `wakapi` service (its Postgres on `pg`). Keep it instance-local; setting it to a public URL makes this a remote time-tracking sink — a deliberate decision, make it a deliberate one. |
-| **Rate limit** | Per-user heartbeat ceiling (default **200/hour**). | Protects Wakapi from client misbehaviour; raise only with care. |
-| **User access** | List of users with keys, key age, last activity. | Keys are personal credentials — **never copy them into tickets, wikis, or chat**; redact them in logs/screenshots. |
+| **Enabled (toggle)** | Master switch. Disabled → the user WakaTime leaf is hidden and relays stop. | Toggling off does not delete stored Wakapi entries. The toggle also exposes the user opt-in. |
+| **Wakapi server URL** | The self-hosted Wakapi the relays forward to. Default: **this instance's own `/wakapi` route**. | Keep it instance-local by default; an off-box URL makes this a remote time-tracking sink — a deliberate decision, make it a deliberate one. |
+| **Check connection** | Probes the Wakapi endpoint server-side and reports ok/message. | Use after any URL change, before onboarding users. |
+| **Provision wakapi user (e-mail)** | Creates the wakapi account for that OlliTeX user (username = the e-mail's local part) and stores the API key server-side for them. | Use to onboard before the first heartbeat or to **regenerate** a user's key. The key never reaches the browser — redact it in any log/screenshot where it does surface. |
+
+> Rates: heartbeats are per-user and the default Wakapi-side ceiling is
+> **200/hour** (the relay does not queue indefinitely — bursts beyond the
+> ceiling are dropped).
 
 ## Architecture on the standard toolkit
 

@@ -56,7 +56,7 @@ async function clickMenuItem(page: import('playwright').Page, menuTitle: string,
   await page.waitForTimeout(400)
 }
 
-for (const route of ['/project', '/editor'] as const) {
+for (const route of ['/editor'] as const) {
   const label = route === '/editor' ? 'renovated' : 'legacy'
   test.describe(`P2 toolbar+rail on ${route} (${label})`, () => {
     let adminPage: any

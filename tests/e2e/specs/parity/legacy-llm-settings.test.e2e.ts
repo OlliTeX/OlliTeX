@@ -34,10 +34,10 @@ test.afterAll(async () => {
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 const list = async () => (await (await a('GET', '/user/llm-providers')).json()).providers ?? []
 
-test('redirects: /user/llm-settings 301 → /hub#/mysettings.llm.general (page removed 2026-09-16)', async () => {
+test('redirects: /user/llm-settings 301 → /user-settings/mysettings.llm.general (page removed 2026-09-16)', async () => {
   const res = await p.request.get(PAGE, { maxRedirects: 0 })
   expect(res.status(), '301 expected').toBe(301)
-  expect(res.headers()['location']).toBe('/hub#/mysettings.llm.general')
+  expect(res.headers()['location']).toBe('/user-settings/mysettings.llm.general')
 })
 
 test('deny: guest cannot open /user/llm-settings', async ({ browser }) => {
@@ -69,7 +69,7 @@ test('save: a new provider persists (masked key) and is visible on the hub BYO s
   providerId = (mine as any)?.id ?? (mine as any)?.provider_id ?? saved.id ?? null
   expect(providerId, 'provider persisted with an id').toBeTruthy()
   // the hub BYO surface (redirect target) lists the provider
-  await p.goto(BASE + '/hub#/mysettings.llm.general', { waitUntil: 'domcontentloaded' })
+  await p.goto(BASE + '/user-settings/mysettings.llm.general', { waitUntil: 'domcontentloaded' })
   await p.waitForTimeout(2500)
   await expect(p.locator('body').getByText(NAME).first()).toBeVisible({ timeout: 15000 })
 })

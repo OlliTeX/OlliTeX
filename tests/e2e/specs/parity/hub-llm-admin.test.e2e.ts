@@ -3,11 +3,11 @@ import { loginRobust } from '../../helpers/auth'
 import { api } from '../../parity/harness'
 import { ADMIN, USER, TPLADMIN } from '../../fixtures/credentials'
 
-// Parity HUB side (hub admin LLM leaves, /hub#/site.llm.*) — the same
+// Parity HUB side (hub admin LLM leaves, /admin-settings/site.llm.*) — the same
 // site-admin LLM surface as legacy /admin/llm/settings: settings JSON,
 // save, check, models, usage — all served by the shared admin endpoints.
 const BASE = 'http://127.0.0.1:7420'
-const PAGE = BASE + '/hub#/site.llm.features'
+const PAGE = BASE + '/admin-settings/site.llm.features'
 let p: any = null
 
 test.beforeAll(async ({ browser }) => {

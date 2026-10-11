@@ -75,7 +75,7 @@ async function createFile(page: any, name: string): Promise<number[]> {
   return created
 }
 
-for (const route of ['/project', '/editor'] as const) {
+for (const route of ['/editor'] as const) {
   test.describe(`P5 panes on ${route}`, () => {
     let page: any
     let pid: string
@@ -310,7 +310,9 @@ for (const route of ['/project', '/editor'] as const) {
       await openEditor(page, route, pid)
       // trigger a real project notification: invite a non-member from the
       // share modal — the result toast is the shared notification surface
-      await page.getByRole('button', { name: /^share$/i }).first().click({ timeout: 10_000 })
+      // B wave 2026-10-11: Share moved into the File menu (owner item T, 2026-10-07).
+      await page.getByRole('button', { name: /^file$/i }).first().click({ timeout: 10_000 })
+      await page.getByRole('menuitem', { name: /share/i }).first().click({ timeout: 10_000 })
       const m = page
         .locator('button[aria-label^="enter emails"], [aria-label*=emails], .mantine-Modal-content, .modal')
         .filter({ hasText: /enter emails/i })

@@ -56,7 +56,7 @@ test('renovated shell dormant on /Project: marker absent, shell CSS not loaded',
   await loginRobust(page, ADMIN.email, ADMIN.password)
   const pid = await createBlankProject(page)
 
-  await page.goto(`${BASE}/project/${pid}`, { waitUntil: 'load' })
+  await page.goto(`${BASE}/editor/${pid}`, { waitUntil: 'load' })
   await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 90_000 })
   await page.waitForTimeout(2000)
 

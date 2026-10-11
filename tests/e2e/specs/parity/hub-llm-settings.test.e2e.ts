@@ -3,12 +3,12 @@ import { loginRobust } from '../../helpers/auth'
 import { api, captureApi, waitForCall } from '../../parity/harness'
 import { USER, TPLADMIN } from '../../fixtures/credentials'
 
-// Parity (HUB) — /hub#/mysettings.llm.general (LLM providers leaf) vs legacy
+// Parity (HUB) — /user-settings/mysettings.llm.general (LLM providers leaf) vs legacy
 // /user/llm-settings. Same BYO-provider contract:
 //   GET  /user/llm-providers, POST /user/llm-providers(201), POST /:id,
 //   POST /check, POST /scan, POST /:id/delete.
 const BASE = 'http://127.0.0.1:7420'
-const LEAF = BASE + '/hub#/mysettings.llm.general'
+const LEAF = BASE + '/user-settings/mysettings.llm.general'
 const RUN = Date.now().toString(36)
 const NAME = `parity-hub-llm-${RUN}`
 const DUMMY_KEY = 'sk-e2e-dummy-key-0000' // NOT a real key

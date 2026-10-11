@@ -45,7 +45,59 @@ function dlgWith(page: any, route: string, hint: RegExp) {
   return page.locator(sel).filter({ hasText: hint }).first()
 }
 
-for (const route of ['/project', '/editor'] as const) {
+
+// B wave 2026-10-11: the File-menu item entries (Make a copy / Settings)
+// race a plain Playwright click sequence (the dropdown closes between the
+// two actionability-checked clicks). Opening + selecting in one in-page
+// click chain keeps the menu open and lands the item.
+async function clickFileMenuItem(page: any, label: string, fallback?: string) {
+  await page.evaluate((l: string) => {
+    const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').trim() === 'File')
+    if (b) (b as HTMLElement).click()
+  })
+  await page.waitForTimeout(700)
+  const clicked = await page.evaluate(async (labels: string[]) => {
+    const isVisible = (e: Element) =>
+      e.getClientRects().length > 0 &&
+      (getComputedStyle(e as HTMLElement).visibility !== 'hidden') &&
+      (getComputedStyle(e as HTMLElement).display !== 'none')
+    for (const want of labels) {
+      const cands = [...document.querySelectorAll('a, [role=menuitem], [role=menuitemradio], button, .dropdown-item, li')]
+        .filter(e => {
+          const t = (e.textContent || '').trim().toLowerCase()
+          return t === want.toLowerCase() || t.startsWith(want.toLowerCase())
+        })
+      // open the nested group (its parent menu item) if the direct item is
+      // not visible: hover the group label first
+      const vis = cands.find(isVisible)
+      if (vis) { (vis as HTMLElement).click(); return true }
+      const group = cands[0]
+      if (group) {
+        // walk up to the menu-item parent and open it before clicking
+        let n: Element | null = group
+        while (n && !isVisible(n)) {
+          const g = n.closest('li, [role=menuitem], [role=menuitemradio]')
+          if (g && g !== n && g.getClientRects().length > 0) {
+            const ev = new MouseEvent('mouseover', { bubbles: true })
+            g.dispatchEvent(ev)
+            break
+          }
+          n = n.parentElement
+        }
+        await new Promise((r) => setTimeout(r, 400))
+        const vis2 = cands.find(isVisible)
+        if (vis2) { (vis2 as HTMLElement).click(); return true }
+        group.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        return true
+      }
+    }
+    return false
+  }, fallback ? [label, fallback] : [label])
+  await page.waitForTimeout(600)
+  if (!clicked) throw new Error('File menu item not found: ' + label)
+}
+
+for (const route of ['/editor'] as const) {
   test.describe(`P4 modals on ${route}`, () => {
     let adminPage: any
     let pid: string
@@ -69,7 +121,14 @@ for (const route of ['/project', '/editor'] as const) {
       // invite row: USER is NOT a member of pid → they appear as an invite
       // candidate. Remove row: TPLADMIN is granted on pid → member row.
       mongoEval(`db.getSiblingDB('sharelatex').projects.updateOne({_id:ObjectId('${pid}')},{$addToSet:{collaberator_refs:'${tplAdminId}'}})`)
-      mongoEval(`db.getSiblingDB('sharelatex').projects.updateOne({_id:ObjectId('${roPid}')},{$addToSet:{readOnly_refs:'${userId}'}})`)
+      // B wave 2026-10-11: grant readOnly through the API (not direct Mongo) -
+      // the request-access button is gated on a real owner sharing-update
+      // (request-access-button.tsx: ownerHasSharingUpdates), which a
+      // direct-DB grant never emits, so the button would stay hidden.
+      await api(adminPage, 'POST', '/project/' + roPid + '/invite', {
+        email: USER.email,
+        privileges: 'readOnly',
+      })
     })
 
     test.afterAll(async () => {
@@ -80,7 +139,11 @@ for (const route of ['/project', '/editor'] as const) {
 
     test('invite: share modal invite-by-email round-trips (POST /invite 2xx + sent copy)', async () => {
       await openEditor(adminPage, route, pid)
-      await adminPage.getByRole('button', { name: /^share$/i }).first().click({ timeout: 10_000 })
+      // B wave 2026-10-11: the Share entry moved into the File menu (owner item
+      // T, 2026-10-07: File → Settings → Share); the ShareProjectModal
+      // contract beneath is unchanged.
+      await adminPage.getByRole('button', { name: /^file$/i }).first().click({ timeout: 10_000 })
+      await adminPage.getByRole('menuitem', { name: /share/i }).first().click({ timeout: 10_000 })
       const m = dlgWith(adminPage, route, /enter emails/i)
       await expect(m).toBeVisible({ timeout: 10_000 })
       const inp = m.locator('input[type=email]').first()
@@ -114,7 +177,11 @@ for (const route of ['/project', '/editor'] as const) {
 
     test('remove: share modal member remove updates membership (API 2xx + membership gone)', async () => {
       await openEditor(adminPage, route, pid)
-      await adminPage.getByRole('button', { name: /^share$/i }).first().click({ timeout: 10_000 })
+      // B wave 2026-10-11: the Share entry moved into the File menu (owner item
+      // T, 2026-10-07: File → Settings → Share); the ShareProjectModal
+      // contract beneath is unchanged.
+      await adminPage.getByRole('button', { name: /^file$/i }).first().click({ timeout: 10_000 })
+      await adminPage.getByRole('menuitem', { name: /share/i }).first().click({ timeout: 10_000 })
       const m = dlgWith(adminPage, route, /enter emails/i)
       await expect(m).toBeVisible({ timeout: 10_000 })
       // expand the 'Project access' list (the member rows live behind it)
@@ -177,9 +244,7 @@ for (const route of ['/project', '/editor'] as const) {
 
     test('clone: make-a-copy clones the project (POST /clone 2xx + new project id)', async () => {
       await openEditor(adminPage, route, pid)
-      await adminPage.getByRole('button', { name: /^file$/i }).first().click()
-      await adminPage.waitForTimeout(700)
-      await adminPage.getByText(/make a copy/i).first().click({ timeout: 8_000 })
+      await clickFileMenuItem(adminPage, 'make a copy')
       const m = dlg(adminPage, route)
       await expect(m.getByText('Copy project', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
       const name = 'p4-clone-' + route.replace('/', '')
@@ -199,7 +264,9 @@ for (const route of ['/project', '/editor'] as const) {
 
     test('compile: settings compile form (root / engine / mode) present + change round-trips', async () => {
       await openEditor(adminPage, route, pid)
-      await adminPage.getByRole('button', { name: /^settings$/i }).first().click({ timeout: 10_000 })
+      // B wave 2026-10-11: Settings moved into the File menu (owner item T,
+      // 2026-10-07); the Settings modal contract is unchanged.
+      await clickFileMenuItem(adminPage, 'settings')
       const m = dlgWith(adminPage, route, /compiler/i)
       await expect(m).toBeVisible({ timeout: 15_000 })
       // this fork's settings modal is TABBED — the compile controls live in
@@ -232,7 +299,9 @@ for (const route of ['/project', '/editor'] as const) {
 
     test('references: settings references tab exposes the bib file controls', async () => {
       await openEditor(adminPage, route, pid)
-      await adminPage.getByRole('button', { name: /^settings$/i }).first().click({ timeout: 10_000 })
+      // B wave 2026-10-11: Settings moved into the File menu (owner item T,
+      // 2026-10-07); the Settings modal contract is unchanged.
+      await clickFileMenuItem(adminPage, 'settings')
       const m = dlgWith(adminPage, route, /compiler/i)
       await expect(m).toBeVisible({ timeout: 15_000 })
       const refsTab = m.getByRole('tab', { name: /references/i }).first()

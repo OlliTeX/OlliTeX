@@ -3,11 +3,11 @@ import { loginRobust } from '../../helpers/auth'
 import { api } from '../../parity/harness'
 import { ADMIN, USER, TPLADMIN } from '../../fixtures/credentials'
 
-// Parity HUB side (hub Instance statistics leaf, /hub#/site.general.stats) —
+// Parity HUB side (hub Instance statistics leaf, /admin-settings/site.general.stats) —
 // same admin-only instance-stats surface as legacy /admin/instance-stats:
 // the shared fetchSeries API + window switcher + admin-only access.
 const BASE = 'http://127.0.0.1:7420'
-const PAGE = BASE + '/hub#/site.general.stats'
+const PAGE = BASE + '/admin-settings/site.general.stats'
 let p: any = null
 
 test.beforeAll(async ({ browser }) => {

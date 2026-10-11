@@ -117,7 +117,7 @@ test('card-assets: cards show thumbnails + "View PDF" + "Download bundle" (owner
 test('license: admin edit form offers the license dropdown (owner item 6)', async ({ browser }) => {
   const ctx = await browser.newContext(); const q = await ctx.newPage()
   await loginRobust(q, ADMIN.email, ADMIN.password)
-  await q.goto(BASE + '/hub#/site.general.managetpl', { waitUntil: 'domcontentloaded' })
+  await q.goto(BASE + '/admin-settings/site.general.managetpl', { waitUntil: 'domcontentloaded' })
   // open the EDIT dialog of the fixture template (the license dropdown lives there)
   const row = q.locator('tr', { hasText: 'Parity Fixture Template' }).first()
   await expect(row).toBeVisible({ timeout: 15000 })

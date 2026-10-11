@@ -37,7 +37,9 @@ test('zotero is graceful without credentials + /library renders', async ({ page,
   const cbody = (await connect.text().catch(() => '')).slice(0, 200)
   expect(await expectNot5xx(connect), `zotero connect bad-token graceful: ${cbody}`).toBeLessThan(500)
 
-  const res = await page.goto('/library')
+  // B wave 2026-10-11: the top-level /library page was retired (Go 404 — see
+  // parity/legacy-library.test.e2e.ts); the library surface is the hub leaf.
+  const res = await page.goto('/hub#/library')
   expect(res?.status() ?? 200).toBe(200)
   await page.waitForTimeout(1_500)
   const body = await page.locator('body').innerText()

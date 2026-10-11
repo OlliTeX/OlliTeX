@@ -17,7 +17,7 @@ test.beforeAll(async ({ browser }) => {
   const c = await browser.newContext({ viewport: { width: 1400, height: 900 } })
   p = await c.newPage()
   await loginRobust(p, ADMIN.email, ADMIN.password)
-  await p.goto(BASE + '/hub#/mysettings.gitsync', { waitUntil: 'domcontentloaded' })
+  await p.goto(BASE + '/user-settings/mysettings.gitsync', { waitUntil: 'domcontentloaded' })
 })
 test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 

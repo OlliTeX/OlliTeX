@@ -21,7 +21,7 @@ test.afterAll(async () => {
 const u = () => { expect(p).toBeTruthy(); return p }
 const userId = () => mongoEval('db.users.findOne({ email: "e2e-user@e2e.test" })._id.toString()')
 const doc = (field: string) => mongoEval(`db.users.findOne({ _id: ObjectId("${userId()}") }).${field}`)
-const LEAF = (id: string) => `${BASE}/hub#/mysettings.${id}`
+const LEAF = (id: string) => `${BASE}/user-settings/mysettings.${id}`
 
 async function gotoLeaf(id: string) {
   const page = u()
@@ -39,7 +39,7 @@ test('renders: hub mysettings leaves load for a logged-in user', async () => {
 })
 
 test('deny: guests cannot open hub mysettings', async ({ page }) => {
-  await page.goto(BASE + '/hub#/mysettings.account', { waitUntil: 'domcontentloaded' })
+  await page.goto(BASE + '/user-settings/mysettings.account', { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(2500)
   const body = (await page.locator('body').innerText().catch(() => '')) || ''
   const denied = /login/i.test(page.url() || '') || !/First name|Update account/i.test(body)

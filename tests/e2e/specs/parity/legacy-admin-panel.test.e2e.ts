@@ -67,7 +67,7 @@ test('system-messages: post a message, it is readable via GET /system/messages; 
 })
 
 test('active-projects: the hub active-projects leaf renders the listing surface', async () => {
-  await p.goto(BASE + '/hub#/site.general.activeprojects', { waitUntil: 'domcontentloaded' })
+  await p.goto(BASE + '/admin-settings/site.general.activeprojects', { waitUntil: 'domcontentloaded' })
   await p.waitForTimeout(1500)
   const bodyText = ((await p.locator('body').innerText().catch(() => '')) || '').toLowerCase()
   expect(/active projects|no projects/i.test(bodyText), 'surface shows the listing (' + bodyText.slice(0, 80) + ')').toBeTruthy()

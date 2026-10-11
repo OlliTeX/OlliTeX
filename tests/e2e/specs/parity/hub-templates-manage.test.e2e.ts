@@ -15,7 +15,7 @@ import { ADMIN, USER } from '../../fixtures/credentials'
 // state (toasts, half-open modals, stale lists) between tests, which makes
 // subsequent interactions unreliable. Fresh page = deterministic state.
 const BASE = 'http://127.0.0.1:7420'
-const HUB = BASE + '/hub#/site.general.managetpl'
+const HUB = BASE + '/admin-settings/site.general.managetpl'
 type Browser = Awaited<ReturnType<Parameters<Parameters<typeof test.beforeAll<unknown, { browser: any }>[1]>[0]>>>
 let SH: { ctx: any } | null = null
 

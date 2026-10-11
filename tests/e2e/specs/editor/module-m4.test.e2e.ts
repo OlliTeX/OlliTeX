@@ -50,7 +50,7 @@ test.describe('M4 llm surfaces', () => {
     const res = await page.request.get(B + '/admin/llm/settings', { maxRedirects: 0 }).catch(() => null)
     expect(res, 'response available').toBeTruthy()
     expect(res!.status(), '301 expected').toBe(301)
-    expect(res!.headers()['location']).toBe('/hub#/site.llm.instance')
+    expect(res!.headers()['location']).toBe('/admin-settings/site.llm.instance')
     // follow the redirect: the hub admin instance surface must render (llm text, no page errors)
     await page.goto(B + '/admin/llm/settings', { waitUntil: 'load' }).catch(() => {})
     await page.waitForTimeout(3500)

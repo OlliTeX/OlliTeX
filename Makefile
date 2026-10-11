@@ -238,6 +238,18 @@ build-texlive-base: ## Build the texlive-full base-2026 (ubuntu 24.04 + fonts + 
 
 .PHONY: build-texlive
 build-texlive: build-texlive-base ## Build the TeXLive 2026 sandbox image (default compile image) → $(TEXLIVE_FULL_TAG)
+	@echo "── D (backbone audit 2026-10-11) preflight: TeXLive 2026 context guard ──";
+	@if [ ! -d "$(TEXLIVE_FULL_CONTEXT)/texlive/2026" ]; then \
+	  echo "ERROR: TEXLIVE_FULL_CONTEXT='$(TEXLIVE_FULL_CONTEXT)' has no texlive/2026/ directory." >&2; \
+	  echo "The 2026 full image is a VERSION-DIR context (texlive/2026/Dockerfile);" >&2; \
+	  echo "the legacy flat context cannot build the 2026 default. Use" >&2; \
+	  echo "  TEXLIVE_FULL_CONTEXT=images/texlive-full-amd64 (or the versioned copy)" >&2; \
+	  echo "and TEXLIVE_FULL_TAG=olpsint/texlive-full:2026.1 — see the README." >&2;
+	  exit 1; \
+	fi;
+	@if [ "${TEXLIVE_FULL_TAG##*:}" = "latest" ] || [ "${TEXLIVE_FULL_TAG##*:}" = "latest-full" ]; then \
+	  echo "WARNING: TEXLIVE_FULL_TAG='$(TEXLIVE_FULL_TAG)' is the RETIRED upstream tag line; the 2026 default is :2026.1 (see README)" >&2;
+	fi;
 	docker pull $(TEXLIVE_CACHE_IMAGE) || true
 	docker build \
 	  --build-arg BUILDKIT_INLINE_CACHE=1 \

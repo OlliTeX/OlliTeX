@@ -16,7 +16,7 @@ test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 
 test('hub /#/site.storage.local renders the storage env-parameter section', async () => {
-  await p.goto(BASE + '/hub#/site.storage.local', { waitUntil: 'domcontentloaded' })
+  await p.goto(BASE + '/admin-settings/site.storage.local', { waitUntil: 'domcontentloaded' })
   await expect(p.locator('body').getByText('Storage (local object storage)').first()).toBeVisible({ timeout: 15_000 })
   for (const label of ['Local storage backend', 'Gateway endpoint', 'Access key ID', 'Secret access key', 'Template files bucket', 'Project blobs bucket', 'Global blobs bucket', 'Docstore archive bucket']) {
     await expect(p.locator('body').getByText(label, { exact: false }).first()).toBeVisible()

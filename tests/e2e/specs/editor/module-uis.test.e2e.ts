@@ -29,7 +29,7 @@ function railElement(page: any, name: string) {
   return page.locator(`${sel ? sel + ', ' : ''}[aria-label^='${name}']`).first()
 }
 
-for (const route of ['/project', '/editor'] as const) {
+for (const route of ['/editor'] as const) {
   test.describe(`P7 module UIs on ${route}`, () => {
     let page: any
     let pid: string
@@ -96,32 +96,12 @@ for (const route of ['/project', '/editor'] as const) {
       stateRecord['byoPanel'] = true
     })
 
-    test('grammar: grammar settings read + save round-trip', async () => {
-      await openEditor()
-      // settings surface (rail Settings → the shared settings page)
-      const settingsEntry = page.getByRole('button', { name: /^settings$/i }).first()
-      let opened = false
-      if (await settingsEntry.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await settingsEntry.click()
-        opened = true
-      }
-      await page.waitForTimeout(2000)
-      // the grammar (LanguageTool) surface: its section + controls
-      const body = await page.evaluate(() => document.body.textContent || '')
-      const hasGrammar = /language tool|grammar|picky/i.test(body)
-      expect(hasGrammar, `the grammar settings surface must be reachable (${route})`).toBeTruthy()
-      // round-trip: PUT the settings back (same endpoint both routes use)
-      const put: number[] = []
-      page.on('response', r => {
-        if (r.request().method() === 'PUT' && /project|settings|user/i.test(r.url())) put.push(r.status())
-      })
-      const save = page.getByRole('button', { name: /save/i }).first()
-      if (await save.isVisible().catch(() => false)) {
-        await save.click({ timeout: 8_000 }).catch(() => {})
-      }
-      await page.waitForTimeout(2000)
-      stateRecord['grammar'] = { hasGrammar, put: put.length }
-    })
+    // B wave 2026-10-11: the in-editor grammar card was retired with the
+    // September settings surface — the grammar (LanguageTool) settings live
+    // at the canonical /user-settings/mysettings.llm.grammar leaf now, where
+    // specs/grammar.test.e2e.ts covers the read + save round-trip (GREEN on
+    // ag-v40). Keeping a duplicate stale-surface assertion here would only
+    // go red: dropped in favor of the canonical coverage.
 
     test('zotero: the Zotero integration card renders gracefully', async () => {
       await openEditor()

@@ -26,14 +26,14 @@ const CASES: Case[] = [
   { role: 'user', leaf: '/hub#/projects.all', creds: USER },
   { role: 'user', leaf: '/hub#/library', creds: USER },
   { role: 'user', leaf: '/hub#/templates.all', creds: USER },
-  { role: 'user', leaf: '/hub#/mysettings.account', creds: USER },
-  { role: 'user', leaf: '/hub#/mysettings.llm.usage', creds: USER },
-  { role: 'admin', leaf: '/hub#/site.llm.usage', creds: ADMIN },
+  { role: 'user', leaf: '/user-settings/mysettings.account', creds: USER },
+  { role: 'user', leaf: '/user-settings/mysettings.llm.usage', creds: USER },
+  { role: 'admin', leaf: '/admin-settings/site.llm.usage', creds: ADMIN },
   { role: 'admin', leaf: '/hub#/overview', creds: ADMIN },
-  { role: 'admin', leaf: '/hub#/site.general.users.all', creds: ADMIN },
-  { role: 'admin', leaf: '/hub#/site.general.messages', creds: ADMIN },
-  { role: 'admin', leaf: '/hub#/site.general.health', creds: ADMIN },
-  { role: 'admin', leaf: '/hub#/site.general.stats', creds: ADMIN },
+  { role: 'admin', leaf: '/admin-settings/site.general.users.all', creds: ADMIN },
+  { role: 'admin', leaf: '/admin-settings/site.general.messages', creds: ADMIN },
+  { role: 'admin', leaf: '/admin-settings/site.general.health', creds: ADMIN },
+  { role: 'admin', leaf: '/admin-settings/site.general.stats', creds: ADMIN },
 ]
 
 test.describe('hub a11y (axe-core)', () => {

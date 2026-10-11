@@ -31,11 +31,11 @@ const projTrashed = (pid: string) =>
 const collabCount = (pid: string) =>
   Number(mongoEval(`(db.projects.findOne({ _id: ObjectId("${pid}") }).collaberator_refs || []).length`))
 
-test('redirects: /admin/project 301 → /hub#/site.general.projects.all (page removed 2026-09-10)', async () => {
+test('redirects: /admin/project 301 → /admin-settings/site.general.projects.all (page removed 2026-09-10)', async () => {
   const p = admin()
   const res = await p.request.get(BASE + '/admin/project', { maxRedirects: 0 })
   expect(res.status(), '301 expected').toBe(301)
-  expect(res.headers()['location']).toBe('/hub#/site.general.projects.all')
+  expect(res.headers()['location']).toBe('/admin-settings/site.general.projects.all')
 })
 
 test('denied: tpladmin + user are denied the admin project surface (gate enforced on the hub)', async ({ browser }) => {

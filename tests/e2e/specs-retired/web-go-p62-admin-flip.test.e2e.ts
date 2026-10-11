@@ -335,7 +335,7 @@ test.describe('@local web-go P6.2 (admin-tools project surface) parity', () => {
     // hard anchors from the live Node oracle — fail fast with a clear label.
     if (!Object.keys(LEG1).length) t.skip('no leg-1 baseline captured (earlier leg failed)')
     expect(LEG1.red_users.status).toBe(301)
-    expect(LEG1.red_users.loc).toBe('/hub#/site.general.users.all')
+    expect(LEG1.red_users.loc).toBe('/admin-settings/site.general.users.all')
     expect(LEG1.red_users_member.loc).toBe('/restricted?from=%2Fadmin%2Fuser')
     expect(LEG1.admin_list.status).toBe(500)
     expect(LEG1.invite_admin.status).toBe(400)

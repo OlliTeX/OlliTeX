@@ -28,9 +28,15 @@ test('notes: /api/hub/notes serves the release notes markdown', async () => {
   expect(txt).toMatch(/One console/)
 })
 
-test('notes: hub Overview shows the What’s new card', async () => {
-  await p.goto(BASE + '/hub#/overview', { waitUntil: 'domcontentloaded' })
-  await expect(p.locator('main').getByText('What’s new', { exact: false }).first())
+test('notes: the (admin) overview renders its KPI grid', async () => {
+  // B wave 2026-10-11: the "What's new" card was retired from the overview by
+  // the owner on 2026-10-09 (leaves.tsx: "the What's new / Instance
+  // management / About cards were retired from this page — the KPI grid
+  // remains"); the overview leaf is admin-settings only (/admin-settings/
+  // overview — hub-root drops it from the /hub rail). Assert the surviving
+  // KPI grid instead of the retired card.
+  await p.goto(BASE + '/admin-settings/overview', { waitUntil: 'domcontentloaded' })
+  await expect(p.locator('main').getByText('Projects', { exact: true }).first())
     .toBeVisible({ timeout: 20000 })
-  expect(await p.locator('main').innerText()).toMatch(/One console/)
+  expect(await p.locator('main').innerText()).toMatch(/Users|Projects/)
 })

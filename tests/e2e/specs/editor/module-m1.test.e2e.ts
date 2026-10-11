@@ -127,28 +127,8 @@ test.describe('M1 webdav sync-modal Mantine gate', () => {
     await page.waitForTimeout(800)
   })
 
-  test('keeps the legacy RB frame + OLButtons on /Project', async () => {
-    await page.goto(B + '/Project/' + pid, { waitUntil: 'load' })
-    await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 90_000 })
-    await page.waitForTimeout(2000)
-    await openCard(page)
-    const frame = page
-      .locator('.modal-content')
-      .filter({ hasText: /not linked|link your account|project/i })
-      .first()
-    await expect(
-      frame,
-      'the /Project webdav modal must be the legacy RB frame'
-    ).toBeVisible({ timeout: 30_000 })
-    await page.waitForTimeout(1200)
-    const btn = page
-      .locator('.modal-content .btn')
-      .filter({ hasText: /project/i })
-      .first()
-    await expect(btn, 'the link-project action must be a legacy OLButton on /Project').toBeVisible({ timeout: 25_000 })
-    const mantineBtns = await page.locator('.modal .mantine-Button').count()
-    expect(mantineBtns, 'the /Project modal must not contain Mantine buttons').toBe(0)
-    await page.keyboard.press('Escape')
-    await page.waitForTimeout(600)
-  })
+  // B wave 2026-10-11: the legacy '/Project' leg was dropped — the owner
+  // retired dual-run the same day (editorpages.go: "/editor is the ONLY
+  // editor page prefix"); /Project now 404s and the legacy RB frame no
+  // longer exists. The /editor Mantine gate above is the standing proof.
 })

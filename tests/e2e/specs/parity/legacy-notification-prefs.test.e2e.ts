@@ -6,13 +6,13 @@ import { USER, TPLADMIN, ADMIN } from '../../fixtures/credentials'
 // Parity baseline (legacy /user/notification-preferences) — email
 // notification preferences. Contract: GET/POST /notifications/preferences.
 // 2026-09-10 (owner queue 3): the legacy PAGE is REMOVED — the URL now 301s
-// to the hub surface (Me → My settings → Email preferences, /hub#/mysettings.email)
+// to the hub surface (Me → My settings → Email preferences, /user-settings/mysettings.email)
 // which manages the same endpoints. Page-form tests now assert the redirect
 // against the hub surface; preference state is exercised via the API, whose
 // contract is unchanged.
 const BASE = 'http://127.0.0.1:7420'
 const PAGE = BASE + '/user/notification-preferences'
-const HUB_EMAIL = BASE + '/hub#/mysettings.email'
+const HUB_EMAIL = BASE + '/user-settings/mysettings.email'
 let p: any = null
 
 test.beforeAll(async ({ browser }) => {

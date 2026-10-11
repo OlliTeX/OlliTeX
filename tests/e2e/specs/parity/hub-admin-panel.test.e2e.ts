@@ -15,13 +15,13 @@ test.beforeAll(async ({ browser }) => {
   const c = await browser.newContext({ viewport: { width: 1400, height: 900 } })
   p = await c.newPage()
   await loginRobust(p, ADMIN.email, ADMIN.password)
-  await p.goto(BASE + '/hub#/site.general.messages', { waitUntil: 'domcontentloaded' })
+  await p.goto(BASE + '/admin-settings/site.general.messages', { waitUntil: 'domcontentloaded' })
 })
 test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
 
 const gotoLeaf = async (id: string) => {
-  const href = BASE + '/hub#/site.general.' + id
+  const href = BASE + '/admin-settings/site.general.' + id
   await p.goto(href, { waitUntil: 'domcontentloaded' })
   // hash-only changes are same-document navigations and are flaky when the shell
   // is on a distant leaf — force a full load so the target hash is rendered for sure
@@ -44,7 +44,7 @@ test('deny: non-site-admins cannot use the hub panel leaves', async ({ browser }
   for (const who of [TPLADMIN, USER]) {
     const ctx = await browser.newContext(); const q = await ctx.newPage()
     await loginRobust(q, who.email, who.password)
-    await q.goto(BASE + '/hub#/site.general.editor', { waitUntil: 'domcontentloaded' })
+    await q.goto(BASE + '/admin-settings/site.general.editor', { waitUntil: 'domcontentloaded' })
     await q.waitForTimeout(1200)
     const body = (await q.locator('body').innerText().catch(() => '')) || ''
     expect(/close editor|disconnect all/i.test(body), who.email + ' must not see editor controls').toBeFalsy()
@@ -65,7 +65,7 @@ test('system-messages: same post/clear contract from the hub messages leaf', asy
     // in-flight shell state of a busy session can race hash navigations)
     const ctx = await browser.newContext(); const q = await ctx.newPage()
     await loginRobust(q, ADMIN.email, ADMIN.password)
-    await q.goto(BASE + '/hub#/site.general.messages', { waitUntil: 'domcontentloaded' })
+    await q.goto(BASE + '/admin-settings/site.general.messages', { waitUntil: 'domcontentloaded' })
     await expect(q.locator('body', { hasText: msg }).first()).toBeVisible({ timeout: 15000 })
     await ctx.close()
   } finally {
@@ -80,7 +80,7 @@ test('active-projects: the hub leaf renders the same real-time active-projects c
   const ctx = (await p.context()).browser()!
   const c2 = await ctx.newContext(); const q = await c2.newPage()
   await loginRobust(q, ADMIN.email, ADMIN.password)
-  await q.goto(BASE + '/hub#/site.general.activeprojects', { waitUntil: 'domcontentloaded' })
+  await q.goto(BASE + '/admin-settings/site.general.activeprojects', { waitUntil: 'domcontentloaded' })
   const heading = q.getByRole('heading', { name: /active projects/i }).first()
   await expect(heading).toBeVisible({ timeout: 15000 })
   const body = (await q.locator('body').innerText()) || ''

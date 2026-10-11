@@ -40,12 +40,12 @@ test('event bus (Go) — 2-tab presence lifecycle', async ({ page, context }) =>
 
   // B1: tab A boots (the IDE only renders after the bus join resolves —
   // joinProjectResponse over the Go bus)
-  await page.goto('/project/' + pid, { waitUntil: 'domcontentloaded' })
+  await page.goto('/editor/' + pid, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('.cm-content', { timeout: 60_000 })
 
   // B2: tab B boots (second bus client in the same room)
   const tab2 = await context.newPage()
-  await tab2.goto('/project/' + pid, { waitUntil: 'domcontentloaded' })
+  await tab2.goto('/editor/' + pid, { waitUntil: 'domcontentloaded' })
   await tab2.waitForSelector('.cm-content', { timeout: 60_000 })
 
   // give the presence refresh a beat

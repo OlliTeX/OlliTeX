@@ -74,7 +74,7 @@ test.afterAll(async () => {
 })
 
 test('file menu: compiled project → word count opens with the current-file count', async () => {
-  await page.goto(`${BASE}/project/${projectId}`, {
+  await page.goto(`${BASE}/editor/${projectId}`, {
     waitUntil: 'domcontentloaded',
   })
   await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 20000 })

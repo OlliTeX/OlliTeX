@@ -12,7 +12,7 @@ test.beforeAll(async ({ browser }) => {
   const c = await browser.newContext({ viewport: { width: 1400, height: 900 } })
   p = await c.newPage()
   await loginRobust(p, ADMIN.email, ADMIN.password)
-  await p.goto(BASE + '/hub#/site.general.enclose', { waitUntil: 'domcontentloaded' })
+  await p.goto(BASE + '/admin-settings/site.general.enclose', { waitUntil: 'domcontentloaded' })
 })
 test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 const a = (method: string, path: string, body?: unknown) => api(p, method, path, body)
@@ -30,7 +30,7 @@ test('deny: non-site-admins cannot open the hub site-settings leaves', async ({ 
   for (const who of [TPLADMIN, USER]) {
     const ctx = await browser.newContext(); const q = await ctx.newPage()
     await loginRobust(q, who.email, who.password)
-    await q.goto(BASE + '/hub#/site.general.misc', { waitUntil: 'domcontentloaded' })
+    await q.goto(BASE + '/admin-settings/site.general.misc', { waitUntil: 'domcontentloaded' })
     await q.waitForTimeout(1200)
     const body = (await q.locator('body').innerText().catch(() => '')) || ''
     expect(/app name|sign-?up|miscellaneous/i.test(body), who.email + ' must not get the site form').toBeFalsy()

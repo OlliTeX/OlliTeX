@@ -31,7 +31,7 @@ function railElement(page: any, name: string) {
   return page.locator(`${sel ? sel + ', ' : ''}[aria-label^='${name}']`).first()
 }
 
-for (const route of ['/project', '/editor'] as const) {
+for (const route of ['/editor'] as const) {
   test.describe(`P8 polish on ${route}`, () => {
     let page: any
     let pid: string

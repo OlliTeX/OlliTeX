@@ -64,7 +64,7 @@ test('D40 review panel — live threads + tracked-changes REST surface', async (
   const pid = await createBlankProject(page)
 
   // R1: editor boots, D25 placeholder retired, review REST reachable
-  await page.goto('/project/' + pid, { waitUntil: 'load' })
+  await page.goto('/editor/' + pid, { waitUntil: 'load' })
   await page.waitForSelector('.cm-content', { timeout: 60_000 })
   expect(await page.locator('.yjs-engine-review-note').count()).toBe(0)
   const rec0 = await apiJSON(page, 'GET', `/project/${pid}/threads`)
@@ -415,7 +415,7 @@ test('D40-P3 anchors — comment range follows the text after edit (R9)', async 
 }) => {
   await loginRobust(page, ADMIN.email, ADMIN.password)
   const pid = await createBlankProject(page)
-  await page.goto('/project/' + pid, { waitUntil: 'load' })
+  await page.goto('/editor/' + pid, { waitUntil: 'load' })
   await page.waitForSelector('.cm-content', { timeout: 60_000 })
 
   const stamp = Date.now().toString(36)

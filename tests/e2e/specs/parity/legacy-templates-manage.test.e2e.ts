@@ -7,7 +7,7 @@ import { ADMIN, USER, TPLADMIN } from '../../fixtures/credentials'
 /**
  * Parity baseline for the RETIRED legacy /templates/manage page (owner
  * item 7, 2026-09-16) — /templates/manage now 301s into the hub admin leaf
- * /hub#/site.general.managetpl. The template-administration API contract
+ * /admin-settings/site.general.managetpl. The template-administration API contract
  * (admin-list, bundle import/import-url, edit, delete) is unchanged and is
  * what the hub uses. Roles: admin + template admin (canManageTemplates);
  * plain users are denied the management APIs.
@@ -31,7 +31,7 @@ test('redirects: /templates/manage 301s into the hub admin leaf (legacy page rem
   // logged-in admin: the 301 target is the hub management section.
   const r = await p.request.get(BASE + '/templates/manage', { maxRedirects: 0 })
   expect(r.status(), 'expected 301, got ' + (await r.text().catch(() => '')).slice(0, 140)).toBe(301)
-  expect(r.headers()['location']).toBe('/hub#/site.general.managetpl')
+  expect(r.headers()['location']).toBe('/admin-settings/site.general.managetpl')
 })
 
 test('denied: a plain user never sees a management surface via the legacy route', async ({ browser }) => {

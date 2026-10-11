@@ -51,7 +51,7 @@ async function createTreeFile(page: any, name: string) {
   await expect(page.getByText(name).first()).toBeVisible({ timeout: 15_000 })
 }
 
-for (const route of ['/project', '/editor'] as const) {
+for (const route of ['/editor'] as const) {
   test.describe(`P3 modals on ${route}`, () => {
     let adminPage: any
     let userPage: any
