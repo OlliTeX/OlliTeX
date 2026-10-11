@@ -350,7 +350,7 @@ export default function HubHealthSection() {
             ))}
           </Stack>
         ) : (
-          <Text size="sm" c="teal" mt="xs" fw={600}>
+          <Text size="sm" mt="xs" fw={600} style={{ color: "var(--ollitex-ok-text, var(--mantine-color-teal-9))" }}>
             {tt('hub.health.noErrors', 'No client errors captured since page load.')}
           </Text>
         )}

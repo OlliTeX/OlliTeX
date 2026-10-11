@@ -165,7 +165,7 @@ export function WakatimeSection() {
       </div>
       {prov.message ? (
         prov.ok
-          ? <Text size="sm" c="teal" mt="xs">{prov.message}</Text>
+          ? <Text size="sm" mt="xs" style={{ color: "var(--ollitex-ok-text, var(--mantine-color-teal-9))" }}>{prov.message}</Text>
           : <Alert icon={undefined} color="red" variant="light" mt="xs" style={{ width: '100%', minWidth: 240 }}>
               <Text size="sm">{prov.message}</Text>
             </Alert>

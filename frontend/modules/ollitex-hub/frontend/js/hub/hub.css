@@ -17,20 +17,34 @@ html[data-mantine-color-scheme='dark'] .mantine-Portal {
 /* 2026-09 (a11y, hub health/stats axe `color-contrast`): Mantine's
  * light-variant Badge pairs its tinted bg (shade 0) with shade-6 text —
  * only ≈2.7:1 even on the OL palettes (teal: #c3fae8/#087f5b = 2.66).
- * The badge backgrounds are always light tints in both schemes, so pin the
- * label to a neutral near-dark that holds ≥4.5:1 on every one of them. */
-.ol-hub-scroll .mantine-Badge-root[data-variant='light'] .mantine-Badge-label,
-.mantine-Portal .mantine-Badge-root[data-variant='light'] .mantine-Badge-label {
+ * The badge backgrounds are always light tints IN THE LIGHT SCHEME, so pin
+ * the label to a neutral near-dark that holds ≥4.5:1 on all of them.
+ * 2026-10-11 (owner badge-contrast report): the pin was UNCONDITIONAL and
+ * corrupted the DARK-scheme pair — Mantine dark pairs the light-variant
+ * bg (dark shade, e.g. rgba(9,32,21)) with color-0 text (#f2faf6 ≈ 16:1),
+ * but this override forced #1b1c1d on that dark pill ≈ 1.0:1 (unreadable
+ * /hub badges). Scope the pin to the light scheme; dark keeps Mantine's
+ * own pair. The gate gap that let this ship: hub-a11y scanned the
+ * default (light) scheme only and never fails on `moderate` contrast —
+ * both fixed in specs/parity/hub-a11y (2026-10-11). */
+html[data-mantine-color-scheme='light'] .mantine-Badge-root[data-variant='light'] .mantine-Badge-label {
   color: #1b1c1d !important;
 }
+
+/* 2026-10-11: scope widened from the 2026-09 hub-shell containers to the
+ * whole document (light scheme only) — the admin-settings pages render
+ * light-variant badges OUTSIDE .ol-hub-scroll/.mantine-Portal (teal-6 on
+ * teal-0 ≈ 2.66:1 flagged by the dual-scheme gate). In the light scheme the
+ * light-variant background is ALWAYS a light tint, so the near-dark label
+ * holds ≥4.5:1 on every one of them (ollitex/success/teal/orange). */
 
 /* 2026-09 (a11y, hub stats axe `color-contrast`): same Mantine weak-pair
  * class — light-variant Alert titles use a mid-shade tint text (e.g. warning
  * #e67700 on #fff3bf = 2.69:1). Alert light backgrounds are always light
- * tints, so pin the title text to the same neutral near-dark. */
-.ol-hub-scroll .mantine-Alert-root[data-variant='light'] .mantine-Alert-title,
-.ol-editor-mantine .mantine-Alert-root[data-variant='light'] .mantine-Alert-title,
-.mantine-Portal .mantine-Alert-root[data-variant='light'] .mantine-Alert-title {
+ * tints IN THE LIGHT SCHEME, so pin the title text to the same neutral
+ * near-dark (2026-10-11: scoped to light scheme — same dark-corruption
+ * class as the badge pin above). */
+html[data-mantine-color-scheme='light'] .mantine-Alert-root[data-variant='light'] .mantine-Alert-title {
   color: #1b1c1d !important;
 }
 
@@ -91,6 +105,20 @@ html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h3,
 html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h4,
 html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h5,
 html[data-mantine-color-scheme] .mantine-Modal:not(.ol-mant-modal) h6 {
+  color: var(--mantine-color-text);
+}
+
+/* 2026-10-11 (dual-scheme gate): the standalone settings pages (/user-settings,
+ * /admin-settings) render OUTSIDE .ol-hub-scroll and the global fixed-navy
+ * heading rule leaks in — dark scheme: #1b222c heading on the #2e2e2e card
+ * = 1.17:1 (health h2, hub-a11y). Dark scheme only (light navy on light
+ * cards already holds AA) — same theme-aware token as the hub rule. */
+html[data-mantine-color-scheme='dark'] .ol-settings-shell h1,
+html[data-mantine-color-scheme='dark'] .ol-settings-shell h2,
+html[data-mantine-color-scheme='dark'] .ol-settings-shell h3,
+html[data-mantine-color-scheme='dark'] .ol-settings-shell h4,
+html[data-mantine-color-scheme='dark'] .ol-settings-shell h5,
+html[data-mantine-color-scheme='dark'] .ol-settings-shell h6 {
   color: var(--mantine-color-text);
 }
 

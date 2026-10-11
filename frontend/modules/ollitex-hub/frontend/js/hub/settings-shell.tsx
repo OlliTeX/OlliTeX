@@ -129,6 +129,7 @@ export function SettingsShell({
 
   return (
     <Box
+      className="ol-settings-shell"
       style={{
         color: 'var(--mantine-color-text)',
         minHeight: '100vh',
@@ -265,16 +266,19 @@ export function SettingsShell({
                         gap: 8,
                         padding: '5px 8px',
                         borderRadius: 6,
-                        color: activeNow ? 'var(--mantine-color-blue-8)' : 'inherit',
+                        color:
+                          activeNow
+                            ? 'var(--ollitex-settings-nav-active-color, var(--mantine-color-blue-9))'
+                            : 'inherit',
                         fontWeight: activeNow ? 600 : 400,
                         background: activeNow ? 'var(--mantine-color-blue-light)' : 'transparent',
-                        backgroundImage:
-                          activeNow
-                            ? 'linear-gradient(0deg, color-mix(in srgb, var(--mantine-color-blue) 20%, transparent), color-mix(in srgb, var(--mantine-color-blue) 20%, transparent))'
-                            : 'none',
-                        boxShadow: activeNow
-                          ? 'inset 3px 0 0 0 var(--mantine-color-blue)'
-                          : 'none',
+                        // 2026-10-11: the 2026-09 gradient overlay (blue 20% over
+                        // the card bg) composited to a mid tone that kept the
+                        // active text under AA in both schemes (gate: dual-
+                        // scheme hub-a11y). Solid tint instead; the 3px inset
+                        // bar still marks the active row.
+                        boxShadow:
+                          activeNow ? 'inset 3px 0 0 0 var(--mantine-color-blue)' : 'none',
                         textDecoration: 'none',
                       }}
                     >

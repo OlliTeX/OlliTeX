@@ -79,7 +79,7 @@ export default function ActiveProjectsSection() {
         </Paper>
       ) : items.length === 0 ? (
         <Paper p="md" withBorder>
-          <Text fw={700} c="teal" size="sm">
+          <Text fw={700} size="sm" style={{ color: "var(--ollitex-ok-text, var(--mantine-color-teal-9))" }}>
             ✔ Great news!
           </Text>
           <Text size="sm" mt={4}>

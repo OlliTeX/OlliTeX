@@ -142,7 +142,7 @@ export function SectionShell({
           <Text size="sm" c="red" style={{ marginRight: 'auto' }}>{flash.error}</Text>
         ) : null}
         {flash.saved && !flash.saving ? (
-          <Text size="sm" c="teal">Saved.</Text>
+          <Text size="sm" style={{ color: "var(--ollitex-ok-text, var(--mantine-color-teal-9))" }}>Saved.</Text>
         ) : null}
         {footerNote ? <Text size="xs" c="dimmed">{footerNote}</Text> : null}
         <Button color="ollitex" loading={flash.saving} onClick={onSave}>

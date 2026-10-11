@@ -339,7 +339,7 @@ function CustomBindingsModal({ onClose }: { onClose: () => void }) {
                   <Table.Td style={{ textAlign: 'right' }}>
                     <Group gap={6} justify="flex-end" wrap="nowrap">
                       {isCapturing ? (
-                        <Text size="xs" c="teal" fw={600} tt="uppercase">
+                        <Text size="xs" fw={600} tt="uppercase" style={{ color: "var(--ollitex-ok-text, var(--mantine-color-teal-9))" }}>
                           Press keys… (Esc cancels)
                         </Text>
                       ) : (
@@ -376,7 +376,7 @@ function CustomBindingsModal({ onClose }: { onClose: () => void }) {
             Reset now
           </Button>
           {resetApplied ? (
-            <Text size="xs" c="teal">✓ Applied as your account default — the editor uses it on the next project load.</Text>
+            <Text size="xs" style={{ color: "var(--ollitex-ok-text, var(--mantine-color-teal-9))" }}>✓ Applied as your account default — the editor uses it on the next project load.</Text>
           ) : null}
         </Group>
 
@@ -399,14 +399,14 @@ function CustomBindingsModal({ onClose }: { onClose: () => void }) {
                 e.currentTarget.value = ''
               }}
             />
-            {savedFlash ? <Text size="xs" c="teal">Imported (invalid rows skipped).</Text> : null}
+            {savedFlash ? <Text size="xs" style={{ color: "var(--ollitex-ok-text, var(--mantine-color-teal-9))" }}>Imported (invalid rows skipped).</Text> : null}
           </Group>
           {!saved ? (
             <Text size="xs" c="dimmed">
               Saved account-wide; the editor applies it on the next project load.
             </Text>
           ) : (
-            <Text size="xs" c="teal">Saved.</Text>
+            <Text size="xs" style={{ color: "var(--ollitex-ok-text, var(--mantine-color-teal-9))" }}>Saved.</Text>
           )}
         </Group>
 
