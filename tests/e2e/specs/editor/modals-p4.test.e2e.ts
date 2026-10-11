@@ -51,50 +51,54 @@ function dlgWith(page: any, route: string, hint: RegExp) {
 // two actionability-checked clicks). Opening + selecting in one in-page
 // click chain keeps the menu open and lands the item.
 async function clickFileMenuItem(page: any, label: string, fallback?: string) {
-  await page.evaluate((l: string) => {
-    const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').trim() === 'File')
-    if (b) (b as HTMLElement).click()
-  })
-  await page.waitForTimeout(700)
-  const clicked = await page.evaluate(async (labels: string[]) => {
-    const isVisible = (e: Element) =>
-      e.getClientRects().length > 0 &&
-      (getComputedStyle(e as HTMLElement).visibility !== 'hidden') &&
-      (getComputedStyle(e as HTMLElement).display !== 'none')
-    for (const want of labels) {
-      const cands = [...document.querySelectorAll('a, [role=menuitem], [role=menuitemradio], button, .dropdown-item, li')]
-        .filter(e => {
-          const t = (e.textContent || '').trim().toLowerCase()
-          return t === want.toLowerCase() || t.startsWith(want.toLowerCase())
-        })
-      // open the nested group (its parent menu item) if the direct item is
-      // not visible: hover the group label first
-      const vis = cands.find(isVisible)
-      if (vis) { (vis as HTMLElement).click(); return true }
-      const group = cands[0]
-      if (group) {
-        // walk up to the menu-item parent and open it before clicking
-        let n: Element | null = group
-        while (n && !isVisible(n)) {
-          const g = n.closest('li, [role=menuitem], [role=menuitemradio]')
-          if (g && g !== n && g.getClientRects().length > 0) {
-            const ev = new MouseEvent('mouseover', { bubbles: true })
-            g.dispatchEvent(ev)
-            break
-          }
-          n = n.parentElement
-        }
-        await new Promise((r) => setTimeout(r, 400))
-        const vis2 = cands.find(isVisible)
-        if (vis2) { (vis2 as HTMLElement).click(); return true }
-        group.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        return true
-      }
+  // REAL mouse click (Playwright), not a synthetic Element.click(): the rail
+  // dropdown closes on the outside/pointer-down path that a synthesized click
+  // never triggers — with the menu left open its panel intercepts the modal's
+  // own tab clicks (the modals-p4 REDs of 2026-10-11: 'Show version history'
+  // label reported at the Settings-tab point).
+  await page.getByRole('button', { name: /^file$/i }).first().click({ timeout: 10_000 })
+  await page.waitForTimeout(500)
+  const names: RegExp[] = (fallback ? [label, fallback] : [label]).map(
+    s => new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i')
+  )
+  let ok = false
+  for (const re of names) {
+    const mi = page.getByRole('menuitem', { name: re }).first()
+    if (await mi.isVisible({ timeout: 2500 }).catch(() => false)) {
+      await mi.click({ timeout: 5_000 })
+      ok = true
+      break
     }
-    return false
-  }, fallback ? [label, fallback] : [label])
+  }
+  // Fallback: nested / non-menuitem item (hover the group, then synthetic).
+  if (!ok) {
+    const clicked = await page.evaluate((labels: string[]) => {
+      const isVisible = (e: Element) =>
+        e.getClientRects().length > 0 &&
+        (getComputedStyle(e as HTMLElement).visibility !== 'hidden') &&
+        (getComputedStyle(e as HTMLElement).display !== 'none')
+      for (const want of labels) {
+        const cands = [...document.querySelectorAll('[role=menuitem], [role=menuitemradio], a.dropdown-item, li')]
+          .filter(e => {
+            const t = (e.textContent || '').trim().toLowerCase()
+            return t === want.toLowerCase() || t.startsWith(want.toLowerCase())
+          })
+        const vis = cands.find(isVisible)
+        if (vis) { (vis as HTMLElement).click(); return true }
+        if (cands[0]) { cands[0].dispatchEvent(new MouseEvent('click', { bubbles: true })); return true }
+      }
+      return false
+    }, fallback ? [label, fallback] : [label])
+    if (clicked) ok = true
+    // the fallback path did not deliver a pointer-down — close the menu the
+    // way a user would (click the editor body) so it can't cover the modal
+    try {
+      const body = page.locator('.cm-content, body').last()
+      await body.click({ position: { x: 40, y: 40 }, force: true, timeout: 2_000 })
+    } catch { /* best effort */ }
+  }
   await page.waitForTimeout(600)
-  if (!clicked) throw new Error('File menu item not found: ' + label)
+  if (!ok) throw new Error('File menu item not found: ' + label)
 }
 
 for (const route of ['/editor'] as const) {
@@ -121,14 +125,14 @@ for (const route of ['/editor'] as const) {
       // invite row: USER is NOT a member of pid → they appear as an invite
       // candidate. Remove row: TPLADMIN is granted on pid → member row.
       mongoEval(`db.getSiblingDB('sharelatex').projects.updateOne({_id:ObjectId('${pid}')},{$addToSet:{collaberator_refs:'${tplAdminId}'}})`)
-      // B wave 2026-10-11: grant readOnly through the API (not direct Mongo) -
-      // the request-access button is gated on a real owner sharing-update
-      // (request-access-button.tsx: ownerHasSharingUpdates), which a
-      // direct-DB grant never emits, so the button would stay hidden.
-      await api(adminPage, 'POST', '/project/' + roPid + '/invite', {
-        email: USER.email,
-        privileges: 'readOnly',
-      })
+      // B wave 2026-10-11: grant readOnly as a real membership (direct
+      // readOnly_refs, the product's own membership shape). The PENDING
+      // `POST /invite` grant never lands refs — USER would not even be a
+      // member and the editor 403s before the request button exists.
+      // The button gate is the OWNER's `sharingUpdates` flag (CE default
+      // true; set it explicitly so the fixture can't drift).
+      mongoEval(`db.getSiblingDB('sharelatex').users.updateOne({ email: "${ADMIN.email}" }, { $set: { sharingUpdates: true } })`)
+      mongoEval(`db.getSiblingDB('sharelatex').projects.updateOne({_id:ObjectId('${roPid}')},{$addToSet:{readOnly_refs:'${userId}'}})`)
     })
 
     test.afterAll(async () => {

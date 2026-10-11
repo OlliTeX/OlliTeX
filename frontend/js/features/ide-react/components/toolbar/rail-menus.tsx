@@ -52,6 +52,15 @@ import importOverleafModules from '../../../../../macros/import-overleaf-module.
  *  Bootstrap CSS the app already loads; zero react-bootstrap imports) *
  * ------------------------------------------------------------------ */
 
+/** Close-the-rail-menu context: leaf menu items activate commands that
+ *  frequently open MODALS (Settings / Clone / Share …). Mantine <Menu>
+ *  doesn't auto-close on item activation for these custom rows, so the open
+ *  panel (position "right-start") kept the `ol-v2-rail-menu-panel` covering
+ *  the modal and intercepting its top controls (e2e modals-p4 REDs,
+ *  2026-10-11: 'Show version history' label at the Settings-tab point).
+ *  Provider = RailMenuDropdown; consumer = RailMenuItem. */
+const RailMenuCloseContext = React.createContext<(() => void) | null>(null)
+
 const RailRow = ({
   title,
   onClick,
@@ -115,6 +124,7 @@ const RailRow = ({
 
 const RailMenuItem = ({ id }: { id: string }) => {
   const { registry, shortcuts } = useCommandRegistry()
+  const closeRailMenu = React.useContext(RailMenuCloseContext)
   const cmd = registry.get(id)
   if (!cmd) {
     return null
@@ -135,7 +145,16 @@ const RailMenuItem = ({ id }: { id: string }) => {
           </span>
         ) : undefined
       }
-      onClick={() => cmd.handler?.({ location: 'menu-bar' })}
+      onClick={() => {
+        // activate, then ALWAYS close the rail menu — otherwise the open
+        // panel stays over any modal the command just opened (intercepting
+        // the modal's top controls); see RailMenuCloseContext.
+        try {
+          cmd.handler?.({ location: 'menu-bar' })
+        } finally {
+          closeRailMenu?.()
+        }
+      }}
     />
   )
 }
@@ -533,7 +552,9 @@ export const RailMenuDropdown = ({
         id={'rail-menu-' + label.toLowerCase()}
         inline
       >
-        {content}
+        <RailMenuCloseContext.Provider value={() => onActiveChange(null)}>
+          {content}
+        </RailMenuCloseContext.Provider>
       </NestableDropdownContextProvider>
     </Menu.Dropdown>
   </Menu>
