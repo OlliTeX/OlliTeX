@@ -185,9 +185,14 @@ type messageOut struct {
 	Content   string           `json:"content"`
 	ID        string           `json:"id"`
 	Timestamp string           `json:"timestamp"`
-	User      reviewUser       `json:"user"`
-	UserID    string           `json:"user_id"`
-	Ranges    []map[string]any `json:"ranges,omitempty"`
+	// EditedAt — the panel's edited-state field (4bc6ac34 wire contract,
+	// overleaf#1509 port): set when the message was edited after
+	// creation; the FE renders time = edited_at || timestamp + the
+	// "(edited)" marker. Optional (additive to the D40 record pin).
+	EditedAt string           `json:"edited_at,omitempty"`
+	User     reviewUser       `json:"user"`
+	UserID   string           `json:"user_id"`
+	Ranges   []map[string]any `json:"ranges,omitempty"`
 }
 
 // changeOut — d10 tracked-change wire record (D40-surface read path; the
@@ -422,6 +427,9 @@ func (h *Handlers) threadRecord(ctx context.Context, pid, self string, st persis
 			User:      h.userShape(ctx, uid, self),
 			UserID:    uid,
 		}
+		if m.Edited > 0 && m.Edited != m.Created {
+			mo.EditedAt = isoMS(m.Edited)
+		}
 		if len(m.Ranges) > 0 {
 			mo.Ranges = m.Ranges
 		}
@@ -599,8 +607,12 @@ func (h *Handlers) messageEdit(cxt *core.Cxt, res *core.Res) {
 		internalErr(res, err)
 		return
 	}
-	// pinned listener 'edit-message': (threadId, commentId, content)
-	h.relay(cxt.Req.Context(), pid, "edit-message", []any{threadID, cid, body.Content})
+	// pinned listener 'edit-message': (threadId, commentId, content);
+	// 4bc6ac34 adds the 4th element (edited timestamp, ms) — the FE
+	// threads-context listener patches `edited_at` from it, which is what
+	// renders the "(edited)" marker in the live panel (the record's
+	// edited_at field persists the same state across reloads).
+	h.relay(cxt.Req.Context(), pid, "edit-message", []any{threadID, cid, body.Content, out.Edited})
 	okJSON(res, http.StatusOK, messageOut{
 		Content: body.Content, ID: out.ID, Timestamp: isoMS(out.Edited),
 		User: h.userShape(cxt.Req.Context(), uidOf(out.Author), uid), UserID: uidOf(out.Author),
