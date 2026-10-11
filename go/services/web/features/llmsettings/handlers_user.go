@@ -1433,5 +1433,5 @@ func (f *fs) saveGrammarSettings(cxt *core.Cxt, res *core.Res) {
 // ---------- legacy 301 ----------
 
 func (f *fs) userSettingsRedirect(cxt *core.Cxt, res *core.Res) {
-	res.Redirect(cxt.Req, 301, "/hub#/mysettings.llm.general")
+	res.Redirect(cxt.Req, 301, "/user-settings/mysettings.llm.general")
 }

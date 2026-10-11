@@ -177,7 +177,7 @@ func page(a *core.App) func(*core.Cxt, *core.Res) {
 		if !a.RequireSiteAdmin(cxt, res) {
 			return
 		}
-		res.Redirect(cxt.Req, 301, "/hub#/site.general.stats")
+		res.Redirect(cxt.Req, 301, "/admin-settings/site.general.stats")
 	}
 }
 

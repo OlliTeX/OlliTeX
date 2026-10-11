@@ -1746,8 +1746,8 @@ func AdminFeature(a *core.App) core.Feature {
 	return core.Feature{
 		Name: "p62-admin-tools",
 		Routes: []core.Route{
-			{Method: "GET", Pattern: adUserRedirPat, Handler: adminRedir(a, "/hub#/site.general.users.all")},
-			{Method: "GET", Pattern: adProjectRedPat, Handler: adminRedir(a, "/hub#/site.general.projects.all")},
+			{Method: "GET", Pattern: adUserRedirPat, Handler: adminRedir(a, "/admin-settings/site.general.users.all")},
+			{Method: "GET", Pattern: adProjectRedPat, Handler: adminRedir(a, "/admin-settings/site.general.projects.all")},
 			{Method: "GET", Pattern: activeProjsPat, Handler: adminActiveProjects(a)},
 			{Method: "POST", Pattern: adUserListPat, Handler: adminUserProjects(a)},
 			{Method: "POST", Pattern: adTrashPat, Handler: adminTrashOrUntrash(a, true)},

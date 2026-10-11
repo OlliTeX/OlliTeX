@@ -775,5 +775,5 @@ func (f *fs) adminUsage(cxt *core.Cxt, res *core.Res) {
 
 // GET /admin/llm/settings — Node 301 to the hub section.
 func (f *fs) adminSettingsRedirect(cxt *core.Cxt, res *core.Res) {
-	res.Redirect(cxt.Req, 301, "/hub#/site.llm.instance")
+	res.Redirect(cxt.Req, 301, "/admin-settings/site.llm.instance")
 }
