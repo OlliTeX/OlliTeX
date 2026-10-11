@@ -87,16 +87,20 @@ services:
       SHARED_SERVICE_TOKEN: ${SHARED_SERVICE_TOKEN}
       # clsi_typst sandbox dirs (scoping: only the clsi_typst runit service
       # reads these; the tex clsi is untouched)
-      TYPST_COMPILES_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
-      TYPST_OUTPUT_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
+      TYPST_COMPILES_DIR: /var/lib/overleaf/data/compiles  # TYPST_COMPILES_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
+      TYPST_OUTPUT_DIR: /var/lib/overleaf/data/output  # TYPST_OUTPUT_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
       # 2026-10-05 (clsitypst conversion finalize / M1 parity): the runit run
-      # script reads the TYPSF_* names (-> CLSI_TYPST_*_PATH). Pin ALL FOUR
-      # dirs to the SAME-PATH bind dirs or the service writes cache/uploads
-      # into root-owned /var/lib and compiles fail with EACCES (live catch:
-      # "mkdir /var/lib/overleaf/typst/cache/<pid>: permission denied").
-      TYPSF_COMPILES_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
-      TYPSF_OUTPUT_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
-      TYPSF_CACHE_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/cache
+      # script reads the TYPSF_* names (-> CLSI_TYPST_*_PATH). The run script
+      # uses SANDBOXED_COMPILES_HOST_DIR_* (shared with the tex clsi, pinned to
+      # /var/lib/overleaf/data/* for the nginx serving contract) as the daemon
+      # bind — so the typst SERVICE view must agree: pin the typst dirs to the
+      # SAME canonical dirs (www-data writable; the tex pipeline already writes
+      # them here). 2026-10-11 root fix: the earlier local-data split made the
+      # daemon mount a phantom empty dir -> "no output.pdf generated" in the
+      # typst container (typst-t2 regression). uploads stay local (no bind).
+      TYPSF_COMPILES_DIR: /var/lib/overleaf/data/compiles  # TYPSF_COMPILES_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
+      TYPSF_OUTPUT_DIR: /var/lib/overleaf/data/output  # TYPSF_OUTPUT_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
+      TYPSF_CACHE_DIR: /var/lib/overleaf/data/cache  # TYPSF_CACHE_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
       TYPSF_UPLOAD_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/uploads
       # Synctex crown jewel (M1): the patched fork (typst 0.15.1+clsi,
       # buildable via `make build-typst` from images/typst-amd64) emits the
