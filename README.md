@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="doc/logo-horizontal.png" alt="OlliTeX — real-time collaborative authoring" width="340">
+  <img src="docs/ollitex-logo/logo-horizontal.png" alt="OlliTeX — real-time collaborative authoring" width="340">
 </h1>
 
 <p align="center">
@@ -227,3 +227,13 @@ Copyright (c) @davrot, 2025-2026, for the 6.3.0 port and extensions.
 
 Portions of the code are derived from other open-source projects; see
 [`CREDITS`](CREDITS.md).
+
+---
+
+<p align="center">
+  <img src="docs/ub-logo/logo_full.svg" alt="University of Bremen" width="320">
+</p>
+
+<p align="center">
+  This project is supported by the [University of Bremen](docs/ub-logo/logo_full.svg).
+</p>
