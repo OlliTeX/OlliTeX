@@ -89,6 +89,12 @@ something from their code we put them into CREDITS.md").
   tree). No code was copied into `go/` or `frontend/` — only the image build
   sources + the default-image config point to it.
 
+## Git-bridge suspended-user PAT rejection (2026-10-11)
+
+- **Upstream git source:** `origin <https://github.com/saveli/overleaf-cep.git>`, branch `fix/git-bridge-token-suspended`, commit `ea4005235ad7973be4ad0bd6d4d21be9371a88d6` ("git-bridge: reject personal access tokens of suspended users").
+- **What was ported:** the PAT user-validity check in the web git-bridge feature (`tokenResolved`: the shared PAT lookup behind `/oauth/token/info` and the `/api/v0/docs` token checks) now also treats a token whose owner is **suspended** as an unknown token (same projection extension + early-return shape as the upstream `GitBridgePATManager.getUserId` patch), so a suspended user's git-bridge PATs 401 instead of still cloning/pulling/pushing. The web login gate already blocks suspended users; only the token surface was bypassing it.
+- **Adopted (2026-10-11)**: gap confirmed in our tree (`grep -ri suspended go/services/gitbridge` = 0 hits; the tokenResolved user check decoded only `_id`). Single choke point — both auth surfaces use `tokenResolved`; session-owned PAT management (list/create/revoke) is correctly unaffected. Go build + feature tests green; the suspended-token round-trip e2e leg rides the test wave (682370f6 #7).
+
 ## File-view SVG preview (2026-10-11)
 
 - **Upstream git source:** `origin <https://github.com/MarkQuach12/overleaf.git>`, branch `svg-file-preview`, commit `eb84ef11b386d7652047b4a8682e154218b38fc8` (upstream issue #1458, "[web] add SVG file preview to the editor file view").

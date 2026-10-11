@@ -302,13 +302,20 @@ func (p *pats) tokenResolved(ctx context.Context, token string) (tokenID, userID
 		return bson.ObjectID{}, bson.ObjectID{}, "", err2
 	}
 	var u struct {
-		ID bson.ObjectID `bson:"_id"`
+		ID        bson.ObjectID `bson:"_id"`
+		Suspended bool          `bson:"suspended"`
 	}
 	if err2 := db.Collection("users").FindOne(ctx, bson.M{"_id": row.UserID}).Decode(&u); err2 != nil {
 		if err2 == mongo.ErrNoDocuments {
 			return bson.ObjectID{}, bson.ObjectID{}, "", nil // deleted user → token invalid
 		}
 		return bson.ObjectID{}, bson.ObjectID{}, "", err2
+	}
+	if u.Suspended {
+		// suspended user → token invalid (Node GitBridgePATManager: a token
+		// whose owner is suspended is treated like an unknown token, so
+		// /oauth/token/info + the /api/v0/docs token checks 401).
+		return bson.ObjectID{}, bson.ObjectID{}, "", nil
 	}
 	// non-blocking lastUsedAt (Node fire-and-forget)
 	now := time.Now()
