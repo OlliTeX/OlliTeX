@@ -186,6 +186,9 @@ module.exports = defineConfig({
             path.join(rootId, 'test/frontend/features/ide-settings/settings/compiler-setting.test.tsx'),
             path.join(rootId, 'test/frontend/features/project-list/components/new-project-button.test.tsx'),
             path.join(rootId, 'test/frontend/features/source-editor/extensions/toolbar/typst-wrap-commands.test.ts'),
+            // source-editor keymap feature spec (list-item continuation,
+            // upstream port — needs this project's jsdom CM shim setup):
+            path.join(rootId, 'test/frontend/features/source-editor/languages/latex/list-continuation.test.ts'),
             path.join(rootId, 'modules/typst/test/frontend/languages/*.test.ts'),
           ],
           fileParallelism: true,

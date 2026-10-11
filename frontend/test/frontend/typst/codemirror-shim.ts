@@ -60,3 +60,19 @@ if (typeof window !== 'undefined') {
 }
 
 export {}
+
+// (3) jsdom has no Worker: the latex lint worker is constructed at module
+//     scope (js/features/source-editor/languages/latex/linter/latex-linter.ts:6)
+//     any test that imports the full `latex()` support hits it. A no-op
+//     stand-in keeps module load intact (lint diagnostics are out of scope
+//     for the keymap specs that use this shim).
+if (typeof globalThis.Worker === 'undefined') {
+  class WorkerStub {
+    terminate() {}
+    postMessage() {}
+    addEventListener() {}
+    removeEventListener() {}
+    onmessage: unknown = null
+  }
+  ;(globalThis as unknown as { Worker: unknown }).Worker = WorkerStub
+}

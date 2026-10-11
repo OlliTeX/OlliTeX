@@ -123,3 +123,24 @@ something from their code we put them into CREDITS.md").
   "list the color themes from that repo as additional options in the theme
   toggle; each new option must correctly switch the editor theme on one
   surface; CREDITS.md gets the credit for the source themes."
+
+## Source-editor list-item continuation (2026-10-11)
+
+- **overleaf** (upstream keymap feature, closes overleaf#1384) — source-editor
+  keymap that continues LaTeX lists: pressing Enter after an `\item` in the
+  source editor inserts a new `\item` (a `\item[]` with the cursor inside the
+  brackets for `description` lists, mirroring the item's optional argument),
+  preserving indentation and not carrying trailing whitespace onto the new
+  item; Shift-Enter always inserts a plain newline; no continuation for empty
+  lists, and none inside verbatim/math. Ported from the upstream git source
+  `origin <https://github.com/MarkQuach12/overleaf.git>`, branch
+  `feature/source-editor-list-item-continuation`, commits
+  `448ff7d6e76c847cc94464d395f2151b2f0754ac` +
+  `908673981519680d9ca6280d809f8cec9e6d71b5`, to
+  `frontend/js/features/source-editor/languages/latex/list-continuation.ts`,
+  wired into `languages/latex/index.ts`; behavior spec (vitest+jsdom, this
+  repo's live FE harness — the mocha/cypress test:frontend harness is retired
+  in this tree) committed at
+  `frontend/test/frontend/features/source-editor/languages/latex/`. We reuse
+  our own `createListItem` / `ancestorOfNodeWithType` / lezer-latex terms
+  (same signatures this code already depended on upstream).
