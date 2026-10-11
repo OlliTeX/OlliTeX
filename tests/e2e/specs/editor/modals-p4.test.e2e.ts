@@ -264,8 +264,11 @@ for (const route of ['/editor'] as const) {
       await m.getByRole('button', { name: /clone|create|copy|make a copy/i }).last().click({ timeout: 8_000 })
       await adminPage.waitForTimeout(5000)
       expect(seen.some(x => x.s >= 200 && x.s < 300), `clone must round-trip 2xx (saw ${JSON.stringify(seen)})`).toBeTruthy()
-      // the new project shows up in the dashboard list with a NEW id
-      await adminPage.goto(`${BASE}/project`, { waitUntil: 'load' })
+      // the new project shows up in the hub list with a NEW id.
+      // (2026-10-11: the legacy /project dashboard is RETIRED — owner
+      // decision 2026-10-05; /project 404s. The hub at /hub is the project
+      // list: All projects / My projects / Shared with you.)
+      await adminPage.goto(`${BASE}/hub`, { waitUntil: 'load' })
       await expect(adminPage.getByText(name).first()).toBeVisible({ timeout: 15_000 })
     })
 

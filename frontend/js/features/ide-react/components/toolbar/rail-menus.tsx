@@ -321,6 +321,13 @@ const fileMenu = (t: TFunction) => (
     <RailDivider />
     <RailMenuItem id="show_version_history" />
     <RailMenuItem id="word_count" />
+    {/* 2026-10-11 (modals-p4 request-access leg): the v2 home of the legacy
+        toolbar's RequestAccessButton CTA. `RailMenuItem` returns null when
+        the `request_access` command is unregistered, and menu-bar.tsx only
+        registers it for the gated audience (readOnly/review viewer, owner
+        sharing-updates, not-yet-editor, no pending request) — so owners
+        and editors never see it here. */}
+    <RailMenuItem id="request_access" />
     <RailDivider />
     <RailMenuItem id="submit-project" />
     <RailMenuItem id="manage-template" />
