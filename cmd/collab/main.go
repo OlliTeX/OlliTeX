@@ -37,10 +37,11 @@
 package main
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
@@ -264,6 +265,59 @@ func main() {
 	mux.HandleFunc("/presence", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		encodeJSON(w, svc.Presences())
+	})
+
+	// ae4d9982: on-demand room->docstore write-back. The write-through is
+	// debounced (1.5s after the last update) and flushed on room-unload, so a
+	// build dispatched inside that window compiles pre-edit content (the
+	// proven stale-build gap). The web compile handler calls this BEFORE
+	// reading the docstore. Same internal-port convention as /presence and
+	// /metrics (the edge does not forward this; caller = Go web on this host).
+	// Body: {"rooms":["<pid>","<pid>-<docid>",...]} (or ?room=a,b). Only
+	// valid room names are flushed; unknown names are reported, not fatal.
+	mux.HandleFunc("/flushroom", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			fmt.Fprint(w, `{"error":"method not allowed"}`)
+			return
+		}
+		var names []string
+		if q := r.URL.Query().Get("room"); q != "" {
+			for _, n := range strings.Split(q, ",") {
+				if n = strings.TrimSpace(n); n != "" {
+					names = append(names, n)
+				}
+			}
+		} else {
+			var body struct {
+				Rooms []string `json:"rooms"`
+			}
+			b, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+			_ = json.Unmarshal(b, &body)
+			names = body.Rooms
+		}
+		if len(names) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, `{"error":"rooms required"}`)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		flushed := 0
+		var invalid []string
+		for _, n := range names {
+			if !collab.ValidRoomName(n) {
+				invalid = append(invalid, n)
+				continue
+			}
+			writeBack.FlushRoom(ctx, n)
+			flushed++
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"flushed": flushed,
+			"invalid": invalid,
+		})
 	})
 
 	ln, err := net.Listen("tcp", env("COLLAB_LISTEN", ":3450"))

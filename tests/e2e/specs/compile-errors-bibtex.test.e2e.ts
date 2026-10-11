@@ -2,7 +2,7 @@
  * compile-errors-bibtex.test.e2e.ts — board TODO-8593857d: COMPILE failure
  * UX + REFERENCES (bibtex two-pass) round-trip.
  *
- * CRITICAL PLANE FACT (proven 2026-10-11, tracked as board TODO-ae4d9982):
+ * PLANE FACT (proven 2026-10-11, board TODO-ae4d9982): FIXED ag-v53:
  * the BUILD reads the Go docstore, which is synced from the Yjs room only
  * when an editor SESSION disconnects (room persist). While the editing
  * session is open, builds compile the PRE-EDIT content (stale, for 120s+ of
@@ -204,8 +204,13 @@ test.describe('compile failure + bibtex references (disconnected-session builds)
     await c.close()
     console.log('T1B open-session build saw the edit? ' + openFresh + ' status=' + j?.status)
 
-    // The DETERMINISTIC contract on this stack: after the session ends, a
-    // build MUST reflect the latest content.
+    // ae4d9982 (FIXED ag-v53): the compile handler now forces the collab
+    // room->docstore write-back before reading content — an OPEN-session
+    // build MUST reflect the latest edit. Both directions asserted.
+    expect(openFresh, 'ae4d9982 fixed: open-session build reflects the latest edit').toBe(true)
+
+    // The DETERMINISTIC contract (pre-fix baseline, must stay true): after
+    // the session ends, a build MUST reflect the latest content.
     const closed = await compileClosed(browser, 'gap-closed')
     const closedFresh = /undefinedcmd_gap|Undefined control sequence/i.test(closed.log)
     console.log('T1B closed-session build saw the edit? ' + closedFresh)

@@ -94,11 +94,14 @@
 package compile
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -123,6 +126,7 @@ import (
 var compilePat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/compile$`)
 var stopPat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/compile/stop$`)
 var wordcountPat = regexp.MustCompile(`^/[Pp]roject/([^/]+)/wordcount$`)
+
 // Node router.mjs L730: DELETE /project/:Project_id/output ->
 // CompileController.deleteAuxFiles (CLS DELETE <clsi>/project/<pid>/user/<uid>
 // + clsi-cache/state clears via allSettled), then res.sendStatus(200).
@@ -196,11 +200,11 @@ func Feature(a *core.App) core.Feature {
 			{Method: "GET", Pattern: convCreatePat, Handler: exportConvCreateHandler(a)},
 			{Method: "GET", Pattern: convDownloadPat, Handler: exportConvDownloadHandler(a)},
 			{Method: "POST", Pattern: stopPat, Handler: stopHandler(a)},
-		// DELETE /project/:id/output (Node CompileController.deleteAuxFiles):
-		// the pdf-preview clear-cache flow. Proxies the CLSI clearCache
-		// (CLS DELETE /project/<pid>/user/<uid>; typst -> clsitypst) and
-		// answers 200 like Node's res.sendStatus(200).
-		{Method: "DELETE", Pattern: deleteOutputPat, Handler: deleteOutputHandler(a)},
+			// DELETE /project/:id/output (Node CompileController.deleteAuxFiles):
+			// the pdf-preview clear-cache flow. Proxies the CLSI clearCache
+			// (CLS DELETE /project/<pid>/user/<uid>; typst -> clsitypst) and
+			// answers 200 like Node's res.sendStatus(200).
+			{Method: "DELETE", Pattern: deleteOutputPat, Handler: deleteOutputHandler(a)},
 			// Word-count (Node CompileController.wordCount; read-auth, no limiter).
 			{Method: "GET", Pattern: wordcountPat, Handler: wordCountHandler(a)},
 			// P5.2b — output read (download-PDF button + clsi-cache shapes)
@@ -529,6 +533,49 @@ func getDocLines(ctx context.Context, pidHex string) (map[string][]string, error
 	return out, nil
 }
 
+// collabBase — the Go collab service (room server) on this host.
+func collabBase() string {
+	b := os.Getenv("COLLAB_URL")
+	if b == "" {
+		b = "http://127.0.0.1:3450"
+	}
+	return strings.TrimSuffix(b, "/")
+}
+
+// flushProjectRooms — ae4d9982: push the project's room heads (root doc +
+// every per-doc room) into the docstore NOW, so a build that reads the
+// docstore moments later sees the LATEST content instead of the debounced
+// write-back catching up (or not) at its own pace. The collab endpoint
+// validates room names and is internally best-effort; this caller treats
+// any error as non-fatal (see the call site).
+func flushProjectRooms(ctx context.Context, pidHex string, docs []treeDoc) error {
+	rooms := []string{pidHex}
+	for _, d := range docs {
+		if d.ID != "" {
+			rooms = append(rooms, pidHex+"-"+d.ID)
+		}
+	}
+	body, _ := json.Marshal(map[string]any{"rooms": rooms})
+	cctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(cctx, http.MethodPost, collabBase()+"/flushroom", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	rsp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer rsp.Body.Close()
+	if rsp.StatusCode >= 400 {
+		b, _ := io.ReadAll(io.LimitReader(rsp.Body, 512))
+		return fmt.Errorf("flushroom: HTTP %d %s", rsp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(rsp.Body, 1<<20))
+	return nil
+}
+
 func genBuildId() string {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
@@ -763,6 +810,16 @@ func compileHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		// ---- 2) tree + docstore content
 		rootFolder, _ := dget(*p, "rootFolder").(bson.A)
 		docs, files := walk(rootFolder)
+		// ae4d9982: force the collab room->docstore write-back BEFORE the
+		// content read. The write-through is debounced (1.5s after the last
+		// keystroke) and flushed on room-unload — a build dispatched inside
+		// that window was silently compiling pre-edit content (edit ->
+		// Recompile is exactly that window; proven in the e2e freshness
+		// matrix). FAIL-SOFT by contract: a collab outage or timeout must
+		// never kill a build — worst case the build sees today's behavior.
+		if ferr := flushProjectRooms(ctx, pid, docs); ferr != nil {
+			log.Printf("compile: pre-build room flush (fail-soft) pid=%s: %v", pid, ferr)
+		}
 		lines, derr := getDocLines(ctx, pid)
 		if derr != nil {
 			res.JSON(500, []byte(internal500))

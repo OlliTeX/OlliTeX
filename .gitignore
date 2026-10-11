@@ -64,8 +64,12 @@ tests/e2e/parity/reference/
 go/services/clsitypst/resourcewriter/cache/
 go/services/clsitypst/urlcache/cache/
 
-# local build/run artifacts (never commit)
-collab
+# local build/run artifacts (never commit) — root-level ONLY: the bare
+# 'collab' pattern was unintentionally gitignoring cmd/collab/ and
+# go/services/collab/ (the tracked Go collab service + its binary entry)
+# 2026-10-11; anchored to the repo root per the original local-artifact
+# intent.
+/collab
 go/collab
 .ollitex-toolkit/
 
