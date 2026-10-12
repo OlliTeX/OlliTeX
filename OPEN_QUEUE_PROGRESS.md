@@ -1007,3 +1007,31 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
   `/data_1/image_mining/the_diff/project_inspection/services/web/modules/project-inspection`:
   white-box inventory (already cross-checked 2026-10-10 in the board body) + LIVE leg (real multi-file project
   → analyze → panel renders issues with source locations) + any CSS/panel gap (J scope).
+## continuation 9 — 2026-10-12 — Phase 3 Wave A: TODO-8a6426ef CLOSED (inspection migration verification, live + white-box, full issue pipeline green)
+- **DONE: TODO-8a6426ef** — Project Inspection migration verification vs the reference source
+  `/data_1/image_mining/the_diff/project_inspection/services/web/modules/project-inspection`:
+  - WHITE-BOX (re-confirmed today): reference inventory intact — app/src/{ProjectInspectionManager,
+    Controller,Router,SnapshotReader,Errors,AnalysisWorkerService} + analyzer/{analyze-project,
+    graph-builder,cycles,bibtex-extractor,latex-extractor,resource-resolver,issue-collector,
+    source-location}.mjs + frontend/{rail-entry,panel,types,api}. OlliTeX: `go/services/web/
+    features/projectinspection/` (contract route POST analyze, rate limit 6/60 per project service.go:55,
+    authz service.go:62, buildSnapshot impl.go, NODE worker spawn impl.go:236 — "reference worker parity",
+    128MiB bound + timeout hardening) — 1:1 coverage of the reference pipeline.
+  - **LIVE E2E (new, today, ag-v57)** — editor typed via CodeMirror (`.cm-content`) a doc with
+    \label{sec-intro} + \ref{sec-missing} + \cite{doe:2000:missing};
+    `POST /project/:pid/project-inspection/analyze` (entry point = rootFolder doc entity id) → **200** with
+    the FULL pipeline: `issues.byId` = 2 issues — `issue-1` missing-citation (title
+    "Citation has no matching bibliography entry: doe:2000:missing", **source location {line:4, column:32,
+    from:107, to:123, sourceText, path:main.tex}** — source-location.mjs working) + `issue-2` missing-
+    reference ("sec-missing"); `overview` {missing:2, unusedUnreferenced:1, citationCount:1, fileCount:1};
+    `coverage` {parsedFiles:1, parseErrors:[]}; graph nodes incl. `citation-group:...` (graph-builder working).
+  - **UI panel verified live**: rail tab (icon `monitoring`, rail.tsx audit-019 entry, `hide:false`) →
+    "Project inspection | Analyze" → click → panel renders **`Files: 1 | Citations: 1 | ... Missing files /
+    references (2)`**: "Reference has no matching label: sec-missing" + "Citation has no matching
+    bibliography entry: doe:2000:missing" + **`Possibly unused (1)`: "Label is not referenced: sec-intro"**
+    (unused-label detection ✓) + analysis metadata (analysisId uuid · timestamp · duration). NO CSS/panel
+    gap that blocks the feature.
+  - **FLAG (owner, cosmetic, J/UI-letter scope)**: one chip in the panel's Citations sub-section renders the
+    issue **id** ("cited but undefined: \"issue-1\"") instead of the target (should say
+    "doe:2000:missing"). Wire payload is correct (issue-1.target = doe:2000:missing); panel binding is the
+    bug. Pinned via this log; NOT shipped (owner-gated product change).
