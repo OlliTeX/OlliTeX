@@ -987,3 +987,23 @@ PINS (ag-v57, 2026-10-12; probes admcy3–admcy7):
 
 Board: 7a8749ff → done (M1–M6 green + exit legs green). PHASE 2 COMPLETE: 22ac7721 ✓ 1d7cb391 ✓
 e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evidence above).
+## continuation 8 — 2026-10-12 — Phase 3 Wave A: TODO-1c29a1c0 CLOSED (tag/inspection/metadata live-pinned; 9/9 + exit 7/7 green)
+- **DONE: TODO-1c29a1c0** — project TAGS + inspection panel + metadata/trash round-trip. LIVE-PINNED on ag-v57:
+  - `specs/project-tags-inspection.test.e2e.ts` 4/4 (31.4s): tag create/membership/list/delete + color-RE pin;
+    `POST /project/:pid/project-inspection/analyze` 200 full envelope (schemaVersion/analysisId/analyzedAt/
+    coverage/entryPoints/graph/issues/overview/views) + error contract 400s (INVALID_ENTRY_POINT both variants,
+    1..50 bound) + 404 bad pid. Entry points = project **rootFolder doc entity id** (docs-collection `_id` ==
+    project_id in this y-world — single-doc model, probe-proven).
+  - `specs/project-metadata.test.e2e.ts` 5/5 (32s): settings no-op 204 / unknown-key 400 / `description` key 400
+    (NOT a settings key — settingsFields = compiler,imageName,png2pdf,name,spellCheckLanguage,
+    mainBibliographyDocId,rootDocId,referenceFormat,grammarPicky) / compiler set+restore 204 + **mongo-verified
+    persistence** (`doc.compiler = typst-0.13`); `GET /project/:pid/metadata` 200 {projectId, projectMeta per-doc
+    labels/packages}; **`GET /project/:pid/details` 404 — route unwired in this build** (pinned; `/metadata` is
+    the live surface); `/entities` shape + `POST /doc {name}` 200 pin (`{filePath}` → 400 Unrecognized);
+    trash/untrash round-trip 200 "OK" + list-disappearance pin + restore path 200.
+  - EXIT LEGS green: `specified smoke + admin-user-lifecycle 7/7 (51.5s)` (typo — that is: smoke +
+    admin-user-lifecycle together, 7 tests).
+- **NEXT IN WAVE A: TODO-8a6426ef (item N)** — inspection migration verification vs reference source
+  `/data_1/image_mining/the_diff/project_inspection/services/web/modules/project-inspection`:
+  white-box inventory (already cross-checked 2026-10-10 in the board body) + LIVE leg (real multi-file project
+  → analyze → panel renders issues with source locations) + any CSS/panel gap (J scope).
