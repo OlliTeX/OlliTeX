@@ -27,11 +27,16 @@ test.afterAll(async () => {
 
 const tplCount = () => Number(mongoEval('db.templates.countDocuments({})'))
 
-test('redirects: /templates/manage 301s into the hub admin leaf (legacy page removed)', async () => {
-  // logged-in admin: the 301 target is the hub management section.
+test('legacy route removed: /templates/manage 404s now (surface moved to /admin-settings/site.general.managetpl)', async () => {
+  // 2026-11-16 (9b142051 drift): the legacy /templates/manage HTML page is
+  // fully retired — a logged-in user gets a flat 404 (the old 301→hub-leaf
+  // redirect is gone in the AJ-1 wave). The MANAGEMENT surface itself is
+  // alive at the hub admin leaf (content verified: switches + category table),
+  // which hub-owner-batch2 covers. Pin the retired route + living surface.
   const r = await p.request.get(BASE + '/templates/manage', { maxRedirects: 0 })
-  expect(r.status(), 'expected 301, got ' + (await r.text().catch(() => '')).slice(0, 140)).toBe(301)
-  expect(r.headers()['location']).toBe('/admin-settings/site.general.managetpl')
+  expect(r.status(), 'expected 404 (route removed), got ' + (await r.text().catch(() => '')).slice(0, 120)).toBe(404)
+  const admin = await p.request.get(BASE + '/admin-settings/site.general.managetpl')
+  expect(admin.status(), 'the managetpl surface must still be alive').toBe(200)
 })
 
 test('denied: a plain user never sees a management surface via the legacy route', async ({ browser }) => {
@@ -40,7 +45,7 @@ test('denied: a plain user never sees a management surface via the legacy route'
   // the legacy page is gone for EVERYONE (301 into the hub); the management
   // ACTION that mattered is the API — a plain user must be denied there.
   const r = await q.request.get(BASE + '/templates/manage', { maxRedirects: 0 })
-  expect([301, 302].includes(r.status()), 'legacy route: ' + r.status()).toBeTruthy()
+  expect([302, 404].includes(r.status()), 'legacy route (login-walled or removed): ' + r.status()).toBeTruthy()
   const deniedApi = await q.request.get(BASE + '/api/templates/admin-list')
   expect([401, 403].includes(deniedApi.status()), 'admin-list denied for plain user (got ' + deniedApi.status() + ')').toBeTruthy()
   await ctx.close()

@@ -51,14 +51,22 @@ test('renovated shell active on /editor: marker + dataset + shell CSS loaded + I
   expect(probe.shellCss, 'shell CSS rules (editor-v2 tokens) must be loaded on /editor').toBe(true)
 })
 
-test('renovated shell dormant on /Project: marker absent, shell CSS not loaded', async ({ page }) => {
+test('renovated shell dormant on the legacy /Project route — retired 404 pin (2026-11-16 drift triage)', async ({ page }) => {
   page.setDefaultTimeout(45_000)
   await loginRobust(page, ADMIN.email, ADMIN.password)
   const pid = await createBlankProject(page)
 
-  await page.goto(`${BASE}/editor/${pid}`, { waitUntil: 'load' })
-  await expect(page.locator('.cm-editor').first()).toBeVisible({ timeout: 90_000 })
-  await page.waitForTimeout(2000)
+  // 2026-11-16 (9b142051): the legacy /Project/:id route is RETIRED (verified
+  // live: logged-in flat 404 "Not found"; anonymous → /login). This test's
+  // original "shell dormant" intent (the legacy route must NOT load the v2
+  // shell) now holds trivially because the route 404s — pin the RETIRED shape
+  // explicitly so the next auditor does not chase the dead route. (The LIVE
+  // /editor shell is asserted present+active by the test above.)
+  await page.goto(`${BASE}/Project/${pid}`, { waitUntil: 'domcontentloaded' }).catch(() => {})
+  await page.waitForTimeout(1500)
+  const body = (await page.locator('body').innerText().catch(() => '')) || ''
+  const retired = /not found|404/i.test(body) || /\/login/i.test(page.url())
+  expect(retired, 'legacy /Project must be RETIRED (url ' + page.url() + ')').toBeTruthy()
 
   const probe = await page.evaluate(() => {
     const root = document.getElementById('ide-root')

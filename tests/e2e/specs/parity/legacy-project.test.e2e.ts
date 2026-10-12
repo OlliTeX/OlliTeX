@@ -46,21 +46,28 @@ test('deny: guests get the login wall (404 now — no redirect to wall)', async 
   await ctx.close()
 })
 
-test('create: hub "New project" menu → Blank → name → POST /project/new', async () => {
+test('create: hub "New project" → Blank → name → POST /project/new (v2: 2xx + editor redirect)', async () => {
   const name = 'PtyCreateProbe' + Date.now().toString(36)
   const cap = captureApi(p as any, BASE)
   await p.goto(HUB_PROJECTS, { waitUntil: 'domcontentloaded' })
   await p.locator('button:has-text("New project")').first().click()
   await p.locator('text=Blank project').first().click()
-  await p.locator('label:has-text("Project name") input, #hub-new-project-name').first().fill(name)
-  await p.locator('[role="dialog"] button:has-text("Create"), .mantine-Modal-root button:has-text("Create")').first().click()
+  await p.locator('#hub-new-project-name, label:has-text("Project name") input').first().fill(name)
+  await p.locator('button:has-text("Create")').first().click()
   await waitForCall(cap, c => c.some(x => x.method === 'POST' && x.path === '/project/new'), 'project/new')
-  await expect(p.locator('body').getByText(name).first()).toBeVisible({ timeout: 20000 })
-  // cleanup via the API (the project row is findable by name)
-  const projects = await (await a('GET', '/project')).json().catch(() => ({} as any))
-  const arr = projects.projects ?? projects
-  const row = (Array.isArray(arr) ? arr : []).find((x: any) => (x.name ?? x.title) === name)
-  if (row) await delProject(p, row._id ?? row.id)
+  // 2026-11-16 (9b142051 drift triage): the v2 create flow REDIRECTS to the new
+  // project's editor after create (verified live: /editor/:pid, POST body
+  // {projectName, template}), and the old /project JSON list endpoint is
+  // retired (404 HTML) — so assert the server-side facts that matter:
+  // POST /project/new → 2xx + our name in the body + the editor transition.
+  const call = cap.calls.find((x: any) => x.method === 'POST' && x.path === '/project/new')
+  expect(call?.status, 'POST /project/new must be 2xx (got ' + call?.status + ')').toBeLessThan(300)
+  const posted = (typeof call?.body === 'string' ? JSON.parse(call.body) : call?.body) as any
+  expect(posted?.projectName ?? posted?.name, 'the typed name must reach the server').toBe(name)
+  await expect.poll(async () => /\/editor\//.test(p.url()), { timeout: 20_000 }).toBe(true)
+  // cleanup by the editor pid we were redirected to
+  const newPid = p.url().split('/').pop() || ''
+  if (/^[0-9a-f]{24}$/.test(newPid)) await delProject(p, newPid)
 })
 
 test('search: hub search filters the all-projects list', async () => {

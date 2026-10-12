@@ -1464,3 +1464,27 @@ Full suite run on ag-v57 (ol-e2e-overleaf-1:7420): **450 passed / 33 failed / 4 
 - Re-pin the route-retirement + stable v2-menu legs with live verification (one cluster at a time,
   verified green, re-arm guards). Flag the lost/regressed surfaces (online-users, rail-account, removed-
   project modal, messages-section render, a11y headings/axe) for owner product decisions — do NOT mask.
+
+## 2026-11-16 — 9b142051 full-battery drift triage (checkpoint 2: route-retirement cluster green)
+
+Re-pinned the legacy route-retirement wave to the LIVE shapes (verified per-route:
+anon → 302 /login; in-session → flat 404 "Not found"). **24/24 passed (1.6m):**
+- `specs/parity/legacy-templates-manage.test.e2e.ts` — /templates/manage now 404 (was 301
+  pin); plain-user deny accepts 302/404; the managetpl surface still alive at
+  /admin-settings/site.general.managetpl. (list/import/edit/delete API tests still green.)
+- `specs/parity/legacy-project.test.e2e.ts` — create flow: v2 "New project → Blank → name →
+  Create" now POSTs {projectName}→2xx and REDIRECTS to /editor/:pid (verified live); the old
+  /project JSON list is 404. Assert 2xx + name-in-body + editor transition; cleanup by pid.
+- `specs/equation-editor.test.e2e.ts` — /Project/:pid pin now accepts anon 302 (login wall) OR
+  in-session 404 (both verified); never 200, never a hub redirect.
+- `specs/editor/shell-probe.test.e2e.ts` — the "dormant on /Project" test was navigating to
+  /editor (contradicting test-1 which asserts the shell IS active on /editor). Re-targeted to the
+  legacy /Project route (404/retired → marker + shell CSS absent); intent preserved.
+- `specs/editor/module-m5.test.e2e.ts` — /templates + /template/:id RETIRED (404/live-verified);
+  templates API still alive (list/import/edit/delete green); gallery surface moved into the hub
+  "New project → From template" flow. FLAG (owner): confirm canonical v2 gallery surface.
+- `specs/editor/module-m6.test.e2e.ts` — /library RETIRED (404/live-verified); the personal-
+  library/citations surface now lives inside the editor (file-tree menu). FLAG (owner): confirm
+  /library retirement + editor-internal library as the v2 surface.
+
+All re-pins carry re-arm guards (assertions flip back if the product restores the surface).

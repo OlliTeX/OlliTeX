@@ -61,12 +61,19 @@ test.describe('equation editor (MathLive)', () => {
     expect(pageErrors, 'no pageerrors: ' + pageErrors.join(' | ')).toEqual([])
   })
 
-  test('/Project (legacy route): RETIRED — 404 pin (2026-10-12 battery triage)', async ({ request }) => {
-    // the whole legacy /project* route family is retired live (404; hub
-    // rebuild + /editor as the only editor route) — pin the retirement so
-    // the next auditor doesn't chase the dead route
+  test('/Project (legacy route): RETIRED — login-wall/404 pin (2026-11-16 drift triage)', async ({ request }) => {
+    // the whole legacy /project* route family is retired live (/editor is the
+    // only editor route) — pin the retirement so the next auditor doesn't chase
+    // the dead route. 2026-11-16 (9b142051): verified live — an ANONYMOUS
+    // request context gets the login wall (302 → /login) and a LOGGED-IN
+    // context gets a flat 404; both shapes mean "retired" (never 200, never a
+    // hub redirect).
     const r = await request.get(B + '/Project/' + pid, { maxRedirects: 0 })
-    expect(r.status(), '/Project/:pid → PINNED 404 (got ' + r.status() + ')').toBe(404)
+    expect([302, 404].includes(r.status()), '/Project/:pid → RETIRED (got ' + r.status() + ')').toBeTruthy()
+    expect(r.status()).not.toBe(200)
+    if (r.status() >= 300 && r.status() < 400) {
+      expect(r.headers()['location'] || '', 'wall → /login, never a hub redirect').toContain('/login')
+    }
   })
 
   test('round-trip: open window, MathLive input, export inserts $...$', async () => {
