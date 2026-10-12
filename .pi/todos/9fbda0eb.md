@@ -6,9 +6,6 @@
     "terminal-audit"
   ],
   "status": "assigned",
-  "created_at": 1790557321965,
-  "last_change": 1791004504598,
-  "restore": "2026-10-11 from pi-transcripts (board dir lost to rm-rf incident)"
+  "created_at": "",
+  "assigned_to_session": "01a12d73-d461-7122-b0b5-d8b2d3625f08"
 }
-
-

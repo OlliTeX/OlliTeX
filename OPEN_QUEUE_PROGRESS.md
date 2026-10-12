@@ -780,3 +780,46 @@ way).
 - Hermetic f1/f2/fedgap4 + the full federation suite GREEN; gofmt/vet clean.
 
 **Owner-window now (all genuinely owner-side):** bringing up the second live instance + the peer pins to RUN the harness (institutional TOFU decision); `ollitex-*` cross-container scrape bind (in-flight runit files); probe-file pile disposition (A→2); go.mod/go.sum module-file state (TUI require lines in the working tree).
+
+## RUN — 2026-10-12 — SESSION TAKEOVER: trust repair (Phase 1) — world rebuilt from source, world cycled
+
+**Context:** session takeover after the 2026-10-11 rm-rf incident; owner directive = execute the
+phase plan (goal `08603aee`) autonomously; owner sleep-mode rules in effect (no questions; blockers
+→ todo bodies; progress → this file).
+
+**DONE (this run, evidence inline):**
+1. **Lezer generator loss (root-cause of the "lost its marbles" build failures)** — `frontend/scripts/lezer-latex/generate.mjs`
+   was in the rm-rf casualty set; the webpack plugin silently no-ops without it, so BOTH storybook and
+   the app-image webpack died on missing `latex.terms.mjs`. Recreated `generate.mjs` from the surviving
+   contract (`webpack-plugins/lezer-grammar-compiler.js` requires `{compile, grammars}` default export;
+   `@lezer/generator` 1.8.0 API = `buildParserFile(text,{fileName,moduleStyle:'es'}) → {parser, terms}`),
+   covering BOTH grammars (latex + bibtex). Ran `yarn lezer-latex:generate` → 4 artifacts regenerated
+   (latex.mjs 67.7KB, latex.terms.mjs, bibtex.mjs, bibtex.terms.mjs). UNCOMMITTED (commit with next slice — see below).
+2. **`.env.test` reconstruction** — written verbatim from `docker exec ol-e2e-overleaf-1 env` (104 keys,
+   all 8 compose refs covered incl. the 7 bootstrap secrets; values never printed); `OVERLEAF_IMAGE=olpsint/overleaf:ag-v56`.
+   compose `config --quiet` OK. (Earlier naive rebuild had a quoting bug — whole-line quoting broke compose parse; fixed.)
+3. **Image train rebuilt from source** — `make images` (base cached; app image full rebuild; pandoc/pdftocairo/
+   png2pdf/typst/texlive targets following): NEW image `ollitex/ollitex:main-886d6242…` (id eb1bc084bc31,
+   label `com.overleaf.ce.revision=886d6242447ffd336998c7a0818c9461687843d2` = git HEAD exactly).
+   Re-tagged `olpsint/overleaf:ag-v56` onto it (an early premature tag had caught the OLD image — re-tagged
+   with label verification). Note: the pre-existing world image ag-v55 was label 1959dab4 (= HEAD~2, docs-only delta)
+   — so the pre-takeover world was functionally current minus the two board commits; the "broken version" fear
+   was the LOCAL build tooling (lezer generator), now repaired. canvas node-gyp build warning in the image is
+   pre-existing (ag-v55 had it too; non-fatal).
+4. **World cycled** — `docker compose … up -d` recreated ol-e2e-overleaf-1 on ag-v56 (sidecars/data volumes untouched;
+   ollitex-web prod left as-is per rail: prod cycle is an owner step). Healthy: container `healthy`, /login 200,
+   chat route 302, /hub 302, /admin/panel 302.
+5. **toolkit/.env (prod) canonical rebuild** — `env.example` is the 93-key contract; .env = contract defaults
+   overlaid with live `ollitex-web` env values (live truth wins) + `OL_PG_PASSWORD` (owner-confirmed required;
+   taken from live `ollitex-pg` POSTGRES_PASSWORD — **sha256 da33f78e9732… verified IDENTICAL to web's PG_PASSWORD**;
+   note: DIFFERS from the stale compose_cep/.env value — live is canonical). 134 lines, no dups, no placeholders, 600.
+   `OLLITEX`/OL_PG_PASSWORD alias kept for `cycle_overleafserver.sh`.
+6. **Owner green-lights recorded in board bodies:** `c8d140c0` (c10 dead-library deletion, PnP surgery) +
+   `91e4f42` (prune ag-v46…v52 after Phase 1 green) — both recorded 2026-10-12 with scope + gate.
+
+**IN FLIGHT:** Phase 1 verification battery (smoke + realtime-bus + typst-t2 compile + collab-two-user, workers=1)
+on ag-v56 → result appended below.
+
+**QUEUED (Phase 1 checklist):** ae4d9982 verify+close (fix commit 1959dab4 in tree); c00741d2 verify+close;
+43a8cb9a live re-audit; 090296e3/225c3d7e reconstruction; then c10 deletion surgery + ag-v46…v52 prune
+(owner-gated GREEN-LIT, scoped); commit slice for generate.mjs + board updates.
