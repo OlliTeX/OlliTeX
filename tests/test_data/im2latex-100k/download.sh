@@ -1,0 +1,1 @@
+wget -O im2latex_formulas.lst https://zenodo.org/records/56198/files/im2latex_formulas.lst?download=1
