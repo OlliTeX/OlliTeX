@@ -92,7 +92,8 @@ test('dropbox token is valid (cached or static)', async () => {
     if (r && r.access_token) token = r.access_token
   }
   test.skip(!token, 'dropbox: no token — run `node scripts/auth-capture.mjs --service dropbox --url <authorize-url>` (see credentials/README.md), or set §dropbox.token / refreshToken(+appKey/appSecret) in config.json')
-  const out = await req('https://api.dropboxapi.com/2/users/get_current_account', {}, { Authorization: `Bearer ${token}` })
+  // Dropbox v2 API: GET → 400 "Use HTTP POST requests" (pinned 2026-10-12)
+  const out = await req('https://api.dropboxapi.com/2/users/get_current_account', { method: 'POST' }, { Authorization: `Bearer ${token}` })
   expect([200, 201], 'dropbox account call').toContain(out.status)
   expect(out.body?.account_id, 'dropbox account_id').toBeTruthy()
 })

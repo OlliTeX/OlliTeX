@@ -1306,3 +1306,39 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
      access+refresh saved → D4/D6 + external-probe dropbox re-arm.
   Fallback if the toggle isn't possible: `--paste` from the cleanest
   personal device (residential IP + existing Dropbox session).
+## 2026-10-12 (cont.) — DROPBOX ARC CLOSED; FULL CREDENTIAL SET GREEN
+- Owner recreated the Dropbox app (old app in the captcha loop). New app
+  `4rls… / rp2e…` (console "OlliTex", app folder **OlliTex**, development
+  status, redirect https://psintern…/user/dropbox/oauth/callback
+  registered, implicit grant allowed). config §dropbox + .env.test world
+  envs updated (old `xs8q…` removed); container cycled (2/2 envs).
+- **Token source = owner's console "Generated access token" (`sl.*`) —
+  long-lived, account-scoped (gittest26@…, dbid:AAC_0LWxfxU…), no refresh
+  companion (generated tokens carry none → D6 EXTEND stays design-skip —
+  the honest pin).** Landed to credentials/.auth/dropbox.json (0600),
+  verified via `POST users/get_current_account` (200, exact account).
+- Spec fixes this round (all pinned with evidence):
+  * D4 was missing loginRobust (fresh per-test context → anonymous →
+    `403 Forbidden` at the login gate) — added;
+  * D5 mongo eval: bare `dropboxusercredentials` alias is undefined in
+    `mongosh --eval` → `db.dropboxusercredentials` (house gotcha, same
+    class as db.users; collection confirmed to exist);
+  * D5 eval expression: no `//` comments INSIDE the --eval string;
+  * D1 self-heal: disconnect-first before the not-connected pin (world
+    can be left connected by an interrupted D4…D8 run);
+  * external-probe dropbox leg: Dropbox v2 API is POST-only
+    (`GET` → 400 "Use HTTP POST requests") — pinned as a comment in the
+    probe.
+- **Result: dropbox-link-cycle 8/8 + external-probe dropbox leg PASS
+  (13 passed / 1 design-skip, 47s).**
+- **Scope FLAG (owner console, optional):** new app grants
+  `account_info.read` only — connect/disconnect/status + probe are all
+  green with that, but a real Dropbox *sync* would additionally need
+  app-folder `files.*` scopes (add in the app console if the sync story
+  comes up; recorded here, not shipped by us).
+- **CREDENTIAL SET STATUS: all 5 families green** —
+  git-hosts (github/gitea/gitlab/forgejo) ✓, webdav ✓, llm ✓,
+  mendeley ✓ (9p/1s, EXTEND green), zotero ✓ (LIFETIME key, probe green),
+  dropbox ✓ (8/8, probe green). Design-skips remaining: dropbox D6
+  (no refresh token by token-kind), mendeley M8 + zotero Z3/Z4
+  (product-UI round-trips, superseded by the capture tool).

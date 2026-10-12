@@ -70,6 +70,8 @@ function cachedRefresh(name: string): string | null {
 
 test('D1: pre-state — status not connected + oauth2 302s with the app pair (creds live)', async ({ page }) => {
   await loginRobust(page, USER.email, USER.password)
+  // self-heal: world may be left CONNECTED by a prior interrupted run (D4 green, D7/D8 not)
+  await api(page, 'POST', '/user/dropbox/disconnect').catch(() => {})
   const s = await api(page, 'GET', '/user/dropbox/status')
   expect(s.status()).toBe(200)
   expect((await s.text()).trim(), 'not-connected pin').toBe('{"connected":false}')
@@ -101,6 +103,7 @@ test('D3: connect contract — missing access_token → 400 exact pin', async ({
 })
 
 test('D4: CONNECT (owner token path) → 200 {"success":true}', async ({ page }) => {
+  await loginRobust(page, USER.email, USER.password) // fresh per-test context — anonymous POST → 403 (pinned 2026-10-12)
   const cfg = dbxCfg()
   const t = await resolveToken(cfg)
   test.skip(!t, 'no dropbox account token — operator assists once: ' +
@@ -119,7 +122,7 @@ test('D5: LINKED state — status connected:true + encrypted cred stored (not pl
   expect(s.status()).toBe(200)
   expect(body, 'connected pin').toContain('"path"')
   // storage hygiene: the stored token must be the ENCRYPTED form
-  const raw = String(mongoEval(`'X' + JSON.stringify(dropboxusercredentials.countDocuments({}))`)).replace(/^X/, '')
+  const raw = String(mongoEval(`'X' + JSON.stringify(db.dropboxusercredentials.countDocuments({}))`)).replace(/^X/, '')
   expect(Number(raw), 'dropboxusercredentials doc present').toBeGreaterThanOrEqual(1)
 })
 
