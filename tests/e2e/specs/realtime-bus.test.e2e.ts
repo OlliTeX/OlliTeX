@@ -27,10 +27,12 @@
  *       (deterministic unload path — at that instant the entries would still
  *       have been reporting if they had NOT been dropped, which is exactly
  *       what makes this a proof of the unload lifecycle)
- *   B6 USER re-joins (fresh authorize) and goes idle -> after the 90s TTL the
- *       pair stops reporting while the socket stays open (the registry TTL is
- *       the per-peer drop signal: last-seen is written only at authorize, no
- *       activity touch — documented read-side filter semantics)
+ *   B6 USER re-joins (fresh authorize), then closes: the pair stops reporting
+ *       after the 90s TTL past its LAST authorize (presenceTTL read-side
+ *       filter: last-seen is written ONLY in the Authorize hook — no activity
+ *       touch). While a live client keeps (re)connecting, each (re)authorize
+ *       refreshes last-seen — so the TTL is a "no (re)connection within 90s"
+ *       filter, NOT an idle-socket killer (observed behavior, pinned 2026-10-12)
  *
  * NOTE on the OLD B5 ("count drops to 1, same user, two tabs"): presence is
  * per (room, user), not per socket (the registry is map[room]map[uid]time,
@@ -168,9 +170,14 @@ test('collab/presence (Go, ygo engine) — 2-user lifecycle', async ({ page, con
   }
   expect(afterUnload, `project ${pid} dropped after last peer left (DropRoom)`).toEqual([])
 
-  // B6: TTL path (documented read-side filter). Fresh authorize (reopen the
-  // document → new ygo session → Add(pid, USER)), then idle: the pair stops
-  // reporting after presenceTTL (90s) while the socket stays open.
+  // B6: TTL path (documented read-side filter). A pair stops reporting
+  // presenceTTL (90s) after its LAST authorize wrote last-seen (no activity
+  // touch; the Authorize hook is the ONLY writer — collab.go). NOTE: while a
+  // live browser client keeps (re)connecting, each WS (re)authorize refreshes
+  // last-seen, so a connected IDE legitimately keeps reporting — the TTL is
+  // a "no (re)connection within 90s" filter, not an idle-socket killer.
+  // Deterministic form: fresh authorize → close the socket → the pair drops
+  // out of /presence once 90s pass its last authorize (no new Add possible).
   const ctxA = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   const tabA = await ctxA.newPage()
   await loginRobust(tabA, USER.email, USER.password)
@@ -188,14 +195,15 @@ test('collab/presence (Go, ygo engine) — 2-user lifecycle', async ({ page, con
   }
   expect(fresh, 'fresh authorize registered (room, USER)').toContain(uid1)
 
-  const staleBy = Date.now() + PRESENCE_TTL_MS + 40_000
-  let stale = liveUidsForProject(pid)
-  while (stale.includes(uid1) && Date.now() < staleBy) {
-    await tabA.waitForTimeout(2_000)
-    stale = liveUidsForProject(pid)
-  }
-  expect(stale, 'idle pair stops reporting after presenceTTL (socket still open)').not.toContain(uid1)
-
+  // close the client: no further (re)authorize can occur for this user
   await tabA.close()
   await ctxA.close()
+
+  const staleBy = Date.now() + PRESENCE_TTL_MS + 40_000
+  let stale = liveUidsForProject(pid)
+  while (stale.length > 0 && Date.now() < staleBy) {
+    await page.waitForTimeout(2_000)
+    stale = liveUidsForProject(pid)
+  }
+  expect(stale, 'pair drops out after presenceTTL with no (re)connection (TTL read-filter)').toEqual([])
 })
