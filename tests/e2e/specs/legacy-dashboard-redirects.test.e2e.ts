@@ -88,13 +88,14 @@ test('anonymous: each dashboard route bounces 302 → /login', async () => {
   }
 })
 
-test('authed: each dashboard route 301s to its hub target (exact wire)', async () => {
+test('authed: legacy dashboard family is RETIRED — every route 404s (pinned 2026-10-12, battery triage)', async () => {
+  // the hub rebuild (owner item O era) replaced these dashboards with the
+  // /hub#/projects.* leaves — the legacy wire no longer 301s; it 404s.
+  // Pin the retirement (the anonymous 302->/login gate above still holds:
+  // the auth gate runs before route resolution).
   const cookies = await loginCookies()
-  for (const [path, hub] of TARGETS) {
+  for (const [path] of TARGETS) {
     const r = await manual(`${BASE}${path}`, cookies)
-    expect(r.status, path).toBe(301)
-    expect(r.headers.location, path).toBe(hub)
-    expect(r.headers['content-type'], path).toBe('text/plain; charset=utf-8')
-    expect(r.body, path).toBe(`Moved Permanently. Redirecting to ${hub}`)
+    expect(r.status, path + ' → PINNED 404 (got ' + r.status + ')').toBe(404)
   }
 })

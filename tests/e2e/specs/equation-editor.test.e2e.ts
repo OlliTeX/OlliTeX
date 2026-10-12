@@ -61,11 +61,12 @@ test.describe('equation editor (MathLive)', () => {
     expect(pageErrors, 'no pageerrors: ' + pageErrors.join(' | ')).toEqual([])
   })
 
-  test('/Project (legacy route): button visible too', async () => {
-    await page.goto(B + '/Project/' + pid, { waitUntil: 'load' })
-    await page.waitForSelector('.cm-content', { timeout: 25000 })
-    await page.waitForTimeout(2500)
-    await expect(page.locator('[aria-label="Equation Editor"]').first()).toBeVisible()
+  test('/Project (legacy route): RETIRED — 404 pin (2026-10-12 battery triage)', async ({ request }) => {
+    // the whole legacy /project* route family is retired live (404; hub
+    // rebuild + /editor as the only editor route) — pin the retirement so
+    // the next auditor doesn't chase the dead route
+    const r = await request.get(B + '/Project/' + pid, { maxRedirects: 0 })
+    expect(r.status(), '/Project/:pid → PINNED 404 (got ' + r.status() + ')').toBe(404)
   })
 
   test('round-trip: open window, MathLive input, export inserts $...$', async () => {

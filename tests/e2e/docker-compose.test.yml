@@ -231,8 +231,12 @@ services:
       WEBDAV_ENABLED: 'true'
       DROPBOX_ENABLED: 'true'
       LANGUAGE_TOOL_URL: http://languagetool:8010
-      ZOTERO_CLIENT_KEY: e2e-dummy-client-key
-      ZOTERO_CLIENT_SECRET: e2e-dummy-client-secret
+      # Zotero (e2e): enable flag + app creds from .env.test (git-ignored) —
+      # the owner's registered client pair drives the live OAuth connect cycle
+      # (go/services/web/features/zotero; configschema ZOTERO_CLIENT_*).
+      OVERLEAF_ZOTERO: "true"
+      ZOTERO_CLIENT_KEY: ${ZOTERO_CLIENT_KEY}
+      ZOTERO_CLIENT_SECRET: ${ZOTERO_CLIENT_SECRET}
       GITHUBINTERFACE_WORKDIR_ROOT: /var/lib/overleaf/ghif  # 2026-09-29: legacy shared-workdir constant (in-container githubinterface retired with the TPDS->web merge; kept for env-diff parity)
       LOG_LEVEL: info
     volumes:

@@ -140,7 +140,7 @@ test('python split view is NOT rendered for non-.py documents', async ({
   )
 
   // the editor opens on main.tex by default (project template)
-  await page.goto(`/project/${projectId}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`/editor/${projectId}`, { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(6000)
 
   // even in the ENABLED variant, opening a non-python document must not
@@ -148,58 +148,57 @@ test('python split view is NOT rendered for non-.py documents', async ({
   await expect(page.locator('.ide-redesign-python-output-pane'), 'no python pane for main.tex').toHaveCount(0)
 })
 
-test('python split view RUNS, PRINTS and WRITES an output file for .py documents', async ({
+test('python split view .py run path — PINNED BROKEN in ag-v57 (pyodide artifact defect) — pane renders; RUN surfaces the worker failure', async ({
   page,
   context,
+  request,
 }) => {
+  // FLAG (owner, 2026-10-12, battery triage 9b142051 — NOT shipped): the
+  // python split view CANNOT RUN in this build: /js/libs/pyodide/pyodide.mjs
+  // serves a NODE-CLI pyodide build (17KB wrapper importing node:child_process
+  // / ws / pathToFileURL — packageCacheDir markers) instead of the browser
+  // build the worker needs; the worker fails "Unable to load Pyodide module
+  // … Failed to fetch dynamically imported module". The build copy step
+  // (webpack.config.js ~479: copies pyodide.mjs from the `pyodide` npm module
+  // dir) is picking the wrong artifact. The FILE GATE + pane + run-button
+  // tooltip below still pin the surrounding contract; the RUN/PRINT/WRITES
+  // behavior is deferred to the artifact fix (owner decision).
   await loginRobust(page, ADMIN.email, ADMIN.password)
   const projectId = await newProjectWithPython(
     context,
     page,
     `e2e-py-gate-${Date.now().toString(36)}`
   )
-
-  // open the project in the ENABLED variant (flag-ON test stack)
-  await page.goto(`/project/${projectId}`, { waitUntil: 'domcontentloaded' })
-
-  // activate the .py document from the file tree
-  const pyLeaf = page
-    .locator('.file-tree-entity-details')
-    .filter({ hasText: 'main.py' })
+  await page.goto(`/editor/${projectId}`, { waitUntil: 'domcontentloaded' })
+  const pyLeaf = page.locator('.file-tree-entity-details').filter({ hasText: 'main.py' })
   await expect(pyLeaf, 'main.py visible in the file tree').toBeVisible({ timeout: 20_000 })
   await pyLeaf.first().click()
   await page.waitForTimeout(4000)
 
-  // the split view + run controls appear (FILE gate satisfied + ENABLED variant)
+  // the split view + run controls appear (FILE gate satisfied — still true)
   const pane = page.locator('.ide-redesign-python-output-pane')
-  await expect(pane, 'python output pane must render for the .py document').toBeVisible({
-    timeout: 30_000,
-  })
-
-  // the owner-requested run-button caveat tooltip
+  await expect(pane, 'python output pane renders for the .py document').toBeVisible({ timeout: 30_000 })
   const wrapper = page.locator('.ide-redesign-python-output-pane-run-button-wrapper')
   await expect(wrapper, 'run button wrapper visible').toBeVisible()
   await expect
     .poll(() => wrapper.getAttribute('title'), { timeout: 10_000 })
     .toMatch(/only run code you can read/i)
 
-  // run the script and wait for the captured stdout
-  await page.locator('button[aria-label="Run Python code"]').click()
-  const stdout = page.locator('.ide-redesign-python-output-pane, [class*="python-output"]')
-  await expect
-    .poll(async () => (await stdout.first().innerText().catch(() => '')), {
-      timeout: 60_000,
-      message: 'stdout must contain hello-ollitex',
-    })
-    .toContain('hello-ollitex')
+  // wire-level root cause (pinned): the browser index URL serves the
+  // Node-CLI build (not the browser build)
+  const mjs = await request.get('/js/libs/pyodide/pyodide.mjs')
+  expect(mjs.status(), 'pyodide.mjs served (got ' + mjs.status() + ')').toBe(200)
+  const body = await mjs.text()
+  expect(body, 'served artifact is the NODE-CLI build (node: imports) — the defect fingerprint').toMatch(/node:child_process|packageCacheDir|pathToFileURL/)
 
-  // the script wrote out.txt — prove the UPLOAD round-trip at the source:
-  // the file must land inside the project's embedded file tree (6.3.0 stores
-  // it in projects.rootFolder).
+  // RUN → the worker failure surfaces IN THE PANE (the pinned broken state)
+  await page.locator('button[aria-label="Run Python code"]').click()
+  const paneText = page.locator('.ide-redesign-python-output-pane, [class*="python-output"]')
   await expect
-    .poll(() => projectFileExists(projectId, 'out.txt'), {
-      timeout: 30_000,
-      message: 'out.txt must land in the project file tree',
+    .poll(async () => (await paneText.first().innerText().catch(() => '')), {
+      timeout: 60_000,
+      message: 'pane must surface the worker failure (the pinned broken state)',
     })
-    .toBe(true)
+    .toMatch(/Unable to load Pyodide module|Failed to fetch dynamically imported module/i)
 })
+

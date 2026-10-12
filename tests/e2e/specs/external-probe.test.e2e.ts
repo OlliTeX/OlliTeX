@@ -89,6 +89,10 @@ test('dropbox token is valid (cached or static)', async () => {
 test('zotero API key resolves the library', async () => {
   test.skip(!externalEnabled('zotero'), 'zotero not enabled — see credentials/README.md')
   const cfg = getExternal('zotero')!
+  // 2026-10-12: this leg needs the CLASSIC ZOTERO_API_KEY pair (a distinct
+  // credential from the OAuth account pair); skip cleanly when the key is
+  // absent (the OAuth pair drives specs/zotero-link-cycle.test.e2e.ts).
+  test.skip(!cfg.apiKey, 'zotero "apiKey" (classic) not set in credentials/config.json')
   const base = String(cfg.baseUrl).replace(/\/$/, '')
   // zotero.org API: /api/users/{id} (or /api/users/byUsername/{name}); key header suffices,
   // ZOTERO_USER header only needed for byUsername lookups

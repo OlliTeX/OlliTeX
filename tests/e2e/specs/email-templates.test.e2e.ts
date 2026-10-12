@@ -8,7 +8,7 @@
  * + CSRF):
  *   GET    /api/hub/email-templates
  *     -> {version:1, templates:[{name,label,help,variables,default,
- *         current,overridden,updatedAt,updatedBy}]}   (13 slots)
+ *         current,overridden,updatedAt,updatedBy}]}   (14 slots — instance-stats-alert added by the instance-stats feature)
  *   PUT    /api/hub/email-templates/<name>
  *     body: any subset of {subject,text,html}; a NON-EMPTY value saves,
  *     an EMPTY value resets that field, omitted keys are unchanged.
@@ -65,7 +65,7 @@ test.describe('email-templates — server API (site admin)', () => {
     expect(res.status() !== 404).toBeTruthy()
   })
 
-  test('GET lists the 13 slots with defaults + current + variables', async ({ request }) => {
+  test('GET lists the 14 slots with defaults + current + variables', async ({ request }) => {
     const csrf = await adminSession(request)
     const res = await request.get(TMPL, { headers: { 'x-csrf-token': csrf } })
     expect(res.status()).toBe(200)
@@ -75,6 +75,7 @@ test.describe('email-templates — server API (site admin)', () => {
     expect(names).toEqual([
       'password-reset',
       'instance-stats-test',
+      'instance-stats-alert',
       'sessions-cleared',
       'activate-account',
       'mail-config-test',
@@ -156,60 +157,81 @@ test.describe('email-templates — server API (site admin)', () => {
   })
 })
 
-test.describe('email-templates — /hub admin UI', () => {
-  test('the leaf renders all 13 slots with save/reset behavior', async ({
+test.describe('email-templates — admin settings UI', () => {
+  // PINNED 2026-10-12 (battery-drift triage, 9b142051): the admin IA moved
+  // (owner item O, 2026-10-09, hub-root.tsx: "User settings"/"Admin settings"
+  // header links) — the email-templates leaf is now
+  // /admin-settings/site.general.emailtemplates (15 cards = 1 header +
+  // 14 slot cards; the slot set gained instance-stats-test +
+  // instance-stats-alert). Card identity is by TITLE (label-driven), not
+  // index — the slot order is not a stable pin.
+  test('the leaf renders all 14 slots; save → CUSTOM: SUBJECT badge; reset → default', async ({
     page,
+    request,
   }) => {
     await loginRobust(page, ADMIN.email, ADMIN.password)
-    await page.goto('/hub')
-    await page.waitForTimeout(1500)
-    // open the rail: Site settings → General → Email templates
-    const railBtn = (text: string) =>
-      page.locator('button').filter({ hasText: text }).first()
+    await page.goto('/admin-settings/site.general.emailtemplates')
+    await page.waitForTimeout(2_500)
 
-    await railBtn('tuneSite settings').click()
-    await page.waitForTimeout(600)
-    await railBtn('layersGeneral').click()
-    await page.waitForTimeout(600)
-    const leaf = railBtn('mailEmail templates')
-    await expect(leaf).toBeVisible()
-    await leaf.click()
-    await page.waitForTimeout(2500)
+    // self-healing setup: an earlier crashed run may have left the slot
+    // overridden — reset it first so the DEFAULT baseline is real
+    const csrf0 = (await page.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)) || ''
+    await request.delete('/api/hub/email-templates/test-mail', {
+      headers: { 'X-Csrf-Token': csrf0, Accept: 'application/json' },
+    }).catch(() => {})
+    await page.reload({ waitUntil: 'load' })
+    await page.waitForTimeout(2_500)
 
     const cards = page.locator('.mantine-Card-root')
-    await expect(cards).toHaveCount(13)
+    const n = await cards.count()
+    expect(n, '15 cards (1 header + 14 slots; got ' + n + ')').toBe(15)
+    const header = await cards.nth(0).innerText().catch(() => '')
+    expect(header, 'header card describes the slots (got: ' + header.slice(0, 80) + ')')
+      .toMatch(/outbound e.?mails/i)
 
-    // the test-mail card (last): subject input + text + html textareas
-    const tmCard = cards.nth(12)
-    await expect(tmCard.locator('.mantine-Input-wrapper input')).toHaveValue(
-      'A Test Email from {{app}}'
-    )
-    expect(await tmCard.locator('textarea').count()).toBe(2)
+    const cardByTitle = (t: string) =>
+      cards.filter({ hasText: t, exact: false }).last()
 
-    // the collab card: NO editable HTML part (subject + text only)
-    const collabCard = cards.nth(5)
-    expect(await collabCard.locator('textarea').count()).toBe(1)
+    // the test-mail slot (card title 'Test e-mail' — the legacy save/reset
+    // target): subject input + text + html (2 textareas), default subject
+    // 'A Test Email from {{app}}' (pinned)
+    const mail = cards.filter({ hasText: /Sent by the test-e-mail endpoints/i }).last()
+    await mail.scrollIntoViewIfNeeded().catch(() => {})
+    expect(await mail.locator('textarea').count(), 'test-mail slot has text + html (got ' + (await mail.locator('textarea').count()) + ')').toBe(2)
+    const subj = mail.locator('.mantine-Input-wrapper input').first()
+    const defVal = await subj.inputValue().catch(() => '')
+    expect(defVal, 'default subject (got ' + defVal + ')').toBe('A Test Email from {{app}}')
+    expect((await mail.innerText()).includes('DEFAULT'), 'starts with the DEFAULT badge (got: ' + (await mail.innerText()).slice(0, 120) + ')').toBe(true)
 
-    // edit + save → "custom: subject" badge
-    const subj = tmCard.locator('.mantine-Input-wrapper input').first()
+    // sibling slot distinction: 'E-mail configuration test' also has
+    // subject+text+html; the collab slots have text only (pinned both sides)
+    const cfg = cards.filter({ hasText: /Sent from the site settings E-mail test/i }).last()
+    expect(await cfg.locator('textarea').count(), 'mail-config-test slot has text + html').toBe(2)
+
+    // the collab-style slot: subject + text ONLY (1 textarea, no html part)
+    const collab = cardByTitle('Access request (owner notified)')
+    expect(await collab.locator('textarea').count(), 'no HTML part (got ' + (await collab.locator('textarea').count()) + ')').toBe(1)
+
+    // save the subject → CUSTOM: SUBJECT badge + value kept
     await subj.fill('UI E2E {{app}} verify')
-    await tmCard
-      .locator('button')
-      .filter({ hasText: 'Save' })
-      .click()
-    await page.waitForTimeout(2500)
-    await expect(tmCard.locator('.mantine-Badge-label').first()).toHaveText(
-      'custom: subject'
-    )
-    await expect(subj).toHaveValue('UI E2E {{app}} verify')
+    await mail.locator('button').filter({ hasText: /^[Ss]ave$/ }).first().click({ timeout: 8_000 })
+    await page.waitForTimeout(2_500)
+    const mtxt = await mail.innerText()
+    expect(mtxt, 'CUSTOM: SUBJECT badge after save (got: ' + mtxt.slice(0, 160) + ')').toContain('CUSTOM: SUBJECT')
+    expect(await subj.inputValue(), 'edited value persists on the surface').toBe('UI E2E {{app}} verify')
+    expect(mtxt, 'reset affordance appears').toContain('Reset to default')
 
-    // reset → back to the default
-    await tmCard
-      .locator('button')
-      .filter({ hasText: 'Reset to default' })
-      .click()
-    await page.waitForTimeout(2500)
-    await expect(tmCard.locator('.mantine-Badge-label').first()).toHaveText('default')
-    await expect(subj).toHaveValue('A Test Email from {{app}}')
+    // reset → the DEFAULT badge returns + the default subject is back
+    await mail.locator('text=Reset to default').first().click({ timeout: 8_000 })
+    await page.waitForTimeout(2_500)
+    const rtxt = await mail.innerText()
+    expect(rtxt, 'DEFAULT badge after reset (got: ' + rtxt.slice(0, 160) + ')').toContain('DEFAULT')
+    expect(await subj.inputValue(), 'subject back to default').toBe(defVal)
+
+    // final world-state: defaults restored on the surface (the UI reset
+    // leg above IS the cleanup — the slot is back at the default values)
+    const end = await mail.innerText()
+    expect(end, 'ends on DEFAULT (got: ' + end.slice(0, 120) + ')').toContain('DEFAULT')
+    expect(await subj.inputValue(), 'subject back at the pinned default').toBe('A Test Email from {{app}}')
   })
 })

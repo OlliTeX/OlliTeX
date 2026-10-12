@@ -81,10 +81,9 @@ test('file menu: compiled project → word count opens with the current-file cou
   await triggerCompileAndWaitPdf()
 
   // File menu → Word count
-  const file = page
-    .locator('[role="button"], button')
-    .filter({ hasText: /^File$/i })
-    .first()
+  // 2026-10-12 battery triage: the renovated chrome's File menu is an icon button
+  // (aria-label='File', aria-haspopup='menu') — no visible 'File' text
+  const file = page.locator('button[aria-label="File"]').first()
   await file.click()
   const item = page
     .locator('[role="menuitem"], [role="menuitemradio"], li')
@@ -122,10 +121,9 @@ test('selected text adds the selection section (always after the doc total)', as
   // select ALL text in the editor → non-empty selection guaranteed
   await page.locator('.cm-content').click()
   await page.keyboard.press('ControlOrMeta+a')
-  const file = page
-    .locator('[role="button"], button')
-    .filter({ hasText: /^File$/i })
-    .first()
+  // 2026-10-12 battery triage: the renovated chrome's File menu is an icon button
+  // (aria-label='File', aria-haspopup='menu') — no visible 'File' text
+  const file = page.locator('button[aria-label="File"]').first()
   await file.click()
   const item = page
     .locator('[role="menuitem"], [role="menuitemradio"], li')

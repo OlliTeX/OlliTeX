@@ -1097,3 +1097,46 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
   89da1036 README/wiki, d857d936 6.3.0 gap audit, d86e9113 develop build, 42f43977 a11y),
   then the finish line: `9b142051` full-suite battery-drift triage (LAST e2e item) +
   `9fbda0eb` GOAL[5] terminal audit (LAST overall).
+
+## 2026-10-12 (owner handoff arc) — e2e external-credentials reconstruction: ALL VERIFIED LIVE
+- **github** ✅ PAT → `GET /user` 200, login `gittest26-itp` (config username matched; no fix).
+- **gitea** ✅ token live (200, login `gittest26-itp`); FIX: `username` was stale
+  `gittest26@neuro.uni-bremen.de` → `gittest26-itp` (spec asserts exact login match).
+- **gitlab** ✅ PAT live (200, `davrot` id 2074 active); normalized `username`
+  `davrot@uni-bremen.de` → `davrot` (spec only requires a resolved user).
+- **forgejo** ✅ new credential verified live: `git.fb1.uni-bremen.de/api/v1/user` 200,
+  login `agp19` (id 310) = config username (exact match). `api` field was `"gitea"`
+  (dead — no code reads it; wire compat is real, gitea+forgejo share /api/v1) → set to
+  `"forgejo"` for label consistency; spec re-green (git-host leg covers all 4 hosts).
+- **llm** ✅ key valid on `chat-ai.academiccloud.de/v1` (/models 200, /chat/completions 200);
+  FIX: `model` was `gpt-4o-mini` (owner asked for Meta Llama 3.1 8B Instruct) → set to the
+  gateway's exact ID `meta-llama-3.1-8b-instruct` (14 models listed, the only 3.1-8B one);
+  completion served by that model. byo-llm + external-probe LLM leg green.
+- **webdav** ✅ Basic auth valid (DAV root 207); FIX: principal segment — the Nextcloud
+  instance serves the files root at `files/agp19@uni-bremen.de` (full e-mail; local part
+  `agp19` → 404). baseUrl updated; PROPFIND 207 (spec leg green).
+- **zotero — SETUP DONE, one owner-assisted step remains (TURNSTILE)**:
+  - config.json §zotero (git-ignored): enabled + account pair (username/password) +
+    registered client pair (clientKey/clientSecret); .env.test (git-ignored) gained
+    ZOTERO_CLIENT_KEY/SECRET + OVERLEAF_ZOTERO=true; compose (tracked) now interpolates
+    `${ZOTERO_CLIENT_KEY}/${ZOTERO_CLIENT_SECRET}` (replaced the two e2e-dummy literals)
+    + `OVERLEAF_ZOTERO: "true"`. Container cycled: env present (3/3).
+  - LIVE VERIFIED headless: status → 200 `false` (not linked); groups → 200 `null`
+    (enabled + not linked); `/oauth` → **302 zotero.org authorize with request token**
+    (app creds live; unconfigured would 503).
+  - New spec `specs/zotero-link-cycle.test.e2e.ts` (Z1–Z6): Z1 pre-state ✓,
+    Z2 connect-START (302 + authorize URL + oauth_token) ✓, Z3 zotero.org login+authorize
+      + callback — CLEAN-SKIP by design: zotero.org login is CLOUDFLARE TURNSTILE-gated
+      headlessly (submit button inert — no POST fired; raw form POST → 400; no CAPTCHA
+      bypass per policy). Operator-assist mode: `ZOTERO_MANUAL_LOGIN=1 … --headed` once
+      on an owner-trusted machine; after that the whole cycle is automated.
+    Z4 linked-state (status true via live /keys check + groups 200 + mongo cred present)
+      — auto-skips until linked; Z5 disconnect (DELETE → 200 + status false) ✓;
+    Z6 idempotent unlink (200 no-op) ✓. Run: **4 passed, 2 skipped (by design)**.
+  - Adjacency re-verified with zotero ENABLED on the site: `specs/zotero.test.e2e.ts`
+    still 2/2 green (ff527f67 pins hold); external-probe zotero leg gate fixed
+    (needs the classic `apiKey` pair — a DISTINCT credential; the OAuth pair drives
+    the link-cycle spec) → external-probe 4 passed / 2 clean-skipped.
+- Security posture: no secret value was ever printed (masked sha256 prefixes only);
+  secrets live only in git-ignored files (`credentials/config.json`, `.env.test`);
+  the tracked compose file carries interpolation, not literals.
