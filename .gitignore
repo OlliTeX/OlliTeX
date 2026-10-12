@@ -76,3 +76,12 @@ go/collab
 # session scratch (keep local)
 junk/
 old_requests.md
+
+# svgedit vendored build legitimately ships its extension deps (2026-10-12 restore; see
+# public/static/svgedit/extensions/node_modules/browser-fs-access/README.md)
+!public/static/svgedit/extensions/node_modules/
+!public/static/svgedit/extensions/node_modules/browser-fs-access/
+!public/static/svgedit/extensions/node_modules/browser-fs-access/.
+!public/static/svgedit/extensions/node_modules/browser-fs-access/*
+!public/static/svgedit/extensions/node_modules/browser-fs-access/dist/
+!public/static/svgedit/extensions/node_modules/browser-fs-access/dist/*

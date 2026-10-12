@@ -197,6 +197,11 @@ func main() {
 		Auth:             auth,
 		Store:            collab.WrapWriteBack(store, writeBack), // 024 Option B: write-through
 		WriteBack:        writeBack,
+		// AJ-3: the (room, uid) presence plane behind GET /presence (and the
+		// web /admin/active-projects projection) — registered in the Authorize
+		// hook, dropped on OnLastPeer. Was never wired (unexported constructor)
+		// until 2026-10-12; /presence reported an empty plane forever.
+		PresenceRegistry: collab.NewPresenceRegistry(),
 		VersionLog:       vlog,
 		Logger:           sl,
 		OnFirstPeer:      lifecycle("first-peer"),

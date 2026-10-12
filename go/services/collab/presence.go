@@ -34,7 +34,12 @@ type presenceRegistry struct {
 	rooms map[string]map[string]time.Time // room -> uid -> last seen
 }
 
-func newPresenceRegistry() *presenceRegistry {
+// NewPresenceRegistry — the exported constructor so the service main can wire
+// the registry into Options (the type itself stays package-internal). Without
+// this the Authorize-hook Add() path is unreachable from cmd/collab and
+// /presence reports an empty plane forever (AJ-3 was read-wired but never
+// write-wired; fixed 2026-10-12, board: e2e realtime/presence gate).
+func NewPresenceRegistry() *presenceRegistry {
 	return &presenceRegistry{rooms: map[string]map[string]time.Time{}}
 }
 
