@@ -230,6 +230,13 @@ services:
       GIT_BRIDGE_HOST: git-bridge
       WEBDAV_ENABLED: 'true'
       DROPBOX_ENABLED: 'true'
+      # Mendeley (e2e): app 'Ollitex' id/secret + the console-registered
+      # redirect URL (https://psintern.neuro.uni-bremen.de/...) + generated
+      # cipher password for the credential store (local test-world value).
+      MENDELEY_CLIENT_ID: ${MENDELEY_CLIENT_ID}
+      MENDELEY_CLIENT_SECRET: ${MENDELEY_CLIENT_SECRET}
+      MENDELEY_CALLBACK_URL: ${MENDELEY_CALLBACK_URL}
+      MENDELEY_CIPHER_PASSWORD: ${MENDELEY_CIPHER_PASSWORD}
       # Dropbox (e2e): app pair from .env.test (git-ignored) drives the
       # password-grant mint + oauth2 start; cipher secret for the connect
       # handler's AES-256-GCM credential store (local test-world value).

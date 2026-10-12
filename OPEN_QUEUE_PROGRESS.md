@@ -1179,3 +1179,43 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
   token (command in spec D4 skip message / config _note). Optionally enable
   "device code authorization" in the Dropbox App Console — that would make
   D4 operator-assist a single code entry instead of a browser log-in.
+
+## 2026-10-12 (cont.) — Mendeley credential arc: setup + live verification
+- Owner's Mendeley app "**Ollitex**" (id 26163, Elsevier auth flow) + console-
+  registered redirect URL `https://psintern.neuro.uni-bremen.de/user/mendeley/
+  oauth/callback` (only https URL the owner could register).
+- **Product contract pinned** (go/services/web/features/mendeley/):
+  status {configured,connected}; groups 403 {forbidden,mendeley_groups_relink}
+  unlinked; /oauth → 302 api.mendeley.com/oauth/authorize
+  ?client_id&redirect_uri(verbatim)&response_type=code&scope=all&state(32hex);
+  callback (code+state) → server exchange + encrypted store
+  users.refProviders.mendeley.encrypted → ALWAYS 302 /hub#mysettings.references
+  (Node parity); POST /mendeley/unlink 200 ($unset, idempotent, NO remote revoke
+  — not in the port).
+- **Seed-vs-reader asymmetry PINNED (flag):** the sitesettings seed writes
+  {enabled, clientId, hasEnvSecret:true} but getMendeleySettings reads
+  `section.clientSecret` (plaintext) and isServiceConfigured requires it
+  non-empty → the service is never "configured" from seed alone. World fix:
+  wrote site_settings.global.mendeley in the stored shape
+  {enabled,clientId:26163,clientSecret, callbackURL} (reader-contract shape).
+  Product owners should reconcile seed/reader.
+- Wired: config.json §mendeley (account + clientId/secret + callbackURL +
+  authFlow Elsevier — git-ignored), .env.test MENDELEY_CLIENT_ID/SECRET +
+  MENDELEY_CALLBACK_URL + generated MENDELEY_CIPHER_PASSWORD (git-ignored),
+  compose ${…} interpolation (tracked), container cycled (4/4 envs).
+- **New spec `specs/mendeley-link-cycle.test.e2e.ts` (M1–M10): 7 passed, 3
+  clean-skipped.** Headless green: configured status, groups-403 pin, oauth-302
+  exact param set (client_id 26163 + console redirect_uri verbatim + scope=all +
+  32-hex state), forged-callback → 302 references + NO cred stored, unlink ×2
+  idempotent 200, world-agnostic groups leg.
+- **Mendeley login (www.mendeley.com) is CLOUDFLARE-WALLED HEADLESS (verified:
+  "Attention Required!" challenge page; no CAPTCHA bypass per policy)** → M8
+  CONNECT is operator-assisted dual-mode (MENDELEY_MANUAL_LOGIN=1, --headed):
+  operator logs in + approves once; the spec captures the callback URL
+  (code+state), drives the callback exchange on this world (7420) with the
+  session state, retries ≤3 cycles (documented code-consumption race if the
+  psintern instance is Mendeley-configured too). After that: M7/M9 EXTEND
+  (Mendeley REFRESH grant at api.mendeley.com/oauth/token) runs headless —
+  the "extend my token" path, same pattern as dropbox.
+- Run (headless legs): `BASE_URL=http://127.0.0.1:7420 CI=1 npx playwright test
+  specs/mendeley-link-cycle.test.e2e.ts` → 7 passed / 3 design-skipped (1.7m).
