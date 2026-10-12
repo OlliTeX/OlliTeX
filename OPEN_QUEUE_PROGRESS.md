@@ -1342,3 +1342,76 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
   dropbox ✓ (8/8, probe green). Design-skips remaining: dropbox D6
   (no refresh token by token-kind), mendeley M8 + zotero Z3/Z4
   (product-UI round-trips, superseded by the capture tool).
+
+## 2026-11-16 — Owner ask: sync/bridge UPDATE-CONFLICT + RESOLUTION e2e (WebDAV / git-hosts / Dropbox)
+
+### Done (green, live, pinned with re-arm guards)
+1. `tests/e2e/specs/sync-conflict-webdav.test.e2e.ts` — **1 test green (35s)** against live Nextcloud (agp19@uni-bremen.de).
+   - Connect/disconnect self-heal, MKCOL+PUT seed (201/204 pins), import 200, link 200
+     (F2: initial push is a no-op pin — fresh API project has rootFolder.docs=[]), local entadd 200 {_id},
+     remote PUT 204, pull/push contract pins.
+   - **F1 (FLAG, owner):** import + pull abort with 500 "Not Found" on ANY real Nextcloud mount —
+     `wdClient.list()` skips the PROPFIND self-entry by trimmed-href equality, but Nextcloud returns
+     server-absolute hrefs (`/remote.php/dav/files/<u>/<folder>/`) so the self-entry is classified as a
+     directory child → import recurses into `<folder>/<folder>` → 404 aborts the whole pull/import.
+     Proven via in-container proxy log (double PROPFIND). Re-arm pins flip to green on fix.
+   - **F2 (FLAG):** link initial push is a no-op for API-created projects (empty rootFolder.docs →
+     `wdProjectTree` empty); state row rootPath falls back to site settings `/Overleaf` (404 on the host).
+   - **F3 (FLAG):** conflict/resolve route is inert — resolve 404
+     `{"message":"No active conflict for this file","errorCode":"CONFLICT_NOT_FOUND"}` (validation 400s
+     pinned: "Missing required parameters" / "Invalid choice"); no Go code path writes lastConflict
+     (Node's conflict-detection engine not ported). Push observed NOT to mirror new local docs to the
+     remote (tree-mirror gap pinned).
+2. `tests/e2e/specs/sync-conflict-git-hosts.test.e2e.ts` — **4/4 green (2.4m): github, gitea, gitlab,
+   forgejo** (real PATs from credentials/config.json; remote repos created + deleted per leg).
+   - Per host: PAT link {provider,url,username,pat} → 200 {success,check.ok} + test {ok:true};
+     import POST /project/new/github-sync → 200 {projectId}; **clean path** (remote-only commit →
+     merge 200 {"status":"merged"} → state clean); **UPDATE-CONFLICT** (local entadd + remote commit →
+     merge 200 {"status":"conflict","message":"both local and remote changed; resolve in the merge UI"}
+     → state {mergeStatus:"conflict", unmergedBranchName:^overleaf-conflict-[0-9a-f]{6}$,
+     conflictVersion>0, unmergedBranchHead}; overview-during-conflict → `null` (Node contract pin);
+     unlink → state {"mergeStatus":"need-export"} (Node parity pin).
+   - **G-FINDING (FLAG, owner):** the RESOLUTION leg is NOT WIRED in the Go port — the merge handler
+     IGNORES its body (`_ = body`) so the frontend's {claimConflictIsResolved:true} (per
+     git-sync-merge-modal.tsx) has no effect and the merge re-conflicts; additionally the response key
+     is `status` while the frontend reads `data.mergeStatus` (contract mismatch). Spec pins both with
+     automatic re-arm to the success shape once the port implements resolution.
+   - Per-host API variances pinned in adapters (github contents-PUT sha tracking; gitlab create=POST /
+     update=PUT strict; gitea/forgejo create=POST, update=PUT+sha with POST fallback — forgejo
+     "[SHA]: Required" on create).
+3. `tests/e2e/specs/sync-conflict-dropbox.test.e2e.ts` — **3/3 green (36s)**.
+   - Anonymous → redirect-to-login gate (page wall, not JSON 403 — pinned); connected status shape;
+     connect {access_token} 200 {"success":true} + 400 "Missing access_token" pin; project state
+     unlinked {"connected":false}; pull/push (POST) + files (GET) unlinked → 409 {"error":"Project not
+     linked to Dropbox"} gate pins; unlink 200 no-op pin.
+   - **DBX-FINDING (FLAG, owner):** in ag-v57 the Dropbox sync ENGINE IS STUBBED — link → 500
+     {"error":"Dropbox connection check failed"}, import → 500 {"error":"Dropbox import failed"} (after
+     the decrypt gate), pull/push/files linked → 500 "Dropbox sync is not available in this environment"
+     (hDbxProjectGate). No conflict route; state docs carry mergeStatus/conflicts only as projection
+     keys (no writer) — an update conflict CANNOT be produced or resolved through the product API in
+     this world. Node's live flow additionally requires files.* scopes; the configured token is
+     account_info.read-only (D-series scope pin). All stub shapes live-pinned with re-arm guards to the
+     success shapes.
+   - Hygiene: disconnect leg returns the world to unconnected (asserted in-spec).
+
+### Evidence runs (this turn)
+- webdav spec: `1 passed (35.0s)` (live Nextcloud: seed 201/204 pins, link 200, pull/push pins)
+- git-hosts spec: `4 passed (2.4m)` — github 45s leg, gitea/gitlab/forgejo legs (conflict + resolution
+  pins observed on all four; repos cleaned up, e.g. gitea 204 / forgejo 204 / github 204 deletes)
+- dropbox spec: `3 passed (36.3s)` (D4 live 500 "Dropbox connection check failed", D6 live 500
+  "Dropbox import failed", D5 409 gate pins, D8 disconnect hygiene)
+
+### Flags for owner (new, this arc) — no product changes made (owner-gated)
+- **WebDAV F1** (blocking for real mounts): client.list self-entry skip bug — import/pull 500 "Not
+  Found" on any Nextcloud tree. Fix is a few lines in the Go client; re-arm pins flip to green.
+- **WebDAV F2/F3**: link initial push no-op on fresh projects; conflict engine + resolve inert (no
+  lastConflict writer; push tree-mirror gap). Node webdav-sync parity unimplemented in the Go port.
+- **ghsync**: conflict RESOLUTION unwired (merge body ignored; `status` vs UI's `mergeStatus` key
+  mismatch) — conflict DETECTION itself is verified working on all four hosts.
+- **dropbox**: sync engine stubbed (500 pins) in this port; conflict/resolve surface unreachable;
+  token scope account_info.read only (files.* needed for the Node live flow).
+
+### Todos queued (owner, this message)
+- bib visual editor under /editor (Zotero / ORCID / Mendeley)
+- library under /editor (Zotero / ORCID / Mendeley)
+- tracked changes + comments as json in project zip import/export/download (except templates)
