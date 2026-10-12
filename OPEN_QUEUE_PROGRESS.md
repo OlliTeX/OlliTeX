@@ -905,3 +905,51 @@ PIN SET (ag-v57, 2026-10-12, probes 1–6 + live battery):
 
 Board: 22ac7721 → done (5 legs green + pins); 1d7cb391 → done (chat 6 legs green + realtime-bus +
 collab-two-user re-runs green as its exit leg). Both closed with the run evidence above.
+
+## cont.6 — 2026-10-12 — PHASE 2: AUTH lifecycle (e994603b) — 6/6 GREEN
+`specs/auth-lifecycle.test.e2e.ts` (A1–A6), live-pinned on ag-v57, **6 passed (4.3m)**.
+Convergence: 403-CSRF (context-cookie pin) → 404-then-429 (shared 6/60s limiter) →
+body-key pins (`passwordResetToken` in set body; `newPassword1/newPassword2` in update
+body — NOT newPassword/newPasswordConfirm) → token-reuse observed-state flip → green.
+
+PINS (ag-v57, 2026-10-12):
+- POST /register → 200 {"message":"Registration successful. Please check your email to
+  activate your account."} + mail "Activate your OlliTeX Account" with link
+  GET /user/activate?token=\<64hex\>&user_id=\<uid\>; GET /user/activate → **302 /login**
+  (route retired in this build).
+- POST /user/login registered account → 401 {"message":{"type":"error","key":"invalid-
+  password-retry-or-reset"}} (see FLAG 1).
+- POST /user/password/reset → 200 "You have been sent an email to complete your password
+  reset."; unknown email → 404 "not registered" family (message pinned /not registered/i).
+- reset mail "Password Reset - OlliTeX"; link GET /user/password/set?passwordResetToken=\<64hex\>&email=…;
+  link open → 302 /user/password/set?email=… (session token; peek semantics).
+- POST /user/password/set body {email, password, passwordResetToken} — missing-key → 400
+  zod "expected string, received undefined at \\"body.passwordResetToken\\"" (PINNED);
+  success → **200 "OK" text/plain** (Node parity) + user.$set hashedPassword/$unset password +
+  removeUserSessions + tok.Expire (see FLAG 2) + login with the new PASSWORD WORKS.
+- POST /user/password/update body {currentPassword, newPassword1, newPassword2} (Node keys,
+  PINNED): wrong current → 400 "Current password is incorrect."; mismatch → 400 "New passwords
+  do not match."; too-short → 400 {"message":{"type":"error","key":"too-short",…}};
+  same-as-current → 400 "The password must be different."; success → 200 {"message":{"type":"success",…}}
+  + other-session removal + password-token expiry. NEW/OLD password flips on re-login (pinned).
+- Rate limits (SOURCE + LIVE): passwordreset family 'password_reset_rate_limit' = 6 pts/60s ipOnly
+  SHARED by reset+set+reconfirm → 429 "Rate limit reached, please try again later" (429 leg
+  A6 pinned live); update family 'changePassword' 10/60s ip_only (source pin).
+- Mail outbox: both mails captured by smtpsink (127.0.0.1:18025) with sender OlliTeX +
+  parseable functional links (QP-decoded — the raw mail is quoted-printable; the token spans
+  a soft line break — spec carries the QP decoder).
+
+⚑⚑ FLAG 1 (P1 candidate, NOT silently shipped): `POST /register` does NOT persist any password
+material — the created user doc has neither `password` nor `hashed_password` (observed field list
+pinned in the spec) — so a sign-up can NEVER log in; combined with the retired /user/activate
+route (302→/login), sign-up-as-a-product is broken in ag-v57. Credential bootstrap TODAY =
+password reset (or admin-create). Owner decision: (a) restore register→bcrypt persist +
+activate handler (Node parity) or (b) retire /register and document the reset-link bootstrap.
+⚑⚑ FLAG 2 (auth gap): tok.Expire after a successful set does NOT kill the reset token — the same
+token still resolves on reuse 1.5s and 3.5s later (link stays usable until its 1-week TTL).
+Node parity = single-use one-time token. Spec A3 pins the observed multi-use state so it cannot
+silently drift; owner decision: (a) wire Expire/Peek usedAt or (b) document multi-use-within-TTL.
+
+Board: e994603b → done (5 board legs + throttle pin green; flags recorded above + in spec header).
+Fixture safety: A5 asserts the ADMIN fixture still logs in after the suite's disposable-account
+churn (no fixture damage).
