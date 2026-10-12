@@ -222,6 +222,11 @@ services:
       LLM_ENABLED: 'true'
       LLM_ALLOW_USER_SETTINGS: 'true'
       GIT_BRIDGE_ENABLED: 'true'
+      # Federation (e2e): master toggle + export gate — the FEDERATION_*
+      # contract (go/services/web/features/federation/config.go); e2e values,
+      # both instances in the two-instance federation battery.
+      FEDERATION_ENABLED: "true"
+      FEDERATION_EXPORT_ENABLED: "true"
       GIT_BRIDGE_HOST: git-bridge
       WEBDAV_ENABLED: 'true'
       DROPBOX_ENABLED: 'true'

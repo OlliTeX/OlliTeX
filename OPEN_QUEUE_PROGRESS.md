@@ -1061,3 +1061,39 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
   - EXIT: smoke 1/1 (37.5s).
 - **Wave status: `eda51a85` FEDERATION is the last Phase-3 e2e item** (the large one; board body
   + owner context ebb76488 pending).
+## continuation 11 — 2026-10-12 — Phase 3: TODO-eda51a85 CLOSED at the honest scope (federation-gate 7/7 green; full RP dance owner-gated with the exact blocker pinned)
+- **DONE: TODO-eda51a85** — `specs/federation-gate.test.e2e.ts` 7/7 (34.9s).
+  - Stood up **instance B** for the two-instance surface: `ol-e2e-overleaf-2` :7421
+    (ag-v57 image, own `ol-e2e-mongo-2` + `ol-e2e-redis-2`, `OVERLEAF_SITE_URL=
+    https://b.fedtest.local`, `FEDERATION_ENABLED=true`,
+    `FEDERATION_EXPORT_ENABLED=true`; B users cloned from A's mongo). A got
+    `FEDERATION_ENABLED/EXPORT_ENABLED` in the compose overleaf env (additive).
+  - LIVE WIRE PINS: B OIDC discovery 200 (issuer/authorization/token/jwks,
+    response_types ["code"]) + JWKS ES256 live (keystore bootstrap automatic);
+    S2S LOCKED envelope `{ok:false, code:"bad-envelope", detail:"from/to/action required"}`
+    (A and B); A invite-preview WITHOUT anchored peer → 400 `{"message":"anchor required"}`
+    (the degradation contract); A RP-callback error → 401 `{ok:false, code:"auth-denied",
+    error:"access_denied"}`; admin surface (B admin) peers `{"peers":[]}` + keys
+    `{keys:[{algorithm:ES256, purpose:federation, state:active}]}` + audit `{"entries":[]}`
+    (the TOFU pin/approve surface IS live — POST /admin/federation/peers + /<origin>/approve
+    per the live-test header); A non-admin → 200 + "Restricted" page (surface authz pin);
+    export wizard `/federation/export` GET 200 (mounted when enabled); OIDF leaf route
+    BUILT (`BuildLeafEntityConfiguration`) but **NOT MOUNTED** (302 SPA fallback) — pinned.
+  - THE BLOCKER (pinned, F2): A has an HTTP siteUrl → the OIDF https-only gate
+    (`federation: entity id must use https:` — leaf.go getEntityIdGo) 500s discovery on A.
+    Both instances serve HTTP-only (nginx :80); no TLS/DNS. Hence the full RP dance /
+    S2S membership / export bundle legs are **owner-precondition gated** (the board item
+    itself names "the owner stands up the instances + pins"; the Go harness
+    `TestFedB_LiveS11RoundTrip`/`TestFedB_LiveBPing` SKIP — env-gated house pattern).
+  - **ebb76488** (export git_url) context attached: the bundle is unreachable in this
+    world (F2 blocker), so the git_url pin is deferred with the full bundle leg — the
+    decision (dead-until-bridge vs alternative) remains the owner's.
+- **PHASE 3 (e2e feature waves) is now fully dispositioned**: 1c29a1c0 ✓, 8a6426ef ✓,
+  7b62372f ✓, eda51a85 ✓ (at scope). Remaining queue: UI polish letters
+  (07f21e18 F / 48029ae0 H / 5e038fa2 L / 6931623d M / 705ad2aa I / 760f2dbb K /
+  d6ee435d G / c945a39d O — now also carrying the two new flags: inspection Citations
+  chip id-vs-target + drawio last-used-mode pin as context), other-queue items
+  (65b0d668 history attribution, 43a8cb9a in_review guardrail, 225c3d7e fileproxy,
+  89da1036 README/wiki, d857d936 6.3.0 gap audit, d86e9113 develop build, 42f43977 a11y),
+  then the finish line: `9b142051` full-suite battery-drift triage (LAST e2e item) +
+  `9fbda0eb` GOAL[5] terminal audit (LAST overall).
