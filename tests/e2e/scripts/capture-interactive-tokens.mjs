@@ -35,12 +35,23 @@
  *   specs' EXTEND legs)
  *
  * USAGE (from tests/e2e, on an operator-trusted machine WITH a display):
- *   node scripts/capture-interactive-tokens.mjs --service mendeley
- *   node scripts/capture-interactive-tokens.mjs --service dropbox zotero
  *   node scripts/capture-interactive-tokens.mjs --all
- *   node scripts/capture-interactive-tokens.mjs --service mendeley --dry-run
- * The headed browser opens; log in + approve when prompted. Each callback
- * capture is aborted in-browser at up to 300s wait.
+ *   node scripts/capture-interactive-tokens.mjs --service zotero
+ *   node scripts/capture-interactive-tokens.mjs --service zotero --dry-run
+ * Flags:
+ *   --browser chrome    use the INSTALLED Chrome for the headed session
+ *                       (often better Cloudflare standing than bundled
+ *                       chromium; auto-falls back if unavailable)
+ *   --paste [URL]       OWN-BROWSER MODE (Cloudflare-proof): the script
+ *                       prints the exact authorize url; you log in + approve
+ *                       in your NORMAL browser; the browser lands on the
+ *                       registered callback (any page/error there is EXPECTED
+ *                       \u2014 other instances cannot exchange the code: they
+ *                       lack the one-time token/secret we hold); copy that
+ *                       FULL url from the address bar, paste it at the prompt
+ *                       (or put it after --paste). Script exchanges + stores.
+ *   --dry-run           print authorize urls (zotero: live-validates the
+ *                       OAuth-1.0a request-token) without any browser.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -157,7 +168,47 @@ else {
   else throw new Error('usage: --service mendeley dropbox zotero | --all | --dry-run')
 }
 
-const browser = DRY ? null : await chromium.launch({ headless: false })
+function argVal(flag) { const i = ARGS.indexOf(flag); return (i > -1 && ARGS[i + 1] && !ARGS[i + 1].startsWith('--')) ? ARGS[i + 1] : null }
+const BROWSER = argVal('--browser') || null                 // e.g. 'chrome' = installed Chrome (better Cloudflare standing)
+const PASTE = ARGS.includes('--paste')                      // own-browser mode: log in + approve in YOUR browser, paste the callback url back
+const PASTE_URL = argVal('--paste')
+
+let browser = null
+async function getBrowser() {
+  if (browser) return browser
+  const attempts = (BROWSER && BROWSER !== 'chromium') ? [{ channel: BROWSER }, {}] : [{}]
+  let err
+  for (const o of attempts) {
+    try { browser = await chromium.launch({ headless: false, ...o }); return browser }
+    catch (e) { err = e; if (o.channel) console.log('  \u26a0 "' + o.channel + '" not launchable \u2192 falling back to bundled chromium') }
+  }
+  throw new Error('cannot launch a headed browser: ' + String(err && err.message).slice(0, 120))
+}
+async function promptPaste() {
+  if (PASTE_URL) return PASTE_URL.trim()
+  const { createInterface } = await import('node:readline/promises')
+  const rl = createInterface({ input: process.stdin, output: process.stdout })
+  const ans = (await rl.question('  \u23f3 PASTE the full callback url from your browser\'s address bar > ')).trim()
+  rl.close()
+  if (!ans) throw new Error('no pasted url \u2014 aborting this service (nothing exchanged yet)')
+  return ans
+}
+async function captureUrl(authzUrl, cbHint) {
+  if (PASTE) {
+    console.log('')
+    console.log('  PASTE MODE \u2014 open THIS url in YOUR OWN browser, log in + approve:')
+    console.log('  ' + authzUrl)
+    console.log('  (the browser then lands on the registered callback; any page/404 there is EXPECTED \u2014')
+    console.log('   other instances cannot exchange the code: they lack the one-time token/secret we hold)')
+    const u = new URL(await promptPaste())
+    if (cbHint && !cbHint.test(u.href)) console.warn('  \u26a0 pasted url is not the expected callback route \u2014 continuing (check code/state/verifier below)')
+    return u
+  }
+  const b = await getBrowser()
+  const ctx = await b.newContext(); contexts.push(ctx)
+  const page = await ctx.newPage()
+  return await captureCallback(page, authzUrl, cbHint)
+}
 const contexts = []
 
 for (const service of SERVICES) {
@@ -173,12 +224,10 @@ for (const service of SERVICES) {
     for (const [k, v] of Object.entries({ client_id: cfg.clientId, redirect_uri: cfg.callbackURL, response_type: 'code', scope: 'all', state })) authz.searchParams.set(k, v)
     console.log(`  authorize: ${authz.origin + authz.pathname} (state ${state.slice(0, 6)}…)`)
     if (DRY) { continue }
-    const ctx = await browser.newContext(); contexts.push(ctx)
-    const page = await ctx.newPage()
-    const cbUrl = new URL(cfg.callbackURL)
     const cbHint = /^(https?:)?\/\/[^/]+\/user\/mendeley\/oauth\/callback/i
-    const u = await captureCallback(page, authz.toString(), cbHint)
+    const u = await captureUrl(authz.toString(), cbHint)
     const code = u.searchParams.get('code')
+    if (u.searchParams.get('state') && u.searchParams.get('state') !== state) throw new Error('state mismatch \u2014 open the EXACT url printed above (fresh authorize), not an earlier one')
     if (!code) throw new Error('no code in callback URL: ' + u.search)
     const tok = await postForm('https://api.mendeley.com/oauth/token', {
       grant_type: 'authorization_code', code, redirect_uri: cfg.callbackURL,
@@ -204,10 +253,8 @@ for (const service of SERVICES) {
     console.log('  NOTE: if Dropbox reports "Redirect URI not in App Settings", add EXACTLY\n' +
       `        ${cb}\n        to the app's OAuth2 settings (developers.dropbox.com) and retry.`)
     if (DRY) { continue }
-    const ctx = await browser.newContext(); contexts.push(ctx)
-    const page = await ctx.newPage()
     const cbHint = /^(https?:)?\/\/[^/]+\/user\/dropbox\/oauth\/callback/i
-    const u = await captureCallback(page, authz.toString(), cbHint)
+    const u = await captureUrl(authz.toString(), cbHint)
     const code = u.searchParams.get('code')
     if (!code) throw new Error('no code in callback URL: ' + u.search)
     const tok = await postForm('https://api.dropboxapi.com/oauth2/token', {
@@ -237,11 +284,10 @@ for (const service of SERVICES) {
       '&library_access=1&all_groups=read'
     console.log(`  request-token ok (${mask(ot)}\u2026) \u2014 browser opens zotero login/approval`)
     if (DRY) { continue }
-    const ctx = await browser.newContext(); contexts.push(ctx)
-    const page = await ctx.newPage()
     const cbHint = /^(https?:)?\/\/[^/]+\/user\/zotero\/oauth\/callback/i
-    const u = await captureCallback(page, authz, cbHint)
+    const u = await captureUrl(authz, cbHint)
     const verifier = u.searchParams.get('oauth_verifier')
+    if (u.searchParams.get('oauth_token') && u.searchParams.get('oauth_token') !== ot) throw new Error('oauth_token mismatch \u2014 open the EXACT url printed above (it carries our request-token), not an earlier one')
     if (!verifier) throw new Error('no oauth_verifier in callback: ' + u.search)
     console.log('  \u2713 verifier captured \u2014 exchanging for the LIFETIME api key')
     // (c) exchange  POST https://www.zotero.org/oauth/access

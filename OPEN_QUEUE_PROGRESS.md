@@ -1258,3 +1258,30 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
   `node scripts/capture-interactive-tokens.mjs --all`
   Then re-run: dropbox-link-cycle, mendeley-link-cycle, external-probe —
   previously design-skipped legs execute for real.
+
+## 2026-10-12 (cont.) — capture tool: Chrome + PASTE modes; MENDELEY ARC COMPLETE
+- Owner ran the capture: **Mendeley DONE** (access + refresh in
+  credentials/.auth/mendeley.json, user gittest26@…; masked only).
+  **Mendeley spec now 9 passed / 1 skipped — M7 (headless EXTEND via
+  refresh grant) and M9 PASS for real** against the live Mendeley
+  account. Remaining skip = M8 (product-UI connect round-trip — legacy
+  leg, superseded by the capture tool; arse with MENDELEY_MANUAL_LOGIN
+  only if wanted).
+- Zotero + Dropbox hit Cloudflare walls in the bundled-chromium headed
+  browser. Capture tool gained two CF-proof modes (both committed):
+  - `--browser chrome` — headed session in the INSTALLED Chrome
+    (much cleaner Cloudflare standing than Playwright's bundled
+    chromium; auto-fallback if unavailable).
+  - `--paste [URL]` — **own-browser mode**: script prints the EXACT
+    authorize url (mendeley/dropbox: code flow with our state; zotero:
+    our one-time request-token) → owner logs in + approves in their own
+    normal browser (their real profile/cookies → CF passes) → browser
+    lands on the registered callback (any page/error there is EXPECTED —
+    other instances CANNOT exchange: the one-time token/secret is only
+    known to the script) → owner copies the FULL url from the address
+    bar and pastes it at the prompt (or after `--paste`) → script
+    verifies code/state/token freshness and exchanges + stores.
+    Guard verified (stale oauth_token rejected before exchange; mendeley
+    state mismatch rejects; dropbox url route-checked).
+- Retry order suggested: `--browser chrome` first (one extra click),
+  `--paste` as universal fallback.
