@@ -1035,3 +1035,29 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
     issue **id** ("cited but undefined: \"issue-1\"") instead of the target (should say
     "doe:2000:missing"). Wire payload is correct (issue-1.target = doe:2000:missing); panel binding is the
     bug. Pinned via this log; NOT shipped (owner-gated product change).
+## continuation 10 — 2026-10-12 — Phase 3: TODO-7b62372f CLOSED (Drawio real round-trip, 4/4 green + smoke exit)
+- **DONE: TODO-7b62372f** — `specs/drawio-roundtrip.test.e2e.ts` 4/4 (1.2m):
+  - DR1: .drawio opens in the VISUAL canvas by default (pinned: drawio-class region +
+    same-origin IFRAME of the vendored draw.io app, public/static/drawio/, synced via the
+    draw.io hash protocol `#R`+Graph.compress — drawio-viewer.tsx; shape labels render inside
+    the engine, not host innerText — the M5 house convention).
+  - DR2: Code|Visual switch = a TOGGLE (DOM pinned: div.editor-toggle-switch [aria="Code and
+    visual editor switch"] > form > fieldset.toggle-switch > label.toggle-switch-label;
+    TWO instances — the main-toolbar one is 0x0/hidden, the viewer-header one is the live
+    segmented control with both pills visible; radios value=cm6 hidden). Edit = full rewrite
+    through the CM6 text plane. **PINNED: a tail-appended mxCell lands AFTER `</mxfile>` and
+    the drawio engine rejects the Visual render** ("Not a diagram file … Extra content at the
+    end of the document", app.min.js setFileData) — engine XML validation is live; app edits
+    must keep the doc well-formed.
+  - DR3: reload → the file reopens in the **remembered last-used mode** (visual-editor-provider.js
+    STORAGE_KEY `editor.lastUsedMode.drawio` — pin) → surface read-back shows BOTH shapes
+    (the round-trip persistence proof) → Visual switch re-mounts the canvas from the edited doc
+    (hash protocol alive). **Store-model pin**: the yjs/collab plane (`ydoc` room per project,
+    upds = array of {v,at,u:base64} — raw bytes verified carrying the typed document) is the
+    canonical editor store in this build; the `docs`-collection mirror is NOT the source for
+    editor writes (probe: empty by entity id while the live surface serves the content) — the
+    app surface is the contract, no raw-store leg.
+  - DR4: self-cleaning (project trashed + verified gone).
+  - EXIT: smoke 1/1 (37.5s).
+- **Wave status: `eda51a85` FEDERATION is the last Phase-3 e2e item** (the large one; board body
+  + owner context ebb76488 pending).
