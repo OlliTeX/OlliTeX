@@ -1140,3 +1140,42 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
 - Security posture: no secret value was ever printed (masked sha256 prefixes only);
   secrets live only in git-ignored files (`credentials/config.json`, `.env.test`);
   the tracked compose file carries interpolation, not literals.
+
+## 2026-10-12 (cont.) — Dropbox credential arc: setup + live verification
+- **App pair VERIFIED** (owner's shared-secret app): `client_credentials`
+  grant → 200 (app-scoped token, ~4h) on api.dropboxapi.com.
+  **Grant landscape pinned (verified):** password grant → 400
+  `unsupported_grant_type`; `device_code` → 400 "Invalid auth function for
+  device authorization" (not enabled in the Dropbox App Console); ⇒ the
+  ACCOUNT token needs the one-time browser authorization_code flow →
+  operator capture policy: `node scripts/auth-capture.mjs --service dropbox
+  --url <authorize-url>` (credentials/.auth/dropbox.json) or set
+  §dropbox.token(+refreshToken). After that everything is unattended.
+- Files: config.json §dropbox (git-ignored: username/password [operator
+  browser login only], appKey/appSecret, appFolder, optional
+  token/refreshToken/tokenExpiresAt, revised _note); .env.test (git-ignored:
+  DROPBOX_APP_KEY/SECRET + generated WEBDAV_TOKEN_CIPHER_PASSWORD — the
+  connect handler's AES-256-GCM secret, previously ABSENT → 500 pinned
+  message); compose (tracked: `${...}` interpolation only; DROPBOX_ENABLED
+  already 'true'). Container cycled: 3/3 envs present.
+- New spec `specs/dropbox-link-cycle.test.e2e.ts` (D1–D8): D1 status
+  `{"connected":false}` pin + `/oauth2` → 302 dropbox.com authorize (app
+  creds live) ✓; D2 app-pair client_credentials 200 ✓; D3 connect missing
+  token → 400 `{"error":"Missing access_token"}` ✓; D4 CONNECT
+  {access_token} → 200 `{"success":true}` (operator-token path, clean-skip
+  with capture instructions until then); D5 linked-state + encrypted-cred
+  storage (auto-skip until connected); D6 EXTEND — refresh_token grant
+  (headless token extension; auto-skip until a refreshToken is captured);
+  D7 DISCONNECT → 200 `{"success":true,"unlinkedProjects":"/"}` + status
+  back to not-connected ✓; D8 idempotent disconnect 200 ✓.
+  Run: **5 passed, 3 clean-skipped (by design — operator one-time capture)**.
+- external-probe dropbox leg extended: token resolution static → .auth cache
+  → **refresh-grant headless mint** (the suite mints/extends per the
+  credentials/_readme policy). Adjacency green: sync-graceful (webdav+dropbox
+  5xx-gate), module-uis (surfaces render), admin-site leaf labels unaffected.
+- Cleanup: removed the tracked leftover probe `tests/e2e/tmp-a4dbg.mjs`
+  (probe-hygiene, cf. f4681d48 precedent).
+- **Remaining owner action (one-time, their browser):** capture the account
+  token (command in spec D4 skip message / config _note). Optionally enable
+  "device code authorization" in the Dropbox App Console — that would make
+  D4 operator-assist a single code entry instead of a browser log-in.

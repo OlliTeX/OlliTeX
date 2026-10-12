@@ -80,7 +80,18 @@ test('dropbox token is valid (cached or static)', async () => {
   const cfg = getExternal('dropbox')!
   let token: string | null | undefined = cfg.token ? String(cfg.token) : undefined
   if (!token) token = getServiceToken('dropbox')?.token
-  test.skip(!token, 'dropbox: no token — run `node scripts/auth-capture.mjs --service dropbox --url <authorize-url>` (see credentials/README.md)')
+  if (!token && cfg.refreshToken && cfg.appKey && cfg.appSecret) {
+    // 2026-10-12: headless EXTEND — the refreshToken grant (stable app pair)
+    // mints a fresh access token per the config _readme policy
+    const r = await fetch('https://api.dropboxapi.com/oauth2/token', {
+      method: 'POST',
+      headers: { Authorization: 'Basic ' + Buffer.from(`${cfg.appKey}:${cfg.appSecret}`).toString('base64') },
+      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: String(cfg.refreshToken) }),
+      signal: AbortSignal.timeout(T),
+    }).then((x) => x.json().catch(() => ({})))
+    if (r && r.access_token) token = r.access_token
+  }
+  test.skip(!token, 'dropbox: no token — run `node scripts/auth-capture.mjs --service dropbox --url <authorize-url>` (see credentials/README.md), or set §dropbox.token / refreshToken(+appKey/appSecret) in config.json')
   const out = await req('https://api.dropboxapi.com/2/users/get_current_account', {}, { Authorization: `Bearer ${token}` })
   expect([200, 201], 'dropbox account call').toContain(out.status)
   expect(out.body?.account_id, 'dropbox account_id').toBeTruthy()

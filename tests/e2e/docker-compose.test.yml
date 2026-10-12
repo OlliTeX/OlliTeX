@@ -230,6 +230,12 @@ services:
       GIT_BRIDGE_HOST: git-bridge
       WEBDAV_ENABLED: 'true'
       DROPBOX_ENABLED: 'true'
+      # Dropbox (e2e): app pair from .env.test (git-ignored) drives the
+      # password-grant mint + oauth2 start; cipher secret for the connect
+      # handler's AES-256-GCM credential store (local test-world value).
+      DROPBOX_APP_KEY: ${DROPBOX_APP_KEY}
+      DROPBOX_APP_SECRET: ${DROPBOX_APP_SECRET}
+      WEBDAV_TOKEN_CIPHER_PASSWORD: ${WEBDAV_TOKEN_CIPHER_PASSWORD}
       LANGUAGE_TOOL_URL: http://languagetool:8010
       # Zotero (e2e): enable flag + app creds from .env.test (git-ignored) —
       # the owner's registered client pair drives the live OAuth connect cycle
