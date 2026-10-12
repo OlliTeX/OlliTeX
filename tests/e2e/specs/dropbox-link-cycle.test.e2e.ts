@@ -60,6 +60,14 @@ async function resolveToken(cfg: any): Promise<{ token: string; via: string } | 
 
 test.describe.configure({ mode: 'serial' })
 
+import fs from 'node:fs'
+function cachedRefresh(name: string): string | null {
+  try {
+    const d = JSON.parse(fs.readFileSync(`credentials/.auth/${name}.json`, 'utf8'))
+    return (d.meta && typeof d.meta.refreshToken === 'string' && (d.meta.refreshToken as string)) || null
+  } catch { return null }
+}
+
 test('D1: pre-state — status not connected + oauth2 302s with the app pair (creds live)', async ({ page }) => {
   await loginRobust(page, USER.email, USER.password)
   const s = await api(page, 'GET', '/user/dropbox/status')
@@ -117,7 +125,8 @@ test('D5: LINKED state — status connected:true + encrypted cred stored (not pl
 
 test('D6: EXTEND — refresh_token grant issues a fresh access token (headless)', async () => {
   const cfg = dbxCfg()
-  test.skip(!(cfg.refreshToken && cfg.appKey && cfg.appSecret),
+  const d6rt: string | null = cfg.refreshToken ? String(cfg.refreshToken) : cachedRefresh('dropbox')
+  test.skip(!(d6rt && cfg.appKey && cfg.appSecret),
     'no refreshToken in config — capture once with the browser flow (see header); extend then runs unattended.')
   const r = await fetch(API + '/oauth2/token', { method: 'POST',
     headers: { Authorization: 'Basic ' + Buffer.from(`${cfg.appKey}:${cfg.appSecret}`).toString('base64') },

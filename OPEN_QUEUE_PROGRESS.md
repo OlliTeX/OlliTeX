@@ -1219,3 +1219,42 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
   the "extend my token" path, same pattern as dropbox.
 - Run (headless legs): `BASE_URL=http://127.0.0.1:7420 CI=1 npx playwright test
   specs/mendeley-link-cycle.test.e2e.ts` → 7 passed / 3 design-skipped (1.7m).
+
+## 2026-10-12 (cont.) — DEDICATED TOKEN CAPTURE TOOL (owner request: Mendeley/Dropbox/Zotero)
+- **Why:** the in-spec operator flow (mendeley M8) hung in practice; and more
+  fundamentally: the console-registered callback host (psintern) is a DIFFERENT
+  instance, so it can consume one-shot codes. The capture tool fixes both:
+  codes are captured AT THE BROWSER LEVEL (Playwright route-ABORT on the
+  callback URL — the request NEVER reaches any server) and exchanged straight
+  against the provider (product-parity wires), then stored.
+- **`scripts/capture-interactive-tokens.mjs`** (from tests/e2e; headed browser;
+  operator completes each provider login+approve once; ≤300s wait each):
+  - `--service mendeley` : authorize (exact product param set) → code capture
+    (aborted) → POST api.mendeley.com/oauth/token (client Basic,
+    authorization_code) → `credentials/.auth/mendeley.json`
+    {token, meta.refreshToken, clientId/Secret, user} → **M7/M9 re-arm**.
+  - `--service dropbox`  : authorize `token_access_type=offline` → code →
+    api.dropboxapi.com/oauth2/token → `.auth/dropbox.json`
+    {token, meta.refreshToken} → **D4/D6 + external-probe dropbox re-arm**.
+    Prints the EXACT redirect URL to add in developers.dropbox.com if Dropbox
+    complains (default: https://psintern…/user/dropbox/oauth/callback —
+    or set config.dropbox.callbackURL).
+  - `--service zotero`   : full **OAuth-1.0a HMAC-SHA1** implemented (RFC-5849
+    percentEncode + signing, parity with go/.../zotero/oauth.go):
+    request-token `POST www.zotero.org/oauth/request` → authorize
+    (`library_access=1&all_groups=read`) → callback carries
+    oauth_token+oauth_verifier (captured/aborted) → exchange
+    `POST www.zotero.org/oauth/access` → **LIFETIME apiKey** (+secret, userId,
+    username) → `.auth/zotero.json` + `config §zotero.{userId,apiKey,
+    apiKeySecret}` → **external-probe zotero leg re-arms instantly** (classic
+    key is exactly what that leg tests). Dry-run verified: request-token
+    accepts our client pair (signature OK).
+  - `--dry-run` prints authorize URLs + live-verifies zotero request-token.
+  - **Tokens are NEVER printed** (masked 4+4 only); files 0600.
+- Spec re-arming patches (green re-verified: 12 passed / 6 design-skips):
+  dropbox D6 + mendeley M7/M9 now resolve refreshToken as
+  `config → .auth/<svc>.json meta.refreshToken` (cachedRefresh helper).
+- Run it (owner, on the display machine):
+  `node scripts/capture-interactive-tokens.mjs --all`
+  Then re-run: dropbox-link-cycle, mendeley-link-cycle, external-probe —
+  previously design-skipped legs execute for real.

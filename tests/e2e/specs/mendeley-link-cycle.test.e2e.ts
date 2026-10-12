@@ -64,6 +64,14 @@ function b64(s: string): string {
   return Buffer.from(s).toString('base64')
 }
 
+import fs from 'node:fs'
+function cachedRefresh(name: string): string | null {
+  try {
+    const d = JSON.parse(fs.readFileSync(`credentials/.auth/${name}.json`, 'utf8'))
+    return (d.meta && typeof d.meta.refreshToken === 'string' && (d.meta.refreshToken as string)) || null
+  } catch { return null }
+}
+
 test('M1: status — configured (app seeded) + unlinked at run start', async ({ page }) => {
   await loginRobust(page, USER.email, USER.password)
   const s = await api(page, 'GET', '/user/mendeley/status')
@@ -128,7 +136,8 @@ test('M6: unlink again → 200 (idempotent)', async ({ page }) => {
 })
 
 test('M7: EXTEND — Mendeley refresh grant (headless, pure API)', async () => {
-  test.skip(!MEN.refreshToken,
+  const m7rt: string | null = MEN.refreshToken ? String(MEN.refreshToken) : cachedRefresh('mendeley')
+  test.skip(!m7rt,
     'Mendeley: no refreshToken yet — complete one operator authorization ' +
     '(MENDELEY_MANUAL_LOGIN=1, --headed) or paste config.mendeley.refreshToken (+clientId/clientSecret)')
   const r = await fetch(API + '/oauth/token', {
@@ -137,7 +146,7 @@ test('M7: EXTEND — Mendeley refresh grant (headless, pure API)', async () => {
       Authorization: 'Basic ' + b64(`${MEN.clientId}:${MEN.clientSecret}`),
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(String(MEN.refreshToken)),
+    body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(m7rt!),
     signal: AbortSignal.timeout(30000),
   }).then(x => x.json().catch(() => ({}) as any))
   expect(r.access_token, 'refresh grant must issue a fresh access token').toBeTruthy()
@@ -191,17 +200,18 @@ test('M8: CONNECT (operator-assisted) — Mendeley login + approve, code capture
 })
 
 test('M9: EXTEND after connect — refresh grant issues a fresh access token', async () => {
-  test.skip(!process.env.MENDELEY_MANUAL_LOGIN && !(MEN.token || MEN.refreshToken),
+  test.skip(!process.env.MENDELEY_MANUAL_LOGIN && !(MEN.token || MEN.refreshToken || cachedRefresh('mendeley')),
     'M9: no world token to refresh — run the manual connect (M8) first, or set config.mendeley.refreshToken')
-  test.skip(!MEN.refreshToken || !MEN.clientId || !MEN.clientSecret,
-    'config.mendeley.refreshToken+clientId+clientSecret all required for the refresh leg')
+  const m9rt: string | null = MEN.refreshToken ? String(MEN.refreshToken) : cachedRefresh('mendeley')
+  test.skip(!m9rt || !MEN.clientId || !MEN.clientSecret,
+    'config.mendeley.refreshToken (or .auth/mendeley.json meta.refreshToken) + clientId + clientSecret all required for the refresh leg')
   const r = await fetch(API + '/oauth/token', {
     method: 'POST',
     headers: {
       Authorization: 'Basic ' + b64(`${MEN.clientId}:${MEN.clientSecret}`),
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(String(MEN.refreshToken)),
+    body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(m9rt!),
     signal: AbortSignal.timeout(30000),
   }).then(x => x.json().catch(() => ({}) as any))
   expect(r.access_token, 'refresh grant must issue a fresh access token').toBeTruthy()
