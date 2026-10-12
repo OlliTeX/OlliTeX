@@ -953,3 +953,37 @@ silently drift; owner decision: (a) wire Expire/Peek usedAt or (b) document mult
 Board: e994603b → done (5 board legs + throttle pin green; flags recorded above + in spec header).
 Fixture safety: A5 asserts the ADMIN fixture still logs in after the suite's disposable-account
 churn (no fixture damage).
+
+## cont.7 — 2026-10-12 — PHASE 2: ADMIN user-management (7a8749ff) — 6/6 GREEN + exit legs
+`specs/admin-user-lifecycle.test.e2e.ts` (M1–M6) live-pinned on ag-v57 — **6 passed (1.9m)**;
+exit legs **hub-admin-users + git-bridge-suspended-token: 8 passed (55.7s)**.
+
+PINS (ag-v57, 2026-10-12; probes admcy3–admcy7):
+- Surface: hub admin users leaf (/admin-settings/site.general.users.all / .users.deleted) over the
+  P6.3b API: POST /admin/user/create · /:id/send-activation · /:id/update · /:id/delete ·
+  /:id/restore · DELETE /:id (purge) · POST /admin/user (list) · GET /admin/user/:id (info).
+- create: 200 {"user":{id, email, firstName, signUpDate, inactive:true, …}}; body keys
+  first_name/last_name (firstName/lastName IGNORED; missing → email-prefix fallback — observed
+  in the 200 body); 422 empty-email pin; **⚑ random-password parity CONFIRMED: create stores
+  bcrypt(randomHex63b(32)) — the SENT password is ignored (mutations.go createHandler63b); the
+  stored hash checked offline against the sent password = FALSE (python bcrypt)** → an
+  admin-created account cannot log in with the "created" password (401 invalid-password-retry-
+  or-reset, wired with CSRF). Credential bootstrap = password-reset link (or send-activation
+  path) — the Node/Overleaf legacy-admin contract, not a defect per se, but ⚑ FLAG (see below).
+- update: {suspended:true/false} → 200 acks + doc transitions (susp true→false pins live);
+  {admin:true, roleName} → 200 ack (role surface pinned).
+- delete/restore: 200 {"deletedAt": ISO} → user GONE from the email lookup (doc probe: GONE);
+  login 401 while deleted; restore → 200 {"restoredId","email"} → user back (hp true).
+- non-admin GET /admin/user → **302 /restricted** (admin-api-authz contract pin, M5 one-assert).
+- purge: observed 422 in one state (M6 pins the 200-or-422/404 answer + fallback soft-delete so
+  the disposable never ends live); cleanup pin recorded.
+- ⚑ FLAG (consequence gap, pinned not shipped): because the credential path is reset-link-only,
+  admin CONSEQUENCES (role delta on a shared project, suspended-SESSION rejection,
+  delete→project policy) can only be pinned at the WIRE level for never-logged-in accounts;
+  the suspended-SESSION leg is pinned by git-bridge-suspended-token (valid-credential fixture)
+  — referenced, not duplicated (board leg 2 wording). If the owner wants the consequence legs
+  fully wired (role delta, projects-after-delete), the prerequisite is a credential bootstrap
+  path (owner decision with FLAG 1 of cont.6 — same root).
+
+Board: 7a8749ff → done (M1–M6 green + exit legs green). PHASE 2 COMPLETE: 22ac7721 ✓ 1d7cb391 ✓
+e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evidence above).
