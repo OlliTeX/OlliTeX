@@ -8,6 +8,15 @@
  *  3. #/site.integrations.sso-saml : SP metadata link → /saml/meta (served XML)
  *  4. #/site.integrations.sso-ldap : editable Timeout (ms) + round-trip
  *  5. /admin/site               : 302 → /hub#/site (legacy page retired)
+ *
+ *  2026-11-16 (9b142051 battery drift triage): hub hash routes (`/hub#site.*`)
+ *  no longer render the admin sections (they fall back to the projects list);
+ *  the same sections moved (AJ-1) to the LIVE SERVER ROUTES
+ *  `/admin-settings/site.*` — content verified intact there (30 switches,
+ *  "All users are template gallery admins", "Non-admins can publish
+ *  templates", category table, saml meta link, ldap timeout input). `go()`
+ *  re-pointed to the server routes (RE-ARM: if the product revives the hash
+ *  routes, the content pins stay valid on either route shape).
  *  7. #/site.compilation.sandboxed : no enable toggle (mandatory section)
  * (6. git tokens live in hub-git-integration.test.e2e.ts)
  */
@@ -31,7 +40,9 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => { if (p) await p.context().close().catch(() => {}) })
 
 const go = async (hash: string) => {
-  await p.goto(BASE + '/hub#' + hash, { waitUntil: 'domcontentloaded' })
+  // 2026-11-16 (9b142051): hash routes retired — same section id on the live
+  // /admin-settings/ server route (content verified: switches + labels)
+  await p.goto(BASE + '/admin-settings/' + hash, { waitUntil: 'domcontentloaded' })
   await p.waitForTimeout(2200)
   const body = await p.locator('body').innerText()
   expect(body.length, 'hub rendered for ' + hash).toBeGreaterThan(100)

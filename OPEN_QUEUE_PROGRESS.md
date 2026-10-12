@@ -1415,3 +1415,52 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
 - bib visual editor under /editor (Zotero / ORCID / Mendeley)
 - library under /editor (Zotero / ORCID / Mendeley)
 - tracked changes + comments as json in project zip import/export/download (except templates)
+
+## 2026-11-16 — 9b142051 full-battery drift triage (checkpoint 1 of N)
+
+Full suite run on ag-v57 (ol-e2e-overleaf-1:7420): **450 passed / 33 failed / 4 skipped / 5 not run** (1.1h, workers=1).
+33 failures classified by root cause; two stable clusters RE-PINNED + verified green this checkpoint:
+
+### Fixed (green, committed)
+- `specs/parity/service-chat-notifications.test.e2e.ts` — **7/7 green** (`7 passed (32.4s)`).
+  Root cause: in-container probes targeted the STOPPED container `overleafserver`; the ag-v57 live web
+  container is `ol-e2e-overleaf-1` (chat still node-active on :3010 — verified `200 /status`). Container
+  name now `OL_E2E_CONTAINER` env-overridable, default `ol-e2e-overleaf-1`. Stale env pin, not product.
+- `specs/parity/hub-owner-batch2.test.e2e.ts` — **7/7 green** (`7 passed (55.1s)`).
+  Root cause: hub hash routes `/hub#site.*` no longer render admin sections (they fall back to the
+  projects list); the same sections moved (AJ-1) to LIVE server routes `/admin-settings/site.*`.
+  Content verified intact there (30 switches, "All users are template gallery admins", "Non-admins can
+  publish templates", category table, saml /saml/meta link, ldap "Timeout (ms)" input). `go()` re-pointed.
+
+### Classified — remaining red (owner-gated / moving target; NOT masked)
+- **v2 editor-chrome renovation (owner AC 2026-10-07, intentional)**: the legacy toolbar STRIP is gone
+  (source: "AE (owner 2026-10-07): the toolbar STRIP is gone from the editor"); controls moved to the
+  File/View/Help menus + rail. Affected pins (still driving the old toolbar): editor/toolbar-rail ×9,
+  editor/modals ×2, editor/panes ×2. v2 present (live-verified menus): File→{Rename Project, Share
+  Project, Make a copy, Show version history, Word count, Download→source(.zip)/PDF, Settings,
+  Publish, LLM}; View→{Editor only/Split view/PDF only, Editing/Reviewing, breadcrumbs, tabs, equation
+  preview, Presentation mode, PDF zoom}; Help→{Keyboard shortcuts}. **Genuinely ABSENT in v2 (live DOM,
+  flagged as loss):** online-users indicator + rail account menu. Several owner v2-chrome UI items are
+  still open (File/View/Insert alignment d6ee435d/705ad2aa/48029ae0; rail spacer 5e038fa2; Settings modal
+  760f2dbb; Hotkeys 6931623d) — this cluster is a MOVING TARGET.
+- **Route-retirement wave**: legacy `/templates/manage`→404, `/templates`, `/library`, `/Project/:pid`
+  (in-session 404; anonymous 302→/login). Affected: editor/module-m5 ×2, editor/module-m6,
+  equation-editor (1 pin), editor/shell-probe, parity/legacy-project, parity/legacy-templates-manage ×2.
+- **a11y / markup debt (flag, do not mask)**: hub section titles now render as Mantine `<Text>`
+  (SectionTitle) — not semantic headings → `getByRole('heading')` pins fail (hub-admin-panel,
+  hub-admin-site); editor axe gates (editor/polish ×2: zero-critical + dark variant; editor/module-m1:
+  aria-required-children on the webdav modal) — real a11y violations in the current UI (owner a11y
+  backlog TODO-42f43977); hub-mysettings WebDAV input selector (Mantine input association — "Element is
+  not an <input>").
+- **Genuine regression (flag)**: `/admin-settings/site.general.messages` renders ONLY the nav shell
+  (bodyLen ~1240, no content section/textarea) while sibling sections (managetpl/saml/ldap/mysettings)
+  render full content — section-content panel not rendering for that page; needs product look.
+- **removed-from-project modal (editor/modals)**: user removed by owner while live (DELETE users/… → 204)
+  does NOT produce the "removed from this project" modal in the current v2 editor (removedInBody=false,
+  editor stays mounted) — either the broadcast/modal was dropped in the renovation (flag/lost surface) or
+  is a timing issue; needs a product decision.
+
+### Next (this board item)
+- Re-pin the route-retirement + stable v2-menu legs with live verification (one cluster at a time,
+  verified green, re-arm guards). Flag the lost/regressed surfaces (online-users, rail-account, removed-
+  project modal, messages-section render, a11y headings/axe) for owner product decisions — do NOT mask.

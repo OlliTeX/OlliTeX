@@ -22,9 +22,14 @@ import { USER } from '../../fixtures/credentials'
 
 const RUN = Date.now().toString(36)
 
-// in-container probes (services bind 127.0.0.1 inside overleafserver)
+// in-container probes (services bind 127.0.0.1 inside the running web container).
+// 2026-11-16 (9b142051 drift triage): the legacy pin `overleafserver` is a
+// STOPPED container in the ag-v57 world; the live web container is
+// ol-e2e-overleaf-1 (chat still node-active on :3010 — verified 200 /status).
+const OL_CONTAINER = process.env.OL_E2E_CONTAINER || 'ol-e2e-overleaf-1'
+
 function probe(method: string, url: string, body?: unknown): { status: number; body: string } {
-  const args = ['exec', 'overleafserver', 'curl', '-s', '-o', '/tmp/b3_body', '-w', '%{http_code}', '-X', method, '--max-time', '10', url]
+  const args = ['exec', OL_CONTAINER, 'curl', '-s', '-o', '/tmp/b3_body', '-w', '%{http_code}', '-X', method, '--max-time', '10', url]
   if (body !== undefined) {
     args.splice(3, 0, '-H', 'Content-Type: application/json', '-d', JSON.stringify(body))
   }
@@ -36,7 +41,7 @@ function probe(method: string, url: string, body?: unknown): { status: number; b
   }
   let out = ''
   try {
-    out = execFileSync('docker', ['exec', 'overleafserver', 'cat', '/tmp/b3_body'], { encoding: 'utf8', timeout: 10_000 })
+    out = execFileSync('docker', ['exec', OL_CONTAINER, 'cat', '/tmp/b3_body'], { encoding: 'utf8', timeout: 10_000 })
   } catch { /* no body */ }
   return { status, body: out }
 }
