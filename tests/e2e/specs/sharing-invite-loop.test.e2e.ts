@@ -30,11 +30,13 @@ test.setTimeout(180_000)
 test('L1 invite → mail link → accept → B list + editor (connected story)', async ({ page, context, browser }) => {
   // -- owner invites USER2 -------------------------------------------------
   await loginRobust(page, USER.email, USER.password)
-  const pid = await createBlankProject(page)
+  const pid = String(await createBlankProject(page)).trim()
   expect(pid).toMatch(/^[0-9a-f]{24}$/)
 
+  const csrfTok = (await page.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)) || ''
   const inv = await page.request.post('http://127.0.0.1:7420/project/' + pid + '/invite', {
     data: { email: USER2.email, privileges: 'readAndWrite' },
+    headers: { 'X-CSRF-TOKEN': csrfTok },
   })
   expect([200, 201, 202].includes(inv.status())).toBe(true)
   const invj: any = await inv.json().catch(() => ({}))
@@ -77,7 +79,7 @@ test('L1 invite → mail link → accept → B list + editor (connected story)',
   // seed = exactly what a successful accept would have represented)
   const uid2 = String(
     mongoEval(`const u = db.users.findOne({ email: '${USER2.email}' }); print(u ? String(u._id) : '');`) || ''
-  )
+  ).trim()
   expect(uid2).toMatch(/^[0-9a-f]{24}$/)
   const grants = mongoEval(
     `db.projects.updateOne({ _id: ObjectId('${pid}') }, { $addToSet: { collaberator_refs: ObjectId('${uid2}') } });

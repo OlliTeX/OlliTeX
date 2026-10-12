@@ -860,3 +860,48 @@ on ag-v56 → result appended below.
 - **CLOSED with evidence (this pass)**: c8d140c0 (c10 residue + gates), 91e4f8a2 (green-lit prune ag-v46…v52 executed post-battery; survivors incl. ag-v53 prod + ag-v54/55/56/57), ae4d9982 (1959dab4 + /flushroom wired + smoke green), 090296e3 (base-image migration evidence), 98bb93f9 (Storybook gate green, 310 entries).
 - **OWNER-DECISION PENDING (noted in bodies, non-blocking)**: 225c3d7e (fileproxy-fix identity), 43a8cb9a (024 guardrail vs P3 multi-doc collab — recommendation (a) guardrail), ebb76488 (federation git_url), 89da1036 (README/wiki no-leak update).
 - **PHASE-2 FIRST-LIVE RUNS starting**: sharing-invite-loop / sharing-permissions / sharing-token-links / sharing-request-access / sharing-remove-impact (22ac7721) + project-chat (1d7cb391) — contracts pinned from source (invite.go/collab.go/accessrequests.go/chatbridge.go); the first live run pins exact response shapes/statuses, then the specs become standing pins.
+
+## cont.5 — 2026-10-12 — PHASE 2: sharing (22ac7721) + project chat (1d7cb391) — 12/12 GREEN + both gates re-green
+Five sharing specs (invite-loop / permissions / token-links / request-access / remove-impact) + the
+project-chat 6-leg suite, all LIVE-PINNED in this session (probe evidence below), run on the ag-v57
+world. Convergence rounds: 0/6 → 2/6 → 6/2 (my own status() misuse — Playwright APIResponse.status is a
+METHOD; custom objects use property) → 3/9 (product pins corrected as probe evidence landed) → **12/12
+passed (3.5m)**; then the 1d7cb391 exit leg **realtime-bus + collab-two-user re-run: 2 passed (5.1m)**.
+
+PIN SET (ag-v57, 2026-10-12, probes 1–6 + live battery):
+- invite: POST /project/:pid/invite → 200 {"invite":{"_id","email","privileges"}}; no SMTP (CE); invite
+  accept XHR → 204 but does NOT seed membership (pinned no-op, Node-parity) → membership seeded direct-DB
+  $addToSet collaberator_refs (the stack's access plane per go access.go); B hub list then shows the
+  project (UI-positive leg).
+- sharing-link (L3): POST+GET /project/:pid/sharing-link → 403 "Restricted" in this CE build AND with the
+  owner (gate sharing-updates-new-link disabled; .env.test sets it false) → spec pins 403 + live shapes
+  (GET /tokens → {}, GET /members shape) + the 200 CSRF-positive control.
+- request-access (L4): POST /project/:pid/request-access → 403 restricted (ownerHasSharingUpdates gate,
+  same disabled family); GET /access-requests → 200 {"editAccessRequests":[]} (empty pin); R3 non-member
+  read denied (404 page) invariant.
+- permissions (L2): PUT /project/:pid/users/:uid body key is **privilegeLevel** (colLevel; `privileges`
+  key → 400 "Unrecognized key: privileges" PINNED); seeded legacy-ref member → **204** (handler resolves
+  collaberator_refs members); ghost uid → 404 {"message":"not found"} (PINNED negative); DELETE users/:uid
+  → 204 idempotent; GET /members → {members:[{_id,first_name,last_name,email,privileges,signUpDate}]}.
+- remove-impact (L5): B member /editor 200 → owner DELETE → B /editor **403** + B hub list no longer shows
+  the project (UNIQUE project name required: default blank names collide across accounts — caught in
+  round 5).
+- chat: POST /project/:pid/messages → 201 {id,content,timestamp,user_id,room_id(=pid)}; GET → 200 array
+  [{content,id,timestamp,user{email,first_name,id,last_name},user_id}] (edited → +edited_at, original
+  timestamp kept); author edit → 204; author delete → 204 (row gone); non-author edit/delete → 403
+  {"message":"restricted"}; pagination: newest-first; limit=N honored; **before= takes a millisecond
+  TIMESTAMP (oldest ts of prior window) → strictly older rows; before=<messageId> → 400; after= → 400**
+  (all PINNED in C6).
+- ⚑ OWNER FLAG (not silently shipped): a legacy-ref MEMBER (B, seeded exactly as access.go reads
+  membership) gets 403 restricted on chat GET AND POST, while the owner is fully functional — the chat
+  plane in this build is owner/first-poster reachable, not project-member derived (Node/Overleaf parity
+  would admit members). Board leg "can commenter post? pin actual" → pinned actual = NO in this build.
+  Decision needed: (a) derive chat membership from project access, or (b) keep + document owner-only.
+  project-chat spec C2/C5 pin the observed 403 so the behavior is asserted, not drifting, with the flag
+  in the spec header.
+- ⚑ OWNER FLAG 2 (L2 evidence): role-PUT today only resolves SEEDED legacy-ref members (ghosts 404); the
+  modern users-structure vs collaberator_refs array coexist — if the UI share-modal demotion path is
+  expected to hit a route not yet wired for this stack, that's the spot.
+
+Board: 22ac7721 → done (5 legs green + pins); 1d7cb391 → done (chat 6 legs green + realtime-bus +
+collab-two-user re-runs green as its exit leg). Both closed with the run evidence above.

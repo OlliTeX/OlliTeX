@@ -1,14 +1,16 @@
 /**
- * sharing-remove-impact — SHARING/ACCESS lifecycle leg 5 (board 22ac7721):
- * owner removes B → B's project VANISHES from B's list AND B's next project
- * read is REJECTED (negative wire). The "impact" legs are the new part over
- * the modals-p4 pin (which covers invite+remove at the modal level).
+ * sharing-remove-impact — SHARING/ACCESS lifecycle leg 5 (board 22ac7721).
  *
- * Pinned surface (projectlist/collab.go):
- *   DELETE /project/:pid/users/:uid   (userPat — the remove leg, modals-p4)
- * Access semantics (access.go): non-member (access NONE) → 403 Forbidden on
- * the project surface / 404 general on ghost projects; the project list
- * projection only returns projects of members/owner.
+ * LIVE-PINNED 2026-10-12 (ag-v57 world, evidence in OPEN_QUEUE_PROGRESS.md):
+ *   B member (legacy collaberator_refs) GET /editor/:pid  → 200   (member)
+ *   owner   DELETE /project/:pid/users/:uid               → 204   (idempotent)
+ *   B after  GET /project/:pid                            → 404   (retired route)
+ *   B after  GET /editor/:pid                             → 403   (PINNED denial)
+ *   B hub list: project name ABSENT after removal (the L1-proven positive:
+ *   B hub list SHOWS the project name while member — invite-loop spec)
+ *
+ * The "impact" legs (new over modals-p4): list-vanish + read-denial after
+ * the owner's remove — pinned to the observed 403 on the editor surface.
  */
 import { test, expect } from '@playwright/test'
 import { loginRobust, createBlankProject } from '../helpers/auth'
@@ -20,47 +22,54 @@ const BASE = 'http://127.0.0.1:7420'
 test.describe.configure({ mode: 'serial' })
 test.setTimeout(180_000)
 
-test('L5 remove impact: B list clears + next read rejected', async ({ page, context, browser }) => {
-  // -- setup: USER2 is a member (the documented seed pattern) ----------------
+test('L5 remove impact: B editor-read 200 → owner remove 204 → B editor-read 403 + list vanishes', async ({ page, context, browser }) => {
+  // -- setup: USER2 is a legacy-ref member -----------------------------------
   await loginRobust(page, USER.email, USER.password)
-  const pid = await createBlankProject(page)
-  const uid2 = String(
-    mongoEval(`const u = db.users.findOne({ email: '${USER2.email}' }); print(u ? String(u._id) : '');`) || ''
-  )
-  expect(uid2).toMatch(/^[0-9a-f]{24}$/)
-  expect(
-    mongoEval(`db.projects.updateOne({ _id: ObjectId('${pid}') }, { $addToSet: { collaberator_refs: ObjectId('${uid2}') } });
-              print(db.projects.findOne({ _id: ObjectId('${pid}') }).collaberator_refs.length);`)
-  ).toMatch(/\d+/)
+  // UNIQUE name: the default blank-project name is shared across accounts,
+  // so a name match on B's hub list would false-positive on B's OWN projects.
+  const run = 'rmimp-' + Date.now()
+  const csrf0 = (await page.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)) || ''
+  const mk = await page.request.post(BASE + '/project/new', { data: { projectName: run }, headers: { 'X-CSRF-TOKEN': csrf0 } })
+  expect(mk.status(), 'create named project → 2xx (got ' + mk.status() + ')').toBeGreaterThanOrEqual(200)
+  const pid = ((await mk.text()).match(/"[0-9a-f]{24}"/) || [''])[0].replace(/"/g, '')
+  expect(pid, 'pid extracted').toMatch(/^[0-9a-f]{24}$/)
+  const projName = run
+  const csrf = csrf0
+  const H = { 'X-CSRF-TOKEN': csrf }
 
-  // B currently sees the project in its list
+  const uid2 = String(mongoEval(`const u = db.users.findOne({ email: '${USER2.email}' }); print(u ? String(u._id) : '');`) || '').trim()
+  expect(uid2).toMatch(/^[0-9a-f]{24}$/)
+  const grants = String(mongoEval(`db.projects.updateOne({ _id: ObjectId('${pid}') }, { $addToSet: { collaberator_refs: ObjectId('${uid2}') } });
+    print(db.projects.findOne({ _id: ObjectId('${pid}') }).collaberator_refs.length);`) || '')
+  expect(/\d+/.test(grants), 'seed membership ack').toBeTruthy()
+
+  // B sees the project in its hub list (positive leg; L1-proven pattern)
+  expect(projName, 'project has a name').toBeTruthy()
+  const nameRe = new RegExp(projName.replace(/[.*+?^${}()|\[\]\\]/g, '\\$&'), 'i')
+
   const ctxB = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   const pB = await ctxB.newPage()
   await loginRobust(pB, USER2.email, USER2.password)
   await pB.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
-  const projName = String(mongoEval(`print(db.projects.findOne({ _id: ObjectId('${pid}') }).name)`) || '').trim()
   const before = await pB.locator('body').innerText().catch(() => '')
-  expect(before, 'B list shows the project BEFORE removal').toMatch(new RegExp(projName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
+  expect(before, 'B hub list shows the project BEFORE removal').toMatch(nameRe)
 
-  // B's read currently succeeds (member)
-  const readBefore = await pB.request.get(BASE + '/project/' + pid, { maxRedirects: 0 }) as any
-  expect([200, 302, 303].includes(readBefore.status()), 'B read before removal OK').toBe(true)
+  // B's editor read works while member (PINNED positive)
+  const readBefore = await pB.request.get(BASE + '/editor/' + pid, { maxRedirects: 0 }) as any
+  expect([200, 302, 303].includes(readBefore.status()), 'B editor read before removal OK (got ' + readBefore.status() + ')').toBe(true)
 
-  // -- owner removes B --------------------------------------------------------
-  const rm = await page.request.delete(BASE + '/project/' + pid + '/users/' + uid2, { maxRedirects: 0 }) as any
-  expect([200, 202, 204].includes(rm.status()),
-    'DELETE member → 2xx (got ' + rm.status() + ')').toBe(true)
+  // -- owner removes B ---------------------------------------------------------
+  const rm = await page.request.delete(BASE + '/project/' + pid + '/users/' + uid2, { headers: H }) as any
+  expect([200, 202, 204].includes(rm.status()), 'DELETE member → 2xx (got ' + rm.status() + ')').toBe(true)
 
-  // -- impact leg 1: B's list no longer shows the project ---------------------
+  // -- impact leg 1: B's hub list no longer shows the project ------------------
   await pB.reload({ waitUntil: 'domcontentloaded' })
   const after = await pB.locator('body').innerText().catch(() => '')
-  expect(after, 'B list no longer shows the project after removal')
-    .not.toMatch(new RegExp(projName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
+  expect(after, 'B hub list no longer shows the project after removal').not.toMatch(nameRe)
 
-  // -- impact leg 2: B's next read is rejected (non-member) -------------------
-  const readAfter = await pB.request.get(BASE + '/project/' + pid, { maxRedirects: 0 }) as any
-  expect([401, 403, 404].includes(readAfter.status()),
-    'B read after removal rejected (got ' + readAfter.status() + ')').toBe(true)
+  // -- impact leg 2: B's editor read is REJECTED (PINNED 403) ------------------
+  const readAfter = await pB.request.get(BASE + '/editor/' + pid, { maxRedirects: 0 }) as any
+  expect(readAfter.status(), 'B editor read after removal → PINNED 403 (got ' + readAfter.status() + ')').toBe(403)
 
   await ctxB.close()
 })
