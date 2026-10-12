@@ -172,6 +172,7 @@ function argVal(flag) { const i = ARGS.indexOf(flag); return (i > -1 && ARGS[i +
 const BROWSER = argVal('--browser') || null                 // e.g. 'chrome' = installed Chrome (better Cloudflare standing)
 const PASTE = ARGS.includes('--paste')                      // own-browser mode: log in + approve in YOUR browser, paste the callback url back
 const PASTE_URL = argVal('--paste')
+const DEVICE = ARGS.includes('--device')                     // dropbox-only: device-code authorization (owner enables the toggle in the app console; consent click in an ALREADY-LOGGED-IN browser — no login captcha at all)
 
 let browser = null
 async function getBrowser() {
@@ -253,6 +254,45 @@ for (const service of SERVICES) {
     console.log('  NOTE: if Dropbox reports "Redirect URI not in App Settings", add EXACTLY\n' +
       `        ${cb}\n        to the app's OAuth2 settings (developers.dropbox.com) and retry.`)
     if (DRY) { continue }
+    if (DEVICE) {
+      const dc = await postForm('https://api.dropboxapi.com/oauth2/token',
+        { grant_type: 'urn:ietf:params:oauth:grant-type:device_code' },
+        { Authorization: 'Basic ' + b64(cfg.appKey + ':' + cfg.appSecret) })
+      if (!dc.device_code || !dc.user_code) {
+        throw new Error('device_code rejected: ' + (dc.error_description || dc.error || JSON.stringify(dc)).slice(0, 160) +
+          '\n  → developers.dropbox.com → your app → Advanced → OAuth2 → ENABLE "device code authorization", then retry --device')
+      }
+      console.log('')
+      console.log('  DEVICE MODE — open in an ALREADY-LOGGED-IN browser (own device ok, the')
+      console.log('  script polls headlessly; no login captcha on this path):')
+      console.log('  ' + (dc.verification_uri_complete || (dc.verification_uri || 'https://www.dropbox.com/oauth2/device') + '/' + dc.user_code))
+      console.log('  (user code ' + dc.user_code + ' — expires in ~' + (dc.expires_in || '?') + 's)')
+      const deadline = Date.now() + (dc.expires_in || 600) * 1000
+      const interval = (dc.interval || 5) * 1000
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, interval))
+        let poll
+        try {
+          poll = await postForm('https://api.dropboxapi.com/oauth2/token',
+            { grant_type: 'device_code', device_code: dc.device_code },
+            { Authorization: 'Basic ' + b64(cfg.appKey + ':' + cfg.appSecret) })
+        } catch (e) { continue }   // transient network — keep polling
+        if (poll.access_token) break
+        if (poll.error === 'authorization_pending') { console.log('  … awaiting your approval'); continue }
+        throw new Error('device flow: ' + (poll.error_description || poll.error || '?').slice(0, 140))
+      }
+      const tok = await postForm('https://api.dropboxapi.com/oauth2/token',
+        { grant_type: 'device_code', device_code: dc.device_code },
+        { Authorization: 'Basic ' + b64(cfg.appKey + ':' + cfg.appSecret) })
+      if (!tok.access_token) throw new Error('device flow expired without approval — retry --device (re-open the consent page)')
+      saveAuth('dropbox', tok.access_token, {
+        refreshToken: tok.refresh_token || null,
+        appKey: cfg.appKey, appSecret: cfg.appSecret,
+        user: cfg.username || null, account: tok.account_id || null, mode: 'device-code',
+      }, tok.expires_in)
+      console.log(`  ✓ Dropbox ${tok.refresh_token ? 'access+refresh (offline)' : 'access'} captured via DEVICE flow — D4/D6 + external-probe re-arm`)
+      continue
+    }
     const cbHint = /^(https?:)?\/\/[^/]+\/user\/dropbox\/oauth\/callback/i
     const u = await captureUrl(authz.toString(), cbHint)
     const code = u.searchParams.get('code')

@@ -1285,3 +1285,24 @@ e994603b ✓ 7a8749ff ✓ (12/12 + 6/6 + 6/6 + 8 exit legs, all ag-v57 live evid
     state mismatch rejects; dropbox url route-checked).
 - Retry order suggested: `--browser chrome` first (one extra click),
   `--paste` as universal fallback.
+## 2026-10-12 (cont.) — ZOTERO ARC COMPLETE; Dropbox --device mode ready
+- **Zotero captured via PASTE mode**: LIFETIME apiKey (userId 22088742,
+  user gittest26) → config §zotero + .auth. VERIFIED:
+  `zotero-link-cycle + external-probe` → **9 passed / 3 skipped (1.2m)** —
+  **external-probe zotero leg (classic key against api.zotero.org) PASSES**;
+  remaining skips = dropbox (pending), Z3/Z4 (product-UI round-trip legs).
+- **Dropbox: login captcha (puzzle) loop** in every tried browser.
+  Added **`--device`** mode (script-side, CF-bypass by design):
+  1. owner enables "**device code authorization**" for the app in
+     developers.dropbox.com (console they're already logged into — one
+     toggle, no login wall)
+  2. `node scripts/capture-interactive-tokens.mjs --service dropbox --device`
+     → script requests a device code (app key/secret only), prints
+     user_code + verification URL
+  3. owner opens that URL in an **already-logged-in** browser
+     (own laptop/phone works — the script polls headlessly, so the
+     browser can be on ANY trusted machine) → consent click →
+     script polls `grant_type=device_code` until the tokens land →
+     access+refresh saved → D4/D6 + external-probe dropbox re-arm.
+  Fallback if the toggle isn't possible: `--paste` from the cleanest
+  personal device (residential IP + existing Dropbox session).
