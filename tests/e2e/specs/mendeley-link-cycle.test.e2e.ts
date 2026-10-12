@@ -149,6 +149,10 @@ test('M8: CONNECT (operator-assisted) — Mendeley login + approve, code capture
     'operator connect: run with MENDELEY_MANUAL_LOGIN=1 ... --headed from an operator-trusted ' +
     'machine. Mendeley login (www.mendeley.com) is Cloudflare-walled headless (verified — no bypass).')
 
+  // fresh per-test context (Playwright default) → authenticate THIS session first
+  await loginRobust(page, USER.email, USER.password)
+  console.log('  [M8] ⏳ headed browser is opening Mendeley — complete the login + approve there; ' +
+    'the callback URL (code+state) will be captured automatically and the connect executed on this world')
   const st = (await (await api(page, 'GET', '/user/mendeley/status')).json()) as any
   if (st.connected) return // already connected — nothing to prove
 
