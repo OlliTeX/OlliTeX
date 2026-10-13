@@ -40,7 +40,7 @@ the todo board."
 | `ce-idor` ✅DONE 10-13 (5/5 green ×2, clone-500 pinned) | Cause-Effect | full permission matrix: every project-scoped route × {owner, editor, comment-viewer, non-member, anonymous} × {active, trashed} + CSRF/token boundaries |
 | `ce-boundaries` ✅DONE 10-13 (7/7 green ×2, 5 findings pinned) | Cause-Effect | domain boundaries: ranges (negative/swapped/out-of-range/emoji-codepoint), doc content (huge line, null bytes, RTL/CJK/emoji in comments+tracked), entity names, zip part sizes, template zod limits |
 | `ce-failures` ✅DONE 10-13 (7/7 green ×2, 5 world-quirk pins) | Cause-Effect | failure injection + concurrency ordering: compile-fail mid-journey, ws-drop during save, same-range conflict merge order, parallel restore, invite race |
-| `ce-persistence` | Cause-Effect | theme switch/persist × surface, session expiry mid-action, settings state round-trip, cross-user CSRF boundary |
+| `ce-persistence` ✅DONE 10-13 (8/8 green ×3) | Cause-Effect | theme switch/persist × surface, session expiry mid-action, settings state round-trip, cross-user CSRF boundary |
 
 ## Rules for the implementations
 - Each suite: self-cleaning within one run (reaper truth), 2× green stable,
@@ -81,3 +81,31 @@ the todo board."
   session context** (fresh page in shared pre-logged context → "Restricted"
   even as owner); (e) **reaper hard-deletes idle fixture projects within
   minutes** — suites must create per-leg projects and self-clean.
+
+### CE-4 DONE — `specs/ce-persistence.test.e2e.ts` (8 legs, 8/8 green ×3, 2.3m)
+- **L1 THEME mid-session switch**: explicit `POST /user/settings {overallTheme}`
+  flips hub + editor surfaces with re-render; per-user scheme-class parity asserted
+  (both dark or both light; base shades may differ by design — 1.8 vs 4.2 lum = same scheme).
+- **L2 THEME persist**: logout → re-login → scheme RETAINED (deterministic);
+  cross-user state ISOLATED (A-light vs B-dark observed = per-session storage truth).
+- **L3 SETTINGS round-trip**: `POST /user/settings {first_name}` → **mongo
+  `users.first_name` persisted** (ground truth; no userSettings collection exists in
+  this world) + leaf UI round-trip renders the value; neutral value restored.
+  `GET /user/settings` 404s (unported-route pin — reads must go via leaf UI/mongo).
+- **L4 SESSION-BIT**: member comment POST after session drop → **401 Unauthorized**
+  deterministic; project intact, no half-state (half-state gated by the refusal set).
+- **L5 CORRUPT cookie**: `GET /user/settings` with garbage session cookie → 200
+  login-shell HTML (client-side auth gate — pinned, not a 5xx); re-login recovers.
+- **L6 CROSS-USER CSRF**: USER2's token on ADMIN's session → **403 + state
+  unchanged** (CE-1 standing invariant re-confirmed at the settings surface).
+- **L7 TRASH gate (probed contract)**: `POST /admin/project/:pid/trash` → owner
+  hub DROPS the project INSTANTLY (immediate visibility gate); member editor keeps
+  working (per-user trash, legacy-faithful — pinned); `DELETE .../purge` 200, hub
+  stays cleared, **mongo record PERSISTS** (hard-delete = time-based reaper,
+  owner-gated — pinned).
+- **L8 housekeeping**: both users restored to dark; trail ≥ 8 cells.
+- **⚑ WORLD-TRUTH PINS (owner record)**: theme = session-scoped (redis `sess:*`),
+  no `overallTheme` in `users`/`site_settings` mongo; settings writes land in
+  `users.{first_name,...}` (mongo) — settings READ API unported (404) → leaf UI or
+  mongo is the readback path; trash/purge = association visibility, record
+  survival until reaper.

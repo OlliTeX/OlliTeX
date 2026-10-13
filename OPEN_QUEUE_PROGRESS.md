@@ -1921,3 +1921,9 @@ Commit: 2798d318
   - World-quirk pins (new, owner record): invite-accept 204 ≠ editor access (member post-accept DENIED; direct `collaberator_refs` grant = green path); `/project/:id` = invite-link route (404 detail); register = mail-gated (sink down → 422 mailfail; up → 200+mail delivered); register body needs `first_name`+`last_name`; editor access binds per-page session context; reaper hard-deletes idle per-minute — per-leg self-contained projects mandatory.
   - Deterministic outcomes pinned: LWW winner=B all 3 rounds; F2 hard-kill → POST(committed) clean; bad-zip → 422; corrupt-part zip → 200.
   - Next lane: CE-4 persistence matrix (TODO-33757387).
+
+- [DONE 2026-10-13] **CE-4 context-persistence matrix — TODO-33757387 — DELIVERED**
+  - Spec: `tests/e2e/specs/ce-persistence.test.e2e.ts` (8 legs: theme switch/persist, settings round-trip (mongo truth), session-bit refusal, corrupt-cookie refusal set, cross-user CSRF, trash instant-gate, housekeeping).
+  - **8/8 GREEN ×3** (2.3m/pass, `CI=1` `--workers=1 --retries=0`).
+  - Pinned world-truth set (owner record): theme is SESSION-SCOPED (redis) with per-user isolation + deterministic retention; user settings persist to `users` mongo (first_name verified) while the settings READ API is 404 (unported — leaf UI/mongo readback); session-bit mutation → 401; corrupt cookie → 200 login-shell (client-side gate); cross-user CSRF token → 403 + state unchanged; trash (200) = INSTANT owner-hub visibility drop, member unaffected (legacy-faithful), purge (200) leaves the mongo record (reaper = time-based hard-delete, owner-gated).
+  - Next lane: Journey suite (onboarding TODO-434b5075) per board order, then the ZIP implementation (TODO-047dc1d9) as the largest product arc.
