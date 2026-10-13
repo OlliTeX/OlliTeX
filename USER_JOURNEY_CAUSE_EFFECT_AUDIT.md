@@ -35,7 +35,7 @@ the todo board."
 | TODO | Class | Scope |
 |---|---|---|
 | `uj-onboarding` ✅DONE 10-13 (8/8 green ×2) | Journey | register → mail-activate (incl. failure states) → first project → first compile → first comment → first export probe |
-| `uj-choreography` | Journey | two-user interleaved comment + tracked-change + history-restore storyline on one doc, incl. mid-journey reload recovery |
+| `uj-choreography` ✅DONE 10-13 (7/7 green ×2) | Journey | two-user interleaved comment + tracked-change + history-restore storyline on one doc, incl. mid-journey reload recovery |
 | `uj-lifecycle` | Journey | create→share→template→instance→export→import→deactivate→trash→purge + store-level residue verification + admin governance audit |
 | `ce-idor` ✅DONE 10-13 (5/5 green ×2, clone-500 pinned) | Cause-Effect | full permission matrix: every project-scoped route × {owner, editor, comment-viewer, non-member, anonymous} × {active, trashed} + CSRF/token boundaries |
 | `ce-boundaries` ✅DONE 10-13 (7/7 green ×2, 5 findings pinned) | Cause-Effect | domain boundaries: ranges (negative/swapped/out-of-range/emoji-codepoint), doc content (huge line, null bytes, RTL/CJK/emoji in comments+tracked), entity names, zip part sizes, template zod limits |
@@ -135,3 +135,23 @@ Full onboarding storyline (fresh USER3 account, in-suite lifecycle):
   SESSION-SCOPED — pinned).
 - **L8 cleanup audit**: project trash+purge; admin `delete` 200 + `purge` 200;
   account state = purged (no leak; audit leg recorded).
+
+### Journey B DONE — `specs/journey-choreography.test.e2e.ts` (7 legs, 7/7 green ×2, 1.1m)
+Two-user choreography composed from the green fragments (single doc storyline):
+- **S1** owner edits (CM6 dispatch) + comment thread on a live range (wire 200/201 → visible).
+- **S2** member sees thread (parity read), replies (two-way wire); owner edits UNDER the
+  commented range → **RANGE-DRIFT TRUTH PINNED**: ranges carry an ANCHOR object
+  (`"a":{"e":"…","s":"…"}`) beside numeric `start/end` — the world ANCHORS ranges
+  (not naive offset shifting); thread content survives the under-range edit, no 5xx.
+- **S3** track-changes toggle (owner `<500`) + toggled-on edit is versioned
+  (/updates maxV≥1, /diff carries the marker) + member diff parity; client-side
+  capture gap remains the trackchanges-arc pin.
+- **S4** restore attempt (both roles): **403 role-identical** (deterministic;
+  unported-or-gated — either way state UNCHANGED, threads+content intact — the
+  restore/interleave question is now pinned at the refusal boundary).
+- **S5** member HARD RELOAD mid-journey → content (MARK2), threads (both messages),
+  timeline all consistent post-reload; P1/P2 content parity exact (024 room re-sync OK).
+- **S6** attribution surface (65b0d668 interlock): File → "Show version history" panel
+  present and **the "Anonymous" pin HOLDS** (attribution gap live-recorded).
+- **S7** kill → member threads 404 "not found" (deterministic refusal class, no 5xx);
+  project doc gone (owner audit).
