@@ -1784,3 +1784,9 @@ Commit timestamps are authoritative; entry text dates may drift.
 - GREEN: full battery 14/14 ×2 consecutive (new 6 + legacy 1 + parity B3 7), 1.2m each,
   world state restored exactly as-found both runs.
 Commit: 2798d318
+- [2026-10-13] d4f9eb7a comments intensive (per the 2026-10-11 owner gap list) — 3 new suites + re-verified neighbor, battery 15/15 ×2 (ag-v57, OLPSINT world):
+  - comments-two-user (4/4): live wire comment delivery A→B and B→A without reload; second-user resolve/reopen round-trip with record convergence (CMT-1/2/3 owner flags pinned by observation — UI comment surface absent in ag-v57; NOT fixed, product verdict).
+  - comments-ui-lifecycle (5/5): UI-created comment → note+text visible to creator (CMT-3 pin re-armed); wire edit → edited marker (E1); own-message delete (E2); thread delete + ghost-delete=200 idempotent pin (E3); blank-edit 400 shape pin (E4).
+  - comments-multifile (5/5): wire completeness for a never-opened sample.bib (thread doc + message ranges {pos,len}, green-neighbor overview-completeness shape); .bib editor surface opens with content rendered + active-tab comment accepted (M1/M2); CMT-3 pin holds on the .bib tab; anchor robustness: two-line-span collapse keeps well-formed ranges (owner: re-anchoring parity question) and end-of-buffer append keeps the span valid with base64 anchors retained (M3/M4).
+  - Re-verified green: review-overview-completeness (04724e42 immune pin still holds).
+  - Contract learned (pinned): thread idRe=[0-9a-zA-Z]{6,64} (hyphens ⇒ non-JSON 500); ranges live on MESSAGES ({pos,len}); message id = top-level `id`; seeded-doc existence via rootFolder entry → db.docs (docs carry no name field); OLPSINT e2e mongosh has no ObjectID global (new ObjectId()). — DONE (15/15 ×2 green)
