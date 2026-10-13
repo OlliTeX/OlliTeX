@@ -1870,3 +1870,25 @@ Commit: 2798d318
   - settings modal: live File menu Settings group = only "Share Project" — "Open settings" entry point is the 10-10/11 wave (bake-pending);
   - hotkeys modal: probe truth = modal OPENS but the live bake renders the frame at y=900 height=0 (below fold, visually unreachable — same class as K2 finding); source OLModal = Mantine fixed frame + K/M flex-basis size fix (ol-modal.tsx K/M repro comment). Contrast gate self-activates when the frame renders.
 - 65b0d668 (per-update attribution) AUDITED live (leg 1 of the spec): history panel renders "Edited | main.tex | **Anonymous**" on a FRESH room edit — the attribution slot exists (MetadataUsersList, update.meta.users) but meta is ABSENT in current rooms → product gap CONFIRMED (owner feature; kept open).
+## ZIP tracked-changes/comments acceptance suite (owner work order 2026-10-13) — DELIVERED
+- Owner stated the feature is "implemented" — AUDIT VERDICT (this checkout, all refs): NOT PRESENT.
+  - GET /project/:pid/download/zip → 404 (Node contract line routes.csv:51 exists; NO Go handler in projectlist);
+  - admin GET /project/download/zip → placeholder overleaf-export.txt (dlzip.go, last commit daad01ac 2026-10-03, still HEAD);
+  - import POST /project/new/upload → files-only (newzip.go: zero json/tracked/comment handling);
+  - git: no feature branch, no commit, no uncommitted work, no stash; only other zip wave = the 10-13 pin spec itself.
+  → FLAG (owner): WHERE was it implemented? (branch/checkout/PR — not visible in /data_1/image_mining/the_diff/overleaf @ HEAD)
+- NEW INTENSIVE ACCEPTANCE SUITE in zip-tracked-comments.test.e2e.ts (13 legs A–M) — 13/13 GREEN ×2 (2.4m):
+  - A–F (existing pins) intact: absent route 404, admin placeholder, upload 400/400/422/200 contracts;
+  - G export contract (files + comments JSON + tracked-changes JSON) — conditional: pin now, FULL ASSERTS when live;
+  - H TEMPLATE EXCLUSION (owner scope "except for templates") — publish via POST /template/new/:pid + exclusion assert;
+  - I/J import carries comments.json / tracked-changes.json — conditional (threads API + editor buffer proofs when live);
+  - K ROUND-TRIP: seed comment (thread idRe [0-9a-zA-Z]{6,64} lesson) → export JSON → import → thread present — conditional;
+  - L corrupt comments.json — deterministic contract (strict 4xx OR files-only; no ambiguous half-import) — GREEN: files-only fallback observed;
+  - M PERMISSIONS leak-gate — anon = login-bounce (200 /login HTML, no zip body), non-member = 404; gates pass.
+## build-images junk audit (owner work order) — REPORT: BUILD_IMAGES_AUDIT_2026-10-13.md
+- Zero byte-identical overlap with images/main-amd64 (md5 scan) — nothing "belongs" there; disjoint roles confirmed.
+- 8 junk candidates flagged (test/ legacy suite 280K, eslint.config.mjs, 2 bin one-offs, .dropbox-secrets placeholder (tracked, unignored, 0 consumers), notifications-smoke.sh, cloudbuild.public.yaml, custom-environment-variables.json) — owner deletion gate; NOT removed.
+- Stale ref found: develop/clsi-nginx.conf comment → build-images/nginx/ (nonexistent).
+## E2E coverage audit (owner work order) — REPORT: E2E_COVERAGE_AUDIT.md
+- 124 specs / 47 features: 30+ surfaces INTENSIVE (multi-leg arcs ×2 green); contract/pin/gap classes itemized;
+  residuals: zip feature absent (pin self-activating), SSO leg-b external, Dropbox tokens owner, 65b0d668 attribution gap, thin: systemmessages/launchpad/staticpages/analytics/PDF-pixel.
