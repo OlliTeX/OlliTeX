@@ -1939,3 +1939,15 @@ Commit: 2798d318
   - **7/7 GREEN ×2** (1.1m/pass, `CI=1` `--workers=1 --retries=0`).
   - Pinned truths (new): (a) **comment ranges carry an anchor object** `"a":{"e","s"}` beside start/end — the world anchors ranges, under-range edits do NOT corrupt threads (drift handled by anchor); (b) **restore_file = 403 role-identical** (owner and member identical class — deterministic; state unchanged; the restore interleave question pinned at the refusal boundary); (c) **hard-reload recovery = clean** (content/threads/timeline consistent; P1/P2 exact parity — 024 room re-sync verified in a journey context); (d) **attribution "Anonymous" pin HOLDS live** (65b0d668 interlock reconfirmed in a composed journey); (e) member CSRs require page meta token (403 without — reconfirmed on comment wires).
   - Next on the board: Journey C (lifecycle+purge, TODO-f0ab4e2f); then the ZIP implementation (TODO-047dc1d9) as the largest remaining arc.
+
+- [DONE 2026-10-13] **Journey C lifecycle + store-level purge + governance — TODO-f0ab4e2f — DELIVERED**
+  - Spec: `tests/e2e/specs/journey-lifecycle.test.e2e.ts` (7 legs).
+  - **7/7 GREEN ×2** (3.6m/pass, `CI=1` `--workers=1 --retries=0`).
+  - Pinned truths (new in this lane):
+    - (a) **trash→untrash restore CYCLE = PROVEN** (both admin routes live: `POST /admin/project/:pid/trash` + `/untrash`, both 200; after restore: owner list regained, member threads 200, content intact).
+    - (b) **deactivate route = GENUINELY ABSENT** (404 with CSRF) — legacy-faithful: deactivation = the legacy 90-day inactivity auto-job (owner-gated time path, not an action).
+    - (c) **STORE-LEVEL CASCADE TRUTH (first store-cleanup assertion)**: hard-delete of a projects row leaves `docs=1, ydoc=1, chunks=1` ORPHANED (no cascade — ⚑ owner adjudication: reapers vs leak); rooms/docHistory*/invites/audit/deletedProjects all clean.
+    - (d) template publish for a fixture-named project = REFUSED 400 (name surface; honest fall-through).
+    - (e) admin-gated routes (`/admin/user/:uid/projects`, deactivate-probe) require **CSRF token + admin session** (owner 403 without CSRF; `e2e-admin` IS admin: `isAdmin=true`).
+    - (f) **mongosh `--eval` quirk**: literal arrays nested in `$or` fail shell-parse (isolated ×5; separate-shape queries workaround pinned in the spec).
+  - NEXT (board order): **ZIP tracked-changes/comments implementation — TODO-047dc1d9** (the largest remaining arc; all acceptance suites ready: `zip-tracked-comments` 13 legs + `e2e-zip-conditional` 4 legs + Journey A L6 + L7 conditional-rearm legs self-activate on landing).

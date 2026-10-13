@@ -155,3 +155,26 @@ Two-user choreography composed from the green fragments (single doc storyline):
   present and **the "Anonymous" pin HOLDS** (attribution gap live-recorded).
 - **S7** kill → member threads 404 "not found" (deterministic refusal class, no 5xx);
   project doc gone (owner audit).
+
+### Journey C DONE — `specs/journey-lifecycle.test.e2e.ts` (7 legs, 7/7 green ×2, 3.6m)
+Lifecycle + store-level purge + governance:
+- **L1** create+content (comment+track toggle+P2 edit footprint, /updates 200).
+- **L2** template publish REFUSED 400 ("Please try reco[rd/word]") — the fixture NAME
+  trips it (template-name surface; pinned; honest fall-through to the import leg).
+- **L3** import-copy: `/project/new/upload` zip → new project (COPY_PID) — two
+  independent worlds proven.
+- **L4** governance: `/admin/project/:pid/members` 200 (owner+member audit),
+  `/admin/active-projects` 200 (fixture listed), **deactivate route 404 with
+  CSRF = GENUINELY ABSENT** (legacy-faithful: deactivation here is the legacy
+  90-day inactivity AUTO-JOB only — owner-gated time path, not an action).
+- **L5** TRASH→UNTRASH **RESTORE CYCLE PROVEN**: trash 200 → untrash 200 → owner
+  project list regained (admin POST `/admin/user/:uid/projects` 200, CSRD-gated),
+  member threads 200, content intact. (Route proven: admin.go adUntrashPat.)
+- **L6** **STORE-LEVEL CASCADE TRUTH (first store-cleanup assertion in the board)**:
+  after the scoped hard-delete of the fixture's own projects row:
+  `projects:1→0`, but **⚑ RESIDUE: docs=1, ydoc=1, chunks=1** — docstore + 024-collab
+  + one chunk orphaned (NO cascade in this world; reaper presumably time-based).
+  All other sub-stores 0 (rooms, docHistory*, projectInvites, audit, deletedProjects).
+- **L7** audit trail: `projectAuditLogEntries`/`userAuditLogEntries`/`instanceStats`
+  present; active-list post-purge = deterministic; template-registry state recorded.
+- Self-cleaning proven (fixture + copy killed/deleted within the run).
