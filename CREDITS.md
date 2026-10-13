@@ -162,3 +162,9 @@ something from their code we put them into CREDITS.md").
   `frontend/test/frontend/features/source-editor/languages/latex/`. We reuse
   our own `createListItem` / `ancestorOfNodeWithType` / lezer-latex terms
   (same signatures this code already depended on upstream).
+
+## Federation git_url edge allowlist (2026-10-13)
+
+- **Upstream git source:** `origin <https://github.com/saveli/overleaf-cep.git>`, branch `fix/git-bridge-nginx-allowlist`, commit `44a4454eb230b8078e2f876236debcd849dd376` (restrict the `/git/` edge to `^/git/[0-9a-f]{24}(\.git)?(/|$)`; 404 everything else under `/git/`).
+- **What was adopted (owner decision ebb76488, Option 1 — "serve it properly"):** the canonical vhost (`images/main-amd64/nginx/overleaf.conf.template`) previously proxied the BLANKET prefix `location ^~ /git/` to git-bridge (every sub-path, including `/git/api/...`). It now uses the upstream allowlist shape — only the federation clone mount `^/git/[0-9a-f]{24}(.git)?(/|$)` reaches `${GIT_BRIDGE_HOST}:${GIT_BRIDGE_PORT}`, and every other `/git/` sub-path returns 404 at the edge. Pinned by `specs/federation-git-edge.test.e2e.ts` (4/4 ×2 green, ag-v57 world, 2026-10-13): allowlisted paths → git-bridge 401 auth challenge (served); non-allowlisted → 404 at the edge; the dormant unauthenticated `DELETE /api/projects/<id>` (go/services/gitbridge/server/delete.go) is NOT reachable (403 web CSRF gate / 404 under /git/api).
+- **Porting note:** an unquoted nginx location regex containing `{24}` breaks the conf lexer (verified 2026-10-13) — the pattern is quoted (`location ~ "...{24}(...)" {`).

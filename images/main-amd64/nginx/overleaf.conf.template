@@ -52,7 +52,18 @@ server {
 		proxy_send_timeout 10m;
 	}
 
-	location ^~ /git/ {
+	# Federation git_url edge (owner decision ebb76488 → Option 1 "serve it
+	# properly", 2026-10-13 — upstream allowlist shape: saveli/overleaf-cep
+	# fix/git-bridge-nginx-allowlist 44a4454eb230b8078e2f876236debcd849dd376;
+	# CREDITS.md): ONLY the clone mount reaches git-bridge; everything else
+	# under /git/ now 404s at the edge (the old blanket ^~ /git/ proxied every
+	# sub-path — including /git/api/... — now closed off). The unauthenticated
+	# DELETE /api/projects/<id> (go/services/gitbridge/server/delete.go,
+	# "dormant — no in-tree caller") is NOT under /git/ and stays outside the
+	# allowlist (pinned in specs/federation-git-edge.test.e2e.ts).
+	# nginx location precedence: regexes are tried in DECLARATION ORDER — the
+	# allowlist must stay before the catch-all (a ^~ prefix would shadow both).
+	location ~ "^/git/[0-9a-f]{24}(\.git)?(/|$)" {
 		resolver_timeout 2s;
 		resolver 127.0.0.11 valid=10s;
 		set $git_upstream http://${GIT_BRIDGE_HOST}:${GIT_BRIDGE_PORT};
@@ -67,6 +78,9 @@ server {
 		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 		proxy_read_timeout 10m;
 		proxy_send_timeout 10m;
+	}
+	location ~ ^/git/ {
+		return 404; # every non-clone /git/ sub-path stays at the edge
 	}
 
 	# Ollitex Go collab service (D19 collaboration pivot, 2026-09-25) — the
