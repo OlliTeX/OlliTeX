@@ -1757,3 +1757,30 @@ Host date = 2026-10-13 (verified `date`); the "2026-11-xx" dates in some entries
 (compaction drift) = the true dates per commit timestamps above (10-13 = today; the incident
 of the "11-10" entries was in fact 2026-10-10, matching board TODO dates 2026-10-09/10/11).
 Commit timestamps are authoritative; entry text dates may drift.
+
+## 0f553d2d: INTENSIVE notifications suite (receiver side) — CLOSED (2026-10-13)
+- NEW specs/notifications-full.test.e2e.ts — 6 legs, all live-verified before pinning:
+  L1 comment→recipient list entry (key project-comment-<pid>-<tid>-<mid>, template
+  notification_comment_on_project, messageOpts contract); L2 reply→author-only template +
+  sender self-exclusion; L3 mail leg = emailNotifications upsert PER (recipient, project)
+  (refresh semantics, recipient_id field — the mail SENDER cronmail is not running in the
+  e2e world: scheduled doc is the pinnable state, pinned in-spec); L4 read-state DELETE
+  entry 200+gone; L5 project-pref mute negative + un-mute re-arm control; L6 shape pin
+  (bodyless key-clear → 400 invalid JSON).
+- World/pollution finding (root-caused, fixed in tests only): the pre-existing
+  notifications.test.e2e.ts logs in as USER=e2e-user (B) and TOGGLED B's GLOBAL
+  muteAllNotifications leaf without restoring it — that gate (chat notify.go
+  MutedUserIDs) silently suppresses ALL fan-out and leaks across batteries (this made
+  the new suite fail 5/6 across runs). Fixed:
+  1) new suite: snapshot/normalize/restore B's global mute state (hermetic either way)
+  2) old spec: wire-restore of the toggle (GET/POST /notifications/preferences read-back)
+     + debounced-save reload-retry waits (8s→20s window, 3× reload-retry) — the UI-label
+     restore click was position-unstable across the persistence reload.
+- Contract facts pinned in-spec: chat notify fan-out gate order (muted → project prefs
+  → prefBool default-true on absent key), recipients = owner+collabs+readOnly+tokenRefs −
+  sender, email upsert per (recipient, project), collab shape = Node-typo
+  collaberator_refs flat [ObjectId] (objects decode away — D2 class), notifications
+  service API has no auth gate (internal trust boundary).
+- GREEN: full battery 14/14 ×2 consecutive (new 6 + legacy 1 + parity B3 7), 1.2m each,
+  world state restored exactly as-found both runs.
+Commit: <pending>
