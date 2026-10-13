@@ -1708,3 +1708,19 @@ driven worker leg complete — Node parity).
 **Board:** `deb4b4ba` → done · `d857d936` → done (family fully settled:
 1 NO-OP · 2 live-verified · 3 owner-resolved). No new product flags; 1 OPEN
 technical item (web-tail client negotiation quirk) logged for the owner.
+
+---
+
+## 2026-11-16 — P7 cutover `TODO-54ed9d38` — CLOSED (7-step directive complete; 5b selection mooted)
+
+Re-verification pass:
+- Steps 1-7 all complete per the 2026-10-08 re-audit (flip permanent, Node backend
+  junked a440cf76, tree moves done, live stack on build #39).
+- **Step 5b "socket-diagnostics junk-page selection" MOOT**: the page + component
+  dir were already RETIRED 2026-10-06 (f1779e07, owner directive, socket.io bus
+  end-to-end). Verified GONE from the tree (zero hits in frontend/ + junk/;
+  only historical comment refs; collab/README.md records the retirement).
+- Remaining owner-externals (tracked elsewhere, NOT closed scope): Docker Hub
+  sharelatex→ollitex push (owner account; TODO-c00741d2; on-host registry serves
+  live) · server-ce→build-images rename (owner-deferred, 0a710094).
+Board: `54ed9d38` → done.
