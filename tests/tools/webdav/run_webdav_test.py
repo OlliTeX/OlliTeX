@@ -229,11 +229,16 @@ def bridge_webdav_base():
     """
     if os.environ.get("OLI_WEBDAV_URL"):
         return os.environ["OLI_WEBDAV_URL"]
-    probe = subprocess.run(
-        ["docker", "exec", "overleafserver", "sh", "-c", "getent hosts webdav-test"],
-        capture_output=True, text=True, timeout=15)
-    if probe.returncode == 0 and probe.stdout.strip():
-        return "http://webdav-test"  # apache container port 80 (compose)
+    fixture = "webdav-test"
+    try:
+        web = _web_container()
+        probe = subprocess.run(
+            ["docker", "exec", web, "sh", "-c", "getent hosts " + fixture],
+            capture_output=True, text=True, timeout=15)
+        if probe.returncode == 0 and probe.stdout.strip():
+            return "http://" + fixture  # apache container port 80 (compose)
+    except Exception:
+        pass
     try:
         net = json.loads(subprocess.run(
             ["docker", "inspect", "-f", "{{json .NetworkSettings.Networks}}", "webdav-test"],
@@ -346,9 +351,12 @@ def part_b():
         return
 
     # B4c — the imported project IS the sync-surface project (no second POST
-    # /project/new: same name, one row).
-    st2b, b2b = oli.req("GET", f"/project/{imp_pid}")
-    report("B4c imported project accessible via /project/:id",
+    # /project/new: same name, one row). Live surface check: /editor/:id
+    # (the legacy /project/:id PAGE routes are RETIRED 2026-10-05 → 404 in
+    # this build; re-arm: if the editor page stops resolving the import row,
+    # this flips red).
+    st2b, b2b = oli.req("GET", f"/editor/{imp_pid}")
+    report("B4c imported project accessible via /editor/:id (legacy /project/:id page retired)",
            st2b == 200, f"-> {st2b} {b2b[:100]!r}")
     pid = imp_pid
 
@@ -414,9 +422,68 @@ def _json(body, key):
     return json.loads(body).get(key)
 
 
+# ---- world-aware container resolution (WDV-A closeout, 2026-11-16) ----
+# The harness predates the ol-e2e world: it hard-coded `overleafserver` +
+# `overleafmongo`. In the ol-e2e world the web container is `ol-e2e-overleaf-1`
+# and its mongo is an `ol-e2e-mongo-*` replica-set member (its MONGO_URL), NOT
+# the legacy `overleafmongo` (a different instance with 0 projects — the B4
+# row/tree/state lookups silently returned empty while the HTTP contract,
+# incl. the .tex docstore parity leg, was actually GREEN). Resolution order:
+#   1. explicit env (WDV_WEB_CONTAINER / WDV_MONGO_CONTAINER);
+#   2. auto: web = first running of (ol-e2e-overleaf-1, ol-e2e-overleaf-2,
+#      overleafserver); mongo = the candidate container that owns the IP the
+#      web's MONGO_URL host resolves to — queried from INSIDE the web
+#      container; fallback overleafmongo (legacy world).
+def _docker_running(name):
+    try:
+        r = subprocess.run(["docker", "inspect", "-f", "{{.State.Running}}", name],
+                           capture_output=True, text=True, timeout=15)
+        return r.stdout.strip() == "true"
+    except Exception:
+        return False
+
+
+def _web_container():
+    if os.environ.get("WDV_WEB_CONTAINER"):
+        return os.environ["WDV_WEB_CONTAINER"].strip()
+    for cand in ("ol-e2e-overleaf-1", "ol-e2e-overleaf-2", "overleafserver"):
+        if _docker_running(cand):
+            return cand
+    return "overleafserver"
+
+
+def _mongo_container():
+    if os.environ.get("WDV_MONGO_CONTAINER"):
+        return os.environ["WDV_MONGO_CONTAINER"].strip()
+    web = _web_container()
+    try:
+        env = subprocess.run(["docker", "exec", web, "sh", "-c",
+                              "printf '%s' \"$MONGO_URL\""],
+                             capture_output=True, text=True, timeout=15).stdout.strip()
+        m = re.search(r"mongodb(?:\+srv)?://([^:/?]+)", env)
+        host = m.group(1) if m else "mongo"
+        ipout = subprocess.run(["docker", "exec", web, "sh", "-c",
+                               "getent hosts " + host],
+                               capture_output=True, text=True, timeout=15)
+        ip = ipout.stdout.split()[0] if ipout.stdout.split() else None
+        if ip:
+            for cand in ("ol-e2e-mongo-1", "ol-e2e-mongo-2", "overleafmongo"):
+                try:
+                    nets = json.loads(subprocess.run(
+                        ["docker", "inspect", "-f", "{{json .NetworkSettings.Networks}}", cand],
+                        capture_output=True, text=True, timeout=15).stdout)
+                    if any((v or {}).get("IPAddress") == ip for v in nets.values()):
+                        return cand
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return "overleafmongo"
+
+
 def _mongo_eval(expr):
     out = subprocess.run(
-        ["docker", "exec", "overleafmongo", "mongosh", "--quiet", "sharelatex", "--eval", expr],
+        ["docker", "exec", _mongo_container(), "mongosh", "--quiet", "sharelatex", "--eval", expr],
         capture_output=True, text=True, timeout=120)
     return out.stdout.strip()
 
