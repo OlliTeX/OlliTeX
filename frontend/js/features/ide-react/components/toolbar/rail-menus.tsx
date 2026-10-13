@@ -521,6 +521,7 @@ export const RailMenuDropdown = ({
         style={{ width: 40, height: 40, opacity: 0.35, cursor: 'default' }}
         aria-label={`${label} (disabled — available for .tex/.typst files only)`}
         aria-disabled="true"
+        role="menuitem"
         title="Available for .tex / .typst files only"
         tabIndex={-1}
       >
@@ -548,6 +549,12 @@ export const RailMenuDropdown = ({
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={opened}
+        // a11y 42f43977 (2026-10-13): RailMenuCluster renders
+        // role="menubar"; axe aria-required-children (critical) fails on the
+        // plain button role of this target. menuitem + haspopup/expanded is
+        // the correct mapping for a menu-opening control (submenu items
+        // already carry role="menuitem").
+        role="menuitem"
       >
         {glyph}
       </ActionIcon>

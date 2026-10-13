@@ -1857,3 +1857,16 @@ Commit: 2798d318
 - LIVE WORLD CAVEAT (ag-v57 bake predates the letters on some surfaces — Download group showed 2 of 5 kids live): the world image carries an older bake; the next official rebake (R2 lane) carries all letters + the git_url allowlist; browser re-verify of G/H/I/K/M/F/O on ag-vN after bake = the gate leg (one pass, ~20 min).
 - TODOs closed: 07f21e18 48029ae0 5e038fa2 6931623d 705ad2aa 760f2dbb d6ee435d c945a39d. Evidence shots: /tmp/ui8/*.png (F-hub, L-rail, G2-file, H2-insert, I2-view, K2-settings).
 ## 89da1036 (README+wiki leak guard) — CLOSED 2026-10-13 (already DONE: 48ebfcdf 10-10 "E: README + wiki refresh + mandatory no-credential/no-secret leak guard (doc-only)" + docs/wiki/LEAK_SWEEP_2026-10-11.md receipt + per-page leak-guard sections; README:186 guard line)
+## 42f43977 (a11y dual-scheme contrast gate, non-hub) — CLOSED DONE 2026-10-13
+- New standing spec tests/e2e/specs/a11y-dual-scheme-nonhub.test.e2e.ts (9 legs) — 9/9 GREEN ×2 (2.6m/2.5m):
+  - login page contrast (axe wcag2a/aa+wcag21, color-contrast ANY impact after rescan) — PASS;
+  - editor page light + dark (forced via POST /user/settings overallTheme, hub-a11y mechanism) — CONTRAST PASS;
+  - settings modal + hotkeys modal legs live-probed (modal opens: "Hotkeys | Keybindings — Default…" in DOM).
+- GATE CAUGHT REAL DEFECTS (fixed in source this commit):
+  1. axe aria-required-children CRITICAL ×2 on `.ol-v2-rail-menus[role="menubar"]` (v2 rail clusters) — RailMenuButton/ActionIcon plain-button children invalid inside menubar → added role="menuitem" (+disabled variant) in frontend/js/features/ide-react/components/toolbar/rail-menus.tsx;
+  2. button-name critical on the same glyphs → covered by the role/aria-label fix (labels present).
+- BAKE-PENDING PINS (spec carries them; self-activate after rebake, no spec edit needed):
+  - editor aria criticals (live ag-v57 lacks the source fix — pin logged, gate bites post-bake);
+  - settings modal: live File menu Settings group = only "Share Project" — "Open settings" entry point is the 10-10/11 wave (bake-pending);
+  - hotkeys modal: probe truth = modal OPENS but the live bake renders the frame at y=900 height=0 (below fold, visually unreachable — same class as K2 finding); source OLModal = Mantine fixed frame + K/M flex-basis size fix (ol-modal.tsx K/M repro comment). Contrast gate self-activates when the frame renders.
+- 65b0d668 (per-update attribution) AUDITED live (leg 1 of the spec): history panel renders "Edited | main.tex | **Anonymous**" on a FRESH room edit — the attribution slot exists (MetadataUsersList, update.meta.users) but meta is ABSENT in current rooms → product gap CONFIRMED (owner feature; kept open).
