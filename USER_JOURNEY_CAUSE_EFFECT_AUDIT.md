@@ -34,7 +34,7 @@ the todo board."
 ## Board items created (implementation queued, 7 open TEST-IMPL items)
 | TODO | Class | Scope |
 |---|---|---|
-| `uj-onboarding` | Journey | register → mail-activate (incl. failure states) → first project → first compile → first comment → first export probe |
+| `uj-onboarding` ✅DONE 10-13 (8/8 green ×2) | Journey | register → mail-activate (incl. failure states) → first project → first compile → first comment → first export probe |
 | `uj-choreography` | Journey | two-user interleaved comment + tracked-change + history-restore storyline on one doc, incl. mid-journey reload recovery |
 | `uj-lifecycle` | Journey | create→share→template→instance→export→import→deactivate→trash→purge + store-level residue verification + admin governance audit |
 | `ce-idor` ✅DONE 10-13 (5/5 green ×2, clone-500 pinned) | Cause-Effect | full permission matrix: every project-scoped route × {owner, editor, comment-viewer, non-member, anonymous} × {active, trashed} + CSRF/token boundaries |
@@ -109,3 +109,29 @@ the todo board."
   `users.{first_name,...}` (mongo) — settings READ API unported (404) → leaf UI or
   mongo is the readback path; trash/purge = association visibility, record
   survival until reaper.
+
+### Journey A DONE — `specs/journey-onboarding.test.e2e.ts` (8 legs, 8/8 green ×2, 2.5m)
+Full onboarding storyline (fresh USER3 account, in-suite lifecycle):
+- **L1 REAL form register**: form = `_csrf,first_name,last_name,email` — **NO
+  password field** (the world never captures the sign-up password — root cause of
+  the ⚑ 401 gap); account in mongo + activation mail in sink.
+- **L2 activation link**: bad-token and good-token both → **302 /login** (route
+  RETIRED in this build — pinned deterministically).
+- **L3 ⚑ sign-up gap + RECOVERY**: pre-reset login → 401
+  `invalid-password-retry-or-reset` (auth-lifecycle owner flag re-pinned); recovery
+  proven end-to-end: reset mail (quoted-printable decoded; 64-hex token; full URL
+  `/user/password/set?passwordResetToken=…&email=…`), set page (single password
+  field — `passwordConfirm` is server-side), 400-missing-key contract, set → 200,
+  **login with reset password OK**.
+- **L4 first project + first compile**: hub UI "New project" → Blank (proven
+  createBlankProject flow) → mongo ownership truth → editor → compile
+  `{projectId, compileId, mainFile}` 200 → `output.pdf` **200 application/pdf**.
+- **L5 first comment**: wire add 200/201 → visible in `GET /threads` (round-trip).
+- **L6 export probe**: `GET /project/:pid/download/zip` → **404 dead-end pinned**
+  (zipcontract PENDING — self-activates on TODO-047dc1d9; [zipcontract LIVE] path
+  asserted in the same leg).
+- **L7 persistence**: logout → re-login → threads API 200 + FIRST COMMENT SURVIVES
+  + ownership intact; new-session fileproxy PDF = 404 (compile cache
+  SESSION-SCOPED — pinned).
+- **L8 cleanup audit**: project trash+purge; admin `delete` 200 + `purge` 200;
+  account state = purged (no leak; audit leg recorded).

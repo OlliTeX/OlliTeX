@@ -1927,3 +1927,9 @@ Commit: 2798d318
   - **8/8 GREEN ×3** (2.3m/pass, `CI=1` `--workers=1 --retries=0`).
   - Pinned world-truth set (owner record): theme is SESSION-SCOPED (redis) with per-user isolation + deterministic retention; user settings persist to `users` mongo (first_name verified) while the settings READ API is 404 (unported — leaf UI/mongo readback); session-bit mutation → 401; corrupt cookie → 200 login-shell (client-side gate); cross-user CSRF token → 403 + state unchanged; trash (200) = INSTANT owner-hub visibility drop, member unaffected (legacy-faithful), purge (200) leaves the mongo record (reaper = time-based hard-delete, owner-gated).
   - Next lane: Journey suite (onboarding TODO-434b5075) per board order, then the ZIP implementation (TODO-047dc1d9) as the largest product arc.
+
+- [DONE 2026-10-13] **Journey A onboarding storyline — TODO-434b5075 — DELIVERED**
+  - Spec: `tests/e2e/specs/journey-onboarding.test.e2e.ts` (8 legs, full storyline with in-suite account lifecycle + cleanup audit).
+  - **8/8 GREEN ×2** (2.5m/pass, `CI=1` `--workers=1 --retries=0`).
+  - Proven E2E: real-form register (form has NO password field — the root of the 401 sign-up gap, owner-flagged) → activation route retired (302 /login, bad & good tokens deterministic) → ⚑ 401 invalid-password gap re-pinned → **full recovery path proven** (reset mail qp-decoded, 64-hex token, set-page single-field, 400-missing-key, set 200, login OK) → first project + first compile (output.pdf 200 application/pdf) → first comment round-trip → zip export dead-end pinned (self-activates on 047dc1d9) → re-login persistence (comment survives, ownership intact, compile cache session-scoped pin) → admin delete+purge 200 + no-leak audit.
+  - Next on the board: Journey B (collab choreography, TODO-0005f1b6) / Journey C (lifecycle+purge, TODO-f0ab4e2f); largest remaining arc = ZIP implementation (TODO-047dc1d9).
