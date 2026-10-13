@@ -1576,3 +1576,13 @@ Open-todo set after this: #3 library under /editor (probe next), #4 ZIP tracked-
 
 **specs/library.test.e2e.ts — 10/10 GREEN (1.9 min).** Full library data plane pinned (list/create-201/validation-400/PATCH/409-duplicateKey/match/download-library.bib/suggestions/soft-delete-restore/delete-guard-400). NEW: CSRF token mechanism for web mutations documented in the spec (ol-csrfToken meta → x-csrf-token); entry shape contract pinned ({entries:[{key,type,fields:[{name,value}]}]}). Self-cleaning verified (afterAll e2elib_* sweep).
 Remaining owner-todo set: **#4 ZIP import/export tracked-changes+comments (except templates)** — next.
+
+## 2026-11-16 — Owner-todo 4 (ZIP tracked changes+comments) COMPLETE — `475a36bf`
+
+**specs/zip-tracked-comments.test.e2e.ts — 6/6 GREEN (52.5s).** VERDICT pinned:
+1. **FLAG: user single-project zip route ABSENT** — /project/:pid/download/zip (the File-menu "Download as source (.zip)" anchor) 404s to the HTML not-found page: the editor zip-export affordance is DEAD in this build (re-arm guard: leg A flips green-failing if the route lands).
+2. **FLAG: admin multi-zip = placeholder content** — contract pinned (200 + application/zip + 'Overleaf Projects (1 items).zip' + nested per-project zip), inner zip holds a marker file only: NO .tex files, NO comment/tracked-changes payload (asserted by regex absence).
+3. **Import side is REAL (files only)** — full contract pins: 400 invalid_upload_request (no file) · 400 zod body.name (missing name; strict schema rejects a _csrf form field → x-csrf-token header only) · 422 'Invalid zip file' (bad bytes) · 200 success+project_id + main.tex imported + title→project name.
+4. Owner question (recorded, non-blocking): a **zip round-trip of tracked changes + comments is impossible in the current model** — export carries no such payload (placeholder) and import creates files only (review state is server-side per-project). Both ends need work if this is a product requirement; if the owner's intent was only "zip source round-trip works + templates excluded", the spec already proves the files round-trip (leg F) and the export gap is flagged for decision.
+
+**ALL THREE owner-todo e2e arcs COMPLETE:** bib-editor (ad98f567) · library (c9aeb787) · zip (this commit). Remaining board: 9fbda0eb (GOAL[5] terminal audit) + the two owner-credential items (9c4b06f0 Mendeley re-capture · 39e56295 Dropbox token).
