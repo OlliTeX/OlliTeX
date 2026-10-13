@@ -1724,3 +1724,36 @@ Re-verification pass:
   sharelatex→ollitex push (owner account; TODO-c00741d2; on-host registry serves
   live) · server-ce→build-images rename (owner-deferred, 0a710094).
 Board: `54ed9d38` → done.
+
+## d1d723f2: develop-stack rewrite + verification — CLOSED (Go superstack local dev, 2026-11-16)
+
+develop/ rewritten from the retired Node-split dev stack to the **Go superstack topology**
+(the image that serves the e2e world and toolkit prod: one ollitex/ollitex:main container =
+web+clsi+real-time+docstore+filestore+chat+notifications+configdb).
+
+- docker-compose.yml: 12 live services (web, mongo, redis, postgres, minio-swarm ×5,
+  smtpsink, git-bridge, languagetool, wakapi) — all derived from tests/e2e
+  docker-compose.test.yml (verified working world); e2e-only bits (s3proxy, federation
+  pair-B, test-toolkit) dropped; ports remapped 127.0.0.1 180xx (host :80/:443 occupied);
+  bind paths fixed (sp-cert, settings.js, smtp-sink script ← tests/e2e/tools/; texlive
+  sandbox dirs identity-bound to the shared tests/e2e/local-data host dirs);
+  REQUIRED secret OVERLEAF_INVITE_TOKEN_SECRET supplied (my_init 000_check gate).
+- Retired (COMMENTED per owner deletion gate): web→junk/services-web (Node build),
+  webpack (dead stage; webpack.config.dev-env.js consumerless; no node_modules),
+  bin/up node-web branch, dev.env Node host vars (now fixtures for optional Node
+  services-chat, default off).
+- README rewritten (topology, quickstart, smoke evidence, known quirks).
+- SMOKE (fresh dev mongo, first boot in this codebase shape): web healthy; /login 200;
+  POST /register 200 → Go go-mail → smtpsink capture → /user/activate 302 (mail flow);
+  login (JSON+csrf) 302 → /hub 200; POST /project/new 200 → /editor/:id 200 (editor shell).
+- Discovered + pinned (already flagged in e2e battery): register stores a RANDOM password
+  — chosen-password login 401s until password-reset (Go parity behavior, ⚑ OWNER FLAG in
+  auth-lifecycle spec). Dev smoke used an admin-path hash to proceed.
+- Stack left RUNNING for the owner (127.0.0.1:18080).
+Commit: 55f11c2a
+
+## DATE-CORRECTION (2026-10-13 06:10 host clock authoritative)
+Host date = 2026-10-13 (verified `date`); the "2026-11-xx" dates in some entries of this log
+(compaction drift) = the true dates per commit timestamps above (10-13 = today; the incident
+of the "11-10" entries was in fact 2026-10-10, matching board TODO dates 2026-10-09/10/11).
+Commit timestamps are authoritative; entry text dates may drift.
