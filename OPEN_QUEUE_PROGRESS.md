@@ -1802,3 +1802,29 @@ Commit: 2798d318
   - Green legs: toolbar New folder root (tree+mongo); nested New folder depth-2 (parent-sub verified); New file INSIDE folder (parent = folder in mongo); rename hybrid (UI on root file works + restored; nested file via WIRE entity route 200 with mongo convergence); blank-name rename 4xx pin; nested-file WIRE delete 204 + live-tree removal + mongo entry pulled; folder delete 204 + root-folder 422 "cannot delete root folder" pin (delent P4.11b contract); UPLOAD folder-targeting VERIFIED (inFolder=1 atRoot=0 — UpPy plain-multi input, webkitdirectory sibling); cleanup killProject → project doc GONE (no stray docs).
   - Contracts discovered + pinned: rename = POST /project/:pid/{doc|folder}/:id/rename {name,source} (400 blank/len≥150/unclean); delete = DELETE /project/:pid/{doc|file|folder}/:id → 204 (root folder 422; missing 404).
   - OWNER FLAGS (ag-v57 UI surface, pinned by observation, NOT fixed): (1) nested file rows carry NO menu affordance at all (root file + expanded folders do; hover does not reveal) → nested rename/delete is wire-only in practice; (2) folder action menu only appears after expanding (chevron); (3) move-via-drag ineffective (no move affordance observed); (4) folder-delete live-tree removal lags the committed 204. — DONE (12/12 ×2)
+## WakaTime client-emission e2e — DONE 2026-10-13 (02:51Z)
+- **specs/wakatime-emission.test.e2e.ts 4/4 ×2 green** (3.1–3.2m). Commit `bf28f95d`.
+- W0 baseline + gap pin; W1 EMITTED (dual emitters: gated ticker time=1 credit + ungated tracker time=unix, same endpoint); W2 disarmed → ticker silent, tracker still fires, server relay 204 no-op (pin); W3 baseline restore.
+- Owner flags AF-1..AF-3 recorded (admin toggle no-op; un-gated tracker + misleading comment; body-shape drift).
+- TODO-e344b444 done. e2e backlog next: ef7e2a57 (Markdown/Milkdown) / 6469fd8d (Grafana bridge) / 479d936a (complex-editing TeX+Typst).
+## Markdown/Milkdown O-1 e2e — DONE 2026-10-13 (03:28Z)
+- **specs/markdown-visual.test.e2e.ts 4/4 ×2 green** (committed in the markdown-visual commit).
+- M1 empty new .md + Milkdown default surface (source pane mounted-hidden; switch control present); M2 visual edit → lines persist; M3 round-trip reload; M4 world hygiene.
+- TODO-ef7e2a57 done. e2e backlog next: 6469fd8d (Grafana bridge) / 479d936a (complex-editing TeX+Typst).
+## Admin Grafana bridge e2e — DONE 2026-10-13 (03:58Z)
+- **specs/admin-grafana-bridge.test.e2e.ts 4/4 ×2 green** (committed in the grafana commit).
+- Gated truth pinned: non-admin → 200+Restricted page; anon → login bounce; admin → 502 proxy-attempt (gate passed) with zero cred leak; subpath parity.
+- TODO-6469fd8d done. e2e backlog next: 479d936a (complex-editing TeX+Typst).
+## Complex-editing TeX e2e — DONE 2026-10-13 (06:00Z)
+- **specs/complex-edit-tex.test.e2e.ts 6/6 ×2 green + self-cleaning** (committed above; fixtures under test-data/complex-edit: lorem.txt, equations.{tex,typ}.json, references.orcid.bib, logo*.png).
+- CONTENT-TRUTH discovered+PINNED: editor content source = collab history store (roomdoc: web-history REST seeds room); mongo docs.lines direct writes are INVISIBLE to the editor — all spec content goes through the real write path (typing → room → flush; bib-visual import; UpPy upload).
+- T4 PDF: pdftotext 5768 chars — lorem ✓, ORCID work title ✓, sub-folder \\input content ✓, references section ✓.
+- OWNER FLAGS (pinned): BUV-1 bib "Upload .bib file" inert (input mounts, selection triggers NO import request); BUV-2 bib "Paste references" box has no reachable submit control. ENTER-MANUALLY = the verified import path.
+- World hygiene: admin delete = SOFT (deletedAt; 90-day hard delay); killProject's api() needs the page on a meta-bearing route (/hub) or the CSRF'd mutations 403 silently. 600+ zombie 'e2e-smoke-project' rows exist (owner-deletion-gate; NOT removed autonomously).
+- TODO-479d936a: TeX leg DONE; Typst leg next.
+## Complex-editing TYPO (both engines) — DONE 2026-10-13 (06:45Z)
+- TeX 6/6 ×2 (fa86882d earlier) + **Typst 5/5 ×2 green** (committed above; equation fixture container-verified on ollitex/typst:main 0.15.1).
+- TODO-479d936a done (owner story 1-4 covered on both engines; orcid refs visible in both PDFs).
+- TYPE-TRUTH: Typst pane eats synthetic keystrokes → CM6 dispatch write (pinned); Typst math = bare fns (frac/sqrt OK), backslash forms fail on this binary incl. \infty and bare infty (Unicode ∞ OK).
+- **e2e coverage backlog is now EMPTY** (wdv, b63post, p7, notifications, comments, trackchanges, file-tree, waka, markdown, grafana, complex-edit all closed).
+- Remaining OPEN backlog: owner-gated decisions/products (225c3d7e, 43a8cb9a, ebb76488, 89da1036, SSO-1 bake ship, Dropbox token TODO-39e56295, 600+ zombie e2e-smoke deletion gate, 219.7GB image GC), TPDS residuals R1/R2, UI polish editor letters.
