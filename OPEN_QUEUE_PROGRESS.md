@@ -1570,7 +1570,7 @@ Schema discovery: this world's project docs use the legacy ref-shape fields (`ow
 
 **specs/bib-editor.test.e2e.ts — 6/6 GREEN (3.1 min):** A panel mount + empty state · B Add-menu six-item set pinned (FLAG: no Mendeley item in this build) · C Enter-manually round-trip (modal fields key/Author/Title/Journal/Year → entry row + `@article{e2ebibkey, title=…, year={2026}, journal={…}}` in the .bib source) · D code↔visual parity (visual edits ARE document writes) · E required-fields validation contract ("Required fields missing Author, Journal, Journal title") · F search filter (count reflects matched set; hidden rows out of rendered text).
 Mechanics discovered live this arc: Visual mode = per-file Code/Visual radio toggle (`editor-switch.tsx`, `visualEditorProviders` → bib provider registers `.bib` ONLY); "code" label renders hidden in visual state (drive `input[value=cm6]` force-click); modal lazy-mounts ~1-8s (poll labels); label→input via `for`/`id` (use the id, not nesting); preview portals outside `.bib-editor-panel-content` (assert on the warning element).
-Open-todo set after this: #3 library under /editor (probe next), #4 ZIP tracked-changes/comments, plus the two owner-credential/token follow-ups (9c4b06f0 re-capture, 39e56295 dropbox token).
+Open-todo set after this: #3 library under /editor (probe next), #4 ZIP tracked-changes/comments, plus the owner-credential follow-up (39e56295 dropbox token re-capture).
 
 ## 2026-11-16 — Owner-todo 3 (library under /editor) COMPLETE — `c9aeb787`
 
@@ -1585,4 +1585,4 @@ Remaining owner-todo set: **#4 ZIP import/export tracked-changes+comments (excep
 3. **Import side is REAL (files only)** — full contract pins: 400 invalid_upload_request (no file) · 400 zod body.name (missing name; strict schema rejects a _csrf form field → x-csrf-token header only) · 422 'Invalid zip file' (bad bytes) · 200 success+project_id + main.tex imported + title→project name.
 4. Owner question (recorded, non-blocking): a **zip round-trip of tracked changes + comments is impossible in the current model** — export carries no such payload (placeholder) and import creates files only (review state is server-side per-project). Both ends need work if this is a product requirement; if the owner's intent was only "zip source round-trip works + templates excluded", the spec already proves the files round-trip (leg F) and the export gap is flagged for decision.
 
-**ALL THREE owner-todo e2e arcs COMPLETE:** bib-editor (ad98f567) · library (c9aeb787) · zip (this commit). Remaining board: 9fbda0eb (GOAL[5] terminal audit) + the two owner-credential items (9c4b06f0 Mendeley re-capture · 39e56295 Dropbox token).
+**ALL THREE owner-todo e2e arcs COMPLETE:** bib-editor (ad98f567) · library (c9aeb787) · zip (this commit). Remaining board: 9fbda0eb (GOAL[5] terminal audit) + the owner-credential item (39e56295 Dropbox token re-capture).
