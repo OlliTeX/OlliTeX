@@ -1,202 +1,372 @@
-volumes:
-  clsi-cache:
-  mongo-data:
-  redis-data:
-  sharelatex-data:
-  web-data:
-  pg-data:
-  sw-master-data:
-  sw-filer-data:
-  sw-volume-data:
+# OlliTeX LOCAL DEV stack (2026-11-16 rewrite; see README.md).
+#
+# Topology mirrors the PROVEN e2e/test + production recipe: ONE superstack
+# image (ollitex/ollitex:main) runs web + clsi + real-time bus + docstore +
+# filestore + chat + notifications + configdb; this file supplies the
+# stateful sidecars (mongo, redis, postgres, seaweed, smtp sink) and the
+# add-ons (git-bridge, languagetool).
+#
+#  - http on 127.0.0.1:18080 (no nginx/TLS, like the e2e pattern)
+#  - bootstrap secrets generated at boot by the image's my_init (no
+#    gitignored .env required locally; dev fixtures in dev.env)
+#  - texlive compiles via the host docker socket (same as production)
+#  - the OLD Node split (junk/services-web) is retired — its services are
+#    commented at the end of this file (owner deletion gate: archive-first)
+name: ollitex-dev
 
 services:
-  clsi:
-    # Go clsi service (node services/clsi retired 2026-09-29) — same dev
-    # pattern as the other Go services (baked binary in the main image;
-    # rebuild first: (from the repo root: run `make images`).
-    image: ollitex/ollitex:main
-    command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/clsitex"]
-    env_file:
-      - dev.env
+  mongo:
+    # 2026-09-16 (owner task T9): same DB as prod (mongo). Fresh line used
+    # to segfault on this host's kernel (SERVER-121912 / SHSTK) — the fix is
+    # the GLIBC hwcaps workaround the toolkit already uses for the prod
+    # mongo (toolkit/lib/docker-compose.mongo.yml). Data volume is
+    # disposable: stack-reset + reseed after the bump.
+    image: mongo:9.0
     environment:
-      - SANDBOXED_COMPILES=false
-      - COMPILES_HOST_DIR=/output
-      - CLSI_CACHE_PATH=/tmp/clsi-cache
-    user: root
+      GLIBC_TUNABLES: glibc.cpu.hwcaps=-SHSTK
+    command: --replSet overleaf
     volumes:
-      - ${PWD}/compiles:/overleaf/compiles
-      - ${PWD}/output:/output
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
-      - clsi-cache:/tmp/clsi-cache
-
-  clsi-nginx:
-    image: nginx:1.28
-    read_only: true
-    tmpfs:
-      - /tmp
-      - /var/cache/nginx
-      - /run
-    volumes:
-      - ${PWD}/output:/output:ro
-      - ../develop/clsi-nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
-
-  real-time:
-    # D28a: the event bus is a Go service (socket.io 0.9 wire, 1:1 with the
-    # retired Node services/real-time). Runs the baked binary from the main
-    # image — build it first (from the repo root: run `make images`).
-    image: ollitex/ollitex:main
-    command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/realtime"]
-    env_file:
-      - dev.env
-    environment:
-      - REAL_TIME_REDIS_HOST=redis
+      - mongo-data:/data/db
+      # in-repo fixture (this tree lacks bin/shared; upstream equivalent)
+      - ../tests/e2e/stack/mongodb-init-replica-set.js:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js:ro
+    # healthy = queryable as PRIMARY (not just process-up)
+    healthcheck:
+      test: ['CMD', 'mongosh', '127.0.0.1:27017/--quiet', '--eval', 'db.hello().isWritablePrimary ? 1 : 3']
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 15s
+    extra_hosts:
+      - 'mongo:127.0.0.1'
+    networks: [e2e]
 
   redis:
-    # 2026-09-26 (owner): aligned with the tree-wide anchor (tests/e2e T9: redis 8.6-alpine).
-    image: redis:8.6-alpine
-    ports:
-      - "127.0.0.1:6379:6379" # for debugging
-    volumes:
-      - redis-data:/data
+    image: redis:8.10-alpine3.23
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [e2e]
 
-  # 2026-09-16 (owner task T5): free local SMTP relay + capture API.
-  # Reuses the dev web build (node is present; entrypoint overridden).
-  # Check captured mail: curl http://127.0.0.1:8025/api/messages
+  # 2026-09-16 (owner task T5): free in-stack SMTP relay + capture API.
+  # Zero registry pulls (Mailpit image unreachable from this box): a
+  # zero-dependency Node sink on the local overleaf node image (node 24).
+  # SMTP :1025 (in-network, no auth) · API :8025 → 127.0.0.1:18025 for the
+  # smtp-capture spec.
   smtpsink:
-    build:
-      context: ..
-      dockerfile: junk/services-web/Dockerfile
-      target: dev
-    # env -u NODE_OPTIONS: the web build preloads its Yarn PnP hooks, which
-    # break running a standalone CJS script; the sink needs none of them.
-    entrypoint: ["env", "-u", "NODE_OPTIONS", "node"]
-    command: ["/sink/smtp-sink.js"]
+    image: ${OVERLEAF_IMAGE:-ollitex/ollitex:main}
+    # env -u NODE_OPTIONS: the overleaf image preloads its Yarn PnP hooks
+    # (--require .pnp.cjs / --import .pnp.register.mjs), which breaks running
+    # a standalone CJS script; the sink needs none of them.
+    entrypoint: ['env', '-u', 'NODE_OPTIONS', 'node']
+    command: ['/sink/smtp-sink.js']
+    environment:
+      SINK_SMTP_PORT: '1025'
+      SINK_API_PORT: '8025'
     volumes:
-      - ../tests/e2e/tools/smtp-sink.js:/sink/smtp-sink.js:ro
-    ports:
-      - "127.0.0.1:8025:8025"
+      - ../tests/e2e/tools/smtp-sink.js:/sink/smtp-sink.js:ro   # repo script (develop/tools/ phantom dir removed 2026-11-16)
+    networks: [e2e]
 
   web:
-    build:
-      context: ..
-      dockerfile: junk/services-web/Dockerfile
-      target: dev
-    env_file:
-      - dev.env
-    environment:
-      - APP_NAME=Overleaf Community Edition
-      - ENABLED_LINKED_FILE_TYPES=project_file,project_output_file,zotero
-      - EMAIL_CONFIRMATION_DISABLED=true
-      - NODE_ENV=development
-      - OVERLEAF_ALLOW_PUBLIC_ACCESS=true
-      # LanguageTool (grammar check) — env fallback for the admin UI.
-      # The admin can also set a URL directly on the LLM admin settings
-      # page (Admin > LLM Settings). See services/web/modules/languagetool.
-      - LANGUAGE_TOOL_HOST=languagetool
-      - LANGUAGE_TOOL_PORT=8010
-      # 2026-09-16 (owner task T5): local SMTP sink -> enables the
-      # password-reset / test e-mail / registration mails in local dev.
-      - OVERLEAF_EMAIL_FROM_ADDRESS=OlliTeX <noreply@example.com>
-      - OVERLEAF_EMAIL_DRIVER=smtp
-      - OVERLEAF_EMAIL_SMTP_HOST=smtpsink
-      - OVERLEAF_EMAIL_SMTP_PORT=1025
-      - OVERLEAF_EMAIL_SMTP_SECURE=false
-      # 2026-09 (mega-batch): SP cert for SAML SP-signing metadata (test fixture)
-      - OVERLEAF_SAML_PUBLIC_CERT=/e2e-saml/sp-cert.pem
-      # template gallery on by default (admin can toggle in /hub)
-      - OVERLEAF_TEMPLATE_GALLERY=true
-    command: ["node", "app.mjs"]
-    volumes:
-      - sharelatex-data:/var/lib/overleaf
-      - web-data:/overleaf/services/web/data
-      - ../tests/e2e/fixtures/saml/sp-cert.pem:/e2e-saml/sp-cert.pem:ro
+    image: ${OVERLEAF_IMAGE:-ollitex/ollitex:main}
+    hostname: web
     depends_on:
-      - mongo
-      - redis
-      - smtpsink
-      - sw-init
-      - clsi
-      - real-time
-      - languagetool
-
-  webpack:
-    build:
-      context: ..
-      dockerfile: junk/services-web/Dockerfile
-      target: webpack
-    command:
-      ["npx", "webpack", "serve", "--config", "webpack.config.dev-env.js"]
-    working_directory: /overleaf/frontend  # consolidated build host
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      sw-init:
+        condition: service_completed_successfully
     ports:
-      - "127.0.0.1:80:3808"
+      - '127.0.0.1:18080:80'
+    environment:
+      # ---- bootstrap secrets (stack-generated, .env.test) ----
+      # clsi_typst sandbox dirs (scoping: only the clsi_typst runit service
+      # reads these; the tex clsi is untouched)
+      TYPST_COMPILES_DIR: /var/lib/overleaf/data/compiles  # TYPST_COMPILES_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
+      TYPST_OUTPUT_DIR: /var/lib/overleaf/data/output  # TYPST_OUTPUT_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
+      # 2026-10-05 (clsitypst conversion finalize / M1 parity): the runit run
+      # script reads the TYPSF_* names (-> CLSI_TYPST_*_PATH). The run script
+      # uses SANDBOXED_COMPILES_HOST_DIR_* (shared with the tex clsi, pinned to
+      # /var/lib/overleaf/data/* for the nginx serving contract) as the daemon
+      # bind — so the typst SERVICE view must agree: pin the typst dirs to the
+      # SAME canonical dirs (www-data writable; the tex pipeline already writes
+      # them here). 2026-10-11 root fix: the earlier local-data split made the
+      # daemon mount a phantom empty dir -> "no output.pdf generated" in the
+      # typst container (typst-t2 regression). uploads stay local (no bind).
+      TYPSF_COMPILES_DIR: /var/lib/overleaf/data/compiles  # TYPSF_COMPILES_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
+      TYPSF_OUTPUT_DIR: /var/lib/overleaf/data/output  # TYPSF_OUTPUT_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
+      TYPSF_CACHE_DIR: /var/lib/overleaf/data/cache  # TYPSF_CACHE_DIR: canonical same-path dir (daemon bind + service view agree; www-data writable)
+      TYPSF_UPLOAD_DIR: /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/uploads
+      # Synctex crown jewel (M1): the patched fork (typst 0.15.1+clsi,
+      # buildable via `make build-typst` from images/typst-amd64) emits the
+      # output.sourcemap.json sidecar the Go resolver consumes.
+      TYPST_IMAGE: ollitex/typst:main
+      # 2026-09-16 (owner #10): tex compiles are SANDBOX-MANDATORY (clsi
+      # DockerRunner; LocalCommandRunner removed). SAME-PATH contract: the
+      # texlive/texlive:latest-full image (uid 33) bind-mounts these host
+      # dirs at the identical container paths.
+      # 2026-09 (PDF-404 root fix): the image's baked clsi-nginx.conf serves
+      # compile OUTPUT from root /var/lib/overleaf/data/output/<pid>-<uid>/
+      # generated-files/<buildId>/ — so the sandbox OUTPUT path MUST be exactly
+      # that path (the reference deployments all use it; our local-data/* path
+      # made every editor PDF + template-bundle PDF 404 in this stack).
+      # Same-path bind keeps the docker-daemon (host) contract intact.
+      SANDBOXED_COMPILES_HOST_DIR_COMPILES: /var/lib/overleaf/data/compiles
+      SANDBOXED_COMPILES_HOST_DIR_CACHE: /var/lib/overleaf/data/cache
+      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: /var/lib/overleaf/data/output
+      # python-runner module: test stack exercises it (CE flag via
+      # splitTestOverrides; see settings.defaults.js 'overleaf-code')
+      ENABLE_PYTHON_RUNNER: 'true'
+      # test-stack only: allow the mongo floor check (prod default unchanged;
+      # see check-mongodb.mjs)
+      OL_MIN_MONGO_VERSION: '6.0'
+      OL_MIN_MONGO_FCV: '6.0'
+      # 2026-09-16 (owner task T5): local SMTP relay (Mailpit) — NO paid
+      # service. Wires the app EmailSender (password-reset/invitations/
+      # registration mails); the hub "test e-mail" button resolves the same
+      # values via the site-settings email fallback. Verify spec:
+      # specs/parity/smtp-capture.test.e2e.ts (sink API on 127.0.0.1:18025).
+      OVERLEAF_EMAIL_FROM_ADDRESS: 'OlliTeX <noreply@e2e.test>'
+      OVERLEAF_EMAIL_DRIVER: smtp
+      OVERLEAF_EMAIL_SMTP_HOST: smtpsink
+      OVERLEAF_EMAIL_SMTP_PORT: '1025'
+      OVERLEAF_EMAIL_SMTP_SECURE: 'false'
+      # 2026-09 (mega-batch): SP public cert for SAML SP-signing metadata
+      # (the app reads the path at request time; test-only fixture keypair).
+      OVERLEAF_SAML_PUBLIC_CERT: /e2e-saml/sp-cert.pem
+      # Template gallery: admin-managed, but the e2e stack must default to ON
+      # so the template parity specs (managetpl, gallery) have a live API on
+      # every fresh stack (stored sections can override at test time).
+      OVERLEAF_TEMPLATE_GALLERY: 'true'
+      EMAIL_CONFIRMATION_DISABLED: 'true'
+      OVERLEAF_INVITE_TOKEN_SECRET: dev-invite-token-secret-fixture   # local dev: first /register = admin, no confirmation mail
+      # Disposable test stack: the e2e suite + seed + manual probes share one
+      # source IP and CE's login limiter (20/min/IP) throttles legitimate
+      # test logins mid-run. This ONLY affects the test stack — the core
+      # default (rate limiting ON) is untouched for real deployments.
+      OVERLEAF_DISABLE_RATE_LIMITS: 'true'
+      LLM_KEY_SECRET: 'dev-llm-key-secret-000000000000000000'
+      # internal service auth (history-v1 requires these under NODE_ENV=production;
+      # project-history & web authenticate with the same values)
+      STAGING_PASSWORD: 'dev-shared-service-token'
+      V1_HISTORY_PASSWORD: 'dev-shared-service-token'
+      OT_JWT_AUTH_ALG: HS256
+      # P2 contract: the "Request edit access" toolbar flow (readOnly members)
+      SHARING_UPDATES_ENABLED: 'true'
+      MONGO_CONNECTION_STRING: mongodb://mongo:27017/sharelatex?replicaSet=overleaf
+      # check-mongodb/redis.mjs scripts (my_init gate) read the toolkit-style names —
+      # point them at the e2e services (2026-10-04; env-chain fix in the scripts follows)
+      MONGO_URL: mongodb://mongo:27017/sharelatex?replicaSet=overleaf
+      REDIS_URL: redis://redis:6379/0
+      # ---- DB / infra ----
+      OVERLEAF_MONGO_URL: mongodb://mongo:27017/sharelatex?replicaSet=overleaf
+      REDIS_HOST: redis
+      OVERLEAF_REDIS_HOST: redis
+      OVERLEAF_FILESTORE_MIGRATION_LEVEL: '2'
+      # ---- PG plane (G1, 2026-09-27 owner: tree-wide anchor postgres:18-alpine) ----
+      # history-v1 (Node knex) + future Go history-v1 port connect via this;
+      # migrations run at boot (build-images init 890).
+      DATABASE_URL: postgres://overleaf:overleaf@postgres:5432/overleaf-history-v1
+      # ---- S3 plane (G2/STOR-1: SeaweedFS = the only durable binary backend) ----
+      # Bucket names are PLAIN (Go s3x PathEscapes the bucket; a "/buckets/x"
+      # name would mis-route). Node persistor keys map onto the same buckets.
+      OVERLEAF_FILESTORE_BACKEND: s3
+      OVERLEAF_FILESTORE_S3_ENDPOINT: http://s3:8333
+      OVERLEAF_FILESTORE_S3_PATH_STYLE: 'true'
+      OVERLEAF_FILESTORE_S3_ACCESS_KEY_ID: e2e
+      OVERLEAF_FILESTORE_S3_SECRET_ACCESS_KEY: e2e-secret
+      OVERLEAF_FILESTORE_TEMPLATE_FILES_BUCKET_NAME: templatefiles
+      OVERLEAF_HISTORY_PROJECT_BLOBS_BUCKET: projectblobs
+      OVERLEAF_HISTORY_BLOBS_BUCKET: globalblobs
+      # monolith history-v1 persistor (build-images custom-env mapping:
+      # persistor.backend <- OVERLEAF_HISTORY_BACKEND etc.)
+      OVERLEAF_HISTORY_BACKEND: s3
+      OVERLEAF_HISTORY_S3_ENDPOINT: http://s3:8333
+      OVERLEAF_HISTORY_S3_PATH_STYLE: 'true'
+      OVERLEAF_HISTORY_S3_ACCESS_KEY_ID: e2e
+      OVERLEAF_HISTORY_S3_SECRET_ACCESS_KEY: e2e-secret
+      OVERLEAF_HISTORY_CHUNKS_BUCKET: chunks
+      OVERLEAF_HISTORY_ZIPS_BUCKET: zips
+      PERSISTOR_BACKEND: s3
+      # docstore (G2 STOR-1: S3-only archive; fs retired — see cmd/docstore/main.go)
+      BACKEND: s3
+      BUCKET_NAME: docstore-archive
+      # H1 flip: Go history-v1 owns :3100 (Node history-v1 stands down)
+      HISTORY_V1_GO: "1"
+      # PH flip: Go project-history owns :3054 (Node project-history stands down)
+      PROJECT_HISTORY_GO: "1"
+      AWS_S3_ENDPOINT: http://s3:8333
+      AWS_S3_PATH_STYLE: 'true'
+      AWS_ACCESS_KEY_ID: e2e
+      AWS_SECRET_ACCESS_KEY: e2e-secret
+      OVERLEAF_EDITOR_ANALYTICS_BUCKET: analytics
+      OVERLEAF_EDITOR_BLOBS_BUCKET: globalblobs
+      OVERLEAF_EDITOR_CHUNKS_BUCKET: chunks
+      OVERLEAF_EDITOR_PROJECT_BLOBS_BUCKET: projectblobs
+      OVERLEAF_EDITOR_ZIPS_BUCKET: zips
+      # ---- plain-HTTP test surface (no proxy) ----
+      OVERLEAF_BEHIND_PROXY: 'false'
+      OVERLEAF_SITE_URL: http://127.0.0.1:18080
+      # the registration domain gate treats an EMPTY list as "block all"
+      # (CE quirk: `allowedDomains && !list.some(...)` with `[]` truthy) —
+      # allow the fixture domain explicitly:
+      PUBLIC_URL: http://127.0.0.1:18080
+      # ---- ext module gates (module paths exercised by the specs) ----
+      LLM_ENABLED: 'true'
+      LLM_ALLOW_USER_SETTINGS: 'true'
+      GIT_BRIDGE_ENABLED: 'true'
+      # Federation (e2e): master toggle + export gate — the FEDERATION_*
+      # contract (go/services/web/features/federation/config.go); e2e values,
+      # both instances in the two-instance federation battery.
+      GIT_BRIDGE_HOST: git-bridge
+      WEBDAV_ENABLED: 'true'
+      # Mendeley (e2e): app 'Ollitex' id/secret + the console-registered
+      # redirect URL (https://psintern.neuro.uni-bremen.de/...) + generated
+      # cipher password for the credential store (local test-world value).
+      # Dropbox (e2e): app pair from .env.test (git-ignored) drives the
+      # password-grant mint + oauth2 start; cipher secret for the connect
+      # handler's AES-256-GCM credential store (local test-world value).
+      WEBDAV_TOKEN_CIPHER_PASSWORD: 'dev-webdav-cipher-000000'
+      LANGUAGE_TOOL_URL: http://languagetool:8010
+      # Zotero (e2e): enable flag + app creds from .env.test (git-ignored) —
+      # the owner's registered client pair drives the live OAuth connect cycle
+      # (go/services/web/features/zotero; configschema ZOTERO_CLIENT_*).
+      OVERLEAF_ZOTERO: "true"
+      GITHUBINTERFACE_WORKDIR_ROOT: /var/lib/overleaf/ghif  # 2026-09-29: legacy shared-workdir constant (in-container githubinterface retired with the TPDS->web merge; kept for env-diff parity)
+      LOG_LEVEL: info
     volumes:
-      - ./webpack.config.dev-env.js:/overleaf/frontend/webpack.config.dev-env.js
+      - ol-data:/var/lib/overleaf
+      # 2026-09 (mega-batch): test-only SAML SP cert (OVERLEAF_SAML_PUBLIC_CERT)
+      - ../tests/e2e/fixtures/saml/sp-cert.pem:/e2e-saml/sp-cert.pem:ro
+      # 2026-09-16 (owner #10): clsi sandbox-compile dirs on a HOST path
+      # (same-path contract with the compile sibling container; see the
+      # note at the bottom of stack/settings.js)
+      - ../tests/e2e/stack/settings.js:/etc/overleaf/settings.js:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      # typst sandbox compile dirs (clsi_typst DockerRunner SAME-PATH
+      # contract): host dir bind-mounted at the identical container path so
+      # the pinned pandoc/typst image (uid 33) and the overleaf service see
+      # the same files (see images/main-amd64/runit/clsi_typst-overleaf/run)
+      - /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/compiles
+      - /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/output
+      - /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/cache:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/cache
+      - /data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/uploads:/data_1/image_mining/the_diff/overleaf/tests/e2e/local-data/typst/uploads
+      # 2026-09-16 (owner #10): tex sandbox compile dirs (texlive/texlive:latest-full, uid 33)
+      # host dirs created+owned by scripts/stack-reset.sh (uid 33, the texlive image user)
+      - /var/lib/overleaf/data/compiles:/var/lib/overleaf/data/compiles
+      - /var/lib/overleaf/data/cache:/var/lib/overleaf/data/cache
+      - /var/lib/overleaf/data/output:/var/lib/overleaf/data/output
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test: bash -c 'curl -fsI --connect-timeout 5 http://localhost/login || exit 1'
+      interval: 10s
+      timeout: 10s
+      retries: 60
+      start_period: 120s
+    networks: [e2e]
+
+  # ---- PG plane (G1, 2026-09-27 owner-pinned image: "14 is dead") ----
+  postgres:
+    image: postgres:18-alpine
+    networks: [e2e]
+    environment:
+      POSTGRES_USER: overleaf
+      POSTGRES_PASSWORD: overleaf
+      POSTGRES_DB: overleaf-history-v1
+    volumes:
+      - pg-data:/var/lib/postgresql   # PG18+ layout: mount at /var/lib/postgresql (not /data)
+    healthcheck:
+      test: pg_isready --host=localhost --quiet
+      interval: 1s
+      retries: 20
+
+  # ---- SeaweedFS (G2/STOR-1) — 1:1 mirror of the known-good compose_cep
+  #      services (chrislusf/seaweedfs:latest; same commands/flags/aliases).
+  #      NO host port mappings: the host already runs the production seaweed
+  #      on 8333/8888/9333; these are reachable only inside the e2e network.
+  sw-master:
+    image: chrislusf/seaweedfs:latest
+    command: master -ip=master -ip.bind=0.0.0.0 -metricsPort=9327
+    volumes:
+      - sw-master-data:/data
+    networks:
+      e2e:
+        aliases: [master]
+  sw-filer:
+    image: chrislusf/seaweedfs:latest
+    command: filer -master="master:9333" -ip=filer -ip.bind=0.0.0.0
+    volumes:
+      - sw-filer-data:/data
+    depends_on:
+      - sw-master
+    networks:
+      e2e:
+        aliases: [filer]
+  sw-volume:
+    image: chrislusf/seaweedfs:latest
+    command: volume -mserver="master:9333" -ip=volume -ip.bind=0.0.0.0 -port=8080 -dir=/data -max=0
+    volumes:
+      - sw-volume-data:/data
+    depends_on:
+      - sw-master
+    networks:
+      e2e:
+        aliases: [volume]
+  sw-s3:
+    image: chrislusf/seaweedfs:latest
+    command: s3 -filer="filer:8888" -ip.bind=0.0.0.0
+    depends_on:
+      - sw-filer
+    networks:
+      e2e:
+        aliases: [s3]
+  # One-shot gate: wait for S3, create the buckets idempotently (S3 PutBucket
+  # works on filer-backed SeaweedFS; object PUT to a missing bucket 403s),
+  # then overleaf may start (the Go filestore fails fast on missing buckets).
+  sw-init:
+    image: curlimages/curl:latest
+    entrypoint: sh
+    command: ["-c", "while :; do if curl -sf -o /dev/null http://s3:8333/; then ok=1; for b in templatefiles projectblobs globalblobs chunks zips analytics; do code=$$(curl -s -o /dev/null -w '%{http_code}' -X PUT http://s3:8333/$$b); case $$code in 200|409) : ;; *) ok=0 ;; esac; done; [ $$ok -eq 1 ] && exit 0; fi; sleep 2; done"]
+    depends_on:
+      - sw-s3
+    networks: [e2e]
 
   git-bridge:
-    # D14 (2026-09-26): 1:1 Go git-bridge (go/services/gitbridge) replaces the
-    # retired Java service (services/git-bridge deleted).
-    #   build:  go/services/gitbridge/build.sh   -> ollitex/git-bridge:latest
+
+    # P7 cutover (2026-09-24): the 1:1 Go git-bridge (go/services/gitbridge)
+    # replaces the Java sharelatex/git-bridge. Image = ollitex/git-bridge
+    # (ubuntu:26.04 + git) with the cmd/gitbridge Go binary, config-agnostic. Config is mounted from
+    # gitbridge-runtime.json (same schema as the Java runtime.json).
+    #   build:    go/services/gitbridge/build.sh   -> ollitex/git-bridge:latest
     #   rollback: image: sharelatex/git-bridge:ext-6.3.0-port
     #             command: ['/server-pro-start.sh']   (revive the Java service)
     image: ollitex/git-bridge:latest
     user: root
     command: ['git_bridge', 'serve', '/conf/runtime.json']
-    expose:
-      - "8000"
-    ports:
-      - "8000:8000"
-    environment:
-      LOG_LEVEL: "DEBUG"
-      METRICS_APP_NAME: "ollitex-gitbridge"   # D22 A2: the app label
     volumes:
       - ./gitbridge-runtime.json:/conf/runtime.json:ro
-      - ./data/git-bridge:/data/git-bridge
+      - gb-data:/data/git-bridge
+    depends_on:
+      - web
+    networks: [e2e]
 
-  # LanguageTool server (grammar check). The web service proxies
-  # GET /languagetool/languages and POST /languagetool/check to it; the admin
-  # can also point at any other server via the LLM admin settings page
-  # (or LANGUAGE_TOOL_URL). `./ngrams` holds the LT language models
-  # (langtool_languageModel=/ngrams) — populate it for full rule quality.
   languagetool:
     image: erikvl87/languagetool:latest
-    container_name: languagetool
-    hostname: languagetool
-    restart: unless-stopped
+    networks: [e2e]
 
-    environment:
-      - Java_Xms=512m
-      - Java_Xmx=2g
-      - langtool_languageModel=/ngrams
+volumes:
+  mongo-data:
+  ol-data:
+  gb-data:
+  pg-data:
+  sw-master-data:
+  sw-filer-data:
+  sw-volume-data:
 
-    healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --spider --timeout=5 http://localhost:8010/v2/languages 2>&1 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    ports:
-      - "8010:8010"
-
-    volumes:
-      - ./ngrams:/ngrams:ro
-
-  # audit 035 (2026-09-30): Wakapi (self-hosted WakaTime server) in the dev
-  # stack — the official quick-start contract (ghcr.io/muety/wakapi, /data
-  # volume, generated WAKAPI_PASSWORD_SALT). Host 127.0.0.1:5001 →
-  # container :3000; the dev 'web' container can also reach it as
-  # http://wakapi:3000 on the compose network.
-  wakapi:
-    image: "${WAKAPI_IMAGE:-ghcr.io/muety/wakapi:latest}"
-    container_name: wakapi
-    hostname: wakapi
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:5001:3000"
-    volumes:
-      - ./data/wakapi:/data
-    environment:
-      WAKAPI_PASSWORD_SALT: "${WAKAPI_PASSWORD_SALT:-}"
-      WAKAPI_DB_TYPE: "${WAKAPI_DB_TYPE:-sqlite3}"
-      WAKAPI_DB_NAME: "${WAKAPI_DB_NAME:-/data/wakapi.db}"
-      WAKAPI_BOOTSTRAP_ADMIN_EMAIL: "${WAKAPI_ADMIN_EMAIL:-admin@localhost.localdomain}"
-      WAKAPI_BOOTSTRAP_ADMIN_PASSWORD: "${WAKAPI_ADMIN_PASSWORD:-}"
+networks:
+  e2e:

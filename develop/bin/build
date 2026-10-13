@@ -1,3 +1,17 @@
 #!/usr/bin/env bash
-
-docker compose build --pull "$@"
+# 2026-11-16: the dev stack is IMAGE-BASED (Go superstack) — there is no
+# compose build context anymore (the old `docker compose build` targets the
+# retired junk/services-web Dockerfile). This now verifies the expected
+# images are present/pullable and prints the rebuild recipe.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+image="${OVERLEAF_IMAGE:-ollitex/ollitex:main}"
+if docker image inspect "$image" >/dev/null 2>&1; then
+  echo "OK: $image present locally."
+else
+  echo "WARN: $image not found locally — `docker compose` will pull it (registry: ollitex.registry:11435 if reachable)."
+  echo "      Or rebuild from this checkout: repo root -> `make images` (see the rebuild skill)."
+fi
+for i in mongo:9.0 redis:8.10-alpine3.23 postgres:18-alpine ollitex/git-bridge:latest chrislusf/seaweedfs:latest curlimages/curl:latest erikvl87/languagetool:latest; do
+  docker image inspect "$i" >/dev/null 2>&1 || echo "WARN: $i not local (will be pulled on up)."
+done

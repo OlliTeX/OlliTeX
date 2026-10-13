@@ -1,3 +1,8 @@
 #!/usr/bin/env bash
-
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --no-deps --detach "$@"
+# dev = up (dev overlay) + tail the log tail (the "hot loop" today is
+# image rebuild — see docker-compose.dev.yml header for the 3-step loop).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --no-deps --detach web
+echo "web is up — see `bin/logs web` (or `bin/logs`) for output."
+echo "Frontend/Go changes: rebuild the image (repo root: make images) then `bin/up` again."

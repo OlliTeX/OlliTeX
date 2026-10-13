@@ -1,3 +1,8 @@
 #!/usr/bin/env bash
-
-docker compose up --detach "$@"
+# Boot the dev stack (base + dev overlay).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --detach "$@"
+echo
+echo "Dev stack is up ->  http://127.0.0.1:18080"
+echo "First run: /register (first account = admin, no confirmation mail) -> /hub."

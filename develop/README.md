@@ -1,76 +1,42 @@
-# Overleaf Community Edition, development environment
+# develop/ — OlliTeX local dev stack (Go superstack)  (2026-11-16 rewrite, TODO-d1d723f2)
 
-## Building and running
+## Topology (single Go image, mirrors tests/e2e and toolkit prod)
+`ollitex/ollitex:main` (or `$OVERLEAF_IMAGE`) runs **web + api + clsi + real-time +
+docstore + filestore + chat + notifications + configdb** (profiles inside one container).
+Sidecars: mongo/redis/postgres (data volumes), minio-swarm (filestore S3), smtpsink
+(repo script `tests/e2e/tools/smtp-sink.js`), git-bridge (GitHub OAuth + sync),
+languagetool (CEX grammar), wakapi (stats, optional — default off).
 
-In this `develop` directory, build the services:
+Retired 2026-11-16 (commented, owner delete-gate):
+- `web` → `junk/services-web/Dockerfile` (retired Node web build) — replaced by superstack web profile
+- `webpack` (dead build stage; `webpack.config.dev-env.js` had no consumer; no
+  node_modules in the image)
+- `dev.env` — retired Node WEB host vars (REDIS_URL / APP_CONFIG... / NODE_OPTIONS);
+  now a fixture for the optional Node `services-chat` container (default commented) +
+  the real Go env contract lives in docker-compose.yml web.environment
+- `bin/up` node-web rebuild branch — commented
 
-```shell
-bin/build
-```
+## Quickstart
+    cd develop
+    bin/up        # base stack → http://127.0.0.1:18080  (web bound to 127.0.0.1)
+    bin/dev       # follow logs
+    bin/shell web # exec in the web container
 
-> [!NOTE]
-> If Docker is running out of RAM while building the services in parallel, create a `.env` file in this directory containing `COMPOSE_PARALLEL_LIMIT=1`.
+Ports (127.0.0.1-only): 18080 web · 18500 real-time :5000 · 18800 git-bridge :3001 ·
+18600 languagetool :9090 · 18300 smtpsink API (sink SMTP :1025 internal).
+mongo/redis/postgres are internal to the `ollitex-dev_*` network (no host ports).
 
-Then start the services:
+## Verified 2026-11-16 (fresh mongo, same image as the e2e world)
+- web profile healthy; /login 200 · csrf gate live (400/403 without token)
+- POST /register 200 → Go go-mail → smtpsink captured ("Activate your OlliTeX Account")
+  → /user/activate 302 · mail-flow e2e
+- login (JSON + x-csrf-token) 302 → /hub 200
+- POST /project/new 200 (project_id) → GET /editor/<id> 200 (editor shell)
+- KNOWN quirk (pinned in tests/e2e/specs/auth-lifecycle.test.e2e.ts, ⚑ OWNER FLAG):
+  registration stores a random password — logging in with the chosen password 401s until
+  the password-reset flow (Go parity behavior; dev smoke set the hash via admin path).
 
-```shell
-bin/up
-```
-
-Once the services are running, open <http://localhost/launchpad> to create the first admin account.
-
-## Development
-
-To avoid running `bin/build && bin/up` after every code change, you can run Overleaf
-Community Edition in _development mode_, where services will automatically update on code changes.
-
-To do this, use the included `bin/dev` script:
-
-```shell
-bin/dev
-```
-
-This will start all services using `node --watch`, which will automatically monitor the code and restart the services as necessary.
-
-To improve performance, you can start only a subset of the services in development mode by providing a space-separated list to the `bin/dev` script:
-
-```shell
-bin/dev [service1] [service2] ... [serviceN]
-```
-
-> [!NOTE]
-> Starting the `web` service in _development mode_ will only update the `web`
-> service when backend code changes. In order to automatically update frontend
-> code as well, make sure to start the `webpack` service in _development mode_
-> as well.
-
-If no services are named, all services will start in development mode.
-
-## Debugging
-
-When run in _development mode_ most services expose a debugging port to which
-you can attach a debugger such as
-[the inspector in Chrome's Dev Tools](chrome://inspect/) or one integrated into
-an IDE. The following table shows the port exposed on the **host machine** for
-each service:
-
-| Service            | Port |
-| ------------------ | ---- |
-| `web`              | 9229 |
-| `clsi`             | 9230 |
-| `chat`             | 9231 |
-| `docstore`         | 9233 |
-| `filestore`        | 9235 |
-| `notifications`    | 9236 |
-| `real-time`        | 9237 |
-| `history-v1`       | 9239 |
-| `project-history`  | 9240 |
-| `linked-url-proxy` | 9241 |
-
-To attach to a service using Chrome's _remote debugging_, go to
-<chrome://inspect/> and make sure _Discover network targets_ is checked. Next
-click _Configure..._ and add an entry `localhost:[service port]` for each of the
-services you want to attach a debugger to.
-
-After adding an entry, the service will show up as a _Remote Target_ that you
-can inspect and debug.
+## Files
+docker-compose.yml (base, e2e-derived) · docker-compose.dev.yml (dev overlays: ports,
+optional chat) · bin/{up,dev,shell,logs,down,build} · gitbridge-runtime.json (unused
+legacy) · compiles/ (shared texlive sandbox dirs = tests/e2e/local-data) · ngrams/ (cache)

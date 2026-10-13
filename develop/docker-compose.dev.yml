@@ -1,48 +1,31 @@
-# Hot-reload overlays for the develop stack (docker/docker-compose.dev.yml).
-# The five previously-listed Node services (chat, docstore, filestore,
-# linked-url-proxy, notifications) were replaced by their Go implementations
-# (go/services/<name>) and removed from the tree, so they no longer have a
-# Node source to hot-reload and are dropped here.
-services:
-  clsi:
-    # Go clsi (node app retired 2026-09-29): baked binary from the main
-    # image (rebuild first from the repo root: run `make images`).
-    image: ollitex/ollitex:main
-    command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/clsitex"]
-    environment:
-      - SANDBOXED_COMPILES=false
+# Dev overlay (2026-11-16 rewrite).
+#
+# In the OLD Node split this overlay carried the hot-reload wiring
+# (node --watch, ../junk/services-web/* mounts, 9229 inspector port).
+# That loop is architecturally dead with the Go superstack (the web app is
+# a baked binary; the frontend is baked too). The dev loop today:
+#
+#   1. change Go/frontend source in this repo
+#   2. rebuild the image (repo root: `make images`, or the rebuild skill —
+#      builds from this checkout's own build-support folder)
+#   3. `bin/up` again (or `docker compose -f docker-compose.yml
+#      -f docker-compose.dev.yml up --force-recreate -d web`)
+#
+# The overlay therefore carries only explicit dev toggles (currently:
+# nothing extra — the base compose is already the dev configuration).
+# Kept as a file so `bin/*` invocations stay stable.
+name: ollitex-dev
 
-
-
-  real-time:
-    # D28a: Go bus — static binary, no hot-mounts. After changing
-    # go/services/realtime (or cmd/realtime) — build from the repo root: `make images`
-    # then `docker compose -f docker-compose.yml -f docker-compose.dev.yml
-    # up -d real-time`.
-    command: ["/bin/sh", "-c", "exec /usr/local/bin/go-services/realtime"]
-
-  web:
-    command: ["node", "--watch", "app.mjs", "--watch-locales"]
-    environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    ports:
-      - "127.0.0.1:9229:9229"
-    volumes:
-      - ../junk/services-web/app:/overleaf/services/web/app
-      - ../junk/services-web/app.mjs:/overleaf/services/web/app.mjs
-      - ../junk/services-web/config:/overleaf/services/web/config
-      - ../locales:/overleaf/locales
-      - ../services/web/modules:/overleaf/services/web/modules
-      - ../public:/overleaf/public
-
-  webpack:
-    volumes:
-      - ../junk/services-web/app:/overleaf/services/web/app
-      - ../junk/services-web/config:/overleaf/services/web/config
-      - ../frontend:/overleaf/frontend
-      - ../locales:/overleaf/locales
-      - ../services/web/modules:/overleaf/services/web/modules
-      - ../public:/overleaf/public
-      - ../services/web/transform:/overleaf/services/web/transform
-      - ../services/web/types:/overleaf/services/web/types
-      - ../services/web/webpack-plugins:/overleaf/services/web/webpack-plugins
+# [retired overlay wiring, kept for the record — do NOT re-enable]
+# web:
+#   command: ["node", "--watch", "app.mjs", "--watch-locales"]
+#   environment:
+#     - NODE_OPTIONS=--inspect=0.0.0.0:9229
+#   ports:
+#     - "127.0.0.1:9229:9229"
+#   volumes:
+#     - ../junk/services-web/app:/overleaf/services/web/app
+#     - ../junk/services-web/app.mjs:/overleaf/services/web/app.mjs
+#     - ../junk/services-web/config:/overleaf/services/web/config
+#     - ../services/web/modules:/overleaf/services/web/modules   (path retired)
+#     - ../public:/overleaf/public
