@@ -462,12 +462,12 @@ func adminTestProvider(a *core.App) func(*core.Cxt, *core.Res) {
 			defer cancel()
 			disc, err := fetchOIDCDiscovery(ctx, oidcP.Issuer)
 			if err != nil {
-				res.JSON(200, []byte(fmt.Sprintf(`{"success":false,"message":%q}`, jsonQuote(err.Error()))))
+				res.JSON(200, []byte(fmt.Sprintf(`{"success":false,"message":%q}`, err.Error())))
 				return
 			}
 			res.JSON(200, []byte(fmt.Sprintf(
 				`{"success":true,"message":"OIDC discovery successful. Issuer: %s","details":{"authorization_endpoint":%q,"token_endpoint":%q,"userinfo_endpoint":%q}}`,
-				jsonQuote(disc.Issuer), disc.Auth, disc.Token, disc.Userinfo)))
+				disc.Issuer, disc.Auth, disc.Token, disc.Userinfo)))
 			return
 		}
 		if samlP != nil {
@@ -485,7 +485,7 @@ func adminTestProvider(a *core.App) func(*core.Cxt, *core.Res) {
 			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				res.JSON(200, []byte(fmt.Sprintf(`{"success":false,"message":"SAML metadata fetch failed: %s"}`, jsonQuote(err.Error()))))
+				res.JSON(200, []byte(fmt.Sprintf(`{"success":false,"message":"SAML metadata fetch failed: %s"}`, err.Error())))
 				return
 			}
 			defer resp.Body.Close()
@@ -497,7 +497,7 @@ func adminTestProvider(a *core.App) func(*core.Cxt, *core.Res) {
 			if meta, perr := parseSAMLIdPMetadata(data); perr == nil {
 				res.JSON(200, []byte(fmt.Sprintf(
 					`{"success":true,"message":"SAML metadata fetched (parsed)","details":{"entityID":%q,"sso":%q,"slo":%q,"certCount":%d}}`,
-					jsonQuote(meta.EntityID), jsonQuote(meta.SSO), jsonQuote(meta.SLO), meta.CertCount)))
+					meta.EntityID, meta.SSO, meta.SLO, meta.CertCount)))
 				return
 			}
 			if !bytes.Contains(data, []byte("EntityDescriptor")) {

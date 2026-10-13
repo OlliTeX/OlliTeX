@@ -1593,3 +1593,76 @@ Remaining owner-todo set: **#4 ZIP import/export tracked-changes+comments (excep
 - **Goal `08603aee`:** set **blocked — session scope complete** (Phases 1–4 + owner handoff + owner-todo arcs + terminal audit, all evidence-gated; tree clean). Explicitly NOT complete: Phase-5 product arcs (c32d1403 WDV-A · d414c964 TPDS · 7358ce12 fedgap-2 · d857d936+deb4b4ba b63post · 54ed9d38 P7 · d1d723f2 develop stack · d86e9113 build rework · f06ba73b backbone audit) — owner-gated product work requiring an explicit next-arc order; resuming the goal is the owner's call (only explicit `/goal resume` reactivates).
 - **Forward dependencies (owner):** (1) Dropbox token re-capture — TODO-39e56295 (suite's single red; ~2 min in console or `scripts/capture-interactive-tokens.mjs`); (2) decisions 225c3d7e · 43a8cb9a · ebb76488 · 89da1036; (3) product verdict on flags F1–F3 (zip export route, admin-zip placeholder, tracked-changes/comments zip round-trip scope).
 - **Handoff artifact:** `GOAL5_TERMINAL_AUDIT.md` (coverage table, battery convergence, credential matrix, F1–F12 flag register, sign-off).
+
+## 2026-11-16 — WDV-A (WebDAV closeout, c32d1403) COMPLETE — \`5b927ff0\`
+
+**Closeout checklist (all green, evidence below):**
+1. **harness full A+B GREEN:** `tests/tools/webdav/run_webdav_test.py` → **20/20 passed** (A0-A7 server-contract family: PROPFIND/401/MKCOL-201-405-409/PUT-GET-weakEtag/If-Match-412/DELETE; B0-B8 Overleaf integration: disconnect/status/connect/seed/**import 200+projectId + project row + ingested tree (hello.txt, notes.txt, chapter.tex) + state row owner**/B4c **/editor/:id 200** (legacy /project/:id page retired 2026-10-05 — re-pinned+re-arm)/push 200 + file intact/**pull 200**/unlink/cleanup/disconnect).
+2. **.tex import+push gates (WDV-C):** **B5b GREEN — push .tex → remote body == docstore seed (byte-identical, docstore-backed parity)**; import ingested chapter.tex into docs[] (B4 tree check).
+3. **forgejo regression GREEN:** `tests/tools/forgejo/run_forgejo_test.py` → **13/13 passed** (A1 first-install bootstrap oltest · A2 v15.0.9 pin · A3 PAT+seed repo · A4 git-wire clone/commit/push · A5 git-data API ABSENT 404 pin (provider fact) · A6 PR merge + file on main · B1 git-servers link · B2 test ok · B3 repos · B4 import projectId · B5 merge overview commits-since · B6 merge remote-only fast path · B6b idempotent clean · B7 unlink). (Board label "14/14" = prior revision's gate count; this revision's gate set is 13/13 all-pass.)
+4. **exact-path commit of harness fix:** $H touches ONLY `tests/tools/webdav/run_webdav_test.py` (+76/−9): world-aware container resolution (WDV_WEB_CONTAINER/WDV_MONGO_CONTAINER env; auto = running ol-e2e web container; mongo resolved from the web's MONGO_URL host via in-container getent → IP → candidate container, overleafmongo legacy fallback) + bridge probe via resolved web + B4c re-pin.
+
+**Root cause of the red (documented, not masked):** harness pre-dates the ol-e2e world — hard-coded `overleafserver` (STOPPED legacy container) + `overleafmongo` (a DIFFERENT mongo with 0 projects) while ol-e2e-overleaf-1 uses the ol-e2e-mongo-* replica set. The B4 import itself was GREEN all along (200+projectId, push/pull/.tex-parity, DELETE-OK) — only the harness's side-channel mongo lookups hit the wrong instance. Fixed at the resolution layer, not by weakening the asserts.
+
+**World changes (additive, non-destructive):** connected `ollitex-webdav-fixture` (→172.20.0.16) + `ollitex-forgejo`/started canonical `forgejo-test` (fresh 1st-install bootstrap by harness, →172.20.0.18) onto the ol-e2e_e2e docker network so the product can dial them by name (container-reachable bases: http://ollitex-webdav-fixture:80, http://forgejo-test:3000 via OLI_WEBDAV_URL/OLI_FORGEJO_URL).
+
+## 2026-11-16 — TPDS→web merge (d414c964) — merge COMPLETE, verification GREEN; 2 owner-gated residuals open
+
+The merge itself was implemented + retired per owner approval (2026-09-29/10-02, commits c66c554bc6 / 3cb114…): in-web fold (features/webdav+dropbox+github, zero bridge imports sweep-verified), 3 bridge services retired (S5 pattern), github leg closed (ghsync in-process).
+
+**Bake-verification legs closed today (evidence):**
+1. **Live image topology = target state (ag-v57, world A):** process list = web-overleaf + owner-named kept services (docstore-overleaf, filestore-overleaf, chat-overleaf, notifications-overleaf) + support (clsi/typst/collab/history×2/nginx/cron); **NO** dropboxinterface/githubinterface/webdavinterface processes; **no** *INTERFACE_API_URL env consumed; **no** runit dirs for the retired bridges → the bake drop is in effect in the shipped image.
+2. **TPDS in-web e2e battery GREEN — 15/15 passed, 1 conditional skip, 0 failed (2.9m):** dropbox-link-cycle (D1–D8, incl. pinned 500-contract legs) + sync-conflict-webdav + sync-conflict-git-hosts + sync-conflict-dropbox.
+3. Complements today's WDV-A closeout: webdav harness 20/20 + forgejo harness 13/13 (same in-web ghsync surface).
+
+**RESIDUALS (owner-gated, non-blocking — item stays flagged, merge work complete):**
+- (R1) linked-url-proxy retirement: BLOCKED on the Node-web (P7 step-4, board 54ed9d38) owner decision — the legacy `services/web UrlHelper.mjs` caller dies with it; the lup e2e battery (tests/e2e/parity/lup, :3066) must re-target in-web first.
+- (R2) Official image re-bake deck (owner's process): next full re-bake drops the 3 runit services + binaries from the packaged image — the ag-v57 live-world verification above is the acceptance evidence for that deck.
+
+---
+
+## 2026-11-16 — fedgap-2 SSO arc `TODO-7358ce12` — acceptance leg (a) COMPLETE + leg (c) parity defect found & fixed in HEAD (SSO-1)
+
+**Scope:** CORE was done 2026-10-02 (5a4ceb6066); remaining acceptance (a) = LIVE E2E
+(admin creates provider via API → /login renders the button via Playwright → OIDC
+test-provider probe against a local OP green); (b) real LDAP transport (externally
+blocked — feature 6b + ldap transport in stack; current honest "pending" report is the
+designed state); (c) byte-parity review vs Node SSOAdminRouter — executed as part of
+leg (a) and caught a real defect (below).
+
+**World prep:** standing OP = `ollitex-sso-oidc` (IdentityServer4, host :8080,
+test client `overleaf_test`) bridged onto `ol-e2e_e2e` (172.20.0.19); discovery
+verified reachable from inside the web container; issuer configured container-side
+(product does not enforce issuer-string equality — probes surface what the OP
+reports, Node parity).
+
+**Evidence:** `tests/e2e/specs/sso-admin-live.test.e2e.ts` **7/7 green (44 s)**:
+- A: GET /admin/sso/config 200 (config doc shape)
+- B: POST /admin/sso/provider {type:oidc} → 200 {success, provider{name "OIDC Provider N",
+  enabled:false, buttonLabel, scope "openid profile email"}} (auto-numbering against the
+  owner's existing "OlliTeX OIDC (E2E)" provider verified — ours numbered 2)
+- C: POST {type:bogus} → 400 {"error":"Invalid provider type"} (pinned)
+- D: POST /admin/sso/config (enable ours + issuer/client) → 200; **owner's pre-existing
+  providers preserved, stored secrets re-masked (••••••••)** — mask-restore verified live
+- E: **/login (anonymous) ol-auth-config slot carries our button {label,
+  href:"/oidc/login/<pid>"} — typed-href invariant** (Playwright, browser-DOM parse;
+  owner's OlliTeX OIDC/SAML (E2E) buttons coexist in the slot — world note)
+- F: POST /admin/sso/test/provider/<pid> → 200 success:true + endpoints surfaced
+  (against the live OP). **STATE BRANCH: MALFORMED (flag SSO-1 active) — re-arm:
+  parses-clean ⇒ fixed image live ⇒ flag resolved**
+- G: DELETE provider → 200 + /login slot back to owner-only (re-arm) — suite
+  self-cleaning; world verified owner-only after the run
+
+**FLAG SSO-1 (new, pinned in spec F):** the probe's 200 success body is **malformed
+JSON** in the live ag-v57 image — Go templates double-quoted already-JSON values
+(`jsonQuote` inside quoted message strings), e.g. `"message":"… Issuer: "http://…:80""`
+— breaks any JSON consumer including the admin SSO panel's test-provider button.
+**Fix staged IN HEAD (this commit):** `go/services/web/features/sso/admin.go` — all
+four probe templates (OIDC success/error, SAML details/error) now emit single-quoted
+values (Node _testOIDCProvider/_testSAMLProvider parity); `go build` + `go vet` +
+`go test ./go/services/web/features/sso/` green; no unit test asserted the old
+bytes. Shreds with the next bake; spec F's state branch is the trip-wire.
+
+**Status:** (a) complete with evidence; (c) parity review executed (defect → fix);
+(b) remains (external). item → **in_progress** (TPDS precedent: external residual in
+scope ⇒ not done).
