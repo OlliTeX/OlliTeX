@@ -1790,3 +1790,11 @@ Commit: 2798d318
   - comments-multifile (5/5): wire completeness for a never-opened sample.bib (thread doc + message ranges {pos,len}, green-neighbor overview-completeness shape); .bib editor surface opens with content rendered + active-tab comment accepted (M1/M2); CMT-3 pin holds on the .bib tab; anchor robustness: two-line-span collapse keeps well-formed ranges (owner: re-anchoring parity question) and end-of-buffer append keeps the span valid with base64 anchors retained (M3/M4).
   - Re-verified green: review-overview-completeness (04724e42 immune pin still holds).
   - Contract learned (pinned): thread idRe=[0-9a-zA-Z]{6,64} (hyphens ⇒ non-JSON 500); ranges live on MESSAGES ({pos,len}); message id = top-level `id`; seeded-doc existence via rootFolder entry → db.docs (docs carry no name field); OLPSINT e2e mongosh has no ObjectID global (new ObjectId()). — DONE (15/15 ×2 green)
+- [2026-10-13] ee318070 track-changes intensive — trackchanges-intensive suite 9/9 ×2 (ag-v57, OLPSINT world):
+  - TC0 toggle contract DISCOVERED + PINNED: persisting shape = per-user {on_for:{uid:bool}} map; **FLAG TC-1 (owner)**: {on:bool} accepted 200 but NOT persisted (Node on→owner-uid mapping dropped); ag-v57 accepts non-boolean on / bad on_for keys with 2xx (current source is stricter — 400) — observed pinned, trip-wired.
+  - TC1 per-user toggle state persists across fresh editor sessions (project-scoped map).
+  - TC2/TC3 create (server-assisted) → pending listed authored; single accept accepted:1; repeat accept → 0 (R5 idempotency re-pinned).
+  - TC4 reject on web profile → 403 text/plain "Forbidden" = Node-parity privateApiRouter pin (routes.csv:25 → Node router.mjs:1020; API-profile Basic path only) — pinned + trip-wired.
+  - TC5 two-user: collaborator (collaberator_refs seed) sees owner-created change + accepts it (accepted:1) — collaborator-accept auth matrix verified.
+  - TC6 CAPTURE FLAG re-pin (owner 2026-10-12, d11/d12): typed edits after ON-toggle still create NO change records (6 polls) — capture chain remains broken in ag-v57; flag stands.
+  - TC7 changes/users 200 with owner author listed. — DONE (9/9 ×2; battery 11/11 incl. review-panel subset)
