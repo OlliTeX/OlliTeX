@@ -1666,3 +1666,45 @@ bytes. Shreds with the next bake; spec F's state branch is the trip-wire.
 **Status:** (a) complete with evidence; (c) parity review executed (defect → fix);
 (b) remains (external). item → **in_progress** (TPDS precedent: external residual in
 scope ⇒ not done).
+
+---
+
+## 2026-11-16 — b63post arc `TODO-d857d936` + `TODO-deb4b4ba` — CLOSED (InactiveData live acceptance 10/10)
+
+The 6.3.0_post tail-Features family's last actionable gap (b63post-2 InactiveData)
+is verified LIVE. The Go conversion was already in HEAD (stale item body); this arc
+added the missing live-acceptance layer.
+
+**World discoveries (durable):**
+1. **World A runs DUAL Go profiles in one container**: web (PID 83, :80 + :4000)
+   AND a STANDING api-profile process (PID 90, 0.0.0.0:3000 → host-reachable at
+   172.20.0.2:3000). The api profile serves the Route.APIOnly U-API surface
+   (basic-auth WEB_API_USER/WEB_API_PASSWORD, APIBasicGate401 wire: 401 12B +
+   challenge header — Go writes it case-normalized `Www-Authenticate`).
+2. **"3000 closed" was a busybox-wget exit-code trap** (non-2xx → nonzero exit —
+   the "scan" script read it as closed). busybox wget also DROPS 4xx bodies.
+   → In-container probes now use `docker cp` + a node script
+   (`tests/e2e/scripts/inactive-probe.cjs`); secrets never leave the container env.
+3. **e2e mongo "replica set" is single-member** (ol-e2e-mongo-2 not in the set) →
+   NO healthy secondary → the bulk route's `readpref SECONDARY` find (Node parity)
+   faithfully 500s "Internal Server Error" in this world (Node would too — same
+   preference, same throw). Spec branches on live `rs.status()` (fail-loud on
+   ambiguity).
+4. **Web-tail anon-GET client quirk (OPEN item, non-blocking)**: unmounted
+   APIOnly path → login surface in TWO client-dependent forms (curl-class → 302
+   /login; undici/Playwright → 200 + login HTML). Same contract, mechanism not
+   isolated. PIN in spec test 10; the stable no-mount pin is POST(no-csrf) → 403.
+
+**Evidence:** `tests/e2e/specs/inactive-data.test.e2e.ts` **10/10 green (1.4m)**:
+1 unauth 401 wire · 2 wrong-cred 401 · 3 bad-oid 404-VA `params.project_id` ·
+4 ghost-oid 200 "OK" · **5 REAL project: create → deactivate → mongo active:false
+(persisted — core acceptance)** · 6 bulk unauth 401 · 7-9 bulk branch-pins
+(200-array | 500-ISE by secondary health; never 400 — zod logOnly; z.coerce
+numeric strings accepted) · 10 web-profile no-mount tails (anon GET login-surface
+302|200 quirk-pinned; POST 403 both routes).
+Image cron driver `images/main-amd64/cron/deactivate-projects.sh` present (route-
+driven worker leg complete — Node parity).
+
+**Board:** `deb4b4ba` → done · `d857d936` → done (family fully settled:
+1 NO-OP · 2 live-verified · 3 owner-resolved). No new product flags; 1 OPEN
+technical item (web-tail client negotiation quirk) logged for the owner.
