@@ -93,8 +93,24 @@ test('dropbox token is valid (cached or static)', async () => {
   }
   test.skip(!token, 'dropbox: no token — run `node scripts/auth-capture.mjs --service dropbox --url <authorize-url>` (see credentials/README.md), or set §dropbox.token / refreshToken(+appKey/appSecret) in config.json')
   // Dropbox v2 API: GET → 400 "Use HTTP POST requests" (pinned 2026-10-12)
-  const out = await req('https://api.dropboxapi.com/2/users/get_current_account', { method: 'POST' }, { Authorization: `Bearer ${token}` })
-  expect([200, 201], 'dropbox account call').toContain(out.status)
+  let out = await req('https://api.dropboxapi.com/2/users/get_current_account', { method: 'POST' }, { Authorization: `Bearer ${token}` })
+  // 2026-11-16 (owner-token drift): the cached sl.* token can EXPIRE
+  // ("expired_access_token"). If the config carries a stable app pair +
+  // refresh_token (see the dropbox-link-cycle D6 EXTEND leg), mint a fresh
+  // access token headlessly and retry ONCE before failing.
+  if (![200, 201].includes(out.status) && cfg.refreshToken && cfg.appKey && cfg.appSecret) {
+    const r = await fetch('https://api.dropboxapi.com/oauth2/token', {
+      method: 'POST',
+      headers: { Authorization: 'Basic ' + Buffer.from(`${cfg.appKey}:${cfg.appSecret}`).toString('base64') },
+      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: String(cfg.refreshToken) }),
+      signal: AbortSignal.timeout(T),
+    }).then((x) => x.json().catch(() => ({}))).catch(() => ({}))
+    if (r && r.access_token) {
+      out = await req('https://api.dropboxapi.com/2/users/get_current_account', { method: 'POST' }, { Authorization: `Bearer ${r.access_token}` })
+    }
+  }
+  const summary = (out.body && (out.body.error_summary || out.body.error?.summary)) ? String(out.body.error_summary || out.body.error?.summary) : ''
+  expect([200, 201], `dropbox account call (status=${out.status} ${summary}). If expired: the owner sl.* app token lapsed — regenerate it in the Dropbox console (or re-run the owner-assisted capture flow); the headless app-pair refresh grant is absent or exhausted too`).toContain(out.status)
   expect(out.body?.account_id, 'dropbox account_id').toBeTruthy()
 })
 
