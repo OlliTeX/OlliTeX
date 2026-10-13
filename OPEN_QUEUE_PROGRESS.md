@@ -1783,4 +1783,4 @@ Commit timestamps are authoritative; entry text dates may drift.
   service API has no auth gate (internal trust boundary).
 - GREEN: full battery 14/14 ×2 consecutive (new 6 + legacy 1 + parity B3 7), 1.2m each,
   world state restored exactly as-found both runs.
-Commit: <pending>
+Commit: 2798d318
