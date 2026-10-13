@@ -27,7 +27,7 @@ test.afterAll(async () => {
 
 const tplCount = () => Number(mongoEval('db.templates.countDocuments({})'))
 
-test('legacy route removed: /templates/manage 404s now (surface moved to /admin-settings/site.general.managetpl)', async () => {
+test('redirects: /templates/manage is RETIRED (404 in-session; anon 302 login) — surface moved to /admin-settings...', async () => {
   // 2026-11-16 (9b142051 drift): the legacy /templates/manage HTML page is
   // fully retired — a logged-in user gets a flat 404 (the old 301→hub-leaf
   // redirect is gone in the AJ-1 wave). The MANAGEMENT surface itself is

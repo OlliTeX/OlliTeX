@@ -32,12 +32,19 @@ const gotoLeaf = async (id: string) => {
 }
 
 test('renders: the hub leaves for the panel panes all render', async () => {
+  // 2026-11-16 (9b142051 drift triage): section titles now render as Mantine
+  // <Text> SectionTitles — NO semantic h1–h4 (a11y debt, FLAGGED to owner;
+  // hub section headings dropped in the Mantine renovation). The CONTENT is
+  // verified present on all three leaves, so assert content anchors scoped to
+  // <main> (the nav rail lives in the <aside>, so main-scoped matches can't
+  // be satisfied by the sidebar). RE-ARM: if the product restores semantic
+  // headings, switch these back to getByRole('heading').
   await gotoLeaf('messages')
-  await expect(p.getByRole('heading', { name: /system messages|messages/i }).first()).toBeVisible({ timeout: 15000 })
+  await expect(p.locator('main').getByText(/banner messages shown to everyone/i).first()).toBeVisible({ timeout: 15000 })
   await gotoLeaf('editor')
-  await expect(p.getByRole('heading', { name: /editor controls/i }).first()).toBeVisible({ timeout: 15000 })
+  await expect(p.locator('main').getByText(/force-close or reopen the instance editor/i).first()).toBeVisible({ timeout: 15000 })
   await gotoLeaf('activeprojects')
-  await expect(p.getByRole('heading', { name: /projects/i }).first()).toBeVisible({ timeout: 15000 })
+  await expect(p.locator('main').getByText(/real-time information from the editor service/i).first()).toBeVisible({ timeout: 15000 })
 })
 
 test('deny: non-site-admins cannot use the hub panel leaves', async ({ browser }) => {

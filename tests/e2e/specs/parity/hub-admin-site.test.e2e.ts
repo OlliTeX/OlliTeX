@@ -19,8 +19,11 @@ const a = (method: string, path: string, body?: unknown) => api(p, method, path,
 const all = async () => (await a('GET', '/admin/site-settings')).json().catch(() => null)
 
 test('renders: the hub "Full site settings" index maps every section', async () => {
-  await expect(p.getByRole('heading', { name: /site settings/i }).first()).toBeVisible({ timeout: 15000 })
-  const body = (await p.locator('body').innerText()) || ''
+  // 2026-11-16 (9b142051): the "Site settings" title is now a Mantine <Text>
+  // (no semantic headings — a11y debt, flagged). Assert the index content
+  // anchor + the section map scoped to <main> (the nav rail is in the <aside>).
+  await expect(p.locator('main').getByText(/full site settings/i).first()).toBeVisible({ timeout: 15000 })
+  const body = (await p.locator('main').innerText()) || ''
   for (const label of ['Miscellaneous', 'Sign-up', 'SSO', 'Email', 'Sandboxed', 'Branding']) {
     expect(new RegExp(label, 'i').test(body), `index lists ${label}`).toBeTruthy()
   }

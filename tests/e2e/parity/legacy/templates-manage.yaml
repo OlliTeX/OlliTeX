@@ -2,7 +2,7 @@
 # Roles: admin + template admin (canManageTemplates) = full; user = denied.
 # Template fixture: e2e import of a bundle (template.json+source.zip+output.pdf)
 # creates "Parity Fixture Template"; tests use throwaway imports + cleanup.
-page: /templates/manage   # retired 2026-09-16 (owner item 7) → 301 /hub#/site.general.managetpl
+page: /templates/manage   # retired 2026-09-16 (owner item 7); 2026-11-16: 301→hub-hash ALSO retired (hub hashes dead); live: anon 302 /login, in-session 404
 id: templates-manage
 roles:
   admin: full
@@ -16,13 +16,13 @@ files:
 features:
   - id: redirects
     kind: page
-    desc: RETIRED (owner item 7): /templates/manage 301 → /hub#/site.general.managetpl (admin)
+    desc: RETIRED (owner item 7; 2026-11-16 drift re-pin): route is gone — anon 302/login, in-session 404; the management surface lives at /admin-settings/site.general.managetpl (still 200 + live)
     legacy_test: redirects
     hub_test: renders
 
   - id: denied
     kind: access
-    desc: plain user denied the management API (legacy route itself 301s for everyone)
+    desc: plain user denied the management API (legacy route itself gone for everyone)
     legacy_test: denied
     hub_test: deny
 

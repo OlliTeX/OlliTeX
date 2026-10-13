@@ -180,37 +180,55 @@ for (const route of ['/editor'] as const) {
 
     test('diagram: the insert-menu module state matches on both routes', async () => {
       await openEditor()
-      // make sure a LaTeX document is open (the split-view row leaves a .py
-      // doc focused, which carries a different Insert menu)
-      const mtex = page.getByText('main.tex').first()
-      if (await mtex.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await mtex.click().catch(() => {})
-        await page.waitForTimeout(1500)
-      }
-      await page.getByRole('button', { name: /^insert$/i }).first().click({ timeout: 8_000 })
-      // wait for the open menu (the show-state popper carrying both anchors)
-      const MENU_EVAL = `(() => {
+      // 2026-11-16 (9b142051 drift triage): in the v2 tabbed chrome the
+      // earlier split-view test leaves the .py document focused, and a single
+      // main.tex click no longer reliably re-focuses it — the menu then opens
+      // in the non-tex context (no Figure/Table entries → empty candidate →
+      // old assertion red). Retry: focus main.tex, open the Insert menu, and
+      // keep going until the menu carries the tex-context entries (live menu:
+      // Math/Inline math/Display math/Symbol/Figure/Table/Citation/Link/
+      // Cross reference/Comment — note: NO diagram/drawio entry; drawio is
+      // opened per-file-type, covered by the drawio-roundtrip spec).
+      const MENU_INNER = `(() => {
         const cands = Array.from(document.querySelectorAll('div, ul, menu')).filter(m => {
-          const t = m.textContent || ''
+          const t = m.innerText || ''
           return /Figure/.test(t) && /Table/.test(t) && t.length < 3000
         })
-        cands.sort((a, b) => (a.textContent || '').length - (b.textContent || '').length)
-        return cands[0] ? ((cands[0]).textContent || '').replace(/\\s+/g, ' ') : ''
+        cands.sort((a, b) => (a.innerText || '').length - (b.innerText || '').length)
+        return cands[0] ? ((cands[0]).innerText || '').replace(/\\s+/g, ' ') : ''
       })()`
       let menuText = ''
-      for (let i = 0; i < 8 && menuText.length < 20; i++) {
-        await page.waitForTimeout(600)
-        menuText = await page.evaluate(new Function('return ' + MENU_EVAL) as any)
+      // 2026-11-16 refined: the v2 editor is a TAB strip — the focused doc
+      // drives the Insert menu (live: .py focused → menu = "Math Figure" only;
+      // .tex focused → full Math/…/Figure/Table/… menu). Switch tabs to
+      // main.tex (tab label click), not the file-tree text.
+      const texTab = page.locator('[role="tab"], [class*="Tab"]').filter({ hasText: 'main.tex' }).first()
+      let tabTried = false
+      for (let attempt = 0; attempt < 5 && menuText.length < 20; attempt++) {
+        if (!tabTried && await texTab.isVisible({ timeout: 2_000 }).catch(() => false)) {
+          await texTab.click({ timeout: 5_000 }).catch(() => {})
+          tabTried = true
+        } else {
+          const mtex = page.getByText('main.tex').first()
+          if (await mtex.isVisible({ timeout: 1_500 }).catch(() => false)) await mtex.click().catch(() => {})
+        }
+        await page.waitForTimeout(1000)
+        await page.getByRole('button', { name: /^insert$/i }).first().click({ timeout: 8_000 })
+        for (let i = 0; i < 5 && menuText.length < 20; i++) {
+          await page.waitForTimeout(500)
+          menuText = await page.evaluate(new Function('return ' + MENU_INNER) as any)
+        }
+        await page.keyboard.press('Escape').catch(() => {})
+        await page.waitForTimeout(500)
       }
-      await page.keyboard.press('Escape').catch(() => {})
-      const diagramPresent = /diagram/i.test(menuText)
+      const diagramPresent = /diagram|draw/i.test(menuText)
       // the entry's config-gated state must match across routes
       const first = stateRecord['diagramFirst']
       stateRecord['diagramFirst'] = first === undefined ? diagramPresent : stateRecord['diagramFirst']
       if (first !== undefined) {
         expect(diagramPresent, `the diagram entry state must match routes (first=${first}, this=${diagramPresent})`).toBe(first)
       }
-      expect(menuText.length > 20, `the Insert menu must render its module entries (got: ${menuText.slice(0, 80)})`).toBeTruthy()
+      expect(menuText.length > 20, `the Insert menu (tex context) must render its module entries (got: ${menuText.slice(0, 80)})`).toBeTruthy()
     })
   })
 }

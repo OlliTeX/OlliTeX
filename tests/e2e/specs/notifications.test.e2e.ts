@@ -39,7 +39,16 @@ test('notification preferences: legacy URL is retired; the hub email leaf round-
   const muteInput = mute.locator('input').first()
   const want = !(await muteInput.isChecked())
   await mute.click()
-  await page.waitForTimeout(1200)
+  // 2026-11-16 (9b142051 drift triage): the v2 switch debounces its save
+  // (~2.5s live: click → POST /notifications/preferences). The old 1.2s
+  // raced the debounce → state not persisted → toBeChecked(want) failed.
+  // Wait for the save to land (or 8s max), then reload.
+  await page.waitForTimeout(1000)
+  await page.waitForRequest(
+    (r) => (r.method() === 'POST') && /notification/i.test(r.url()),
+    { timeout: 8000 },
+  ).catch(() => {})
+  await page.waitForTimeout(700)
 
   // persist across reload
   await page.goto('/user-settings/mysettings.email', { waitUntil: 'domcontentloaded' })

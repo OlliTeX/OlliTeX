@@ -146,7 +146,23 @@ for (const route of ['/editor'] as const) {
     })
 
     test('search: project search narrows results for a project query', async () => {
-      await openEditor(page, route, pid)
+      // 2026-11-16 (9b142051 drift triage): in the v2 tabbed editor the
+      // focused document drives whether the CodeMirror (.cm-editor) mounts —
+      // the preceding file-tree tests can leave a NON-tex document focused
+      // (live error snapshot: "Insert/View disabled — available for
+      // .tex/.typst files only", no .cm-editor). Red in battery #2, green in
+      // isolation (ordering-dependent). Recovery: focus the main.tex tab and
+      // wait for the editor to mount. Re-arm: if the tex tab is missing
+      // entirely this still fails (no masking of a missing document).
+      await openEditor(page, route, pid).catch(() => {})
+      for (let i = 0; i < 3 && !(await page.locator('.cm-editor').first().isVisible().catch(() => false)); i++) {
+        const texTab = page.locator('[role="tab"], [class*="Tab"]').filter({ hasText: 'main.tex' }).first()
+        if (await texTab.isVisible({ timeout: 2_000 }).catch(() => false)) {
+          await texTab.click({ timeout: 4_000 }).catch(() => {})
+        }
+        await page.waitForTimeout(1500)
+      }
+      await expect(page.locator('.cm-editor').first(), 'the tex editor must be mounted in the search test').toBeVisible({ timeout: 20_000 })
       // the search pane indexes file contents: put a distinctive token in
       // main.tex and let the indexer pick it up (probe-verified flow)
       await page.locator('.cm-editor').first().click()
@@ -210,19 +226,47 @@ for (const route of ['/editor'] as const) {
         await page.getByRole('button', { name: /re?compile/i }).first().click({ timeout: 8_000 }).catch(() => {})
         await page.waitForTimeout(3000)
       }
-      await page.getByRole('button', { name: /history/i }).first().click({ timeout: 10_000 })
-      await page.waitForTimeout(2500)
-      const hist = page.locator('[class*=history]')
-      await expect(hist.first()).toBeVisible({ timeout: 15_000 })
-      const row = page
-        .locator('[class*=history] [class*=item], [class*=history] li, [class*=history] [class*=row]')
-        .first()
-      if (await row.isVisible().catch(() => false)) {
-        await row.click()
-        await page.waitForTimeout(2000)
+      // 2026-11-16 (9b142051 drift triage): the v2 chrome has NO 'History'
+      // toolbar button — version history lives at File → "Show version
+      // history" (live-verified), rendering the ide-react-editor-sidebar
+      // history-file-tree with a per-file item ("main.tex Edited"); clicking
+      // the item opens "All history" (snapshot rows: date / Edited / author /
+      // More actions) with the diff surface mounted.  RE-ARM GUARD: if the
+      // legacy History toolbar button returns, prefer it (both entry points
+      // asserted below).
+      const fileBtn = page.getByRole('button', { name: /^file$/i }).first()
+      let opened = false
+      if (await fileBtn.isVisible({ timeout: 4_000 }).catch(() => false)) {
+        await fileBtn.click({ timeout: 8_000 }).catch(() => {})
+        await page.waitForTimeout(1200)
+        const vh = page.locator('[role="menuitem"], [class*="menuitem"], button, [role="button"]').filter({ hasText: /version history/i }).first()
+        if (await vh.isVisible().catch(() => false)) {
+          await vh.click({ timeout: 8_000 }).catch(() => {})
+          opened = true
+        }
+        await page.keyboard.press('Escape').catch(() => {})
       }
+      if (!opened) {
+        // re-arm path: legacy History toolbar button
+        const hbtn = page.getByRole('button', { name: /history/i }).first()
+        if (await hbtn.isVisible({ timeout: 2_000 }).catch(() => false)) await hbtn.click({ timeout: 5_000 }).catch(() => {})
+      }
+      await page.waitForTimeout(2500)
+      const hist = page.locator('.history-file-tree-item, [class*=history]')
+      await expect(hist.first(), 'the v2 history sidebar must render').toBeVisible({ timeout: 15_000 })
+      // open the file's snapshot list ("All history")
+      const item = page.locator('.history-file-tree-item').first()
+      if (await item.isVisible().catch(() => false)) {
+        await item.click({ timeout: 6_000 }).catch(() => {})
+        await page.waitForTimeout(2500)
+      }
+      const snapshotList = await page.evaluate(() =>
+        /all history/i.test(document.body.innerText || ''),
+      )
       const diffVisible = await page.locator('[class*=diff]').first().isVisible().catch(() => false)
-      expect(diffVisible, 'the diff viewer must render for a history snapshot').toBeTruthy()
+      expect(snapshotList || diffVisible,
+        'the v2 history must expose the snapshot list and/or the diff surface').toBeTruthy()
+      expect(diffVisible, 'the diff viewer surface must be mounted for the history view').toBeTruthy()
       await page.keyboard.press('Escape').catch(() => {})
     })
 

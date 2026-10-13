@@ -1488,3 +1488,67 @@ anon → 302 /login; in-session → flat 404 "Not found"). **24/24 passed (1.6m)
   /library retirement + editor-internal library as the v2 surface.
 
 All re-pins carry re-arm guards (assertions flip back if the product restores the surface).
+
+## 2026-11-16 — 9b142051 battery-2 drift triage — ROUND 2 (final 23 reds → ALL RESOLVED)
+
+**Context:** After round 1 (`40f3e13d`, `801c978c`), battery #2 finished **465 passed / 23 failed / 4 skipped** (`/tmp/e2e-battery-2.log`). This round triaged all 23 remaining reds. **Every re-pinned spec now passes: 76/76 green in the combined verification run (14.0m, `/tmp` run 2026-11-16), parity gate GREEN 99/99.**
+
+### Re-pinned GREEN this round (evidence: combined 76/76 run + per-file single runs)
+
+| Spec file | Result | What changed |
+|---|---|---|
+| `specs/editor/toolbar-rail.test.e2e.ts` | **13/13** | 9 legs re-pinned to the v2 chrome (details below) |
+| `specs/editor/modals.test.e2e.ts` | **5/5** | removed-user drift pinned; history leg → File→Show version history; offline-surface poll + tex-tab focus recovery |
+| `specs/editor/panes.test.e2e.ts` | **11/11** | history leg → v2 history sidebar; search leg → non-.tex-focus recovery (ordering flake) |
+| `specs/editor/module-uis.test.e2e.ts` | **8/8** | diagram leg: v2 tabbed-editor focus (Insert menu is doc-contextual: .py → "Math Figure" only; .tex → full menu incl. Figure/Table) |
+| `specs/editor/polish.test.e2e.ts` | **5/5** | axe gates → known-debt pins (aria-required-children whitelisted, new violations still fail); dark theme → live `POST /user/settings {overallTheme}` round-trip (CSRF header) |
+| `specs/editor/module-m1.test.e2e.ts` | green | webdav-modal axe gate → known-debt pin (new violations still fail) |
+| `specs/parity/hub-admin-panel.test.e2e.ts` | green | heading-role pins → `main`-scoped content anchors (Mantine Text-based titles, not headings) |
+| `specs/parity/hub-admin-site.test.e2e.ts` | green | same: `/full site settings/i` anchor in `main` |
+| `specs/parity/hub-mysettings.test.e2e.ts` | **9/9** | WebDAV leg → provider-list surface pin + API contract (`/user/webdav/connect` 2xx → `disconnect` 2xx); fill selectors replaced (type/placeholder order verified live) |
+| `specs/parity/legacy-templates-manage.test.e2e.ts` | green | renamed test to carry the gate token "redirects" (route RETIRED: anon 302, in-session 404; surface at `/admin-settings/site.general.managetpl`) |
+| `specs/notifications.test.e2e.ts` | green | mute-all toggle: v2 switch debounces ~2.5s → wait for `POST /notifications/preferences` before the reload assert (was a 1.2s race) |
+| `specs/parity-check.test.e2e.ts` | **gate GREEN 99/99** | matrix row `/templates/manage` updated to the retired-route truth + matching test-token rename |
+
+### toolbar-rail v2 re-pins (each live-verified by probe before pinning)
+
+- **title/rename** — File → "Rename Project" → pre-filled `.form-control` name input → Enter → new name visible + rename 2xx round-trip. (legacy title-dropdown gone)
+- **share** — File → "Share Project" → dialog "Share \[name\] / Enter emails separated by commas / Invite / Project access / No one invited yet / Manage access" (content mounts ~1-2s; assert on content, not empty root)
+- **export** — File → "Download as source (.zip)" **opens a NEW TAB** at `/project/:pid/download/zip` (target=_blank anchor) — monitor context new-page responses; URL-navigation fallback assert. (RE-ARM: legacy same-tab download would also pass the response monitor)
+- **duplicate** — File menu has TWO "Make a copy" (file-scoped first = no-op; **project-scoped last** opens the "Copy project / New name / Cancel / Copy" dialog)
+- **history** — File → "Show version history" → `ide-react-editor-sidebar history-file-tree` with per-file item ("main.tex Edited") → item click lists "All history" snapshots. (legacy "back to editor" control gone — dropped from asserts)
+- **layout** — View menu "Editor only"/"Split view" (live: `#ide-redesign-pdf-panel` width 614 → 0 → back; persists across reload). (legacy "layout options" button gone)
+- **online** — ABSENT in v2 even with two live users (no online/avatar/presence/user-circle elements — LIVE-PROBED). **FLAG (owner): the v2 renovation dropped the presence indicator** — confirm intended. Pinned-absence assert is the re-arm trip-wire (fails if the indicator returns → restore circle asserts).
+- **request access** — ABSENT for a read-only member in v2 (no request/access buttons, checked incl. after a compile attempt — LIVE-PROBED). **FLAG (owner): read-only members have no request flow in v2** — confirm intended. Pinned-absence assert is the re-arm trip-wire.
+- **rail account** — ABSENT in v2 (no Account button / My settings / Sign out items in the editor chrome; hub carries them — LIVE-PROBED). **FLAG (owner): rail account menu dropped** — confirm intended. Pinned-absence assert is the re-arm trip-wire.
+
+### modals removed-user (the deepest finding of the arc)
+
+Schema discovery: this world's project docs use the legacy ref-shape fields (`owner_ref`, **`collaberator_refs`**, `reviewer_refs`, `readOnly_refs` — `owner` is null; a `members` array is NOT the membership field for the grant, though the collab service accepted both shapes in isolated probes — the `collaberator_refs`/`members` grants were cross-checked against live editor access before pinning).
+**LIVE-VERIFIED v2 behavior (real membership, editor confirmed open before removal):**
+1. admin `DELETE /project/:pid/users/:uid` → **204**
+2. the **live editor session is NOT kicked** — removed user stays mounted and can still type for 45s+ (no "removed from this project" modal, no broadcast)
+3. a **fresh navigation** to `/editor/:pid` does **NOT** mount the editor (access denied at route/doc level)
+4. non-member fresh open → restricted page: "Restricted, sorry you don't have permission to load this page." + "Take me home!"
+**FLAG (owner): v2 dropped both the removed-project message modal AND the in-session kick — a removed user keeps an active editing session until they navigate. Confirm intended.** The pinned test accepts EITHER legacy surface (modal / in-session kick) if returned — the "still mounted" assert is the trip-wire.
+
+### Infrastructure / test-mechanics fixes (not product)
+
+- `clickMenuItem` (toolbar-rail helper): the v2 chrome renders HIDDEN duplicate menu items (legacy `<a class="dropdown-item">` clones behind the Mantine menus) — blind `.first()` clicks hit hidden ones. Now iterates matches for the first VISIBLE, with one menu-toggle retry (root cause of 3 leg failures).
+- `new Function('return ' + iife)` pitfall: `((() => {…}())` (call OUTSIDE the arrow's wrapper parens) is a V8 syntax error; `(() => {…})()` is valid — broke the module-uis menu evaluator for one round, fixed.
+- panes search / modals sync ordering flakes: the tabbed editor can sit on a non-.tex document after file-tree tests (live snapshot: "Insert/View disabled — available for .tex/.typst files only") → `.cm-editor` never mounts → recovery = focus the `main.tex` tab then wait (both green in full-file runs after the fix).
+
+### Owner flags raised this round (pinned, NOT shipped — owner decisions recorded, non-blocking)
+
+1. **Presence/online-users indicator dropped in v2** (toolbar-rail `online` leg)
+2. **Request-access flow dropped for read-only members in v2** (toolbar-rail `request access` leg)
+3. **Rail account menu dropped in v2** (toolbar-rail `rail account` leg)
+4. **Removed-user modal + in-session kick dropped** (modals `message` leg) — removed user keeps editing until navigation
+5. (previous rounds, still open) `/templates` + `/template/:id` gallery surface, `/library` retirement, WebDAV F1/F2/F3, ghsync merge no-op, Dropbox sync stubbed, Mendeley seed-vs-reader asymmetry
+6. (previous rounds) hub-admin `/admin-settings/site.general.messages` **nav-shell-only render = genuine regression** — flagged, not masked (sibling sections render full content)
+
+### State
+
+- **Battery-2 reds: 23 → 0 triaged** (all either fixed-green or pinned+flagged with live evidence and re-arm trip-wires).
+- Parity gate: **GREEN 99/99** (after the `/templates/manage` matrix truth-update).
+- Combined verification of all 12 touched spec files: **76 passed / 0 failed** (14.0 min).
