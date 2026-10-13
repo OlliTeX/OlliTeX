@@ -1565,3 +1565,9 @@ Schema discovery: this world's project docs use the legacy ref-shape fields (`ow
 - **Recommendation to owner:** ~2 min in the Dropbox console (create app → generate `sl.*` token) or run `node scripts/capture-interactive-tokens.mjs` for dropbox if interactive capture is acceptable.
 
 **9b142051 drift triage is COMPLETE:** every drift red from batteries #1/#2/#3 is green (fixed or pinned+flagged) with live evidence + re-arm trip-wires; parity gate GREEN 99/99; standing suite has exactly one known red and it is the owner-credential item above (tracked as its own owner-action todo — category: external credential expiry, not drift).
+
+## 2026-11-16 — Owner-todo 2 (bib visual editor) COMPLETE — `ad98f567`
+
+**specs/bib-editor.test.e2e.ts — 6/6 GREEN (3.1 min):** A panel mount + empty state · B Add-menu six-item set pinned (FLAG: no Mendeley item in this build) · C Enter-manually round-trip (modal fields key/Author/Title/Journal/Year → entry row + `@article{e2ebibkey, title=…, year={2026}, journal={…}}` in the .bib source) · D code↔visual parity (visual edits ARE document writes) · E required-fields validation contract ("Required fields missing Author, Journal, Journal title") · F search filter (count reflects matched set; hidden rows out of rendered text).
+Mechanics discovered live this arc: Visual mode = per-file Code/Visual radio toggle (`editor-switch.tsx`, `visualEditorProviders` → bib provider registers `.bib` ONLY); "code" label renders hidden in visual state (drive `input[value=cm6]` force-click); modal lazy-mounts ~1-8s (poll labels); label→input via `for`/`id` (use the id, not nesting); preview portals outside `.bib-editor-panel-content` (assert on the warning element).
+Open-todo set after this: #3 library under /editor (probe next), #4 ZIP tracked-changes/comments, plus the two owner-credential/token follow-ups (9c4b06f0 re-capture, 39e56295 dropbox token).
