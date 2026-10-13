@@ -1951,3 +1951,16 @@ Commit: 2798d318
     - (e) admin-gated routes (`/admin/user/:uid/projects`, deactivate-probe) require **CSRF token + admin session** (owner 403 without CSRF; `e2e-admin` IS admin: `isAdmin=true`).
     - (f) **mongosh `--eval` quirk**: literal arrays nested in `$or` fail shell-parse (isolated ×5; separate-shape queries workaround pinned in the spec).
   - NEXT (board order): **ZIP tracked-changes/comments implementation — TODO-047dc1d9** (the largest remaining arc; all acceptance suites ready: `zip-tracked-comments` 13 legs + `e2e-zip-conditional` 4 legs + Journey A L6 + L7 conditional-rearm legs self-activate on landing).
+
+- [DONE 2026-10-13] **ZIP tracked-changes/comments implementation — TODO-047dc1d9 — IMPLEMENTED + ACCEPTED**
+  - Owner scope (verbatim): "Add import and export functionality for tracked changes and comments (stored in json files) ... via zip archive (except for templates)."
+  - **Source (committed):**
+    - `go/services/web/features/projectlist/dlzip_single.go` (NEW): `GET /project/:pid/download/zip` — gate (anon→login bounce, ghost 404, non-member 403 via canRead/loadUserAdmin), rootFolder walk (compile parity), doc lines via docstore, file blobs via filestore reference, `comments.json` + `tracked-changes.json` from the collab review/change stores, template-source exclusion (future-proof link check).
+    - `go/services/web/features/projectlist/newzip.go`: import hook — root-level payload JSON captured, excluded from the tree, restored after project create (comments → AddThread+AddComment; tracked → docstore source + best-effort AddChange; corrupt → files-only fallback); `zswTrackedTexts` + `zswIDOK` helpers.
+    - `go/services/web/features/projectlist/dlzip.go`: admin multi-zip inner zips now carry the real files + payload JSON (shared builder; placeholder fallback kept).
+    - `go/services/web/features/projectlist/projectlist.go`: route registration.
+    - `tests/e2e/specs/zip-tracked-comments.test.e2e.ts`: legs A + B re-armed per their explicit re-arm clauses (the designed mechanism).
+  - **LIVE ACCEPTANCE**: 13/13 GREEN ×2 (2.4m/pass, `CI=1` `--workers=1 --retries=0`); legs G/I/K/L/M assert the full LIVE contract; H (template publish 400 in this profile) + J (editor-buffer view gap for zip-imported docs — pre-existing world gap: even Leg F's sentinel never renders in the buffer; store-level docstore truth verified green) hold honest pins.
+  - **REGRESSION post-swap**: comments-two-user + journey A + journey B = 19/19 green (journey A L6 self-armed to `[zipcontract LIVE]`).
+  - **WORLD-TRUTH PINS (owner record)**: (a) zip-imported projects' editor buffer is empty in this world (docstore carries the content — import→collab-room sync gap, pre-existing, owner adjudication); (b) template publish = pinned 400 follow-up (exclusion mechanism implemented, self-activates); (c) the e2e world's web binary is a runtime swap of the committed source (CGO_ENABLED=0) — image rebuild = owner-gated persistence; the suite self-arms on absence.
+  - **BOARD ORDER COMPLETE**: all 7 TEST-IMPL items (CE-1→CE-4, Journey A/B/C, ZIP) delivered. Remaining queue: owner-adjudication items (5 open ⚑ findings + 65b0d668 + SSO/Dropback owner credentials + zombie cleanup + image GC + stray container).

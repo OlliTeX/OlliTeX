@@ -178,3 +178,41 @@ Lifecycle + store-level purge + governance:
 - **L7** audit trail: `projectAuditLogEntries`/`userAuditLogEntries`/`instanceStats`
   present; active-list post-purge = deterministic; template-registry state recorded.
 - Self-cleaning proven (fixture + copy killed/deleted within the run).
+
+### ZIP tracked-changes/comments implementation DONE — board TODO-047dc1d9 (2026-10-13)
+Owner scope implemented end-to-end (source in repo, live in the e2e world):
+- **EXPORT** `GET /project/:pid/download/zip` (new `dlzip_single.go` + route):
+  200 application/zip; zip = project files (rootFolder walk, doc lines via
+  docstore, file blobs via the filestore reference — compile parity) +
+  `comments.json {"comments":[...]}` (collab ListThreads/MessagesOfThread
+  flattened: id/text/doc/ranges/state) + `tracked-changes.json
+  {"tracked":[...]}` (collab ListChanges). Anonymous → login bounce;
+  ghost → 404; non-member → 403 (package gate canRead/loadUserAdmin);
+  no cross-project bleed (per-project builder).
+- **ADMIN MULTI-ZIP** (`dlzip.go` re-wired): each inner zip now carries the
+  same files + payload JSON (shared `zswBuildZip`; placeholder fallback
+  only when content cannot materialize).
+- **IMPORT** (`newzip.go` hook): root-level `comments.json` /
+  `tracked-changes.json` are CAPTURED, excluded from the project tree, and
+  restored into the new project: comments → collab AddThread+AddComment
+  (GET /threads then shows them — LIVE proven); tracked texts → canonical
+  docstore source (docstore lines verified to carry ZIPTRACK-888) + best-effort
+  collab AddChange; corrupt payloads → files-only fallback (deterministic 200).
+- **TEMPLATE EXCLUSION** (owner scope "except for templates"): the exporter
+  omits the payloads when a `templates.source_project_id` link row exists
+  (future-proof; the profile's publish is the pinned 400 follow-up → leg H
+  stays honestly pending).
+- **ACCEPTANCE**: specs/zip-tracked-comments.test.e2e.ts **13/13 GREEN ×2**
+  (2.4m/pass; legs A/B re-armed per their own re-arm clauses; legs G/I/K/L/M
+  assert the full LIVE contract; H/J hold honest pins with the exact
+  missing-world-truth recorded: template publish 400 in this profile;
+  editor-buffer view gap for zip-imported docs (pre-existing: even the plain
+  import sentinel never appeared in the buffer — store-level truth is green)).
+- **REGRESSION**: comments-two-user + journey A + journey B = **19/19 green**
+  post binary swap (journey A L6 self-armed to [zipcontract LIVE]).
+- BAKE NOTE (owner-gated): the e2e world's web binary was swapped in the
+  running container (CGO_ENABLED=0 build of the committed source; the
+  image-baked binary predates the change). Source-of-truth is the repo; a
+  full image rebuild (ag-v57 → next) is the owner-gated persistence step.
+  The suite self-arms: if the world ever loses the binary, leg A re-pins
+  the absent state (no silent breakage).

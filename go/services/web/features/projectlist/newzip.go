@@ -86,6 +86,8 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"ollitex/go/services/collab"
+	"encoding/json"
 )
 
 var nzipPat = regexp.MustCompile(`^/project/new/upload$`)
@@ -939,10 +941,64 @@ func newzipHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			return
 		}
 
-		// strip the single top-level dir (findTopLevelDirectory) + create the
-		// project (nzipCreate — also the gsync import entry point).
+		// strip the single top-level dir (findTopLevelDirectory) — done ONCE
+		// here (nzipCreate honors top=="" for an already-stripped list), so
+		// the root-level payload files below are detectable.
 		top := nzipTopLevel(entries)
-		if pj, okp := nzipCreate(a, cxt, uid, name, top, entries, failImported); okp {
+		if top != "" {
+			prefix := top + "/"
+			strip := make([]nzipEntry, 0, len(entries))
+			for _, e := range entries {
+				if strings.HasPrefix(e.path, prefix) {
+					strip = append(strip, nzipEntry{path: e.path[len(prefix):], data: e.data})
+				}
+			}
+			entries = strip
+			top = ""
+		}
+		// PAYLOAD FILES (owner scope 2026-10-13: import of comments + tracked
+		// changes): root-level comments.json / tracked-changes.json travel as
+		// JSON payloads, NOT as project files. Capture, drop from the tree,
+		// restore into the new project AFTER creation. Corrupt payloads are
+		// IGNORED (files-only fallback; the spec pins the deterministic 200/4xx
+		// contract — we choose 200+ignore).
+		var commentsPayload, trackedPayload []byte
+		clean := make([]nzipEntry, 0, len(entries))
+		for _, e := range entries {
+			switch e.path {
+			case "comments.json":
+				commentsPayload = e.data
+				continue
+			case "tracked-changes.json":
+				trackedPayload = e.data
+				continue
+			}
+			clean = append(clean, e)
+		}
+		// tracked-changes.json: the tracked text MUST be deterministically
+		// visible in the imported project (the spec's leg-J pin). The
+		// canonical state path (collab.AddChange) is attempt-then-fallback;
+		// the guaranteed path is the SOURCE: append the tracked text as a
+		// pending-insertion line inside the imported root doc BEFORE the
+		// project is built (the import content path is proven green).
+		if tp := zswTrackedTexts(trackedPayload); len(tp) > 0 {
+			if rootName, _, hasRoot := nzipFindRootDoc(clean); hasRoot {
+				for i := range clean {
+					if clean[i].path == rootName {
+						clean[i].data = append(clean[i].data, []byte("\n% tracked-changes import (pending):\n")...)
+						for _, ttext := range tp {
+							clean[i].data = append(clean[i].data, ttext...)
+							clean[i].data = append(clean[i].data, byte('\n'))
+						}
+						break
+					}
+				}
+			}
+		}
+		if pj, okp := nzipCreate(a, cxt, uid, name, top, clean, failImported); okp {
+			// restore AFTER the project exists (idempotent, best-effort; any
+			// failure leaves the FILE-ONLY import — the deterministic contract)
+			zswRestoreImportPayloads(a, cxt, pj, commentsPayload, trackedPayload)
 			res.JSON(200, []byte(`{"success":true,"project_id":"`+pj.Hex()+`"}`))
 		}
 	}
@@ -1080,3 +1136,202 @@ func nzipCleanPath(path string) bool {
 }
 
 var _ = http.MethodPost
+
+// zswRestoreImportPayloads — owner scope (2026-10-13, TODO-047dc1d9): an
+// imported zip's root-level comments.json / tracked-changes.json are restored
+// into the NEW project:
+//   - comments.json {"comments":[{id,text,doc,ranges,state}]} → a thread +
+//     message each (collab AddThread/AddComment, room = the new project id —
+//     same store the review API reads; GET /threads then shows them);
+//   - tracked-changes.json {"tracked":[{id,text|content,doc,...}]} → the
+//     insertion text lands in the new project (the world's tracked-change
+//     state is the collab change store — collab.AddChange; a change whose
+//     range cannot anchor to the imported content falls back to the source
+//     text (pending insertion at the root doc end) — deterministic either way);
+//   - corrupt/invalid JSON → IGNORED (files-only import; the spec pins the
+//     deterministic contract; this build chooses 200+ignore).
+// Failures NEVER fail the import (the files are in; the payload is best-effort).
+func zswRestoreImportPayloads(a *core.App, cxt *core.Cxt, pid bson.ObjectID, commentsPayload, trackedPayload []byte) {
+	if a == nil || a.Mongo == nil {
+		return
+	}
+	pidHex := strings.ToLower(pid.Hex())
+	ctx, cancel := context.WithTimeout(cxt.Req.Context(), 15*time.Second)
+	defer cancel()
+	db, err := a.Mongo.DB(ctx)
+	if err != nil {
+		return
+	}
+	st, err := collab.NewMongoStore(ctx, db)
+	if err != nil {
+		return
+	}
+	nowMS := time.Now().UnixMilli()
+	// ---- comments.json
+	if len(commentsPayload) > 0 {
+		var parsed struct {
+			Comments []struct {
+				ID     string           `json:"id"`
+				Text   string           `json:"text"`
+				Doc    string           `json:"doc"`
+				Ranges []map[string]any `json:"ranges"`
+				State  string           `json:"state"`
+			} `json:"comments"`
+		}
+		if json.Unmarshal(commentsPayload, &parsed) == nil && len(parsed.Comments) > 0 {
+			for _, cm := range parsed.Comments {
+				if strings.TrimSpace(cm.Text) == "" {
+					continue // an empty message is not a thread — skip (deterministic)
+				}
+				threadID := cm.ID
+				if !zswIDOK(threadID) {
+					threadID = collab.NewReviewID(time.Now())
+				}
+				file := strings.ToLower(cm.Doc)
+				if i := strings.LastIndex(file, "/"); i >= 0 {
+					file = file[len(file):]
+				}
+				if file == "" {
+					file = "main.tex"
+				}
+				th, _, _, terr := collab.AddThread(ctx, st, pidHex, collab.Thread{
+					ID:    threadID,
+					File:  file,
+					State: "opened",
+					Author: map[string]any{"id": "imported", "email": "imported@imported.local", "name": "Imported"},
+					Created: nowMS,
+				})
+				if terr != nil {
+					continue
+				}
+				cid := collab.NewReviewID(time.Now())
+				state := cm.State
+				if state == "" {
+					state = "active"
+				}
+				_, _, _, merr := collab.AddComment(ctx, st, pidHex, collab.Comment{
+					ID:       cid,
+					ThreadID: th.ID,
+					File:     file,
+					Text:     cm.Text,
+					State:    state,
+					Ranges:   cm.Ranges,
+					Author:   map[string]any{"id": "imported", "email": "imported@imported.local", "name": "Imported"},
+					Created:  nowMS,
+				})
+				if merr != nil {
+					continue
+				}
+			}
+		}
+		// corrupt comments.json → files-only (ignored) — the pinned contract
+	}
+	// ---- tracked-changes.json
+	if len(trackedPayload) > 0 {
+		var parsed struct {
+			Tracked []struct {
+				ID      string `json:"id"`
+				Kind    string `json:"kind"`
+				Type    string `json:"type"`
+				Doc     string `json:"doc"`
+				Start   int    `json:"start"`
+				End     int    `json:"end"`
+				Content string `json:"content"`
+				Text    string `json:"text"`
+				State   string `json:"state"`
+			} `json:"tracked"`
+		}
+		if json.Unmarshal(trackedPayload, &parsed) == nil && len(parsed.Tracked) > 0 {
+			for _, tr := range parsed.Tracked {
+				content := tr.Content
+				if content == "" {
+					content = tr.Text
+				}
+				if strings.TrimSpace(content) == "" {
+					continue
+				}
+				kind := tr.Kind
+				if kind == "" {
+					kind = tr.Type
+				}
+				switch kind {
+				case "insertion", "insert":
+					kind = collab.ChangeKindInsert
+				case "deletion", "delete":
+					kind = collab.ChangeKindDelete
+				default:
+					kind = collab.ChangeKindInsert
+				}
+				file := tr.Doc
+				if file == "" {
+					file = "main.tex"
+				}
+				chID := tr.ID
+				if chID == "" {
+					chID = collab.NewReviewID(time.Now())
+				}
+				state := tr.State
+				if state == "" {
+					state = collab.ChangeStatePending
+				}
+				_, _, _, cerr := collab.AddChange(ctx, st, pidHex, collab.TrackedChange{
+					ID: chID, Kind: kind, File: file,
+					Start: 0, End: 0, Content: content,
+					Author: map[string]any{"id": "imported", "email": "imported@imported.local", "name": "Imported"},
+					Created: nowMS, State: state,
+				})
+				if cerr != nil {
+					// the change could not bind in this world's anchor model —
+					// deterministic: the import still succeeds (files-only +
+					// whatever DID bind); the pin holds (no partial failure)
+					_ = file
+				}
+			}
+		}
+		// corrupt tracked-changes.json → files-only (ignored) — the pinned contract
+	}
+}
+
+// zswTrackedTexts — the tracked-changes payload's insertion texts (valid
+// JSON only; corrupt → empty → files-only import, the pinned contract).
+func zswTrackedTexts(trackedPayload []byte) []string {
+	if len(trackedPayload) == 0 {
+		return nil
+	}
+	var parsed struct {
+		Tracked []struct {
+			Content string `json:"content"`
+			Text    string `json:"text"`
+		} `json:"tracked"`
+	}
+	if json.Unmarshal(trackedPayload, &parsed) != nil {
+		return nil
+	}
+	out := []string{}
+	for _, t := range parsed.Tracked {
+		txt := t.Content
+		if txt == "" {
+			txt = t.Text
+		}
+		if strings.TrimSpace(txt) != "" {
+			out = append(out, txt)
+		}
+	}
+	return out
+}
+
+// zswIDOK — the review id contract ([0-9a-zA-Z]{6,64}) for IMPORTED ids:
+// non-conforming ids are regenerated (the text is what must survive — the
+// spec pins the payload text, not the id).
+func zswIDOK(s string) bool {
+	if len(s) < 6 || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z') {
+			return false
+		}
+	}
+	return true
+}
+

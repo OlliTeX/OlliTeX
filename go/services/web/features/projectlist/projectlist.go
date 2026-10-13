@@ -130,6 +130,7 @@ func Feature(a *core.App) core.Feature {
 			// Express's more-specific-first), and upPat swallows id='new' (live
 			// 404 'Invalid Mongo ObjectId at params.Project_id' on a good upload).
 			{Method: "POST", Pattern: nzipPat, Handler: newzipHandler(a)},
+			{Method: "GET", Pattern: zipsinglePat, Handler: singleZipHandler(a)},
 			// P4.13a file upload (POST /Project/:id/upload — capital P, pinned;
 			// session+csrf applied by core — matches Node's csrf'd route)
 			{Method: "POST", Pattern: upPat, Handler: uploadHandler(a)},

@@ -104,17 +104,30 @@ test.beforeAll(() => {
 })
 
 test.describe('zip import/export — tracked changes + comments (templates excluded)', () => {
-  test('A: user single-project zip route is ABSENT in this build (404 HTML page)', async ({ page }) => {
+  test('A: user single-project zip route is LIVE (200 application/zip + files + payloads)', async ({ page }) => {
     await loginRobust(page, ADMIN.email, ADMIN.password)
     const pid = await createBlankProject(page)
     try {
       const r = await page.request.get(BASE + '/project/' + pid + '/download/zip')
-      // Re-arm: if the route gains a real zip implementation (the owner's
-      // requested surface), this assert fails and the spec is revisited.
-      expect(r.status(), 'route should be 404 until the feature lands').toBe(404)
-      expect(r.headers()['content-type'] || '').toMatch(/text\/html/i)
-      const body = await r.text()
-      expect(body).toMatch(/Not Found|Page Not Found/i)
+      expect(r.status(), 'route is the live export surface (was the 404 pin, re-armed 2026-10-13 when the feature landed per board TODO-047dc1d9)').toBe(200)
+      expect(r.headers()['content-type'] || '').toMatch(/application\/zip/i)
+      expect(r.headers()['content-disposition'] || '').toMatch(/attachment;\s*filename="/i)
+      const file = '/tmp/spec_a.zip'
+      fs.writeFileSync(file, await r.body())
+      const names = listZip(file)
+      expect(names.join('|'), 'project files present').toMatch(/main\.tex/i)
+      const c = names.find((n: string) => /comment/i.test(n) && n.endsWith('.json'))
+      const t = names.find((n: string) => /tracked|changes/i.test(n) && n.endsWith('.json'))
+      expect(c, 'comments JSON payload entry').toBeTruthy()
+      expect(t, 'tracked-changes JSON payload entry').toBeTruthy()
+      const read = (name: string) =>
+        execSync(`python3 -c 'import zipfile,sys;print(zipfile.ZipFile(sys.argv[1]).read(sys.argv[2]).decode())' ${file} "${name}"`, { encoding: 'utf8' })
+      const cj = JSON.parse(read(c!))
+      expect(Array.isArray(cj.comments), 'comments.json shape {comments:[...]}').toBe(true)
+      const tj = JSON.parse(read(t!))
+      expect(Array.isArray(tj.tracked), 'tracked-changes.json shape {tracked:[...]}').toBe(true)
+      // eslint-disable-next-line no-console
+      console.log('[zipcontract LIVE] A export: ' + names.join(','))
     } finally {
       await page.request.delete(BASE + '/project/' + pid, { headers: { 'x-csrf-token': await csrf(page) } }).catch(() => {})
     }
@@ -134,14 +147,15 @@ test.describe('zip import/export — tracked changes + comments (templates exclu
       const names = listZip(outer)
       expect(names, 'one inner zip per project').toHaveLength(1)
       expect(names[0]).toMatch(/\.zip$/i)
-      // Pinned: the inner zip is a placeholder — no project files, and
-      // explicitly NO tracked-changes / comments payloads (product gap;
-      // FLAGGED owner in the header). Re-arm: if real files or a
-      // comments/tracked-changes entry appear, fail loudly.
+      // RE-ARMED 2026-10-13 (re-arm clause tripped when the feature landed;
+      // owner scope: "each inner zip must carry the same files + payloads"):
+      // the inner zip now carries the project files + the payload JSON files.
       const inner = innerZipEntries(outer, names[0])
-      expect(inner.join('|'), 'no comment/tracked-changes payload in export').not.toMatch(/comment|tracked|annotation|change/i)
-      expect(inner.join('|')).not.toMatch(/\.tex$/i)
-      expect(inner.length, 'placeholder marker only').toBeGreaterThanOrEqual(1)
+      expect(inner.join('|'), 'inner zip carries the project files').toMatch(/\.tex/i)
+      const ic = inner.find((n: string) => /comment/i.test(n) && n.endsWith('.json'))
+      const it = inner.find((n: string) => /tracked|changes/i.test(n) && n.endsWith('.json'))
+      expect(ic, 'inner comments JSON payload').toBeTruthy()
+      expect(it, 'inner tracked-changes JSON payload').toBeTruthy()
     } finally {
       await page.request.delete(BASE + '/project/' + pid, { headers: { 'x-csrf-token': tok } }).catch(() => {})
     }

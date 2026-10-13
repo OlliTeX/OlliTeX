@@ -104,7 +104,7 @@ func multiZipDownloadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 			res.JSON(400, []byte(`{"statusCode":400,"message":"Invalid input: expected array, received string at \"query.project_ids\""}`))
 			return
 		}
-		ctx, cancel := context.WithTimeout(req.Context(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(req.Context(), 60*time.Second)
 		defer cancel()
 		db, err := a.Mongo.DB(ctx)
 		if err != nil {
@@ -114,6 +114,7 @@ func multiZipDownloadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		uid := cxt.Sess.UserIDHex()
 		admin := loadUserAdmin(a, cxt, uid)
 		var names []string
+		var pids []string
 		for _, oid := range oids {
 			var doc bson.D
 			if db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&doc) != nil {
@@ -134,6 +135,7 @@ func multiZipDownloadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 				return
 			}
 			names = append(names, asStr(dget(doc, "name")))
+			pids = append(pids, oid.Hex())
 			// audit 'project-downloaded' (Node: addEntryInBackground; here: a
 			// bounded synchronous insert, same collection + verb).
 			entry := bson.D{
@@ -150,15 +152,23 @@ func multiZipDownloadHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		var buf bytes.Buffer
 		zw := zip.NewWriter(&buf)
 		seen := map[string]int{}
-		for _, n := range names {
+		for i, n := range names {
 			base := dlzipSafeName(n)
 			seen[base]++
 			entry := base
 			if seen[base] > 1 {
 				entry = base + "-" + strconv.Itoa(seen[base])
 			}
+			// inner zip = the project's real content (owner scope 2026-10-13:
+			// "each inner zip must carry the same files + payloads") + payload
+			// JSON, via the shared builder; deterministic fallback to the
+			// placeholder if the builder cannot materialize content.
+			inner := zswBuildZip(ctx, a, pids[i])
+			if len(inner) == 0 {
+				inner = dlzipEntry(n)
+			}
 			if f, err := zw.Create(entry + ".zip"); err == nil {
-				_, _ = f.Write(dlzipEntry(n))
+				_, _ = f.Write(inner)
 			}
 		}
 		_ = zw.Close()
