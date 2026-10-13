@@ -1586,3 +1586,10 @@ Remaining owner-todo set: **#4 ZIP import/export tracked-changes+comments (excep
 4. Owner question (recorded, non-blocking): a **zip round-trip of tracked changes + comments is impossible in the current model** — export carries no such payload (placeholder) and import creates files only (review state is server-side per-project). Both ends need work if this is a product requirement; if the owner's intent was only "zip source round-trip works + templates excluded", the spec already proves the files round-trip (leg F) and the export gap is flagged for decision.
 
 **ALL THREE owner-todo e2e arcs COMPLETE:** bib-editor (ad98f567) · library (c9aeb787) · zip (this commit). Remaining board: 9fbda0eb (GOAL[5] terminal audit) + the owner-credential item (39e56295 Dropbox token re-capture).
+
+## 2026-11-16 — SESSION TERMINAL STATE (GOAL[5] audit closed `44685d0b`)
+
+- **Board:** `9fbda0eb` (GOAL[5] terminal audit) → **done**; three owner-todo arcs + their board duplicates (`ed0ca1ca`/`419f9f3f`/`ab876e5d`) → **done** with commit cross-refs (`ad98f567`,`c9aeb787`,`475a36bf`).
+- **Goal `08603aee`:** set **blocked — session scope complete** (Phases 1–4 + owner handoff + owner-todo arcs + terminal audit, all evidence-gated; tree clean). Explicitly NOT complete: Phase-5 product arcs (c32d1403 WDV-A · d414c964 TPDS · 7358ce12 fedgap-2 · d857d936+deb4b4ba b63post · 54ed9d38 P7 · d1d723f2 develop stack · d86e9113 build rework · f06ba73b backbone audit) — owner-gated product work requiring an explicit next-arc order; resuming the goal is the owner's call (only explicit `/goal resume` reactivates).
+- **Forward dependencies (owner):** (1) Dropbox token re-capture — TODO-39e56295 (suite's single red; ~2 min in console or `scripts/capture-interactive-tokens.mjs`); (2) decisions 225c3d7e · 43a8cb9a · ebb76488 · 89da1036; (3) product verdict on flags F1–F3 (zip export route, admin-zip placeholder, tracked-changes/comments zip round-trip scope).
+- **Handoff artifact:** `GOAL5_TERMINAL_AUDIT.md` (coverage table, battery convergence, credential matrix, F1–F12 flag register, sign-off).
