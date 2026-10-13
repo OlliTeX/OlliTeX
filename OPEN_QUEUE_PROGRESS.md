@@ -1844,3 +1844,15 @@ Commit: 2798d318
 - LIVE ACCEPTANCE (world overleaf.conf patched + reloaded): allowlist → 401 git-bridge auth challenge ("Log in with the username 'git'"); non-allowlisted /git/zzz/..., /git/api/projects/... , bare /git/ → 404 EDGE (was 401/500 blanket); DELETE /api/projects/<hex> → 403 web CSRF gate (dormant delete NOT exposed); /login+/hub intact.
 - SUITE: specs/federation-git-edge.test.e2e.ts 4/4 ×2 GREEN.
 - RESIDUALS (owner lanes, flagged): (1) PROD git-bridge container Exited(127) — production must run a git-bridge for the served path (e2e world runs ollitex/git-bridge:latest fine — prod compose wiring/entrypoint to check); (2) official image re-bake carries the hardened template (R2 bake lane); (3) authenticated clone acceptance = the federation dance (needs the 2×https world).
+## UI polish lane (editor rail/menu + hub + md) — ALL 8 LETTERS SOURCE-VERIFIED DONE + CLOSED 2026-10-13
+- Owner order: after fileproxy audit + git_url Option 1. Audit result: every letter is ALREADY IMPLEMENTED in source (the 2026-10-10 wave `fe1067ad` "rail/hotkeys/md wave fixes (live-verified ag-v28/v30)" + 10-11 rail-menus commits 2a639bf9/9924bef9):
+  - G File→Download group: rail-menus.tsx:335-344, all 5 items (zip/PDF/docx/md/html) + top-aligned (position right-start, live topDelta=5 in world).
+  - H Insert→Math(Inline|Display)+Figure(Upload-from-computer|From-project-files): rail-menus.tsx:364-376 (Figure has 4 entries incl. from-another-project/from-url); live groups confirmed.
+  - I View→PDF(Zoom in|out|Fit width|height): rail-menus.tsx:425-431; live group confirmed.
+  - L spacer: mantine-rail.tsx:202-204 `.ol-v2-rail-spacer` (live: 1px divider between the menu cluster and File-tree tabs — matches "thin 1px divider").
+  - K settings modal: settings-modal.tsx:47 size={1440}.
+  - M hotkeys: hotkeys-modal.tsx size={1280} + hotkeys-modal-bottom-text.tsx link FIXED `/user-settings/mysettings.keybindings` (item-M marker; route exists — 302-login-bounce anonymous, no 404).
+  - F hub indent: ollitex-hub rail.tsx:149 "owner 2026-10-10 (item F): the same 7px slot the Leaf rows use" — slot parity fix; live name cell padL/marginL/textIndent all 0.
+  - O md: new-.md-empty leg LIVE-VERIFIED (markdown-visual spec M1, ag-v57); theme wiring in milkdown/styles.css:315-396 ("owner O (2026-10-10): theme-aware — was hardcoded #2f3437") aliased to Mantine vars light+dark.
+- LIVE WORLD CAVEAT (ag-v57 bake predates the letters on some surfaces — Download group showed 2 of 5 kids live): the world image carries an older bake; the next official rebake (R2 lane) carries all letters + the git_url allowlist; browser re-verify of G/H/I/K/M/F/O on ag-vN after bake = the gate leg (one pass, ~20 min).
+- TODOs closed: 07f21e18 48029ae0 5e038fa2 6931623d 705ad2aa 760f2dbb d6ee435d c945a39d. Evidence shots: /tmp/ui8/*.png (F-hub, L-rail, G2-file, H2-insert, I2-view, K2-settings).
