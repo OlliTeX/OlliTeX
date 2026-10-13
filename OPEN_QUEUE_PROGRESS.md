@@ -1552,3 +1552,16 @@ Schema discovery: this world's project docs use the legacy ref-shape fields (`ow
 - **Battery-2 reds: 23 → 0 triaged** (all either fixed-green or pinned+flagged with live evidence and re-arm trip-wires).
 - Parity gate: **GREEN 99/99** (after the `/templates/manage` matrix truth-update).
 - Combined verification of all 12 touched spec files: **76 passed / 0 failed** (14.0 min).
+
+## 2026-11-16 — FULL BATTERY #3 (terminal evidence) + dropbox credential finding
+
+**Battery #3:** `487 passed / 1 failed / 4 skipped` (1.0h, `/tmp/e2e-battery-3.log`) — up from 465/23/4 at battery #2 and 450/33/4 at battery #1.
+
+**The single red:** `specs/external-probe.test.e2e.ts:78` (dropbox token is valid) — NOT a spec/product drift:
+- `POST https://api.dropboxapi.com/2/users/get_current_account` (Bearer cached `sl.*`) → **401 `expired_access_token`** (live-verified this turn)
+- the config's app-pair `refreshToken` grant is exhausted too (the 2026-10-12 D6-EXTEND path no longer mints a token)
+- **BLOCKER (owner action, non-autonomous):** regenerate the Dropbox app token in the Dropbox console (or re-run the owner-assisted capture flow) and refresh `credentials/.auth/dropbox.json` (0600, git-ignored). No bypass attempted (standing policy).
+- Mitigation shipped (`9dec56c9`): the leg now attempts the headless refresh grant before failing, and the failure message carries the exact owner action.
+- **Recommendation to owner:** ~2 min in the Dropbox console (create app → generate `sl.*` token) or run `node scripts/capture-interactive-tokens.mjs` for dropbox if interactive capture is acceptable.
+
+**9b142051 drift triage is COMPLETE:** every drift red from batteries #1/#2/#3 is green (fixed or pinned+flagged) with live evidence + re-arm trip-wires; parity gate GREEN 99/99; standing suite has exactly one known red and it is the owner-credential item above (tracked as its own owner-action todo — category: external credential expiry, not drift).
