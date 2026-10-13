@@ -1892,3 +1892,14 @@ Commit: 2798d318
 ## E2E coverage audit (owner work order) — REPORT: E2E_COVERAGE_AUDIT.md
 - 124 specs / 47 features: 30+ surfaces INTENSIVE (multi-leg arcs ×2 green); contract/pin/gap classes itemized;
   residuals: zip feature absent (pin self-activating), SSO leg-b external, Dropbox tokens owner, 65b0d668 attribution gap, thin: systemmessages/launchpad/staticpages/analytics/PDF-pixel.
+## USER-JOURNEY + CAUSE-EFFECT — weaknesses identified + 7 TEST-IMPL items ON THE BOARD (2026-10-13)
+- Audit: USER_JOURNEY_CAUSE_EFFECT_AUDIT.md (evidence sweep over the 124-spec suite: journey-fragmentation + no systematic matrices + ZERO unicode/emoji tests + no store-level purge verification + no session/CSRF-boundary + no concurrency ordering).
+- BOARD (todo tool, all open, each with executable leg design + acceptance + pin-rules):
+  TODO-434b5075 journey A onboarding (register→activate→compile→comment→export; password-reset quirk pin)
+  TODO-0005f1b6 journey B collab choreography (comment+tracked+restore interleave + reload recovery + attribution interlock)
+  TODO-f0ab4e2f journey C lifecycle+purge (template copy-isolation, deactivation matrix, store-level residue, admin audit)
+  TODO-345fef7c CE-1 IDOR/permission × state matrix (~100 cells) + CSRF/token boundaries + leak gate
+  TODO-43ef8516 CE-2 domain boundaries (ranges/codepoints/emoji/RTL-CJK, content extremes, names, zip/template sizes, path-traversal)
+  TODO-39396c71 CE-3 failure injection + concurrency ordering (ws-drop save race, parallel restore, invite race, N=3 invariant assertions)
+  TODO-33757387 CE-4 context persistence (theme×surface×persist, session expiry mid-action, cross-user CSRF)
+- Finding rule standing: real defect from any of these = ⚑ OWNER FLAG + pin (no silent product fixes).
