@@ -2172,3 +2172,14 @@ Commit lineage: `f378e51b` (CI matrix + Q2) → `06da575b` (battery verdict) →
   - 4 skipped = documented conditional legs (e.g., zip H template-exclusion when publish contract is 400).
 - **Commit:** L4 pin fix + this entry. Tree clean.
 - **BOARD STATUS: no open items.** Open questions to the owner: (1) FINDING #10 adjudication (active-projects 500 dangling-presence — accept the faithful edge [pin stands] or normalize the handler); (2) nothing else — all of Q1–Q5, CE-1 clone-500, a11y, SSO/parity, lifecycle, coverage and credential arcs are closed with evidence.
+
+------------------------------------------------------------------------
+### 2026-10-14 — FINDING #10 Option B (owner-sanctioned) — NORMALIZED + VERIFIED (ag-v66)
+- **Owner ruling (15:25 UTC): "Option B — Normalize (product change). please."**
+- **Handler** (go/services/web/features/projectlist/admin.go, commit `9ce36150`): adminActiveProjects now SKIPS presence rooms whose project row is gone (dangling presence after deletion; `ErrNoDocuments` distinguished — genuine projection errors still 500). Surface = always 200. Owner knowingly diverges from the Node-faithful 500 edge.
+- **Bake:** `make build-community` on `ollitex/base:main-396a211…` → `ollitex/ollitex:main-9ce36150…` (revision label = HEAD ✓, 0 ERROR) → tagged `olpsint/overleaf:ag-v66` → cutover via `docker compose -f docker-compose.test.yml --env-file .env.test` (note: without `--env-file` the startup secrets-check refuses — hit and fixed) → image-ID match YES, login 200.
+- **Verification (ag-v66):**
+  - **Strongest-case live repro** (room STILL CONNECTED at deletion — pre-normalization a deterministic 500): fixture created via hub UI → editor ready (presence live) → **listed-before=true (200)** → trash 200 + `DELETE /admin/project/<pid>` 200 → **`GET /admin/active-projects` = 200 + fixture ABSENT** → post-delete members=404 (clean). Promoted to permanent spec `specs/active-projects-normalized.test.e2e.ts` (1 test, ~40s).
+  - journey-lifecycle **7/7 (1.1m)** — L4 200 (fixture live, listed — correct); L6 Q4 cascade intact (residue 1/1/1 → 0/0/0, residue-after=none); **L7 200 + fixtureInList=false** (normalized contract enforced post-purge).
+- **Pitfalls log:** `mongo-driver v2` renames the sentinel → `mongo.ErrNoDocuments` (v0/v1 `ErrNoDocument` undefined); compose cutovers on this stack REQUIRE `--env-file .env.test` (missing → `000_check_missing_secrets` exit 101).
+- **Battery ag-v66:** global gate running (pid 1263775, /tmp/battery_agv66.log) — verdict appended on completion.
