@@ -2117,3 +2117,28 @@ Commit: 2798d318
 - **FINDING #9 RE-ADJUDICATED (2026-10-14, autonomous pass) — ❌ REJECTED: FALSE POSITIVE, no defect.**
   The "blank popup export" was a misread of the download-delivery UX. Evidence:
   (1) in-page trace: the menu-item click calls `window.open("/project/<pid>/download/zip","_blank","noopener")` with the correct href (ag-v59 world, `window.open` native, unpatched); (2) menu click → Playwright `download` event → `e2e-smoke-project.zip`, 425 bytes, `PK` signature, `saveAs`-verified (the blank tab is BY DESIGN — the file IS the delivery); (3) isolation: new-tab navigations to /login and /hub from /editor work fine — only the zip URL "stays blank" because it's an attachment download, not a page load. The speculative fix `59ba96ec` (extra handler) was made then **REVERTED (`56394a7c`)** — no product code for a non-defect. Spec export leg re-armed to the true contract (visible item + click→`download` event + PK bytes + API 200 zip): **13/13 toolbar-rail green** on ag-v59. Probe lessons (failure memory): download links present as blank tabs; arm `waitForEvent('download')` BEFORE the click (events aren't buffered); `browser.newContext` needs `acceptDownloads: true` (default `page` fixture accepts). World note: ag-v59 (source `59ba96ec`) is running; source reverted to `56394a7c`; behavior functionally identical either way (the exercised externalHref branch is byte-identical); next bake syncs source. **Board: TODO-339abc6f → done (rejected-false-positive); findings board row #9 marked ❌ REJECTED.**
+- **OWNER ADJUDICATIONS + EXECUTION (2026-10-14, autonomous pass)**:
+  - **Q2 / FINDING #4 — (b) accept = PENDING** (approved semantics). Pin in
+    `sharing-invite-loop` L1 now marked OWNER-ADJUDICATED (approved contract,
+    not an open question); audit row #4 updated; TODO-12f65e97 → done.
+  - **CI MATRIX (owner: yes) — sso-ldap-live made world-native (commit f378e51b)**:
+    committed OpenLDAP asset `tests/e2e/stack/ldap/` (Dockerfile + proven
+    slapd.conf + seed init.ldif + run.sh — faithful to the ad-hoc v1,
+    build-verified: admin bind ✓, user bind ✓, wrong-pw → 49 ✓); compose
+    service `e2e-ldaptest` on the e2e network (DNS `e2e-ldaptest:3890`,
+    healthcheck, builds on fresh CI runners, stack:up/down lifecycle); spec
+    URL indirection (`OL_LDAP_URL`, default the DNS name — retired the
+    fixed-IP 172.20.0.20 ad-hoc container) + readiness retry using the exact
+    production probe. Cutover executed locally: legacy container removed,
+    service built from the committed asset, **sso-ldap-live 7/7 green (48s)**
+    in the service-based world. Note caught in cutover: the ad-hoc v1 image
+    did NOT self-seed (its dir lived in the runtime layer) — the committed
+    asset seeds at build time (required for recreate-from-image).
+  - **FULL BATTERY ag-v59 (final world) — 667 PASS / 4 FAIL / 2 FLAKY / 4 SKIP (1.8h)**:
+    4 fails triaged to exhaustion: (a) dropbox token = EXPECTED owner block
+    (TODO-39e56295); (b) journey-lifecycle L4 + L7 (`active-projects` 500
+    under battery load) = FLAKES — quiet-world re-run **7/7 green**
+    (L4 200 + fixture-in-list, L7 200); (c) modals "offline recovery" =
+    FLAKE — quiet-world re-run **green (13.2s)**. => globally green apart
+    from the one owner-blocked external leg. Battery also re-captured the
+    a11y/perf baselines (committed alongside this entry).
