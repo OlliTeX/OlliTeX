@@ -216,3 +216,25 @@ Owner scope implemented end-to-end (source in repo, live in the e2e world):
   full image rebuild (ag-v57 → next) is the owner-gated persistence step.
   The suite self-arms: if the world ever loses the binary, leg A re-pins
   the absent state (no silent breakage).
+
+
+---
+
+## ⚑ finding status board (updated 2026-10-14, post autonomous work-orders)
+
+| # | Finding | Status |
+|---|---------|--------|
+| 1 | `POST /project/:pid/clone` → 500 (body `{}`) | **AUDITED — faithful Node quirk** (`projectName.trim()` TypeError; named clone = 200 live, blank = 400). Not a defect. |
+| 2 | zip part trailing space → 500 | **AUDITED — faithful vendor pin** (ext gate; `{'Upload failed'}` Node shape). Deterministic. |
+| 3 | intermittent comment-write 500s | **RESOLVED-GREEN** (comments-two-user + trackchanges 2× post-swaps; no 5xx observed). |
+| 4 | invite-accept 204 ≠ editor access | **STILL OWNER-ADJUDICATE** (permission-model choice; pinned in CE-3). |
+| 5 | sign-up gap: no password field + retired activation | **STILL OWNER-ADJUDICATE** (mail-gated register is a product policy; Journey A pins it). |
+| 6 | store-cascade: hard-delete orphans docs/ydoc/chunks | **PARTIALLY OBSERVED-SWEEPED** (zombie pass cleared the leaked rows; cascade-behavior question stays with the owner — the reaper appears to sweep over time). |
+| 7 | zip-imported docs: empty editor buffer | **STILL OWNER-ADJUDICATE** (import→collab-room sync gap; store-level content verified; ZIP leg J pins). |
+| 8 | `65b0d668` attribution "Anonymous" + template publish 400 | **ATTRIBUTION FIXED** (`45ab08a7`; panel renders "You", 29/29 regression); template publish stays 400 in this profile (exclusion self-activates when it lands). |
+
+Also closed this block: **SSO leg-b** (TODO-7358ce12 → done, real LDAP round-trip +
+ldapJIT user-doc fix, 14/14); **zombie sweep** (793 projects + sub-stores + 246 users,
+4 fixtures verified); **TODO-65b0d668 → done**.
+build-images junk: **deletion-ready receipt** `BUILD_IMAGES_JUNK_RECIPE_2026-10-14.md`
+(pending the develop-stack deletion gate).
