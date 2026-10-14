@@ -1,13 +1,15 @@
 /**
  * editor-v2 P2 contract — toolbar + rail (EDITOR_RENOVATION_PLAN.md §3).
  *
- * ⚑ OWNER FLAG (2026-10-14, ag-v58 bake): the export+download leg pins a
- * DEFECT — in the Mantine rail chrome (a11y wave 0e3cb1f5) the
- * "Download as source (.zip)" menu item opens a BLANK POPUP and its anchor
- * navigation is swallowed (live-probed; pre-bake legacy chrome worked).
- * The standard API (GET /project/:pid/download/zip → 200 application/zip)
- * is green and asserted. Owner decision: fix the rail anchor path or
- * rewire the item. Pinned here per findings policy — not silently fixed.
+ * FINDING #9 (2026-10-14) — REJECTED after re-probe: the earlier
+ * "blank popup export" read was a false positive — the menu click fires a
+ * real browser DOWNLOAD (new tab stays blank by design; the download IS
+ * the delivery). Direct evidence: window.open called with the correct
+ * /project/:pid/download/zip href (in-page trace) + Playwright download
+ * event from the click ("e2e-smoke-project.zip", 425 B, PK saveAs-
+ * verified). The speculative fix (59ba96ec) was REVERTED (56394a7c) — no
+ * product change for a non-defect. The export leg below asserts the real
+ * contract: visible item + click→download event + PK bytes + API green.
  *
  * Every control of the 14-row matrix is exercised WITH ITS BEHAVIOR
  * (open/rename/download/toggle round-trips) on BOTH /editor (Mantine frame)
@@ -20,6 +22,7 @@
  *   layout · online · request access · rail · account · shortcuts · help
  */
 import { test, expect } from '@playwright/test'
+import fs from 'fs'
 import { loginRobust, createBlankProject } from '../../helpers/auth'
 import { api, killProject, mongoEval } from '../../parity/harness'
 
@@ -96,7 +99,7 @@ for (const route of ['/editor'] as const) {
     let userPid: string
 
     test.beforeAll(async ({ browser }) => {
-      const c = await browser.newContext({ viewport: { width: 1500, height: 950 } })
+      const c = await browser.newContext({ viewport: { width: 1500, height: 950 }, acceptDownloads: true })
       adminPage = await c.newPage()
       await loginRobust(adminPage, ADMIN.email, ADMIN.password)
       pid = await createBlankProject(adminPage)
@@ -190,39 +193,52 @@ for (const route of ['/editor'] as const) {
       expect(editorAlive, 'editor must stay alive through the compile round-trip').toBeTruthy()
     })
 
-       test('export + download: menu offers source-zip/PDF export and the zip downloads via the standard API', async () => {
+       test('export + download: menu offers source-zip/PDF export and the item click DOWNLOADS the zip', async () => {
       await openEditor(adminPage, route, pid)
-      // 2026-10-14 (ag-v58 bake) — SPLIT VERDICT, pinned:
-      //  (a) STANDARD API is green: GET /project/:pid/download/zip → 200
-      //      application/zip, PK signature (in-session) — asserted below.
-      //  (b) ⚑ OWNER FLAG (defect, NOT silently fixed): in the new Mantine
-      //      rail chrome (a11y wave 0e3cb1f5), File → "Download as source
-      //      (.zip)" click opens a BLANK POPUP and the anchor navigation is
-      //      swallowed by the menu wrapper (live probe 2026-10-14: popup
-      //      stuck at "", no /download/zip request in 15s; the same item
-      //      worked in the pre-bake legacy chrome). The affordance is VISUALLY
-      //      offered (visible menu item) — pinned — but its click behavior
-      //      regressed. Owner decision: fix the rail menu-item anchor path
-      //      (download-project.tsx / rail-menus.tsx) or rewire the item; the
-      //      download API itself needs no change.
+      // 2026-10-14 finding #9 RE-ADJUDICATED — the "blank popup" was a
+      // FALSE POSITIVE: the click fires a real browser DOWNLOAD (the new
+      // tab stays blank BY DESIGN — it's the download delivery). Evidence:
+      //  - window.open called with the correct /project/:pid/download/zip
+      //    href (in-page trace), and a direct window.open probe of the
+      //    same URL from /editor downloads identically;
+      //  - Playwright download event from the menu click: "e2e-smoke-project
+      //    .zip", 425 bytes, PK signature (saveAs-verified).
+      // Contract asserted: visible item + click → download event + PK
+      // bytes + API ground truth. Honest and green in both chrome gens.
       await adminPage.getByRole('menuitem', { name: /^file$/i }).first().click({ timeout: 10_000 })
       await adminPage.waitForTimeout(500)
       const dlItem = adminPage.locator('[role="menuitem"]').filter({ hasText: /download as source/i })
       let visibleDl = false
+      let clicked = false
+      // download events are not buffered — the waiter MUST be armed before
+      // the click that triggers the download (observed race 2026-10-14).
+      const dlP = adminPage.waitForEvent('download', { timeout: 25_000 })
       for (let i = 0; i < (await dlItem.count().catch(() => 0)); i++) {
-        if (await dlItem.nth(i).isVisible().catch(() => false)) { visibleDl = true; break }
+        if (await dlItem.nth(i).isVisible().catch(() => false)) {
+          visibleDl = true
+          await dlItem.nth(i).click({ timeout: 5_000 }).then(() => { clicked = true }).catch(() => {})
+          break
+        }
       }
-      await adminPage.keyboard.press('Escape').catch(() => {})
-      expect(visibleDl, 'the File menu must OFFER a VISIBLE "Download as source (.zip)" item (affordance pinned; click-regression flagged ⚑)').toBeTruthy()
-      // (a) the standard API leg (the leg's real assertion): session GET → 200 zip
+      expect(visibleDl, 'the File menu must OFFER a visible "Download as source (.zip)" item').toBeTruthy()
+      expect(clicked, 'the visible item must be clickable').toBeTruthy()
+      // the click must deliver a real zip download (download event + PK)
+      const dl = await dlP
+      expect(dl.suggestedFilename(), 'suggested filename').toMatch(/\.zip$/)
+      const zipPath = `/tmp/leg-export-${pid}.zip`
+      await dl.saveAs(zipPath)
+      const zb = fs.readFileSync(zipPath)
+      expect(zb.length, 'zip bytes').toBeGreaterThan(0)
+      expect(zb.slice(0, 2).toString(), 'zip signature (PK)').toBe('PK')
+      // close the (blank-by-design) download tab
+      for (const p2 of adminPage.context().pages().filter(x => x !== adminPage)) { try { await p2.close().catch(() => {}) } catch {}
+      }
+      // API ground truth: session GET → 200 zip
       const zr = await adminPage.request.get(`/project/${pid}/download/zip`)
       const zt = await zr.body()
       expect(zr.status(), 'download/zip status').toBe(200)
       expect(/zip|octet/i.test(zr.headers()['content-type'] || ''), 'content-type').toBeTruthy()
       expect(zt && zt!.length > 0 && zt!.slice(0, 2).toString() === 'PK', 'zip signature (PK)').toBeTruthy()
-      // close any popup the broken click may have opened (harmless blank tab)
-      for (const p2 of adminPage.context().pages().filter(x => x !== adminPage)) { try { await p2.close().catch(() => {}) } catch {}
-      }
     })
 
 

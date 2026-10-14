@@ -2107,10 +2107,13 @@ Commit: 2798d318
     re-verified green in the recovery set).
 - Recovery set: git-bridge 4/4 + journey-lifecycle 7/7 + external-probe
   5/6 (dropbox = the expected owner block) — 16/18 green + 1 expected.
-- **NEW FINDING #9 (⚑ OWNER FLAG, pinned, not silently fixed)**: in the
-  new Mantine rail chrome, File → "Download as source (.zip)" click opens a
+- **SUPERSEDED (see re-adjudication below): initial read of a possible export-click defect (⚑ pinned at the time).**
+  - Original: in the new Mantine rail chrome, File → "Download as source (.zip)" click opens a
   BLANK POPUP — anchor navigation swallowed by the menu wrapper (live
   probed: popup stuck at "", no /download/zip request in 15s; legacy chrome
   worked). The standard API is green (200 application/zip, PK). Pinned in
   the toolbar-rail export leg (affordance-present + API-green + regressed
   click flagged) + spec header + findings board. Fix candidates documented.
+- **FINDING #9 RE-ADJUDICATED (2026-10-14, autonomous pass) — ❌ REJECTED: FALSE POSITIVE, no defect.**
+  The "blank popup export" was a misread of the download-delivery UX. Evidence:
+  (1) in-page trace: the menu-item click calls `window.open("/project/<pid>/download/zip","_blank","noopener")` with the correct href (ag-v59 world, `window.open` native, unpatched); (2) menu click → Playwright `download` event → `e2e-smoke-project.zip`, 425 bytes, `PK` signature, `saveAs`-verified (the blank tab is BY DESIGN — the file IS the delivery); (3) isolation: new-tab navigations to /login and /hub from /editor work fine — only the zip URL "stays blank" because it's an attachment download, not a page load. The speculative fix `59ba96ec` (extra handler) was made then **REVERTED (`56394a7c`)** — no product code for a non-defect. Spec export leg re-armed to the true contract (visible item + click→`download` event + PK bytes + API 200 zip): **13/13 toolbar-rail green** on ag-v59. Probe lessons (failure memory): download links present as blank tabs; arm `waitForEvent('download')` BEFORE the click (events aren't buffered); `browser.newContext` needs `acceptDownloads: true` (default `page` fixture accepts). World note: ag-v59 (source `59ba96ec`) is running; source reverted to `56394a7c`; behavior functionally identical either way (the exercised externalHref branch is byte-identical); next bake syncs source. **Board: TODO-339abc6f → done (rejected-false-positive); findings board row #9 marked ❌ REJECTED.**
