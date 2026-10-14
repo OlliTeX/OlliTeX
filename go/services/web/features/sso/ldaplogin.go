@@ -29,6 +29,7 @@ import (
 	ldap "github.com/go-ldap/ldap/v3"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/registrationpage"
 
 	"encoding/json"
 
@@ -219,28 +220,31 @@ func ldapJIT(ctx context.Context, db *mongo.Database, p *LDAPProvider, profile s
 	users := db.Collection("users")
 	var u map[string]any
 	if err := users.FindOne(ctx, bson.D{{Key: "emails.email", Value: email}}).Decode(&u); err != nil {
-		// create (Node UserCreator defaults: holdingAccount:false, analyticsId).
-		uid := randomHex(24)
+		// 65b0d668-era port fix (leg-b closeout 2026-10-14): the hand-rolled
+		// 12-field doc (camelCase firstName/lastName, no ace/features/
+		// overleaf/labsProgram) broke every downstream render for JIT users
+		// (hub 500: the user-doc invariants every other feature assumes).
+		// Node's UserCreator writes the SAME full baseline doc that the
+		// registration and admin-create paths use — build from it and overlay
+		// the identity (snake_case per this world's user model).
 		now := time.Now().UTC()
-		ins, ierr := users.InsertOne(ctx, bson.D{
-			{Key: "_id", Value: uid},
-			{Key: "email", Value: email},
-			{Key: "emails", Value: []bson.M{{"email": email, "confirmed": true}}},
-			{Key: "firstName", Value: firstName},
-			{Key: "lastName", Value: lastName},
-			{Key: "isAdmin", Value: isAdmin},
-			{Key: "holdingAccount", Value: false},
-			{Key: "analyticsId", Value: newUUID()},
-			{Key: "created", Value: now},
-			{Key: "lastActive", Value: now},
-			{Key: "loginEpoch", Value: int32(0)},
-		})
-		if ierr != nil {
+		base := registrationpage.NewUserDoc()
+		base["email"] = email
+		base["emails"] = []bson.M{{"email": email, "confirmed": true}}
+		base["first_name"] = firstName
+		base["last_name"] = lastName
+		base["isAdmin"] = isAdmin // IdP admin attribute: JIT grant at creation only
+		base["analyticsId"] = newUUID()
+		base["created"] = now
+		base["lastActive"] = now
+		base["loginEpoch"] = int32(0)
+		uid := bson.NewObjectID()
+		base["_id"] = uid
+		if _, ierr := users.InsertOne(ctx, base); ierr != nil {
 			return nil, ierr
 		}
-		uid2, _ := ins.InsertedID.(string)
-		u = map[string]any{"_id": uid2, "email": email}
-		_, _ = users.UpdateOne(ctx, bson.D{{Key: "_id", Value: uid2}},
+		u = map[string]any{"_id": uid, "email": email}
+		_, _ = users.UpdateOne(ctx, bson.D{{Key: "_id", Value: uid}},
 			bson.D{{Key: "$set", Value: bson.D{{Key: "emails.0.confirmedAt", Value: time.Now().UTC()}}}})
 	}
 	// Node: userDetails = updateOnLogin ? {first,last} : {}; always $inc
@@ -253,9 +257,10 @@ func ldapJIT(ctx context.Context, db *mongo.Database, p *LDAPProvider, profile s
 	_ = isAdmin
 	details := bson.D{}
 	if p.UpdateUserDetailsOnLogin && (firstName != "" || lastName != "") {
+		// snake_case: this world's user model (first_name/last_name).
 		details = append(details,
-			bson.E{Key: "firstName", Value: firstName},
-			bson.E{Key: "lastName", Value: lastName})
+			bson.E{Key: "first_name", Value: firstName},
+			bson.E{Key: "last_name", Value: lastName})
 	}
 	roleDetails := bson.D{
 		{Key: "ssoRoles." + providerID, Value: bson.M{"role": role, "at": time.Now().UTC()}},

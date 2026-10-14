@@ -2012,3 +2012,18 @@ Commit: 2798d318
   chunks/docs/blobs zeroed for the deleted pids.
 - Still owner-gated: build-images junk deletion (develop-stack gate — receipt-ready next),
   image rebuild (ag-v57→next) for the 3 binary swaps (web+collab+...), SSO leg-b external IdP.
+
+## 2026-10-14 (early) — SSO leg-b CLOSED (TODO-7358ce12 → done; a+b+c ALL complete)
+- Task: "leg-b needs external SSO provider / LDAP transport" — made it self-sufficient.
+- World asset: OpenLDAP slapd 2.5.13 (Debian bookworm) in container `e2e-ldaptest`
+  (network ol-e2e_e2e, IP 172.20.0.20:3890; committed image olpsint/e2e-ldaptest:v1
+  with DIT dc=e2e,dc=test + test user e2e-ldap@e2e.test; entrypoint starts slapd).
+- New spec tests/e2e/specs/sso-ldap-live.test.e2e.ts (7 legs): config save (masked
+  credentials round-trip), admin probe success, full 3x-bind auth success + wrong-pw
+  failure, /sso/ldap/login JIT + session + HUB 200, cleanup (0 leak rows).
+  **7/7 ×2 green; OIDC sso-admin-live regression 7/7 (14/14 block, 3.2m).**
+- Defect FIXED in the pass: ldapJIT user doc was a hand-rolled 12-field camelCase
+  shape → hub 500 for every JIT/SSO user. Now built from registrationpage.NewUserDoc()
+  (the Node-parity baseline used by admin-create) + snake_case identity;
+  go build/vet/pkg-tests green; web binary swapped (image rebuild = persistence step).
+- Board: TODO-7358ce12 done.
