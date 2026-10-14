@@ -61,7 +61,7 @@ test.describe('bug-hunt guards (BH-1 / BH-2 / BH-3)', () => {
     // no dial. The exact internal host is chosen so a REGRESSION (guard
     // removed) would visibly echo an internal body instead of 400.
     const blocked = await api(page, 'POST', '/user/llm-providers/check', {
-      url: 'http://172.20.0.11:8025/v1',
+      baseUrl: 'http://172.20.0.11:8025/v1',
       apiKey: 'sk-test',
     })
     expect(blocked.status()).toBe(400)
@@ -70,7 +70,7 @@ test.describe('bug-hunt guards (BH-1 / BH-2 / BH-3)', () => {
     // BH-1 — public host must NOT be SSRF-blocked (guard passes; the dial may
     // still fail for unrelated network reasons — that is a different message).
     const pub = await api(page, 'POST', '/user/llm-providers/check', {
-      url: 'https://example.com/v1',
+      baseUrl: 'https://example.com/v1',
       apiKey: 'sk-test',
     })
     const pubBody = await pub.text().catch(() => '')

@@ -2206,3 +2206,15 @@ Finding #10 arc: CLOSED with the global gate met. Board fully cleared.
 - **Informational:** no Secure on cookies (plain-HTTP world), nginx version disclosure, 429 limiter opaque (Node-pinned), zz_live_probe dev test in product tree, probe/dev binaries in image, NoCSRF federation surfaces (preflight-mitigated, dormant), **BH-8 process rule: temporary e2e specs MUST match the `*.test.e2e.ts` glob → delete after run** (silent battery pickup).
 - **CLEARED (close-read/live):** IDOR planes (library/templates/history/serveradmin/tokenaccess/chatbridge/fileproxy), CSRF coverage, zip-slip ×2 (safe-path + whitelist), zip-bomb (actual-byte caps), file proxy (hash-id), stored XSS (text-escape/sanitized), session fixation (sid rotates on login), SAML/OIDC signatures, LDAP dual limiting, 16 anon mutation routes all bounded, 12MB MaxBytes body cap, internal stats sink gated (302).
 - **Deliverable:** `BUG_HUNT_REPORT_2026-10-14.md` (+ board items + world-hardening compose change).
+
+## Bug-hunt ALL-THREE implementation (owner: "all three", 2026-10-14)
+
+- **Owner gate (2026-10-14):** "all three" → BH-1 (LLM SSRF), BH-2 (alerts fail-closed), BH-3 (WebDAV SSRF) approved as product changes.
+- **Shared guard** `go/services/web/core/ssrf.go` (new): `SSRFBlocked` (0/8, 10/8, 100.64/10, 127/8, 169.254/16, 172.16/12, 192.168/16, 198.18/15, 224/4+, IPv6 ::,::1,fe80/10,fc00::/7, mapped-v4); `CheckSSRFHost` (parse-time literal-IP veto → synchronous 400, no dial); `SafeClient` (dial-level: resolve → **ANY private result vetoes the set** → dial the RESOLVED IP directly = rebinding-safe; CheckRedirect re-vetoes each Location). Test-only escape `OL_SSRF_TEST_BYPASS` (server-side env, unreachable over HTTP; used only by the webdav unit tests that need loopback httptest).
+- **BH-1:** llmsettings `llmHTTP` + both local provider clients → `core.SafeClient`; `assertPublicLlmBaseUrl` now also runs `core.CheckSSRFHost` (RFC1918/LAN **pin reverted** in `llmsettings_test.go` — that "LAN allowed" parity was exactly the gap). Unit tests green (core + llmsettings + webdav + instancestats packages).
+- **BH-2:** `alerts_webhook.go` FAIL-CLOSED — token unset → 401 for every peer (old open back-compat removed); relay-in-same-container path preserved (token shared via env; world already sets the disposable token).
+- **BH-3:** webdav `NewClient` hc + `wdSyncHTTP` (sync poller) → `core.SafeClient`; `hConnect` rejects blocked literal-IP hosts BEFORE the credentials write (400, nothing saved).
+- **Specs (permanent):** `tests/e2e/specs/internal-security-guards.test.e2e.ts` — 5 legs, **2/2 green on ag-67** (31.8s): unauth 401 / world-token 200 (token read from the compose file — no secret duplication); LLM blocked 400 'blocked host' / public not-blocked; WebDAV blocked 400.
+- **Pass-through proof:** `sync-conflict-webdav` spec **1 passed (36.6s)** on ag-67 — PUBLIC Nextcloud (193.57.139.244) still connects + syncs through the guarded client.
+- **Bake:** ag-67 (10be8f3d), container healthy, login 200.
+- **Battery ag-67: RUNNING** (677+ specs, ~1.8h) — verdict to follow.

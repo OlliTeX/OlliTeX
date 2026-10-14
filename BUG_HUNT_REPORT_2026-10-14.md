@@ -112,13 +112,13 @@ templates policy).
 
 ---
 
-## RECOMMENDED SEQUENCING (owner's call)
-1. **Now (world only, done):** `INTERNAL_ALERTS_TOKEN` set in the e2e compose (BH-2 mitigated in-world).
-2. **Owner decision, then implement (product changes, gate open on request):**
-   - BH-1: shared SSRF policy helper (RFC1918/link-local/loopback + DNS pre-check + redirect re-check) applied to `assertPublicLlmBaseUrl`.
-   - BH-3: same helper applied to the WebDAV base-URL path.
-   - BH-2 (code default): fail-closed when the token env is unset, or keep open-by-default + pin.
-3. **Hygiene (no gate needed):** `zz_live_probe_d_test.go` → move out of the product package or convert to a real unit test; BH-8 rule recorded in the progress log.
+## STATUS — ALL THREE IMPLEMENTED (owner: "all three", 2026-10-14)
+1. **BH-1 — DONE:** shared guard `go/services/web/core/ssrf.go`; `assertPublicLlmBaseUrl` + all LLM provider clients (`llmHTTP`, client.go:365, project.go:712) now SSRF-guarded; RFC1918/LAN pin reverted in the unit tests (that parity was exactly the gap).
+2. **BH-2 — DONE:** `alerts_webhook.go` FAIL-CLOSED (unset → 401 for every peer); world token-gated (compose).
+3. **BH-3 — DONE:** webdav client + sync poller on the guard; `hConnect` rejects blocked hosts before the credentials write.
+4. **Evidence:** guard spec `internal-security-guards.test.e2e.ts` 2/2 green ag-67; `sync-conflict-webdav` 1 passed 36.6s ag-67 (PASS-THROUGH to the public Nextcloud); unit tests green (core/llmsettings/webdav/instancestats); bake ag-67 (10be8f3d).
+5. **Battery ag-67: in flight** — final verdict appended below / progress log.
+6. **Hygiene (no gate needed, still open):** `zz_live_probe_d_test.go` → move out of the product package or convert to a real unit test; BH-8 rule recorded in the progress log.
 
 *Evidence artifacts: this report, `OPEN_QUEUE_PROGRESS.md` (bug-hunt entry), board items TODO-edbf7900-style
 entries for BH-1/2/3, probe transcripts in the session log (all secret values stored to files, never printed).*
