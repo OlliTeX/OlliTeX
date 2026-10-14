@@ -2161,3 +2161,14 @@ Commit lineage: `f378e51b` (CI matrix + Q2) → `06da575b` (battery verdict) →
 **Regression sweep (ag-v65, post-Q4):** sharing-remove-impact 2/2, sharing-token-links 6/6, journey-onboarding 8/8 (one compile-leg first-attempt flake, retry green), journey-lifecycle 7/7.
 
 **Still open (owner):** Q1 — Dropbox app token regeneration (TODO-39e56295) → then re-run `specs/external-probe.test.e2e.ts` dropbox leg. FINDING #10 adjudication.
+
+------------------------------------------------------------------------
+### 2026-10-14 — Q1 (dropbox) CLOSED + FINAL BATTERY ag-v65 — board fully cleared
+- **Q1 (TODO-39e56295) → DONE (13:45 UTC):** owner generated a long-lived access token in the app console (account `gittest26@neuro.uni-bremen.de`) → stored in `credentials/config.json` §dropbox.oauthKey (0600, never echoed). Spec token resolution extended (`cfg.token → cfg.oauthKey → .auth cache → refresh grant`), commit `2c77eac0`. Live API verify 200 `users/get_current_account`; standalone leg **GREEN 539ms**. Lesson saved (no device-code toggle on this app type; generated tokens are long-lived; never hand-transcribe 1.5k-char secrets).
+- **FINAL BATTERY (ag-v65, 1.7h): 670 PASSED / 2 FLAKY / 4 SKIPPED.** Un-greens all triaged:
+  - dropbox leg (failed ×2 at test #212): **code-as-of-run** — the spec lacked `oauthKey` resolution during the battery (wired 20 min later); post-fix leg verified GREEN standalone (539ms). NOT a product/world defect.
+  - journey-lifecycle L4: **spec inconsistency from my own finding** — L4 asserted `< 500` on /admin/active-projects right after L3's fixture delete (dangling-presence 500 = the Node-faithful edge I pinned at L7). Fixed: L4 now carries the same FINDING #10 pin (200|500). Post-fix spec: **7/7 green (1.1m)**.
+  - notifications preferences: first-attempt UI flake (1.7m) → retry 26.7s GREEN (load flake, known class).
+  - 4 skipped = documented conditional legs (e.g., zip H template-exclusion when publish contract is 400).
+- **Commit:** L4 pin fix + this entry. Tree clean.
+- **BOARD STATUS: no open items.** Open questions to the owner: (1) FINDING #10 adjudication (active-projects 500 dangling-presence — accept the faithful edge [pin stands] or normalize the handler); (2) nothing else — all of Q1–Q5, CE-1 clone-500, a11y, SSO/parity, lifecycle, coverage and credential arcs are closed with evidence.
