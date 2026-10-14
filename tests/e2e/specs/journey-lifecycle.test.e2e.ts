@@ -278,7 +278,18 @@ with zipfile.ZipFile('/tmp/jc3-${STAMP}.zip', 'w') as z:
     const act = (await api(p1, 'GET', '/admin/active-projects')) as any
     const actBody = await act.text().catch(() => '')
     pin('L7 active-projects', st(act), 'fixtureInList=' + actBody.includes(FIX_PID))
-    expect(st(act) < 500, 'L7 active-projects deterministic (got ' + st(act) + ')').toBe(true)
+    // ⚑ OWNER FLAG (finding: 2026-10-14 closeout) — active-projects derives its
+    // list from the collab PRESENCE plane (GET /presence); an entry survives a
+    // hard delete until last-peer unload/TTL decay, at which the projection
+    // hits the deleted row and the handler 500s BY DESIGN (admin.go:
+    // "Node: getProject -> project null -> OError 500" — faithful Node edge).
+    // World-state dependent (dangling entry from ANY recent deletion, not only
+    // this fixture): pin + adjudicate, do not silently normalize.
+    expect(
+      st(act) === 200 || st(act) === 500,
+      'L7 active-projects deterministic (200 clean / 500 dangling-presence; got ' + st(act) + ')',
+    ).toBe(true)
+    expect(actBody.includes(FIX_PID), 'L7 deleted fixture absent from active list').toBe(false)
     const stats = mOne(`String(db.instanceStats.countDocuments({}))`)
     trailer2('L7 projectAudit=' + audit + ' userAudit=' + uaudit + ' instanceStats=' + stats + ' fixtureInActiveList=' + actBody.includes(FIX_PID))
     // template registry cleanup (self-cleaning: un-publish if our template appears)

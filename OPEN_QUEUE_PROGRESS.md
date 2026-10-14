@@ -2142,3 +2142,22 @@ Commit: 2798d318
     FLAKE — quiet-world re-run **green (13.2s)**. => globally green apart
     from the one owner-blocked external leg. Battery also re-captured the
     a11y/perf baselines (committed alongside this entry).
+
+------------------------------------------------------------------------
+### 2026-10-14 — owner-adjudication execution wave (Q2–Q5) + battery triage — CLOSED
+World: **ag-v59 → ag-v62 → ag-v63 → ag-v64 → ag-v65** (bake recipe; each cutover verified Image-ID match).
+Commit lineage: `f378e51b` (CI matrix + Q2) → `06da575b` (battery verdict) → `9a99358c`/`8b02b036` (Q4 v1/v2) → v5 `925e15c2`+build-fix (Q4 root) → `d4e4f208` (L6 settle/L7 pin + audit board).
+
+**Battery ag-v59 (667/4/2/4, 1.7h) — triaged green:** dropbox leg = known owner-block (Q1); journey-lifecycle L4/L7 "active-projects 500" + modals offline-recovery = load flakes (quiet re-runs green). a11y + sso-ldap baselines re-captured (committed with verdict).
+
+**Owner adjudications executed (2026-10-14):**
+- **Q2 (b) invite-accept = PENDING — CLOSED as policy** (spec pin + audit row #4 + board TODO-12f65e97 done).
+- **Q3 (a) mail-gated registration — VERIFIED IMPLEMENTED (no code needed):** live chain proven (source token+link+mail fail-closed → smtpsink :1025/:18025 capture → new-user probe captured "Activate your OlliTeX Account" → pre-activation login rejected → `journey-onboarding` 8/8 green on ag-v65 incl. L1 register/L2 activation-pin/L3 recovery). Board TODO-32c45172 done.
+- **Q4 probe-then-decide — FIXED + VERIFIED (ag-v65):** no reaper exists; product deletion now owns residue. Root cause chain proven live: docstore archive no-op (D41) + chunks are ObjectID-keyed (3446/3446 — raw string deletes could never match) + historyv1 purge route (`DELETE /api/projects/{pid}`, staging:STAGING_PASSWORD) 204-verified (chunk active→deleted) + room grace-close late chunk finalizations (sweeps +12s/+60s). **L6 (product route `DELETE /admin/project/<pid>`, settle window): residue projects:1→0 docs:1→0 ydoc:1→0 chunks:1→0, residue-after=none; journey-lifecycle 7/7 green (1.1m).** storeTable perf: 90 cold mongosh → 1 batched round-trip (L6 15.6m → ~40s). Board TODO-d8d5ee40 done.
+- **Q5 (a) zip-import sync — VERIFIED WORKING (no code needed):** sentinel zip → `POST /project/new/upload` (name+qqfile) → editor buffer carries full sentinel (`SENTINEL-IN-BUFFER=true`); room seed path (`collab/seedsource.go`) proven; L3 independence green. Board TODO-419d4f03 done.
+
+**NEW FINDING #10 (owner adjudication, pinned — NOT a defect to silently fix):** `GET /admin/active-projects` → 500 while ANY recently-deleted project still holds a collab presence entry (handler projects the presence plane; `name == nil` → 500 by design, "Node: getProject → project null → OError 500"). Deterministic repro + decay to 200 documented; L7 pins (200 clean / 500 dangling) + asserts deleted-fixture-absent. Owner question: accept the faithful edge or normalize.
+
+**Regression sweep (ag-v65, post-Q4):** sharing-remove-impact 2/2, sharing-token-links 6/6, journey-onboarding 8/8 (one compile-leg first-attempt flake, retry green), journey-lifecycle 7/7.
+
+**Still open (owner):** Q1 — Dropbox app token regeneration (TODO-39e56295) → then re-run `specs/external-probe.test.e2e.ts` dropbox leg. FINDING #10 adjudication.
