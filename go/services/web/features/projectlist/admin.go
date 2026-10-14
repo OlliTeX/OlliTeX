@@ -44,6 +44,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"golang.org/x/crypto/hkdf"
 	"io"
@@ -55,6 +56,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"ollitex/go/services/web/core"
 	"ollitex/go/services/web/views"
 )
@@ -405,15 +407,23 @@ func adminActiveProjects(a *core.App) func(*core.Cxt, *core.Res) {
 			var proj struct {
 				Name *string `bson:"name"`
 			}
+			var projErr error
 			if dbErr == nil {
-				if dbErr = db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&proj); dbErr == nil {
-					name = proj.Name
-				}
+				projErr = db.Collection("projects").FindOne(ctx, bson.D{{Key: "_id", Value: oid}}).Decode(&proj)
 			}
-			if name == nil {
-				// Node: getProject -> project null -> OError 500.
-				aPage500(cxt, res)
+			if projErr != nil && !errors.Is(projErr, mongo.ErrNoDocuments) {
+				aPage500(cxt, res) // genuine projection failure on a live room — keep the error edge
 				return
+			}
+			name = proj.Name
+			if name == nil {
+				// Finding #10 Option B (owner-sanctioned 2026-10-14): dangling presence —
+				// the presence plane still lists a room whose project row is gone
+				// (deletion seconds ago; presence decays async on last-peer unload/TTL).
+				// Legacy Node edge was 500 ("getProject -> project null -> OError 500");
+				// owner selected the normalized edge: skip the room, the surface
+				// renders the remaining live projects (200).
+				continue
 			}
 			uidsSorted := make([]string, 0, len(uniq[pid]))
 			for u := range uniq[pid] {

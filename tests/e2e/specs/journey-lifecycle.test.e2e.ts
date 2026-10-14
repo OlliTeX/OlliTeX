@@ -158,19 +158,13 @@ with zipfile.ZipFile('/tmp/jc3-${STAMP}.zip', 'w') as z:
     pin('L4 members', st(mem), (await mem.text().catch(() => '')).slice(0, 60))
     expect(st(mem) < 500, 'L4 members surface deterministic (got ' + st(mem) + ')').toBe(true)
     const act = (await api(p1, 'GET', '/admin/active-projects')) as any
-    /* ⚑ FINDING #10 PIN (2026-10-14): 200 = clean / 500 = dangling-presence edge
-     * (admin.go:414 "Node: getProject -> project null -> OError 500") — freshly-deleted
-     * fixtures (L3's zip project, prior-battery residue) still holding collab presence
-     * entries deterministically 500 this surface until the presence plane decays. */
-    const actEdge500 = st(act) === 500
-    pin('L4 active-projects', st(act), actEdge500 ? 'PINNED dangling-presence 500 (F10)' : ((await act.text().catch(() => '')).slice(0, 60)))
-    expect(st(act) === 200 || actEdge500, 'L4 active-projects ∈ {200, 500-dangling-presence pin} (got ' + st(act) + ')').toBe(true)
-    if (st(act) === 200) {
-      const actBody = (await act.text().catch(() => ''))
-      trailer2('L4 active-list sees fixture=' + actBody.includes(FIX_PID))
-    } else {
-      trailer2('L4 active-list: 500 pin — dangling presence on a deleted fixture (owner adjudication: accept/normalize)')
-    }
+    /* ⚑ FINDING #10 — NORMALIZED (owner Option B, sanctioned 2026-10-14): dangling presence
+     * (freshly-deleted fixtures from L3 / prior runs, presence decays async) is SKIPPED
+     * by the handler instead of the legacy Node-faithful 500 → the surface is always 200. */
+    pin('L4 active-projects', st(act), (await act.text().catch(() => '')).slice(0, 60))
+    expect(st(act) === 200, 'L4 active-projects 200 (normalized dangling-presence edge; was Node-faithful 500 pre-Option-B) (got ' + st(act) + ')').toBe(true)
+    const actBody = (await act.text().catch(() => ''))
+    trailer2('L4 active-list sees fixture=' + actBody.includes(FIX_PID) + ' (fixture still live here; absence is enforced post-purge in L7)')
     // deactivation: NO admin project-deactivate route in this world's admin.go pattern set
     // (deactivateold*.go = the legacy 90-day inactivity auto-job — owner-gated time path, not an action)
     await p1.goto(BASE + '/hub', { waitUntil: 'domcontentloaded' }).catch(() => {})
@@ -287,16 +281,18 @@ with zipfile.ZipFile('/tmp/jc3-${STAMP}.zip', 'w') as z:
     const act = (await api(p1, 'GET', '/admin/active-projects')) as any
     const actBody = await act.text().catch(() => '')
     pin('L7 active-projects', st(act), 'fixtureInList=' + actBody.includes(FIX_PID))
-    // ⚑ OWNER FLAG (finding: 2026-10-14 closeout) — active-projects derives its
-    // list from the collab PRESENCE plane (GET /presence); an entry survives a
-    // hard delete until last-peer unload/TTL decay, at which the projection
-    // hits the deleted row and the handler 500s BY DESIGN (admin.go:
-    // "Node: getProject -> project null -> OError 500" — faithful Node edge).
-    // World-state dependent (dangling entry from ANY recent deletion, not only
-    // this fixture): pin + adjudicate, do not silently normalize.
+    // ⚑ FINDING #10 — NORMALIZED (owner Option B, sanctioned 2026-10-14):
+    // active-projects derives its list from the collab PRESENCE plane (GET /presence);
+    // a dangling entry (project hard-deleted, presence still decaying on last-peer
+    // unload/TTL) used to 500 BY DESIGN (admin.go: "Node: getProject -> project null
+    // -> OError 500" — faithful Node edge). Owner selected the normalized edge:
+    // handler SKIPS rooms whose project row is gone (real projection errors still
+    // 500) → the surface is now ALWAYS 200, and the deleted fixture must be absent
+    // from the rendered list. The enforceable version of this assertion was
+    // previously impossible (world-state-dependent 500s); it is now the contract.
     expect(
-      st(act) === 200 || st(act) === 500,
-      'L7 active-projects deterministic (200 clean / 500 dangling-presence; got ' + st(act) + ')',
+      st(act) === 200,
+      'L7 active-projects 200 post-purge (normalized dangling-presence edge; was 500 pre-Option-B; got ' + st(act) + ')',
     ).toBe(true)
     expect(actBody.includes(FIX_PID), 'L7 deleted fixture absent from active list').toBe(false)
     const stats = mOne(`String(db.instanceStats.countDocuments({}))`)
