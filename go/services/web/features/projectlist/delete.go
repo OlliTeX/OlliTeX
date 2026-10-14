@@ -215,10 +215,19 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 				_ = cursor.Close(ctx)
 			}
 			_, _ = db.Collection("docs").DeleteMany(ctx, bson.D{{Key: "project_id", Value: oid}})
+			// ydoc rooms, the three known key shapes (roomkey.go):
+			//   root room      _id = ObjectId(project-id)
+			//   per-doc rooms  _id = "<pid>-<docid>" (string)
+			//   (legacy)       _id IN the project's doc ids
 			if len(docIDs) > 0 {
+				all := append([]bson.ObjectID{oid}, docIDs...)
 				_, _ = db.Collection("ydoc").DeleteMany(ctx,
-					bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: docIDs}}}})
+					bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: all}}}})
 			}
+			_, _ = db.Collection("ydoc").DeleteOne(ctx,
+				bson.D{{Key: "_id", Value: oid}})
+			_, _ = db.Collection("ydoc").DeleteMany(ctx,
+				bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pid + "-"}}}})
 			_, _ = db.Collection("chunks").DeleteMany(ctx,
 				bson.D{{Key: "projectId", Value: pid}})
 		}
