@@ -2183,3 +2183,12 @@ Commit lineage: `f378e51b` (CI matrix + Q2) → `06da575b` (battery verdict) →
   - journey-lifecycle **7/7 (1.1m)** — L4 200 (fixture live, listed — correct); L6 Q4 cascade intact (residue 1/1/1 → 0/0/0, residue-after=none); **L7 200 + fixtureInList=false** (normalized contract enforced post-purge).
 - **Pitfalls log:** `mongo-driver v2` renames the sentinel → `mongo.ErrNoDocuments` (v0/v1 `ErrNoDocument` undefined); compose cutovers on this stack REQUIRE `--env-file .env.test` (missing → `000_check_missing_secrets` exit 101).
 - **Battery ag-v66:** global gate running (pid 1263775, /tmp/battery_agv66.log) — verdict appended on completion.
+
+------------------------------------------------------------------------
+### 2026-10-14 — BATTERY ag-v66 VERDICT (Finding #10 Option B world) — 673 / 0 / 1 / 4 — GLOBAL GREEN
+Full battery 1.8h on `olpsint/overleaf:ag-v66`:
+- **673 PASSED** (up from 670 on ag-v65: +dropbox leg now GREEN with the owner's long-lived token; +journey-lifecycle L4/L7 on the normalized 200-only contract; +permanent `active-projects-normalized` regression leg).
+- **0 FAILED.**
+- **1 FLAKY**: notifications preferences first attempt (1.7m load flake under battery concurrency; retry 26s green) — known class, second occurrence on record (ag-v65 + ag-v66), no code change justified.
+- **4 SKIPPED**: documented conditional legs (template-exclusion when publish contract 400, etc.).
+Finding #10 arc: CLOSED with the global gate met. Board fully cleared.
