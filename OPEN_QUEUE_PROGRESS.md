@@ -2224,3 +2224,25 @@ Finding #10 arc: CLOSED with the global gate met. Board fully cleared.
 - **failed:** external-probe 'dropbox token is valid' — **external cause**: owner's sl.u. token now 401 `expired_access_token` on Dropbox's side (direct host-side probe; green 2h earlier). → **board: owner must regenerate** (never hand-transcribe).
 - **flaky:** notifications first-attempt load flake — **3rd occurrence on record** (ag-v65/66/67) → instrument board item opened (rule: 3rd = real-timing review).
 - **guards arc:** internal-security-guards 2/2 GREEN (BH-1/2/3 legs); sync-conflict-webdav 1 passed (public pass-through ✓); LLM/WebDAV/alerts suites green; **all three BH product changes verified in the full battery with zero collateral failures**.
+
+### Round-2 bug hunt (2026-10-14, same mandate — deeper plane)
+**BH-4 (FINDING, owner adjudication TODO-2f5828a3):** ghsync server-URL surface = unguarded SSRF/oracle dial
+(scheme-only vetting `gsAssertHttpServerUrl`). Live proofs (self-cleaned after capture): linkPAT @ forgejo 172.20.0.18 →
+internal 401 MAPPED INTO RESPONSE ("Token invalid or expired…", oracle proven); linkPAT @ 169.254.169.254 → 30s+ client
+timeout (server hung dialing cloud metadata = full SSRF read on a real VM); cross-project clone stopped ACCIDENTALLY by
+git-bridge's per-repo token gate (live 401 without token = good defense, but not a URL guard). DESIGN NUANCE: feature
+dials the user's OWN self-hosted git (legit private targets exist) → a full SSRF block would BREAK the feature →
+surgical recommendation (block 127/8 + 169.254/16 + 0/8 + :: only, allow RFC1918+public+names) is the OWNER'S CALL.
+Pin spec GREEN + self-cleaning: `tests/e2e/specs/ghsync-url-surface.test.e2e.ts` (oracle pin = flip point if approved).
+Secondary (report §SECONDARY): R2-1 password-reset email enumeration (3 distinguishable outcomes — code-verified,
+Node-faithful); R2-2 `DELETE /user/git-servers/:id` can't address '/'-bearing URLs → ununlinkable state (hit live;
+mongo `githubSyncUserCredentials` cleanup, fixtures preserved); R2-3 faq-search unsanitized innerHTML (Algolia wiki
+content; instance-owned + CSP-mitigated + dormant without Algolia config = low); R2-4 wakatime user-server design
+(excluded from SSRF class — same principal).
+CLEARED (round 2): askpass shellQuote escaping correct; all git calls argv-only (no shell); `file://` repo URLs
+defeated by the serverUrl join (only http(s) internal dialing is live = the oracle); typst compile = quoted positional
+args (no filename injection); historyv1 zip = write-only; crypto/rand at every security-relevant token/ID site
+(math/rand = non-security use); `go test -race` CLEAN (core/ghsync/gitbridge); persistor key flattening = FSPersistor-mode
+only (active S3 persistor = keys verbatim, no cross-project keys); git-bridge per-repo token gate = recorded good defense.
+Recorded in `BUG_HUNT_REPORT_2026-10-14_R2.md`. **No product changes this round** (awaiting owner on BH-4).
+**World state: ag-67** (unchanged; all probe state verified removed from mongo + spec self-cleaning).
