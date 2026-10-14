@@ -48,6 +48,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -356,7 +357,7 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 			_, _ = db.Collection("ydoc").DeleteMany(ctx,
 				bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHexOf(oid) + "-"}}}})
 			_, _ = db.Collection("chunks").DeleteMany(ctx,
-				bson.D{{Key: "projectId", Value: bson.D{{Key: "$in", Value: []any{oid, pidHexOf(oid)}}}})
+				bson.D{{Key: "projectId", Value: bson.D{{Key: "$in", Value: []any{oid, pidHexOf(oid)}}}}})
 			return countOrphans(ctx, db, oid, pidHexOf(oid))
 		}
 
@@ -401,7 +402,7 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 						_, _ = db.Collection("ydoc").DeleteMany(ctx3,
 							bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHexOf(oid) + "-"}}}})
 						_, _ = db.Collection("chunks").DeleteMany(ctx3,
-							bson.D{{Key: "projectId", Value: bson.D{{Key: "$in", Value: []any{oid, pidHexOf(oid)}}}})
+							bson.D{{Key: "projectId", Value: bson.D{{Key: "$in", Value: []any{oid, pidHexOf(oid)}}}}})
 					}
 				}
 				time.Sleep(12 * time.Second)
