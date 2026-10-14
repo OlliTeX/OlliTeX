@@ -149,6 +149,9 @@ services:
       OVERLEAF_EMAIL_FROM_ADDRESS: 'OlliTeX <noreply@e2e.test>'
       OVERLEAF_EMAIL_DRIVER: smtp
       OVERLEAF_EMAIL_SMTP_HOST: smtpsink
+      # bug-hunt 2026-10-14 (BH-2): enable the internal token gate on /internal/alerts
+      # (otherwise the sink is open-accept by back-compat default). Disposable e2e secret.
+      INTERNAL_ALERTS_TOKEN: E2E-INTERNAL-c40b9f9e1e73ceac6dec4e5a
       OVERLEAF_EMAIL_SMTP_PORT: '1025'
       OVERLEAF_EMAIL_SMTP_SECURE: 'false'
       # 2026-09 (mega-batch): SP public cert for SAML SP-signing metadata

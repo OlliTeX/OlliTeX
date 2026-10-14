@@ -2192,3 +2192,17 @@ Full battery 1.8h on `olpsint/overleaf:ag-v66`:
 - **1 FLAKY**: notifications preferences first attempt (1.7m load flake under battery concurrency; retry 26s green) — known class, second occurrence on record (ag-v65 + ag-v66), no code change justified.
 - **4 SKIPPED**: documented conditional legs (template-exclusion when publish contract 400, etc.).
 Finding #10 arc: CLOSED with the global gate met. Board fully cleared.
+
+---
+
+## Bug hunt (owner mandate 2026-10-14) — report + board + world hardening (2026-10-14)
+
+- **Mandate:** intensive bug hunt over the project — bugs, security, structural problems.
+- **Method:** route-table extraction (322 routes) → per-plane static security reads (authz, CSRF, SSRF shells/files/crypto/session/anon surface) → **live adversarial probes on ag-v66** (throwaway fixtures, self-clean) → structural/hygiene pass → battery cross-check (673 green incl. ce-idor-matrix 7×5).
+- **CONFIRMED FINDINGS:**
+  - **BH-1 (HIGH, live):** LLM provider check/scan SSRF — 10/8, 172.16/12, 192.168/16 + DNS-resolved private pass; internal response **bodies** echoed to the user (sw-filer/smtpsink/sw-s3 oracles). Guard (assertPublicLlmBaseUrl) blocks names+127/8+169.254/16 only. In-tree fix pattern exists (templates allowlist+CIDR+redirect-recheck). → **board TODO-c4b266c2** (owner-gated fix; pin meanwhile).
+  - **BH-2 (MED, live):** /internal/alerts open-accept when INTERNAL_ALERTS_TOKEN unset (200 unauth live-verified) → alert-injection→email-spam primitive once recipients configured. **World hardened now:** token set in e2e compose → unauth 401 / authed 200 verified; container healthy. Code default (open back-compat) = owner call. → **board TODO-425037f1**.
+  - **BH-3 (MED, code):** WebDAV base URL stored with no range/host guard (latent dial on sync) → **board TODO-1f13b0d2** (fix = product change, owner-gated).
+- **Informational:** no Secure on cookies (plain-HTTP world), nginx version disclosure, 429 limiter opaque (Node-pinned), zz_live_probe dev test in product tree, probe/dev binaries in image, NoCSRF federation surfaces (preflight-mitigated, dormant), **BH-8 process rule: temporary e2e specs MUST match the `*.test.e2e.ts` glob → delete after run** (silent battery pickup).
+- **CLEARED (close-read/live):** IDOR planes (library/templates/history/serveradmin/tokenaccess/chatbridge/fileproxy), CSRF coverage, zip-slip ×2 (safe-path + whitelist), zip-bomb (actual-byte caps), file proxy (hash-id), stored XSS (text-escape/sanitized), session fixation (sid rotates on login), SAML/OIDC signatures, LDAP dual limiting, 16 anon mutation routes all bounded, 12MB MaxBytes body cap, internal stats sink gated (302).
+- **Deliverable:** `BUG_HUNT_REPORT_2026-10-14.md` (+ board items + world-hardening compose change).
