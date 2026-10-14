@@ -118,6 +118,7 @@ templates policy).
 3. **BH-3 — DONE:** webdav client + sync poller on the guard; `hConnect` rejects blocked hosts before the credentials write.
 4. **Evidence:** guard spec `internal-security-guards.test.e2e.ts` 2/2 green ag-67; `sync-conflict-webdav` 1 passed 36.6s ag-67 (PASS-THROUGH to the public Nextcloud); unit tests green (core/llmsettings/webdav/instancestats); bake ag-67 (10be8f3d).
 5. **Battery ag-67: in flight** — final verdict appended below / progress log.
+**Battery ag-67 final: 674 passed / 1 failed / 1 flaky / 4 skipped (1.7h)** — the single failure is external (owner's Dropbox token lapsed on Dropbox's side; verified by direct probe). Guard legs green; public WebDAV pass-through green; zero collateral regressions from the three fixes.
 6. **Hygiene (no gate needed, still open):** `zz_live_probe_d_test.go` → move out of the product package or convert to a real unit test; BH-8 rule recorded in the progress log.
 
 *Evidence artifacts: this report, `OPEN_QUEUE_PROGRESS.md` (bug-hunt entry), board items TODO-edbf7900-style

@@ -2218,3 +2218,9 @@ Finding #10 arc: CLOSED with the global gate met. Board fully cleared.
 - **Pass-through proof:** `sync-conflict-webdav` spec **1 passed (36.6s)** on ag-67 — PUBLIC Nextcloud (193.57.139.244) still connects + syncs through the guarded client.
 - **Bake:** ag-67 (10be8f3d), container healthy, login 200.
 - **Battery ag-67: RUNNING** (677+ specs, ~1.8h) — verdict to follow.
+
+### Battery ag-67 verdict (2026-10-14)
+- **674 passed / 1 failed / 1 flaky / 4 skipped (1.7h).**
+- **failed:** external-probe 'dropbox token is valid' — **external cause**: owner's sl.u. token now 401 `expired_access_token` on Dropbox's side (direct host-side probe; green 2h earlier). → **board: owner must regenerate** (never hand-transcribe).
+- **flaky:** notifications first-attempt load flake — **3rd occurrence on record** (ag-v65/66/67) → instrument board item opened (rule: 3rd = real-timing review).
+- **guards arc:** internal-security-guards 2/2 GREEN (BH-1/2/3 legs); sync-conflict-webdav 1 passed (public pass-through ✓); LLM/WebDAV/alerts suites green; **all three BH product changes verified in the full battery with zero collateral failures**.
