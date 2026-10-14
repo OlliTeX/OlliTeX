@@ -335,25 +335,31 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 		//     response and cannot be cancelled by the request finishing).
 		if residual > 0 {
 			go func() {
-				time.Sleep(12 * time.Second)
-				ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel2()
-				flushRoomsNow(ctx2, pidHexOf(oid), docIDHexes)
-				ctx3, cancel3 := context.WithTimeout(context.Background(), 8*time.Second)
-				defer cancel3()
-				if db, err := a.Mongo.DB(ctx3); err == nil {
-					_, _ = db.Collection("docs").DeleteMany(ctx3, bson.D{{Key: "project_id", Value: oid}})
-					yids := []any{oid, pidHexOf(oid)}
-					for _, h := range docIDHexes {
-						yids = append(yids, h)
+				sweep := func() {
+					ctx3, cancel3 := context.WithTimeout(context.Background(), 8*time.Second)
+					defer cancel3()
+					flushRoomsNow(ctx3, pidHexOf(oid), docIDHexes)
+					if db, err := a.Mongo.DB(ctx3); err == nil {
+						_, _ = db.Collection("docs").DeleteMany(ctx3, bson.D{{Key: "project_id", Value: oid}})
+						yids := []any{oid, pidHexOf(oid)}
+						for _, h := range docIDHexes {
+							yids = append(yids, h)
+						}
+						_, _ = db.Collection("ydoc").DeleteMany(ctx3,
+							bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: yids}}}})
+						_, _ = db.Collection("ydoc").DeleteMany(ctx3,
+							bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHexOf(oid) + "-"}}}})
+						_, _ = db.Collection("chunks").DeleteMany(ctx3,
+							bson.D{{Key: "projectId", Value: pidHexOf(oid)}})
 					}
-					_, _ = db.Collection("ydoc").DeleteMany(ctx3,
-						bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: yids}}}})
-					_, _ = db.Collection("ydoc").DeleteMany(ctx3,
-						bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHexOf(oid) + "-"}}}})
-					_, _ = db.Collection("chunks").DeleteMany(ctx3,
-						bson.D{{Key: "projectId", Value: pidHexOf(oid)}})
 				}
+				time.Sleep(12 * time.Second)
+				sweep()
+				// second sweep: the room's grace-close flush can land well after the
+				// first one (L6 live data: chunk row still landing 20-40s post-delete);
+				// the later write wins, so sweep again after the grace window.
+				time.Sleep(60 * time.Second)
+				sweep()
 			}()
 		}
 	}

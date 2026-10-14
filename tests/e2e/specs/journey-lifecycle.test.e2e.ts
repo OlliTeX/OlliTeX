@@ -289,27 +289,34 @@ function okIf2xx(r: any, label: string): void {
 }
 function storeTable(pid: string): Record<string, number> {
   const cols = ['projects', 'docs', 'ydoc', 'rooms', 'docHistory', 'docHistoryIndex', 'docSnapshots', 'projectHistoryChunks', 'projectHistoryLabels', 'projectInvites', 'projectAuditLogEntries', 'contacts', 'libraryreferences', 'deletedProjects', 'chunks']
-  const out: Record<string, number> = {}
-  for (const c of cols) {
-    try {
-      // a project-keyed doc may carry the pid as _id (ObjectId), _id (string), or a ref field —
-      // query each shape SEPARATELY (mongosh --eval chokes on literal arrays nested in $or —
-      // world-quirk pinned 2026-10-13) and take the max (honest bound across keyings).
-      const q = (filter: string): number => {
-        const raw = mOne(`db.getCollection('${c}').countDocuments(${filter})`)
-        const n = parseInt(String(raw).replace(/[^0-9-]/g, '') || '0', 10)
-        return Number.isFinite(n) ? Math.abs(n) : 0
-      }
-      out[c] = Math.max(
-        q(`{ _id: ObjectId('${pid}') }`),
-        q(`{ _id: '${pid}' }`),
-        q(`{ project_id: ObjectId('${pid}') }`),
-        q(`{ projectId: ObjectId('${pid}') }`),
-        q(`{ projectDocId: '${pid}/MAIN' }`),
-        q(`{ projectDocId: '${pid}/main.tex' }`),
-      )
-    } catch { out[c] = -1 }
+  // PERF (2026-10-14 L6 hang post-mortem): the per-cell docker-exec loop was
+  // 15 cols × 6 shapes = 90 COLD mongosh starts per table (45-90s per call;
+  // the 12-poll settle loop → 15+ min test "hangs"). One batched eval:
+  const shapes = [
+    `{ _id: ObjectId('${pid}') }`,
+    `{ _id: '${pid}' }`,
+    `{ project_id: ObjectId('${pid}') }`,
+    `{ projectId: ObjectId('${pid}') }`,
+    `{ projectDocId: '${pid}/MAIN' }`,
+    `{ projectDocId: '${pid}/main.tex' }`,
+  ]
+  let raw = ''
+  try {
+    raw = `var out={}; ${cols.map((c) => `try{var mx=0; ${shapes.map((s) => `var n=db.${c}.countDocuments(${s}); if(n>mx)mx=n;`).join(' ')} out['${c}']=mx;}catch(e){out['${c}']=-1;}`).join(' ')} JSON.stringify(out)`
+  } catch { return {} as Record<string, number> }
+  let j: any = null
+  try {
+    const v = mongoEval(raw)
+    if (v && typeof v === 'object') j = v as Record<string, unknown>
+    else j = JSON.parse(String(v).trim())
+  } catch { j = null }
+  if (!j || typeof j !== 'object') {
+    const out: Record<string, number> = {}
+    cols.forEach((c) => (out[c] = -1))
+    return out
   }
+  const out: Record<string, number> = {}
+  cols.forEach((c) => (out[c] = Number.isFinite(Number(j[c])) ? Number(j[c]) : -1))
   return out
 }
 async function killCtx(p: Page, pid: string): Promise<string> {
