@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"ollitex/go/services/web/core"
 )
 
 // ---------- SSRF guard (Node assertPublicLlmBaseUrl, exact details) ----------
@@ -64,6 +66,14 @@ func assertPublicLlmBaseUrl(rawURL string) error {
 		case a == 169 && b == 254:
 			return blockedURL("cloud metadata / link-local range")
 		}
+	}
+	// bug-hunt 2026-10-14 (BH-1, owner-gated): extended blocked ranges for
+	// LITERAL-IP hosts — RFC1918 (10/8, 172.16/12, 192.168/16), CGNAT,
+	// benchmarking, reserved/multicast. Name hosts are enforced against
+	// their RESOLVED address set at dial time by core.SafeClient (ANY
+	// private result vetoes the dial — fail-closed).
+	if cerr := core.CheckSSRFHost(host); cerr != nil {
+		return blockedURL(cerr.Error())
 	}
 	return nil
 }
@@ -194,7 +204,7 @@ func clampJS(n, lo, hi int) int {
 
 // ---------- listModels (Node LLMClient.listModels) ----------
 
-var llmHTTP = &http.Client{Timeout: 61 * time.Second}
+var llmHTTP = core.SafeClient(61 * time.Second)
 
 func isTimeoutErr(err error) bool {
 	if errors.Is(err, context.DeadlineExceeded) {
@@ -362,7 +372,7 @@ func chatProbe(base, apiType, apiKey, model string) (string, error) {
 	if err != nil {
 		return "", &llmError{code: "llm-error", message: "LLM request failed: " + err.Error()}
 	}
-	client := &http.Client{Timeout: 61 * time.Second}
+	client := core.SafeClient(61 * time.Second)
 	req, err := http.NewRequest("POST", uStr, strings.NewReader(string(raw)))
 	if err != nil {
 		return "", &llmError{code: "llm-error", message: fmt.Sprintf("LLM request failed: %s (model: %s)", err.Error(), model)}

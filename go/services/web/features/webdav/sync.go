@@ -30,7 +30,7 @@ import (
 	"ollitex/go/services/web/core"
 )
 
-var wdSyncHTTP = &http.Client{Timeout: 30 * time.Second}
+var wdSyncHTTP = core.SafeClient(30 * time.Second)
 
 // wdDocstoreBase — service base (Node: DocstoreManager).
 func wdDocstoreBase() string {

@@ -709,7 +709,7 @@ func llmCall(lr *laneRef, timeout time.Duration, attempts int, messages []map[st
 		}
 		uStr = base + "/chat/completions"
 	}
-	client := &http.Client{Timeout: timeout}
+	client := core.SafeClient(timeout)
 	raw := llmPayload(lr, messages, maxTokens, temperature)
 	var lastErr error
 	for i := 0; i < attempts; i++ {

@@ -27,6 +27,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"ollitex/go/services/web/core"
 )
 
 // wdHTTPError — an HTTP-level WebDAV failure (Node error message =
@@ -86,12 +88,19 @@ func wdNewCredsClient(plainJSON string) (*wdClient, error) {
 	}
 	prefix := strings.TrimSuffix(u.Path, "/")
 	prefix, _ = url.QueryUnescape(prefix)
+	// bug-hunt 2026-10-14 (BH-3, owner-gated): no WebDAV servers on the
+	// container network — literal-IP hosts in blocked ranges are rejected
+	// here; name hosts are enforced against their RESOLVED address set at
+	// dial time by core.SafeClient (fail-closed).
+	if cerr := core.CheckSSRFHost(u.Hostname()); cerr != nil {
+		return nil, &wdHTTPError{code: 400, msg: "WebDAV base URL points at a blocked host (private/internal not allowed)"}
+	}
 	return &wdClient{
 		base: u.Scheme + "://" + u.Host + prefix,
 		user: user,
 		pass: pass,
 		root: wdNormalizePath(root),
-		hc:   &http.Client{Timeout: 10 * time.Second},
+		hc:   core.SafeClient(10 * time.Second),
 	}, nil
 }
 

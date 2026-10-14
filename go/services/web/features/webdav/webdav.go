@@ -74,6 +74,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -424,6 +425,17 @@ func hConnect(a *core.App) func(*core.Cxt, *core.Res) {
 		if err != nil {
 			res.JSON(400, []byte(`{}`))
 			return
+		}
+		// bug-hunt 2026-10-14 (BH-3, owner-gated): reject blocked literal-IP
+		// hosts at connect time. Name hosts are enforced against their
+		// RESOLVED address set at dial time by core.SafeClient (fail-closed).
+		if burl, _, _ := wdStrField(body, "baseUrl"); burl != "" {
+			if uu, perr := url.Parse(burl); perr == nil && uu.Hostname() != "" {
+				if cerr := core.CheckSSRFHost(uu.Hostname()); cerr != nil {
+					res.JSON(400, []byte(`{"success":false,"message":"blocked host (private/loopback/link-local/internal not allowed)"}`))
+					return
+				}
+			}
 		}
 		if serr := wdSaveCreds(ctx, a, uid, wdCredsPlain(body)); serr != nil {
 			res.JSON(500, []byte(`{"error":`+wdJSString(serr.Error())+`}`))

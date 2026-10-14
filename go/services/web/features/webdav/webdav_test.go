@@ -28,6 +28,15 @@ import (
 // like a file) and kept the self-entry in items (import then GET <self> →
 // 404 "Not Found"; directory recursion would be unbounded). Fixed: presence
 // pointer + self-entry skip.
+
+// TestMain — unit tests dial loopback httptest servers; the SSRF guard
+// (bug-hunt 2026-10-14 BH-3) vetoes loopback in production, so the tests use
+// the documented server-side test bypass (never set in production/e2e).
+func TestMain(m *testing.M) {
+	os.Setenv("OL_SSRF_TEST_BYPASS", "1")
+	os.Exit(m.Run())
+}
+
 func TestWdListMultistatusParse(t *testing.T) {
 	const listing = `<?xml version="1.0" encoding="utf-8" ?>
 <D:multistatus xmlns:D="DAV:">

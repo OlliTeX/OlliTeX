@@ -156,8 +156,11 @@ func TestBlockedURLs(t *testing.T) {
 		"ftp://example.com/x":                     "only http(s) URLs are allowed",
 		"http://localhost:1234/v1":                "loopback/local name",
 		"http://127.0.0.1:11434/v1":               "loopback range",
-		"http://192.168.1.10:8080/v1":             "",
-		"http://10.0.0.5:8080/v1":                 "",
+		// bug-hunt 2026-10-14 (BH-1, owner-gated): RFC1918 pin REVERTED —
+		// 192.168/16 and 10/8 are now blocked (the old "LAN allowed" parity
+		// was exactly the SSRF gap that was closed).
+		"http://192.168.1.10:8080/v1": "blocked host (private/loopback/link-local/internal not allowed)",
+		"http://10.0.0.5:8080/v1":     "blocked host (private/loopback/link-local/internal not allowed)",
 		"http://169.254.169.254/latest/meta-data": "cloud metadata / link-local range",
 		"http://[::1]:11434/v1":                   "loopback/local name",
 		"http://0.0.0.0:11434/v1":                 "loopback/local name",
