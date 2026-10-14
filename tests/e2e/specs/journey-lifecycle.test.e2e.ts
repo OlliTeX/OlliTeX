@@ -232,7 +232,18 @@ with zipfile.ZipFile('/tmp/jc3-${STAMP}.zip', 'w') as z:
     trailer2('L6 pDel=' + pDel.status() + ' ' + (await pDel.text().catch(() => '')).slice(0, 80))
     expect(pDel.status(), 'admin hard delete status').toBe(200)
     // RESIDUE TABLE (the store-cleanup truth)
-    const after = storeTable(FIX_PID)
+    // The product handler converges (flush → purge ×3); the room's debounced
+    // write-back (grace close) can land just AFTER the handler returns, so
+    // the spec settles: re-measure up to 3× at 1.5s and assert on the FINAL
+    // table — the convergence contract, not an instant snapshot.
+    let after = storeTable(FIX_PID)
+    const settleChecks = 3
+    for (let i = 0; i < settleChecks; i++) {
+      const hasResidue = (after.docs > 0 || after.ydoc > 0 || after.chunks > 0)
+      if (!hasResidue) break
+      await new Promise((r) => setTimeout(r, 1500))
+      after = storeTable(FIX_PID)
+    }
     const row = Object.keys(after).map((k) => k + ':' + before[k] + '→' + after[k]).join(' ')
     trail.push('L6 residue ' + row)
     expect(after.projects, 'L6 projects row gone (got ' + after.projects + ')').toBe(0)

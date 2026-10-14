@@ -47,8 +47,10 @@ package projectlist
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -64,6 +66,29 @@ import (
 
 var delPat = regexp.MustCompile(`^/Project/([^/]+)$`)
 var restPat = regexp.MustCompile(`^(?i)/project/([^/]+)/restore$`)
+
+// pidHexOf — ObjectID → 24-hex (the store key shape).
+func pidHexOf(o bson.ObjectID) string { return o.Hex() }
+
+// countOrphans — residue the 5b cascade must drive to zero (the L6
+// "residue table" in spec terms): docs by project_id, ydoc by the known
+// key shapes, chunks by projectId.
+func countOrphans(ctx context.Context, db *mongo.Database, oid bson.ObjectID, pidHex string) (int64, error) {
+	t, _ := db.Collection("docs").CountDocuments(ctx, bson.D{{Key: "project_id", Value: oid}})
+	ys := []any{oid, pidHex}
+	if t2, err := db.Collection("ydoc").CountDocuments(ctx,
+		bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: ys}}}}); err == nil {
+		t += t2
+	}
+	if t3, err := db.Collection("ydoc").CountDocuments(ctx,
+		bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHex + "-"}}}}); err == nil {
+		t += t3
+	}
+	if t4, err := db.Collection("chunks").CountDocuments(ctx, bson.D{{Key: "projectId", Value: pidHex}}); err == nil {
+		t += t4
+	}
+	return t, nil
+}
 
 // S4 (owner RETIRE document-updater): the DU service base + the delete-flow
 // DEL {DU}/project/{pid} flush fallback are removed — content truth is the
@@ -189,47 +214,101 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 	//     must clean the sub-stores; nothing else in this build will: the
 	//     docstore archive above (step 3) is a NO-OP persistor by design —
 	//     D41 retired document-updater — and there is no reaper service to
-	//     sweep orphans afterwards. Proven residue pre-fix: docs=1, ydoc=1,
-	//     chunks=1 after project purge).
-	//     docs   — {project_id: oid}
-	//     ydoc   — {_id IN project doc ids} (the Yjs update store is keyed by
-	//              DOCUMENT id, not project id)
-	//     chunks — {projectId: <oid-hex>} (history-chunk store, camelCase key)
+	//     sweep orphans afterwards).
+	//
+	//     Key shapes (live-verified 2026-10-14, L6 residue table + import
+	//     probe):
+	//       docs    {project_id: id}
+	//       ydoc    _id = STRING project id (root room {pid}), "<pid>-<docid>"
+	//               (per-doc rooms), or a doc _id; both string and
+	//               ObjectID encodings occur → delete all shapes.
+	//       chunks  {projectId: <pid-hex>}
+	//     The room server's write-back is DEBOUNCED and the room may still
+	//     be open (last-peer grace close), flushing state AFTER our deletes
+	//     (proven: docs:1→0 but ydoc:1→1 chunks:1→1 immediately after the
+	//     product delete). So: flush the rooms NOW (POST /flushroom, same
+	//     surface compile uses), purge, re-verify, converge ×3.
 	if a.Mongo != nil {
-		ctx, cancel := context.WithTimeout(cxt.Req.Context(), 8*time.Second)
-		defer cancel()
-		if db, err := a.Mongo.DB(ctx); err == nil {
-			var docIDs []bson.ObjectID
-			if cursor, cerr := db.Collection("docs").Find(ctx, bson.D{{Key: "project_id", Value: oid}}); cerr == nil {
-				type docRow struct {
-					ID bson.ObjectID `bson:"_id"`
-				}
-				var rows []docRow
-				if cursor.All(ctx, &rows) == nil {
-					for _, r := range rows {
-						if !r.ID.IsZero() {
-							docIDs = append(docIDs, r.ID)
+		var docIDHexes []string
+		{ ctx, cancel := context.WithTimeout(cxt.Req.Context(), 5*time.Second);
+			defer cancel()
+			if db, err := a.Mongo.DB(ctx); err == nil {
+				cursor, cerr := db.Collection("docs").Find(ctx, bson.D{{Key: "project_id", Value: oid}})
+				if cerr == nil {
+					type docRow struct {
+						ID any `bson:"_id"`
+					}
+					var rows []docRow
+					if cursor.All(ctx, &rows) == nil {
+						for _, r := range rows {
+							if o, ok := r.ID.(bson.ObjectID); ok {
+								docIDHexes = append(docIDHexes, o.Hex())
+							} else if s, ok := r.ID.(string); ok && s != "" {
+								docIDHexes = append(docIDHexes, s)
+							}
 						}
 					}
+					_ = cursor.Close(ctx)
 				}
-				_ = cursor.Close(ctx)
+			}
+		}
+
+		// flush the project's rooms (root + per-doc) so their debounced
+		// write-back lands BEFORE we delete (best-effort; the converge
+		// loop below covers any write that follows).
+		{
+			cols := []string{pidHexOf(oid)}
+			for _, h := range docIDHexes {
+				cols = append(cols, pidHexOf(oid)+"-"+h)
+			}
+			if b := strings.TrimSpace(os.Getenv("COLLAB_URL")); b != "" {
+				body, _ := json.Marshal(map[string]any{"rooms": cols})
+				fctx, fcancel := context.WithTimeout(cxt.Req.Context(), 5*time.Second)
+				if req, err := http.NewRequestWithContext(fctx, http.MethodPost,
+					strings.TrimSuffix(b, "/")+"/flushroom", bytes.NewReader(body)); err == nil {
+					req.Header.Set("Content-Type", "application/json")
+					if rsp, err := http.DefaultClient.Do(req); err == nil {
+						_, _ = io.Copy(io.Discard, io.LimitReader(rsp.Body, 1<<20))
+						_ = rsp.Body.Close()
+					}
+				}
+				fcancel()
+			}
+		}
+
+		purge := func(ctx context.Context) (int64, error) {
+			db, err := a.Mongo.DB(ctx)
+			if err != nil {
+				return 0, err
 			}
 			_, _ = db.Collection("docs").DeleteMany(ctx, bson.D{{Key: "project_id", Value: oid}})
-			// ydoc rooms, the three known key shapes (roomkey.go):
-			//   root room      _id = ObjectId(project-id)
-			//   per-doc rooms  _id = "<pid>-<docid>" (string)
-			//   (legacy)       _id IN the project's doc ids
-			if len(docIDs) > 0 {
-				all := append([]bson.ObjectID{oid}, docIDs...)
-				_, _ = db.Collection("ydoc").DeleteMany(ctx,
-					bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: all}}}})
+			yids := []any{oid, pidHexOf(oid)}
+			for _, h := range docIDHexes {
+				yids = append(yids, h)
 			}
-			_, _ = db.Collection("ydoc").DeleteOne(ctx,
-				bson.D{{Key: "_id", Value: oid}})
 			_, _ = db.Collection("ydoc").DeleteMany(ctx,
-				bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pid + "-"}}}})
+				bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: yids}}}})
+			_, _ = db.Collection("ydoc").DeleteMany(ctx,
+				bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHexOf(oid) + "-"}}}})
 			_, _ = db.Collection("chunks").DeleteMany(ctx,
-				bson.D{{Key: "projectId", Value: pid}})
+				bson.D{{Key: "projectId", Value: pidHexOf(oid)}})
+			return countOrphans(ctx, db, oid, pidHexOf(oid))
+		}
+
+		residual := int64(-1)
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(cxt.Req.Context(), 8*time.Second)
+			if i > 0 {
+				select {
+				case <-time.After(800 * time.Millisecond):
+				case <-cxt.Req.Context().Done():
+				}
+			}
+			residual, _ = purge(ctx)
+			cancel()
+			if residual == 0 {
+				break
+			}
 		}
 	}
 
