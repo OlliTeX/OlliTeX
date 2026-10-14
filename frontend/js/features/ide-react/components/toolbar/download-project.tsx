@@ -24,25 +24,10 @@ export const DownloadProjectZip = () => {
       {
         id: 'download-as-source-zip',
         href: `/project/${projectId}/download/zip`,
-        // ag-v59 fix (finding #9, 2026-10-14): href-only registration left the
-        // v2 rail click dead in the live world (probe: handler ran, no
-        // window.open, no errors — the rendered registry entry carried no
-        // href). Belt + braces: a self-contained handler that performs the
-        // same navigation, so the item works regardless of which registry
-        // object wins (RailRow runs the externalHref path first when both
-        // are present — exactly one window.open either way).
-        handler: () => {
-          sendDownloadEvent();
-          window.open(
-            `/project/${projectId}/download/zip`,
-            '_blank',
-            'noopener,noreferrer',
-          );
-        },
         label: t('download_as_source_zip'),
       },
     ],
-    [t, projectId, sendDownloadEvent]
+    [t, projectId]
   )
 
   return (
