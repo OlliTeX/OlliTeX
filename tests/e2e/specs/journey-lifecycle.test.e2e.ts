@@ -237,11 +237,14 @@ with zipfile.ZipFile('/tmp/jc3-${STAMP}.zip', 'w') as z:
     // the spec settles: re-measure up to 3× at 1.5s and assert on the FINAL
     // table — the convergence contract, not an instant snapshot.
     let after = storeTable(FIX_PID)
-    const settleChecks = 3
+    // The handler's converge loop runs in-request; a 5c delayed reaper
+    // fires ~12s after the response (the room's grace-close flush window
+    // — last writer wins), so the settle window must span it: ≤12 polls at
+    // 2s. Assert on the FINAL converged table.
+    const settleChecks = 12
     for (let i = 0; i < settleChecks; i++) {
-      const hasResidue = (after.docs > 0 || after.ydoc > 0 || after.chunks > 0)
-      if (!hasResidue) break
-      await new Promise((r) => setTimeout(r, 1500))
+      if (!(after.docs > 0 || after.ydoc > 0 || after.chunks > 0)) break
+      await new Promise((r) => setTimeout(r, 2000))
       after = storeTable(FIX_PID)
     }
     const row = Object.keys(after).map((k) => k + ':' + before[k] + '→' + after[k]).join(' ')

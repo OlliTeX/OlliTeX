@@ -90,6 +90,36 @@ func countOrphans(ctx context.Context, db *mongo.Database, oid bson.ObjectID, pi
 	return t, nil
 }
 
+// flushRoomsNow — POST the project's rooms (root + per-doc) to the collab
+// /flushroom surface (the same call compile makes, so the debounced room
+// write-back lands on disk immediately) — best-effort; any error is
+// swallowed, the callers treat the flush as a hint, not a gate.
+func flushRoomsNow(ctx context.Context, pidHex string, docIDHexes []string) {
+	rooms := []string{pidHex}
+	for _, h := range docIDHexes {
+		if h != "" {
+			rooms = append(rooms, pidHex+"-"+h)
+		}
+	}
+	b := strings.TrimSpace(os.Getenv("COLLAB_URL"))
+	if b == "" {
+		return
+	}
+	body, _ := json.Marshal(map[string]any{"rooms": rooms})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		strings.TrimSuffix(b, "/")+"/flushroom", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	rsp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(rsp.Body, 1<<20))
+	_ = rsp.Body.Close()
+}
+
 // S4 (owner RETIRE document-updater): the DU service base + the delete-flow
 // DEL {DU}/project/{pid} flush fallback are removed — content truth is the
 // docstore; the OT in-memory state DU flushed no longer exists in the Yjs
@@ -254,26 +284,11 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 		}
 
 		// flush the project's rooms (root + per-doc) so their debounced
-		// write-back lands BEFORE we delete (best-effort; the converge
-		// loop below covers any write that follows).
+		// write-back lands BEFORE we delete (best-effort).
 		{
-			cols := []string{pidHexOf(oid)}
-			for _, h := range docIDHexes {
-				cols = append(cols, pidHexOf(oid)+"-"+h)
-			}
-			if b := strings.TrimSpace(os.Getenv("COLLAB_URL")); b != "" {
-				body, _ := json.Marshal(map[string]any{"rooms": cols})
-				fctx, fcancel := context.WithTimeout(cxt.Req.Context(), 5*time.Second)
-				if req, err := http.NewRequestWithContext(fctx, http.MethodPost,
-					strings.TrimSuffix(b, "/")+"/flushroom", bytes.NewReader(body)); err == nil {
-					req.Header.Set("Content-Type", "application/json")
-					if rsp, err := http.DefaultClient.Do(req); err == nil {
-						_, _ = io.Copy(io.Discard, io.LimitReader(rsp.Body, 1<<20))
-						_ = rsp.Body.Close()
-					}
-				}
-				fcancel()
-			}
+			fctx, fcancel := context.WithTimeout(cxt.Req.Context(), 5*time.Second)
+			flushRoomsNow(fctx, pidHexOf(oid), docIDHexes)
+			fcancel()
 		}
 
 		purge := func(ctx context.Context) (int64, error) {
@@ -309,6 +324,37 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 			if residual == 0 {
 				break
 			}
+		}
+
+		// 5c. delayed reaper (owner adjudication Q4): the LAST peer's room
+		//     grace-close can flush chunks/state AFTER the converge loop
+		//     above — the L6 live table proved chunks:1→1 surviving the
+		//     request even after the room was idle. One bounded final
+		//     flush+purge after the grace window (best-effort; a
+		//     context-independent background context so it outlives the
+		//     response and cannot be cancelled by the request finishing).
+		if residual > 0 {
+			go func() {
+				time.Sleep(12 * time.Second)
+				ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel2()
+				flushRoomsNow(ctx2, pidHexOf(oid), docIDHexes)
+				ctx3, cancel3 := context.WithTimeout(context.Background(), 8*time.Second)
+				defer cancel3()
+				if db, err := a.Mongo.DB(ctx3); err == nil {
+					_, _ = db.Collection("docs").DeleteMany(ctx3, bson.D{{Key: "project_id", Value: oid}})
+					yids := []any{oid, pidHexOf(oid)}
+					for _, h := range docIDHexes {
+						yids = append(yids, h)
+					}
+					_, _ = db.Collection("ydoc").DeleteMany(ctx3,
+						bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: yids}}}})
+					_, _ = db.Collection("ydoc").DeleteMany(ctx3,
+						bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHexOf(oid) + "-"}}}})
+					_, _ = db.Collection("chunks").DeleteMany(ctx3,
+						bson.D{{Key: "projectId", Value: pidHexOf(oid)}})
+				}
+			}()
 		}
 	}
 
