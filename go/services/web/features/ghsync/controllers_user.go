@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -56,6 +57,15 @@ func gsJSONArr(vals ...any) string {
 }
 
 // gsAssertHttpServerUrl — Node assertHttpServerUrl (P0-4/C5).
+//
+// 2026-10-14 BH-4 (owner-approved surgical SSRF guard): the feature legitimately
+// dials the user's OWN self-hosted git instance (GHE/Forgejo — often RFC1918 or
+// names on a private network), so only the ranges that are NEVER a legitimate user
+// git host are blocked: the v4/v6 loopback, link-local (incl. the 169.254.169.254
+// cloud-metadata address) and 0/8 (this-network/unspecified) sets. RFC1918, ULA,
+// public addresses and hostnames stay allowed. Literal IP hosts are vetoed at
+// parse time (no dial, no response oracle); names are allowed by design (the
+// self-hosted-git trust model the owner adjudicated).
 func gsAssertHttpServerUrl(u string) error {
 	parsed, err := url.Parse(u)
 	if err != nil {
@@ -64,7 +74,26 @@ func gsAssertHttpServerUrl(u string) error {
 	if (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
 		return &gsError{Status: 400, Message: "Server URL must be http(s)"}
 	}
+	if ip, perr := netip.ParseAddr(parsed.Hostname()); perr == nil && gsLoopbackOrLinkLocal(ip) {
+		return &gsError{Status: 400, Message: "blocked host: loopback/link-local git servers are not allowed"}
+	}
 	return nil
+}
+
+// gsLoopbackOrLinkLocal — the surgical BH-4 block set: 0/8, 127/8, 169.254/16
+// (v4) and ::, ::1, fe80::/10 (v6), judged on the embedded IPv4 for v4-mapped v6.
+func gsLoopbackOrLinkLocal(ip netip.Addr) bool {
+	if ip.Is6() && ip.Is4In6() {
+		a0 := ip.As16()
+		ip = netip.AddrFrom4([4]byte{a0[12], a0[13], a0[14], a0[15]})
+	}
+	if !ip.Is6() {
+		a0 := ip.As16()
+		b0, b1 := a0[12], a0[13]
+		return b0 == 0 || b0 == 127 || (b0 == 169 && b1 == 254)
+	}
+	a0 := ip.As16()
+	return ip.IsUnspecified() || ip.IsLoopback() || (a0[0] == 0xfe && a0[1]&0xc0 == 0x80)
 }
 
 // gsMapPatCheckError — Node mapPatCheckError (P0-9/U2).
@@ -234,6 +263,15 @@ func testServerHandler(cxt *core.Cxt, res *core.Res) {
 	username := gsStr(body, "username")
 	if provider == "" || u == "" {
 		res.JSON(400, []byte(`{"message":"Missing provider or url"}`))
+		return
+	}
+	if err := gsAssertHttpServerUrl(u); err != nil { // BH-4: guard the inline-URL dial (was unguarded)
+		var ge *gsError
+		if asGSerr(err, &ge) {
+			res.JSON(ge.Status, []byte(`{"message":`+gsJSONStr(ge.Message)+`}`))
+			return
+		}
+		res.JSON(500, []byte(`{"message":"internal error"}`))
 		return
 	}
 	if err := gsTestServerConnection(cxt.Req.Context(), cxt.A, uid, provider, u, username, ""); err != nil {

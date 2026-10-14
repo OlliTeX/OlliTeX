@@ -45,3 +45,42 @@ func TestGetOAuthShapes(t *testing.T) {
 		t.Fatalf("empty object slot = (%v,%q); want (false,\"\")", linked, uname)
 	}
 }
+
+// ---- BH-4 surgical SSRF guard (round-2, owner-approved: block loopback/link-local/0/8 only) ----
+
+func mustGSAvailable(t *testing.T, u string) {
+	t.Helper()
+	if err := gsAssertHttpServerUrl(u); err != nil {
+		t.Fatalf("expected ALLOW %q, got: %v", u, err)
+	}
+}
+
+func mustGSBlocked(t *testing.T, u string) {
+	t.Helper()
+	err := gsAssertHttpServerUrl(u)
+	if err == nil {
+		t.Fatalf("expected BLOCK %q, got allow", u)
+	}
+}
+
+func TestGSAssertServerUrl_SurgicalGuard(t *testing.T) {
+	// BLOCKED: loopback / link-local (metadata) / this-network — never legit git hosts
+	for _, u := range []string{
+		"http://127.0.0.1:3000", "http://127.9.9.9/", "https://0.0.0.0/", "http://0.255.255.255:8080",
+		"http://169.254.169.254/", "http://169.254.0.1:80",
+		"http://[::1]/", "http://[fe80::1]/", "http://[fe80::abcd%eth0]/", "http://[::]/", "http://[::ffff:127.0.0.1]/",
+	} {
+		mustGSBlocked(t, u)
+	}
+	// ALLOWED: legit self-hosted git targets (RFC1918, ULA, public, names)
+	for _, u := range []string{
+		"http://192.168.1.10:3000", "http://10.0.0.5/", "http://172.16.0.10/", "https://ghe.corp.example/git",
+		"https://github.com", "https://8.8.8.8", "http://193.57.139.244:8080", "http://forgejo-test:3000",
+		"http://[fd12:3456::7]:3000", "http://[2606:4700:4400::1111]/", "http://93.184.216.34/",
+	} {
+		mustGSAvailable(t, u)
+	}
+	// scheme/shape rules preserved
+	mustGSBlocked(t, "ftp://github.com")
+	mustGSBlocked(t, "http://")
+}
