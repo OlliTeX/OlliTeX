@@ -1984,3 +1984,31 @@ Commit: 2798d318
   (was []); panel "Edited | main.tex | You" (ANON=false).
 - Regression: a11y-dual-scheme-nonhub + journey-choreography + comments-two-user
   + trackchanges-intensive = 29/29 green (4.9m).
+
+## 2026-10-13 (late) — autonomous work-order block 2 (findings adjudication + zombie cleanup)
+- ⚑ clone-500 (CE-1 M6): AUDITED → NOT a defect. `POST /project/:pid/clone {projectName:"clprobe-xyz"}`
+  = 200 (clone created, correct owner shape, purged). The pinned 500 is the FAITHFUL Node quirk for
+  body `{}` (Node `projectName.trim()` TypeError) — newzip/clone.go pins it by design; blank name =
+  Node-faithful 400. No action; CE-1 cell already tolerant of both.
+- ⚑ zip trailing-space 500 (CE-2 L5 Z-trailspace): AUDITED → faithful vendor pin. Part name `pad.txt `
+  (trailing space) → ext gate sees `Ext = " "` → UnsupportedFileType → 500 {'Upload failed'} — the
+  Node-pinned shape (newzip.go header). Deterministic; leave pinned.
+- ⚑ comment-write flake (CE-2): RESOLVED-GREEN — comments-two-user + trackchanges-intensive pass
+  2× post binary-swaps (4.9m 29/29 block + 1.5m 11/11 block); no 5xx observed.
+- ⚑ attribution + template-publish (Journey B/ZIP): attribution FIXED (previous entry); template
+  publish stays 400 in this profile (exclusion self-activates).
+- Zombie cleanup (owner green-lit in the current directive): ELIGIBILITY + EXECUTED in world
+  ol-e2e-mongo-1: 793 leaked `e2e-smoke-project` rows + 1007 docs + 793 chunks + 793 blobs +
+  13 projectAudit + 20 invites + 49 userAudit deleted; ~246 leaked suite users swept (world
+  reaper corroborates; fixture-safe).
+  - PROTECTION MISS DISCLOSED: the ad-hoc protection regex missed the REAL fixture emails
+    (USER2 = `e2e-collab@e2e.test`, TPLADMIN = `e2e-tpladmin@e2e.test` per
+    tests/e2e/fixtures/credentials.ts). Outcome verified: all 4 fixtures authenticate (hub 200);
+    tpladmin row re-created with the canonical ensureTpladmin recipe (canManageTemplates=true,
+    activated, analyticsId, bcrypt12); collab row carries the ORIGINAL $2a$12$ hash (survived).
+  - Post-cleanup suites: comments-two-user + journey-choreography = 11/11 green (S6 now logs
+    "attribution present").
+- World hygiene numbers: projects 1859→~1066 (smoke gone), users 250→4 (4 fixtures),
+  chunks/docs/blobs zeroed for the deleted pids.
+- Still owner-gated: build-images junk deletion (develop-stack gate — receipt-ready next),
+  image rebuild (ag-v57→next) for the 3 binary swaps (web+collab+...), SSO leg-b external IdP.
