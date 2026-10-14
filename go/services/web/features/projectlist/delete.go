@@ -185,6 +185,45 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 		}
 	}
 
+	// 5b. content cascade (owner adjudication 2026-10-14, Q4/a — hard delete
+	//     must clean the sub-stores; nothing else in this build will: the
+	//     docstore archive above (step 3) is a NO-OP persistor by design —
+	//     D41 retired document-updater — and there is no reaper service to
+	//     sweep orphans afterwards. Proven residue pre-fix: docs=1, ydoc=1,
+	//     chunks=1 after project purge).
+	//     docs   — {project_id: oid}
+	//     ydoc   — {_id IN project doc ids} (the Yjs update store is keyed by
+	//              DOCUMENT id, not project id)
+	//     chunks — {projectId: <oid-hex>} (history-chunk store, camelCase key)
+	if a.Mongo != nil {
+		ctx, cancel := context.WithTimeout(cxt.Req.Context(), 8*time.Second)
+		defer cancel()
+		if db, err := a.Mongo.DB(ctx); err == nil {
+			var docIDs []bson.ObjectID
+			if cursor, cerr := db.Collection("docs").Find(ctx, bson.D{{Key: "project_id", Value: oid}}); cerr == nil {
+				type docRow struct {
+					ID bson.ObjectID `bson:"_id"`
+				}
+				var rows []docRow
+				if cursor.All(ctx, &rows) == nil {
+					for _, r := range rows {
+						if !r.ID.IsZero() {
+							docIDs = append(docIDs, r.ID)
+						}
+					}
+				}
+				_ = cursor.Close(ctx)
+			}
+			_, _ = db.Collection("docs").DeleteMany(ctx, bson.D{{Key: "project_id", Value: oid}})
+			if len(docIDs) > 0 {
+				_, _ = db.Collection("ydoc").DeleteMany(ctx,
+					bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: docIDs}}}})
+			}
+			_, _ = db.Collection("chunks").DeleteMany(ctx,
+				bson.D{{Key: "projectId", Value: pid}})
+		}
+	}
+
 	// 6. remove the project doc.
 	if a.Mongo != nil {
 		ctx, cancel := context.WithTimeout(cxt.Req.Context(), 5*time.Second)

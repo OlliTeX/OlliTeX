@@ -221,18 +221,32 @@ with zipfile.ZipFile('/tmp/jc3-${STAMP}.zip', 'w') as z:
     })) as any
     trailer2('L6 pre-purge trash=' + st(t2))
     const before = storeTable(FIX_PID)
-    // scoped hard-delete of the fixture's own rows
-    // scoped hard-delete: THIS RUN'S fixture rows only (project-keyed _id shapes)
-    const pDel = mongoEval(`var r = db.projects.deleteOne({ _id: ObjectId('${FIX_PID}') }); r.deletedCount + ' ack:' + r.acknowledged;`)
-    trailer2('L6 pDel=' + String(pDel).trim())
-    // RESIDUE TABLE (the store-cleanup truth nobody asserts today)
+    trailer2('L6 before ' + Object.keys(before).map((k) => k + '=' + before[k]).join(' '))
+    // scoped hard-delete: THIS RUN'S fixture via the PRODUCT route
+    // DELETE /admin/project/:id (adminDelete → deleteProjectExec) — the
+    // 2026-10-14 Q4 fix cascades docs/ydoc/chunks there (owner a), so the
+    // residue table below measures the PRODUCT deletion, not a raw row drop.
+    const pDel = await p1.request.delete(BASE + '/admin/project/' + FIX_PID, {
+      headers: { ...(tok6 ? { 'X-CSRF-Token': tok6 } : {}) }, maxRedirects: 0,
+    }) as any
+    trailer2('L6 pDel=' + pDel.status() + ' ' + (await pDel.text().catch(() => '')).slice(0, 80))
+    expect(pDel.status(), 'admin hard delete status').toBe(200)
+    // RESIDUE TABLE (the store-cleanup truth)
     const after = storeTable(FIX_PID)
     const row = Object.keys(after).map((k) => k + ':' + before[k] + '→' + after[k]).join(' ')
     trail.push('L6 residue ' + row)
     expect(after.projects, 'L6 projects row gone (got ' + after.projects + ')').toBe(0)
-    // sub-stores: PIN whatever survives (docstore may hold keyed ydoc state under a different id shape)
-    const residue = Object.entries(after).filter(([, v]) => Number(v) > 0)
-    if (residue.length) trailer2('L6 ⚑ RESIDUE pinned (owner adjudication): ' + residue.map(([k, v]) => k + '=' + v).join(','))
+    // sub-stores: CASCADE CONTRACT (owner 2026-10-14 Q4/a; fix in
+    // deleteProjectExec step 5b) — the three historically-orphaned stores
+    // MUST be 0 after the product hard delete (anything >0 = regression;
+    // no silent pin anymore). Other stores report their table state
+    // (audit/contacts rows, when a fixture makes them, are retained by
+    // design and are NOT part of this contract).
+    for (const k of ['docs', 'ydoc', 'chunks']) {
+      expect(after[k], 'L6 ' + k + ' residue (got ' + after[k] + ')').toBe(0)
+    }
+    const residue = Object.entries(after).filter(([k, v]) => Number(v) > 0)
+    trailer2('L6 residue-after=' + (residue.length ? residue.map(([k, v]) => k + '=' + v).join(',') : 'none'))
     // COPY project hygiene (self-cleaning)
     const ck = await killCtx(p1, COPY_PID)
     trailer2('L6 copy-kill=' + ck)
