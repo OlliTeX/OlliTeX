@@ -75,6 +75,10 @@ func pidHexOf(o bson.ObjectID) string { return o.Hex() }
 // key shapes, chunks by projectId.
 func countOrphans(ctx context.Context, db *mongo.Database, oid bson.ObjectID, pidHex string) (int64, error) {
 	t, _ := db.Collection("docs").CountDocuments(ctx, bson.D{{Key: "project_id", Value: oid}})
+	// chunks: the PRODUCT contract is the historyv1 soft-delete (state →
+	// "deleted"); orphans = rows still active/closed (all live rows carry
+	// projectId as ObjectID — 2026-10-14 live check: 3446/3446).
+	stateActive := bson.D{{Key: "state", Value: bson.D{{Key: "$in", Value: []string{"active", "closed"}}}}}
 	ys := []any{oid, pidHex}
 	if t2, err := db.Collection("ydoc").CountDocuments(ctx,
 		bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: ys}}}}); err == nil {
@@ -84,10 +88,50 @@ func countOrphans(ctx context.Context, db *mongo.Database, oid bson.ObjectID, pi
 		bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHex + "-"}}}}); err == nil {
 		t += t3
 	}
-	if t4, err := db.Collection("chunks").CountDocuments(ctx, bson.D{{Key: "projectId", Value: pidHex}}); err == nil {
+	if t4, err := db.Collection("chunks").CountDocuments(ctx, append([]bson.E{{Key: "projectId", Value: oid}}, stateActive...)); err == nil {
 		t += t4
 	}
+	if t5, err := db.Collection("chunks").CountDocuments(ctx, append([]bson.E{{Key: "projectId", Value: pidHex}}, stateActive...)); err == nil {
+		t += t5
+	}
 	return t, nil
+}
+
+// historyDelete — the PRODUCT chunk/blob purge: DELETE {V1_HISTORY_URL}/api
+// projects/{pid} (historyv1). Soft-deletes the project's chunk rows
+// (state: active|closed → deleted) via the ObjectID-aware chunk backend AND
+// removes its history blobs. Live-verified 2026-10-14: 204, the fixture's
+// active chunk flipped to state=deleted (active=0). Basic auth is required
+// (401 without) — the same credentials the 63b admin-user purge path uses
+// (admin.go: "staging" : STAGING_PASSWORD).
+func historyDelete(ctx context.Context, pidHex string) error {
+	base := strings.TrimSpace(os.Getenv("V1_HISTORY_URL"))
+	if base == "" {
+		base = "http://127.0.0.1:3100/api"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, strings.TrimSuffix(base, "/")+"/projects/"+pidHex, nil)
+	if err != nil {
+		return err
+	}
+	user := strings.TrimSpace(os.Getenv("V1_HISTORY_USER"))
+	if user == "" {
+		user = "staging"
+	}
+	pass := os.Getenv("STAGING_PASSWORD")
+	if pass == "" {
+		pass = os.Getenv("V1_HISTORY_PASSWORD")
+	}
+	req.SetBasicAuth(user, pass)
+	rsp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(rsp.Body, 1<<20))
+	_ = rsp.Body.Close()
+	if rsp.StatusCode >= 400 {
+		return fmt.Errorf("historyv1 delete: HTTP %d", rsp.StatusCode)
+	}
+	return nil
 }
 
 // flushRoomsNow — POST the project's rooms (root + per-doc) to the collab
@@ -252,12 +296,16 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 	//       ydoc    _id = STRING project id (root room {pid}), "<pid>-<docid>"
 	//               (per-doc rooms), or a doc _id; both string and
 	//               ObjectID encodings occur → delete all shapes.
-	//       chunks  {projectId: <pid-hex>}
+	//       chunks  projectId = ObjectID, and the PRODUCT purge is the
+	//               historyv1 service (DELETE /api/projects/{pid}) — soft-
+	//               delete (state → "deleted") + blob removal; 401 without
+	//               basic auth (staging : STAGING_PASSWORD). Raw deletes
+	//               remain as belt-and-braces.
 	//     The room server's write-back is DEBOUNCED and the room may still
-	//     be open (last-peer grace close), flushing state AFTER our deletes
-	//     (proven: docs:1→0 but ydoc:1→1 chunks:1→1 immediately after the
-	//     product delete). So: flush the rooms NOW (POST /flushroom, same
-	//     surface compile uses), purge, re-verify, converge ×3.
+	//     be open (last-peer grace close): late chunk finalizations land
+	//     20-120s post-delete (proven across L6 runs), so: in-request
+	//     (historyv1 + docs/ydoc purge) then bounded delayed re-sweeps at
+	//     +12s/+60s (idempotent) for the late landings.
 	if a.Mongo != nil {
 		var docIDHexes []string
 		{ ctx, cancel := context.WithTimeout(cxt.Req.Context(), 5*time.Second);
@@ -283,11 +331,13 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 			}
 		}
 
-		// flush the project's rooms (root + per-doc) so their debounced
-		// write-back lands BEFORE we delete (best-effort).
+		// flush the project's rooms + the PRODUCT history purge (chunks →
+		// state=deleted, blobs removed) so the debounced room write-back and
+		// late chunk finalizations land on already-deleted state.
 		{
-			fctx, fcancel := context.WithTimeout(cxt.Req.Context(), 5*time.Second)
+			fctx, fcancel := context.WithTimeout(cxt.Req.Context(), 6*time.Second)
 			flushRoomsNow(fctx, pidHexOf(oid), docIDHexes)
+			_ = historyDelete(fctx, pidHexOf(oid)) // best-effort; raw deletes + sweeps cover failure
 			fcancel()
 		}
 
@@ -306,7 +356,7 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 			_, _ = db.Collection("ydoc").DeleteMany(ctx,
 				bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHexOf(oid) + "-"}}}})
 			_, _ = db.Collection("chunks").DeleteMany(ctx,
-				bson.D{{Key: "projectId", Value: pidHexOf(oid)}})
+				bson.D{{Key: "projectId", Value: bson.D{{Key: "$in", Value: []any{oid, pidHexOf(oid)}}}})
 			return countOrphans(ctx, db, oid, pidHexOf(oid))
 		}
 
@@ -339,6 +389,7 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 					ctx3, cancel3 := context.WithTimeout(context.Background(), 8*time.Second)
 					defer cancel3()
 					flushRoomsNow(ctx3, pidHexOf(oid), docIDHexes)
+					_ = historyDelete(ctx3, pidHexOf(oid))
 					if db, err := a.Mongo.DB(ctx3); err == nil {
 						_, _ = db.Collection("docs").DeleteMany(ctx3, bson.D{{Key: "project_id", Value: oid}})
 						yids := []any{oid, pidHexOf(oid)}
@@ -350,7 +401,7 @@ func deleteProjectExec(a *core.App, cxt *core.Cxt, oid bson.ObjectID, project bs
 						_, _ = db.Collection("ydoc").DeleteMany(ctx3,
 							bson.D{{Key: "_id", Value: bson.D{{Key: "$regex", Value: "^" + pidHexOf(oid) + "-"}}}})
 						_, _ = db.Collection("chunks").DeleteMany(ctx3,
-							bson.D{{Key: "projectId", Value: pidHexOf(oid)}})
+							bson.D{{Key: "projectId", Value: bson.D{{Key: "$in", Value: []any{oid, pidHexOf(oid)}}}})
 					}
 				}
 				time.Sleep(12 * time.Second)

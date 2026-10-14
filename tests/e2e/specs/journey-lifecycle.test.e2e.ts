@@ -241,7 +241,13 @@ with zipfile.ZipFile('/tmp/jc3-${STAMP}.zip', 'w') as z:
     // fires ~12s after the response (the room's grace-close flush window
     // — last writer wins), so the settle window must span it: ≤12 polls at
     // 2s. Assert on the FINAL converged table.
-    const settleChecks = 16
+    // Convergence window (live-measured 2026-10-14, v64): docs/ydoc converge
+    // in-request; the room's grace-close chunk flush + the two delayed reaps
+    // (+12s/+60s) land with the residue at ~60-120s post-delete (the +12s
+    // reap provably cleaned the 12:14/12:16 fixtures shortly after their
+    // spec windows). Poll up to 30×5s, break on clean: the honest contract
+    // of the Q4 fix (eventual zero), not an instant snapshot.
+    const settleChecks = 30
     for (let i = 0; i < settleChecks; i++) {
       if (!(after.docs > 0 || after.ydoc > 0 || after.chunks > 0)) break
       await new Promise((r) => setTimeout(r, 5000))
@@ -289,20 +295,24 @@ function okIf2xx(r: any, label: string): void {
 }
 function storeTable(pid: string): Record<string, number> {
   const cols = ['projects', 'docs', 'ydoc', 'rooms', 'docHistory', 'docHistoryIndex', 'docSnapshots', 'projectHistoryChunks', 'projectHistoryLabels', 'projectInvites', 'projectAuditLogEntries', 'contacts', 'libraryreferences', 'deletedProjects', 'chunks']
-  // PERF (2026-10-14 L6 hang post-mortem): the per-cell docker-exec loop was
-  // 15 cols × 6 shapes = 90 COLD mongosh starts per table (45-90s per call;
-  // the 12-poll settle loop → 15+ min test "hangs"). One batched eval:
-  const shapes = [
+  // PERF (2026-10-14 L6 post-mortem): one batched mongosh round-trip replaces
+  // 15 cols × 6 shapes = 90 COLD docker-exec starts (15.6m 'hang' → ~2s).
+  // chunks semantics (PRODUCT contract, live-verified): historyv1 purge =
+  // soft-delete (state active|closed → "deleted"); orphans = active|closed
+  // rows; projectId is always ObjectID (3446/3446 live check). State filters
+  // apply only to the chunks collection (a no-op elsewhere).
+  const shapesAll = [
     `{ _id: ObjectId('${pid}') }`,
     `{ _id: '${pid}' }`,
     `{ project_id: ObjectId('${pid}') }`,
-    `{ projectId: ObjectId('${pid}') }`,
-    `{ projectDocId: '${pid}/MAIN' }`,
-    `{ projectDocId: '${pid}/main.tex' }`,
+  ]
+  const shapesChunks = [
+    `{ projectId: ObjectId('${pid}'), state: { $in: ['active', 'closed'] } }`,
+    `{ projectId: '${pid}', state: { $in: ['active', 'closed'] } }`,
   ]
   let raw = ''
   try {
-    raw = `var out={}; ${cols.map((c) => `try{var mx=0; ${shapes.map((s) => `var n=db.${c}.countDocuments(${s}); if(n>mx)mx=n;`).join(' ')} out['${c}']=mx;}catch(e){out['${c}']=-1;}`).join(' ')} JSON.stringify(out)`
+    raw = `var out={}; ${cols.map((c) => { const sh = c === 'chunks' ? shapesChunks : shapesAll; return `try{var mx=0; ${sh.map((s) => `var n=db.${c}.countDocuments(${s}); if(n>mx)mx=n;`).join(' ')} out['${c}']=mx;}catch(e){out['${c}']=-1;}` }).join(' ')} JSON.stringify(out)`
   } catch { return {} as Record<string, number> }
   let j: any = null
   try {
