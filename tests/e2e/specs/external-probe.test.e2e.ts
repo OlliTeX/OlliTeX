@@ -78,7 +78,7 @@ test('webdav credentials list the root collection', async () => {
 test('dropbox token is valid (cached or static)', async () => {
   test.skip(!externalEnabled('dropbox'), 'dropbox not enabled — see credentials/README.md')
   const cfg = getExternal('dropbox')!
-  let token: string | null | undefined = cfg.token ? String(cfg.token) : undefined
+  let token: string | null | undefined = cfg.token ? String(cfg.token) : cfg.oauthKey ? String(cfg.oauthKey) : undefined
   if (!token) token = getServiceToken('dropbox')?.token
   if (!token && cfg.refreshToken && cfg.appKey && cfg.appSecret) {
     // 2026-10-12: headless EXTEND — the refreshToken grant (stable app pair)
@@ -91,7 +91,7 @@ test('dropbox token is valid (cached or static)', async () => {
     }).then((x) => x.json().catch(() => ({})))
     if (r && r.access_token) token = r.access_token
   }
-  test.skip(!token, 'dropbox: no token — run `node scripts/auth-capture.mjs --service dropbox --url <authorize-url>` (see credentials/README.md), or set §dropbox.token / refreshToken(+appKey/appSecret) in config.json')
+  test.skip(!token, 'dropbox: no token — set §dropbox.oauthKey (generated access token, long-lived) / token / refreshToken(+appKey/appSecret) in config.json, or run the capture script (see credentials/README.md)')
   // Dropbox v2 API: GET → 400 "Use HTTP POST requests" (pinned 2026-10-12)
   let out = await req('https://api.dropboxapi.com/2/users/get_current_account', { method: 'POST' }, { Authorization: `Bearer ${token}` })
   // 2026-11-16 (owner-token drift): the cached sl.* token can EXPIRE
