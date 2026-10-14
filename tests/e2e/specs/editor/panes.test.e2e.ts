@@ -234,7 +234,7 @@ for (const route of ['/editor'] as const) {
       // More actions) with the diff surface mounted.  RE-ARM GUARD: if the
       // legacy History toolbar button returns, prefer it (both entry points
       // asserted below).
-      const fileBtn = page.getByRole('button', { name: /^file$/i }).first()
+      const fileBtn = page.getByRole('menuitem', { name: /^file$/i }).first()
       let opened = false
       if (await fileBtn.isVisible({ timeout: 4_000 }).catch(() => false)) {
         await fileBtn.click({ timeout: 8_000 }).catch(() => {})
@@ -355,7 +355,7 @@ for (const route of ['/editor'] as const) {
       // trigger a real project notification: invite a non-member from the
       // share modal — the result toast is the shared notification surface
       // B wave 2026-10-11: Share moved into the File menu (owner item T, 2026-10-07).
-      await page.getByRole('button', { name: /^file$/i }).first().click({ timeout: 10_000 })
+      await page.getByRole('menuitem', { name: /^file$/i }).first().click({ timeout: 10_000 })
       await page.getByRole('menuitem', { name: /share/i }).first().click({ timeout: 10_000 })
       const m = page
         .locator('button[aria-label^="enter emails"], [aria-label*=emails], .mantine-Modal-content, .modal')

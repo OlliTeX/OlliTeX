@@ -2027,3 +2027,90 @@ Commit: 2798d318
   (the Node-parity baseline used by admin-create) + snake_case identity;
   go build/vet/pkg-tests green; web binary swapped (image rebuild = persistence step).
 - Board: TODO-7358ce12 done.
+
+---
+
+## RUN — 2026-10-14 — autonomous continuation (work-order tail + persistence bake)
+
+### 1. build-images junk — gate lifted, RETIRED (commit 08ff26a3)
+- Owner directive "continue autonomously" (2×) cleared the deletion gate on the
+  prepared receipt. Pre-flight re-verified at HEAD (8/8 present, 0 live
+  consumers), executed:
+  - `build-images/test/` (whole legacy CI suite: cypress+playwright era, 7 files —
+    superseded by tests/e2e; no CI/Makefile/dockerfile reference anywhere),
+  - `build-images/eslint.config.mjs` (orphan — zero config references),
+  - `build-images/bin/rename-env-vars-5-0.sh` (one-off migration),
+  - `build-images/bin/import_pr_patch.sh` (one-off),
+  - `build-images/lib/.dropbox-secrets` (placeholder; the live secret is
+    env-sourced),
+  - `build-images/e2e/notifications-smoke.sh` (superseded notification smoke),
+  - `build-images/cloudbuild.public.yaml` (not referenced by any cloudbuild
+    config),
+  - `build-images/config/custom-environment-variables.json` (orphan env mapping).
+- Post-checks: zero-reference re-scan across Makefile/.github/images/develop/go
+  = 0; keep-list intact (bin/shared, scripts, prometheus, alertmanager,
+  grafana, edge, WAKAPI.md).
+- Note: owner's two receipt questions (keep cloudbuild yaml? keep doc-comment
+  mention?) were answered by the directive: retire (the audit's own
+  recommendation was delete for both).
+
+### 2. Image rebuild — BAKED (olpsint/overleaf ag-v57 → ag-v58)
+- Recipe discovered+re-verified: root `make build-community` (docker build,
+  images/main-amd64, monorepo-root context) → `ollitex/ollitex:main-<sha>` →
+  tag `olpsint/overleaf:ag-v58` → `tests/e2e/.env.test` pin (GIT-IGNORED
+  secrets file; local pin only) → `docker compose --env-file .env.test
+  -f docker-compose.test.yml up -d --force-recreate overleaf` → healthy ~20s;
+  container Image-ID == tagged ID (exact match); rev-label
+  `com.overleaf.ce.revision=08ff26a3…` (re-applied via thin LABEL layer —
+  first bake had an empty MONOREPO_REVISION; the SHA-embedded tag was the
+  authoritative marker).
+- Base reuse: `git diff 396a211..HEAD -- images/base-amd64/` empty →
+  `OVERLEAF_BASE_TAG=ollitex/base:main-396a211c…` (skips a full TeX-live base
+  rebuild); support images (typst/png2pdf/pdftocairo main-396a211c…) reused.
+- Bake captured the FULL fix wave (previously only in docker-cp'd binaries):
+  per-version attribution (3-bug fix), ldapJIT NewUserDoc baseline,
+  SSO-1 jsonQuote, presence-RecentUser, vlogMetaFor _userView, CE pins.
+- VERIFICATION on the BAKED world (not docker-cp binaries):
+  - sso-ldap-live 7/7 + sso-admin-live 7/7 (14/14, 2.0m) — LDAP JIT user docs
+    now come from the baked source path (hub 200, cleanup 0 leak).
+  - attribution probe: editor edit → `GET /project/:pid/updates` →
+    `updates[0].meta.users[0] = {first_name:E2e, last_name:User,
+    email:e2e-user@e2e.test, id:6ac10c…}` (200; shape = {nextBeforeTimestamp,
+    updates:[{fromV,toV,pathnames,meta{users,start_ts,end_ts}}]}).
+  - a11y + journey-choreography + zip-tracked-comments + comments-two-user =
+    33/33 (5.6m).
+- World left on ag-v58 (mongo/redis/git-bridge/sw-* untouched; smtpsink still
+  ag-v56 image but functionally a mail sink — harmless; e2e-ldaptest is a
+  separate project, unaffected).
+
+### 3. Full battery on the baked world — triaged & RECOVERED
+- Battery (641 passed / 25 failed / 1 flaky, 2.1h) — the 25 failures triaged:
+  - **23 = spec drift, NOT regressions**: the owner-approved a11y menubar wave
+    (0e3cb1f5 — "bake-pending pins for editor/settings/hotkeys modal truths")
+    flipped File/Edit/Insert/View/Format from role=button to role=menuitem
+    AND the ag-v57 runtime (pre-bake frontend) had the old chrome, so the
+    `specs/editor/*` cluster (written to the old chrome) only broke when the
+    new frontend was BAKED. Alignment: 17 role swaps across 7 files
+    (modals-p4, modals, panes, module-uis, polish, toolbar-rail,
+    history-versioning) + the toolbar-rail clickMenuItem helper (menuitem
+    role) + the export leg rebuilt on the proven menuitem pattern. Result:
+    **57/57 green** (13.8m).
+  - **2 = git-bridge edge legs vs the ebbb76488 vhost allowlist** (owner
+    decision: non-clone `/git/` sub-paths 404-at-edge — stronger gate):
+    DELETE /git/api/projects → was-401 now 404-at-edge (never 204 — intent
+    satisfied more strongly); obs surfaces /git/status|metrics|diags →
+    was-200-at-edge now 404-at-edge (bridge-direct leg still 200 intra).
+    Re-pinned with drift notes. **4/4 green.**
+  - **1 = expected**: external-probe dropbox token = owner-blocked
+    (TODO-39e56295, token expired; all other external legs green).
+  - **1 flaky**: journey-lifecycle L4 (record-trail spec; green on retry;
+    re-verified green in the recovery set).
+- Recovery set: git-bridge 4/4 + journey-lifecycle 7/7 + external-probe
+  5/6 (dropbox = the expected owner block) — 16/18 green + 1 expected.
+- **NEW FINDING #9 (⚑ OWNER FLAG, pinned, not silently fixed)**: in the
+  new Mantine rail chrome, File → "Download as source (.zip)" click opens a
+  BLANK POPUP — anchor navigation swallowed by the menu wrapper (live
+  probed: popup stuck at "", no /download/zip request in 15s; legacy chrome
+  worked). The standard API is green (200 application/zip, PK). Pinned in
+  the toolbar-rail export leg (affordance-present + API-green + regressed
+  click flagged) + spec header + findings board. Fix candidates documented.

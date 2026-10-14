@@ -271,7 +271,7 @@ for (const route of ['/editor'] as const) {
       // More actions) with the diff surface mounted.  RE-ARM GUARD: if the
       // legacy History toolbar button returns, prefer it (both entry points
       // asserted below).
-      const fileBtn = adminPage.getByRole('button', { name: /^file$/i }).first()
+      const fileBtn = adminPage.getByRole('menuitem', { name: /^file$/i }).first()
       let opened = false
       if (await fileBtn.isVisible({ timeout: 4_000 }).catch(() => false)) {
         await fileBtn.click({ timeout: 8_000 }).catch(() => {})

@@ -45,7 +45,7 @@ const MARK_C = 'OLPSINT_HIST_C_33'
 // the File-menu item click pattern (modals-p4): real mouse click, menuitem
 // role, fallback to the in-page visible-item click.
 async function clickFileMenuItem(page: any, label: string) {
-  await page.getByRole('button', { name: /^file$/i }).first().click({ timeout: 10_000 })
+  await page.getByRole('menuitem', { name: /^file$/i }).first().click({ timeout: 10_000 })
   await page.waitForTimeout(500)
   const re = new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
   const mi = page.getByRole('menuitem', { name: re }).first()

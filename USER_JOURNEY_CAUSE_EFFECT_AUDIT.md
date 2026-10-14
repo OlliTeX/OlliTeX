@@ -232,9 +232,16 @@ Owner scope implemented end-to-end (source in repo, live in the e2e world):
 | 6 | store-cascade: hard-delete orphans docs/ydoc/chunks | **PARTIALLY OBSERVED-SWEEPED** (zombie pass cleared the leaked rows; cascade-behavior question stays with the owner — the reaper appears to sweep over time). |
 | 7 | zip-imported docs: empty editor buffer | **STILL OWNER-ADJUDICATE** (import→collab-room sync gap; store-level content verified; ZIP leg J pins). |
 | 8 | `65b0d668` attribution "Anonymous" + template publish 400 | **ATTRIBUTION FIXED** (`45ab08a7`; panel renders "You", 29/29 regression); template publish stays 400 in this profile (exclusion self-activates when it lands). |
+| 9 | ⚑ **Export menu-item broken in the ag-v58 Mantine rail**: File → "Download as source (.zip)" opens a BLANK POPUP, anchor navigation swallowed by the menu wrapper (live-probed 2026-10-14; pre-bake legacy chrome worked). Standard API is green (`GET /project/:pid/download/zip` → 200 `application/zip`, PK). | **⚑ OWNER-FLAG — DEFECT, PINNED** (toolbar-rail export leg pins affordance-present + API-green + click-regression flagged; NOT silently fixed per policy). Fix candidates: the rail menu-item anchor path (`download-project.tsx` target=_blank item inside the Mantine `Menu`, `rail-menus.tsx` wrapper) or rewire the item to a direct action. The ZIP DOWNLOAD API needs no change. |
 
 Also closed this block: **SSO leg-b** (TODO-7358ce12 → done, real LDAP round-trip +
 ldapJIT user-doc fix, 14/14); **zombie sweep** (793 projects + sub-stores + 246 users,
 4 fixtures verified); **TODO-65b0d668 → done**.
-build-images junk: **deletion-ready receipt** `BUILD_IMAGES_JUNK_RECIPE_2026-10-14.md`
-(pending the develop-stack deletion gate).
+build-images junk: **RETIRED 2026-10-14** (`08ff26a3`, gate cleared by directive).
+**Battery-recovery block (2026-10-14, post-ag-v58 bake)**: the full 641/25 battery's
+25 failures triaged — 23 = stale `role=button` chrome selectors vs the owner-approved
+a11y menubar wave (0e3cb1f5, "bake-pending pins" — the flip landed WITH the bake):
+7 spec files aligned (menuitem roles + proven click patterns), **57/57 green**;
+2 = git-bridge edge legs vs the ebbb76488 vhost allowlist (non-clone `/git/` now
+404-at-edge — STRONGER gate): re-pinned, **4/4 green**. Remaining known failure:
+external-probe dropbox token = owner-blocked (TODO-39e56295). New finding: #9 above.

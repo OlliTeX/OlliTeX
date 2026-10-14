@@ -56,7 +56,7 @@ async function clickFileMenuItem(page: any, label: string, fallback?: string) {
   // never triggers — with the menu left open its panel intercepts the modal's
   // own tab clicks (the modals-p4 REDs of 2026-10-11: 'Show version history'
   // label reported at the Settings-tab point).
-  await page.getByRole('button', { name: /^file$/i }).first().click({ timeout: 10_000 })
+  await page.getByRole('menuitem', { name: /^file$/i }).first().click({ timeout: 10_000 })
   await page.waitForTimeout(500)
   const names: RegExp[] = (fallback ? [label, fallback] : [label]).map(
     s => new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i')
@@ -146,7 +146,7 @@ for (const route of ['/editor'] as const) {
       // B wave 2026-10-11: the Share entry moved into the File menu (owner item
       // T, 2026-10-07: File → Settings → Share); the ShareProjectModal
       // contract beneath is unchanged.
-      await adminPage.getByRole('button', { name: /^file$/i }).first().click({ timeout: 10_000 })
+      await adminPage.getByRole('menuitem', { name: /^file$/i }).first().click({ timeout: 10_000 })
       await adminPage.getByRole('menuitem', { name: /share/i }).first().click({ timeout: 10_000 })
       const m = dlgWith(adminPage, route, /enter emails/i)
       await expect(m).toBeVisible({ timeout: 10_000 })
@@ -184,7 +184,7 @@ for (const route of ['/editor'] as const) {
       // B wave 2026-10-11: the Share entry moved into the File menu (owner item
       // T, 2026-10-07: File → Settings → Share); the ShareProjectModal
       // contract beneath is unchanged.
-      await adminPage.getByRole('button', { name: /^file$/i }).first().click({ timeout: 10_000 })
+      await adminPage.getByRole('menuitem', { name: /^file$/i }).first().click({ timeout: 10_000 })
       await adminPage.getByRole('menuitem', { name: /share/i }).first().click({ timeout: 10_000 })
       const m = dlgWith(adminPage, route, /enter emails/i)
       await expect(m).toBeVisible({ timeout: 10_000 })
@@ -377,7 +377,7 @@ for (const route of ['/editor'] as const) {
 
         test('word: word-count modal shows counts (File → Word Count)', async () => {
       await openEditor(adminPage, route, pid)
-      await adminPage.getByRole('button', { name: /^file$/i }).first().click()
+      await adminPage.getByRole('menuitem', { name: /^file$/i }).first().click()
       await adminPage.waitForTimeout(700)
       await adminPage.getByText('Word Count', { exact: false }).first().click({ timeout: 8_000 })
       const m = dlg(adminPage, route)
@@ -391,11 +391,11 @@ for (const route of ['/editor'] as const) {
 
     test('hotkeys: shortcuts surface lists the bindings (rail entry or Help menu)', async () => {
       await openEditor(adminPage, route, pid)
-      const railShortcut = adminPage.getByRole('button', { name: /keyboard shortcuts/i }).first()
+      const railShortcut = adminPage.getByRole('menuitem', { name: /keyboard shortcuts/i }).first()
       if (await railShortcut.isVisible().catch(() => false)) {
         await railShortcut.click()
       } else {
-        await adminPage.getByRole('button', { name: /^help$/i }).first().click()
+        await adminPage.locator('[aria-label="Help"]').first().click()
         await adminPage.waitForTimeout(700)
         await adminPage.getByText(/keyboard shortcuts/i).first().click({ timeout: 8_000 })
       }

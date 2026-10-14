@@ -83,7 +83,7 @@ for (const route of ['/editor'] as const) {
 
     test('provider lifecycle: the BYO panel renders from the editor UI', async () => {
       await openEditor()
-      await page.getByRole('button', { name: /^file$/i }).first().click({ timeout: 8_000 })
+      await page.getByRole('menuitem', { name: /^file$/i }).first().click({ timeout: 8_000 })
       await page.waitForTimeout(900)
       const modelEntry = page.locator('[role=menuitem], [class*=option], [class*=item], li').filter({ hasText: /llm model/i }).first()
       await expect(modelEntry, 'the File menu must offer the LLM model entry').toBeVisible({ timeout: 8_000 })
@@ -213,7 +213,7 @@ for (const route of ['/editor'] as const) {
           if (await mtex.isVisible({ timeout: 1_500 }).catch(() => false)) await mtex.click().catch(() => {})
         }
         await page.waitForTimeout(1000)
-        await page.getByRole('button', { name: /^insert$/i }).first().click({ timeout: 8_000 })
+        await page.getByRole('menuitem', { name: /^insert$/i }).first().click({ timeout: 8_000 })
         for (let i = 0; i < 5 && menuText.length < 20; i++) {
           await page.waitForTimeout(500)
           menuText = await page.evaluate(new Function('return ' + MENU_INNER) as any)

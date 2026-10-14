@@ -98,7 +98,7 @@ for (const route of ['/editor'] as const) {
     test('translations: no raw i18n keys leak onto the page', async () => {
       await openEditor()
       // open the main surfaces (menus, rail) so their strings are mounted
-      await page.getByRole('button', { name: /^file$/i }).first().click().catch(() => {})
+      await page.getByRole('menuitem', { name: /^file$/i }).first().click().catch(() => {})
       await page.waitForTimeout(800)
       await page.keyboard.press('Escape').catch(() => {})
       const leaked = await page.evaluate(() => {
@@ -149,7 +149,7 @@ for (const route of ['/editor'] as const) {
       }
       expect(stops.length, 'tabbing must reach interactive chrome').toBeGreaterThan(0)
       // menus close on Escape
-      await page.getByRole('button', { name: /^view$/i }).first().click({ timeout: 8_000 })
+      await page.getByRole('menuitem', { name: /^view$/i }).first().click({ timeout: 8_000 })
       await page.waitForTimeout(800)
       await page.keyboard.press('Escape')
       await page.waitForTimeout(600)

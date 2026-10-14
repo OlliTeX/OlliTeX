@@ -98,22 +98,28 @@ test('2. edge: credential & destructive surfaces are auth-gated; the git URL wor
     const r = await edge('GET', `/git/${THROWAWAY}/info/refs?service=${svc}`)
     expect(r.code, `GET info/refs?service=${svc} must be 401 anonymous — got ${r.code}`).toBe(401)
   }
-  // DESTRUCTIVE: the throwaway DELETE at the edge must be rejected (401)
-  // — never 204 (no project deleted through the open surface).
+  // DESTRUCTIVE: the throwaway DELETE at the edge must be rejected —
+  // never 204 (no project deleted through the open surface).
+  // 2026-10-14 (ag-v58 / ebbb76488 vhost allowlist, owner decision): non-clone
+  // /git/ sub-paths (this includes /git/api/...) are CUT AT THE EDGE with a
+  // 404 — STRONGER than the old blanket-proxy 401 (the request never reaches
+  // the auth layer at all). Allowlist shape: ^/git/[0-9a-f]{24}(.git)?(/|$) —
+  // pid-prefixed paths (info/refs above) still hit the bridge and 401.
   const d = await edge('DELETE', `/git/api/projects/${THROWAWAY}`)
-  expect(d.code, `anonymous DELETE /git/api/projects → 401 (got ${d.code}: ${d.body})`).toBe(401)
+  expect([401, 404].includes(d.code), `anonymous DELETE /git/api/projects must be refused at the edge (401 or 404) — got ${d.code}: ${d.body}`).toBeTruthy()
   expect(d.code, 'anonymous DELETE must never 204').not.toBe(204)
 })
 
-test('3. edge: observability surfaces are open by design (accepted-with-rationale)', async () => {
-  const st = await edge('GET', '/git/status')
-  expect(st.code, 'GET /git/status open health surface').toBe(200)
-  expect(st.body, 'health body "ok"').toMatch(/ok/)
-  const me = await edge('GET', '/git/metrics')
-  expect(me.code, 'GET /git/metrics open metrics surface').toBe(200)
-  expect(me.body, 'prometheus text').toMatch(/# (HELP|TYPE)/)
-  const dg = await edge('GET', '/git/diags')
-  expect(dg.code, 'GET /git/diags open diags surface').toBe(200)
+test('3. edge: non-clone /git/ sub-paths are cut at the edge (vhost allowlist — obs surfaces included)', async () => {
+  // 2026-10-14 (ebbb76488 vhost allowlist, owner decision): the edge now
+  // serves ONLY the federation clone mount shape (^/git/[0-9a-f]{24}(.git)?(/|$));
+  // every other /git/ sub-path — including the observability family that was
+  // "open by design" under the old blanket proxy — 404s at the edge. The
+  // surfaces still exist on the BRIDGE itself (leg 4, intra-network).
+  for (const p of ['/git/status', '/git/metrics', '/git/diags']) {
+    const r = await edge('GET', p)
+    expect(r.code, `GET ${p} at the edge must be 404 (edge-cut, allowlist) — got ${r.code}: ${r.body}`).toBe(404)
+  }
 })
 
 test('4. intra-network: the same gates hold on the bridge directly (no edge exception)', async () => {
