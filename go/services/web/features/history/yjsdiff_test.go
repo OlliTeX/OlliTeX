@@ -103,7 +103,7 @@ func TestVlogMetaFor(t *testing.T) {
 		t.Fatalf("upsert: %v", err)
 	}
 	ctx := context.Background()
-	m := vlogMetaFor(ctx, log, "r1", "mainbasic.tex", 3)
+	m := vlogMetaFor(ctx, nil, log, "r1", "mainbasic.tex", 3)
 	if m == nil {
 		t.Fatalf("missing meta")
 	}
@@ -115,11 +115,11 @@ func TestVlogMetaFor(t *testing.T) {
 		t.Fatalf("origin = %#v", o)
 	}
 	// unattributed version -> nil (caller leaves meta absent)
-	if got := vlogMetaFor(ctx, log, "r1", "mainbasic.tex", 9); got != nil {
+	if got := vlogMetaFor(ctx, nil, log, "r1", "mainbasic.tex", 9); got != nil {
 		t.Fatalf("want nil, got %#v", got)
 	}
 	// nil vlog -> nil
-	if got := vlogMetaFor(ctx, nil, "r1", "mainbasic.tex", 3); got != nil {
+	if got := vlogMetaFor(ctx, nil, nil, "r1", "mainbasic.tex", 3); got != nil {
 		t.Fatalf("want nil (nil vlog), got %#v", got)
 	}
 }

@@ -156,6 +156,14 @@ func New(opts Options) (*Service, error) {
 	}
 	// d5dd23dd S1: actor/origin side log (no-op when opts.VersionLog is nil).
 	store = Wrap(store, opts.VersionLog)
+	// 65b0d668: the ws apply path has no per-user context — resolve the
+	// actor from live room membership (RoomProject maps per-doc rooms to
+	// the project presence key). No-op without a registry.
+	if al, ok := store.(*ActorLog); ok && opts.PresenceRegistry != nil {
+		al.RoomUID = func(room string) (string, bool) {
+			return opts.PresenceRegistry.RecentUser(RoomProject(room))
+		}
+	}
 	// The ygo WS server takes the two-method PersistenceAdapter; the versioned
 	// store speaks the fuller interface, so bridge with LegacyAdapter. The
 	// adapter already implements the server's optional CompactableAdapter and

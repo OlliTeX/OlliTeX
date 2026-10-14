@@ -35,6 +35,8 @@ package history
 // projects).
 
 import (
+	"ollitex/go/services/web/core"
+	"encoding/json"
 	"context"
 	"sort"
 	"strconv"
@@ -189,7 +191,7 @@ func diffTextRange(ctx context.Context, st persistence.VersionedPersistence, roo
 	return map[string]any{"diff": parts}, nil
 }
 
-func vlogMetaFor(ctx context.Context, vlog collab.Log, room, rootPath string, v int) map[string]any {
+func vlogMetaFor(ctx context.Context, cxt *core.Cxt, vlog collab.Log, room, rootPath string, v int) map[string]any {
 	if vlog == nil || v < 1 {
 		return nil
 	}
@@ -199,7 +201,24 @@ func vlogMetaFor(ctx context.Context, vlog collab.Log, room, rootPath string, v 
 	}
 	users := []any{}
 	if m.UID != "" {
-		users = []any{m.UID}
+		// Wire-contract fix (65b0d668 arc): the panel (pt/T in the history
+		// bundle) expects _userView objects here — raw uid strings crash it
+		// (email.split on undefined) because injectUserDetails only walks
+		// /updates entries. Resolve exactly like the injection pass;
+		// unresolvable -> null (the panel's "Anonymous"), same as Node.
+		var app *core.App
+		if cxt != nil {
+			app = cxt.A
+		}
+		if app != nil {
+			if uv, found := loadUsersByIDs(app, cxt, []string{m.UID})[m.UID]; found {
+				users = []any{json.RawMessage(userViewJSON(uv))}
+			} else {
+				users = []any{nil}
+			}
+		} else {
+			users = []any{m.UID}
+		}
 	}
 	ats := m.At.UnixMilli()
 	out := map[string]any{"users": users, "start_ts": ats, "end_ts": ats}

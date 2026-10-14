@@ -58,6 +58,31 @@ func (p *presenceRegistry) Add(room, uid string) {
 	m[uid] = now
 }
 
+// RecentUser — the most recently active occupant for a project (TTL-scoped,
+// same cutoff as Entries). Multi-occupant rooms return the latest by
+// last-seen — the best attribution available at commit time (65b0d668 fix:
+// the ws apply path has no per-user context, so the live room membership is
+// the faithful actor source).
+func (p *presenceRegistry) RecentUser(pid string) (string, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	cutoff := time.Now().Add(-presenceTTL)
+	best := ""
+	var bestAt time.Time
+	for uid, last := range p.rooms[pid] {
+		if last.Before(cutoff) {
+			continue
+		}
+		if uid == "" {
+			continue
+		}
+		if best == "" || last.After(bestAt) {
+			best, bestAt = uid, last
+		}
+	}
+	return best, best != ""
+}
+
 func (p *presenceRegistry) DropRoom(room string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

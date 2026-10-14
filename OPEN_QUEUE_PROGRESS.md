@@ -1964,3 +1964,23 @@ Commit: 2798d318
   - **REGRESSION post-swap**: comments-two-user + journey A + journey B = 19/19 green (journey A L6 self-armed to `[zipcontract LIVE]`).
   - **WORLD-TRUTH PINS (owner record)**: (a) zip-imported projects' editor buffer is empty in this world (docstore carries the content — import→collab-room sync gap, pre-existing, owner adjudication); (b) template publish = pinned 400 follow-up (exclusion mechanism implemented, self-activates); (c) the e2e world's web binary is a runtime swap of the committed source (CGO_ENABLED=0) — image rebuild = owner-gated persistence; the suite self-arms on absence.
   - **BOARD ORDER COMPLETE**: all 7 TEST-IMPL items (CE-1→CE-4, Journey A/B/C, ZIP) delivered. Remaining queue: owner-adjudication items (5 open ⚑ findings + 65b0d668 + SSO/Dropback owner credentials + zombie cleanup + image GC + stray container).
+
+## 2026-10-13 (late) — 65b0d668 attribution — FIXED + closed (TODO-65b0d668 → done)
+- Task: owner work-order follow-through — close the "Anonymous" attribution gap
+  (board item open since the a11y/Journey-B arcs).
+- Root causes: (1) `MongoVersionLog.Upsert` used driver-v2 `ReplaceOne` with a
+  $set doc → rejected every write → `ydocVersionMeta` empty forever → meta.users=[];
+  (2) ws apply path has no actor ctx (ygo context.Background) → uid would be "" anyway;
+  (3) exposing meta then hit a wire-contract crash in the panel (raw-uid strings in
+  /diff metas vs _userView objects in /updates) → email.split on undefined.
+- Fix (source): collab/versionlog.go (UpdateOne upsert), collab/presence.go
+  (RecentUser lookup), collab/collab.go (ActorLog.RoomUID wiring), web history
+  yjsdiff.go/handlers.go (vlogMetaFor resolves uid→_userView, null on miss),
+  yjsdiff_test.go (nil-safe args). go build + vet + unit tests green.
+- Deploy: collab + web binaries rebuilt from committed source (CGO_ENABLED=0),
+  docker cp + sv restart (world ol-e2e-overleaf-1). Persistence = image rebuild
+  (owner-gated, same as the ZIP arc).
+- Proof: ydocVersionMeta 0→rows with uid; /updates users=[full user object]
+  (was []); panel "Edited | main.tex | You" (ANON=false).
+- Regression: a11y-dual-scheme-nonhub + journey-choreography + comments-two-user
+  + trackchanges-intensive = 29/29 green (4.9m).

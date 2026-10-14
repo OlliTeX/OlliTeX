@@ -367,7 +367,7 @@ func (h *svc) yjsDiffBody(cxt *core.Cxt, from, to int, doc bool) (body []byte, s
 				}
 				if _, berr := textAt(ctx, st, froom, int(beforeV)); berr == nil {
 					if _, aerr := textAt(ctx, st, froom, int(afterV)); aerr == nil {
-						meta := vlogMetaFor(ctx, vlog, froom, path, int(afterV))
+						meta := vlogMetaFor(ctx, cxt, vlog, froom, path, int(afterV))
 						if out, terr := diffTextRange(ctx, st, froom, int(beforeV), int(afterV), meta); terr == nil {
 							b, merr := json.Marshal(out)
 							if merr == nil {
@@ -413,7 +413,7 @@ func (h *svc) yjsDiffBody(cxt *core.Cxt, from, to int, doc bool) (body []byte, s
 	var out map[string]any
 	if doc {
 		out, err = yjsDocDiff(ctx, st, room, from, to, func(ctx context.Context, v int) map[string]any {
-			return vlogMetaFor(ctx, vlog, room, root, v)
+			return vlogMetaFor(ctx, cxt, vlog, room, root, v)
 		})
 	} else {
 		// S3b: unified-stream replay (room text + tree ops) when the plane is

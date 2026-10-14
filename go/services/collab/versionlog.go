@@ -131,6 +131,11 @@ type ActorLog struct {
 	Now func() time.Time
 	// ErrLog — fail-soft sink for log-write errors (optional).
 	ErrLog func(err error)
+	// RoomUID — actor fallback resolver (room -> uid): the ws apply path
+	// carries no per-user context (context.Background() by ygo design), so
+	// the live room membership is the faithful actor source for version
+	// metadata (65b0d668: /updates meta.users was empty -> "Anonymous").
+	RoomUID func(room string) (string, bool)
 }
 
 var _ persistence.VersionedPersistence = (*ActorLog)(nil)
@@ -145,7 +150,13 @@ func (a *ActorLog) AppendUpdate(ctx context.Context, room string, update []byte)
 	if a.Now != nil {
 		now = a.Now().UTC()
 	}
-	m := VersionMeta{Room: room, V: uint64(v), UID: actorOf(ctx), Origin: originOf(ctx), Source: sourceOf(ctx), At: now}
+	uid := actorOf(ctx)
+	if uid == "" && a.RoomUID != nil {
+		if ru, rok := a.RoomUID(room); rok {
+			uid = ru
+		}
+	}
+	m := VersionMeta{Room: room, V: uint64(v), UID: uid, Origin: originOf(ctx), Source: sourceOf(ctx), At: now}
 	if lerr := a.Log.Upsert(ctx, m); lerr != nil {
 		// Fail-soft: the version is live; metadata is best-effort.
 		if a.ErrLog != nil {
@@ -308,14 +319,25 @@ func NewMongoVersionLog(ctx context.Context, db *mongo.Database) (*MongoVersionL
 }
 
 func (m *MongoVersionLog) Upsert(ctx context.Context, meta VersionMeta) error {
+	// 65b0d668 fix (2026-10-13): driver v2's ReplaceOne validates the
+	// REPLACEMENT document — a $set-prefixed update document is rejected
+	// ("replacement document cannot contain keys beginning with '$'"), so
+	// this mirror previously failed on EVERY write and ydocVersionMeta
+	// stayed empty forever (/updates meta.users = [] -> "Anonymous" in the
+	// panel). Upsert semantics with $set = UpdateOne (the intended call).
 	filter := bson.D{{Key: "room", Value: meta.Room}, {Key: "v", Value: meta.V}}
-	update := bson.D{{Key: "$set", Value: bson.D{
-		{Key: "uid", Value: meta.UID},
-		{Key: "origin", Value: meta.Origin},
-		{Key: "source", Value: meta.Source},
-		{Key: "at", Value: meta.At},
-	}}}
-	_, err := m.coll.ReplaceOne(ctx, filter, update, options.Replace().SetUpsert(true))
+	setV := bson.D{}
+	if meta.UID != "" {
+		setV = append(setV, bson.E{Key: "uid", Value: meta.UID})
+	}
+	if meta.Origin != "" {
+		setV = append(setV, bson.E{Key: "origin", Value: meta.Origin})
+	}
+	if meta.Source != "" {
+		setV = append(setV, bson.E{Key: "source", Value: meta.Source})
+	}
+	setV = append(setV, bson.E{Key: "at", Value: meta.At})
+	_, err := m.coll.UpdateOne(ctx, filter, bson.D{{Key: "$set", Value: setV}}, options.UpdateOne().SetUpsert(true))
 	return err
 }
 
