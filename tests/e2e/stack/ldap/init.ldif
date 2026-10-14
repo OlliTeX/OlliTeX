@@ -1,0 +1,17 @@
+dn: dc=e2e,dc=test
+objectClass: dcObject
+objectClass: organization
+o: e2e-test
+dc: e2e
+
+dn: ou=users,dc=e2e,dc=test
+objectClass: organizationalUnit
+ou: users
+
+dn: uid=e2e-ldap,ou=users,dc=e2e,dc=test
+objectClass: inetOrgPerson
+uid: e2e-ldap
+cn: E2e Ldap
+sn: Ldap
+mail: e2e-ldap@e2e.test
+userPassword:: T2wtTGRhcFVzZXItM20yUQ==

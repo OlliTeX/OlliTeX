@@ -227,7 +227,7 @@ Owner scope implemented end-to-end (source in repo, live in the e2e world):
 | 1 | `POST /project/:pid/clone` → 500 (body `{}`) | **AUDITED — faithful Node quirk** (`projectName.trim()` TypeError; named clone = 200 live, blank = 400). Not a defect. |
 | 2 | zip part trailing space → 500 | **AUDITED — faithful vendor pin** (ext gate; `{'Upload failed'}` Node shape). Deterministic. |
 | 3 | intermittent comment-write 500s | **RESOLVED-GREEN** (comments-two-user + trackchanges 2× post-swaps; no 5xx observed). |
-| 4 | invite-accept 204 ≠ editor access | **STILL OWNER-ADJUDICATE** (permission-model choice; pinned in CE-3). |
+| 4 | invite-accept 204 ≠ editor access | **OWNER-ADJUDICATED 2026-10-14 → (b) accept = PENDING policy**: 204 no-access accept is the INTENDED semantics (invite consumed one-shot; the owner grants membership). Pin stands as the approved contract (sharing-invite-loop L1). |
 | 5 | sign-up gap: no password field + retired activation | **STILL OWNER-ADJUDICATE** (mail-gated register is a product policy; Journey A pins it). |
 | 6 | store-cascade: hard-delete orphans docs/ydoc/chunks | **PARTIALLY OBSERVED-SWEEPED** (zombie pass cleared the leaked rows; cascade-behavior question stays with the owner — the reaper appears to sweep over time). |
 | 7 | zip-imported docs: empty editor buffer | **STILL OWNER-ADJUDICATE** (import→collab-room sync gap; store-level content verified; ZIP leg J pins). |

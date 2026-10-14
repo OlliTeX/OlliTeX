@@ -11,6 +11,12 @@
  *   5. POST /admin/sso/test/ldap wrong-pw → success:false (invalid user or password)
  *   6. POST /sso/ldap/login {email,password} → JIT user + session → /hub
  *   7. cleanup: JIT user removed, config restored to baseline
+ *
+ * CI matrix (owner-approved 2026-10-14): the directory is a first-class
+ * COMPOSE service (`e2e-ldaptest`, built from the committed asset in
+ * stack/ldap — the ad-hoc fixed-IP side container is retired). URL via DNS
+ * name on the stack network — identical local and CI; override with
+ * OL_LDAP_URL.
  */
 import { test, expect } from '@playwright/test'
 import { execSync } from 'child_process'
@@ -18,7 +24,10 @@ import { loginRobust } from '../helpers/auth'
 import { ADMIN } from '../fixtures/credentials'
 
 const BASE = process.env.OL_BASE || 'http://127.0.0.1:7420'
-const LDAP_URL = 'ldap://172.20.0.20:3890'
+// 2026-10-14 (CI matrix): compose DNS name on the stack network (works local
+// and CI; the retired ad-hoc world pinned 172.20.0.20). OL_LDAP_URL override
+// stays for one-off dirs.
+const LDAP_URL = process.env.OL_LDAP_URL || 'ldap://e2e-ldaptest:3890'
 const LDAP_BASE = 'dc=e2e,dc=test'
 const LDAP_BIND_DN = 'cn=admin,dc=e2e,dc=test'
 const LDAP_BIND_PW = 'Ol-LdapRoot-9x7K'
@@ -92,15 +101,26 @@ test.describe('SSO leg-b — live LDAP transport', () => {
 
   test('C: probe branch — connectivity + service-account bind', async ({ page }) => {
     await loginRobust(page, ADMIN.email, ADMIN.password)
-    const tok = (await page.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)) || ''
-    const r = await page.request.post(BASE + '/admin/sso/test/ldap', {
-      data: JSON.stringify({}),
-      headers: { 'content-type': 'application/json', 'x-csrf-token': tok },
-    }) as any
-    const j: any = await r.json().catch(() => ({}))
-    console.log('PROBE=' + r.status() + ' ' + JSON.stringify(j))
-    expect(r.status()).toBe(200)
-    expect(j.success, 'probe: ' + JSON.stringify(j)).toBe(true)
+    // Readiness gate: the directory is a compose member that starts WITH the
+    // stack — on a fresh CI runner it may still be binding when this leg
+    // runs. Retry the EXACT production probe (same code path) until the
+    // directory answers; a real misconfiguration still fails after the window.
+    let j: any = {}
+    let status = 0
+    for (let i = 0; i < 8; i++) {
+      const tok = (await page.locator('meta[name="ol-csrfToken"]').getAttribute('content').catch(() => null)) || ''
+      const r = await page.request.post(BASE + '/admin/sso/test/ldap', {
+        data: JSON.stringify({}),
+        headers: { 'content-type': 'application/json', 'x-csrf-token': tok },
+      }) as any
+      status = r.status()
+      j = await r.json().catch(() => ({}))
+      console.log(`PROBE[${i}]=` + status + ' ' + JSON.stringify(j).slice(0, 160))
+      if (r.status() === 200 && j.success) break
+      await page.waitForTimeout(5_000)
+    }
+    expect(status).toBe(200)
+    expect(j.success, 'probe (after readiness window): ' + JSON.stringify(j)).toBe(true)
   })
 
   test('D: full auth — correct credentials', async ({ page }) => {

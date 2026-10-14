@@ -66,6 +66,18 @@ services:
       - '127.0.0.1:18025:8025'
     networks: [e2e]
 
+  # 2026-10-14 (SSO leg-b → CI matrix, owner-approved): the world's OpenLDAP
+  # directory as a first-class stack member. Replaces the ad-hoc side container
+  # (fixed IP 172.20.0.20, uncommitted build recipe) with the committed asset
+  # in stack/ldap — buildable on a fresh CI runner, DNS-resolvable from
+  # overleaf as `e2e-ldaptest:3890` on the e2e network. Disposable: the spec
+  # (sso-ldap-live) restores the SSO config baseline + removes any JIT user;
+  # the directory itself is re-created by compose on every stack:up.
+  e2e-ldaptest:
+    build: ./stack/ldap
+    container_name: e2e-ldaptest
+    networks: [e2e]
+
   overleaf:
     image: ${OVERLEAF_IMAGE:-ollitex/ollitex:main}
     hostname: overleaf

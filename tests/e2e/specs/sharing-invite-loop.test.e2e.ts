@@ -12,10 +12,13 @@
  *  - accept XHR (X-Requested-With) → 204 pinned (Node parity: one-shot
  *    consumption + sender contact; NO project refs write — collab.go
  *    arrayFilters parity; PUT /users/:uid 404s for non-members).
+ *    ⚑ OWNER-ADJUDICATED 2026-10-14 → **(b) accept = PENDING policy**:
+ *    the 204 no-access accept IS the intended product semantics — this
+ *    pin is the APPROVED contract, not an open question.
  *  - membership therefore seeded direct-DB for the capability legs (the
  *    documented stack pattern, identical to specs/collab-two-user +
  *    specs/history-versioning T5): $addToSet collaberator_refs = exactly
- *    what a successful accept would have represented.
+ *    what a granted membership would look like once the owner acts.
  */
 import { test, expect } from '@playwright/test'
 import { loginRobust, createBlankProject } from '../helpers/auth'
