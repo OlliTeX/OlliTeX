@@ -6,19 +6,17 @@
  * tracked-changes email to the author" contract is this user-controlled
  * grace period.
  *
- * ⚑ PRODUCT FLAG (2026-10-15, flake #3+4 instrumentation): the mute switch UI can
- * render the OPPOSITE of the loaded data under load — captured live: the page's
- * own GET /notifications/preferences returned 200 with the saved value, no page
- * errors, and yet label.mantine-Switch-body[0] held the inverted checked state
- * for 15+ s (converged only after ~18-30 s on some runs; consistent at rest and
- * after quiet loads). The WIRE contract (save 200 + read-back = saved value)
- * is intact in EVERY capture, so this test asserts the contract on the wire
- * (hard) + a converging UI check (hard, 18 s window, full diagnostics on
- * failure). If the UI leg fails while the wire passes, that IS the flag — the
- * board item (owner adjudication: chase the hub switch desync as a product bug
- * vs accept retry-green) carries the repro + evidence. A user acting on a
- * desynced switch would save the opposite direction, so this is not cosmetic
- * noise.
+ * ⚑ NTF-UI-1 — FIXED (2026-10-15, owner-approved; ag-69). The hub mute switch used
+ * to render the OPPOSITE of the page's own fetched data under load (silent
+ * load()-catch → checked-default; a user acting on it saved the opposite
+ * direction). FIX in notifications-settings-section.tsx: load() now retries
+ * (3×, backoff) and on final failure renders a VISIBLE error state with Retry —
+ * the control is never rendered in a guessed state. This spec now PINS that
+ * contract: (A) a flaky first load recovers via the retry path and still
+ * agrees with the wire; (B) a persistently failing load shows the visible
+ * error state AND renders NO switch (no misleading control); (C) the round-trip
+ * data contract (wire persistence) + UI⇄wire agreement are HARD legs — a desync
+ * recurring after the fix is a regression and must fail the battery.
  *
  * 2026-09-10 (owner queue 3): legacy page removed; this journey now drives
  * the redirect target (hub) instead of the removed legacy form.
@@ -104,6 +102,82 @@ test('notification preferences: legacy URL is retired; the hub email leaf round-
       const b = await r.json()
       return (b.muteAllNotifications as boolean) ?? false
     })
+
+  // ---- NTF-UI-1 contract legs (pinned fix, ag-69; owner-approved 2026-10-15) ----
+  // Leg A: a FLAKY first load must recover via the retry path and the switch
+  // must converge to the WIRE (the ag-67/68 desync signature must be gone).
+  {
+    let aborted = 0
+    await page.route('**/notifications/preferences', async (route) => {
+      if (route.request().method() === 'GET' && aborted < 1) {
+        aborted += 1
+        return route.abort('failed')
+      }
+      return route.continue()
+    })
+    await page.goto('/user-settings/mysettings.email', { waitUntil: 'domcontentloaded' })
+    await page.unroute('**/notifications/preferences')
+    const wireA = await readWire()
+    let okA = false
+    for (let t = 0; t < 15; t++) {
+      const n = await page.locator('label.mantine-Switch-body').count()
+      if (n > 0) {
+        const ck = await page
+          .locator('label.mantine-Switch-body')
+          .first()
+          .locator('input')
+          .first()
+          .isChecked()
+          .catch(() => 'ERR')
+        if (ck === !wireA) {
+          okA = true
+          break
+        }
+      }
+      await page.waitForTimeout(1000)
+    }
+    expect(
+      okA,
+      `NTF-UI-1 Leg A: flaky first load must recover via retry and the switch must agree with the wire (aborted-first-GET captured=${aborted})`,
+    ).toBe(true)
+  }
+  // Leg B: a persistently failing load must show the VISIBLE error state and
+  // render NO switch control — no misleading checked-default state (the ag-68
+  // defect). 3 GETs blocked = all retry attempts.
+  {
+    let blocked = 0
+    await page.route('**/notifications/preferences', async (route) => {
+      if (route.request().method() === 'GET') {
+        blocked += 1
+        if (blocked <= 3) return route.abort('failed')
+      }
+      return route.continue()
+    })
+    await page.goto('/user-settings/mysettings.email', { waitUntil: 'domcontentloaded' })
+    await page.getByText("Couldn't load notification preferences").waitFor({ state: 'visible', timeout: 20000 })
+    const n = await page.locator('label.mantine-Switch-body').count()
+    await page.unroute('**/notifications/preferences')
+    expect(
+      n,
+      `NTF-UI-1 Leg B: failed loads must not render the switch control (no misleading state; blocked=${blocked})`,
+    ).toBe(0)
+  }
+  // Healthy recovery for the round-trip flow (Leg B intentionally left the page
+  // in the error state) — the switch must be back once the route is cleared;
+  // a persistent error state here is a real product regression and fails hard.
+  await page.goto('/user-settings/mysettings.email', { waitUntil: 'domcontentloaded' })
+  const roundTripHealthy = await page
+    .locator('label.mantine-Switch-body')
+    .first()
+    .isVisible({ timeout: 15000 })
+    .catch(() => false)
+  if (!roundTripHealthy) {
+    throw new Error(
+      'NTF-UI-1: switch control missing after Leg B recovery load — either the retry path is broken (regression) or the world is rejecting the GET. ' +
+        'errorStateVisible=' + String(await page.getByText("Couldn't load notification preferences").isVisible().catch(() => false)),
+    )
+  }
+
   const saveToast = page.getByText('Notification preferences saved.').waitFor({
     state: 'visible',
     timeout: 60000,
@@ -177,14 +251,34 @@ test('notification preferences: legacy URL is retired; the hub email leaf round-
       throw new Error('post-reload wire read failed: ' + String(e).slice(0, 120))
     })
 
-  // World hygiene (2026-10-13): this toggle inverts B's GLOBAL muteAll leaf and the
-  // chat fan-out honors it (chat notify.go MutedUserIDs) — leaving the world in a
-  // muted state poisons the receiver-side suites. Restore over the WIRE (the UI
-  // label position is not stable across the re-render — 2026-10-13) and read it
-  // back through the canonical route. 2026-10-15: the trailing UI-click restore
-  // was REMOVED (it re-flipped the switch after the wire restore — a
-  // cross-run world contaminant) and this restore now runs BEFORE the final
-  // assertion so a failing repeat cannot leave the world in the toggled state.
+  // UI leg — HARD (NTF-UI-1 pinned contract, fixed ag-69): the page is loaded
+  // with the POST-TOGGLE state at this point (the reload goto above), so the
+  // switch must converge to !postWire. A silent-checked-default regression or
+  // any desync fails with the full evidence series.
+  let uiAgrees = false
+  const series: string[] = []
+  const uiTarget = !postWire // UI checked = !wire; wire is now postWire (post-toggle)
+  for (let t = 0; t < 18; t++) {
+    const ck = await page.locator('label.mantine-Switch-body').first().locator('input').first()
+      .isChecked().catch(() => 'ERR')
+    series.push(`${t}.s:${ck}`)
+    if (ck === uiTarget) { uiAgrees = true; break }
+    await page.waitForTimeout(1000)
+  }
+  const uiDiag = `ui-target-checked=${uiTarget} (post-toggle wire=${postWire}) | series=${series.join(',')} | preClickConverged=${uiConverged} | ${gotoRes ? gotoRes.status() : ''} ${reloadedUrl} switches=${swCount} | pageErrors=${JSON.stringify(pageErrors)} | exchanges=${JSON.stringify(seen)}`
+  if (!uiAgrees) {
+    const msg = `⚑ NTF-UI-1 REGRESSION (desync or silent-default returned — must be chased): ${uiDiag}`
+    console.log(msg)
+    test.info().annotations.push({ type: 'NTF-UI-1-regression', description: msg.slice(0, 300) })
+  } else {
+    console.log('UI⇄wire agreement: OK (converged after ~' + series.length + ' s)')
+  }
+
+  // World hygiene (2026-10-13): this toggle inverts B's GLOBAL muteAll leaf and
+  // the chat fan-out honors it (chat notify.go MutedUserIDs) — leaving the world
+  // in a muted state poisons the receiver-side suites. Restore over the WIRE and
+  // read it back through the canonical route. Runs LAST so it cannot leave the
+  // world in the toggled state on any earlier failure path.
   {
     const csrf = await page
       .locator('meta[name="ol-csrfToken"]')
@@ -200,31 +294,13 @@ test('notification preferences: legacy URL is retired; the hub email leaf round-
     const body = await got.json()
     expect(body.muteAllNotifications, 'restore read-back must equal the pre-test WIRE state').toBe(preState)
   }
+
+  expect(
+    uiAgrees,
+    `UI switch must agree with the wire after reload (NTF-UI-1 pinned contract) | ${uiDiag}`,
+  ).toBe(true)
   expect(
     postWire,
     `wire contract: persisted value must equal the toggled state (preState=${preState}, want post-toggle mute=${!preState})`,
   ).toBe(!preState)
-
-  // UI leg — pinned product condition (⚑ NTF-UI-1, see spec header + board): the
-  // hub mute switch can desync from the wire under load, so this leg is a
-  // RECORDED AGREEMENT CHECK, not a hard failure: capture the convergence
-  // series + flag every disagreement. (The data contract above is the hard
-  // requirement; a wire defect still fails the test.)
-  let uiAgrees = false
-  const series: string[] = []
-  const uiTarget = !preState // after restore, wire=preState → UI checked should be !preState
-  for (let t = 0; t < 18; t++) {
-    const ck = await page.locator('label.mantine-Switch-body').first().locator('input').first()
-      .isChecked().catch(() => 'ERR')
-    series.push(`${t}.s:${ck}`)
-    if (ck === uiTarget) { uiAgrees = true; break }
-    await page.waitForTimeout(1000)
-  }
-  if (!uiAgrees) {
-    const msg = `⚑ NTF-UI-1 DESYNC (flagged product condition; data contract OK): UI switch did not agree with wire in 18s | ui-target-checked=${uiTarget} (wire=preState=${preState}) | series=${series.join(',')} | preClickConverged=${uiConverged} | wireAtToggle=${postWire} | ${gotoRes ? gotoRes.status() : ''} ${reloadedUrl} switches=${swCount} | pageErrors=${JSON.stringify(pageErrors)} | exchanges=${JSON.stringify(seen)}`
-    console.log(msg)
-    test.info().annotations.push({ type: 'desync-flag', description: msg.slice(0, 300) })
-  } else {
-    console.log('UI⇄wire agreement: OK (converged after ~' + series.length + ' s)')
-  }
 })
