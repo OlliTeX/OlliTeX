@@ -13,6 +13,7 @@ import {
 import { notify } from '../../shared/notify'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
 import { PageLoading } from '../../shared/page-state'
+import Icon from '../../shared/icons'
 
 
 // Owner #21 (2026-09-13 editor wave): per-type notification table.
@@ -103,26 +104,36 @@ export default function NotificationsSettingsSection() {
   const [pref, setPref] = useState<Record<string, unknown> | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // NTF-UI-1 fix (2026-10-15, owner-approved): the previous load() caught ANY
+  // failure and rendered a SILENT checked-default state (setEnabled(true) + all
+  // prefs on) — under load an intermittent first-GET failure made the mute
+  // switch show the OPPOSITE of the saved state, and a user acting on it saved
+  // the opposite direction. Now: bounded retries with backoff, and on final
+  // failure a VISIBLE error state with Retry — the control is not rendered in
+  // a misleading state (enabled stays null, so no save can go out the wrong way).
+  const [loadFailed, setLoadFailed] = useState(false)
 
   const load = useCallback(async () => {
-    try {
-      const prefs = await getJSON('/notifications/preferences')
-      setEnabled(!(prefs?.muteAllNotifications ?? false))
-      setDelay(prefs?.notificationDelayMinutes != null ? String(prefs.notificationDelayMinutes) : '')
-      const next: Record<string, unknown> = {}
-      for (const k of KNOWN_PREF_KEYS) {
-        next[k] = prefs?.[k] === true
+    setLoadFailed(false)
+    let lastErr: unknown = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const prefs = await getJSON<any>('/notifications/preferences')
+        setEnabled(!(prefs?.muteAllNotifications ?? false))
+        setDelay(prefs?.notificationDelayMinutes != null ? String(prefs.notificationDelayMinutes) : '')
+        const next: Record<string, unknown> = {}
+        for (const k of KNOWN_PREF_KEYS) {
+          next[k] = prefs?.[k] === true
+        }
+        setPref(next)
+        return
+      } catch (e) {
+        lastErr = e
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)))
       }
-      setPref(next)
-    } catch {
-      setEnabled(true)
-      setDelay('')
-      // compiled defaults: everything on (the server defaults)
-      const next: Record<string, unknown> = {}
-      for (const k of KNOWN_PREF_KEYS) next[k] = true
-      next.mentionsInThread = true
-      setPref(next)
     }
+    void lastErr
+    setLoadFailed(true) // visible error state below — NO silent default render
   }, [])
 
   useEffect(() => {
@@ -149,6 +160,28 @@ export default function NotificationsSettingsSection() {
     } finally {
       setBusy(false)
     }
+  }
+
+  if (loadFailed) {
+    // NTF-UI-1: visible failure state — the control is NOT rendered with a
+    // guessed/misleading value; the user can retry without risking a wrong save.
+    return (
+      <Alert
+        icon={<Icon name="warn" size={18} />}
+        variant="light"
+        color="red"
+        withBorder
+        radius="md"
+        title="Couldn't load notification preferences"
+      >
+        <Text size="sm">The preferences request failed. Your saved preferences were not changed.</Text>
+        <Group mt={8}>
+          <Button size="xs" onClick={() => void load()} loading={false}>
+            Retry
+          </Button>
+        </Group>
+      </Alert>
+    )
   }
 
   if (enabled === null || pref === null) return <PageLoading label="Loading notification preferences…" />
