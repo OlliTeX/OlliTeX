@@ -2282,3 +2282,32 @@ Data contract intact in every capture. Owner call: fix the hub surface (surface 
 UNMUTED every round (restore correctness proven); every desync occurrence is captured as 'NTF-UI-1 DESYNC' annotated lines
 in the battery log (evidence accumulates for the owner).
 **World state: ag-68** (unchanged — spec-only changes; no bake needed). B baseline: UNMUTED (receiver-suite safe).
+
+### NTF-UI-1 closeout (hub mute-switch desync — owner-approved fix; 2026-10-15)
+**Root cause (product, ollitex-hub notifications-settings-section):** `load()` caught ANY failure and
+rendered a SILENT checked-default (`setEnabled(true)` + all prefs on) — an intermittent first-GET failure
+under load made the mute switch show the OPPOSITE of the saved state; a user acting on it saved the
+OPPOSITE direction (the component saves from local state). This was the truth under the notifications
+flake (the old spec's "UI vs UI" expectation floated with the desync and masked it).
+**Fix (commit 107cbfe5, baked ag-69):** load() retries 3× (300/600 ms backoff); final failure → VISIBLE
+red error card + Retry; the control is never rendered in a guessed state.
+**Pinned spec (tests/e2e/specs/notifications.test.e2e.ts):** Leg A flaky-first-load recovers via retry +
+converges to wire; Leg B persistent failure → visible error state, NO switch control; main flow:
+wire-grounded pre-state → toast save gate → wire-direction self-heal → HARD wire persistence contract →
+HARD UI⇄wire agreement (desync now = regression fail with diagnostics) → unconditional correct wire
+restore (preState) LAST.
+**Evidence (ag-69):** 10/10 spec repeats GREEN; UI⇄wire converged at ~1 s (ag-67/68 desync gone); 3/3
+rounds × (notifications + notifications-full) = 21/21 green; world B starts and ends UNMUTED every round.
+**Battery ag-69 in flight (final global proof → verdict appended at closeout).**
+
+### Product-tree probe hygiene (2026-10-15, during battery ag-69)
+**Removed:** `go/services/web/features/history/zz_live_probe_d_test.go` (stale one-off dev probe for the long-closed
+D item: hardcoded pid, stale db name, self-skip; the history surface's real coverage = the e2e battery). History
+package tests still GREEN after removal.
+**Inventory recorded (owner's call on the rest; NOT swept mid-battery):** 6 other `zz_` files in the tree —
+`federation/zz_live_fedb_test.go` (348-line documented S11 WIRE round-trip harness — complements the hermetic
+battery; keep), `sso/zz_samljit_probe_test.go` (documented live regression test for the empty-passport SSO fix —
+keep), `toolkit/zz_repro81_test.go` (issue-81 repro — keep unless the owner confirms 81 is closed),
+`toolkit/zz_live_hub_test.go` (live round-trip vs canonical stack, hermetic tests carry the predicate coverage —
+owner's call), `clsitex/compilemanager/zz_probe_synctex_test.go` + `projectlist/zz_joinprobe_test.go` (past
+incident probes — prime deletion candidates if the owner confirms both incidents are closed).
