@@ -2311,3 +2311,29 @@ keep), `toolkit/zz_repro81_test.go` (issue-81 repro — keep unless the owner co
 `toolkit/zz_live_hub_test.go` (live round-trip vs canonical stack, hermetic tests carry the predicate coverage —
 owner's call), `clsitex/compilemanager/zz_probe_synctex_test.go` + `projectlist/zz_joinprobe_test.go` (past
 incident probes — prime deletion candidates if the owner confirms both incidents are closed).
+
+### ORCID import — "selected 3 works, only 1 imported" (owner live report, 2026-10-15; ag-70)
+**Report:** hub library → Add reference → ORCID — 3 references selected, 1 imported, no error shown.
+**Repro/diagnosis (e2e world = same product code):** server chain fully healthy (3/3 no-DOI works @ ~200 ms;
+3/3 DOI works < 1 s; unique and duplicate keys all list + render). Two defects matching the symptom:
+(1) **Go parity deviation** — the fetch-bib 2-hop chain (ORCID work + DOI resolution) was capped at **10 s
+TOTAL** (orcidpicker.go handler), while the Node original gave **each hop its own 10 s** (per the code's own
+comment) → slow-but-healthy ORCID/DOI hop = hard 502 = work lost; (2) **confirmed UX gap** — the hub ORCID
+modal swallowed every per-work failure (`catch {}`, "partial import = legacy") with NO error reporting
+(the project-surface modal reports it) → lost works invisible, hence "only 1 imported" undiagnosable.
+**Fix (commit 7038248d, baked ag-70):** `fetchBibTotalCtx` 30 s chain budget / 10 s per-hop (Node parity);
+hub modal now collects per-work errors and the toast reports partial imports
+("Imported N references… — M selected work(s) could not be imported: <work>: <error>"); pinned spec
+`specs/orcid-import.test.e2e.ts` (Leg A: 3/3 via exact user path + DOI-work budget precheck with retry over
+orcid.org result flakiness; Leg B: aborted 2nd fetch-bib → toast names the failed work + two still import).
+**Evidence (ag-70):** 6/6 spec green; battery ag-70 in flight (collateral + NTF-UI-1 re-proof → closeout on verdict).
+**Owner actions:** (a) roll the live instance to an ag-70-equivalent build (commit 7038248d) for the fix to
+reach production; (b) caveat — the live instance's own sessions are not observable from this host (dev.env
+admin login 401s there; its production traffic does not hit the local dev stack), so the two defects above are
+the code paths that match the symptom; if it recurs post-deploy, the new toast names the failing work + upstream
+error = immediate next diagnostic.
+
+### NTF-UI-1 battery verdict (ag-69, 2026-10-15)
+Battery ag-69 (full product): **677 passed / 1 failed (external: Dropbox token expired — known owner action
+TODO-e62d1b55) / 4 skipped** — zero collateral from the NTF-UI-1 fix; NTF-UI-1 board → closeable on the
+ag-70 battery (which re-proves it plus carries the ORCID fixes).
