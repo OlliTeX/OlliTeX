@@ -596,6 +596,13 @@ type limits struct {
 const (
 	defCompileGroup   = "standard" // Settings.defaultFeatures.compileGroup
 	defCompileTimeout = 180        // Settings.defaultFeatures.compileTimeout
+
+	// ag-71 (2026-10-15 live incident): the cold FIRST typst compile (fresh
+	// package cache, cold fs) measured ~270 s; the 240 s dispatch deadline
+	// expired before the job finished → invisible 500 + the client's "compiling"
+	// spinner never cleared. 900 s covers realistic cold runs; warm compiles
+	// complete in ~3 s (measured on the same image).
+	clsiDispatchTimeout = 900 * time.Second
 )
 
 func computeLimits(owner *bson.D, projectCompiler string) limits {
@@ -981,7 +988,7 @@ func compileHandler(a *core.App) func(*core.Cxt, *core.Res) {
 		creq, _ := http.NewRequest("POST", u, strings.NewReader(string(reqBody2)))
 		creq.Header.Set("Accept", "application/json")
 		creq.Header.Set("Content-Type", "application/json")
-		cctx, cancel := context.WithTimeout(ctx, 240*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, clsiDispatchTimeout)
 		defer cancel()
 		cresp, cerr := http.DefaultClient.Do(creq.WithContext(cctx))
 		if cerr != nil {

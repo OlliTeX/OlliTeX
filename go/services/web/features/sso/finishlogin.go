@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"ollitex/go/services/web/core"
+	"ollitex/go/services/web/features/registrationpage"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -95,29 +96,28 @@ func samlJIT(ctx context.Context, db *mongo.Database, p *SAMLProvider, profile s
 		if err := users.FindOne(ctx, bson.D{
 			{Key: "emails.email", Value: email},
 		}).Decode(&u); err != nil {
-			uid := randomHex(24)
+			// ag-71 (2026-10-15 live incident davrot@): the hand-rolled 11-field
+			// doc (camelCase firstName/lastName, no ace/features/enrollment) broke
+			// every downstream render for JIT users (/hub 500: the user-doc
+			// invariants every other feature assumes). Node's UserCreator writes
+			// the SAME full baseline doc that registration and admin-create use —
+			// mirror ldapJIT (2026-10-14 leg-b): build from it, overlay identity.
 			now := time.Now().UTC()
-			var existing struct {
-				LoginEpoch int32 `bson:"loginEpoch"`
-			}
-			_ = users.FindOne(ctx, bson.D{{Key: "_id", Value: uid}}).Decode(&existing)
-			ins, ierr := users.InsertOne(ctx, bson.D{
-				{Key: "_id", Value: uid},
-				{Key: "email", Value: email},
-				{Key: "emails", Value: []bson.M{{"email": email, "confirmed": true}}},
-				{Key: "firstName", Value: firstName},
-				{Key: "lastName", Value: lastName},
-				{Key: "isAdmin", Value: isAdmin},
-				{Key: "holdingAccount", Value: false},
-				{Key: "analyticsId", Value: newUUID()},
-				{Key: "created", Value: now},
-				{Key: "lastActive", Value: now},
-				{Key: "loginEpoch", Value: int32(0)},
-			})
-			if ierr != nil {
+			base := registrationpage.NewUserDoc()
+			base["email"] = email
+			base["emails"] = []bson.M{{"email": email, "confirmed": true}}
+			base["first_name"] = firstName
+			base["last_name"] = lastName
+			base["isAdmin"] = isAdmin // IdP attribute: JIT grant at creation only
+			base["analyticsId"] = newUUID()
+			base["created"] = now
+			base["lastActive"] = now
+			base["loginEpoch"] = int32(0)
+			uid := bson.NewObjectID()
+			base["_id"] = uid
+			if _, ierr := users.InsertOne(ctx, base); ierr != nil {
 				return nil, ierr
 			}
-			uid = ins.InsertedID.(string)
 			u = map[string]any{"_id": uid, "email": email}
 		}
 		// NOTE: the email-found path used to `return nil, err` INSIDE the
@@ -202,25 +202,25 @@ func oidcJIT(ctx context.Context, db *mongo.Database, p *OIDCProvider, profile s
 	created := false
 	if u == nil {
 		if err := users.FindOne(ctx, bson.D{{Key: "emails.email", Value: email}}).Decode(&u); err != nil {
-			uid := randomHex(24)
+			// ag-71 (2026-10-15 live incident davrot@): mirror ldapJIT (above) —
+			// full NewUserDoc baseline + identity overlay (see samlJIT comment).
 			now := time.Now().UTC()
-			ins, ierr := users.InsertOne(ctx, bson.D{
-				{Key: "_id", Value: uid},
-				{Key: "email", Value: email},
-				{Key: "emails", Value: []bson.M{{"email": email, "confirmed": true}}},
-				{Key: "firstName", Value: firstName},
-				{Key: "lastName", Value: lastName},
-				{Key: "isAdmin", Value: isAdmin},
-				{Key: "holdingAccount", Value: false},
-				{Key: "analyticsId", Value: newUUID()},
-				{Key: "created", Value: now},
-				{Key: "lastActive", Value: now},
-				{Key: "loginEpoch", Value: int32(0)},
-			})
-			if ierr != nil {
+			base := registrationpage.NewUserDoc()
+			base["email"] = email
+			base["emails"] = []bson.M{{"email": email, "confirmed": true}}
+			base["first_name"] = firstName
+			base["last_name"] = lastName
+			base["isAdmin"] = isAdmin // IdP attr/attrFilter: JIT grant at creation only
+			base["analyticsId"] = newUUID()
+			base["created"] = now
+			base["lastActive"] = now
+			base["loginEpoch"] = int32(0)
+			uid := bson.NewObjectID()
+			base["_id"] = uid
+			if _, ierr := users.InsertOne(ctx, base); ierr != nil {
 				return nil, ierr
 			}
-			u = map[string]any{"_id": ins.InsertedID.(string), "email": email}
+			u = map[string]any{"_id": uid, "email": email}
 		}
 		// (the old `else { return nil, err }` sat on the SUCCESS branch —
 		// same (nil,nil) empty-session bug as samlJIT; removed 2026-10-06)

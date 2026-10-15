@@ -145,6 +145,11 @@ type WriteUpdates struct {
 	Lines   *[]string
 	Ranges  *any
 	Version *int64
+	// Name is the caller-known file path for the doc. Kept on INSERT (ag-71
+	// 2026-10-15: the nameless insert path produced live rows without `name`,
+	// breaking every read surface that treats the store name as canonical)
+	// and $set on the upsert branch (heals a nameless row on next write).
+	Name string
 }
 
 // ArchivedDoc is the persistor JSON payload shape.

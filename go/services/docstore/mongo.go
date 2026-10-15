@@ -305,6 +305,9 @@ func (s *mongoStore) UpsertDoc(ctx context.Context, projectID, docID string, pre
 		if u.Version != nil {
 			stages = append(stages, bson.D{{Key: "$set", Value: bson.D{{Key: "version", Value: bson.D{{Key: "$literal", Value: *u.Version}}}}}})
 		}
+		if u.Name != "" {
+			stages = append(stages, bson.D{{Key: "$set", Value: bson.D{{Key: "name", Value: u.Name}}}})
+		}
 		if u.Lines != nil || u.Ranges != nil {
 			stages = append(stages, bson.D{{Key: "$set", Value: bson.D{{Key: "rev", Value: previousRev + 1}}}})
 		}
@@ -336,6 +339,9 @@ func (s *mongoStore) UpsertDoc(ctx context.Context, projectID, docID string, pre
 	}
 	if u.Version != nil {
 		doc = append(doc, bson.E{Key: "version", Value: *u.Version})
+	}
+	if u.Name != "" {
+		doc = append(doc, bson.E{Key: "name", Value: u.Name})
 	}
 	_, err := s.docs.InsertOne(ctx, doc)
 	if err != nil {

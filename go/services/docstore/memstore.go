@@ -262,6 +262,10 @@ func applyWrite(d *Doc, u WriteUpdates, rev int64) {
 	if u.Version != nil {
 		d.Version = int64Ptr(*u.Version)
 	}
+	if u.Name != "" {
+		n := u.Name
+		d.Name = &n
+	}
 	if u.Lines != nil || u.Ranges != nil {
 		d.Rev = int64Ptr(rev)
 	}
