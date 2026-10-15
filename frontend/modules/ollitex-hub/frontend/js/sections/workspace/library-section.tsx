@@ -495,8 +495,16 @@ function OrcidImportModal({
     setImporting(true)
     setError(null)
     let imported = 0
+    // 2026-10-15 (owner report "selected 3 works, only 1 imported"): failures
+    // used to be swallowed SILENTLY (partial import is the legacy behaviour —
+    // keep it) — now every per-work failure is captured and reported in the
+    // toast, so a partial import is always explainable (parity with the
+    // project-surface ORCID modal, which already reports "Some works could
+    // not be imported (n): …").
+    const errors: string[] = []
     try {
       for (const code of codes) {
+        const label = works.find(w => String(w.putCode) === String(code))?.title || `work ${code}`
         try {
           const data = await getJSON<{ bibtex: string }>(
             `/orcid-picker/fetch-bib?orcid=${encodeURIComponent(orcid)}&putCode=${encodeURIComponent(String(code))}`
@@ -510,13 +518,20 @@ function OrcidImportModal({
               fields: Object.entries(entry.fields || {}).map(([name, value]) => ({ name, value: String(value ?? '') })),
             }])
             imported += 1
+          } else {
+            errors.push(`${label}: no reference data returned`)
           }
-        } catch {
-          // keep importing the rest (partial import is the legacy behaviour)
+        } catch (e) {
+          errors.push(`${label}: ${failureFromError(e).message}`)
         }
       }
-      if (imported > 0) notify({ message: `Imported ${imported} reference${imported > 1 ? 's' : ''} from ORCID.`, color: 'teal' })
-      else notify({ message: 'No references could be imported from that ORCID record.', color: 'orange' })
+      if (imported > 0 && errors.length === 0) {
+        notify({ message: `Imported ${imported} reference${imported > 1 ? 's' : ''} from ORCID.`, color: 'teal' })
+      } else if (imported > 0) {
+        notify({ message: `Imported ${imported} reference${imported > 1 ? 's' : ''} from ORCID — ${errors.length} selected work${errors.length > 1 ? 's' : ''} could not be imported: ${errors.join('; ').slice(0, 240)}`, color: 'orange' })
+      } else {
+        notify({ message: `No references could be imported from that ORCID record. ${errors.join('; ').slice(0, 240) || 'Check your connection.'}`, color: 'orange' })
+      }
       onClose()
       if (imported > 0) onImported()
     } catch (e) {

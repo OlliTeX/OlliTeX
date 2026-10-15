@@ -50,6 +50,19 @@ func orcidTimeoutCtx(ctx context.Context) (context.Context, context.CancelFunc) 
 	return context.WithTimeout(ctx, 10*time.Second)
 }
 
+// fetchBibTotalCtx — the fetch-bib chain is the ONLY multi-hop endpoint:
+// ORCID work fetch (10 s per-hop) followed by the DOI resolution fetch
+// (10 s per-hop), each with up to 5 redirects. Node gave EVERY fetch its
+// own 10_000 ms AbortController (per-hop), so the worst-case Node budget
+// was ~20 s. This port must not cap the WHOLE chain at one 10 s window
+// (a slow-but-healthy DOI hop used to hard-fail and the UI dropped the
+// work silently — 2026-10-15 "selected 3, only 1 imported" report).
+// 30 s total = Node per-hop worst case (2×10 s) + redirect margin;
+// per-hop timeouts inside safeFetch remain 10 s.
+func fetchBibTotalCtx(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, 30*time.Second)
+}
+
 func fail502(res *core.Res, err error) {
 	msg := "OrCID request failed"
 	if e, ok := err.(orcidErr); ok {
@@ -116,7 +129,7 @@ func hFetchBib(a *core.App) func(cxt *core.Cxt, res *core.Res) {
 			res.JSON(400, []byte(`{"error":"putCode query parameter required"}`))
 			return
 		}
-		ctx, cancel := orcidTimeoutCtx(cxt.Req.Context())
+		ctx, cancel := fetchBibTotalCtx(cxt.Req.Context())
 		defer cancel()
 		bib, err := fetchBibtexFromOrcid(ctx, orcid, putCode)
 		if err != nil {
