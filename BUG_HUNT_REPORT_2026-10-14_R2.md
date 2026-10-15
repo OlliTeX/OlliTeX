@@ -6,7 +6,7 @@ concurrency (race detector), frontend XSS sinks, user enumeration.
 
 ## CONFIRMED FINDING (round 2)
 
-### BH-4 — github-sync server-URL surface = unguarded SSRF/oracle dial — MED-HIGH (owner adjudication)
+### BH-4 — github-sync server-URL surface = unguarded SSRF/oracle dial — MED-HIGH (owner adjudication) → **IMPLEMENTED (surgical, owner-approved)**
 **Surface:** `ghsync` (web feature) → `githubinterface` (`git` via argv — no shell injection; `shellQuote`
 askpass escaping verified correct). User-controllable dials with **scheme-only** vetting
 (`gsAssertHttpServerUrl` — http/https only, no range/name/DNS checks):
@@ -29,6 +29,16 @@ that are never a legitimate user git host — **127/8, 169.254/16, 0/8, ::** (lo
 scheme-only check → faithful legacy risk.
 **Pin (permanent spec):** `tests/e2e/specs/ghsync-url-surface.test.e2e.ts` (1 test, GREEN, self-cleaning)
 — header carries the ⚑ owner flag. Board: **TODO-<pending>** below.
+
+**RESOLVED (owner approved the surgical recommendation, 2026-10-14):** `gsAssertHttpServerUrl` now
+blocks literal-IP hosts in **0/8, 127/8, 169.254/16 (v4) and ::, ::1, fe80::/10 (v6)** at parse time
+(no dial, no response oracle, synchronous 400 "blocked host") while **allowing RFC1918, ULA, public
+IPs and hostnames** (the legit self-hosted-git trust model). `testServerHandler` — the hidden gap
+(inline URL + saved creds, no guard) — is now guarded too; import/export are transitively covered
+(unsaved URLs rejected at cred resolution). Unit tests (all edges) + flipped pin spec (blocked legs
+sync-400 + RFC1918 forgejo STILL DIALED = feature preserved; 2/2 GREEN on ag-68).
+`sync-conflict-git-hosts` 4/4 GREEN on ag-68 = github/forgejo/gitea full sync + conflict arc intact.
+Battery ag-68 in flight as the global proof.
 
 ## SECONDARY NOTES (recorded, no defect claimed / low)
 - **R2-1 (code-verified):** password-reset `POST /user/password/reset` returns **three distinguishable

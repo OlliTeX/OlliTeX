@@ -2246,3 +2246,19 @@ args (no filename injection); historyv1 zip = write-only; crypto/rand at every s
 only (active S3 persistor = keys verbatim, no cross-project keys); git-bridge per-repo token gate = recorded good defense.
 Recorded in `BUG_HUNT_REPORT_2026-10-14_R2.md`. **No product changes this round** (awaiting owner on BH-4).
 **World state: ag-67** (unchanged; all probe state verified removed from mongo + spec self-cleaning).
+
+### BH-4 closeout (round-2 SSRF/oracle — owner approved surgical guard; 2026-10-14/15)
+**Implemented (commit 2b1c83d2, baked ag-68):** `gsAssertHttpServerUrl` surgical literal-IP veto — BLOCK
+0/8 + 127/8 + 169.254/16 (v4) and :: + ::1 + fe80::/10 (v6) at parse time (no dial, no response oracle,
+synchronous 400 "blocked host"); ALLOW RFC1918/ULA/public/names (the self-hosted-git feature kept working).
+`testServerHandler` now guarded (hidden gap: inline URL + saved PAT, unguarded dial). import/export transitively
+covered (live-verified in round 2: unsaved URL rejected at cred resolution before any dial).
+**Verified:** unit tests (all edges incl. ::ffff:127.0.0.1, fe80%zone) GREEN on ag-68; pin spec flipped
+`specs/ghsync-url-surface.test.e2e.ts` 2/2 GREEN (blocked legs sync-400 + RFC1918 forgejo STILL DIALED = feature
+preserved); `sync-conflict-git-hosts` 4/4 GREEN (github/forgejo/gitea full sync + conflict arc intact).
+**BATTERY ag-68: 676 passed / 1 failed / 1 flaky / 4 skipped** — failed = known EXTERNAL Dropbox token expiry
+(owner action, non-code); flaky = known notifications load flake (retry-green). **ZERO new failures = BH-4 zero
+collateral.** Board TODO-2f5828a3 → done. **All four bug-hunt findings (BH-1..BH-4) closed** — every finding
+owned, fixed, pinned, and battery-proven; the round-2 secondary records (R2-1..R2-11) stand as recorded.
+**World state: ag-68** (current). Remaining owner actions: Dropbox token regeneration (TODO-e62d1b55);
+notifications flake instrument (TODO-bf901b66).
