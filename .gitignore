@@ -85,3 +85,6 @@ old_requests.md
 !public/static/svgedit/extensions/node_modules/browser-fs-access/*
 !public/static/svgedit/extensions/node_modules/browser-fs-access/dist/
 !public/static/svgedit/extensions/node_modules/browser-fs-access/dist/*
+
+# live-instance credential files (plaintext secrets — never commit; see credentials-live/)
+credentials-live/

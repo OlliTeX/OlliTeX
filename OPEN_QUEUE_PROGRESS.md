@@ -2337,3 +2337,29 @@ error = immediate next diagnostic.
 Battery ag-69 (full product): **677 passed / 1 failed (external: Dropbox token expired — known owner action
 TODO-e62d1b55) / 4 skipped** — zero collateral from the NTF-UI-1 fix; NTF-UI-1 board → closeable on the
 ag-70 battery (which re-proves it plus carries the ORCID fixes).
+
+### ORCID — LIVE DEPLOY + LIVE PROOF (2026-10-15, owner green-lit "(b) please!" + "(a) create your own dev account")
+- **Live topology mapped:** compose project `ollitex-toolkit` (`toolkit/compose.yaml`), service `ollitex-web`
+  (image pin `WEB_IMAGE` in `toolkit/.env`); data stores = separate raw projects `overleafmongo`/`overleafredis`
+  (5 days, untouched); haproxy = TLS facade.
+- **Cutover:** `WEB_IMAGE` ag-v53 (`ollitex/ollitex:main`) → **`olpsint/overleaf:ag-70`**, recreate web only.
+  ⚠ **Incident (self-inflicted, recovered):** orphaned docker-proxy held 127.0.0.1:27017 → 503 window ~35 min
+  (real user traffic). Recovery: orphan proxy killed (target IP verified dead), twin mongo/redis (accidental,
+  Created, never started) removed, ag-70 web started (mongo/redis reachable, health green), haproxy restarted
+  (IP re-resolve). Rollback: `WEB_IMAGE=ollitex/ollitex:main` + recreate (ag-v53 image retained).
+- **Post-deploy proof:** bundle forensics (hub build of 2026-10-15; ORCID toast string in fr/it catalogs + hub
+  source-map; NTF strings in source-map + catalogs) + /login 200 external.
+- **LIVE accounts bootstrapped** (live DB had **zero users** — no owner account/data on this instance; no public
+  registration route in this build): (1) instance-configured admin `overleaf@uni-bremen.de` (env password — was
+  401 because the account never existed, not a wrong password), (2) agent dev account
+  `agent.dev+ollitex@protonmail.com` (credentials: `credentials-live/agent-account.json`, chmod 600, gitignored).
+  Doc shape = the app's own `NewUserDoc()` + adminusers fields; bcrypt cost 12.
+- **LIVE ORCID proof (owner's exact flow, dev account):** hub → library → Add reference → ORCID → search
+  "carol davis" → Browse works → 3 DOI-works → **Import (3) → toast "Imported 3 references from ORCID." → 3 rows
+  in `libraryreferences` → cleaned up (0 left).** Green in 1.7 min.
+- **Battery ag-70 FINAL: 678 PASS / 1 FAIL (external Dropbox token, owner TODO-e62d1b55) / 1 FLAKY (journey L4
+  cold first-compile race — known family) / 4 SKIP** — NTF-UI-1 + ORCID specs green in-battery; zero collateral.
+- **Observed (not regressions):** live /login rate-limit window after ~8-9 attempts (CE parity; unified
+  `invalid-password-retry-or-reset`; true over-limit = 429 per core/limiter.go) — do not hammer live /login;
+  empty /project → 404 (body renders); `/library/references?q=` missed fresh import (rows exist) — candidate quirk.
+- **Board:** TODO-5ae8a06a → done (full evidence in board body). Throwaway live-spec + probes removed.
