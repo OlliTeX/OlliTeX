@@ -2262,3 +2262,23 @@ collateral.** Board TODO-2f5828a3 → done. **All four bug-hunt findings (BH-1..
 owned, fixed, pinned, and battery-proven; the round-2 secondary records (R2-1..R2-11) stand as recorded.
 **World state: ag-68** (current). Remaining owner actions: Dropbox token regeneration (TODO-e62d1b55);
 notifications flake instrument (TODO-bf901b66).
+
+### Notifications flake arc (2026-10-15) — instrumented to root cause + one REAL product defect found
+**Owner item (TODO-bf901b66, 3rd-occurrence rule) → CLOSED as instrumented. New finding NTF-UI-1 (owner adjudication, TODO-6a2f33cf).**
+Instrumentation chain (all evidence retained in session logs /tmp/notif_*.log): exchange capture (status+body per request),
+pageError/requestfailed listeners, wire dumps, DOM dumps, React fiber probe at rest (consistent: wire↔React↔DOM agree),
+cohort/direction splits (NOT directional — ~50% both ways under hammering), convergence time-series.
+**ROOT CAUSES (spec, fixed):** (1) late-registered waitForRequest + .catch(()=>{}) → in-flight save missed/aborted by the
+hard reload; (2) trailing UI-click restore re-flipped the switch AFTER the wire restore (left B muted after "green" runs —
+cross-suite poison); (3) the restore wrote the UI-semantic value into the WIRE field (inverted write — caught by its own
+mismatching assertion); (4) pre-state was read from the UI (can be the desynced value). **Fix:** wire pre-state (ground
+truth), UI convergence wait with desync recording, deterministic completion-toast save gate, wire-direction self-heal,
+HARD wire persistence contract, UNCONDITIONAL correct wire restore (preState), soft UI-agreement leg.
+**REAL DEFECT FOUND (product, pinned + flagged NTF-UI-1):** the hub mute switch can render the OPPOSITE of the page's OWN
+fetched data (page GET = 200 + correct body, no errors) and hold it 15-18 s under load → a user can save the OPPOSITE
+direction (component saves from local state). Suspect: load() catch path's silent `setEnabled(true)` checked-default.
+Data contract intact in every capture. Owner call: fix the hub surface (surface load failures / no default render) vs accept pin.
+**Verification:** 3/3 battery-context rounds × (notifications + notifications-full) = 21/21 GREEN; world B starts and ends
+UNMUTED every round (restore correctness proven); every desync occurrence is captured as 'NTF-UI-1 DESYNC' annotated lines
+in the battery log (evidence accumulates for the owner).
+**World state: ag-68** (unchanged — spec-only changes; no bake needed). B baseline: UNMUTED (receiver-suite safe).
