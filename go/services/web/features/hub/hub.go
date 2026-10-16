@@ -39,6 +39,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -169,6 +170,7 @@ func hubPage(a *core.App) func(*core.Cxt, *core.Res) {
 		uid := cxt.Sess.UserIDHex()
 		udoc, aceRaw, ok := loadUserDoc(a, ctx, uid)
 		if !ok {
+			log.Printf("web: /hub 500 — loadUserDoc failed (uid=%s)", uid)
 			res.SendStatus(500)
 			return
 		}
@@ -1183,23 +1185,33 @@ func loadUserDoc(a *core.App, ctx context.Context, uid string) (map[string]any, 
 	if err != nil {
 		return nil, nil, false
 	}
-	oid, err := bson.ObjectIDFromHex(uid)
-	if err != nil {
-		return nil, nil, false
+	users := db.Collection("users")
+	// ag-72 (2026-10-15 live incident davrot@ /hub 500): SSO JIT users can
+	// carry _id as a 24-hex STRING (SaaS-legal; ssoUserIDFilter documents
+	// "string-hex _id docs exist (SSO-created users)" — probe-verified
+	// 2026-10-06 that driver v2 filters match _id strictly by type). Node
+	// parity: mongoose _id lookups are type-tolerant. ObjectID-first,
+	// string-fallback — the exact pattern finishlogin.go already follows.
+	idFirst := any(uid)
+	if o, e := bson.ObjectIDFromHex(uid); e == nil {
+		idFirst = o
 	}
+	doc := map[string]any{}
+	if err := users.FindOne(ctx, bson.D{{Key: "_id", Value: idFirst}}).Decode(&doc); err != nil {
+		if err := users.FindOne(ctx, bson.D{{Key: "_id", Value: uid}}).Decode(&doc); err != nil {
+			return nil, nil, false
+		}
+	}
+	// ace probe: use the STORED _id value (the resolved type) so the typed
+	// filter always matches, whatever the doc's _id shape is.
 	var aceRes struct {
 		Ace *bson.Raw `bson:"ace"`
 	}
 	var aceRaw bson.Raw
-	if err := db.Collection("users").FindOne(ctx,
-		bson.D{{Key: "_id", Value: oid}},
+	if err := users.FindOne(ctx,
+		bson.D{{Key: "_id", Value: doc["_id"]}},
 		options.FindOne().SetProjection(bson.D{{Key: "ace", Value: 1}})).Decode(&aceRes); err == nil && aceRes.Ace != nil {
 		aceRaw = *aceRes.Ace
-	}
-	doc := map[string]any{}
-	if err := db.Collection("users").FindOne(ctx,
-		bson.D{{Key: "_id", Value: oid}}).Decode(&doc); err != nil {
-		return nil, nil, false
 	}
 	return core.LooseDoc(doc), aceRaw, true
 }

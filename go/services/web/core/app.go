@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	i18nlib "ollitex/go/libraries/i18n"
 	"ollitex/go/pbhttp"
@@ -316,12 +317,14 @@ func (a *App) RegisterFeature(f Feature) { a.feats = append(a.feats, f) }
 type recWriter struct {
 	http.ResponseWriter
 	written bool
+	code    int // first WriteHeader code seen (0 = not yet set; 200 implied)
 }
 
 func (w *recWriter) WriteHeader(code int) {
 	if !w.written {
 		w.ResponseWriter.WriteHeader(code)
 		w.written = true
+		w.code = code
 	}
 }
 
@@ -351,6 +354,18 @@ func (a *App) Handler() http.Handler {
 		// bare client-connection reset (the B9 otc-decode path). Node models
 		// the same with express error middleware.
 		defer RecoverPanic(rw)
+		// Request log (owner request 2026-10-15: "Maybe improve the
+		// logging?") — one line per request: method, path, status, duration.
+		// Panics additionally log their stack via RecoverPanic. No bodies,
+		// no secrets.
+		start := time.Now()
+		defer func() {
+			code := rw.code
+			if code == 0 {
+				code = http.StatusOK
+			}
+			log.Printf("web: %s %s -> %d (%d ms)", r.Method, r.URL.Path, code, time.Since(start).Milliseconds())
+		}()
 		// D22 A2: the Prometheus scrape surface — the ONLY route that bypasses
 		// the core pipeline (no session/CSRF/static/CSP): Prometheus scrapers
 		// are stateless and this port is docker-internal (the HAProxy edge
